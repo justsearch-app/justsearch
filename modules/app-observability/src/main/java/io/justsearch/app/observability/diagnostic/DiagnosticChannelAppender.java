@@ -56,8 +56,8 @@ public final class DiagnosticChannelAppender extends UnsynchronizedAppenderBase<
 
   /**
    * Constructs the appender against the registry + a single-channel catalog. V1 ships
-   * exactly one DiagnosticChannel (the {@code HeadLogDiagnosticChannelCatalog}'s
-   * {@code core.head-log}); the appender publishes every (non-marker-filtered) log event
+   * exactly one DiagnosticChannel (the {@code EngineLogDiagnosticChannelCatalog}'s
+   * {@code core.engine-log}); the appender publishes every (non-marker-filtered) log event
    * to that channel. Multi-channel routing (one log event fanned to multiple channels by
    * sub-category) is a phase-5+ concern and would extend the catalog parameter to a list.
    */

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -27,7 +28,7 @@ class AgentCitationResolverNumberingTest {
   private static DocumentService docsReturning(DocumentService.CitationMatchResult result) {
     return new DocumentService() {
       @Override
-      public CompletionStage<DocumentRecord> fetch(String docId) {
+      public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
         return CompletableFuture.completedFuture(null);
       }
 
@@ -36,7 +37,10 @@ class AgentCitationResolverNumberingTest {
       // `matchCitations` overload here would leave this fake silently unreached.
       @Override
       public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-          String answerText, List<VerificationSource> sources, double threshold) {
+          String answerText,
+          List<VerificationSource> sources,
+          double threshold,
+          EngineContext engineContext) {
         return CompletableFuture.completedFuture(result);
       }
     };
@@ -67,7 +71,7 @@ class AgentCitationResolverNumberingTest {
 
     var cites =
         new AgentCitationResolver(docsReturning(result))
-            .resolve("A sentence.", twoPassagesOfOneDoc())
+            .resolve("A sentence.", twoPassagesOfOneDoc(), EngineContextTestFixtures.AGENT_LOOP)
             .cites();
 
     assertEquals(1, cites.size());
@@ -94,7 +98,7 @@ class AgentCitationResolverNumberingTest {
 
     var cites =
         new AgentCitationResolver(docsReturning(result))
-            .resolve("A sentence.", twoPassagesOfOneDoc())
+            .resolve("A sentence.", twoPassagesOfOneDoc(), EngineContextTestFixtures.AGENT_LOOP)
             .cites();
 
     assertTrue(cites.isEmpty(), "59 addresses no source in a 2-source answer, so no mark is minted");

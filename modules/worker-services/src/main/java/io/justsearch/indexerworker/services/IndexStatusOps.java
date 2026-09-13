@@ -54,7 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Status reporting helper for {@link GrpcIngestService}.
+ * Status reporting helper for {@link WorkerIngestService}.
  *
  * <p>Builds the {@link StatusResponse} for the {@code indexStatus} RPC, encapsulating
  * compatibility checking, fingerprint comparison, queue health aggregation, and all
@@ -445,10 +445,19 @@ final class IndexStatusOps {
             .setLastCommitTimestamp(indexingLoop == null ? 0L : indexingLoop.getLastCommitTime())
             // Tempdoc 885 item 3: signal_bus_activity_ts is no longer populated. The Worker no
             // longer reads the Head-written activity byte at all (foreground load is observed
-            // in-process), so reporting it would be reporting a value nothing acts on. The proto
-            // field stays declared — removing it is a wire break, and lane F deletes the MMF
-            // activity byte and this field together.
-            .setSignalBusHeartbeatTs(signalBus.readHeartbeat())
+            // in-process), so reporting it would be reporting a value nothing acts on.
+            //
+            // Lane F item A10: signal_bus_heartbeat_ts joins it, for the stronger reason that the
+            // heartbeat no longer exists. It was the Head process writing "I am still alive" into
+            // the memory-mapped region; inside one JVM there is no second process to have written
+            // it, and reporting System.currentTimeMillis() here would have been a liveness claim
+            // manufactured by its own reader. Both proto fields stay declared (they are the other
+            // half of a message this JVM now passes to itself) and both stay at their zero default.
+            //
+            // Lane F item A16 removed their last PROJECTION: WorkerStatusMapper used to copy both
+            // into a SignalBusView on /api/debug/state, so the endpoint published two permanent
+            // zeros as if they were readings. The sub-object is gone from the response, the record
+            // and its schema; the fields end here.
             .setUptimeMs(System.currentTimeMillis() - signalBus.startupTime())
             .setIndexSizeBytes(cachedIndexSizeIfFreshOrRefresh())
             .setPendingEmbeddingCount(

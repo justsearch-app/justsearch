@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tempdoc": 627,
-  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption. Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel.",
+  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption. Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel. Lane F stage A item A11 retired the Worker entry (`status: \"retired\"`): the Worker is no longer a process, and the Engine's own supervisor contract lands at stage B (design 7.1). A retired entry is skipped by assertions (1) and (3) and still checked by (2). It is skipped by (3) on purpose: the guards a retired row names were deleted with the thing they guarded, so resolving them would fail the build for the retirement itself — see the Worker entry's `guardsNote` for which of its FQCNs no longer exist. Lane F stage B item B7 added the `engine` row that replaces it, and two things about that row are different in kind rather than in degree. FIRST, the register is the AUTHORITY for it, not a declaration OF code: the Engine's supervisor is deliberately not a JVM (7.1's `never`), so both implementations READ these numbers at runtime — the dev-runner parses this file, the Tauri shell embeds it with include_str! — and the Java `EngineSupervisionPolicy` is a mirror kept honest by `EngineSupervisionPolicyTest`, which the row names in `driftCheck` because the module edge forbids `SupervisionContractTest` from importing it. SECOND, a guard may now be a repo-relative PATH as well as an FQCN, because the tests that exercise this row are a Node conformance harness and a Rust `#[cfg(test)]` table; the path still has to exist. The row also carries two things the older rows do not: `exitCodes` (a projection of `io.justsearch.app.engine.EngineExit`, drift-checked in both directions) and `conformanceCases` (the case list `scripts/supervisor-conformance/contract.mjs` and `modules/shell/src-tauri/src/supervisor.rs`'s decision-table tests BOTH read, so 'one contract, two implementations' is a fact about one list rather than two lists that agree today).",
   "guardSentinels": [
     "dev-stack-smoke",
     "audit-verdict"
@@ -25,12 +25,13 @@
         "baseCooldownMs": 1000,
         "maxCooldownMs": 30000,
         "stabilityWindowMs": 300000,
-        "hangUnhealthyThreshold": 3
+        "hangUnhealthyThreshold": 3,
+        "note": "HISTORICAL as of A11: these were SupervisionPolicy.DEFAULT_* when the Worker was a process. Nothing asserts them against code any more because the record is deleted. Stage B declares the Engine supervisor's own numbers."
       },
       "faultModes": [
         {
           "mode": "clean-exit",
-          "detection": "1s death monitor (WorkerSpawner.checkWorkerHealth: !process.isAlive())",
+          "detection": "(historical, A11) 1s death monitor (WorkerSpawner.checkWorkerHealth: !process.isAlive())",
           "recovery": "respawn (no graceful stop — process already gone), shared restart budget",
           "terminalState": "capability DEGRADED + worker.restart_exhausted after cap",
           "guards": [
@@ -39,7 +40,7 @@
         },
         {
           "mode": "hang",
-          "detection": "gRPC health-failure streak (KnowledgeServerBootstrap.checkHealth -> WorkerSpawner.recordHealthResult, 10s poll, threshold 3) while the process is alive",
+          "detection": "(historical, A11) gRPC health-failure streak (KnowledgeServerBootstrap.checkHealth -> WorkerSpawner.recordHealthResult, 10s poll, threshold 3) while the process is alive",
           "recovery": "graceful signal-bus stop then respawn, shared restart budget",
           "terminalState": "capability DEGRADED + worker.restart_exhausted after cap",
           "guards": [
@@ -48,7 +49,7 @@
         },
         {
           "mode": "oom",
-          "detection": "1s death monitor (OOM exits the JVM non-zero -> seen as process death; -XX:+HeapDumpOnOutOfMemoryError dumps)",
+          "detection": "(historical, A11) 1s death monitor (OOM exits the JVM non-zero -> seen as process death; -XX:+HeapDumpOnOutOfMemoryError dumps)",
           "recovery": "respawn (OOM is not distinguished from clean death by the decision)",
           "terminalState": "capability DEGRADED + worker.restart_exhausted after cap (recurring OOM trips the cap)",
           "guards": [
@@ -59,23 +60,22 @@
         },
         {
           "mode": "zombie",
-          "detection": "worker-side heartbeat suicide-pact (MmfWorkerSignalBus.shouldDie, 5s stale, 15s grace) corroborated by Head-PID liveness (WorkerLivenessDecision, tempdoc 630) + Windows Job Object KILL_ON_JOB_CLOSE",
+          "detection": "(historical, A11) worker-side heartbeat suicide-pact (MmfWorkerSignalBus.shouldDie, 5s stale, 15s grace) corroborated by Head-PID liveness (WorkerLivenessDecision, tempdoc 630) + Windows Job Object KILL_ON_JOB_CLOSE",
           "recovery": "worker self-exits when the heartbeat is stale AND Head's PID is dead (or no PID signal — standalone/legacy); OS force-kills on Head crash (Windows). Heartbeat-only on Linux/macOS where the Job Object is absent.",
           "terminalState": "worker process exits (no orphan outliving a dead Head)",
-          "livenessContinuity": "tempdoc 630: a stale heartbeat is only actionable if Head was continuously live during the measurement window. A stale beat ALONE no longer kills — it must be corroborated by Head-PID death (WorkerLivenessDecision.HeadLiveness != ALIVE), because an OS suspend/resume produces a benign stale beat while Head (its PID persisting across suspend) is alive. UNKNOWN (no PID forwarded — standalone/tests) preserves the pre-630 heartbeat-only behavior. Guard: WorkerLivenessDecisionTest.",
+          "livenessContinuity": "(historical, A10/A11) tempdoc 630: a stale heartbeat is only actionable if Head was continuously live during the measurement window. A stale beat ALONE no longer kills — it must be corroborated by Head-PID death (WorkerLivenessDecision.HeadLiveness != ALIVE), because an OS suspend/resume produces a benign stale beat while Head (its PID persisting across suspend) is alive. UNKNOWN (no PID forwarded — standalone/tests) preserves the pre-630 heartbeat-only behavior. Guard: WorkerLivenessDecisionTest.",
           "guards": [
-            "io.justsearch.systemtests.ChaosSuiteTest",
             "io.justsearch.app.util.WindowsJobObjectTest",
             "io.justsearch.indexerworker.loop.WorkerLivenessDecisionTest"
           ],
-          "note": "Real-process coverage is opt-in systemTest (ChaosSuiteTest.workerDiesWhenHeartbeatStale) + WindowsJobObjectTest.assign_killsChildOnClose. The suspend/resume false-suicide is guarded fast in-process by WorkerLivenessDecisionTest (stale beat + Head ALIVE => no suicide)."
+          "note": "(historical, A12) Real-process coverage WAS opt-in systemTest (ChaosSuiteTest.workerDiesWhenHeartbeatStale) + WindowsJobObjectTest.assign_killsChildOnClose. Both are gone: WindowsJobObjectTest at A11 with the job object, ChaosSuiteTest at A12 — its watchdog, signal-noise and stale-port cases asserted the heartbeat suicide pact and the MMF port handshake, and A10 deleted the bus that carried both, so there was nothing left for them to be true about. Its one surviving arm (the foreground duty cycle) moved in-process to app-engine EngineForegroundPacingTest. The suspend/resume false-suicide guard WorkerLivenessDecisionTest went at A10 with WorkerLivenessDecision itself."
         },
         {
           "mode": "partial-boot",
-          "detection": "awaitPort timeout (spawned but never published gRPC port), or PID validation exhausting its window (PidValidationTimeoutException) — the confirmed 821 §O.4 signature",
+          "detection": "(historical, A11) awaitPort timeout (spawned but never published gRPC port), or PID validation exhausting its window (PidValidationTimeoutException) — the confirmed 821 §O.4 signature",
           "recovery": "initial boot: KnowledgeServerBootstrap.startWithRetry re-attempts transient failures (3 attempts, supervision-vetoed). If those are exhausted the bootstrap is NO LONGER discarded (tempdoc 825): KnowledgeServerHealthMonitor is constructed regardless of outcome and takes its boot-recovery arm — a bounded, backed-off re-attempt sequence under BootRecoveryPolicy (4 attempts, 10s doubling to 60s) decided by the pure BootRecoveryDecision, holding the capability at RECOVERING for the arc so a boot that ultimately succeeds narrates no flap. On success the monitor performs the HeadAssembly/LocalApiServer handover. Restart path: doRestart reaps the port-less orphan (stopProcess graceful); next supervision tick restarts or gives up from a clean slate.",
           "terminalState": "capability DEGRADED + worker.spawn_recovery_exhausted once the boot-recovery budget is spent (distinct from supervision's worker.restart_exhausted, which boot recovery may never supersede — see recoveryAuthorityBoundary); no port-less zombie holding the data-dir lock",
-          "recoveryAuthorityBoundary": "Tempdoc 825 §D5 decision 2: BootRecoveryDecision governs ONLY the never-started state and stands down — without narrating — when supervision engaged during the failing attempt (KnowledgeServerBootstrap.supervisionEngagedOnLastAttempt) or already declared worker.restart_exhausted. So the two authorities never both hold the restart budget, and supervision's terminal verdict stays terminal.",
+          "recoveryAuthorityBoundary": "HISTORICAL: tempdoc 825 §D5 separated never-started recovery from the former Worker supervisor's restart budget. Lane F stage B B14 removes the obsolete local vetoes; the live Engine supervisor owns process replacement and local bootstrap recovery owns initial component activation.",
           "guards": [
             "io.justsearch.app.services.worker.BootRecoveryDecisionTest",
             "io.justsearch.app.services.worker.KnowledgeServerBootRecoveryTest",
@@ -83,7 +83,11 @@
           ],
           "note": "BootRecoveryDecisionTest pins the decision law (budget, backoff, both vetoes, narrate-once); KnowledgeServerBootRecoveryTest drives a real bootstrap against an empty temp dir through the monitor's arm. The orphan reap lives in WorkerSpawner.doRestart's failure path; exercising THAT needs a real spawn that never publishes a port — still a dev-stack smoke."
         }
-      ]
+      ],
+      "status": "retired",
+      "retiredAt": "lane-F/stage-A/A11 (2026-09-07)",
+      "guardsNote": "HISTORICAL as of A11, and deliberately not resolvable. Three of the guard FQCNs below name test classes deleted with the code they pinned: `io.justsearch.app.services.worker.SupervisionDecisionTest` (clean-exit, hang, oom) and `io.justsearch.app.util.WindowsJobObjectTest` (zombie) went at A11; `io.justsearch.indexerworker.loop.WorkerLivenessDecisionTest` (zombie) went at A10 with WorkerLivenessDecision itself, whose only production consumer was MmfWorkerSignalBus.shouldDie — the suicide pact has no reader inside one JVM. They are kept verbatim so the row still records what USED to guard each fault mode; SupervisionContractTest.everyGuardResolves skips a retired entry, which is what stops them failing the build. Item A12 then deleted the fourth, `io.justsearch.systemtests.ChaosSuiteTest` (zombie), and removed it from the guard list rather than keeping it verbatim: unlike the three above it was not deleted WITH the code it pinned, it was deleted because A10 had already removed the heartbeat bus its watchdog cases read, so it had stopped guarding anything. The ones that DO still resolve are `io.justsearch.app.services.worker.{BootRecoveryDecisionTest,KnowledgeServerBootRecoveryTest}` (partial-boot), because A11 kept the boot-recovery arm. Stage B's replacement entry must name guards that resolve, since it will not be retired.",
+      "retiredNote": "retired at lane F stage A: the Worker is no longer a process; the Engine's supervisor contract lands at stage B (design 7.1). The row is kept rather than deleted so the register still records what the split gave and what stage A deliberately gave up (stage A §10: no crash detection, no restart budget, no cooldown, no stability window; a crashed Engine stays down until the user restarts it). Its `authority` (SupervisionPolicy) and `decisionSeam` (SupervisionDecision) were deleted with WorkerSpawner at A11, so SupervisionContractTest skips the live-policy equality check for a retired entry — the Brain's check is unaffected and still runs. When stage B gives the Engine a supervisor, this entry is replaced (not un-retired): the supervised thing is a different thing."
     },
     {
       "id": "brain",
@@ -144,6 +148,353 @@
           "guards": [
             "io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest"
           ]
+        }
+      ]
+    },
+    {
+      "id": "engine",
+      "role": "Engine (the one JVM: API, index, encoders)",
+      "authority": "io.justsearch.app.engine.EngineSupervisionPolicy",
+      "authorityNote": "The register is the AUTHORITY and the Java class is the MIRROR, which is the inverse of the brain row. The Engine's supervisor is deliberately not a JVM (design 7.1 'never'), so its two implementations read these numbers at runtime — the dev-runner through scripts/dev/lib/engine-supervisor.cjs, the Tauri shell through include_str! + serde in modules/shell/src-tauri/src/supervisor.rs. EngineSupervisionPolicy exists so the drift check has a subject on the Java side; it is a pure constant holder with no production caller, and saying that here is cheaper than letting a reader infer a consumer that does not exist.",
+      "decisionSeam": "scripts/dev/lib/engine-supervisor.cjs::decide + modules/shell/src-tauri/src/supervisor.rs::decide",
+      "driftCheck": "io.justsearch.app.engine.EngineSupervisionPolicyTest",
+      "driftCheckNote": "Not in SupervisionContractTest, unlike the brain row, and the reason is a module edge: that test lives in app-services, and the dependency runs app-engine -> app-services (modules/app-engine/build.gradle.kts). A test-only edge back would invert it. SupervisionContractTest.everyLiveProcessHasADriftCheck therefore requires a live row to EITHER be checked in that class or name a resolvable driftCheck here, which keeps 'cannot be skipped by omission' without inverting the edge.",
+      "policy": {
+        "maxRestartAttempts": 3,
+        "cooldownIncrementMs": 1000,
+        "maxCooldownMs": 5000,
+        "stabilityWindowMs": 300000,
+        "stabilityWindowCountedFrom": "ready",
+        "startDeadlineMs": 120000,
+        "gracefulStopDeadlineMs": 15000,
+        "hangPollIntervalMs": 10000,
+        "hangUnhealthyThreshold": 3,
+        "note": "Stage B §2's re-cut of the 627 seeds, for one process instead of a child behind a live API. The cooldown FLOOR is not a number: it is the process handle closing, which the death path waits for anyway and which Windows makes load-bearing. Above that floor the ramp is LINEAR (+cooldownIncrementMs per attempt), not exponential, because with one process the cooldown is dead-API time and the restart COUNT is what bounds a crash loop. maxCooldownMs does not bind at maxRestartAttempts 3 (the ramp reaches 3000 ms on the last attempt); it bounds the ramp if the attempt budget is ever raised, and the conformance case cooldown-ceiling-binds-when-budget-raised is the only place it is exercised. stabilityWindowMs is counted from `ready`, not from spawn, because the Engine's boot carries the encoder load. hangPollIntervalMs and hangUnhealthyThreshold are PLACEHOLDERS set with the collector at stage E (design 7.1): health and indexing allocation share one heap, so interval x count must exceed the worst safepoint pause the soak observes. A test may assert the hang path fires; no test may assert it fires within a tuned budget."
+      },
+      "harnessOverrides": {
+        "flag": "JUSTSEARCH_SUPERVISOR_HARNESS",
+        "overridable": [
+          "stabilityWindowMs",
+          "maxCooldownMs",
+          "cooldownIncrementMs",
+          "startDeadlineMs",
+          "gracefulStopDeadlineMs",
+          "hangPollIntervalMs",
+          "hangUnhealthyThreshold"
+        ],
+        "note": "A 300 s stability window and a multi-second cooldown make the conformance harness unrunnable in CI, so both implementations accept per-run overrides — but ONLY when the flag above is set to 1 in the same environment. Setting an override alone is inert. That is asserted in both implementations (engine-supervisor.test + supervisor.rs's overrides_are_inert_without_the_harness_flag) so the product path cannot pick a test value up by accident from an inherited environment."
+      },
+      "exitCodes": [
+        { "code": 4, "name": "REQUESTED_RESTART", "class": "REQUESTED" },
+        { "code": 0, "name": "OK", "class": "REQUESTED" },
+        { "code": 1, "name": "FATAL_OR_UNCAUGHT", "class": "TRANSIENT" },
+        { "code": 2, "name": "DATA_DIR_LOCKED", "class": "NON_TRANSIENT" },
+        { "code": 3, "name": "OUT_OF_MEMORY", "class": "TRANSIENT" }
+      ],
+      "unknownExitClass": "TRANSIENT",
+      "exitCodesNote": "A projection of io.justsearch.app.engine.EngineExit (stage B item B1), which is the code that produces these integers. It is duplicated here rather than parsed out of Java by two non-JVM readers, and EngineSupervisionPolicyTest fails the build if the two disagree — including if EngineExit gains a constant this list does not carry. scripts/supervisor-conformance/contract.mjs re-checks the same agreement at harness start, so the harness refuses to run on drift without waiting for Gradle. unknownExitClass is TRANSIENT on purpose: a wrong retry costs one cooldown, a wrong `exhausted` costs the product.",
+      "faultModes": [
+        {
+          "mode": "clean-exit",
+          "detection": "child exit observed by the supervisor (dev-runner: the `exit` event on the spawned Engine; Tauri: the supervision thread's try_wait over BackendState.child)",
+          "recovery": "classified by exit code (exitCodes above). REQUESTED stops supervising; TRANSIENT restarts after handle release plus the linear cooldown, counted; NON_TRANSIENT goes to `exhausted` at once with the reason.",
+          "terminalState": "ENGINE_RESTART_EXHAUSTED in <dataDir>/runtime/supervisor.v1.json, with the last exit reason",
+          "guards": [
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
+          ]
+        },
+        {
+          "mode": "hang",
+          "detection": "in `running` only: consecutive failures of GET /api/health on the manifest port while the process is alive, hangUnhealthyThreshold misses at hangPollIntervalMs. Suspended in `starting` and `stopping`.",
+          "recovery": "write <dataDir>/runtime/shutdown-request.v1.json with reason `hang` and a deadline (gracefulStopDeadlineMs); a JVM that still runs its watcher thread honours it (hang-soft). A whole-JVM wedge ignores it and is force-killed at the deadline (hang-hard). Either way the resulting exit takes the death path and is counted TRANSIENT.",
+          "terminalState": "same as clean-exit once the budget is spent",
+          "guards": [
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
+          ],
+          "note": "The two arms are separate conformance cases on purpose (design 16's `hang, graceful` and `hang, forced` rows): folding them would leave the forced-kill branch unexercised, and that branch is the one a wedged JVM actually needs."
+        },
+        {
+          "mode": "oom",
+          "detection": "child exit with code 3, which the Engine only produces because -XX:+ExitOnOutOfMemoryError is at both spawn sites (item B1). Without the flag an OOM reaches the default uncaught-exception handler and exits 1 — indistinguishable from a boot failure.",
+          "recovery": "TRANSIENT: restart under cooldown, counted. A recurring OOM therefore trips the budget and reaches the terminal state rather than looping.",
+          "terminalState": "ENGINE_RESTART_EXHAUSTED with reason out_of_memory",
+          "guards": [
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
+          ]
+        },
+        {
+          "mode": "zombie",
+          "detection": "not detected by the supervisor, and the honest reading is that it cannot be: with one process there is no peer to hold a heartbeat with (the two-process suicide pact went with the Worker at stage A item A10/A11). What replaces it is ownership: the dev-runner's presence-aware reaper tears an abandoned stack down, and the Tauri shell's Drop/kill_child stops the Engine when the shell exits.",
+          "recovery": "an Engine that outlives its supervisor is reclaimed by the next start's admission path (dev-runner) or killed on shell exit (Tauri); neither is a supervision decision, so `decide` has no arm for it.",
+          "terminalState": "no orphan Engine outliving its supervisor",
+          "guards": [
+            "audit-verdict"
+          ],
+          "note": "Sentinel, and the verdict is stated rather than implied: read at stage B, this row has no live detection mechanism of its own, and the design does not give it one — design 7.1's `never` clause puts the supervisor outside the JVM, so the JVM cannot corroborate its own liveness with it. Tempdoc 630's hardest-won rule (a stale beat ALONE is not a dead peer) is preserved in the retired worker/zombie row above, and the Engine row inherits it as a constraint on any future mechanism rather than as code that exists today."
+        },
+        {
+          "mode": "partial-boot",
+          "detection": "`starting` outlives startDeadlineMs without the essential components reaching `ready` (api and index). Hang detection is suspended in `starting`, so this deadline is the ONLY thing that ends the state.",
+          "recovery": "the same graceful-then-forced stop as a hang (request file with reason `hang`, then the deadline kill), after which the death path classifies the exit and counts it.",
+          "terminalState": "ENGINE_RESTART_EXHAUSTED once the budget is spent",
+          "guards": [
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
+          ],
+          "note": "The per-component start deadlines design 7.6 describes are D1's; this is the one number stage B needs for the `starting` -> `running` edge, and nothing here reads a component vector."
+        },
+        {
+          "mode": "external-adoption",
+          "detection": "Engine startup reads retained schema-v2 managed-child identities before child-capable work and verifies PID, process start time, executable and declared configuration.",
+          "recovery": "A compatible owned llama-server is revalidated and adopted with its handle; incompatible verified children are terminated. Unknown/reused identities are left alone, and uncertain termination blocks replacement. Extraction children are never adopted.",
+          "terminalState": "Adopted child remains monitored; terminal shutdown kills verified owned children and retains incomplete evidence if cleanup fails.",
+          "guards": [
+            "io.justsearch.ui.runtime.ManagedChildReconcilerTest",
+            "io.justsearch.app.inference.ManagedLlamaAdoptionTest",
+            "io.justsearch.ui.runtime.MutableManagedChildRegistryTest"
+          ],
+          "note": "B11/B12 implemented and reviewed 2026-09-08; see docs/design/lane-f-engine-jvm/evidence/B/b11-b12-managed-child-registry.md. The separate unowned external-server compatibility path remains described by the brain row."
+        }
+      ],
+      "conformanceCases": [
+        {
+          "id": "fileless-clean-local-restart-is-not-counted",
+          "faultMode": "clean-exit",
+          "drives": [
+            "decision",
+            "actuator"
+          ],
+          "engine": {
+            "mode": "clean-exit",
+            "exitCode": 4,
+            "exitAfterMs": 600
+          },
+          "observation": {
+            "event": "exit",
+            "exitCode": 4,
+            "requestedReason": null,
+            "restartCount": 2,
+            "state": "running"
+          },
+          "expect": {
+            "action": "restart",
+            "cooldownMs": 0,
+            "counted": false
+          },
+          "why": "A clean local restart remains identifiable if the Engine exits before its host observes the manifest handoff. Neither Engine nor fixture writes a shutdown request."
+        },
+        {
+          "id": "local-handoff-bounds-responsive-close-with-churn",
+          "faultMode": "hang",
+          "drives": ["actuator"],
+          "engine": { "mode": "honour", "localHandoffAfterMs": 800, "churnHandoff": true },
+          "expect": { "action": "restart", "counted": true },
+          "why": "The current Engine announces close while HTTP remains healthy. Stale identity, disappearance and refreshed handoff timestamps cannot cancel or extend its latched deadline; forced death is charged."
+        },
+        {
+          "id": "completed-local-handoff-still-bounds-native-exit",
+          "faultMode": "hang",
+          "drives": ["actuator"],
+          "engine": { "mode": "honour", "localHandoffAfterMs": 800, "localHandoffState": "ready" },
+          "expect": { "action": "restart", "counted": true },
+          "why": "A completed ordered close can still hang in native shutdown hooks. The existing ready handoff bounds process exit without granting a free restart."
+        },
+        {
+          "id": "local-handoff-fatal-exit-remains-counted",
+          "faultMode": "clean-exit",
+          "drives": ["actuator"],
+          "engine": { "mode": "crash", "exitCode": 1, "exitAfterMs": 1700, "localHandoffAfterMs": 800 },
+          "expect": { "action": "restart", "counted": true },
+          "why": "A restart handoff also precedes terminal writer exit 1. Observation must not overwrite host intent or make a fatal close free."
+        },
+        {
+          "id": "stale-local-handoff-cannot-arm-close",
+          "faultMode": "clean-exit",
+          "drives": ["actuator"],
+          "engine": { "mode": "clean-exit", "exitCode": 0, "exitAfterMs": 2800, "localHandoffAfterMs": 800, "staleHandoff": true },
+          "expect": { "action": "stop", "counted": false },
+          "why": "Same PID with a stale per-boot instance cannot arm a close deadline: the healthy Engine must live past that false deadline and reach its own clean exit."
+        },
+        {
+          "id": "clean-exit-0-stops",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "clean-exit", "exitCode": 0, "exitAfterMs": 600 },
+          "observation": { "event": "exit", "exitCode": 0, "requestedReason": null, "restartCount": 0, "state": "running" },
+          "expect": { "action": "stop", "reason": "ok", "counted": false },
+          "why": "An exit the supervisor did not ask for and that says the ordered shutdown ran. Nothing to restart: something else (the HTTP trigger) asked the Engine to stop."
+        },
+        {
+          "id": "crash-1-restarts-under-budget",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "crash", "exitCode": 1, "exitAfterMs": 600 },
+          "observation": { "event": "exit", "exitCode": 1, "requestedReason": null, "restartCount": 0, "state": "running" },
+          "expect": { "action": "restart", "cooldownMs": 1000, "counted": true },
+          "why": "Exit 1 is ambiguous (uncaught-exception handler OR the run catch) and is classified TRANSIENT for that reason — see EngineExit.FATAL_OR_UNCAUGHT."
+        },
+        {
+          "id": "oom-3-restarts-under-budget",
+          "faultMode": "oom",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "oom", "exitCode": 3, "exitAfterMs": 600 },
+          "observation": { "event": "exit", "exitCode": 3, "requestedReason": null, "restartCount": 0, "state": "running" },
+          "expect": { "action": "restart", "cooldownMs": 1000, "counted": true },
+          "why": "The whole point of -XX:+ExitOnOutOfMemoryError: a memory death the supervisor can price, instead of one that reads as a bad config."
+        },
+        {
+          "id": "non-transient-2-exhausts-at-once",
+          "faultMode": "partial-boot",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "boot-fail", "exitCode": 2, "exitAfterMs": 200 },
+          "observation": { "event": "exit", "exitCode": 2, "requestedReason": null, "restartCount": 0, "state": "starting" },
+          "expect": { "action": "exhausted", "reason": "data_dir_locked", "counted": false },
+          "why": "Another instance holds the data-directory lock. Three retries is forty seconds of flapping before the same answer."
+        },
+        {
+          "id": "requested-restart-is-not-counted",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "honour", "exitCode": 4 },
+          "request": { "reason": "restart" },
+          "observation": { "event": "exit", "exitCode": 4, "requestedReason": "restart", "restartCount": 2, "state": "stopping" },
+          "expect": { "action": "restart", "cooldownMs": 0, "counted": false },
+          "why": "627 U3's unresolved caveat closed by construction: one budget, one classifier, and the requested path does not spend it. restartCount 2 in the observation is deliberate — at 2 a counted restart would be the last one, so a case that passed with `counted: true` would be indistinguishable here if the count were 0."
+        },
+        {
+          "id": "requested-restart-completion-failure-is-counted",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "honour", "requestExitCode": 1, "requestPollMs": 500 },
+          "request": { "reason": "restart" },
+          "observation": { "event": "exit", "exitCode": 1, "requestedReason": "restart", "restartCount": 0, "state": "stopping" },
+          "expect": { "action": "restart", "cooldownMs": 1000, "counted": true },
+          "why": "Observing a restart request cannot excuse a failed ordered close. Only clean completion code 4 grants a free restart; code 1 must spend the bounded crash budget."
+        },
+        {
+          "id": "requested-upgrade-stops",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "honour", "exitCode": 0 },
+          "request": { "reason": "upgrade" },
+          "observation": { "event": "exit", "exitCode": 0, "requestedReason": "upgrade", "restartCount": 0, "state": "stopping" },
+          "expect": { "action": "stop", "reason": "upgrade", "counted": false },
+          "why": "The installer takes over from here; restarting the Engine would hold the binary the installer is about to overwrite."
+        },
+        {
+          "id": "hang-soft-recovered-through-the-request-file",
+          "faultMode": "hang",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "hang-soft", "hangAfterMs": 400 },
+          "observation": { "event": "health-miss", "consecutiveMisses": 3, "restartCount": 0, "state": "running" },
+          "expect": { "action": "request-shutdown", "reason": "hang" },
+          "why": "design 16's `hang, graceful` row: a wedge that leaves the watcher thread runnable is recovered through the out-of-band channel, not by a kill."
+        },
+        {
+          "id": "hang-hard-recovered-by-forced-kill",
+          "faultMode": "hang",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "hang-hard", "hangAfterMs": 400 },
+          "observation": { "event": "request-deadline-elapsed", "requestedReason": "hang", "restartCount": 0, "state": "stopping" },
+          "expect": { "action": "force-kill", "reason": "hang" },
+          "why": "design 16's `hang, forced` row. A JVM wedged at a safepoint never reads the file; only the deadline ends it."
+        },
+        {
+          "id": "budget-exhausted-after-max-attempts",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "crash", "exitCode": 1, "exitAfterMs": 400 },
+          "observation": { "event": "exit", "exitCode": 1, "requestedReason": null, "restartCount": 3, "state": "running" },
+          "expect": { "action": "exhausted", "reason": "fatal_or_uncaught", "counted": false },
+          "why": "The count, not the cooldown, is what stops a crash loop (§2). The actuator arm drives a fake engine that crashes every incarnation and asserts the supervisor reaches `exhausted` after exactly maxRestartAttempts restarts."
+        },
+        {
+          "id": "unknown-exit-code-fails-open-to-transient",
+          "faultMode": "clean-exit",
+          "drives": ["decision"],
+          "observation": { "event": "exit", "exitCode": -1073741819, "requestedReason": null, "restartCount": 0, "state": "running" },
+          "expect": { "action": "restart", "cooldownMs": 1000, "counted": true },
+          "why": "A Windows access-violation status is not in the table. Failing closed here would turn every native crash into a permanent stop."
+        },
+        {
+          "id": "cooldown-ramps-linearly",
+          "faultMode": "clean-exit",
+          "drives": ["decision"],
+          "observation": { "event": "exit", "exitCode": 1, "requestedReason": null, "restartCount": 1, "state": "running" },
+          "expect": { "action": "restart", "cooldownMs": 2000, "counted": true },
+          "why": "+cooldownIncrementMs per attempt over the handle-release floor, not a doubling."
+        },
+        {
+          "id": "cooldown-ceiling-binds-when-budget-raised",
+          "faultMode": "clean-exit",
+          "drives": ["decision"],
+          "policyOverride": { "maxRestartAttempts": 9 },
+          "observation": { "event": "exit", "exitCode": 1, "requestedReason": null, "restartCount": 6, "state": "running" },
+          "expect": { "action": "restart", "cooldownMs": 5000, "counted": true },
+          "why": "The ONLY case that reaches maxCooldownMs, and it needs a raised budget to get there — which is the fact §2's ceiling row does not state: at maxRestartAttempts 3 the ceiling is inert."
+        },
+        {
+          "id": "ready-starts-the-stability-window",
+          "faultMode": "partial-boot",
+          "drives": ["decision"],
+          "observation": { "event": "ready", "restartCount": 2, "state": "starting" },
+          "expect": { "action": "enter-running", "counted": false },
+          "why": "The window runs from `ready`, not from spawn — and `ready` is also the `starting` -> `running` edge that arms hang detection."
+        },
+        {
+          "id": "stability-elapsed-resets-the-budget",
+          "faultMode": "clean-exit",
+          "drives": ["decision"],
+          "observation": { "event": "stability-elapsed", "restartCount": 2, "state": "running" },
+          "expect": { "action": "reset-budget", "counted": false },
+          "why": "An Engine that has been ready for the whole window has recovered; the next crash starts from a full budget."
+        },
+        {
+          "id": "hang-misses-below-the-threshold-do-nothing",
+          "faultMode": "hang",
+          "drives": ["decision"],
+          "observation": { "event": "health-miss", "consecutiveMisses": 2, "restartCount": 0, "state": "running" },
+          "expect": { "action": "none" },
+          "why": "The adverse precondition for the hang case above: a threshold that fires one miss early would restart a healthy Engine over a single dropped poll."
+        },
+        {
+          "id": "hang-detection-is-suspended-while-starting",
+          "faultMode": "hang",
+          "drives": ["decision"],
+          "observation": { "event": "health-miss", "consecutiveMisses": 9, "restartCount": 0, "state": "starting" },
+          "expect": { "action": "none" },
+          "why": "design 7.1: no hang detection until `api` readiness. A booting Engine answers nothing for seconds and is not hung."
+        },
+        {
+          "id": "hang-detection-is-suspended-while-stopping",
+          "faultMode": "hang",
+          "drives": ["decision"],
+          "observation": { "event": "health-miss", "consecutiveMisses": 9, "requestedReason": "quit", "restartCount": 0, "state": "stopping" },
+          "expect": { "action": "none" },
+          "why": "An Engine running its ordered shutdown stops answering by design; reading that as a hang would race the shutdown with a kill."
+        },
+        {
+          "id": "live-503-and-continuous-essential-stability",
+          "faultMode": "partial-boot",
+          "drives": ["actuator"],
+          "enginePlan": [
+            { "mode": "crash", "exitCode": 1, "exitAfterMs": 1500, "healthStatus": 503 },
+            { "mode": "honour", "healthStatus": 503, "controlEssentialReadiness": true }
+          ],
+          "expect": { "action": "reset-budget" },
+          "why": "503 proves startup and running liveness; only continuous API/index readiness resets the budget. Losing index readiness restarts the window, while optional AI is always unavailable."
+        },
+        {
+          "id": "start-deadline-stops-a-partial-boot",
+          "faultMode": "partial-boot",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "slow-start", "slowStartMs": 60000 },
+          "observation": { "event": "start-deadline-elapsed", "restartCount": 0, "state": "starting" },
+          "expect": { "action": "request-shutdown", "reason": "hang" },
+          "why": "`starting` has no hang detection, so without this edge a boot that never publishes a port is a supervisor that waits forever."
         }
       ]
     }

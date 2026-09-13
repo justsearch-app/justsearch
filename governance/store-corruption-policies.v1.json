@@ -36,9 +36,17 @@
   },
   "ratchet": {
     "note": "Two numbers, both pinned OUTSIDE the register they describe. Before this, `pendingDurableClassification.cap` called itself 'a ratchet' while living in the same file as the entries it capped, so one commit could add a pending entry and raise the cap that forbade it. `durableStoreRows` is a FLOOR, not an equality: rows are meant to be added (that is the register growing to cover more of the tree), and a lane adding rows in parallel must not red this gate. A row DISAPPEARING is the event worth a build failure — a durable authority does not stop existing quietly.",
-    "durableStoreRows": 36,
+    "durableStoreRows": 35,
     "pendingDurableClassificationCap": 8,
     "remedy": "If a durable store is genuinely retired, lower `durableStoreRows` here in the same commit that removes its row, and say in the commit message where its bytes went. If the pending list genuinely needs more room, raise `pendingDurableClassificationCap` here AND in the register, and add a `bumps` entry saying which store forced it and what its blocker is. Never raise the cap to make a new pending entry fit without both.",
-    "bumps": []
+    "bumps": [],
+    "retirements": [
+      {
+        "store": "worker-config-snapshot",
+        "lane": "lane F stage A item A19 (tempdoc 936)",
+        "date": "2026-09-07",
+        "whereItsBytesWent": "Nowhere — the file stopped being written and nothing reads it. It was <dataDir>/runtime/worker-config-snapshot.json, the Head's resolved configuration serialised for a SECOND JVM to load at config ordinal 450. Items A11/A13 deleted that JVM, so the store had one writer and no reader; A19 deleted the writer (HeadlessApp), the ordinal-450 tier, ResolvedConfig.toWorkerSnapshot/loadWorkerSnapshot and ResolvedConfigBuilder.contributeWorkerSnapshot/loadWorkerSnapshotFromSysprop/loadRawWorkerSnapshotFromSysprop. There is one ResolvedConfig in one JVM now, so there are no bytes to relocate: the data still exists, in memory, as the object both halves already share. An existing installation keeps a stale file on disk that nothing opens; it is inert, not orphaned state, and no migration is required."
+      }
+    ]
   }
 }

@@ -48,7 +48,7 @@ final class WorkerUpgradeQuiescence {
       return response(requestedId, List.of("indexing loop did not drain at a batch boundary"));
     }
     if (!queueCheckpointed) {
-      queueCheckpointed = jobQueue == null || jobQueue.checkpointForUpgrade();
+      queueCheckpointed = jobQueue == null || jobQueue.checkpointWal();
     }
     return response(
         requestedId,

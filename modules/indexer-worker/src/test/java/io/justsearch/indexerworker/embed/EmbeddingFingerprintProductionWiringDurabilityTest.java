@@ -65,7 +65,7 @@ import org.junit.jupiter.api.Test;
  *   <li>(c) the negative control — no fingerprint ever offered stays BLOCKED_LEGACY</li>
  * </ul>
  */
-class EmbeddingFingerprintProductionWiringDurabilityTest {
+class EmbeddingFingerprintProductionWiringDurabilityTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String FP = "prod-wiring-embed-fp-sha256";
   private static final String SIBLING_FP = "prod-wiring-sibling-fp-sha256";
@@ -116,7 +116,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r1 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r1.indexingCoordinator()
           .indexSingle(
@@ -139,7 +139,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r2 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -184,7 +184,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r3 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var freshEcc =
           new EmbeddingCompatibilityController(
@@ -212,7 +212,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r1 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r1.indexingCoordinator()
           .indexSingle(
@@ -235,7 +235,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r2 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -267,7 +267,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r3 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var freshEcc =
           new EmbeddingCompatibilityController(
@@ -301,7 +301,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r1 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r1.indexingCoordinator()
           .indexSingle(
@@ -318,7 +318,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     var r2 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open();
     var ecc =
         new EmbeddingCompatibilityController(
@@ -357,7 +357,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r3 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .openDeferred()) {
       var freshEcc =
           new EmbeddingCompatibilityController(
@@ -391,7 +391,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r1 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r1.indexingCoordinator()
           .indexSingle(
@@ -415,7 +415,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r2 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -450,7 +450,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r3 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var freshEcc =
           new EmbeddingCompatibilityController(
@@ -481,7 +481,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r1 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r1.indexingCoordinator()
           .indexSingle(
@@ -493,7 +493,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r2 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -512,7 +512,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest {
     try (var r3 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var freshEcc =
           new EmbeddingCompatibilityController(

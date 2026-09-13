@@ -12,9 +12,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Dev-only service restart manager for hot-reloading Worker application services.
  *
- * <p>On reload signal (MMF byte at offset 29): quiesces the IndexingLoop, reconstructs
+ * <p>On reload signal — the existence of {@code <dataDir>/runtime/dev-reload.request}, polled by
+ * {@link io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus#isReloadRequested()} and
+ * consumed by deleting the file ({@code clearReloadSignal()}); it was a byte in the memory-mapped
+ * file until lane F stage A item A10 deleted that bus — quiesces the IndexingLoop, reconstructs
  * {@link DefaultWorkerAppServices} from the same {@link InfraContext}, re-wires models,
- * swaps gRPC delegates, and starts the new indexing loop.
+ * publishes the new instance, and starts the new indexing loop. Until lane F stage A item A9 the
+ * publish step was two: re-point the three {@code Delegating*Service} gRPC delegates, then update
+ * the field. The delegates are gone, so the volatile write IS the swap — see
+ * {@link #performReload()}.
  *
  * <p>This works in tandem with JBR + HotSwapPush (Phase 1): class bytecode is updated by
  * HotSwap, then Phase 2 restarts services so constructors, static initializers, and field
@@ -72,12 +78,15 @@ final class DevReloadManager {
       // 5. Re-wire models from ModelContext (typed, no scattered field reads)
       rewireModels(newServices, modelCtx);
 
-      // 6. Swap gRPC delegates (volatile write — atomic for new requests)
-      server.searchWrapper.setDelegate(newServices.grpcSearchService());
-      server.ingestWrapper.setDelegate(newServices.grpcIngestService());
-      server.healthWrapper.setDelegate(newServices.grpcHealthService());
-
-      // 7. Update KnowledgeServer's appServices reference
+      // 6-7. Publish the new services (volatile write — atomic for calls that arrive after it).
+      //
+      // Lane F stage A item A9: this used to be two steps. The gRPC registration held three
+      // `Delegating*Service` wrappers whose delegates had to be re-pointed, and only then was
+      // `appServices` updated. Those wrappers existed for nothing else, and they went with the
+      // server. The volatile write IS the swap now, because every caller reads the services per
+      // call through `KnowledgeServer.appServices()` rather than through a registered object —
+      // `EngineKnowledgeClient` holds a supplier for exactly this reason, so a reload it did not
+      // know about still reaches the new instance on the next call.
       server.appServices = newServices;
 
       // 8. Start new indexing loop
@@ -204,8 +213,11 @@ final class DevReloadManager {
   /**
    * 371: Reads the build stamp left by the MCP reload tool and updates the system property.
    * The MCP tool writes the on-disk stamp to {@code <dataDir>/reload-build-stamp.txt} after
-   * a successful HotSwapPush. We read it here so the next {@code IndexStatus} RPC reports
-   * the correct stamp, preventing false-positive "stale JVM" warnings from jseval.
+   * a successful HotSwapPush. We read it here so the next status projection reports the correct
+   * stamp, preventing false-positive "stale JVM" warnings from jseval. (It reached the Head over
+   * the {@code IndexStatus} RPC until lane F stage A item A9 deleted the wire; the stamp itself
+   * now describes the Engine distribution — item A13 re-homed {@code generateBuildStamp} onto
+   * {@code modules/ui/build/install/ui/build-stamp.txt}.)
    */
   private void updateBuildStampFromReloadFile() {
     try {

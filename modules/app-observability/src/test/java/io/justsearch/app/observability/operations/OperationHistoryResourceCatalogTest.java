@@ -14,8 +14,10 @@ import io.justsearch.agent.api.registry.Resource;
 import io.justsearch.agent.api.registry.ResourceCatalog;
 import io.justsearch.agent.api.registry.SubscriptionMode;
 import java.time.Duration;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("OperationHistoryResourceCatalog")
 final class OperationHistoryResourceCatalogTest {
@@ -51,28 +53,33 @@ final class OperationHistoryResourceCatalogTest {
   }
 
   @Test
+  void eventStreamDeclaresAndPublishesInvocationIdentity() {
+    Resource resource = entry();
+    assertEquals(Category.EVENT_STREAM, resource.category());
+    assertEquals("operationKey", resource.primaryKey());
+    Map<?, ?> wire = JsonMapper.builder().build().convertValue(resource, Map.class);
+    assertEquals("operationKey", wire.get("primaryKey"));
+  }
+
+  @Test
   @DisplayName("HistoryPolicy is present (EVENT_STREAM Category requires it)")
   void historyPolicyPresent() {
     assertTrue(entry().history().isPresent(), "EVENT_STREAM Resource must declare HistoryPolicy");
   }
 
   @Test
-  @DisplayName("HistoryPolicy mode is RING_BUFFER (matches in-memory store)")
-  void historyPolicyModeIsRingBuffer() {
+  @DisplayName("HistoryPolicy declares the durable source")
+  void historyPolicyModeIsDurable() {
     HistoryPolicy p = entry().history().orElseThrow();
-    assertSame(HistoryPolicy.Mode.RING_BUFFER, p.mode());
+    assertSame(HistoryPolicy.Mode.DURABLE, p.mode());
   }
 
   @Test
-  @DisplayName("HistoryPolicy capacity matches OperationHistoryStore.DEFAULT_CAPACITY")
-  void historyPolicyCapacityMatches() {
-    HistoryPolicy p = entry().history().orElseThrow();
-    assertEquals(
-        OperationHistoryStore.DEFAULT_CAPACITY,
-        p.capacity().orElseThrow(),
-        "HISTORY_CAPACITY must equal OperationHistoryStore.DEFAULT_CAPACITY; if either"
-            + " changes without the other, the wire-declared retention diverges from the"
-            + " actual in-memory retention.");
+  @DisplayName("HistoryPolicy declares thirty-day storage retention, separate from the 200-row read limit")
+  void historyRetentionMatchesStore() {
+    HistoryPolicy policy = entry().history().orElseThrow();
+    assertTrue(policy.capacity().isEmpty());
+    assertEquals(Duration.ofDays(30), policy.retention().orElseThrow());
   }
 
   @Test
@@ -111,8 +118,8 @@ final class OperationHistoryResourceCatalogTest {
   }
 
   @Test
-  @DisplayName("HISTORY_CAPACITY constant is 200 (pinned)")
+  @DisplayName("recent read bound remains 200")
   void historyCapacityConstantPinned() {
-    assertEquals(200, OperationHistoryResourceCatalog.HISTORY_CAPACITY);
+    assertEquals(200, OperationHistoryStore.DEFAULT_CAPACITY);
   }
 }

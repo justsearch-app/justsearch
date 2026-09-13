@@ -54,14 +54,14 @@ CE_NOT_IN_PLAY_REASONS = frozenset({
     "DISABLED",               # KnowledgeSearchEngine.java:951 — rerankConfig.enabled() == false
     "PIPELINE_NOT_ELIGIBLE",  # :958 — pipeline.crossEncoderEnabled() == false for this preset
     "MODEL_NOT_CONFIGURED",   # :962 — head-side: no model configured
-    "MODEL_NOT_LOADED",       # GrpcSearchService.java:470 — worker-side: reranker absent
+    "MODEL_NOT_LOADED",       # WorkerSearchService.java:470 — worker-side: reranker absent
 })
 
 # Load-dependent, irreproducible losses of the CE — the contamination class. Listed for legibility;
 # classification is fail-closed, so ANY reason outside the two sets above counts as a silent drop
 # whether or not it appears here.
 NONDETERMINISTIC_SKIP_REASONS = frozenset({
-    "DEADLINE_EXCEEDED",  # GrpcSearchService.wireSkipReason — a reranker budget PRE-CHECK only
+    "DEADLINE_EXCEEDED",  # WorkerSearchService.wireSkipReason — a reranker budget PRE-CHECK only
     "INFERENCE_FAILED",   # register F-054 — inference ran and ORT threw (arena exhaustion, dead
                           # session). Split out of DEADLINE_EXCEEDED, which used to be stamped on
                           # every reranker skip: a measured campaign's 199/200 "deadline misses"

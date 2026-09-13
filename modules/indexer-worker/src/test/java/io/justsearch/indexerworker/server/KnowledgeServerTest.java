@@ -41,6 +41,32 @@ class KnowledgeServerTest {
 
   private static final ObjectMapper JSON = new ObjectMapper();
 
+  @Test
+  void cutoverDefersWhenPendingEmbeddingCountCannotBeRead() throws Exception {
+    var server = createServerWithJobQueue(new StubJobQueue());
+    var runtime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    var controller = org.mockito.Mockito.mock(EmbeddingCompatibilityController.class);
+    org.mockito.Mockito.when(controller.currentFingerprint()).thenReturn("current-model");
+    setField(server, "ingestLifecycle", runtime);
+    setField(server, "embeddingCompatController", controller);
+    var counts = runtime.indexCountOps();
+    org.mockito.Mockito.when(counts.countByFieldOrThrow(
+        io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS,
+        io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenThrow(new IOException("reader unavailable"))
+        .thenReturn(0);
+    Method method = KnowledgeServer.class.getDeclaredMethod("finalizeEmbeddingRebuildBeforeCutover");
+    method.setAccessible(true);
+
+    assertEquals(false, method.invoke(server), "unreadable is not drained");
+    org.mockito.Mockito.verify(controller, org.mockito.Mockito.never())
+        .checkRebuildCompletion(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt());
+    assertEquals(true, method.invoke(server), "a subsequent successful zero read permits certification");
+    org.mockito.Mockito.verify(controller).checkRebuildCompletion(0L, 0);
+  }
+
   // ==================== Phase 1: Safe Gauge Methods ====================
 
   @Nested
@@ -202,38 +228,10 @@ class KnowledgeServerTest {
 
   // ==================== Phase 2: State Getters ====================
 
-  @Nested
-  @DisplayName("getPort()")
-  class GetPortTests {
-
-    @Test
-    @DisplayName("returns -1 when grpcServer is null")
-    void nullServer_returnsMinusOne() throws Exception {
-      KnowledgeServer server = createEmptyServer();
-      assertEquals(-1, server.getPort());
-    }
-  }
-
-  @Nested
-  @DisplayName("isRunning()")
-  class IsRunningTests {
-
-    @Test
-    @DisplayName("returns false when grpcServer is null")
-    void nullServer_returnsFalse() throws Exception {
-      KnowledgeServer server = createEmptyServer();
-      setField(server, "running", true);
-      assertFalse(server.isRunning());
-    }
-
-    @Test
-    @DisplayName("returns false when running is false")
-    void notRunning_returnsFalse() throws Exception {
-      KnowledgeServer server = createEmptyServer();
-      setField(server, "running", false);
-      assertFalse(server.isRunning());
-    }
-  }
+  // Lane F stage A item A13 deleted KnowledgeServer#getPort() along with its last caller (the
+  // standalone IndexerWorker.main log line). It had returned a constant -1 since A9 removed the
+  // gRPC server, so the nested GetPortTests block that pinned "-1, there is no socket" went with
+  // it: inside one JVM there is no port to be wrong about.
 
   @Nested
   @DisplayName("embeddingCompatController()")
@@ -611,7 +609,7 @@ class KnowledgeServerTest {
     return new EmbeddingCompatibilityController(java.util.Map::of, () -> 0L);
   }
 
-  /** Initializes final atomic fields that require non-null values. */
+  /** Initializes final fields that require non-null values. */
   private static void initializeAtomicFields(KnowledgeServer server) throws Exception {
     setField(server, "migrationEnumeratorRunning", new AtomicBoolean(false));
     setField(server, "migrationEnumeratorRootsTotal", new AtomicLong(0L));

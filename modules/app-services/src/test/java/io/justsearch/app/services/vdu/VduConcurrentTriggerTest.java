@@ -1,321 +1,120 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.vdu;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.EngineAdmissionService;
+import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.OfflineProcessingOutcome;
+import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
+import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
+import io.justsearch.app.api.OnlineAiLifecycleControl;
+import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
-/**
- * Tests for concurrent VDU trigger protection.
- *
- * <p>Verifies that:
- * <ul>
- *   <li>Only one offline processing run executes at a time</li>
- *   <li>Concurrent triggers are safely ignored (not queued)</li>
- *   <li>No race conditions in the AtomicBoolean guard</li>
- * </ul>
- *
- * <p>Uses the same test pattern as OfflineCoordinatorTest with stub dependencies
- * and configurable delays to simulate slow processing.
- */
-@DisplayName("VDU Concurrent Trigger Protection")
+/** Contending callers exercise the production single-flight guard and its actual-exit release. */
+@Timeout(15)
 class VduConcurrentTriggerTest {
-
-  private StubInferenceLifecycleManager stubInference;
-  private StubRemoteKnowledgeClient stubClient;
-  private SlowVduBatchProcessor slowBatchProcessor;
-  private TestableOfflineCoordinator coordinator;
-
-  private ExecutorService executor;
-
-  @BeforeEach
-  void setup() {
-    stubInference = new StubInferenceLifecycleManager().withMode(Mode.ONLINE);
-    stubClient = new StubRemoteKnowledgeClient();
-    slowBatchProcessor = new SlowVduBatchProcessor(500);
-
-    coordinator = new TestableOfflineCoordinator(stubInference, slowBatchProcessor, stubClient);
-    executor = Executors.newFixedThreadPool(4);
-  }
-
-  @AfterEach
-  void teardown() {
-    executor.shutdownNow();
-  }
-
-  @Nested
-  @DisplayName("Single Execution Guard")
-  class SingleExecutionGuard {
-
-    @Test
-    @DisplayName("concurrent triggers result in only one execution")
-    void concurrentTriggersOnlyOneExecutes() throws Exception {
-      stubClient.withPendingVduCount(5);
-
-      CountDownLatch startLatch = new CountDownLatch(1);
-      List<Future<?>> futures = new ArrayList<>();
-
-      for (int i = 0; i < 5; i++) {
-        futures.add(executor.submit(() -> {
-          try {
-            startLatch.await();
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
-          coordinator.startOfflineProcessing();
-        }));
-      }
-
-      startLatch.countDown();
-
-      for (Future<?> f : futures) {
-        f.get(10, TimeUnit.SECONDS);
-      }
-
-      assertEquals(1, slowBatchProcessor.getExecutionCount(),
-          "Only one batch processing should execute despite concurrent triggers");
-    }
-
-    @Test
-    @DisplayName("isProcessing returns true during execution")
-    void isProcessingTrueDuringExecution() throws Exception {
-      stubClient.withPendingVduCount(5);
-
-      CountDownLatch started = new CountDownLatch(1);
-      CountDownLatch completed = new CountDownLatch(1);
-      slowBatchProcessor.onStarted(started::countDown);
-      slowBatchProcessor.onCompleted(completed::countDown);
-
-      @SuppressWarnings("FutureReturnValueIgnored")
-      var unused = executor.submit(coordinator::startOfflineProcessing);
-
-      assertTrue(started.await(5, TimeUnit.SECONDS), "Processing should start");
-      assertTrue(coordinator.isProcessing(), "isProcessing() should return true during execution");
-
-      assertTrue(completed.await(5, TimeUnit.SECONDS), "Processing should complete");
-      // Small delay to allow AtomicBoolean to be cleared after callback
-      Thread.sleep(50);
-
-      assertFalse(coordinator.isProcessing(), "isProcessing() should return false after completion");
-    }
-
-    @Test
-    @DisplayName("second trigger while processing is ignored immediately")
-    void secondTriggerIgnoredImmediately() throws Exception {
-      stubClient.withPendingVduCount(5);
-
-      CountDownLatch firstStarted = new CountDownLatch(1);
-      CountDownLatch completed = new CountDownLatch(1);
-      slowBatchProcessor.onStarted(firstStarted::countDown);
-      slowBatchProcessor.onCompleted(completed::countDown);
-
-      @SuppressWarnings("FutureReturnValueIgnored")
-      var unused = executor.submit(coordinator::startOfflineProcessing);
-
-      assertTrue(firstStarted.await(5, TimeUnit.SECONDS));
-
-      long start = System.currentTimeMillis();
-      coordinator.startOfflineProcessing();
-      long elapsed = System.currentTimeMillis() - start;
-
-      assertTrue(elapsed < 100, "Second trigger should return immediately, took " + elapsed + "ms");
-
-      assertTrue(completed.await(5, TimeUnit.SECONDS), "Processing should complete");
-      assertEquals(1, slowBatchProcessor.getExecutionCount());
-    }
-
-    @Test
-    @DisplayName("rapid successive triggers all handled correctly")
-    void rapidSuccessiveTriggers() throws Exception {
-      stubClient.withPendingVduCount(1);
-      slowBatchProcessor.setDelayMs(200); // Short delay but long enough to test overlap
-
-      // Start processing in background so it's running during rapid triggers
-      CountDownLatch started = new CountDownLatch(1);
-      CountDownLatch completed = new CountDownLatch(1);
-      slowBatchProcessor.onStarted(started::countDown);
-      slowBatchProcessor.onCompleted(completed::countDown);
-
-      @SuppressWarnings("FutureReturnValueIgnored")
-      var unused = executor.submit(coordinator::startOfflineProcessing);
-
-      // Wait for processing to start
-      assertTrue(started.await(5, TimeUnit.SECONDS), "Processing should start");
-
-      // Now fire rapid triggers while first is still processing
-      for (int i = 0; i < 100; i++) {
-        coordinator.startOfflineProcessing();
-      }
-
-      // Wait for completion
-      assertTrue(completed.await(5, TimeUnit.SECONDS), "Processing should complete");
-
-      assertEquals(1, slowBatchProcessor.getExecutionCount(),
-          "Only one execution despite 100 rapid triggers");
-    }
-  }
-
-  @Nested
-  @DisplayName("Sequential Processing")
-  class SequentialProcessing {
-
-    @Test
-    @DisplayName("can trigger again after previous completes")
-    void canTriggerAgainAfterCompletion() throws Exception {
-      stubClient.withPendingVduCount(1);
-      slowBatchProcessor.setDelayMs(100);
-
-      // First execution
-      CountDownLatch firstCompleted = new CountDownLatch(1);
-      slowBatchProcessor.onCompleted(firstCompleted::countDown);
-
-      coordinator.startOfflineProcessing();
-      assertTrue(firstCompleted.await(5, TimeUnit.SECONDS), "First processing should complete");
-      // Small delay to allow AtomicBoolean to be cleared after callback
-      Thread.sleep(50);
-
-      assertFalse(coordinator.isProcessing());
-
-      // Second execution - need to reset callback for new latch
-      CountDownLatch secondCompleted = new CountDownLatch(1);
-      slowBatchProcessor.onCompleted(secondCompleted::countDown);
-
-      coordinator.startOfflineProcessing();
-      assertTrue(secondCompleted.await(5, TimeUnit.SECONDS), "Second processing should complete");
-
-      assertEquals(2, slowBatchProcessor.getExecutionCount(),
-          "Should execute twice when triggered sequentially");
-    }
-  }
-
-  // =========================================================================
-  // Test Support Classes
-  // =========================================================================
-
-  /**
-   * VduBatchProcessor that simulates slow processing.
-   */
-  static class SlowVduBatchProcessor {
-    private long delayMs;
-    private final AtomicInteger executionCount = new AtomicInteger(0);
-    private Runnable onStartedCallback = () -> {};
-    private Runnable onCompletedCallback = () -> {};
-
-    SlowVduBatchProcessor(long delayMs) {
-      this.delayMs = delayMs;
-    }
-
-    void setDelayMs(long delayMs) {
-      this.delayMs = delayMs;
-    }
-
-    void onStarted(Runnable callback) {
-      this.onStartedCallback = callback;
-    }
-
-    void onCompleted(Runnable callback) {
-      this.onCompletedCallback = callback;
-    }
-
-    int processPendingFiles() {
-      executionCount.incrementAndGet();
-      onStartedCallback.run();
-
+  @Test
+  void concurrentAndRapidTriggersRunOnlyOneBodyAndRefuseWhileItIsHeld() throws Exception {
+    var start = new CountDownLatch(1);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var accepted = new AtomicReference<CompletionStage<OfflineProcessingOutcome>>();
+    try (var fixture = new Fixture(); var callers = Executors.newFixedThreadPool(5)) {
+      when(fixture.batch.processPendingFiles(any(), any())).thenAnswer(invocation -> {
+        entered.countDown();
+        assertTrue(release.await(5, TimeUnit.SECONDS));
+        return fixture.outcome;
+      });
       try {
-        Thread.sleep(delayMs);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-
-      onCompletedCallback.run();
-      return 1;
-    }
-
-    int getExecutionCount() {
-      return executionCount.get();
-    }
-  }
-
-  /**
-   * Testable version of OfflineCoordinator (same as OfflineCoordinatorTest).
-   */
-  static class TestableOfflineCoordinator {
-    private final StubInferenceLifecycleManager inferenceManager;
-    private final SlowVduBatchProcessor vduBatchProcessor;
-    private final StubRemoteKnowledgeClient knowledgeClient;
-    private final AtomicBoolean processing = new AtomicBoolean(false);
-
-    TestableOfflineCoordinator(StubInferenceLifecycleManager inferenceManager,
-                               SlowVduBatchProcessor vduBatchProcessor,
-                               StubRemoteKnowledgeClient knowledgeClient) {
-      this.inferenceManager = inferenceManager;
-      this.vduBatchProcessor = vduBatchProcessor;
-      this.knowledgeClient = knowledgeClient;
-    }
-
-    void startOfflineProcessing() {
-      if (!processing.compareAndSet(false, true)) {
-        return;
-      }
-
-      try {
-        knowledgeClient.recoverVduProcessing();
-
-        int pendingVdu = knowledgeClient.countPendingVdu();
-        knowledgeClient.countPendingEmbeddings();
-
-        if (pendingVdu > 0) {
-          processVduPhase();
+        var submissions = new ArrayList<Future<Boolean>>();
+        for (int i = 0; i < 5; i++) {
+          submissions.add(callers.submit(() -> {
+            assertTrue(start.await(5, TimeUnit.SECONDS));
+            try {
+              accepted.set(fixture.coordinator.startOfflineProcessing(fixture.context, outcome -> {}));
+              return true;
+            } catch (IllegalStateException refusal) {
+              assertEquals("Enrichment is already running", refusal.getMessage());
+              return false;
+            }
+          }));
         }
-
-        int pendingEmbeddings = knowledgeClient.countPendingEmbeddings();
-        if (pendingEmbeddings > 0) {
-          processEmbeddingPhase();
+        start.countDown();
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        int admitted = 0;
+        for (var submission : submissions) if (submission.get(5, TimeUnit.SECONDS)) admitted++;
+        assertEquals(1, admitted);
+        assertTrue(fixture.coordinator.isProcessing());
+        for (int i = 0; i < 100; i++) {
+          assertThrows(IllegalStateException.class,
+              () -> fixture.coordinator.startOfflineProcessing(fixture.context, outcome -> {}));
         }
+        assertFalse(accepted.get().toCompletableFuture().isDone());
+        verify(fixture.batch, times(1)).processPendingFiles(any(), any());
+        release.countDown();
+        assertTrue(accepted.get().toCompletableFuture().get(5, TimeUnit.SECONDS).complete());
+        assertFalse(fixture.coordinator.isProcessing());
       } finally {
-        processing.set(false);
+        start.countDown();
+        release.countDown();
       }
     }
+  }
 
-    private void processVduPhase() {
-      if (!inferenceManager.isOnline()) {
-        try {
-          inferenceManager.switchToOnlineMode();
-        } catch (Exception e) {
-          return;
-        }
+  @Test
+  void aCompletedPassAllowsTheNextPassWithoutATimingDelay() throws Exception {
+    try (var fixture = new Fixture()) {
+      for (int i = 0; i < 2; i++) {
+        assertTrue(fixture.coordinator.startOfflineProcessing(fixture.context, outcome -> {})
+            .toCompletableFuture().get(5, TimeUnit.SECONDS).complete());
+        assertFalse(fixture.coordinator.isProcessing());
       }
+      verify(fixture.batch, times(2)).processPendingFiles(any(), any());
+      verify(fixture.work, times(2)).close();
+    }
+  }
 
-      if (inferenceManager.isOnline()) {
-        vduBatchProcessor.processPendingFiles();
-      }
+  private static final class Fixture implements AutoCloseable {
+    final TestEngineExecutors executors = TestEngineExecutors.awaitingTermination();
+    final io.justsearch.core.context.EngineContext context = TestEngineContexts.durableInternal();
+    final EngineWorkHandle work = mock(EngineWorkHandle.class);
+    final VduBatchProcessor batch = mock(VduBatchProcessor.class);
+    final OfflineProcessingOutcome outcome = new OfflineProcessingOutcome(
+        1, 1, 0, BlockReason.NONE, EmbeddingHandoff.NOT_EVALUATED);
+    final OfflineCoordinator coordinator;
+
+    Fixture() {
+      var admission = mock(EngineAdmissionService.class);
+      when(admission.attach(context)).thenReturn(work);
+      when(work.context()).thenReturn(context);
+      when(work.cancellationReason()).thenReturn(Optional.empty());
+      when(work.onCancel(any())).thenReturn(() -> {});
+      var inference = mock(OnlineAiLifecycleControl.class);
+      when(inference.isOnline()).thenReturn(true);
+      var client = mock(KnowledgeClient.class);
+      when(client.countPendingVdu(any())).thenReturn(1);
+      when(batch.processPendingFiles(any(), any())).thenReturn(outcome);
+      coordinator = new OfflineCoordinator(executors, admission, inference, null, batch,
+          () -> client, new VduCapabilityState());
     }
 
-    private void processEmbeddingPhase() {
-      try {
-        inferenceManager.switchToIndexingMode();
-      } catch (Exception e) {
-        // Continue
-      }
-    }
-
-    boolean isProcessing() {
-      return processing.get();
+    @Override public void close() {
+      try { coordinator.close(); }
+      finally { executors.close(); }
     }
   }
 }

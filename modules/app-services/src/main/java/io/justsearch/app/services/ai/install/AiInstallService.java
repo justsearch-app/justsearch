@@ -669,17 +669,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   /**
-   * Liveness backstop (tempdoc 575 §17 Face C). Install is a <em>polled-state</em> liveness model: the
-   * backend owns the state, the FE polls it. If the owner wedges in "running" (no {@code
-   * updatedAtEpochMs} progress past {@link #STALE_RUNNING_MS}), reclaim it to a terminal failed state
-   * on the next read — so the UI never polls a dead "running" forever (the gap this fixes: install/pack
-   * previously had no backstop, unlike the worker's recoverStuckJobs reaper). The owner certifies its
-   * own death; the FE's shorter staleness window surfaces a "stalled" badge earlier, while still running.
+   * Reclaim stale status only when no install owner holds the running guard. Progress age is
+   * diagnostic evidence, not proof that a live writer exited; revoking that guard would allow
+   * another installer over the same partial files. The owner releases it after actual cleanup.
+   * The existing unowned stale-status backstop remains (575; lane F C2-2 correction).
    */
   private void reapIfStale() {
-    if (io.justsearch.app.services.ai.PolledStateLiveness.isStaleRunning(
+    if (!running.get() && io.justsearch.app.services.ai.PolledStateLiveness.isStaleRunning(
         status.state, status.updatedAtEpochMs, System.currentTimeMillis(), STALE_RUNNING_MS)) {
-      running.set(false);
       fail(
           "STALLED",
           "Install stalled — no progress for over "
@@ -688,70 +685,92 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
   }
 
-  public void startInstall(boolean acceptTerms) {
+  public Attempt startInstall(boolean acceptTerms) {
     if (!acceptTerms) {
       throw new AiInstallException(
           400, ApiErrorCode.TERMS_REQUIRED, "You must accept the model terms before downloading.");
     }
     checkPolicy();
-    if (!running.compareAndSet(false, true)) {
-      throw new AiInstallException(
-          409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
+    AiInstallStatus started;
+    synchronized (lock) {
+      if (!running.compareAndSet(false, true)) {
+        throw new AiInstallException(
+            409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
+      }
+      cancelFlag.set(false);
+      pause.resume();
+      status.cancelRequested = false;
+      status.startedAtEpochMs = System.currentTimeMillis();
+      updateState("running", "preflight", "Starting AI install...");
+      started = status.snapshot();
     }
-    cancelFlag.set(false);
-    pause.resume();
-    // Registered on the CALLING thread, before the virtual thread starts: registering inside it
-    // leaves a window where upgrade prepare sees no blocker while the download is about to begin.
-    // Same race-window closure as BulkReindexHandler. Tempdoc 840 Phase 3: the run now takes ONE
-    // LEASE PER STAGE instead of one blanket 7200 s lease, and this is the first stage's — the only
-    // one that cannot be sized from its bytes, because the plan does not exist yet on this thread.
-    // The staged loop releases it when the first stage ends and registers the next stage's itself.
-    StageLease lease =
-        new StageLease(
-            operationLeases.register(
-                InstallStage.first().leaseOpClass(),
-                OpCriticality.INTERRUPTIBLE_WITH_LOSS,
-                PRE_PLAN_STAGE_LEASE_SEC,
-                Map.of("source", "ai.model-install", "stage", InstallStage.first().id()),
-                // Cancellation callback: upgrade prepare drains every active lease, so without this
-                // a consented update would sit behind a multi-hour download instead of asking it to
-                // stop. Safe to honour because a cancelled download resumes from its .partial rather
-                // than restarting (tempdoc 798). The lease still blocks until this actually returns —
-                // the request is an ask, not a release.
-                this::cancel));
+    // The first stage's lease is acquired before starting the owner. Later stages keep their
+    // existing byte-sized leases and cancellation callback; no parallel lifetime registry.
+    StageLease lease;
     try {
-      Thread.ofVirtual()
-          .name("ai-install-v2")
-          .start(
-              () -> {
-                boolean ok = false;
-                try {
-                  runInstallInternal(lease);
-                  ok = true;
-                } finally {
-                  running.set(false);
-                  // The pause gate outlives the run (it is a service field). A run cancelled while
-                  // paused leaves the flag set on purpose, so clearing it belongs to whichever run
-                  // ends — otherwise the next status read reports a terminated run as paused.
-                  pause.clear();
-                  try {
-                    // Every exit — completed, failed, cancelled — changes what is staged on disk,
-                    // and a run that ends is exactly when a surface starts asking again. One
-                    // re-derivation here covers all three rather than one per terminal path.
-                    // Refresh BEFORE releasing the lease so a draining upgrade reads a truthful
-                    // resumable-bytes state, and inside its own try so a refresh failure can
-                    // never leak the lease.
-                    refreshResumableBytesFromDisk();
-                  } finally {
-                    lease.release(ok ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
-                  }
-                }
-              });
-    } catch (RuntimeException e) {
-      // The thread never ran, so its finally block will not release the lease.
-      running.set(false);
-      lease.release(OpLeaseOutcome.FAILURE);
-      throw e;
+      lease = new StageLease(operationLeases.register(
+          InstallStage.first().leaseOpClass(), OpCriticality.INTERRUPTIBLE_WITH_LOSS,
+          PRE_PLAN_STAGE_LEASE_SEC,
+          Map.of("source", "ai.model-install", "stage", InstallStage.first().id()), this::cancel));
+    } catch (RuntimeException | Error failure) {
+      installStartFailed(failure);
+      throw failure;
+    }
+    var completion = new CompletableFuture<AiInstallStatus>();
+    try {
+      Thread.ofVirtual().name("ai-install-v2").start(() -> {
+        Throwable failure = null;
+        try {
+          runInstallInternal(lease);
+        } catch (RuntimeException | Error thrown) { failure = thrown; }
+        try {
+          // These are still owner work: another attempt cannot start or reset their shared state.
+          pause.clear();
+          refreshResumableBytesFromDisk();
+        } catch (RuntimeException | Error cleanup) {
+          if (failure == null) failure = cleanup;
+          else failure.addSuppressed(cleanup);
+        }
+        try {
+          lease.release(failure == null && "completed".equals(status.state)
+              ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
+        } catch (RuntimeException | Error cleanup) {
+          if (failure == null) failure = cleanup;
+          else failure.addSuppressed(cleanup);
+        }
+        AiInstallStatus outcome;
+        synchronized (lock) {
+          try {
+            if (failure instanceof RuntimeException) {
+              fail("INSTALL_OWNER_FAILED", "AI install owner failed: " + failure.getMessage());
+            }
+            status.paused = pause.isPaused();
+            status.resumableBytes = resumableBytesOnDisk;
+            outcome = status.snapshot();
+          } finally { running.set(false); }
+        }
+        if (failure == null) completion.complete(outcome);
+        else {
+          completion.completeExceptionally(failure);
+          if (failure instanceof Error fatal) throw fatal;
+          log.warn("AI install owner failed", failure);
+        }
+      });
+    } catch (RuntimeException | Error failure) {
+      try { lease.release(OpLeaseOutcome.FAILURE); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      installStartFailed(failure);
+      throw failure;
+    }
+    return new Attempt(started, completion.minimalCompletionStage());
+  }
+
+  private void installStartFailed(Throwable failure) {
+    synchronized (lock) {
+      try {
+        pause.clear();
+        fail("INSTALL_START_FAILED", "AI install could not start: " + failure.getMessage());
+      } finally { running.set(false); }
     }
   }
 
@@ -767,9 +786,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   @Override
   public boolean isInstallRunning() {
-    synchronized (lock) {
-      return "running".equals(status.state);
-    }
+    return running.get();
   }
 
   public void cancel() {
@@ -895,8 +912,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     return pause.isPaused();
   }
 
-  public void repair(boolean acceptTerms) {
-    startInstall(acceptTerms);
+  public Attempt repair(boolean acceptTerms) {
+    return startInstall(acceptTerms);
   }
 
   // ---------------------------------------------------------------------------
@@ -910,6 +927,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   private void runInstallInternal(StageLease firstStageLease) {
     updateState("running", "preflight", "Starting AI install...");
+    if (cancelFlag.get()) {
+      cancelled();
+      return;
+    }
     try {
       Files.createDirectories(homeDir);
       Files.createDirectories(modelsDir);
@@ -1836,8 +1857,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // No sysprop write here (883 §C.5c residue, #605 review S1). The save above plus the rebuild
     // below already deliver this path at ordinal 300 (settings.json) through
     // ConfigStoreRebuilder.contributeUiSettings, and every reader takes it from ResolvedConfig —
-    // InferenceConfig reads rc.ai().llmModelPath(), and LLM_MODEL_PATH is not in
-    // WorkerSpawner.WORKER_FORWARDED_PROPS, so no process boundary depends on the sysprop.
+    // InferenceConfig reads rc.ai().llmModelPath(), and LLM_MODEL_PATH was not in the spawner's
+    // forwarded-property set, so no process boundary depended on the sysprop even before lane F
+    // stage A item A11 deleted that spawner and the boundary with it.
     // Writing it as well put a GUI/installer value at ordinal 500, which is the precedence lie
     // tempdoc 842 (S2) then needed a companion `.source` marker to un-tell: with the write gone the
     // marker has nothing to correct, and the installer's path classifies as STORED_SETTINGS —
@@ -1904,15 +1926,19 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       String absolute = modelDir.toAbsolutePath().toString();
       feature.setter().accept(absolute);
       // This sysprop write SURVIVES the 883 promotion retirement, and not by oversight (#605
-      // review S1). Unlike the chat model path it is load-bearing across a process boundary: the
-      // Worker is respawned immediately after this step (ConfigurationStage's restart gate), and
-      // WorkerSpawner forwards these five keys as `-D` args read via EnvRegistry.get(), i.e. from
-      // the HEAD'S SYSPROPS. The ordinal-450 worker snapshot cannot carry them instead, because
-      // ResolvedConfig.toWorkerSnapshot is called exactly once, at boot (HeadlessApp.resolveConfig),
-      // so the file on disk predates this install and knows nothing about the models it just
-      // landed. Deleting this line would re-open tempdoc 374 alpha.19 Bug J-1: SPLADE/NER/reranker
-      // silently disabled after Install AI because the Worker saw modelPath=null. The real fix is
-      // to make the snapshot re-writable at runtime, which is a separate change; until then this is
+      // review S1). Unlike the chat model path it is what the index half actually reads: these five
+      // keys reach it through EnvRegistry.get(), i.e. from THIS JVM'S SYSPROPS. Before lane F stage
+      // A the route was longer and the reason was the same — the Worker was respawned right after
+      // this step (ConfigurationStage's restart gate) and WorkerSpawner forwarded the five keys as
+      // `-D` args. Item A11 deleted the respawn and the forwarding; the read is now direct, so this
+      // write matters more, not less. (Item A19 has since deleted the ordinal-450 worker snapshot
+      // that used to be the alternative here. It was never a usable one: it was written exactly
+      // once, at boot, so the file always predated an install and knew nothing about the models it
+      // had just landed. The "real fix" this comment used to name — making the snapshot re-writable
+      // at runtime — is not needed and will not happen; there is one ResolvedConfig now.) Deleting
+      // this line would re-open tempdoc 374 alpha.19 Bug J-1: SPLADE/NER/reranker silently disabled
+      // after Install AI because the index half saw modelPath=null. Until the five keys are read
+      // from ResolvedConfig rather than from sysprops, this is
       // a knowingly-kept ordinal-500 write, not a forgotten one.
       SystemPropertyUtils.setSysPropIfBlank(feature.sysProp(), absolute);
       dirty = true;
@@ -2118,23 +2144,24 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // Worker restart and smoke test
   // ---------------------------------------------------------------------------
 
-  /** @return true when the worker was actually restarted; false when absent or the restart threw */
+  /**
+   * @return always false since lane F stage A item A11: there is no worker process to restart.
+   *
+   * <p>This used to replace the Worker child process so a freshly installed model was picked up
+   * without the user doing anything. The index half runs in this process now, so the equivalent is
+   * an Engine restart — the user's action, not the installer's. The method is kept (rather than
+   * having its two call sites drop the step silently) so the FALSE it returns keeps flowing into
+   * the install status the surface already renders: the caller reports "a restart is required"
+   * instead of claiming the model is live. Stage A §10, "restart-as-reload".
+   */
   private boolean tryRestartWorkerBestEffort() {
-    if (knowledgeServer == null || knowledgeServer.spawner() == null) return false;
-    try {
-      knowledgeServer.spawner().restart();
-      long expectedPid = knowledgeServer.spawner().getWorkerPid();
-      try {
-        knowledgeServer.client().reconnect(expectedPid);
-        knowledgeServer.client().resetCircuitBreaker();
-      } catch (Exception e) {
-        log.debug("Worker client reconnect failed (best-effort)", e);
-      }
-      return true;
-    } catch (Exception e) {
-      log.warn("Worker restart failed (best-effort): {}", e.getMessage());
+    if (knowledgeServer == null || !knowledgeServer.hasClient()) {
       return false;
     }
+    log.info(
+        "AI install complete; an Engine restart is required to load the new model ({})",
+        io.justsearch.app.services.worker.RestartRequiredException.CODE);
+    return false;
   }
 
   /**
@@ -2169,7 +2196,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       } else {
         onlineAi.switchToOnlineMode(); // LEGACY-FALLBACK: no reconciler wired (test/non-configured)
       }
-      CompletableFuture<String> answer = onlineAi.askQuestion("Reply with exactly OK.", "OK");
+      CompletableFuture<String> answer = onlineAi.askQuestion("Reply with exactly OK.", "OK",
+          io.justsearch.app.services.intent.EngineProvenance.internal("post-install-smoke-test",
+              io.justsearch.core.context.EngineContext.Survival.DURABLE,
+              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
       long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(SMOKE_TEST_TIMEOUT_MS);
       String result;
       while (true) {

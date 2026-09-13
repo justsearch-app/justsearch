@@ -31,7 +31,7 @@ import org.junit.jupiter.api.io.TempDir;
  * document where it is and hand the decision upward — which is what lets {@code KnowledgeServer}
  * open Blue read-only and build Green beside it.
  */
-final class SchemaMismatchPolicyBranchTest {
+final class SchemaMismatchPolicyBranchTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -88,7 +88,7 @@ final class SchemaMismatchPolicyBranchTest {
                 FieldCatalogDef.forTesting(4),
                 withFingerprint(STORED),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open();
     r.indexingCoordinator()
         .indexSingle(
@@ -105,7 +105,7 @@ final class SchemaMismatchPolicyBranchTest {
                 FieldCatalogDef.forTesting(4),
                 withoutFingerprint(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open();
     r.indexingCoordinator()
         .indexSingle(
@@ -168,7 +168,7 @@ final class SchemaMismatchPolicyBranchTest {
                               FieldCatalogDef.forTesting(4),
                               withFingerprint(EXPECTED),
                               new JsonSchemaCommitMetadataValidator())
-                          .atPath(dir)
+                          .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
                           .open());
           assertEquals(
               IndexRuntimeIOException.Reason.SCHEMA_MISMATCH,
@@ -199,7 +199,7 @@ final class SchemaMismatchPolicyBranchTest {
                               FieldCatalogDef.forTesting(4),
                               withFingerprint(EXPECTED),
                               new JsonSchemaCommitMetadataValidator())
-                          .atPath(dir)
+                          .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
                           .open());
           assertEquals(IndexRuntimeIOException.Reason.SCHEMA_MISMATCH, e.reason());
           assertEquals(
@@ -226,7 +226,7 @@ final class SchemaMismatchPolicyBranchTest {
                       FieldCatalogDef.forTesting(4),
                       withFingerprint(EXPECTED),
                       new JsonSchemaCommitMetadataValidator())
-                  .atPath(dir)
+                  .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
                   .open()) {
             assertEquals(
                 0,
@@ -263,7 +263,7 @@ final class SchemaMismatchPolicyBranchTest {
                               FieldCatalogDef.forTesting(4),
                               withFingerprint(EXPECTED),
                               new JsonSchemaCommitMetadataValidator())
-                          .atPath(dir)
+                          .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
                           .open());
           assertEquals(
               IndexRuntimeIOException.Reason.SCHEMA_MISMATCH,
@@ -292,7 +292,7 @@ final class SchemaMismatchPolicyBranchTest {
                               FieldCatalogDef.forTesting(4),
                               withFingerprint(EXPECTED),
                               new JsonSchemaCommitMetadataValidator())
-                          .atPath(dir)
+                          .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
                           .open());
           assertEquals(IndexRuntimeIOException.Reason.SCHEMA_MISMATCH, e.reason());
           assertEquals(seeded, docCount(dir), "refusing must not cost the user a document");
@@ -318,7 +318,7 @@ final class SchemaMismatchPolicyBranchTest {
                       FieldCatalogDef.forTesting(4),
                       withFingerprint(EXPECTED),
                       new JsonSchemaCommitMetadataValidator())
-                  .atPath(dir)
+                  .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
                   .open()) {
             assertEquals(0, r.indexCountOps().docCount());
           }

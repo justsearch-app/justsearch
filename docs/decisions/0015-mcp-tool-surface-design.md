@@ -2,11 +2,11 @@
 title: "ADR-0015: MCP Tool Surface Design"
 type: decision
 status: stable
-description: "Consolidate the MCP surface from 7 capability-oriented tools to a short task-oriented list for higher agent accuracy; the shipped surface is six task-oriented tools (amended 2026-09-02)."
+description: "Keep a short task-oriented MCP surface; the accepted seven-tool list includes a read-only operation outcome query for recovery (amended 2026-09-13)."
 date: 2026-04-01
 probes:
-  - adr-0015-six-mcp-tools
-last_reviewed: 2026-09-04
+  - adr-0015-seven-mcp-tools
+last_reviewed: 2026-09-13
 ---
 
 # ADR-0015: MCP Tool Surface Design
@@ -138,3 +138,42 @@ This is a representation change, not a seventh tool or a narrowing of the decisi
 counts entries in the typed production registry. The six names and their order remain `answer`,
 `search`, `browse`, `ingest`, `status`, and `runtime_manifest`; any seventh registry entry still
 fails the count premise and forces another decision review.
+
+## Amendment 2026-09-13: a separate operation-outcome recovery query
+
+**Classification: narrowed.** The short task-oriented surface remains the decision; the
+six-entry cardinality no longer describes the lane F candidate. At review, origin/main
+3a3e8e489 still has six entries in `McpToolSurface.PRODUCTION_TOOL_DEFINITIONS`; lane F
+15bac5f90 has seven. Hosted CI34775117498 and the local ADR premise probe correctly rejected
+that drift. The accepted target is the existing six tools, in their existing order, followed
+by `justsearch_operation_outcome`. This amendment records the decision under delegated lane F
+authority before changing the probe; it does not claim the candidate has merged into main.
+
+The additional task is to determine whether an earlier mutation was accepted or completed
+after the caller lost its response or the Engine restarted. `McpToolSurface.java:385-387`
+defines one required argument, the original UUIDv7 `operationKey`. The registry entry at
+`:434-444` is read-only and states that the query never starts or retries work; dispatch at
+`:498` reaches `callOperationOutcome` at `:547-560`, which calls the existing operation-outcome
+read projection. Its metadata answer distinguishes accepted, running, complete, failed,
+unknown and expired. That distinction is needed before deciding whether another mutation is
+safe: missing retained history cannot be treated as proof that nothing happened.
+
+The alternatives were re-examined against the existing schemas. `justsearch_status` has no
+arguments and answers index health/readiness; an optional operation-key mode would introduce
+a different subject and result contract into that tool. Putting this query into a write tool
+would blur the guaranteed no-effect recovery check with execution. Omitting the query leaves
+MCP callers without the same recovery observation available to HTTP callers. A dedicated final
+entry keeps its one-key schema explicit and preserves answer-first ordering for retrieval.
+It adds one selection choice; the cardinality remains a deliberate bounded decision.
+
+The original four-tool Haiku results remain evidence only for that four-tool surface.
+Neither the six-tool nor this seven-tool list has a new comparative tool-selection accuracy
+measurement in this amendment. Existing operation-outcome tests, including
+`modules/app-engine/src/test/java/io/justsearch/app/engine/OperationOutcomeQueryTest.java`,
+prove outcome/restart/key semantics, not model selection quality. Lane F C2 retains its live
+MCP and real-model behavior verification obligations; no earlier accuracy number is reused.
+
+Probe `adr-0015-seven-mcp-tools` now pins exactly seven entries in the same canonical typed
+registry. Removing a required tool or adding an eighth fails the premise. Reassess this
+amendment if tool-selection evidence favors consolidation, if outcome querying acquires
+mutation behavior, or before any eighth entry. A broader tool inventory is not authorized.

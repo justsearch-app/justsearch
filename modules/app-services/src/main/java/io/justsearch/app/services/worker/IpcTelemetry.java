@@ -1,28 +1,27 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
-import io.justsearch.app.services.worker.IpcTags.CircuitBreakerStateChangeTags;
 import io.justsearch.app.services.worker.IpcTags.WorkerRestartTags;
 import io.justsearch.telemetry.catalog.EmptyTags;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * IPC-focused telemetry helper for worker process lifecycle instrumentation.
+ * IPC-focused telemetry helper for worker lifecycle instrumentation.
  *
- * <p>Tempdoc 417 Phase 2e: thin façade over {@link IpcMetricCatalog}. Bridge holders
- * ({@code WorkerSpawner}, {@code GrpcCircuitBreaker}, {@code RemoteKnowledgeClient}) take
- * {@link IpcTelemetry} (not the catalog) and use {@link #noop()} when no telemetry is wired.
- *
- * <p>Provides low-cardinality metrics for:
- * <ul>
- *   <li>Port discovery latency and timeouts</li>
- *   <li>Worker restart attempts and outcomes</li>
- *   <li>Shutdown timeouts and forcible kills</li>
- *   <li>PID validation mismatches</li>
- * </ul>
+ * <p>Tempdoc 417 Phase 2e: thin façade over {@link IpcMetricCatalog}. Holders take
+ * {@link IpcTelemetry} (not the catalog) and use {@link #noop()} when no telemetry is wired;
+ * {@code KnowledgeClient} is the one that survives the process merge, and it records the
+ * status-poll pair.
  *
  * <p>All metrics use the "ipc." namespace prefix for consistent filtering.
+ *
+ * <p><b>Lane F stage A item A10</b> removed the three channel recorders (reconnect and the two
+ * circuit-breaker ones) with the wire client stack that called them. The remaining
+ * spawn/supervision recorders — port discovery, restart outcomes, shutdown timeouts, PID
+ * mismatches — lost their producers at item A11 when the Worker process was deleted; they are
+ * kept here deliberately, because unlike the channel metrics their subject (a supervised
+ * subprocess) is scheduled to return at stage B rather than to disappear.
  */
 public final class IpcTelemetry {
 
@@ -85,26 +84,6 @@ public final class IpcTelemetry {
   /** Records a forcible process kill. */
   public void recordForcibleKill() {
     catalog.shutdownForcibleKill.increment(EmptyTags.INSTANCE);
-  }
-
-  /** Records a gRPC client reconnect due to port change. */
-  public void recordReconnect() {
-    catalog.grpcReconnect.increment(EmptyTags.INSTANCE);
-  }
-
-  /**
-   * Records a circuit breaker state transition.
-   *
-   * @param from the previous state
-   * @param to the new state
-   */
-  public void recordCircuitBreakerStateChange(CircuitBreakerState from, CircuitBreakerState to) {
-    catalog.circuitBreakerStateChange.increment(new CircuitBreakerStateChangeTags(from, to));
-  }
-
-  /** Records a request rejected due to open circuit breaker. */
-  public void recordCircuitBreakerRejection() {
-    catalog.circuitBreakerRejected.increment(EmptyTags.INSTANCE);
   }
 
   /**

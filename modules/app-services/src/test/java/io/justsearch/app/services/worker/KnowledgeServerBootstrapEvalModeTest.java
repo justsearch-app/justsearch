@@ -67,15 +67,15 @@ final class KnowledgeServerBootstrapEvalModeTest {
     System.setProperty(EVAL_MODE_PROP, "true");
     Path dataDir = Files.createDirectories(tempDir.resolve("data"));
     KnowledgeServerConfig config = configFor(dataDir, tempDir.resolve("working"));
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
 
-    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
+    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config);
     bootstrap.tryIngestHelpFiles(client, config);
 
     assertFalse(
         Files.exists(dataDir.resolve(".help-ingested-version")),
         "Marker file must NOT be written when eval.mode=true");
-    verify(client, never()).submitBatch(any(), anyBoolean(), anyString());
+    verify(client, never()).submitBatch(any(), anyBoolean(), anyString(), any());
   }
 
   @Test
@@ -90,16 +90,16 @@ final class KnowledgeServerBootstrapEvalModeTest {
     KnowledgeServerConfig config = configFor(dataDir, workingDir);
 
     // Don't stub submitBatch — default null return is fine; production ignores the return value.
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
 
-    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
+    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config);
     bootstrap.tryIngestHelpFiles(client, config);
 
     assertTrue(
         Files.exists(dataDir.resolve(".help-ingested-version")),
         "Marker file must be written after successful ingest");
     // Production calls submitBatch exactly once with the full path list — no batching at this layer.
-    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString());
+    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), any());
   }
 
   /** Build a minimal KnowledgeServerConfig pointing at the temp directories. */
@@ -109,12 +109,9 @@ final class KnowledgeServerBootstrapEvalModeTest {
         /* dataDir */ dataDir,
         /* libDir */ dataDir, // unused by tryIngestHelpFiles
         /* workingDirectory */ workingDir,
-        /* workerLibDir */ dataDir, // unused by tryIngestHelpFiles
-        /* signalFilePath */ dataDir.resolve("worker_signal.lock"),
         /* deadlineMs */ 5_000L,
         /* portDiscoveryTimeoutMs */ 15_000L,
         /* maxRetries */ 3,
-        /* workerHeapSize */ "256m",
         /* workerShutdownTimeoutMs */ 5_000L,
         /* pidValidationTimeoutMs */ 5_000L,
         /* stabilityWindowMs */ 300_000L,

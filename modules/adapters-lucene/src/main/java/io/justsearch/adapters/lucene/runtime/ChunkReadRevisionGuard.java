@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * computed digest is memoized per parent for the lifetime of this guard — one instance per read —
  * so N chunks of one parent cost one hash, not N. Trusting the stored value rests on §C.6's
  * invariant that {@code content_sha256} is written from the same digest wherever {@code content}
- * is: {@code IndexingDocumentOps#buildDocumentFields}, both {@code GrpcIngestService} VDU
+ * is: {@code IndexingDocumentOps#buildDocumentFields}, both {@code WorkerIngestService} VDU
  * content-overwrite branches, and {@code KnowledgeServerMigrationOps}' VDU replay are the only
  * production writers of {@code content}, and all four write the pair together.
  */

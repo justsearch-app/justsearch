@@ -31,6 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 final class OnlineAiServiceImplTest {
 
   @Mock InferenceLifecycleManager manager;
+  @Mock io.justsearch.app.api.EngineAdmissionService admission;
+  @Mock io.justsearch.app.api.EngineWorkHandle work;
 
   @TempDir Path tmp;
 
@@ -38,7 +40,7 @@ final class OnlineAiServiceImplTest {
 
   @BeforeEach
   void setUp() {
-    service = new OnlineAiServiceImpl(manager);
+    service = new OnlineAiServiceImpl(admission, manager);
   }
 
   @Test
@@ -70,22 +72,23 @@ final class OnlineAiServiceImplTest {
 
   @Test
   void summarize_usesDefaultTokens() {
-    when(manager.summarize(anyString(), anyInt()))
+    var context = engineContext();
+    when(admission.attach(context)).thenReturn(work);
+    when(manager.summarize(anyString(), anyInt(), same(work)))
         .thenReturn(CompletableFuture.completedFuture("result"));
 
-    var unused = service.summarize("some content");
+    var unused = service.summarize("some content", 0, context);
 
-    verify(manager).summarize("some content", OnlineAiService.DEFAULT_SUMMARY_TOKENS);
+    verify(manager).summarize("some content", OnlineAiService.DEFAULT_SUMMARY_TOKENS, work);
   }
 
   @Test
   void summarize_resolvesZeroTokensToDefault() {
-    when(manager.summarize(anyString(), anyInt()))
-        .thenReturn(CompletableFuture.completedFuture("result"));
-
-    var unused = service.summarize("some content", 0);
-
-    verify(manager).summarize("some content", OnlineAiService.DEFAULT_SUMMARY_TOKENS);
+    var failure = assertThrows(
+        java.util.concurrent.CompletionException.class,
+        () -> service.summarize("some content", 0).join());
+    assertInstanceOf(IllegalStateException.class, failure.getCause());
+    verifyNoInteractions(admission, manager);
   }
 
   // Tempdoc 491 §C5: streamSummary + streamAnswer test coverage removed; the interface
@@ -100,7 +103,11 @@ final class OnlineAiServiceImplTest {
     Consumer<String> onComplete = mock(Consumer.class);
     Consumer<Throwable> onError = mock(Consumer.class);
 
-    service.streamChat(messages, -1, onChunk, onComplete, onError);
+    var work = mock(io.justsearch.app.api.EngineWorkHandle.class);
+    service.stream(
+        new OnlineAiService.StreamRequest(messages, -1, null, null, true, work),
+        new OnlineAiService.StreamSink(onChunk, ignored -> {}, ignored -> {}, ignored -> {},
+            onComplete, onError));
 
     verify(manager)
         .stream(
@@ -109,7 +116,17 @@ final class OnlineAiServiceImplTest {
             eq(OnlineAiService.DEFAULT_QA_TOKENS),
             any(), any(), any(), any(), any(), any(),
             isNull(),
-            eq(true));
+            eq(true), same(work));
+  }
+
+  @Test
+  void streamCarriesExactWorkOwnerToProducer() {
+    var work = mock(io.justsearch.app.api.EngineWorkHandle.class);
+    var request = new OnlineAiService.StreamRequest(List.of(Map.of("role", "user", "content", "probe")),
+        32, null, null, true, work);
+    service.stream(request, OnlineAiService.StreamSink.of(ignored -> {}, ignored -> {}, ignored -> {}));
+    verify(manager).stream(eq(request.messages()), isNull(), eq(32), any(), any(), any(), any(), any(), any(),
+        isNull(), eq(true), same(work));
   }
 
   @Test
@@ -443,10 +460,13 @@ final class OnlineAiServiceImplTest {
   void countPromptTokens_withTools_threadsToolListToManager() {
     List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "hi"));
     List<Map<String, Object>> tools = List.of(Map.of("type", "function"));
-    when(manager.countPromptTokens(messages, tools)).thenReturn(java.util.Optional.of(1234));
+    var context = engineContext();
+    when(admission.attach(context)).thenReturn(work);
+    when(manager.countPromptTokens(messages, tools, work)).thenReturn(java.util.Optional.of(1234));
 
-    assertEquals(java.util.Optional.of(1234), service.countPromptTokens(messages, tools));
-    verify(manager).countPromptTokens(messages, tools);
+    assertEquals(
+        java.util.Optional.of(1234), service.countPromptTokens(messages, tools, context));
+    verify(manager).countPromptTokens(messages, tools, work);
   }
 
   /**
@@ -492,5 +512,17 @@ final class OnlineAiServiceImplTest {
         legacyImplementor.countPromptTokens(messages, List.of(Map.of("type", "function"))),
         "default overload must fall through to the single-argument override");
     assertEquals(List.of(messages), seen, "the single-argument form must be the one invoked");
+  }
+
+  private static io.justsearch.core.context.EngineContext engineContext() {
+    return new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.INTERNAL,
+        "inference-test",
+        java.util.Optional.empty(),
+        java.util.Optional.empty(),
+        "internal",
+        "request",
+        io.justsearch.core.context.EngineContext.Survival.DURABLE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
   }
 }

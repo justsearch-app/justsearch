@@ -315,7 +315,7 @@ final class ChatControllerConversationJoinTest {
       String shapeId,
       String limit) {
     ChatController controller =
-        new ChatController(
+        new ChatController(new io.justsearch.core.execution.TestEngineExecutors(),
             null,
             new SseWriter(null),
             null,

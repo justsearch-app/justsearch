@@ -17,11 +17,12 @@ Get-Process java -ErrorAction SilentlyContinue | ForEach-Object {
         $wmiProc = Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
         $cmd = $wmiProc.CommandLine
         
-        if ($cmd -match "indexer-worker|HeadlessApp|justsearch|io\.justsearch") {
+        # Lane F stage A item A13: the "indexer-worker" arm (labelled IndexerWorker) is gone with
+        # the Worker child process and its start script: there is no such command line to match.
+        if ($cmd -match "HeadlessApp|justsearch|io\.justsearch") {
             $found += [PSCustomObject]@{
                 PID = $proc.Id
-                Name = if ($cmd -match "indexer-worker") { "IndexerWorker" }
-                       elseif ($cmd -match "HeadlessApp") { "HeadlessApp" }
+                Name = if ($cmd -match "HeadlessApp") { "HeadlessApp" }
                        else { "JustSearch" }
                 Memory = [math]::Round($proc.WorkingSet64 / 1MB, 1)
                 Command = if ($cmd.Length -gt 80) { $cmd.Substring(0, 80) + "..." } else { $cmd }

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -94,20 +96,20 @@ public interface IndexingService {
   }
 
   /** List of paths currently watched for indexing. */
-  List<Path> getWatchedPaths();
+  List<Path> getWatchedPaths(EngineContext engineContext);
 
   /** List of watched roots with collection metadata. */
-  default List<WatchedRoot> getWatchedRoots() {
+  default List<WatchedRoot> getWatchedRoots(EngineContext engineContext) {
     // Fallback for implementations that only support primary collection.
-    return getWatchedPaths().stream().map(p -> new WatchedRoot(null, p)).toList();
+    return getWatchedPaths(engineContext).stream().map(p -> new WatchedRoot(null, p)).toList();
   }
 
   /** Add a new watch root (primary collection). */
-  void addWatchedPath(Path path);
+  void addWatchedPath(Path path, EngineContext engineContext);
 
   /** Add a new watch root for a specific collection. */
-  default void addWatchedRoot(String collection, Path path) {
-    addWatchedPath(path);
+  default void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
+    addWatchedPath(path, engineContext);
   }
 
   /**
@@ -118,11 +120,11 @@ public interface IndexingService {
    * @param path the path to stop watching
    * @return number of deleted jobs, or -1 on error
    */
-  int removeWatchedPath(Path path);
+  int removeWatchedPath(Path path, EngineContext engineContext);
 
   /** Stop watching the given root for a specific collection. */
-  default int removeWatchedRoot(String collection, Path path) {
-    return removeWatchedPath(path);
+  default int removeWatchedRoot(String collection, Path path, EngineContext engineContext) {
+    return removeWatchedPath(path, engineContext);
   }
 
   // =========================================================================
@@ -137,7 +139,7 @@ public interface IndexingService {
    * @param pathPrefix absolute path prefix (directory) to delete
    * @return number of deleted jobs (best-effort), or 0 on failure
    */
-  default int deleteDocsByPathPrefix(Path pathPrefix) {
+  default int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -149,7 +151,7 @@ public interface IndexingService {
    * @param docId document id (normalized absolute path)
    * @return true if the Worker accepted the delete request
    */
-  default boolean deleteDocById(String docId) {
+  default boolean deleteDocById(String docId, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -164,7 +166,7 @@ public interface IndexingService {
    * @param collection the collection tag
    * @return number of documents deleted, or -1 on error
    */
-  default int deleteDocsByCollection(String collection) {
+  default int deleteDocsByCollection(String collection, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -174,8 +176,8 @@ public interface IndexingService {
    * <p>Implementations should scan existing files under each watched root and submit batches to the
    * indexing pipeline. May be expensive for large trees.
    */
-  default void reindex() {
-    reindexWatchedRoots();
+  default void reindex(EngineContext engineContext) {
+    reindexWatchedRoots(engineContext);
   }
 
   /**
@@ -184,8 +186,8 @@ public interface IndexingService {
    * <p>Implementations should scan existing files under each watched root and submit batches to the
    * indexing pipeline. May be expensive for large trees.
    */
-  default void reindexWatchedRoots() {
-    reindexWatchedRoots(false);
+  default void reindexWatchedRoots(EngineContext engineContext) {
+    reindexWatchedRoots(false, engineContext);
   }
 
   /**
@@ -197,8 +199,16 @@ public interface IndexingService {
    *
    * @param force if true, bypass unchanged check and force re-extraction
    */
-  default void reindexWatchedRoots(boolean force) {
+  default void reindexWatchedRoots(boolean force, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
+  }
+
+  /**
+   * Capture the current idle serving generation for a recorded plan. Missing or unreadable
+   * authority refuses; callers must revalidate at admission and commit. This is not a lease.
+   */
+  default String captureServingGeneration(EngineContext engineContext) {
+    throw new UnsupportedOperationException("Serving generation capture unavailable");
   }
 
   /**
@@ -214,7 +224,7 @@ public interface IndexingService {
    * @param force when true (the recovery default), bypass the mtime fast-path and fully re-converge
    * @return true if a matching root was found and the reconcile was dispatched
    */
-  default boolean reconcileRoot(String pathHash, boolean force) {
+  default boolean reconcileRoot(String pathHash, boolean force, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -222,28 +232,31 @@ public interface IndexingService {
   // Migration controls (Phase H)
   // =========================================================================
 
-  /** Starts a Blue/Green migration (best-effort). Implementations may restart the worker. */
-  default boolean startMigration(String reason) {
+  /** Projection of the migration response; the protocol response remains the result authority. */
+  record MigrationOutcome(boolean accepted, boolean restartRequired) {}
+
+  /** Starts a Blue/Green migration and reports whether an Engine restart is required. */
+  default MigrationOutcome startMigration(String reason, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
   /** Requests cutover (best-effort). Implementations may no-op if migration is not in progress. */
-  default boolean requestCutover(boolean forceSwitching) {
+  default MigrationOutcome requestCutover(boolean forceSwitching, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
-  /** Rolls back to the previous generation (best-effort). Implementations may restart the worker. */
-  default boolean rollbackMigration() {
+  /** Rolls back to the previous generation and reports its Engine restart requirement. */
+  default MigrationOutcome rollbackMigration(EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
   /** Pauses migration orchestration (enumerator + cutover monitor). */
-  default boolean pauseMigration(String reason) {
+  default boolean pauseMigration(String reason, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
   /** Resumes migration orchestration. */
-  default boolean resumeMigration() {
+  default boolean resumeMigration(EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -277,7 +290,7 @@ public interface IndexingService {
    * the worker's structured outcome so callers can surface marked / pruned counts
    * (handler's structured-output map; REST response body).
    */
-  default IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+  default IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -324,7 +337,7 @@ public interface IndexingService {
    *     false, also force-merge down to {@code maxSegments} segments
    * @param maxSegments target segment count for the force-merge branch (0 = worker default of 1)
    */
-  default SettleIndexOutcome settleIndex(boolean expungeDeletesOnly, int maxSegments) {
+  default SettleIndexOutcome settleIndex(boolean expungeDeletesOnly, int maxSegments, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -356,7 +369,7 @@ public interface IndexingService {
       String scanId) {}
 
   /** Lists jobs in FAILED state, ordered by most recent failure first. */
-  default List<FailedJobInfo> listFailedJobs(int limit) {
+  default List<FailedJobInfo> listFailedJobs(int limit, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -364,12 +377,12 @@ public interface IndexingService {
    * Lists FAILED jobs under a watched-root path prefix (tempdoc 599 §16/B1) — the per-folder
    * "failed files" drill-down. Returns empty when the Worker is unavailable.
    */
-  default List<FailedJobInfo> listFailedJobsByPathPrefix(Path pathPrefix, int limit) {
+  default List<FailedJobInfo> listFailedJobsByPathPrefix(Path pathPrefix, int limit, EngineContext engineContext) {
     return List.of();
   }
 
   /** Deletes all jobs in FAILED state. */
-  default int clearFailedJobs() {
+  default int clearFailedJobs(EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -440,7 +453,7 @@ public interface IndexingService {
    * Counts in-flight and failed indexing jobs under the given watched-root path prefix. Returns
    * {@link JobCounts#zero()} when the Worker is unavailable (a degraded folder row, never a throw).
    */
-  default JobCounts countJobsByPathPrefix(Path pathPrefix) {
+  default JobCounts countJobsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
     return JobCounts.zero();
   }
 
@@ -449,15 +462,15 @@ public interface IndexingService {
    * SHA-256 path-hash, never the raw path. Implementations that don't support the ledger may
    * return an empty list rather than throwing.
    */
-  default List<java.util.Map<String, Object>> recentIngestionEvents(int limit) {
+  default List<java.util.Map<String, Object>> recentIngestionEvents(int limit, EngineContext engineContext) {
     return List.of();
   }
 
   /**
    * Aggregated ingestion outcome counts since {@code sinceMs} (epoch ms; 0 = all retained).
-   * See {@link #recentIngestionEvents(int)}.
+   * See {@link #recentIngestionEvents(int, EngineContext)}.
    */
-  default List<java.util.Map<String, Object>> ingestionOutcomeSummary(long sinceMs) {
+  default List<java.util.Map<String, Object>> ingestionOutcomeSummary(long sinceMs, EngineContext engineContext) {
     return List.of();
   }
 
@@ -468,7 +481,7 @@ public interface IndexingService {
    * single-purpose endpoint {@code POST /api/library/resolve-hash}; diagnostic export endpoints
    * MUST NOT call this method.
    */
-  default java.util.Map<String, Object> resolvePathHash(String pathHash) {
+  default java.util.Map<String, Object> resolvePathHash(String pathHash, EngineContext engineContext) {
     return java.util.Map.of("found", false);
   }
 
@@ -478,7 +491,7 @@ public interface IndexingService {
    * {@code CANCELLED} outcome, and the change-feed emits an UPDATE delta. Returns a map with
    * {@code cancelled} (boolean) and {@code previousState} (string, diagnostic).
    */
-  default java.util.Map<String, Object> cancelIndexingJob(String pathHash) {
+  default java.util.Map<String, Object> cancelIndexingJob(String pathHash, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -487,17 +500,17 @@ public interface IndexingService {
    * row as PENDING, replacing any existing FAILED entry. Returns a map with {@code retried}
    * (boolean) and {@code previousState} (string, diagnostic).
    */
-  default java.util.Map<String, Object> retryIndexingJob(String pathHash) {
+  default java.util.Map<String, Object> retryIndexingJob(String pathHash, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
   /** Clears all watched roots (stops watchers, clears state, persists). Used by profiling reset. */
-  default void clearAllRoots() {
+  default void clearAllRoots(EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
   /** Resets index state on the Worker via gRPC. Used by profiling reset. Returns true on success. */
-  default boolean resetIndex() {
+  default boolean resetIndex(EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -507,12 +520,12 @@ public interface IndexingService {
    *
    * @param reason low-cardinality telemetry tag (e.g., "admin_triggered")
    */
-  default long reloadRuntime(String reason) {
+  default long reloadRuntime(String reason, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
   /** Flush pending indexing work (best effort). Implementations may no-op or throw if unavailable. */
-  void flush();
+  void flush(EngineContext engineContext);
 
   /**
    * Null Object for environments where the Worker isn't connected. Returns empty
@@ -524,82 +537,82 @@ public interface IndexingService {
   static IndexingService unavailable() {
     return new IndexingService() {
       @Override
-      public List<Path> getWatchedPaths() {
+      public List<Path> getWatchedPaths(EngineContext engineContext) {
         return List.of();
       }
 
       @Override
-      public void addWatchedPath(Path path) {
+      public void addWatchedPath(Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public void addWatchedRoot(String collection, Path path) {
+      public void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public int removeWatchedPath(Path path) {
+      public int removeWatchedPath(Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public int removeWatchedRoot(String collection, Path path) {
+      public int removeWatchedRoot(String collection, Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public int deleteDocsByPathPrefix(Path pathPrefix) {
+      public int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean deleteDocById(String docId) {
+      public boolean deleteDocById(String docId, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public void reindexWatchedRoots(boolean force) {
+      public void reindexWatchedRoots(boolean force, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean startMigration(String reason) {
+      public MigrationOutcome startMigration(String reason, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean requestCutover(boolean forceSwitching) {
+      public MigrationOutcome requestCutover(boolean forceSwitching, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean rollbackMigration() {
+      public MigrationOutcome rollbackMigration(EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean pauseMigration(String reason) {
+      public boolean pauseMigration(String reason, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean resumeMigration() {
+      public boolean resumeMigration(EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+      public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public SettleIndexOutcome settleIndex(boolean expungeDeletesOnly, int maxSegments) {
+      public SettleIndexOutcome settleIndex(boolean expungeDeletesOnly, int maxSegments, EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public void flush() {
+      public void flush(EngineContext engineContext) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
     };

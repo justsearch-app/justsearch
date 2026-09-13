@@ -58,10 +58,8 @@ async function __maybeLockdown() {
 void __maybeLockdown()
 
 import './styles/tokens.css'
-// i18n boots its catalogs at module load (errorCatalog + resourceCatalog) so
-// every shell-v0 element that calls `localizeResourceKey` finds the catalog
-// populated. Slice 3a.1.4b documented the bug class.
-import './i18n'
+// Register local strategies immediately; catalog requests start after API discovery.
+import { startMessageCatalogs } from './i18n'
 // Slice 449 phase 11 — Lit chrome is the production chrome. The React `<App>`
 // + `<GlassShell>` + `<ActivityRail>` + `<Stage>` and the React rail-view
 // components were decommissioned in this slice; the shell-v0 barrel registers
@@ -120,39 +118,20 @@ async function bootstrap() {
 
   // Production boot: <jf-shell> directly. SurfaceCatalog booted up-front
   // so the rail has data on first paint.
-  const { bootSurfaceRegistry } = await import('./api/registry/SurfaceCatalogClient.ts')
-  const { resolveBootApiBase } = await import('./boot/apiBase.ts')
-  const resolvedApiBase = await resolveBootApiBase()
+  const { resolveBootWithRecovery } = await import('./boot/desktopRecovery.ts')
+  const resolvedApiBase = await resolveBootWithRecovery(document.getElementById('root'))
   if (!resolvedApiBase) {
     appLog.error('Unable to resolve JustSearch backend API base')
-    const root = document.getElementById('root')
-    root.innerHTML = '<div role="alert" style="padding:24px;font:14px system-ui,sans-serif">Unable to connect to the JustSearch backend.</div>'
     return
   }
+  const { bootSurfaceRegistry } = await import('./api/registry/SurfaceCatalogClient.ts')
   const apiBase = resolvedApiBase
+  startMessageCatalogs(apiBase)
   try {
     await bootSurfaceRegistry(apiBase)
   } catch {
     // Catalog boot is best-effort; rail re-renders when the listener fires
     // after a successful background re-fetch.
-  }
-
-  // Tempdoc 637 #1 / 805 G.1 — production self-heal for a dead FE→backend binding. When the desktop
-  // shell detects the backend restarted (a new per-boot instanceId ⇒ a new ephemeral port AND a new
-  // session token), the webview's cached binding is dead. The bridge invalidates the cached session
-  // token first, then a full reload re-runs boot → resolveApiEndpoint() re-invokes `api_port` and
-  // re-binds to the live backend. Tauri-only: in the Vite dev server the proxy re-resolves per
-  // request (so no reload is needed, and a reload loop must be avoided). The Rust side emits only
-  // when the binding is REPLACED by a new instance, never on initial boot, so this fires at most
-  // once per real restart.
-  try {
-    const { installBackendRestartBridge } = await import('./api/backendRestart.ts')
-    await installBackendRestartBridge(() => {
-      appLog.warn('Backend restarted on a new instance — reloading to re-bind to the live backend')
-      window.location.reload()
-    })
-  } catch {
-    // Event API unavailable (not running under Tauri) — the self-heal is simply not wired.
   }
 
   // Tempdoc 508 §3.2 — boot operation catalog so commands can project

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.GateBehavior;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.SourceTier;
@@ -64,8 +66,8 @@ public final class PendingAuthorizationStore {
       SourceTier sourceTier,
       RiskTier riskTier,
       GateBehavior gateBehavior,
-      String rationale) {
-    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, null);
+      String rationale, EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance) {
+    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, null, engineContext, provenance);
   }
 
   /**
@@ -81,7 +83,7 @@ public final class PendingAuthorizationStore {
       RiskTier riskTier,
       GateBehavior gateBehavior,
       String rationale,
-      String requestedBy) {
+      String requestedBy, EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance) {
     return create(
         operationId,
         argsJson,
@@ -90,7 +92,7 @@ public final class PendingAuthorizationStore {
         gateBehavior,
         rationale,
         requestedBy,
-        TransportTag.SYSTEM_INTERNAL);
+        TransportTag.valueOf(engineContext.transport()), engineContext, provenance);
   }
 
   /**
@@ -108,7 +110,35 @@ public final class PendingAuthorizationStore {
       GateBehavior gateBehavior,
       String rationale,
       String requestedBy,
-      TransportTag transport) {
+      TransportTag transport, EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance) {
+    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, requestedBy,
+        transport, engineContext, provenance, null, false);
+  }
+
+  /** Preserve the original operation identity across approval; neither field grants authority. */
+  public String create(String operationId, String argsJson, SourceTier sourceTier, RiskTier riskTier,
+      GateBehavior gateBehavior, String rationale, String requestedBy, TransportTag transport,
+      EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance,
+      String operationKey, boolean undo) {
+    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, requestedBy,
+        transport, engineContext, provenance, operationKey, undo, null);
+  }
+
+  /** Preserve the exact frozen preparation selected before the gate. */
+  public String create(String operationId, String argsJson, SourceTier sourceTier, RiskTier riskTier,
+      GateBehavior gateBehavior, String rationale, String requestedBy, TransportTag transport,
+      EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance,
+      String operationKey, boolean undo, UUID preparationNonce) {
+    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, requestedBy,
+        transport, engineContext, provenance, operationKey, undo, preparationNonce, null);
+  }
+
+  /** The preview is a bounded projection for point-to-point approval, never routing broadcast. */
+  public String create(String operationId, String argsJson, SourceTier sourceTier, RiskTier riskTier,
+      GateBehavior gateBehavior, String rationale, String requestedBy, TransportTag transport,
+      EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance,
+      String operationKey, boolean undo, UUID preparationNonce,
+      io.justsearch.agent.api.registry.OperationApprovalPreview approvalPreview) {
     Instant now = clock.instant();
     // Evict expired entries here — expiry is otherwise only checked lazily on peek/consume of
     // a specific id, so a pending that is gated-then-abandoned (never approved) would never be
@@ -136,7 +166,7 @@ public final class PendingAuthorizationStore {
             now,
             now.plus(ttl),
             requestedBy,
-            transport));
+            transport, engineContext, provenance, operationKey, undo, preparationNonce, approvalPreview));
     return id;
   }
 

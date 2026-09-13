@@ -1,0 +1,155 @@
+{
+  "revision": "4cc619fb4 + final stream ownership correction",
+  "summary": {
+    "numTotalTests": 6508,
+    "numPassedTests": 6508,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "success": true
+  },
+  "files": 484,
+  "commands": [
+    "npm run test:unit:run -- --reporter=default --reporter=json --outputFile=../../tmp/c2-3-stream-owner1050-vitest.json",
+    "npm run typecheck",
+    "npm run lint"
+  ],
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-stream-owner-negative1044",
+    "c2-3-stream-owner1045",
+    "c2-3-stream-owner1046",
+    "c2-3-stream-owner1047",
+    "c2-3-stream-owner1048",
+    "c2-3-stream-owner1049",
+    "c2-3-stream-owner1050",
+    "c2-3-stream-owner-negative1051",
+    "c2-3-stream-owner1052",
+    "c2-3-stream-owner1053"
+  ],
+  "sources": [
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts",
+      "sha256": "06d6c846866dd91c8d14ffbab900f200e859ad8073c608c29b7a36bb36418ef6"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "sha256": "f88f6d735ccfcd8fb19b3d6b8302f8370856449f8bf117c5a5520c12ae81182e"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts",
+      "sha256": "42ee4397b06ebb816bfc36b4f394a8bfe10d5b0cf59d69be1fb9535a76d63187"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "tmp/c2-3-stream-owner-negative1044.txt",
+      "bytes": 3627,
+      "sha256": "107dd6333b78d2a170306171a9f483c25b7594f0327cf6855c0ebf9252e49545"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner-negative1051.txt",
+      "bytes": 2329,
+      "sha256": "fb9d12b07cf4cfa0b6ef83d005d5f78553d0f806e96e4a85583e411c396cb606"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1045-typecheck.txt",
+      "bytes": 63,
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1045.txt",
+      "bytes": 24850,
+      "sha256": "e9b194ca51a4f31a34659d11acfec64d606474675680f4738dabc413b8d1cbc3"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1046.txt",
+      "bytes": 24851,
+      "sha256": "f7e1b369bd29ccbff7002287dcad0e46783d75b7f66e9aa0b7e753e658763ef6"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1047.txt",
+      "bytes": 427,
+      "sha256": "d06e65c0a0cdcab64c50ae82bbf036fcc73471c240a5bbdc6fefed3bc5e84217"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1048.txt",
+      "bytes": 2020,
+      "sha256": "c814596dbe3a38e46d0a4cc65761505a3cfbe7beeed43db9970b21506385a8c3"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1049.txt",
+      "bytes": 427,
+      "sha256": "e116badd7080fde3a640123f5c0e980d108b6f8342ce959e1e587f573eba9b27"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1050-lint.txt",
+      "bytes": 54,
+      "sha256": "3149ac7befc4811974b69632c28064ab3d8f1160b3f889c1071a9fe40ec62284"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1050-typecheck.txt",
+      "bytes": 63,
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1050-vitest.json",
+      "bytes": 2468805,
+      "sha256": "4daf80902979481d018f8e4bd55282e851c44a7341d163264da6416e48f4e6ed"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1050.txt",
+      "bytes": 930523,
+      "sha256": "12ea5b8e81e1e442e416b00e087ab11f3e8f702791f1c56e36e9200206819980"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1052.txt",
+      "bytes": 427,
+      "sha256": "1173e7bf01d3e11c2144989ac332d830b7bcba081a5a57b28952e52d288b279f"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-affected.txt",
+      "bytes": 179,
+      "sha256": "2a390deeeafaab22efb803acf89bbba3f047782ae86ce56fabb11635d2ced4a9"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-generate.txt",
+      "bytes": 58,
+      "sha256": "0d32e5da615e7dbed077b33f9087265d3025a49ee540d77200b0de1d1d8e0df4"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-links.txt",
+      "bytes": 44,
+      "sha256": "feba590381f9dcc8d994c8c4a0cafa8c6b29fcedcd4cbd621733ad9d04cc4f0f"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-llmstxt.txt",
+      "bytes": 49,
+      "sha256": "c6c1b413b5b641cb17badc7a1d90d3d82c59311fa68bfe65993e1e6e652cbe86"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-module-deps.txt",
+      "bytes": 101,
+      "sha256": "2e39ff52754c4874d187c98f9384948792fbda51ea5766ebd74c1d73a4f3aae1"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-runtime-matrix.txt",
+      "bytes": 66,
+      "sha256": "eeb41fc8bc569a2ca5d3ce87bc73abe65da57168bc28cbefda53bc4056b4af33"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-skills-sync.txt",
+      "bytes": 58,
+      "sha256": "f8b1ea5dfa9a4c7c0a5463e76ca4139a59541a61f28c3543fa3457259b6c3676"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-skills.txt",
+      "bytes": 57,
+      "sha256": "feca1fb60cd7f9a2ed3a32ec2c567623d00d1a9082bb44ce9b273c345a943ef3"
+    },
+    {
+      "path": "tmp/c2-3-stream-owner1053-ui-coverage.txt",
+      "bytes": 430,
+      "sha256": "37ab0713d91bbaeef27c95a93fdd6ab89781859fac214352447faba36a5c239c"
+    }
+  ]
+}

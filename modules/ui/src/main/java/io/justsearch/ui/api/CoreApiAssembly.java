@@ -69,7 +69,8 @@ final class CoreApiAssembly {
       AiModelsController aiModelsController,
       HeadHttpInflightMetricCatalog inflightCatalog,
       HeadGpuMetricCatalog gpuCatalog,
-      KnowledgeSearchController knowledgeSearchController) {}
+      KnowledgeSearchController knowledgeSearchController,
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch) {}
 
   static Result assemble(
       LocalApiServer.Builder b,
@@ -215,6 +216,7 @@ final class CoreApiAssembly {
     io.justsearch.ui.observability.GpuSaturationMonitor gpuSaturationMonitor = new io.justsearch.ui.observability.GpuSaturationMonitor();
     io.justsearch.ui.observability.GpuSaturationSampler gpuSaturationSampler =
         new io.justsearch.ui.observability.GpuSaturationSampler(
+            b.executors,
             () -> gpuCapabilitiesService, gpuSaturationMonitor);
     statusLifecycleHandler.setGpuSaturationMonitor(gpuSaturationMonitor);
     // Tempdoc 672 follow-up: idle/energy-aware VDU auto-trigger sampler, same shape as
@@ -223,6 +225,7 @@ final class CoreApiAssembly {
     final HeadAssembly headForVduSampler = b.HeadAssembly;
     io.justsearch.app.services.vdu.VduOfflineTriggerSampler vduOfflineTriggerSampler =
         new io.justsearch.app.services.vdu.VduOfflineTriggerSampler(
+            b.executors,
             () ->
                 headForVduSampler != null
                     ? headForVduSampler.headInfraRegistry().offlineCoordinator()
@@ -256,7 +259,10 @@ final class CoreApiAssembly {
               java.time.Clock.systemUTC(),
               () ->
                   b.knowledgeServer != null
-                      ? b.knowledgeServer.client().getWatchedRoots()
+                      ? b.knowledgeServer.client().getWatchedRoots(
+                          io.justsearch.app.services.intent.EngineProvenance.internal(
+                              "index-drift-health-tap", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND))
                       : java.util.List.of()));
       // Tempdoc 629 (FLOOR): wire the at-rest-protection condition tap + the shared disk-encryption
       // probe (one PowerShell shell-property read of the data-dir volume, cached 5s, fed to both the
@@ -351,7 +357,7 @@ final class CoreApiAssembly {
     // unless the head's own apiPort already holds it (then 8082). Pre-alpha.13
     // both defaulted to 8080 and collided.
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(llamaServerPortSupplier, telemetry);
+        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry);
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).
@@ -367,7 +373,7 @@ final class CoreApiAssembly {
     EffectiveConfigController effectiveConfigController =
         new EffectiveConfigController(portSupplier, b.settingsStore, enterprisePolicyService,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(), b.indexBasePath,
-            ConfigStore.globalOrNull());
+            ConfigStore.globalOrNull(), b.engineAdmission);
     SessionPoliciesController sessionPoliciesController =
         b.knowledgeServer != null
             ? new SessionPoliciesController(b.knowledgeServer.client())
@@ -391,6 +397,7 @@ final class CoreApiAssembly {
     } else {
       runtimeActivationHelper =
           new RuntimeActivationService(
+              b.executors,
               onlineAi,
               b.settingsStore,
               gpuCapabilitiesService,
@@ -414,7 +421,8 @@ final class CoreApiAssembly {
       }
     }
     AiRuntimeController aiRuntimeController =
-        new AiRuntimeController(runtimeActivationHelper, telemetry);
+        new AiRuntimeController(runtimeActivationHelper, telemetry,
+            b.HeadAssembly == null || b.HeadAssembly.serviceOut() == null);
     // Tempdoc 656 Task 4: read-only reconciliation of the model registry against on-disk
     // presence — reuses aiInstallHelper + runtimeActivationHelper, no new resolution logic.
     AiModelsController aiModelsController =
@@ -494,9 +502,13 @@ final class CoreApiAssembly {
 
     // Log server start event
     eventBuffer.info("LocalApiServer", "API Server starting");
+    // The core search cohort keeps the borrowed Head owner for both eager and late wiring.
+    var perSourceSearch = b.perSourceSearch != null ? b.perSourceSearch
+        : b.HeadAssembly == null ? null : b.HeadAssembly.perSourceSearch();
     KnowledgeSearchController knowledgeSearchController = b.knowledgeServer != null
         ? new KnowledgeSearchController(
             b.knowledgeServer,
+            perSourceSearch,
             telemetry,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(),
             b.lambdaMartReranker,
@@ -537,7 +549,8 @@ final class CoreApiAssembly {
         aiModelsController,
         inflightCatalog,
         gpuCatalog,
-        knowledgeSearchController);
+        knowledgeSearchController,
+        perSourceSearch);
   }
 
   private static io.justsearch.app.services.lifecycle.WorkerCapability resolveWorkerCapability(

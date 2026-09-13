@@ -1,0 +1,97 @@
+{
+  "revision": "83a78c564 + final reviewed prepared approval prerequisite",
+  "command": "gradlew.bat :modules:app-agent-api:test :modules:app-services:test --tests '*PendingAuthorizationStoreTest' --tests '*ConsentCapsuleServiceTest' --tests '*OperationExecutorImplTest' :modules:ui:test --tests '*AuthorizationControllerTest' --tests '*OperationsControllerTest' --tests '*McpOperationKeyTest' :modules:app-agent-api:pmdMain :modules:app-services:pmdMain :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 422,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 52
+  },
+  "tasks": [
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 239,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 41
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 114,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 7
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 69,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "reuseOrigins": {
+    "app-agent-api:test": "972 executed239, successful run"
+  },
+  "sourceHashes": [
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/ConfirmationRequiredException.java",
+      "sha256": "6d5a0f753b5f10256ca89dc386c9ffcf44fdc4e0ac3dde820a97e20707fd5282"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/ConsentCapsuleAuthority.java",
+      "sha256": "beb7309aca0fdd73f6125b35bd86dfbd74bc1d75938bea3137e97fd00f1a31ea"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationDispatcher.java",
+      "sha256": "3d56fadc3b3277b0db3077450f139395e4cf1c110a3b13e982ae6ca048b71adf"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/intent/ConsentCapsuleService.java",
+      "sha256": "67686a4a2a522bea224b616384805f35ed584c17bc8b4919f8a7c6bb22d40bfb"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/intent/PendingAuthorization.java",
+      "sha256": "7fc7291eb382eeabd98b99db0fd4a0611a6ab9f36919f3e1dc1322ecd543666f"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/intent/PendingAuthorizationStore.java",
+      "sha256": "de9bba012faea4f8a42878f8e386ccf1fd996117f865da1f94523a75b057a506"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/AuthorizationController.java",
+      "sha256": "31027d7d478a30d9117be36d3cc7ee3438e35b2bf19d031ccc0c48f6ce208a92"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationsController.java",
+      "sha256": "ddad7099bb31934218e5c35e8c4e7702f390ec51cf5b068464848e8a520290d7"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
+      "sha256": "93e27a237bc9ecc8e4e39d8b6088a42065f7e239443751fc26c164a840e69dde"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/AuthorizationControllerTest.java",
+      "sha256": "8f0b1ccb456e36922326947dffe6d8e32d0d81e3c35c33d2fa93264364654055"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/OperationsControllerTest.java",
+      "sha256": "813925eac7d67443d2865ba417c70e9453d43ce398159c67329b03b2d029509f"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java",
+      "sha256": "d9a1ed1d2d5973c8e2476991a29d4cdf469bbfdce6c473a73959fe83531078ea"
+    }
+  ]
+}

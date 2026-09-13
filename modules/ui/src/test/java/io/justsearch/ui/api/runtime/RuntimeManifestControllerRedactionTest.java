@@ -17,6 +17,7 @@ import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestWorkerInfoBuilder;
 import io.justsearch.ui.runtime.RuntimeManifestPublisher;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -132,10 +133,11 @@ class RuntimeManifestControllerRedactionTest {
             .sessionToken("token")
             .readyAt("2026-05-20T20:00:00Z")
             .build();
+    // No grpcPort: lane F item A11 left it without a producer, and this test is about the public
+    // projection preserving the worker sub-record, which state/indexBasePath assert without it.
     RuntimeManifest.WorkerInfo worker =
         RuntimeManifestWorkerInfoBuilder.builder()
             .state("ready")
-            .grpcPort(9000)
             .indexBasePath("/data/idx")
             .readyAt("2026-05-20T20:01:00Z")
             .build();
@@ -165,7 +167,8 @@ class RuntimeManifestControllerRedactionTest {
     RuntimeManifest publicView = manifest.publicProjection();
 
     assertNotNull(publicView.worker(), "worker sub-record must survive projection");
-    assertEquals(9000, publicView.worker().grpcPort());
+    assertEquals("ready", publicView.worker().state());
+    assertEquals("/data/idx", publicView.worker().indexBasePath());
     assertNotNull(publicView.ai(), "ai sub-record must survive projection");
     assertEquals("READY", publicView.ai().phase());
     // Tempdoc 682 Item 2: the build-pin pair is not a credential — it must survive projection.
@@ -214,5 +217,37 @@ class RuntimeManifestControllerRedactionTest {
         RuntimeContract.current().constituents().mcpToolSurfaceVersion(),
         publicView.runtimeContract().constituents().mcpToolSurfaceVersion(),
         "constituent versions must be intact on the public view");
+  }
+
+  @Test
+  void publicProjectionOmitsPrivateManagedChildAndHandoffFields() throws Exception {
+    RuntimeManifest manifest =
+        RuntimeManifestBuilder.builder()
+            .schemaVersion(2)
+            .instanceId("instance-private")
+            .pid(1234L)
+            .startedAt("2026-09-08T12:00:00Z")
+            .dataDir("C:\\private")
+            .head(new RuntimeManifest.HeadInfo(54321, "http://127.0.0.1:54321", "token",
+                "2026-09-08T12:00:01Z", null))
+            .children(
+                List.of(
+                    new io.justsearch.app.api.runtime.ManagedChild(
+                        "private-id", io.justsearch.app.api.runtime.ManagedChild.Kind.LLAMA_SERVER,
+                        4321L, "2026-09-08T12:00:00Z", "c:\\private\\llama.exe",
+                        "http://127.0.0.1:8081", "c:\\private\\model.gguf", "declared", "argv")))
+            .shutdownHandoff(
+                new RuntimeManifest.ShutdownHandoff("pending", "restart", "2026-09-08T12:01:00Z"))
+            .build();
+
+    String publicJson =
+        new tools.jackson.databind.ObjectMapper()
+            .writeValueAsString(manifest.publicProjection());
+
+    assertFalse(publicJson.contains("private-id"));
+    assertFalse(publicJson.contains("children"));
+    assertFalse(publicJson.contains("shutdownHandoff"));
+    assertFalse(publicJson.contains("token"));
+    assertEquals(2, manifest.publicProjection().schemaVersion());
   }
 }

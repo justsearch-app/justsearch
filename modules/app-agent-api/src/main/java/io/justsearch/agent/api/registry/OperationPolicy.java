@@ -6,7 +6,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Six-axis policy for an Operation invocation.
+ * Invocation policy, including the durable record's declared classification.
  *
  * <p>Per tempdoc 429 §6 + §C.D: five core axes (risk, confirm, audit, retry,
  * requiredCapabilities) drive the executor's gating, retry, audit recording, and
@@ -34,7 +34,8 @@ public record OperationPolicy(
     boolean undoSupported,
     Optional<ResourceRef> advisoryClass,
     Optional<OperationRef> inverseOperationRef,
-    Optional<String> capabilityFamily) {
+    Optional<String> capabilityFamily,
+    OperationKind recordKind) {
 
   public OperationPolicy {
     Objects.requireNonNull(risk, "risk");
@@ -44,6 +45,7 @@ public record OperationPolicy(
     Objects.requireNonNull(advisoryClass, "advisoryClass");
     Objects.requireNonNull(inverseOperationRef, "inverseOperationRef");
     Objects.requireNonNull(capabilityFamily, "capabilityFamily");
+    Objects.requireNonNull(recordKind, "recordKind");
     requiredCapabilities =
         requiredCapabilities == null ? Set.of() : Set.copyOf(requiredCapabilities);
   }
@@ -73,7 +75,8 @@ public record OperationPolicy(
         undoSupported,
         advisoryClass,
         Optional.of(Objects.requireNonNull(inverse, "inverse")),
-        capabilityFamily);
+        capabilityFamily,
+        recordKind);
   }
 
   /**
@@ -95,14 +98,30 @@ public record OperationPolicy(
         undoSupported,
         advisoryClass,
         inverseOperationRef,
-        Optional.of(Objects.requireNonNull(family, "family")));
+        Optional.of(Objects.requireNonNull(family, "family")),
+        recordKind);
+  }
+
+  /** Backend record classification; declaring a kind requires its corresponding recovery owner. */
+  public OperationPolicy withRecordKind(OperationKind kind) {
+    return new OperationPolicy(risk, confirm, audit, retry, requiredCapabilities, undoSupported,
+        advisoryClass, inverseOperationRef, capabilityFamily, kind);
+  }
+
+  /** Existing declarations remain ordinary operations until their recorded owners are connected. */
+  public OperationPolicy(RiskTier risk, ConfirmStrategy confirm, AuditPolicy audit, RetryPolicy retry,
+      Set<RequiredCapability> requiredCapabilities, boolean undoSupported,
+      Optional<ResourceRef> advisoryClass, Optional<OperationRef> inverseOperationRef,
+      Optional<String> capabilityFamily) {
+    this(risk, confirm, audit, retry, requiredCapabilities, undoSupported, advisoryClass,
+        inverseOperationRef, capabilityFamily, OperationKind.OPERATION);
   }
 
   /**
    * Backwards-compat constructor (the pre-560-§28 canonical 8-arg shape). Defaults
    * {@link #capabilityFamily} to {@link Optional#empty()} so Operations declared before 4d compile
    * unchanged and belong to no capability family until their authors opt in via
-   * {@link #withCapabilityFamily} or the 9-arg canonical constructor.
+   * {@link #withCapabilityFamily} or the full constructor.
    */
   public OperationPolicy(
       RiskTier risk,

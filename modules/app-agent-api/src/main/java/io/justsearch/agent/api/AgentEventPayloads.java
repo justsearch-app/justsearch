@@ -142,6 +142,7 @@ public final class AgentEventPayloads {
         var errorPayload = new LinkedHashMap<String, Object>();
         errorPayload.put("error", e.error());
         errorPayload.put("errorCode", e.errorCode());
+        if (e.reasonCode() != null) errorPayload.put("reasonCode", e.reasonCode());
         if (e.errorClass() != null) {
           errorPayload.put("errorClass", e.errorClass());
         }

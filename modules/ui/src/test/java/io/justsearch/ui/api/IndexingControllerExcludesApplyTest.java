@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -263,38 +264,38 @@ class IndexingControllerExcludesApplyTest {
     }
 
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(EngineContext engineContext) {
       return roots.stream().map(WatchedRoot::path).toList();
     }
 
     @Override
-    public List<WatchedRoot> getWatchedRoots() {
+    public List<WatchedRoot> getWatchedRoots(EngineContext engineContext) {
       return roots;
     }
 
     @Override
-    public void addWatchedPath(Path path) {
+    public void addWatchedPath(Path path, EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public void flush() {
+    public void flush(EngineContext engineContext) {
       // no-op
     }
 
     @Override
-    public int deleteDocsByPathPrefix(Path pathPrefix) {
+    public int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
       deletedByPathPrefixes.add(pathPrefix.toAbsolutePath().normalize());
       return 3;
     }
 
     @Override
-    public boolean deleteDocById(String docId) {
+    public boolean deleteDocById(String docId, EngineContext engineContext) {
       deletedDocIds.add(docId);
       return true;
     }

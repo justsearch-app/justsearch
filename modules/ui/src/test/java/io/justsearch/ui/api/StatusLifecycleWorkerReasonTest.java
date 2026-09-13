@@ -112,17 +112,6 @@ final class StatusLifecycleWorkerReasonTest {
   }
 
   @Test
-  @DisplayName("the terminal give-up code still passes through (tempdoc 627's behaviour, generalised)")
-  void restartExhaustedStillPassesThrough() {
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(
-        CapabilityHealth.DEGRADED, LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code(), "gave up");
-
-    assertEquals(
-        LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code(), workerComponent(cap).reason_code());
-  }
-
-  @Test
   @DisplayName("825: the boot-recovery give-up reaches the wire as its own terminal code")
   void bootRecoveryExhaustedPassesThrough() {
     WorkerCapability cap = new WorkerCapability();
@@ -133,9 +122,7 @@ final class StatusLifecycleWorkerReasonTest {
 
     LifecycleSnapshotV1.Component c = workerComponent(cap);
     assertEquals(LifecycleState.LIFECYCLE_STATE_ERROR, c.state());
-    // Distinct from BOTH neighbours on purpose: worker.spawn.failed now means "failed, recovery
-    // pending or in flight", and worker.restart_exhausted is supervision's verdict about a worker
-    // that HAD been running. Collapsing either way destroys what the fixture fail-fast keys on.
+    // Unlike worker.spawn.failed, this terminal verdict says no local retry remains.
     assertEquals(LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(), c.reason_code());
   }
 

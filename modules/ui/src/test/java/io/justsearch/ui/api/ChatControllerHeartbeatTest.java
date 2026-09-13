@@ -77,7 +77,7 @@ final class ChatControllerHeartbeatTest {
               return null;
             })
         .when(engine)
-        .run(any(), any(), any(), any());
+        .run(any(), any(), any(), any(), any());
 
     scheduler = Executors.newSingleThreadScheduledExecutor();
     ChatController controller =
@@ -164,6 +164,7 @@ final class ChatControllerHeartbeatTest {
 
   private static Context mockContext(String body) {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/chat/dispatch");
     when(ctx.body()).thenReturn(body);
     when(ctx.contentType(anyString())).thenReturn(ctx);
     when(ctx.attributeOrCompute(anyString(), any())).thenReturn(new Object());
@@ -177,7 +178,7 @@ final class ChatControllerHeartbeatTest {
     // An added START needs an added STOP, or this is tempdoc 638 PE's leak again under a new
     // controller's name — which is why `LocalApiServer` now calls this alongside AgentController's.
     ChatController controller =
-        new ChatController(mock(ConversationEngine.class), mock(SseWriter.class), null);
+        new ChatController(new io.justsearch.core.execution.TestEngineExecutors(), mock(ConversationEngine.class), mock(SseWriter.class), null);
     assertFalse(controller.isHeartbeatSchedulerShutdown(), "running before shutdown");
     controller.shutdown();
     assertTrue(controller.isHeartbeatSchedulerShutdown(), "shutdown() must stop the scheduler");

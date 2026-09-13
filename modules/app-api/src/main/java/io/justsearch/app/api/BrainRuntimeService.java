@@ -56,13 +56,15 @@ public interface BrainRuntimeService {
   ModeTransitionOutcome switchInferenceMode(String mode) throws Exception;
 
   /**
-   * Trigger background offline processing (VDU + embeddings catch-up). Runs
-   * asynchronously on a virtual thread; returns immediately after dispatch.
+   * Start one captured enrichment pass and return its actual completion after owner cleanup.
+   * Progress contains only acknowledged index outcomes; embedding work is a mode handoff.
    *
    * @throws UnsupportedOperationException if the offline-processing trigger
    *     isn't configured (test paths, headless modes that don't enable it)
-   * @throws Exception on dispatch failure
+   * @throws RuntimeException on admission or dispatch failure
    */
-  void triggerOfflineProcessing() throws Exception;
+  java.util.concurrent.CompletionStage<OfflineProcessingOutcome> triggerOfflineProcessing(
+      io.justsearch.core.context.EngineContext context,
+      java.util.function.Consumer<OfflineProcessingOutcome> progress);
 
 }

@@ -1,0 +1,76 @@
+{
+  "revision": "b9acc26e8 + R5 bounded history, timer, migration and atomic completion snapshot",
+  "command": "gradlew.bat :modules:app-api:test --tests *OperationDescriptorPreparationTest :modules:app-observability:test --tests *OperationRetentionTest --tests *SqliteOperationStoreTest --tests *OperationAcceptanceStoreTest --tests *OperationAttemptRunnerTest --tests *OperationChildAcceptanceTest :modules:app-services:test --tests *OperationsRetentionTimerTest --tests *HeadAssemblyTest --tests *OrchestrationHandlesShutdownTest --tests *OperationExecutorImplTest :modules:app-launcher:test --tests *OperationStoreArchitectureTest --tests *LauncherEnvironmentCloseTest :modules:ui:compileIntegrationTestJava :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 228,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 32
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 57,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 111,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 8
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 46,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 16
+    }
+  ],
+  "finalTimerAssertion": {
+    "revision": "b9acc26e8 + R5 final scheduled-callback assertion (production unchanged from810)",
+    "command": "gradlew.bat :modules:app-services:test --tests *OperationsRetentionTimerTest --tests *HeadAssemblyTest --tests *OrchestrationHandlesShutdownTest --tests *OperationExecutorImplTest :modules:ui:compileIntegrationTestJava :modules:app-services:pmdMain :modules:app-services:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+    "summary": {
+      "tests": 111,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 8
+    },
+    "tasks": [
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 111,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 8
+      }
+    ]
+  }
+}

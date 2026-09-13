@@ -83,7 +83,7 @@ final class StreamingCitationIntegrationTest {
                 "The grass is green in the field. JustSearch indexes your files locally. "));
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // Verify rag.citation_delta events exist.
     List<SseEvent> deltas =
@@ -161,7 +161,7 @@ final class StreamingCitationIntegrationTest {
             () -> new WordByWordAi("Answer text here. "));
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     int ragCitationsIdx = -1;
     int firstChunkIdx = -1;
@@ -265,7 +265,7 @@ final class StreamingCitationIntegrationTest {
   private static final class StubDocumentService implements DocumentService {
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
@@ -273,7 +273,8 @@ final class StreamingCitationIntegrationTest {
     public CompletionStage<CitationMatchResult> matchCitations(
         String answerText,
         List<DocumentService.ContextCitation> citations,
-        double threshold) {
+        double threshold,
+        io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(
           new CitationMatchResult(
               List.of(), 0, 0, 0, 0, DocumentService.ScorerKind.NONE, List.of()));

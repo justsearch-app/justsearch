@@ -179,16 +179,16 @@ final class SseStreamChannelAtomicSubscribeTest {
 
   @Test
   @Timeout(30)
-  @DisplayName("the channel lock excludes publish while the replay window is being taken")
-  void subscribeWaitsForAnInFlightPublish() throws Exception {
+  @DisplayName("atomic attachment replays an appended frame while another socket remains blocked")
+  void subscribeDoesNotWaitForAnInFlightSocketWrite() throws Exception {
     SseStreamChannel channel = channel();
     publish(channel, 1);
     long cursor = 0L;
 
     CountDownLatch publisherInsideFanOut = new CountDownLatch(1);
     CountDownLatch releasePublisher = new CountDownLatch(1);
-    // An existing pass-through listener that blocks inside the fan-out, i.e. the publisher
-    // holds the channel's read lock for as long as this listener takes.
+    // Socket delivery is outside the publication boundary. The frame is already appended
+    // and enqueued before this callback blocks, so another subscriber can safely replay it.
     channel.subscribe(
         frame -> {
           if (marker(frame) == 2L) {
@@ -213,15 +213,15 @@ final class SseStreamChannelAtomicSubscribeTest {
             "atomic-subscriber");
     subscriber.start();
 
-    // It must NOT complete: the replay window cannot be taken while a publish is halfway
-    // through appending + fanning out.
-    subscriber.join(300);
-    assertTrue(subscriber.isAlive(), "subscribe blocks until the in-flight publish completes");
-
-    releasePublisher.countDown();
-    publisher.join(TimeUnit.SECONDS.toMillis(20));
-    subscriber.join(TimeUnit.SECONDS.toMillis(20));
-    assertFalse(subscriber.isAlive(), "subscribe completes once the publish releases the lock");
+    try {
+      subscriber.join(5_000);
+      assertFalse(subscriber.isAlive(), "subscribe completes while the existing socket is blocked");
+    } finally {
+      releasePublisher.countDown();
+      publisher.join(TimeUnit.SECONDS.toMillis(20));
+      subscriber.join(TimeUnit.SECONDS.toMillis(20));
+    }
+    assertFalse(publisher.isAlive(), "publisher completes after releasing its callback");
 
     assertNotNull(handle.get());
     assertTrue(handle.get().isPresent(), "cursor 0 is inside the window");

@@ -499,7 +499,7 @@ public final class InferenceCompositionRoot {
     if (selection != null && selection.degraded()) {
       // Tempdoc 691 B-5: a silent degraded selection (INT8 CPU variant on CUDA for NER) cost
       // ~10× per-call for a week with no log line — surface every degraded selection at the
-      // single resolution site so worker.log names the encoder and the reason.
+      // single resolution site so the engine log names the encoder and the reason.
       log.warn("{}: degraded model variant selected — {}", packageId, selection.degradationReason());
     }
     return selection;

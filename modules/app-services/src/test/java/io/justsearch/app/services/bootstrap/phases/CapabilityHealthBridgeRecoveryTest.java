@@ -92,7 +92,7 @@ final class CapabilityHealthBridgeRecoveryTest {
     worker.transition(CapabilityHealth.RECOVERING, "restarting");
     int before = occurrences.recent().size();
     worker.transition(
-        CapabilityHealth.DEGRADED, LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code());
+        CapabilityHealth.DEGRADED, LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code());
     assertFalse(emitted("worker.recovered"), "give-up is not a recovery");
     assertTrue(
         occurrences.recent().size() == before,

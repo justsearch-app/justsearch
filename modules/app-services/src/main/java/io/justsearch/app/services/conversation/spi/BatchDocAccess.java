@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation.spi;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.ContextInjector;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.InjectorResult;
@@ -67,6 +69,7 @@ public final class BatchDocAccess implements ContextInjector {
 
   @Override
   public InjectorResult inject(ConversationContext ctx) {
+    var engineContext = ctx.engineContext();
     Map<String, Object> body = ctx.requestBody();
     List<String> docIds = extractDocIds(body);
 
@@ -84,7 +87,7 @@ public final class BatchDocAccess implements ContextInjector {
 
     // Resolve all docs; failed fetches are tolerated (their slot becomes empty, with a
     // {{File: <name>}} delimiter so the model can see what was attempted).
-    Map<String, DocumentRecord> records = fetchAll(docIds);
+    Map<String, DocumentRecord> records = fetchAll(docIds, engineContext);
 
     String concatenated = formatDocuments(records, docIds);
     if (concatenated.isBlank()) {
@@ -131,10 +134,10 @@ public final class BatchDocAccess implements ContextInjector {
     return List.copyOf(out);
   }
 
-  private Map<String, DocumentRecord> fetchAll(List<String> docIds) {
+  private Map<String, DocumentRecord> fetchAll(List<String> docIds, EngineContext engineContext) {
     try {
       return documents
-          .fetchBatch(docIds)
+          .fetchBatch(docIds, engineContext)
           .toCompletableFuture()
           .get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
     } catch (Exception e) {

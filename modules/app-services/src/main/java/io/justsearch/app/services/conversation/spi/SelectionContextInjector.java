@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation.spi;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.ContextInjector;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.InjectorResult;
@@ -189,6 +191,7 @@ public final class SelectionContextInjector implements ContextInjector {
   // -------------------------------------------------------------------------
 
   private InjectorResult injectTextRange(ConversationContext ctx, SelectionPayload.TextRange tr) {
+    var engineContext = ctx.engineContext();
     ResolvedRange resolved;
     try {
       resolved = resolveAddress(tr.address());
@@ -197,7 +200,7 @@ public final class SelectionContextInjector implements ContextInjector {
       return InjectorResult.terminalError(errorEvent(e.getMessage(), "UNRESOLVABLE_ADDRESS"));
     }
 
-    String fullContent = fetchDocContent(resolved.docId());
+    String fullContent = fetchDocContent(resolved.docId(), engineContext);
     if (fullContent == null || fullContent.isBlank()) {
       return InjectorResult.terminalError(
           errorEvent("Document content unavailable", "DOC_UNAVAILABLE"));
@@ -242,8 +245,9 @@ public final class SelectionContextInjector implements ContextInjector {
    * stranded the user with no UX feedback).
    */
   private InjectorResult injectItem(ConversationContext ctx, SelectionPayload.Item item) {
+    var engineContext = ctx.engineContext();
     String docId = item.itemId();
-    String fullContent = fetchDocContent(docId);
+    String fullContent = fetchDocContent(docId, engineContext);
     if (fullContent == null || fullContent.isBlank()) {
       LOG.info(
           "SelectionContextInjector: item kind {} id {} has no fetchable content",
@@ -271,8 +275,9 @@ public final class SelectionContextInjector implements ContextInjector {
    * collapsed into a direct substring + emit.
    */
   private InjectorResult injectCitation(ConversationContext ctx, SelectionPayload.Citation cit) {
+    var engineContext = ctx.engineContext();
     SourceCitation sc = cit.citation();
-    String fullContent = fetchDocContent(sc.parentDocId());
+    String fullContent = fetchDocContent(sc.parentDocId(), engineContext);
     if (fullContent == null || fullContent.isBlank()) {
       return injectInlineExcerpt(ctx, sc.parentDocId(), sc.excerpt());
     }
@@ -325,6 +330,7 @@ public final class SelectionContextInjector implements ContextInjector {
    * same menu — so it stashes here too, with the per-doc text it actually injected.
    */
   private InjectorResult injectResultSet(ConversationContext ctx, SelectionPayload.ResultSet rs) {
+    var engineContext = ctx.engineContext();
     List<SelectionPayload.ResultRef> refs = rs.items();
     if (refs.isEmpty()) return InjectorResult.empty();
     StringBuilder concat = new StringBuilder();
@@ -337,7 +343,7 @@ public final class SelectionContextInjector implements ContextInjector {
     int taken = 0;
     for (SelectionPayload.ResultRef ref : refs) {
       if (taken >= MAX_RESULT_SET_DOCS) break;
-      String content = fetchDocContent(ref.id());
+      String content = fetchDocContent(ref.id(), engineContext);
       if (content == null || content.isBlank()) continue;
       String truncated = truncateToBudget(content, "result-set document", ref.id(), perDocChars);
       if (concat.length() > 0) concat.append(DocumentService.SECTION_SEPARATOR);
@@ -524,12 +530,12 @@ public final class SelectionContextInjector implements ContextInjector {
     return new SseEvent("rag.citations", Map.of("citations", List.of(citationMap)));
   }
 
-  private String fetchDocContent(String docId) {
+  private String fetchDocContent(String docId, EngineContext engineContext) {
     if (docId == null || docId.isBlank()) return null;
     try {
       DocumentRecord record =
           documents
-              .fetch(docId)
+              .fetch(docId, engineContext)
               .toCompletableFuture()
               .get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
       if (record != null && record.content() != null && !record.content().isBlank()) {

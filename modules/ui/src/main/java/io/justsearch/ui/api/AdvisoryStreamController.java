@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.observability.advisory.AdvisoryChangeRegistry;
 import io.justsearch.app.observability.advisory.AdvisoryClassId;
@@ -11,7 +13,6 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Predicate;
 
@@ -35,6 +36,7 @@ public final class AdvisoryStreamController {
   @SuppressWarnings("unused")
   private final Telemetry telemetry;
 
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final Clock clock;
 
@@ -50,20 +52,22 @@ public final class AdvisoryStreamController {
   private final Predicate<AdvisoryRecord> liveFilter;
 
   public AdvisoryStreamController(
+      EngineExecutorRegistry processExecutors,
       AdvisoryClassId classId,
       AdvisoryLog log,
       AdvisoryChangeRegistry changes,
       Telemetry telemetry) {
-    this(classId, log, changes, telemetry, Clock.systemUTC(), record -> true);
+    this(processExecutors, classId, log, changes, telemetry, Clock.systemUTC(), record -> true);
   }
 
   public AdvisoryStreamController(
+      EngineExecutorRegistry processExecutors,
       AdvisoryClassId classId,
       AdvisoryLog log,
       AdvisoryChangeRegistry changes,
       Telemetry telemetry,
       Clock clock) {
-    this(classId, log, changes, telemetry, clock, record -> true);
+    this(processExecutors, classId, log, changes, telemetry, clock, record -> true);
   }
 
   /**
@@ -72,15 +76,17 @@ public final class AdvisoryStreamController {
    * snapshot; a record for which it returns {@code false} is omitted.
    */
   public AdvisoryStreamController(
+      EngineExecutorRegistry processExecutors,
       AdvisoryClassId classId,
       AdvisoryLog log,
       AdvisoryChangeRegistry changes,
       Telemetry telemetry,
       Predicate<AdvisoryRecord> liveFilter) {
-    this(classId, log, changes, telemetry, Clock.systemUTC(), liveFilter);
+    this(processExecutors, classId, log, changes, telemetry, Clock.systemUTC(), liveFilter);
   }
 
   public AdvisoryStreamController(
+      EngineExecutorRegistry processExecutors,
       AdvisoryClassId classId,
       AdvisoryLog log,
       AdvisoryChangeRegistry changes,
@@ -93,14 +99,13 @@ public final class AdvisoryStreamController {
     this.telemetry = telemetry;
     this.clock = Objects.requireNonNull(clock, "clock");
     this.liveFilter = Objects.requireNonNull(liveFilter, "liveFilter");
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t =
-                  new Thread(r, "advisory-" + classId.value() + "-stream-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.advisory-" + classId.value() + "-stream-heartbeat",
+            "advisory-" + classId.value() + "-stream-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
   }
 
   public void handle(SseClient sseClient) {
@@ -129,5 +134,42 @@ public final class AdvisoryStreamController {
 
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
   }
+
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

@@ -1,0 +1,112 @@
+Lane F stage A item A9 — the accepted reds, checked rather than assumed
+=======================================================================
+
+The item's acceptance names two reds as accepted after A9:
+
+  1. WholeProgramDeadCodeTest   (unreferenced wire classes, until A10)
+  2. adr-0002-grpc-present      (until A15 retires the probe)
+
+Both were run. **Neither is red at A9.** The reasons differ and both matter, so
+they are recorded here rather than left as a silently-unused allowance — an
+accepted red nobody checked is the same false authority as a dead gate.
+
+-----------------------------------------------------------------------
+1. adr-0002-grpc-present — GREEN, and it could not have been otherwise
+-----------------------------------------------------------------------
+
+    $ node scripts/governance/run.mjs --gate adr-coverage --mode gate
+    governance: 1 gate evaluated, 0 fail, 51 findings
+      adr-coverage: pass
+
+This is section 0.1 correction 1, confirmed by running it. The probe
+(governance/adr-probes.v1.json) is:
+
+      "id": "adr-0002-grpc-present",
+      "kind": "grep-present",
+      "pattern": "libs\\.grpc|io\\.grpc",
+      "paths":   ["modules"],
+      "include": [".kts"]          <-- the scope that decides this
+
+It reads BUILD FILES, not Java. A9 removed every `io.grpc` reference from the
+Java main sources of indexer-worker, worker-core and worker-services, and the
+probe did not move, because `libs.grpc.*` is still declared in nine
+`modules/*/build.gradle.kts`. The probe goes red at **A14** (proto service blocks
+and grpc codegen removed), not here. 17.4's "red the moment the wire is deleted"
+is therefore conditional on A14, exactly as 0.1 predicted.
+
+-----------------------------------------------------------------------
+2. WholeProgramDeadCodeTest — GREEN, because the wire still has one caller
+-----------------------------------------------------------------------
+
+    $ ./gradlew.bat :modules:dead-code-audit:cleanTest :modules:dead-code-audit:test \
+        --no-build-cache -PskipWebBuild=true --console=plain
+    BUILD SUCCESSFUL
+
+    $ git diff --stat -- modules/dead-code-audit/archunit_store/
+    (no change — the 18 accepted entries A6 left are still exactly the accepted set)
+
+A6 was expected to strand `RemoteKnowledgeClient` as unreferenced. It did not:
+`KnowledgeServerBootstrap` still constructs it on the legacy no-WorkerHost branch,
+which keeps the whole wire client stack referenced from main source. That branch
+dies at **A11** with `WorkerSpawner`, and A10 deletes the client itself, so the
+accepted red belongs to A10/A11 rather than to A6 or A9.
+
+-----------------------------------------------------------------------
+3. One red A9 DID cause, and did not accept: adr-0048
+-----------------------------------------------------------------------
+
+Deleting `ForegroundLoadInterceptorTest.java` broke a probe the item does not
+mention:
+
+    adr-coverage/probe-failed :: 0048-extraction-isolation-and-indexing-pacing.md:
+      premise "ForegroundLoad is a worker-services type so it survives a Head/Worker
+      merge; the gRPC interceptor that feeds it is the throwaway adapter. This test
+      pins the gauge's balance across ok/error/cancel closes, which is the property
+      the duty cycle depends on." no longer holds — named test file
+      'modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/
+      ForegroundLoadInterceptorTest.java' does not exist.
+
+The premise is not merely still true, it is what A9 just executed: ADR-0048 said
+the interceptor was the throwaway adapter and the gauge would survive, and A9 threw
+the adapter away. What broke was the PIN's subject, not the property.
+
+Two things follow, and the first is the one worth recording:
+
+  (a) The item's instruction to delete A4's `ForegroundLoadGateTest` wholesale was
+      wrong, and following it would have lost seven real assertions. Only TWO of
+      its nine tests were the interceptor drift pin
+      (`operationSetMatchesTheInterceptor`, the interceptor half of
+      `exclusionsAreMirrored`). The other seven pin the gauge's BALANCE across a
+      normal return, a thrown exception, a cancellation and an Error, the two
+      deliberate exclusions, and never-negative under concurrent use — which is
+      precisely what ADR-0048's probe names. Those seven were kept; the drift pin
+      was removed because there is nothing left to drift from.
+
+  (b) The probe was RETARGETED onto the surviving pin
+      (`ForegroundLoadGateTest#eachForegroundOperationIncrementsAndDecrements`),
+      with a `note` recording why. Per the register's own amendment rule this is
+      not "editing the probe until it passes": the probe did not fail because the
+      property lapsed, it failed because the file naming it was deleted by a
+      decision the ADR itself anticipated.
+
+    $ node scripts/governance/run.mjs --gate adr-coverage --mode gate
+      adr-coverage: pass   (after the retarget; 0 errors, 51 informational findings)
+
+-----------------------------------------------------------------------
+4. Environment reds, not content reds (recorded so a later reader does not
+   mistake them for A9's)
+-----------------------------------------------------------------------
+
+    $ node scripts/governance/run.mjs --gate wire --mode gate
+      wire: fail
+      contract-governance/buf-cli-missing :: buf CLI not found at
+        scripts/wire-contract/node_modules/... run 'npm install' in
+        scripts/wire-contract/
+
+    $ node scripts/ci/regen-all.mjs --check
+      regen-all: FAILED at `notices`
+      ENOENT: build/reports/licenses/third-party-licenses.json
+
+Neither is caused by this change: `contracts/**` and the proto are untouched at A9,
+and no `package-lock.json` or model registry moved. Both are missing build inputs
+in a fresh worktree.

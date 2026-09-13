@@ -60,10 +60,12 @@ final class WorkerBootFixture {
       meta.put(IndexFingerprint.COMMIT_META_KEY, fingerprintOverride);
     }
     Map<String, Object> frozen = Map.copyOf(meta);
-    try (RunningRuntime r =
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        RunningRuntime r =
         IndexSchema.fromCatalog(
                 productionCatalog(), () -> frozen, new JsonSchemaCommitMetadataValidator())
-            .atPath(path)
+            .atPath(path).withExecutorRegistrations(luceneExecutors)
             .open()) {
       for (int i = 0; i < docs; i++) {
         r.indexingCoordinator()
@@ -98,10 +100,12 @@ final class WorkerBootFixture {
       meta.put(IndexFingerprint.COMMIT_META_KEY, fingerprintOverride);
     }
     Map<String, Object> frozen = Map.copyOf(meta);
-    try (RunningRuntime r =
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        RunningRuntime r =
         IndexSchema.fromCatalog(
                 productionCatalog(), () -> frozen, new JsonSchemaCommitMetadataValidator())
-            .atPath(path)
+            .atPath(path).withExecutorRegistrations(luceneExecutors)
             .open()) {
       r.indexingCoordinator()
           .indexSingle(

@@ -1,0 +1,23 @@
+{
+  "revision": "0693495bd + R4 acceptance/admission correction",
+  "command": "gradlew.bat :modules:app-services:test --tests *OperationExecutorImplTest :modules:ui:compileIntegrationTestJava :modules:app-services:pmdMain :modules:app-services:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 88,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 5
+  },
+  "tasks": [
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 88,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ]
+}

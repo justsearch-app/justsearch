@@ -45,7 +45,9 @@ final class AgentSession {
    * frame has been evicted from the replay ring.
    */
   record PendingGate(
-      AgentEvent.PendingApproval detail, long sinceEpochMs, CompletableFuture<Boolean> future) {}
+      AgentEvent.PendingApproval detail,
+      java.util.Optional<io.justsearch.agent.api.registry.OperationApprovalPreview> preview,
+      long sinceEpochMs, CompletableFuture<Boolean> future) {}
 
   private final Map<String, PendingGate> approvalGates = new ConcurrentHashMap<>();
   /**
@@ -184,16 +186,48 @@ final class AgentSession {
   private boolean terminated;
 
   /** Backward-compatible constructor for single-agent sessions (no initial agent ID). */
-  AgentSession(List<Map<String, Object>> messages, int initialBudget) {
-    this(messages, initialBudget, null);
+  AgentSession(List<Map<String, Object>> messages, int initialBudget,
+      io.justsearch.core.context.EngineContext engineContext) {
+    this(messages, initialBudget, null, engineContext);
   }
 
-  AgentSession(List<Map<String, Object>> messages, int initialBudget, String initialAgentId) {
+  AgentSession(List<Map<String, Object>> messages, int initialBudget, String initialAgentId,
+      io.justsearch.core.context.EngineContext engineContext) {
+    this(messages, initialBudget, initialAgentId, engineContext, null);
+  }
+
+  AgentSession(List<Map<String, Object>> messages, int initialBudget, String initialAgentId,
+      io.justsearch.core.context.EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
+    this.work = work;
+    this.engineContext = Objects.requireNonNull(engineContext, "engineContext");
     this.messages = new ArrayList<>(messages);
     this.budgetRemaining = new AtomicInteger(initialBudget);
     this.promptTokensConsumed = new AtomicInteger(0);
     this.completionTokensConsumed = new AtomicInteger(0);
     this.activeAgentId = initialAgentId != null ? initialAgentId : "primary";
+  }
+
+  private final io.justsearch.core.context.EngineContext engineContext;
+  // Borrowed from runAgent's try-with-resources; model producers retain their own reference.
+  private final io.justsearch.app.api.EngineWorkHandle work;
+
+  io.justsearch.app.api.EngineWorkHandle work() { return work; }
+
+  String cancellationReason() {
+    return work == null ? "user_stop" : work.cancellationReason().orElse("user_stop");
+  }
+
+  CancelTrigger cancellationTrigger() {
+    return cancellationReason().equals("user_stop") ? CancelTrigger.USER : CancelTrigger.SYSTEM;
+  }
+
+  AgentEvent.AgentError cancellationEvent() {
+    return new AgentEvent.AgentError("Session cancelled", "CANCELLED", "CANCELLED", "ABORT",
+        null, io.justsearch.agent.api.TraceContext.none(), cancellationReason());
+  }
+
+  io.justsearch.core.context.EngineContext engineContext() {
+    return engineContext;
   }
 
   List<Map<String, Object>> messages() {
@@ -300,6 +334,11 @@ final class AgentSession {
   }
 
   void cancel() {
+    if (work != null) work.cancel("user_stop");
+    cancelFromWork();
+  }
+
+  void cancelFromWork() {
     cancelled = true;
     approvalGates.values().forEach(g -> g.future().complete(false));
     // §13.5 Phase B — cancel pending virtual-tool waits with a
@@ -520,7 +559,7 @@ final class AgentSession {
    * cannot spell the same document differently.
    *
    * <p>Case-folded on every platform, not just Windows. The Worker lowercases paths before it looks
-   * a document up ({@code GrpcSearchService.fetchDocumentSlice} → {@code
+   * a document up ({@code WorkerSearchService.fetchDocumentSlice} → {@code
    * PathNormalizer.normalizePath}), so two spellings that differ only in case ARE one document as
    * far as every fetch is concerned; keying them apart here would let the case-variant mint a
    * duplicate source for a document the index cannot even distinguish.
@@ -712,10 +751,24 @@ final class AgentSession {
    * approve/reject. Tempdoc 834 §6.2 — {@code detail} is the same call description the caller just
    * emitted as {@code tool_call_pending}, retained so the state snapshot can carry the open gate.
    */
-  CompletableFuture<Boolean> createApprovalGate(String callId, AgentEvent.PendingApproval detail) {
+  CompletableFuture<Boolean> createApprovalGate(String callId, AgentEvent.PendingApproval detail,
+      java.util.Optional<io.justsearch.agent.api.registry.OperationApprovalPreview> preview) {
     var gate = new CompletableFuture<Boolean>();
-    approvalGates.put(callId, new PendingGate(detail, System.currentTimeMillis(), gate));
+    approvalGates.put(callId, new PendingGate(detail, Objects.requireNonNull(preview, "preview"),
+        System.currentTimeMillis(), gate));
     return gate;
+  }
+
+  java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String callId) {
+    if (callId == null || callId.isBlank()) return java.util.Optional.empty();
+    var gate = approvalGates.get(callId);
+    return gate == null || gate.detail() == null || gate.future().isDone() ? java.util.Optional.empty()
+        : java.util.Optional.of(new io.justsearch.agent.api.PendingToolApproval(gate.detail(), gate.preview()));
+  }
+
+  /** The waiter owns cleanup when announcement or waiting ends without an approve/reject reply. */
+  void discardApprovalGate(String callId) {
+    approvalGates.remove(callId);
   }
 
   /** Approve a pending tool call. Returns whether a gate with that callId existed (was completed). */

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.runtime;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.api.runtime.RuntimeManifest;
 import io.justsearch.app.api.stream.SseFrameKind;
@@ -12,7 +14,6 @@ import io.justsearch.ui.runtime.RuntimeManifestPublisher;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
@@ -37,24 +38,29 @@ public final class RuntimeManifestStreamController {
   private static final long HEARTBEAT_SECONDS = StreamLivenessWindows.STREAM_HEARTBEAT_INTERVAL_SECONDS;
 
   private final SseStreamChannel channel;
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final Clock clock;
 
-  public RuntimeManifestStreamController(RuntimeManifestPublisher publisher) {
-    this(publisher, Clock.systemUTC());
+  public RuntimeManifestStreamController(
+      EngineExecutorRegistry processExecutors,
+      RuntimeManifestPublisher publisher) {
+    this(processExecutors, publisher, Clock.systemUTC());
   }
 
-  public RuntimeManifestStreamController(RuntimeManifestPublisher publisher, Clock clock) {
+  public RuntimeManifestStreamController(
+      EngineExecutorRegistry processExecutors,
+      RuntimeManifestPublisher publisher, Clock clock) {
     Objects.requireNonNull(publisher, "publisher");
     this.clock = Objects.requireNonNull(clock, "clock");
     this.channel = new SseStreamChannel(STREAM_ID);
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "runtime-manifest-stream-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.runtime-manifest-stream-heartbeat",
+            "runtime-manifest-stream-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
     publisher.addListener(this::onManifestChange);
   }
 
@@ -71,6 +77,7 @@ public final class RuntimeManifestStreamController {
   /** Stops the heartbeat scheduler. Call on shutdown. */
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
   }
 
   /** Test/inspection accessor for the underlying channel. */
@@ -83,4 +90,39 @@ public final class RuntimeManifestStreamController {
     // projection. Each record owns its redaction policy via publicProjection().
     channel.publish(SseFrameKind.UPDATE, manifest.publicProjection());
   }
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

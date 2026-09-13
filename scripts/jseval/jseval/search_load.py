@@ -27,11 +27,13 @@ from datetime import datetime, timezone
 
 import httpx
 
+from .retriever import DEFAULT_SEARCH_TIMEOUT_SEC
+
 log = logging.getLogger(__name__)
 
 #: Per-request timeout. A slower response is counted as an error rather than retried —
 #: retrying would distort the offered load the measurement is about.
-REQUEST_TIMEOUT_SEC = 30.0
+REQUEST_TIMEOUT_SEC = DEFAULT_SEARCH_TIMEOUT_SEC
 
 #: Poll granularity while waiting for the next scheduled query, so ``stop()`` stays responsive.
 _STOP_POLL_SEC = 0.1
@@ -65,7 +67,7 @@ def issue_search(client: httpx.Client, body: dict) -> float | None:
         resp.raise_for_status()
         return (time.monotonic() - t0) * 1000.0
     except Exception as e:
-        log.debug("Search query failed: %s", e)
+        log.warning("Search query failed (%s): %s", type(e).__name__, e)
         return None
 
 
@@ -139,6 +141,7 @@ def summarize(
         "mode": spec.mode,
         "qpm": spec.qpm,
         "search_mode": spec.search_mode,
+        "request_timeout_sec": REQUEST_TIMEOUT_SEC,
         "queries_issued": len(latencies_ms) + errors,
         "queries_ok": len(latencies_ms),
         "errors": errors,

@@ -16,6 +16,10 @@ import io.justsearch.configuration.model.ModelRegistry;
  */
 public interface AiInstallService {
 
+  /** Exact owner snapshots: initial status plus terminal status after actual cleanup. */
+  record Attempt(AiInstallStatus started,
+      java.util.concurrent.CompletionStage<AiInstallStatus> completion) {}
+
   /**
    * Return the parsed model registry manifest. Used by the install flow to plan downloads
    * and by callers needing to surface available models.
@@ -55,10 +59,10 @@ public interface AiInstallService {
   InstallPlanPreview previewInstallPlan();
 
   /**
-   * Start the install flow. Idempotent if already running. Throws {@link AiInstallException}
+   * Start the install flow. Refuse if already running; completion follows actual owner cleanup. Throws {@link AiInstallException}
    * on validation failures (e.g., terms not accepted, policy disallows).
    */
-  void startInstall(boolean acceptTerms);
+  Attempt startInstall(boolean acceptTerms);
 
   /** Request cancellation of an in-flight install. */
   void cancel();
@@ -72,7 +76,7 @@ public interface AiInstallService {
    *
    * <p>Throws {@link AiInstallException} on validation failures.
    */
-  void repair(boolean acceptTerms);
+  Attempt repair(boolean acceptTerms);
 
   /**
    * Halt an in-flight install before its next file, keeping the run, its op-lease and its place in

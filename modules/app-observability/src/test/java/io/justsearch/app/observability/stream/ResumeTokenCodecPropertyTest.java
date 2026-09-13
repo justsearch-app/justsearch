@@ -22,7 +22,7 @@ class ResumeTokenCodecPropertyTest {
 
   @Property(tries = 1000)
   void decodeOfEncodeIsIdentity(@ForAll("decoded") Decoded value) {
-    String token = ResumeTokenCodec.encode(value.streamId(), value.seq());
+    String token = ResumeTokenCodec.encode(value.streamId(), value.seq(), value.incarnation());
     assertEquals(
         Optional.of(value),
         ResumeTokenCodec.decode(token),
@@ -42,6 +42,8 @@ class ResumeTokenCodecPropertyTest {
         Combinators.combine(Arbitraries.of("registry", "surface", "system"), slug)
             .as((kind, s) -> new StreamId(kind + ":" + s));
     Arbitrary<Long> seqs = Arbitraries.longs().greaterOrEqual(0);
-    return Combinators.combine(ids, seqs).as(Decoded::new);
+    var incarnations = Combinators.combine(Arbitraries.longs(), Arbitraries.longs())
+        .as(java.util.UUID::new);
+    return Combinators.combine(ids, seqs, incarnations).as(Decoded::new);
   }
 }

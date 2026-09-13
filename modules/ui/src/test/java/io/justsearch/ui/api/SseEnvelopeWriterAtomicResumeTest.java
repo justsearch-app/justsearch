@@ -3,8 +3,11 @@ package io.justsearch.ui.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.javalin.http.Context;
@@ -66,8 +69,12 @@ final class SseEnvelopeWriterAtomicResumeTest {
               return null;
             })
         .when(client)
-        .sendEvent(org.mockito.ArgumentMatchers.eq(SseEnvelopeWriter.EVENT_NAME), org.mockito.ArgumentMatchers.any(String.class));
+        .sendEvent(org.mockito.ArgumentMatchers.eq(SseEnvelopeWriter.EVENT_NAME), any(String.class));
     return client;
+  }
+
+  private static String firstUpdateToken(SseStreamChannel source) {
+    return source.framesSince(0).getFirst().resumeToken();
   }
 
   @Test
@@ -81,17 +88,17 @@ final class SseEnvelopeWriterAtomicResumeTest {
     SseEnvelopeWriter w = new SseEnvelopeWriter(client, channel, Clock.systemUTC());
 
     Optional<SseStreamChannel.Subscription> sub =
-        w.attemptResumeAndSubscribe(ResumeTokenCodec.encode(STREAM, 1L));
+        w.attemptResumeAndSubscribe(firstUpdateToken(channel));
 
     assertTrue(sub.isPresent(), "in-window cursor returns a subscription");
-    assertEquals(1, sent.size(), "replayed only seq 2 (strictly after the cursor)");
+    assertEquals(2, sent.size(), "connected plus replayed seq 2 (strictly after the cursor)");
 
     channel.publish(SseFrameKind.UPDATE, Map.of("a", 3));
-    assertEquals(2, sent.size(), "live frame forwarded through the same subscription");
+    assertEquals(3, sent.size(), "live frame forwarded through the same subscription");
 
     sub.get().unsubscribe();
     channel.publish(SseFrameKind.UPDATE, Map.of("a", 4));
-    assertEquals(2, sent.size(), "unsubscribe detaches");
+    assertEquals(3, sent.size(), "unsubscribe detaches");
   }
 
   @Test
@@ -101,13 +108,18 @@ final class SseEnvelopeWriterAtomicResumeTest {
     SseClient client = mockSseClient(null, sent);
     SseEnvelopeWriter w = new SseEnvelopeWriter(client, channel, Clock.systemUTC());
 
-    // Empty ring + positive cursor — the "previous server lifetime" case (slice 436 Fix B).
-    assertTrue(w.attemptResumeAndSubscribe(ResumeTokenCodec.encode(STREAM, 5L)).isEmpty());
+    channel.publish(SseFrameKind.UPDATE, Map.of("seed", true));
+    String issuedToken = firstUpdateToken(channel);
+    var incarnation = ResumeTokenCodec.decode(issuedToken).orElseThrow().incarnation();
+
+    // A same-incarnation future cursor is rejected, as is a token from another source.
+    assertTrue(w.attemptResumeAndSubscribe(ResumeTokenCodec.encode(STREAM, 5L, incarnation)).isEmpty());
     assertTrue(w.attemptResumeAndSubscribe("not-a-valid-token").isEmpty());
     assertTrue(w.attemptResumeAndSubscribe(null).isEmpty());
+    SseStreamChannel wrongSource = new SseStreamChannel(StreamId.surface("health-events"));
+    wrongSource.publish(SseFrameKind.UPDATE, Map.of("wrong", true));
     assertTrue(
-        w.attemptResumeAndSubscribe(ResumeTokenCodec.encode(StreamId.surface("health-events"), 1L))
-            .isEmpty(),
+        w.attemptResumeAndSubscribe(firstUpdateToken(wrongSource)).isEmpty(),
         "a token addressed to another stream is a miss");
 
     channel.publish(SseFrameKind.UPDATE, Map.of("a", 1));
@@ -121,9 +133,12 @@ final class SseEnvelopeWriterAtomicResumeTest {
     channel.publish(SseFrameKind.UPDATE, Map.of("a", 2));
 
     List<String> sent = new ArrayList<>();
-    SseClient client = mockSseClient(ResumeTokenCodec.encode(STREAM, 1L), sent);
+    SseClient client = mockSseClient(firstUpdateToken(channel), sent);
     SseEnvelopeWriter.attach(
         client, channel, () -> Map.of("snap", true), Clock.systemUTC(), heartbeatScheduler, 30L);
+
+    verify(client.ctx()).future(any());
+    verify(client, never()).keepAlive();
 
     String joined = String.join("\n", sent);
     assertTrue(joined.contains("\"connected\""), joined);
@@ -139,9 +154,15 @@ final class SseEnvelopeWriterAtomicResumeTest {
   @DisplayName("attach with an out-of-window token still resets, snapshots and subscribes once")
   void attachFallsBackToResetSnapshot() {
     List<String> sent = new ArrayList<>();
-    SseClient client = mockSseClient(ResumeTokenCodec.encode(STREAM, 99L), sent);
+    channel.publish(SseFrameKind.UPDATE, Map.of("seed", true));
+    String issuedToken = firstUpdateToken(channel);
+    var incarnation = ResumeTokenCodec.decode(issuedToken).orElseThrow().incarnation();
+    SseClient client = mockSseClient(ResumeTokenCodec.encode(STREAM, 99L, incarnation), sent);
     SseEnvelopeWriter.attach(
         client, channel, () -> Map.of("snap", true), Clock.systemUTC(), heartbeatScheduler, 30L);
+
+    verify(client.ctx()).future(any());
+    verify(client, never()).keepAlive();
 
     String joined = String.join("\n", sent);
     assertTrue(joined.contains("\"reset\""), joined);
@@ -159,12 +180,14 @@ final class SseEnvelopeWriterAtomicResumeTest {
     channel.publish(SseFrameKind.UPDATE, Map.of("a", 2));
 
     List<String> sent = new ArrayList<>();
-    SseClient client = mockSseClient(ResumeTokenCodec.encode(STREAM, 1L), sent);
+    SseClient client = mockSseClient(firstUpdateToken(channel), sent);
     SseEnvelopeWriter.attachEventOnly(client, channel, Clock.systemUTC(), heartbeatScheduler, 30L);
 
     String joined = String.join("\n", sent);
     assertFalse(joined.contains("\"snapshot\""), "event-only streams never snapshot");
     assertFalse(joined.contains("\"reset\""), joined);
+    verify(client.ctx()).future(any());
+    verify(client, never()).keepAlive();
 
     int before = sent.size();
     channel.publish(SseFrameKind.UPDATE, Map.of("a", 3));

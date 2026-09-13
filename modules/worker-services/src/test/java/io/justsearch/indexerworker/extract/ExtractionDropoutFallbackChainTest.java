@@ -113,7 +113,7 @@ final class ExtractionDropoutFallbackChainTest {
   }
 
   private static PolicyDrivenTikaExtractor extractorWithBudget(ExtractionFallbackBudget budget) {
-    return new PolicyDrivenTikaExtractor(
+    return new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(),
         TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), OcrMetricCatalog.noop(), budget);
   }
 }

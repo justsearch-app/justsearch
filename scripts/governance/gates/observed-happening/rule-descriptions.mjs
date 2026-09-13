@@ -28,7 +28,7 @@ export const OBSERVED_HAPPENING_RULE_DESCRIPTIONS = {
     'No stream is claimed by two concepts (healthy).',
   'observed-happening/operator-trace-must-be-channel':
     'A Resource declares an operator-trace origin (a ProducerKind: IN_PROCESS_LOGBACK / ' +
-    'WORKER_GRPC_STREAM / EXTERNAL_OBSERVER) — it models operator-trace data as a Resource. Operator ' +
+    'EXTERNAL_OBSERVER) — it models operator-trace data as a Resource. Operator ' +
     'traces are not Resource truth (ADR-0036 / C-012): different consumer model, schema discipline, ' +
     'privacy class, and self-observation risk. Model it as a DiagnosticChannel ' +
     '(*DiagnosticChannelCatalog.java), not a Resource. Drop the .withOrigin(...) declaration, or move ' +

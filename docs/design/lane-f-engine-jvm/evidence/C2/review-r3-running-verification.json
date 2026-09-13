@@ -1,0 +1,47 @@
+{
+  "revision": "a0c7d390a + final refused-running transition correction",
+  "command": "gradlew.bat :modules:app-observability:test --tests '*OperationAttemptRunnerTest' :modules:app-services:test --tests '*OperationExecutorImplTest' --tests '*BackgroundRunServiceTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:compileIntegrationTestJava -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 105,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 7
+  },
+  "tasks": [
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 88,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "negativeControls": [
+    {
+      "log": "tmp/c2-review-r3-running-negative874.txt",
+      "tests": 4,
+      "failures": 2,
+      "reason": "ignored start/resume returned normally instead of STORAGE_FAILED"
+    },
+    {
+      "log": "tmp/c2-review-r3-terminal-negative876.txt",
+      "tests": 3,
+      "failures": 1,
+      "reason": "second terminal read lost the row after retention pruning"
+    }
+  ]
+}

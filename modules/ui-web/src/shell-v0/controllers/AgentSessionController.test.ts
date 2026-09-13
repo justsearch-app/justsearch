@@ -79,6 +79,22 @@ function mockFetchError(status: number, body = ''): typeof fetch {
   ) as unknown as typeof fetch;
 }
 
+/** Existing short public-display gates, served through the new private read in approval tests. */
+function mockFetchLiveApprovals(controller: AgentSessionController, overrides: Record<string, unknown> = {}): typeof fetch {
+  return vi.fn(async (url: string) => {
+    if (String(url).includes('/api/chat/approval?')) {
+      const callId = new URL(String(url)).searchParams.get('callId')!;
+      const call = controller.toolCalls[callId];
+      return new Response(JSON.stringify({
+        callId, operationId: call?.toolName, argsSummary: call?.arguments ?? '',
+        riskTier: call?.risk?.toUpperCase(), gateBehavior: call?.gateBehavior?.toUpperCase() ?? null,
+        ...overrides,
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+  }) as unknown as typeof fetch;
+}
+
 /** One row of `GET /api/chat/runs/live`, defaulted to a live agent run with no conversation. */
 function liveRun(runId: string, conversationId: string | null = null, shapeId = 'core.agent-run'): object {
   return {
@@ -151,6 +167,7 @@ afterEach(() => {
 // ==================== G1 migration: SSE event handling ====================
 
 describe('AgentSessionController SSE handlers (G1 migration)', () => {
+  beforeEach(() => { ctrl.isStreaming = true; ctrl.runKind = 'agent'; });
   // ===== 1. session_started =====
   it('onSessionStarted sets sessionId', () => {
     ctrl.onSessionStarted({ sessionId: 'sess-123' });
@@ -267,7 +284,7 @@ describe('AgentSessionController SSE handlers (G1 migration)', () => {
       return { approved: true, allowAlways: false };
     });
     ctrl.sessionId = 'sess-parked';
-    globalThis.fetch = mockFetchJson({});
+    globalThis.fetch = mockFetchLiveApprovals(ctrl);
 
     ctrl.onStateSnapshot({
       iteration: 9,
@@ -305,7 +322,7 @@ describe('AgentSessionController SSE handlers (G1 migration)', () => {
       return { approved: false, allowAlways: false };
     });
     ctrl.sessionId = 'sess-dup';
-    globalThis.fetch = mockFetchJson({});
+    globalThis.fetch = mockFetchLiveApprovals(ctrl);
     const approval = {
       callId: 'call-dup',
       toolName: 'core_search',
@@ -1480,9 +1497,10 @@ describe('AgentSessionController interaction methods', () => {
 
   // ===== auto-approval driven by the autonomy dial (§32 unify) =====
   it('backend AUTO verdict: queues callId when sessionId is null, flushes (approves) on session_started', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     // Tempdoc 561 P-D collapse: the FE OBEYS the backend gateBehavior. The backend decided AUTO
     // (e.g. a read-only call under assist) — the FE auto-approves; it no longer re-derives from risk.
-    const fetchSpy = mockFetchJson({});
+    const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
 
     ctrl.onToolCallPending({
@@ -1500,8 +1518,9 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('the backend verdict is the SOLE auto-approval authority: AUTO approves, non-AUTO does not', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     ctrl.sessionId = 'sess-z';
-    const fetchSpy = mockFetchJson({});
+    const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
     // A typed_confirm call routes to the ceremony; deny it deterministically.
     setAuthorizationPresenter(async () => ({ approved: false, allowAlways: false }));
@@ -1528,32 +1547,38 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('assist + LOW: calls approveCall immediately when sessionId is set', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('assist');
     ctrl.sessionId = 'sess-y';
-    const fetchSpy = mockFetchJson({});
+    const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
 
     ctrl.onToolCallPending({
-      callId: 'auto2', toolName: 't', arguments: '{}', risk: 'LOW', gateBehavior: 'inline_confirm',
+      callId: 'auto2', toolName: 't', arguments: '{}', risk: 'LOW', gateBehavior: 'auto',
     });
     await new Promise(r => setTimeout(r, 10));
-    expect((fetchSpy as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+    expect((fetchSpy as ReturnType<typeof vi.fn>).mock.calls.filter(c =>
+      String(c[0]).endsWith('/api/chat/approve'))).toHaveLength(1);
   });
 
-  it('assist: does NOT auto-approve MEDIUM or HIGH', () => {
+  it('assist: does NOT auto-approve MEDIUM or HIGH', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('assist');
     ctrl.sessionId = 'sess-z';
-    const fetchSpy = mockFetchJson({});
+    const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
 
     ctrl.onToolCallPending({ callId: 'med', toolName: 't', arguments: '{}', risk: 'MEDIUM', gateBehavior: 'inline_confirm' });
     ctrl.onToolCallPending({ callId: 'high', toolName: 't', arguments: '{}', risk: 'HIGH', gateBehavior: 'typed_confirm' });
-    expect((fetchSpy as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+    await new Promise(r => setTimeout(r, 0));
+    expect((fetchSpy as ReturnType<typeof vi.fn>).mock.calls.filter(c =>
+      String(c[0]).endsWith('/api/chat/approve'))).toHaveLength(0);
   });
 
   it('backend AUTO: auto-approves MEDIUM directly; backend typed_confirm HIGH routes to the ceremony host', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     ctrl.sessionId = 'sess-a';
-    const fetchSpy = mockFetchJson({});
+    const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
     const prompts: Array<{ operationId: string; gateBehavior: string }> = [];
     // Presenter denies in-test (so a routed HIGH call resolves deterministically to reject).
@@ -1578,9 +1603,10 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('watch: auto-approves NOTHING — routes even LOW through the ceremony host', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('watch'); // watch → manual approval for everything
     ctrl.sessionId = 'sess-b';
-    const fetchSpy = mockFetchJson({});
+    const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
     const prompts: Array<{ gateBehavior: string }> = [];
     setAuthorizationPresenter(async (p) => {
@@ -1596,9 +1622,10 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('ceremony APPROVAL drives the unified approve endpoint (tempdoc 550 C3 / 565 §15.C)', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('watch'); // everything manual → routes to the ceremony
     ctrl.sessionId = 'sess-c';
-    const fetchSpy = mockFetchJson({});
+    const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
     setAuthorizationPresenter(async () => ({ approved: true, allowAlways: false })); // user approves
 
@@ -1611,6 +1638,77 @@ describe('AgentSessionController interaction methods', () => {
     expect(approveCalls.length).toBe(1);
     expect(JSON.parse(approveCalls[0]![1]!.body as string)).toMatchObject({ callId: 'c-ok' });
   });
+});
+
+describe('private live tool approval display', () => {
+  beforeEach(() => { ctrl.isStreaming = true; ctrl.runKind = 'agent'; });
+  const pending = { callId: 'private-call', toolName: 'event-alias', arguments: 'PRIVATE_INPUT',
+    risk: 'LOW', gateBehavior: 'inline_confirm' };
+  const detail = { callId: 'private-call', operationId: 'core.frozen-target', argsSummary: 'Frozen server target',
+    riskTier: 'HIGH', gateBehavior: 'TYPED_CONFIRM' };
+
+  it('uses the complete frozen server display and verdict before approving the owning run', async () => {
+    ctrl.sessionId = 'private-run';
+    const frozen = 'C:/' + 'segment/'.repeat(900) + 'target.md';
+    const fetchSpy = mockFetchLiveApprovals(ctrl, { ...detail, argsSummary: frozen });
+    globalThis.fetch = fetchSpy;
+    const presenter = vi.fn(async (prompt: { operationId: string; argsSummary?: string; gateBehavior: string }) => {
+      expect(prompt.argsSummary).toBe(frozen);
+      return { approved: true, allowAlways: false };
+    });
+    setAuthorizationPresenter(presenter);
+    ctrl.onToolCallPending(pending);
+    await vi.waitFor(() => expect(presenter).toHaveBeenCalledTimes(1));
+    const prompt = presenter.mock.calls[0]![0];
+    expect(prompt.operationId).toBe('core.frozen-target');
+    expect(prompt.gateBehavior).toBe('TYPED_CONFIRM');
+    expect(JSON.stringify(prompt)).not.toContain('PRIVATE_INPUT');
+    const requests = (fetchSpy as ReturnType<typeof vi.fn>).mock.calls;
+    expect(String(requests[0]![0])).toContain('/api/chat/approval?sessionId=private-run&callId=private-call');
+    await vi.waitFor(() => expect(requests.filter(c => String(c[0]).endsWith('/api/chat/approve'))).toHaveLength(1));
+    const approval = requests.find(c => String(c[0]).endsWith('/api/chat/approve'))!;
+    expect(JSON.parse(approval[1].body)).toEqual({ sessionId: 'private-run', callId: 'private-call' });
+  });
+
+  it.each([404, 500, 200, 0])('refuses unavailable or malformed live details (status %s) without raw fallback', async (status) => {
+    ctrl.sessionId = 'private-run';
+    const presenter = vi.fn(async () => ({ approved: true, allowAlways: false }));
+    setAuthorizationPresenter(presenter);
+    const fetchSpy = vi.fn(async (url: string) => {
+      if (url.includes('/api/chat/approval?') && status === 0) throw new Error('offline');
+      return new Response('{}', { status: url.includes('/api/chat/approval?') ? status : 200 });
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    ctrl.onToolCallPending(pending);
+    await vi.waitFor(() => expect(fetchSpy.mock.calls.some(c => c[0].endsWith('/api/chat/reject'))).toBe(true));
+    expect(presenter).not.toHaveBeenCalled();
+    expect(fetchSpy.mock.calls.some(c => c[0].endsWith('/api/chat/approve'))).toBe(false);
+    expect(emitEphemeralToast).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Approval details are unavailable. The action was not approved.',
+    }));
+  });
+
+  it.each(['done', 'error', 'replacement', 'approved', 'destroy'] as const)(
+    'ignores a lookup that arrives after %s', async (transition) => {
+      ctrl.sessionId = 'private-run';
+      let resolveLookup!: (response: Response) => void;
+      const lookup = new Promise<Response>(resolve => { resolveLookup = resolve; });
+      const fetchSpy = vi.fn(() => lookup);
+      globalThis.fetch = fetchSpy as unknown as typeof fetch;
+      const presenter = vi.fn(async () => ({ approved: true, allowAlways: false }));
+      setAuthorizationPresenter(presenter);
+      ctrl.onToolCallPending(pending);
+      if (transition === 'done') ctrl.onDone({ finalResponse: 'done', iterationsUsed: 1, toolCallsExecuted: 0, totalTokensUsed: 1 });
+      if (transition === 'error') ctrl.onError({ error: 'run ended' });
+      if (transition === 'replacement') ctrl.onSessionStarted({ sessionId: 'replacement-run' });
+      if (transition === 'approved') ctrl.onToolCallApproved({ callId: pending.callId });
+      if (transition === 'destroy') ctrl.destroy();
+      resolveLookup(new Response(JSON.stringify(detail), { status: 200 }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(presenter).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 // ==================== Tempdoc 585 §D Phase 2 (D3): shareable replay ====================

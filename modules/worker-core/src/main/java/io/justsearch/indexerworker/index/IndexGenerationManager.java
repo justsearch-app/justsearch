@@ -123,10 +123,39 @@ public final class IndexGenerationManager {
   // a gRPC handler thread can never observe a torn version/state pair while a migration thread writes;
   // writeState() invalidates by nulling it. (tempdoc 589 — replaces a non-volatile lastReadVersion +
   // a non-atomic stateVersion++ counter, which together formed a data race.)
+  //
+  // Lane F stage A item A12: the cache also carries a stamp identifying the state.json revision it
+  // was parsed from, and a hit is only a hit while that stamp still matches. Invalidating on THIS
+  // instance's own writes is not enough, because one state.json has several managers over it in one
+  // JVM — KnowledgeServer builds one (KnowledgeServer.java:611) for the migration enumerator and the
+  // cutover monitor, WorkerIngestService builds its own from the same indexBasePath
+  // (WorkerIngestService.java:177) for the migration control calls, and the switch-buffer replay
+  // builds two more temporaries (KnowledgeServerMigrationOps.java:542, :718). A write through one
+  // left every other instance serving its own stale parse forever. The concrete defect that found
+  // this: `resumeMigration` wrote through the service's manager, the enumerator kept reading
+  // `migration_paused=true` out of the server's manager, and the migration never resumed.
+  //
+  // The stamp is a CONTENT HASH, not (mtime, size). The review pass caught that pair colliding on
+  // precisely the writes this cache has to notice: state.json's fields are mostly fixed-width, so
+  // an active/previous generation-id swap, a migration_state transition between two equal-length
+  // names, or a `migration_paused` true->... flip through a rewrite lands at the SAME byte length,
+  // and two writes inside one filesystem timestamp tick then produce the same (mtime, size) for
+  // different content. Windows makes that likely rather than theoretical — NTFS updates the
+  // last-write time lazily, so back-to-back writes routinely share a stamp. A collision here is not
+  // a missed refresh; it is the stale read the stamp exists to prevent, restored silently. Hashing
+  // the bytes has no such window. It costs a read of a file measured in hundreds of bytes plus one
+  // SHA-256 where the miss costs a full Jackson parse, so the cache still does the job tempdoc 589
+  // gave it.
   private volatile CachedState cache = null;
 
-  /** Atomically-published read-cache entry; only PRESENT states are cached (null == "re-read"). */
-  private record CachedState(State value) {}
+  /**
+   * Atomically-published read-cache entry; only PRESENT states are cached (null == "re-read").
+   *
+   * @param value the parsed, normalized state
+   * @param contentHash hex SHA-256 of the state.json bytes it was parsed from, or {@code null} if
+   *     the file was unreadable at that moment
+   */
+  private record CachedState(State value, String contentHash) {}
 
   public IndexGenerationManager(Path indexBasePath) {
     this.basePath = normalize(Objects.requireNonNull(indexBasePath, "indexBasePath"));
@@ -647,6 +676,32 @@ public final class IndexGenerationManager {
   }
 
   /**
+   * Fresh authoritative state check for a mutation targeting the captured serving generation.
+   * No cached state, backup recovery, normalization write or missing-state fallback is allowed.
+   * This is an observation, not a lease across a concurrent generation transition.
+   */
+  public boolean isIdleActiveGeneration(Path capturedTarget) throws IOException {
+    return idleActiveGeneration(capturedTarget).isPresent();
+  }
+
+  /** Return the identity from the same strict observation that validates the captured target. */
+  public java.util.Optional<String> idleActiveGeneration(Path capturedTarget) throws IOException {
+    Objects.requireNonNull(capturedTarget, "capturedTarget");
+    State current = JSON.readValue(Files.readAllBytes(statePath), State.class);
+    if (current == null || (current.format_version() != 1
+        && current.format_version() != STATE_FORMAT_VERSION)) {
+      throw new IOException("Unsupported or empty authoritative index state");
+    }
+    String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
+    Path activePath = resolveGenerationPathReadOnly(active);
+    boolean eligible = MigrationState.IDLE.name().equals(current.migration_state())
+        && (current.building_generation() == null || current.building_generation().isBlank())
+        && activePath.equals(capturedTarget.toAbsolutePath().normalize())
+        && Files.isDirectory(activePath);
+    return eligible ? java.util.Optional.of(active) : java.util.Optional.empty();
+  }
+
+  /**
    * Reads the current state pointer best-effort, without performing legacy imports or creating new
    * generations.
    *
@@ -656,8 +711,16 @@ public final class IndexGenerationManager {
    * never observes a torn version/state pair (tempdoc 589).
    */
   public State readStateBestEffort() {
-    CachedState cached = cache; // single volatile read — the (present?, value) pair is atomic
-    if (cached != null) {
+    String stamp = contentStampBestEffort();
+    CachedState cached = cache; // single volatile read — the whole entry is atomic
+    // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
+    // writeState replaces state.json by renaming (state.json -> state.json.prev, then tmp ->
+    // state.json), and on Windows a file being renamed over is briefly unopenable. Treating that
+    // window as "re-read" rather than "unchanged" would trade the stale read this stamp exists to
+    // fix for a transient NULL — which is worse, because every caller projects null as an empty
+    // migration state. A permanently missing state.json serves the last parse, which is exactly
+    // what the pre-stamp cache did.
+    if (cached != null && (stamp == null || stamp.equals(cached.contentHash()))) {
       return cached.value();
     }
     try {
@@ -667,9 +730,48 @@ public final class IndexGenerationManager {
         return null;
       }
       State normalized = normalizeAndUpgradeStateIfNeeded(s);
-      cache = new CachedState(normalized); // single volatile publish
+      // Stamp from BEFORE the read — the one taken at the top of this method — and not a fresh one
+      // taken after the parse. The two orders fail in opposite directions and only this one fails
+      // safe:
+      //
+      //   after-parse:  read stamp S1, parse V from revision R1, ANOTHER MANAGER WRITES (file
+      //                 becomes R2), stamp S2 = R2, cache (V-from-R1, stamp-of-R2). The next
+      //                 caller's stamp is R2, which MATCHES, so it is served R1's value — and goes
+      //                 on being served it until some later write moves the stamp again. That is
+      //                 the exact stale-read this stamp was added to prevent, reintroduced in a
+      //                 narrower window.
+      //   before-read:  cache (V, S1). If the file changed at any point during the read, the next
+      //                 caller's stamp is S2 != S1, so it misses and re-parses. The cost is one
+      //                 extra parse; there is no order in which a stale value can be served.
+      //
+      // The window is small either way. It is also exactly the window this whole change exists for
+      // — concurrent writes through a DIFFERENT manager instance over the same file — so sizing the
+      // fix to the common case rather than the racing one would have missed the point.
+      cache = new CachedState(normalized, stamp);
       return normalized;
     } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * Hex SHA-256 of state.json's bytes; {@code null} when the file is absent or unreadable.
+   *
+   * <p>Deliberately reads the whole file rather than sampling its attributes — see the cache comment
+   * on {@link #cache} for why (mtime, size) cannot identify a state.json revision. The file is a
+   * handful of fixed-width fields; SHA-256 over it is not the expensive part of anything.
+   *
+   * <p>{@code null} is a distinct answer from "hash of nothing", and callers treat it as "cannot
+   * tell, keep serving the last parse" rather than "changed": {@code writeState} replaces state.json
+   * by rename, and the brief window where the old name is gone must not be reported as a new
+   * revision.
+   */
+  private String contentStampBestEffort() {
+    try {
+      byte[] bytes = Files.readAllBytes(statePath);
+      return java.util.HexFormat.of()
+          .formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (Exception absentOrUnreadable) {
       return null;
     }
   }
@@ -878,6 +980,10 @@ public final class IndexGenerationManager {
 
   private Path resolveGenerationPath(String genId) throws IOException {
     Files.createDirectories(indicesDir);
+    return resolveGenerationPathReadOnly(genId);
+  }
+
+  private Path resolveGenerationPathReadOnly(String genId) throws IOException {
     Path p = indicesDir.resolve(genId).toAbsolutePath().normalize();
     if (!p.startsWith(indicesDir.toAbsolutePath().normalize())) {
       throw new IOException("Refusing generation path outside indicesDir. genId=" + genId + " path=" + p);

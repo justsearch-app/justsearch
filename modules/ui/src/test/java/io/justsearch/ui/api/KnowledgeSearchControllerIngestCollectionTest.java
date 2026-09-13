@@ -46,12 +46,9 @@ final class KnowledgeSearchControllerIngestCollectionTest {
             tempDir,
             tempDir,
             tempDir,
-            tempDir,
-            tempDir.resolve("worker_signal.lock"),
             5_000L,
             15_000L,
             3,
-            "256m",
             5_000L,
             5_000L,
             300_000L,
@@ -59,7 +56,7 @@ final class KnowledgeSearchControllerIngestCollectionTest {
             0L,
             0);
     KnowledgeSearchController controller =
-        new KnowledgeSearchController(new KnowledgeServerBootstrap(config));
+        new KnowledgeSearchController(new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config), org.mockito.Mockito.mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
     app =
         Javalin.create(
                 cfg -> {

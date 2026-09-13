@@ -1,437 +1,215 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.vdu;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import io.justsearch.indexing.SchemaFields;
+import io.justsearch.app.api.OfflineProcessingOutcome;
+import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
+import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.gpu.GpuCapabilities;
+import io.justsearch.gpu.GpuCapabilitiesService;
+import io.justsearch.ipc.VduUpdateOutcome;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Unit tests for VduBatchProcessor.
- *
- * <p>Tests VRAM gating, retry logic, failure marking, and batch processing.
- * Uses stub dependencies - no real LLM or gRPC calls.
- */
-@DisplayName("VduBatchProcessor")
+/** Production-backed coverage for VDU pass selection, gates, and acknowledged results. */
 class VduBatchProcessorTest {
+  @TempDir Path tempDir;
 
-    @TempDir
-    Path tempDir;
+  private VduProcessor processor;
+  private KnowledgeClient client;
+  private GpuCapabilitiesService gpu;
+  private EngineContext context;
 
-    private StubVduProcessor vduProcessor;
-    private StubVramDetector vramDetector;
-    private StubRemoteKnowledgeClient knowledgeClient;
-    private TestableVduBatchProcessor batchProcessor;
+  @BeforeEach
+  void setUp() {
+    processor = mock(VduProcessor.class);
+    client = mock(KnowledgeClient.class);
+    gpu = mock(GpuCapabilitiesService.class);
+    context = TestEngineContexts.durableInternal();
+    when(processor.hasVisionCapability()).thenReturn(true);
+    when(gpu.snapshot()).thenReturn(gpuSnapshot(24_000_000_000L));
+    when(client.queryPendingVduDocIds(context)).thenReturn(List.of());
+    when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
+    when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), any()))
+        .thenReturn(true);
+  }
 
-    @BeforeEach
-    void setUp() {
-        vduProcessor = new StubVduProcessor();
-        vramDetector = new StubVramDetector();
-        knowledgeClient = new StubRemoteKnowledgeClient();
-        batchProcessor = new TestableVduBatchProcessor(vduProcessor, vramDetector, knowledgeClient);
+  @Test
+  void lowVramBlocksCapturedPass() throws Exception {
+    Path file = file("low-vram.png");
+    when(client.queryPendingVduDocIds(context)).thenReturn(List.of(file.toString()));
+    when(gpu.snapshot()).thenReturn(gpuSnapshot(1_000_000_000L));
+
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+    assertEquals(1, outcome.selected());
+    assertEquals(1, outcome.remaining());
+    assertEquals(BlockReason.INSUFFICIENT_VRAM, outcome.blockedReason());
+    verify(processor, never()).enterVduMode();
+  }
+
+  @Test
+  void emptySelectionDoesNotEnterModelMode() throws Exception {
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+    assertEquals(0, outcome.selected());
+    assertEquals(0, outcome.remaining());
+    verify(processor, never()).enterVduMode();
+  }
+
+  @Test
+  void acknowledgedTextIsProcessed() throws Exception {
+    Path file = file("text.png");
+    select(file);
+    when(processor.process(file, context))
+        .thenReturn(new VduProcessor.VduResult("text", "{}", 1));
+
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+    assertEquals(1, outcome.processed());
+    assertEquals(0, outcome.failed());
+    verify(client).updateVduResult(file.toString(), "text",
+        VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT, "{}", 1, context);
+  }
+
+  @Test
+  void multipleAcknowledgedTextsAreProcessed() throws Exception {
+    Path first = file("first.png");
+    Path second = file("second.png");
+    when(client.queryPendingVduDocIds(context))
+        .thenReturn(List.of(first.toString(), second.toString()));
+    when(processor.process(any(Path.class), any(EngineContext.class)))
+        .thenReturn(new VduProcessor.VduResult("text", "{}", 1));
+
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+    assertEquals(2, outcome.processed());
+    assertEquals(0, outcome.remaining());
+  }
+
+  @Test
+  void processingRefusalLeavesSelectedUnitRemaining() throws Exception {
+    Path file = file("refused.png");
+    select(file);
+    when(client.markVduProcessing(
+        org.mockito.ArgumentMatchers.eq(file.toString()), anyInt(),
+        org.mockito.ArgumentMatchers.same(context))).thenReturn(-1);
+
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+    assertEquals(0, outcome.processed());
+    assertEquals(0, outcome.failed());
+    assertEquals(1, outcome.remaining());
+    assertEquals(BlockReason.PROCESSING_REFUSED, outcome.blockedReason());
+    verify(processor, never()).process(any(), any());
+  }
+
+  @Test
+  void missingFileCountsFailedOnlyAfterFailedWriteAcknowledgement() {
+    Path missing = tempDir.resolve("missing.png");
+    select(missing);
+
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+    assertEquals(0, outcome.processed());
+    assertEquals(1, outcome.failed());
+    verify(client).updateVduResult(
+        org.mockito.ArgumentMatchers.eq(missing.toString()),
+        org.mockito.ArgumentMatchers.isNull(),
+        org.mockito.ArgumentMatchers.eq(VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED),
+        anyString(), org.mockito.ArgumentMatchers.eq(0),
+        org.mockito.ArgumentMatchers.same(context));
+  }
+
+  @Test
+  void blankNullAndWhitespaceResultsAreAcknowledgedAsNoText() throws Exception {
+    for (String text : new String[] {"", null, "   "}) {
+      Path file = file("empty-" + (text == null ? "null" : text.length()) + ".png");
+      select(file);
+      when(processor.process(file, context))
+          .thenReturn(new VduProcessor.VduResult(text, "{\"partial\":true}", 4));
+
+      OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+      assertEquals(1, outcome.failed());
+      verify(client).updateVduResult(
+          org.mockito.ArgumentMatchers.eq(file.toString()), org.mockito.ArgumentMatchers.isNull(),
+          org.mockito.ArgumentMatchers.eq(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY),
+          org.mockito.ArgumentMatchers.contains("no_text_detected"),
+          org.mockito.ArgumentMatchers.eq(4), org.mockito.ArgumentMatchers.same(context));
+      org.mockito.Mockito.reset(processor, client);
+      when(processor.hasVisionCapability()).thenReturn(true);
+      when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
+      when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), any()))
+          .thenReturn(true);
     }
-
-    @Nested
-    @DisplayName("VRAM Gating")
-    class VramGating {
-
-        @Test
-        @DisplayName("skips processing when VRAM requirements not met")
-        void skipsWhenInsufficientVram() {
-            vramDetector.withMeetsVduRequirements(false);
-            knowledgeClient.withPendingVduCount(10);
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Should return 0 when VRAM insufficient");
-            assertEquals(0, vduProcessor.getProcessCallCount(), "Should not call VDU processor");
-        }
-
-        @Test
-        @DisplayName("proceeds when VRAM requirements are met")
-        void proceedsWhenSufficientVram() throws Exception {
-            vramDetector.withMeetsVduRequirements(true);
-            Path testFile = createTestFile("test.png");
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(testFile.toString()));
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(1, processed, "Should process files when VRAM sufficient");
-        }
-    }
-
-    @Nested
-    @DisplayName("Empty Queue Handling")
-    class EmptyQueueHandling {
-
-        @Test
-        @DisplayName("returns 0 when no pending VDU files")
-        void returnsZeroWhenNoPending() {
-            knowledgeClient.withPendingVduCount(0);
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed);
-            assertEquals(0, vduProcessor.getProcessCallCount(), "Should not call VDU processor");
-        }
-
-        @Test
-        @DisplayName("returns 0 when pending count > 0 but docIds list is empty")
-        void returnsZeroWhenDocIdsEmpty() {
-            knowledgeClient.withPendingVduCount(5);
-            knowledgeClient.withPendingVduDocIds(List.of());  // Empty list
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed);
-        }
-    }
-
-    @Nested
-    @DisplayName("Retry Logic (Poison Pill Protection)")
-    class RetryLogic {
-
-        @Test
-        @DisplayName("skips document when max retries exceeded")
-        void skipsWhenMaxRetriesExceeded() throws Exception {
-            Path testFile = createTestFile("poison.png");
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(testFile.toString()));
-            knowledgeClient.withMarkVduProcessingRetryCount(-1);  // Max retries exceeded
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Should not count as processed");
-            assertEquals(0, vduProcessor.getProcessCallCount(), "Should skip VDU processing");
-        }
-
-        @Test
-        @DisplayName("processes document when retry count is valid")
-        void processesWhenRetryCountValid() throws Exception {
-            Path testFile = createTestFile("valid.png");
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(testFile.toString()));
-            knowledgeClient.withMarkVduProcessingRetryCount(1);  // First retry
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(1, processed);
-            assertEquals(1, vduProcessor.getProcessCallCount());
-        }
-    }
-
-    @Nested
-    @DisplayName("File Existence Check")
-    class FileExistenceCheck {
-
-        @Test
-        @DisplayName("marks as failed when file no longer exists")
-        void marksFailedWhenFileNotExists() {
-            String nonExistentPath = tempDir.resolve("nonexistent.png").toString();
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(nonExistentPath));
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Should not count missing file as processed");
-            var update = knowledgeClient.getVduUpdate(nonExistentPath);
-            assertNotNull(update, "Should have update for missing file");
-            assertEquals(SchemaFields.VDU_STATUS_FAILED, update.vduStatus());
-            assertTrue(update.enrichment().contains("no longer exists"));
-        }
-    }
-
-    @Nested
-    @DisplayName("Success Path")
-    class SuccessPath {
-
-        @Test
-        @DisplayName("processes single file successfully")
-        void processesSingleFileSuccessfully() throws Exception {
-            Path testFile = createTestFile("test.png");
-            String docId = testFile.toString();
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(docId));
-            vduProcessor.withDefaultResult("Extracted text", "{\"summary\":\"test\"}", 1);
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(1, processed);
-            assertTrue(knowledgeClient.getMarkedProcessingDocIds().contains(docId));
-            var update = knowledgeClient.getVduUpdate(docId);
-            assertNotNull(update);
-            assertEquals("Extracted text", update.extractedContent());
-            assertEquals(SchemaFields.VDU_STATUS_COMPLETED, update.vduStatus());
-            assertEquals("{\"summary\":\"test\"}", update.enrichment());
-            assertEquals(1, update.pageCount());
-        }
-
-        @Test
-        @DisplayName("processes multiple files in batch")
-        void processesMultipleFiles() throws Exception {
-            Path file1 = createTestFile("file1.png");
-            Path file2 = createTestFile("file2.png");
-            Path file3 = createTestFile("file3.png");
-            knowledgeClient.withPendingVduCount(3);
-            knowledgeClient.withPendingVduDocIds(List.of(
-                file1.toString(), file2.toString(), file3.toString()));
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(3, processed);
-            assertEquals(3, vduProcessor.getProcessCallCount());
-            assertEquals(3, knowledgeClient.getVduUpdates().size());
-        }
-    }
-
-    @Nested
-    @DisplayName("No Text Detected (P0.4)")
-    class NoTextDetected {
-
-        @Test
-        @DisplayName("marks document as FAILED when extracted text is blank")
-        void marksFailedWhenExtractedTextBlank() throws Exception {
-            Path testFile = createTestFile("empty.png");
-            String docId = testFile.toString();
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(docId));
-            vduProcessor.withDefaultResult("", "{\"pages\":1}", 1);  // Blank extracted text
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Blank text should not count as processed");
-            var update = knowledgeClient.getVduUpdate(docId);
-            assertNotNull(update);
-            assertEquals(SchemaFields.VDU_STATUS_FAILED, update.vduStatus(),
-                "Should mark as FAILED, not COMPLETED");
-            assertTrue(update.enrichment().contains("no_text_detected"),
-                "Should include no_text_detected error code");
-        }
-
-        @Test
-        @DisplayName("marks document as FAILED when extracted text is null")
-        void marksFailedWhenExtractedTextNull() throws Exception {
-            Path testFile = createTestFile("null.png");
-            String docId = testFile.toString();
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(docId));
-            vduProcessor.withDefaultResult(null, "", 1);  // Null extracted text
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Null text should not count as processed");
-            var update = knowledgeClient.getVduUpdate(docId);
-            assertNotNull(update);
-            assertEquals(SchemaFields.VDU_STATUS_FAILED, update.vduStatus());
-            assertTrue(update.enrichment().contains("no_text_detected"));
-        }
-
-        @Test
-        @DisplayName("marks document as FAILED when extracted text is whitespace only")
-        void marksFailedWhenExtractedTextWhitespace() throws Exception {
-            Path testFile = createTestFile("whitespace.png");
-            String docId = testFile.toString();
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(docId));
-            vduProcessor.withDefaultResult("   \t\n  ", "", 3);  // Whitespace only
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Whitespace-only text should not count as processed");
-            var update = knowledgeClient.getVduUpdate(docId);
-            assertNotNull(update);
-            assertEquals(SchemaFields.VDU_STATUS_FAILED, update.vduStatus());
-            assertTrue(update.enrichment().contains("no_text_detected"));
-        }
-
-        @Test
-        @DisplayName("preserves page count in no_text_detected enrichment")
-        void preservesPageCountInEnrichment() throws Exception {
-            Path testFile = createTestFile("multipage.pdf");
-            String docId = testFile.toString();
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(docId));
-            vduProcessor.withDefaultResult("", "", 5);  // 5 pages, no text
-
-            batchProcessor.processPendingFiles();
-
-            var update = knowledgeClient.getVduUpdate(docId);
-            assertNotNull(update);
-            assertTrue(update.enrichment().contains("pageCount") || update.enrichment().contains("5"),
-                "Should preserve page count in enrichment");
-        }
-    }
-
-    @Nested
-    @DisplayName("Failure Handling")
-    class FailureHandling {
-
-        @Test
-        @DisplayName("marks document as failed when VduProcessor throws VduException")
-        void marksFailedOnVduException() throws Exception {
-            Path testFile = createTestFile("failing.png");
-            String docId = testFile.toString();
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(docId));
-            vduProcessor.withFailingDocId(docId, "OCR extraction failed");
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Failed file should not count as processed");
-            var update = knowledgeClient.getVduUpdate(docId);
-            assertNotNull(update);
-            assertEquals(SchemaFields.VDU_STATUS_FAILED, update.vduStatus());
-            assertTrue(update.enrichment().contains("OCR extraction failed"));
-        }
-
-        @Test
-        @DisplayName("continues processing other files after failure")
-        void continuesAfterFailure() throws Exception {
-            Path failingFile = createTestFile("failing.png");
-            Path successFile = createTestFile("success.png");
-            knowledgeClient.withPendingVduCount(2);
-            knowledgeClient.withPendingVduDocIds(List.of(
-                failingFile.toString(), successFile.toString()));
-            vduProcessor.withFailingDocId(failingFile.toString(), "Failed");
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(1, processed, "Should count only successful file");
-            assertEquals(2, vduProcessor.getProcessCallCount(), "Should attempt both files");
-            assertEquals(SchemaFields.VDU_STATUS_FAILED,
-                knowledgeClient.getVduUpdate(failingFile.toString()).vduStatus());
-            assertEquals(SchemaFields.VDU_STATUS_COMPLETED,
-                knowledgeClient.getVduUpdate(successFile.toString()).vduStatus());
-        }
-
-        @Test
-        @DisplayName("marks failed when update returns false")
-        void countsAsFailedWhenUpdateFails() throws Exception {
-            Path testFile = createTestFile("test.png");
-            knowledgeClient.withPendingVduCount(1);
-            knowledgeClient.withPendingVduDocIds(List.of(testFile.toString()));
-            knowledgeClient.withUpdateVduResultSuccess(false);
-
-            int processed = batchProcessor.processPendingFiles();
-
-            assertEquals(0, processed, "Should not count as processed when update fails");
-        }
-    }
-
-    // ========== Test Helpers ==========
-
-    private Path createTestFile(String name) throws Exception {
-        Path file = tempDir.resolve(name);
-        Files.writeString(file, "test content");
-        return file;
-    }
-
-    // ========== Test Support Classes ==========
-
-    /**
-     * Testable version of VduBatchProcessor that works with stubs.
-     */
-    static class TestableVduBatchProcessor {
-        private final StubVduProcessor vduProcessor;
-        private final StubVramDetector vramDetector;
-        private final StubRemoteKnowledgeClient knowledgeClient;
-
-        TestableVduBatchProcessor(StubVduProcessor vduProcessor,
-                                  StubVramDetector vramDetector,
-                                  StubRemoteKnowledgeClient knowledgeClient) {
-            this.vduProcessor = vduProcessor;
-            this.vramDetector = vramDetector;
-            this.knowledgeClient = knowledgeClient;
-        }
-
-        int processPendingFiles() {
-            if (!vramDetector.meetsVduRequirements()) {
-                return 0;
-            }
-
-            int pendingCount = knowledgeClient.countPendingVdu();
-            if (pendingCount == 0) {
-                return 0;
-            }
-
-            List<String> pendingDocIds = knowledgeClient.queryPendingVduDocIds();
-            if (pendingDocIds.isEmpty()) {
-                return 0;
-            }
-
-            int processed = 0;
-
-            for (String docId : pendingDocIds) {
-                try {
-                    // Poison pill protection
-                    int retryCount = knowledgeClient.markVduProcessing(docId, SchemaFields.VDU_MAX_RETRIES);
-                    if (retryCount < 0) {
-                        continue;
-                    }
-
-                    Path filePath = Path.of(docId);
-                    if (!Files.exists(filePath)) {
-                        markVduFailed(docId, "File no longer exists");
-                        continue;
-                    }
-
-                    VduProcessor.VduResult result = vduProcessor.process(filePath);
-
-                    // P0.4: If VDU/OCR produced no text, treat as FAILED (not COMPLETED).
-                    String extractedText = result.extractedText();
-                    boolean noTextDetected = extractedText == null || extractedText.isBlank();
-
-                    String vduStatus;
-                    String enrichment;
-                    if (noTextDetected) {
-                        vduStatus = SchemaFields.VDU_STATUS_FAILED;
-                        enrichment = "{\"error\":\"no_text_detected\",\"pageCount\":" + result.pageCount() + "}";
-                    } else {
-                        vduStatus = SchemaFields.VDU_STATUS_COMPLETED;
-                        enrichment = result.enrichment();
-                    }
-
-                    boolean updated = knowledgeClient.updateVduResult(
-                        docId,
-                        noTextDetected ? "" : extractedText,
-                        vduStatus,
-                        enrichment,
-                        result.pageCount()
-                    );
-
-                    if (updated) {
-                        if (!noTextDetected) {
-                            processed++;
-                        }
-                        // noTextDetected counts as failed, not processed
-                    }
-
-                } catch (VduProcessor.VduException e) {
-                    markVduFailed(docId, e.getMessage());
-                } catch (Exception e) {
-                    markVduFailed(docId, "Unexpected error: " + e.getMessage());
-                }
-            }
-
-            return processed;
-        }
-
-        private void markVduFailed(String docId, String reason) {
-            String safeReason = reason.replace("\"", "'");
-            knowledgeClient.updateVduResult(
-                docId,
-                "",
-                SchemaFields.VDU_STATUS_FAILED,
-                "{\"error\": \"" + safeReason + "\"}",
-                0
-            );
-        }
-    }
+  }
+
+  @Test
+  void acknowledgedModelFailureDoesNotPreventFollowingDocument() throws Exception {
+    Path first = file("failure.png");
+    Path second = file("success.png");
+    when(client.queryPendingVduDocIds(context))
+        .thenReturn(List.of(first.toString(), second.toString()));
+    when(processor.process(first, context))
+        .thenThrow(new VduProcessor.VduException("model failed", null));
+    when(processor.process(second, context))
+        .thenReturn(new VduProcessor.VduResult("text", "{}", 1));
+
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+
+    assertEquals(1, outcome.processed());
+    assertEquals(1, outcome.failed());
+    assertEquals(0, outcome.remaining());
+  }
+
+  @Test
+  void unacknowledgedResultIsAnErrorRatherThanProgress() throws Exception {
+    Path file = file("unacknowledged.png");
+    select(file);
+    when(processor.process(file, context))
+        .thenReturn(new VduProcessor.VduResult("text", "{}", 1));
+    when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), any()))
+        .thenReturn(false);
+
+    assertThrows(IllegalStateException.class, () -> run(new ArrayList<>()));
+  }
+
+  private OfflineProcessingOutcome run(List<OfflineProcessingOutcome> progress) {
+    return new VduBatchProcessor(processor, gpu, () -> client, VduMetricCatalog.noop(),
+        new VduCapabilityState()).processPendingFiles(context, progress::add);
+  }
+
+  private void select(Path file) {
+    when(client.queryPendingVduDocIds(context)).thenReturn(List.of(file.toString()));
+  }
+
+  private Path file(String name) throws Exception {
+    Path file = tempDir.resolve(name);
+    Files.writeString(file, "image");
+    return file;
+  }
+
+  static GpuCapabilities gpuSnapshot(long totalVramBytes) {
+    var effective = new GpuCapabilities.Effective(true, "test", GpuCapabilities.Confidence.HIGH,
+        "1.0", 1, 0, 1, totalVramBytes, totalVramBytes, 0L,
+        GpuCapabilities.Cuda.unknown());
+    return new GpuCapabilities(null, null, effective);
+  }
 }

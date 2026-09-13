@@ -51,7 +51,7 @@ final class ExtractionSandboxLatencyBenchmarkTest {
 
     ExtractionSandbox inProcess =
         new InProcessExtractionSandbox(
-            new PolicyDrivenTikaExtractor(
+            new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(),
                 TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled()));
 
     StringBuilder table = new StringBuilder();
@@ -61,7 +61,7 @@ final class ExtractionSandboxLatencyBenchmarkTest {
     double textRoundTripOverheadMs = 0.0d;
 
     try (PersistentExtractionSandbox outOfProcess =
-        new PersistentExtractionSandbox(
+        new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             ExtractionSandboxCommand.defaultCommand(TikaExtractionPolicy.defaults(), ""),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),

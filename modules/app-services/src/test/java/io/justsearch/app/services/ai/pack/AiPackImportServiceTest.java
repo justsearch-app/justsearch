@@ -114,8 +114,10 @@ class AiPackImportServiceTest {
             new EnterprisePolicyServiceImpl(),
             new PackAllowlistService(Set.of(manifestSha)));
 
-    svc.startImport(zip, false);
+    var attempt = svc.startImport(zip, false);
     AiPackImportStatus st = awaitDone(svc);
+    assertEquals("completed", attempt.completion().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS).state);
+    assertEquals("running", attempt.started().state);
     assertEquals("completed", st.state, st.errorCode + " " + st.message);
 
     assertTrue(Files.isRegularFile(tmp.resolve("models").resolve("chat.gguf")));

@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -108,13 +109,13 @@ class PreviewControllerTest {
     DocumentService docService =
         new DocumentService() {
           @Override
-          public CompletableFuture<DocumentRecord> fetch(String ignored) {
+          public CompletableFuture<DocumentRecord> fetch(String ignored, EngineContext engineContext) {
             return CompletableFuture.completedFuture(null);
           }
 
           @Override
           public CompletableFuture<DocumentSlice> fetchSlice(
-              String ignored, int offsetChars, int maxChars) {
+              String ignored, int offsetChars, int maxChars, EngineContext engineContext) {
             return CompletableFuture.completedFuture(
                 new DocumentSlice(
                     docId,
@@ -238,12 +239,13 @@ class PreviewControllerTest {
   private static DocumentService documentIdService() {
     return new DocumentService() {
       @Override
-      public CompletableFuture<DocumentRecord> fetch(String docId) {
+      public CompletableFuture<DocumentRecord> fetch(String docId, EngineContext engineContext) {
         return CompletableFuture.completedFuture(null);
       }
 
       @Override
-      public CompletableFuture<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
+      public CompletableFuture<DocumentIdPage> listAllDocumentIds(
+          int offset, int limit, EngineContext engineContext) {
         return CompletableFuture.completedFuture(
             new DocumentIdPage(
                 java.util.List.of("C:/root/a.txt", "C:/root/nested/b.txt"), 2, 7));
@@ -366,13 +368,13 @@ class PreviewControllerTest {
   }
 
   private static DocumentService stubDocumentsAlwaysNotFound() {
-    return docId -> CompletableFuture.completedFuture(null);
+    return (docId, engineContext) -> CompletableFuture.completedFuture(null);
   }
 
   private static DocumentService stubDocumentsUnavailable() {
     return new DocumentService() {
       @Override
-      public CompletableFuture<DocumentService.DocumentRecord> fetch(String docId) {
+      public CompletableFuture<DocumentService.DocumentRecord> fetch(String docId, EngineContext engineContext) {
         return CompletableFuture.failedFuture(new DocumentService.UnavailableException("index unavailable"));
       }
     };
@@ -386,7 +388,7 @@ class PreviewControllerTest {
       String expectedDocId, String fullContent, Map<String, Object> metadata) {
     return new DocumentService() {
       @Override
-      public CompletableFuture<DocumentService.DocumentRecord> fetch(String docId) {
+      public CompletableFuture<DocumentService.DocumentRecord> fetch(String docId, EngineContext engineContext) {
         if (!expectedDocId.equals(docId)) {
           return CompletableFuture.completedFuture(null);
         }

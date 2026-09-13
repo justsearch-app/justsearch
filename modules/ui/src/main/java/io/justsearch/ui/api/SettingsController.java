@@ -358,34 +358,8 @@ public class SettingsController {
     }
     UiSettings current = settingsStore.load();
 
-    // Reset only the FE-controlled subset (matches the FE's prior
-    // resetToDefaults map at modules/ui-web/src/hooks/useSettings.ts:81-97
-    // pre-migration). Admin-set fields below are preserved.
-    //
-    // NOTE: vimMode is intentionally NOT reset here — the FE's pre-migration
-    // resetToDefaults did not touch it, so a user with vimMode=true who
-    // clicks Reset should keep their vim binding preference. Behavior parity
-    // with the prior FE reset is the contract.
-    current.setTheme("system");
-    current.setHighContrast(false);
-    current.setDensity("comfort");
-    current.setDefaultAction("open");
-    current.setPauseIndexingDuringAi(false);
-    current.setMode("simple");
-    current.setTrustLoopNudgeSeen(false);
-    current.setExcludePatterns(new ArrayList<>());
-    current.setContextLength(0);
-    current.setMaxTokens(1024);
-    current.setGpuLayers(0);
+    io.justsearch.app.services.settings.SettingsResetDefaults.applyTo(current);
 
-    // Preserved (NOT reset by user-triggered reset-to-defaults):
-    // - serverExecutablePath, llmModelPath, llamaLibPath (admin-managed paths)
-    // - indexBasePath (computed at install / set by operator)
-    // - schemaVersion, version (settings migration metadata)
-    // - splits, window (geometry / inspector width — UX-state, but not
-    //   "settings" the user thinks of when clicking Reset)
-    // - inspectorWidth (UX state, persistent across reload)
-    // - vimMode (user binding preference; not in the FE's prior reset map)
     settingsStore.save(current);
     rebuildConfigStore(current);
 

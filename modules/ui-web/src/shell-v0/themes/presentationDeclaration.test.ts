@@ -29,6 +29,15 @@ const VALID: PresentationDeclaration = {
 };
 
 describe('PresentationDeclaration — validation', () => {
+  it('rejects a skin that mounts native Engine recovery controls', () => {
+    const recoveryLayout = {
+      ...VALID,
+      layout: { regions: [{ id: 'main', component: 'jf-engine-recovery', order: 0 }] },
+    };
+    expect(validatePresentationDeclaration(recoveryLayout).ok).toBe(false);
+    expect(validatePresentationDeclaration(VALID).ok).toBe(true);
+  });
+
   it('accepts a valid declaration across theme/body/layout tiers', () => {
     const r = validatePresentationDeclaration(VALID);
     expect(r.ok).toBe(true);

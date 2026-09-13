@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
  *
  * <p>Format mirrors {@link OperationRef} / {@link DiagnosticChannelRef}:
  * {@code ^(core|vendor\.\w+)\.[a-z][a-z0-9-]*$}. Examples:
- * {@code core.library-surface}, {@code core.head-log-surface},
+ * {@code core.library-surface}, {@code core.engine-log-surface},
  * {@code vendor.acme.dashboard}.
  *
  * <p>Per slice 449 §0 D1: Surface is a {@code Manifest} (composition over

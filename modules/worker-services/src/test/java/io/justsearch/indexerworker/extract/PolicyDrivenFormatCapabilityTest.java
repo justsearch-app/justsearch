@@ -263,7 +263,7 @@ final class PolicyDrivenFormatCapabilityTest {
     assertEquals(expected.recipeId(), generated.recipeId());
     assertEquals(expected.sha256(), sha256(generated.bytes()), () -> id + " fixture hash drifted");
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor().extractArtifact(fixture);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()).extractArtifact(fixture);
 
     assertEquals(ExtractionStatus.SUCCESS_FULL, artifact.status());
     assertEquals(expected.mimeType(), artifact.result().mimeType());
@@ -314,7 +314,7 @@ final class PolicyDrivenFormatCapabilityTest {
     try {
       Locale.setDefault(Locale.Category.FORMAT, Locale.GERMANY);
       Path fixture = FormatCapabilityFixtureFactory.write(tempDir, FormatId.XLSX_TYPED_CELLS);
-      ExtractionArtifact artifact = new PolicyDrivenTikaExtractor().extractArtifact(fixture);
+      ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()).extractArtifact(fixture);
       assertEquals(
           FormatCapabilityExpectedState.forFormat(FormatId.XLSX_TYPED_CELLS)
               .exactAnnotatedText(),

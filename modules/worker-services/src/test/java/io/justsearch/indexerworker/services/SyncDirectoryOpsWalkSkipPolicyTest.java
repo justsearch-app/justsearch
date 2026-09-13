@@ -2,7 +2,6 @@ package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.ipc.SyncDirectoryResponse;
@@ -37,8 +36,9 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
 
     // force=true so the walk enqueues every non-skipped file unconditionally (no indexed-path
     // lookup, which would require a real readPathOps).
-    ops.execute(root.toString(), true, new CapturingObserver());
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null);
 
+    assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(List.of(keep), queue.enqueuedPaths, "Only the non-policy-skipped file is enqueued");
   }
 
@@ -56,8 +56,9 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     RecordingQueue queue = new RecordingQueue();
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
 
-    ops.execute(root.toString(), true, new CapturingObserver());
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null);
 
+    assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(2, queue.enqueuedEntries.size(), "Both files enqueued as sized entries");
     for (JobQueue.EnqueueEntry entry : queue.enqueuedEntries) {
       assertEquals(
@@ -73,6 +74,25 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
             .filter(e -> e.sizeBytes() == smallSize || e.sizeBytes() == largeSize)
             .count(),
         "The two distinct real sizes must both be recorded");
+  }
+
+  @Test
+  void explicitSyncCarriesCallerAttributionToEveryEnqueuedFile() throws Exception {
+    Path root = Files.createDirectories(tempDir.resolve("attributed"));
+    Files.writeString(root.resolve("one.md"), "one");
+    Files.writeString(root.resolve("two.md"), "two");
+    RecordingQueue queue = new RecordingQueue();
+    SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
+    JobQueue.EnqueueProvenance provenance =
+        new JobQueue.EnqueueProvenance("agent", "AGENT_LOOP");
+
+    SyncDirectoryResponse response = ops.execute(root.toString(), true, provenance);
+
+    assertEquals("", response.getError());
+    assertEquals(2, queue.enqueuedEntries.size());
+    assertEquals(
+        List.of(provenance, provenance),
+        queue.enqueuedEntries.stream().map(JobQueue.EnqueueEntry::provenance).toList());
   }
 
   private static final class RecordingQueue implements JobQueue {
@@ -131,18 +151,5 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
 
     @Override
     public void close() {}
-  }
-
-  private static final class CapturingObserver implements StreamObserver<SyncDirectoryResponse> {
-    @Override
-    public void onNext(SyncDirectoryResponse value) {}
-
-    @Override
-    public void onError(Throwable t) {
-      throw new AssertionError("unexpected error", t);
-    }
-
-    @Override
-    public void onCompleted() {}
   }
 }

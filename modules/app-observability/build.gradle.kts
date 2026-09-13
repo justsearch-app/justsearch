@@ -5,6 +5,8 @@ plugins {
 }
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
+  testImplementation(libs.mockito.core)
   // Configuration - app-config exposes types in public API
   implementation(project(":modules:configuration"))
   api(project(":modules:app-config"))
@@ -38,10 +40,10 @@ dependencies {
   // JSON serialization
   api(libs.jackson.core)
   api(libs.jackson.databind)
+  // Lane F C2: one Engine-owned durable acceptance store, reached through app-api.
+  runtimeOnly(libs.sqlite.jdbc)
 
   // gRPC
-  api(libs.grpc.stub)
-  runtimeOnly(libs.grpc.netty.shaded)
 
 }
 

@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for {@link SessionPoliciesController}'s thin HTTP-adapter shape after the
  * tempdoc 397 §14.28 U4 gRPC-bridge migration. The client-facing JSON parsing + failure-mode
- * logic lives in {@link RemoteKnowledgeClient#getSessionPolicies} (per the
+ * logic lives in {@link KnowledgeClient#getSessionPolicies} (per the
  * {@code UiApiGuardrailsTest} rule that ui.api must not depend on proto types); this
  * controller only handles the null-client degradation.
  */
@@ -26,7 +26,7 @@ class SessionPoliciesControllerTest {
   @DisplayName("null client → configStatus='worker-unreachable', empty maps")
   void nullClientReturnsWorkerUnreachable() {
     SessionPoliciesController controller = new SessionPoliciesController(null);
-    Map<String, Object> response = controller.buildResponse();
+    Map<String, Object> response = controller.buildResponse(TestRequestContexts.browser());
 
     assertEquals("worker-unreachable", response.get("configStatus"));
     assertTrue(response.get("runtime") instanceof Map);
@@ -38,7 +38,7 @@ class SessionPoliciesControllerTest {
   @Test
   @DisplayName("client returns map → controller passes through unchanged")
   void clientMapPassesThrough() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> mockResponse = new LinkedHashMap<>();
     mockResponse.put("configStatus", "ok");
     Map<String, Object> runtime = new LinkedHashMap<>();
@@ -47,10 +47,10 @@ class SessionPoliciesControllerTest {
     Map<String, Object> models = new TreeMap<>();
     models.put("EMBEDDING", new LinkedHashMap<>());
     mockResponse.put("models", models);
-    when(client.getSessionPolicies()).thenReturn(mockResponse);
+    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(mockResponse);
 
     SessionPoliciesController controller = new SessionPoliciesController(client);
-    Map<String, Object> response = controller.buildResponse();
+    Map<String, Object> response = controller.buildResponse(TestRequestContexts.browser());
 
     assertEquals("ok", response.get("configStatus"));
     assertEquals(runtime, response.get("runtime"));
@@ -67,18 +67,18 @@ class SessionPoliciesControllerTest {
     // PolicySnapshot response.
     SessionPoliciesController controller = new SessionPoliciesController(null);
     assertEquals(
-        "worker-unreachable", controller.buildResponse().get("configStatus"));
+        "worker-unreachable", controller.buildResponse(TestRequestContexts.browser()).get("configStatus"));
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> ready = new LinkedHashMap<>();
     ready.put("configStatus", "ok");
     ready.put("runtime", new LinkedHashMap<>());
     ready.put("models", new TreeMap<>());
-    when(client.getSessionPolicies()).thenReturn(ready);
+    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(ready);
 
     controller.setClient(client);
 
-    Map<String, Object> response = controller.buildResponse();
+    Map<String, Object> response = controller.buildResponse(TestRequestContexts.browser());
     assertEquals("ok", response.get("configStatus"));
   }
 
@@ -89,10 +89,10 @@ class SessionPoliciesControllerTest {
     // if the late-bind fires with a null ks (Worker boot failed), the
     // controller must return to worker-unreachable rather than retain a
     // stale reference.
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     SessionPoliciesController controller = new SessionPoliciesController(client);
     controller.setClient(null);
     assertEquals(
-        "worker-unreachable", controller.buildResponse().get("configStatus"));
+        "worker-unreachable", controller.buildResponse(TestRequestContexts.browser()).get("configStatus"));
   }
 }

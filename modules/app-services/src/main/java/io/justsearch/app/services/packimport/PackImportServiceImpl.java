@@ -39,12 +39,11 @@ public final class PackImportServiceImpl implements PackImportService {
   }
 
   @Override
-  public Map<String, Object> startImport(String path, boolean allowDowngrade) throws Exception {
+  public AiPackImportService.Attempt startImport(String path, boolean allowDowngrade) throws Exception {
     if (path == null || path.isBlank()) {
       throw new IllegalArgumentException("Missing pack path");
     }
-    helper.startImport(Path.of(path), allowDowngrade);
-    return convertToMap(helper.getStatus());
+    return helper.startImport(Path.of(path), allowDowngrade);
   }
 
   @SuppressWarnings("unchecked")

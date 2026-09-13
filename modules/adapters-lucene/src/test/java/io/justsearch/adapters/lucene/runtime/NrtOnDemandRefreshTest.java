@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
  * document visible is the refresh {@link SearcherBridge} performs before acquiring. A test that
  * left the thread running would pass in both modes and prove nothing.
  */
-final class NrtOnDemandRefreshTest {
+final class NrtOnDemandRefreshTest extends LuceneExecutorTestBase {
 
   private static final int DIM = 768;
 
@@ -52,12 +52,12 @@ final class NrtOnDemandRefreshTest {
   private static final String CONTINUOUS = "  nrt:\n    mode: continuous\n";
 
   /** Opens a runtime under the given NRT config with the background reopen thread suspended. */
-  private static RunningRuntime openWithBackgroundReopenStopped(String nrtBlock) throws IOException {
+  private RunningRuntime openWithBackgroundReopenStopped(String nrtBlock) throws IOException {
     return openWithBackgroundReopenStopped(nrtBlock, () -> true);
   }
 
   /** Opens a runtime under the given NRT config with the background reopen thread STILL RUNNING. */
-  private static RunningRuntime open(String nrtBlock) throws IOException {
+  private RunningRuntime open(String nrtBlock) throws IOException {
     Path dataDir = Files.createTempDirectory("justsearch-nrt-ondemand-");
     Path cfg = Files.createTempFile("justsearch-nrt-ondemand-", ".yaml");
     Files.writeString(cfg, config(dataDir, nrtBlock));
@@ -66,7 +66,7 @@ final class NrtOnDemandRefreshTest {
             FieldCatalogDef.forTesting(DIM),
             new SsotCommitMetadataSource(),
             new JsonSchemaCommitMetadataValidator())
-        .ephemeral()
+        .ephemeral().withExecutorRegistrations(testLuceneExecutors())
         .open();
   }
 
@@ -78,7 +78,7 @@ final class NrtOnDemandRefreshTest {
   }
 
   /** As above, with an explicit foreground predicate — the seam's gate. */
-  private static RunningRuntime openWithBackgroundReopenStopped(
+  private RunningRuntime openWithBackgroundReopenStopped(
       String nrtBlock, java.util.function.BooleanSupplier foregroundActive) throws IOException {
     Path dataDir = Files.createTempDirectory("justsearch-nrt-ondemand-");
     Path cfg = Files.createTempFile("justsearch-nrt-ondemand-", ".yaml");
@@ -89,7 +89,7 @@ final class NrtOnDemandRefreshTest {
                 FieldCatalogDef.forTesting(DIM),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .ephemeral()
+            .ephemeral().withExecutorRegistrations(testLuceneExecutors())
             .withForegroundActive(foregroundActive)
             .open();
     runtime.commitOps().suspendNrtRefresh();

@@ -115,6 +115,10 @@ public final class URLExtractor implements StreamConsumer {
 
   @Override
   public StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
+    var incomingContext = ctx.engineContext();
+    var engineContext = io.justsearch.app.services.intent.EngineProvenance.rebase(
+        incomingContext, incomingContext.sessionId(), TransportTag.LLM_EMISSION,
+        incomingContext.survival(), incomingContext.urgency());
     List<SseEvent> events = new ArrayList<>();
     List<Map<String, Object>> sideEffects = new ArrayList<>();
     int urlIndex = 0;
@@ -137,8 +141,8 @@ public final class URLExtractor implements StreamConsumer {
 
       try {
         IntentDispatchResult result =
-            router.dispatch(intent, InvocationProvenance.fromTransport(
-                TransportTag.LLM_EMISSION, Optional.empty(), clock.instant()));
+            router.dispatch(intent, io.justsearch.app.services.intent.EngineProvenance.invocation(
+                engineContext, io.justsearch.agent.api.registry.ExecutorTag.AGENT, clock.instant(), Optional.empty()), engineContext);
         events.add(dispatchedEvent(intent, urlIndex, result));
         sideEffects.add(sideEffectRecord(intent, urlIndex, result, null));
       } catch (RuntimeException e) {

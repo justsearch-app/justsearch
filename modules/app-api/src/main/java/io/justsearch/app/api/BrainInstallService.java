@@ -9,13 +9,11 @@ import java.util.Map;
  * <p>Slice 3a-2-c continuation (BrainInstall cluster): backs
  * {@code core.start-ai-install}, {@code core.cancel-ai-install}, and
  * {@code core.repair-ai-install} Operations. Production wiring:
- * {@code AiInstallController} implements this interface; {@code LocalApiServer}
- * late-binds it onto {@code HeadAssembly}.
+ * {@code BrainInstallServiceImpl} is composed by {@code ServicePhase}.
  *
- * <p>All methods return {@code Map<String, Object>} mirroring the existing
- * REST response shape (AiInstallStatus) so the FE consumer
- * (BrainInstallSection / useBrainInstall) can deserialize without lifting
- * the modules/ui-side type into app-api.
+ * <p>Start/repair return the owner's initial snapshot and actual completion; the
+ * handler projects the snapshot into the existing REST response shape. Cancellation
+ * returns its synchronous control-request status.
  *
  * <p>Stability: stable (API contract).
  */
@@ -29,11 +27,11 @@ public interface BrainInstallService {
    * @param acceptTerms whether the user has accepted the install terms
    *     (required for first-time install; the controller / underlying
    *     service enforces).
-   * @return current install status as a serializable map
+   * @return frozen initial status and owner completion
    * @throws Exception on install-start failure (typed errors carry codes;
    *     handler surfaces messages)
    */
-  Map<String, Object> startInstall(boolean acceptTerms) throws Exception;
+  AiInstallService.Attempt startInstall(boolean acceptTerms) throws Exception;
 
   /**
    * Cancel a running install. Idempotent if no install is running. Returns
@@ -49,9 +47,9 @@ public interface BrainInstallService {
    * partial / corrupted state).
    *
    * @param acceptTerms whether the user has accepted the repair terms
-   * @return current install status as a serializable map
+   * @return frozen initial status and owner completion
    * @throws Exception on repair-start failure
    */
-  Map<String, Object> repairInstall(boolean acceptTerms) throws Exception;
+  AiInstallService.Attempt repairInstall(boolean acceptTerms) throws Exception;
 
 }

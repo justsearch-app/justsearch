@@ -23,6 +23,7 @@ dependencies {
           "app-agent-api",
           "app-api",
           "app-config",
+          "app-engine",
           "app-inference",
           "app-launcher",
           "app-observability",

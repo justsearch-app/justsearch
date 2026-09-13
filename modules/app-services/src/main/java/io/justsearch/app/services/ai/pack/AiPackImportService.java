@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.slf4j.Logger;
@@ -124,22 +125,11 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     }
   }
 
-  /**
-   * Liveness backstop (tempdoc 575 §17 Face C). Pack import is a <em>polled-state</em> liveness model.
-   * If the owner wedges in "running" with no progress past {@link #STALE_RUNNING_MS}, reclaim it to a
-   * terminal failed state on read — so the UI never polls a dead "running" forever (the gap this fixes:
-   * pack import had no backstop, unlike the worker's recoverStuckJobs reaper).
-   */
+  /** A timestamp may reap abandoned status, never revoke a live writer's guard. */
   private void reapIfStale() {
-    if (io.justsearch.app.services.ai.PolledStateLiveness.isStaleRunning(
+    if (!running.get() && io.justsearch.app.services.ai.PolledStateLiveness.isStaleRunning(
         status.state, status.updatedAtEpochMs, System.currentTimeMillis(), STALE_RUNNING_MS)) {
-      running.set(false);
-      fail(
-          "STALLED",
-          "Pack import stalled — no progress for over "
-              + (STALE_RUNNING_MS / 1000)
-              + "s; reclaimed by the liveness backstop (575 §17 Face C).",
-          null);
+      fail("STALLED", "Abandoned pack import status exceeded the progress window", null);
     }
   }
 
@@ -162,46 +152,79 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     return isFile ? preflightZip(packPath) : preflightFolder(packPath);
   }
 
-  public void startImport(Path packPath, boolean allowDowngrade) {
+  public Attempt startImport(Path packPath, boolean allowDowngrade) {
     Objects.requireNonNull(packPath, "packPath");
+    AiPackImportStatus started;
     synchronized (lock) {
-      if (running.get()) {
-        throw new IllegalStateException("Pack import already running");
-      }
+      if (running.get()) throw new IllegalStateException("Pack import already running");
       running.set(true);
+      status.startedAtEpochMs = System.currentTimeMillis();
+      status.packId = "";
+      status.packVersion = "";
+      status.manifestSha256 = "";
+      status.bytesTotal = 0;
+      status.bytesDone = 0;
       updateState("running", "preflight", "Starting AI Pack import…", null);
+      started = copyStatus(status);
     }
-    // Register on the CALLING thread, before start(): registering inside the thread leaves a
-    // window in which upgrade prepare observes no blocker while the import is about to write.
-    // Same race-window closure as BulkReindexHandler.
-    OperationLeaseHandle lease =
-        operationLeases.register(
-            "ai.pack-import",
-            OpCriticality.INTERRUPTIBLE_WITH_LOSS,
-            3600L,
-            Map.of("source", "ai.pack-import", "packPath", packPath.toString()));
-    Thread t =
-        new Thread(
-            () -> {
-              boolean ok = false;
-              try {
-                runImport(packPath, allowDowngrade);
-                ok = true;
-              } finally {
-                running.set(false);
-                lease.release(ok ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
-              }
-            },
-            "ai-pack-import");
-    t.setDaemon(true);
-    this.importThread = t;
+    OperationLeaseHandle lease;
     try {
-      t.start();
-    } catch (RuntimeException e) {
-      // The thread never ran, so its finally block will not release the lease.
-      running.set(false);
-      lease.release(OpLeaseOutcome.FAILURE);
-      throw e;
+      // Register before starting: upgrade preparation must observe the pending writer.
+      lease = operationLeases.register("ai.pack-import", OpCriticality.INTERRUPTIBLE_WITH_LOSS,
+          3600L, Map.of("source", "ai.pack-import", "packPath", packPath.toString()));
+    } catch (RuntimeException | Error failure) {
+      importStartFailed();
+      throw failure;
+    }
+    var completion = new CompletableFuture<AiPackImportStatus>();
+    try {
+      Thread thread = new Thread(() -> completeImport(packPath, allowDowngrade, lease, completion), "ai-pack-import");
+      thread.setDaemon(true);
+      this.importThread = thread;
+      thread.start();
+    } catch (RuntimeException | Error failure) {
+      try { lease.release(OpLeaseOutcome.FAILURE); }
+      catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      importStartFailed();
+      throw failure;
+    }
+    return new Attempt(started, completion.minimalCompletionStage());
+  }
+
+  private void importStartFailed() {
+    synchronized (lock) {
+      try { fail("PACK_IMPORT_START_FAILED", "Pack import owner could not start", null); }
+      finally { running.set(false); }
+    }
+  }
+
+  private void completeImport(Path packPath, boolean allowDowngrade, OperationLeaseHandle lease,
+      CompletableFuture<AiPackImportStatus> completion) {
+    Throwable failure = null;
+    try { runImport(packPath, allowDowngrade); }
+    catch (RuntimeException | Error ownerFailure) { failure = ownerFailure; }
+    try {
+      boolean completed;
+      synchronized (lock) { completed = "completed".equals(status.state); }
+      lease.release(failure == null && completed ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
+    } catch (RuntimeException | Error cleanupFailure) {
+      if (failure == null) failure = cleanupFailure;
+      else failure.addSuppressed(cleanupFailure);
+    }
+    AiPackImportStatus terminal;
+    synchronized (lock) {
+      try {
+        if (failure instanceof RuntimeException runtime) {
+          fail("PACK_IMPORT_OWNER_FAILED", "Pack import owner failed", runtime);
+        }
+        terminal = copyStatus(status);
+      } finally { running.set(false); }
+    }
+    if (failure == null) completion.complete(terminal);
+    else {
+      completion.completeExceptionally(failure);
+      if (failure instanceof Error fatal) throw fatal;
+      log.warn("Pack import owner exited exceptionally", failure);
     }
   }
 
@@ -594,7 +617,10 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     // Record installed pack AFTER successful settings application (matches original ordering).
     packInstallOps.recordPack(result.pack());
 
-    updateState("running", "restart_worker", "Restarting worker…", null);
+    // Lane F stage A: nothing restarts a worker (RestartRequiredException). The import is done;
+    // the user restarts JustSearch to pick it up. The phase ID is the machine key and stays.
+    updateState(
+        "running", "restart_worker", "Applied — restart JustSearch to use the new model", null);
     tryRestartWorkerBestEffort();
 
     updateState("completed", "done", "AI Pack installed.", null);
@@ -624,20 +650,18 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     }
   }
 
+  /**
+   * Lane F stage A item A11: there is no worker process to restart. The import used to replace the
+   * Worker child process so the imported pack was picked up immediately; the index half runs in
+   * this process now, so the equivalent is an Engine restart — the user's action. Logged with the
+   * stable code rather than dropped silently, so the import's own log says why the pack is not
+   * live yet. Stage A §10, "restart-as-reload".
+   */
   private void tryRestartWorkerBestEffort() {
-    try {
-      if (knowledgeServer != null && knowledgeServer.spawner() != null) {
-        knowledgeServer.spawner().restart();
-        long expectedPid = knowledgeServer.spawner().getWorkerPid();
-        try {
-          knowledgeServer.client().reconnect(expectedPid);
-          knowledgeServer.client().resetCircuitBreaker();
-        } catch (Exception e) {
-          log.debug("Worker client reconnect failed (best-effort)", e);
-        }
-      }
-    } catch (Exception e) {
-      log.warn("Worker restart failed (best-effort): {}", e.getMessage());
+    if (knowledgeServer != null && knowledgeServer.hasClient()) {
+      log.info(
+          "Pack import complete; an Engine restart is required to load it ({})",
+          io.justsearch.app.services.worker.RestartRequiredException.CODE);
     }
   }
 

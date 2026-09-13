@@ -323,6 +323,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
 
     const bursts = host.shadowRoot!.querySelectorAll('[data-testid="ledger-burst"]');
     expect(bursts.length).toBe(1);
+    expect(bursts[0]!.querySelector('[data-testid="ledger-new-dot"]')?.getAttribute('role')).toBe('img');
     expect(bursts[0]!.textContent).toContain('Indexed 5 · default');
     // tempdoc 558 Deepening 3 — the burst is also a projection of records that occurred at a time:
     // it carries the most-recent occurredAt of the collapsed group (rows are newest-first).
@@ -454,6 +455,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
 
       const newDots = host.shadowRoot!.querySelectorAll('[data-testid="ledger-new-dot"]');
       expect(newDots.length).toBe(2); // the 2 foreground rows, NOT the routine navigation
+      expect(Array.from(newDots).every((dot) => dot.getAttribute('role') === 'img')).toBe(true);
       const count = host.shadowRoot!.querySelector('[data-testid="ledger-new-count"]');
       expect(count!.textContent).toContain('2');
       // the routine navigation row is present (revealed) but carries no new-dot
@@ -630,6 +632,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
 
       const rollups = host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-rollup"]');
       expect(rollups.length).toBe(1);
+      expect(rollups[0]!.querySelector('[data-testid="ledger-new-dot"]')?.getAttribute('role')).toBe('img');
       expect(rollups[0]!.textContent).toContain('Indexed 11 documents');
       expect(rollups[0]!.textContent).toContain('scifact');
       expect(rollups[0]!.textContent).toContain('6m 12s'); // 372s at human altitude

@@ -27,7 +27,7 @@ package io.justsearch.indexerworker.services;
  * <p>This type is package-private to {@code services/} — minimum-surface
  * promotion per C-018; promote only when a second consumer outside {@code
  * services/} emerges. The cross-module wire-shape backstop is
- * {@code GrpcSearchServiceReasonCodeContractTest}.
+ * {@code WorkerSearchServiceReasonCodeContractTest}.
  */
 public enum SearchReasonCode {
   // === 8 embedding-compat codes (mapped at boundary) ===

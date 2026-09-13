@@ -230,7 +230,7 @@ export class Table<T extends Record<string, unknown> = Record<string, unknown>>
     const hasRowActions = !!this.rowActionsRenderer;
 
     return html`
-      <div class="table-root">
+      <div class="table-root" role="table">
         <div class="header-row" role="row">
           ${headerGroups.flatMap((g) =>
             g.headers.map((header) => {

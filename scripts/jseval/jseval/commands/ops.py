@@ -49,7 +49,7 @@ def cmd_preflight(ctx, base_url):
 @click.command("log-path")
 @click.option("--base-url", default=_DEFAULT_BASE_URL, show_default=True)
 def cmd_log_path(base_url):
-    """Discover and print the worker.log path from the running backend."""
+    """Discover and print the engine.log path from the running backend."""
     from .. import preflight
 
     status = preflight._fetch_endpoint(base_url, "/api/status", 10)
@@ -64,7 +64,7 @@ def cmd_log_path(base_url):
 
     # indexBasePath is like <data_dir>/index/default — go up 2 levels
     data_dir = Path(index_base).parent.parent
-    log_path = data_dir / "logs" / "worker.log"
+    log_path = data_dir / "logs" / "engine.log"
     click.echo(str(log_path))
 
 
@@ -204,8 +204,6 @@ def cmd_search(ctx, query, mode, limit, base_url, ce):
 
 
 @click.command("logs")
-@click.option("--source", type=click.Choice(["worker", "head", "all"]),
-              default="worker", show_default=True)
 @click.option("--filter", "-f", "pattern", default=None, help="Filter by message content.")
 @click.option("--level", "-l", "min_level", default=None,
               help="Minimum log level (DEBUG, INFO, WARN, ERROR).")
@@ -213,8 +211,14 @@ def cmd_search(ctx, query, mode, limit, base_url, ce):
 @click.option("--lines", "-n", "max_lines", default=50, show_default=True,
               help="Number of recent lines to show (0 = all).")
 @click.option("--base-url", default=_DEFAULT_BASE_URL, show_default=True)
-def cmd_logs(source, pattern, min_level, tail_mode, max_lines, base_url):
-    """Read and filter structured JSON logs from the running backend."""
+def cmd_logs(pattern, min_level, tail_mode, max_lines, base_url):
+    """Read and filter structured JSON logs from the running backend's engine.log.
+
+    Lane F stage A merged the Head and Worker processes into one Engine JVM, which
+    writes exactly one JSON log file (``<dataDir>/logs/engine.log``) — the former
+    ``--source worker|head|all`` split (worker.log / app.log) no longer has two
+    files to choose between, so this command reads the single engine log.
+    """
     from .. import preflight
 
     # Discover data dir
@@ -229,11 +233,7 @@ def cmd_logs(source, pattern, min_level, tail_mode, max_lines, base_url):
         sys.exit(1)
 
     data_dir = Path(index_base).parent.parent
-    log_files = []
-    if source in ("worker", "all"):
-        log_files.append(("worker", data_dir / "logs" / "worker.log"))
-    if source in ("head", "all"):
-        log_files.append(("head", data_dir / "logs" / "app.log"))
+    log_files = [("engine", data_dir / "logs" / "engine.log")]
 
     level_order = {"TRACE": 0, "DEBUG": 10, "INFO": 20, "WARN": 30, "ERROR": 40}
     min_level_val = level_order.get((min_level or "").upper(), 0)
@@ -256,8 +256,7 @@ def cmd_logs(source, pattern, min_level, tail_mode, max_lines, base_url):
         logger = entry.get("logger_name", "")
         # Shorten logger: keep last segment
         short_logger = logger.rsplit(".", 1)[-1] if logger else ""
-        prefix = f"[{src}] " if source == "all" else ""
-        return f"{prefix}{ts} {level:<5} {short_logger}: {msg[:200]}"
+        return f"{ts} {level:<5} {short_logger}: {msg[:200]}"
 
     # Read existing lines
     for src, log_path in log_files:

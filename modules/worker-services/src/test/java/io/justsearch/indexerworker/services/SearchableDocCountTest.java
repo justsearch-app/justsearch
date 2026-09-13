@@ -36,7 +36,7 @@ import org.junit.jupiter.api.io.TempDir;
  * pass if the field were wired to {@code doc_count} by mistake.
  */
 @DisplayName("searchable doc count (tempdoc 811 C-4)")
-final class SearchableDocCountTest {
+final class SearchableDocCountTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   /** Documents in the default search scope: 2 user docs + 1 bundled help doc + 1 ad-hoc ingest. */
   private static final int DEFAULT_SCOPE_DOCS = 4;
@@ -49,7 +49,7 @@ final class SearchableDocCountTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     seedCorpus();
   }
 

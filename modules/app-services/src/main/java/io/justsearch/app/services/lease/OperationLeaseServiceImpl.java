@@ -78,6 +78,11 @@ public final class OperationLeaseServiceImpl implements OperationLeaseService {
     }
   }
 
+  /** A real process-local barrier with no dev-runner file projection. */
+  public static OperationLeaseServiceImpl processLocal() {
+    return new OperationLeaseServiceImpl((Path) null);
+  }
+
   /** Visible for testing — explicit file path. */
   OperationLeaseServiceImpl(Path leasesFile) {
     this.enabled = leasesFile != null;

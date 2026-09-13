@@ -35,6 +35,7 @@ abstract class LocalApiIntegrationTestBase {
 
   protected Path aiHome;
   protected LocalApiServer server;
+  private final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
   protected HttpClient client;
   protected String baseUrl;
 
@@ -75,7 +76,7 @@ abstract class LocalApiIntegrationTestBase {
     Path indexBase = tmp.resolve("index");
     Files.createDirectories(indexBase);
 
-    server = configureServer(LocalApiServer.builder(settingsStore, indexBase)).build();
+    server = configureServer(LocalApiServer.builder(executors, settingsStore, indexBase)).build();
     baseUrl = "http://127.0.0.1:" + server.getPort();
     client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
   }
@@ -91,6 +92,8 @@ abstract class LocalApiIntegrationTestBase {
         server = null;
       }
     }
+
+    executors.close();
 
     // Best-effort cleanup: remove any machine policy file created during the test, but only inside the sandbox.
     cleanupMachinePolicySandboxBestEffort();

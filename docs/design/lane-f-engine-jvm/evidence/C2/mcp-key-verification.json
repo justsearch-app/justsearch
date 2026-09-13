@@ -1,0 +1,52 @@
+{
+  "revision": "d5c43a9d9 + complete MCP key and 0.8.0 contract projection",
+  "command": "gradlew.bat :modules:app-api:test :modules:ui:test --tests '*McpOperationKeyTest' --tests '*McpProtocolHandlerTest' --tests '*McpErrorLegibilityTest' --tests '*McpToolLifecycleTest' :modules:app-api:pmdMain :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 278,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 47
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 74,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "sourceHashes": [
+    {
+      "path": "modules\\ui\\src\\main\\java\\io\\justsearch\\ui\\api\\mcp\\McpToolSurface.java",
+      "sha256": "f06e8dfcf7fb11c17acce07f274f634765ab507b4edec49d1eb8b353d442d456"
+    },
+    {
+      "path": "modules\\ui\\src\\test\\java\\io\\justsearch\\ui\\api\\mcp\\McpProtocolHandlerTest.java",
+      "sha256": "f8707eba9f161edbfc69dbd0f3c7ffc62ce09ce7b98d1633d741d48ee2adc46a"
+    },
+    {
+      "path": "modules\\ui\\src\\test\\java\\io\\justsearch\\ui\\api\\mcp\\McpOperationKeyTest.java",
+      "sha256": "4ad5168b59fc2394b6ca4058fe261efff5ac391639e884aabb0fcb467ae79c18"
+    },
+    {
+      "path": "modules\\app-api\\src\\main\\java\\io\\justsearch\\app\\api\\mcp\\McpContractVersions.java",
+      "sha256": "0c7fa1ddc52db442e5b0000b645089009d374e528458128ec6dce733ac0af510"
+    }
+  ]
+}

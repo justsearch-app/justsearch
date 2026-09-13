@@ -228,6 +228,11 @@ class HybridFusionUtilsPropertyTest {
     assertEquals(1.0, HybridFusionUtils.spladeParentLengthMultiplier(Map.of("parent_token_count", "  ")), EPS);
     assertEquals(1.0, HybridFusionUtils.spladeParentLengthMultiplier(Map.of("parent_token_count", "abc")), EPS);
     assertEquals(0.5, HybridFusionUtils.spladeParentLengthMultiplier(Map.of("parent_token_count", "2560")), EPS);
+    assertEquals(1.0, HybridFusionUtils.chunkBranchParentLengthMultiplier((Map<String, String>) null, 0.3), EPS);
+    assertEquals(1.0, HybridFusionUtils.chunkBranchParentLengthMultiplier(Map.of(), 0.3), EPS);
+    assertEquals(1.0, HybridFusionUtils.chunkBranchParentLengthMultiplier(Map.of("parent_token_count", "  "), 0.3), EPS);
+    assertEquals(1.0, HybridFusionUtils.chunkBranchParentLengthMultiplier(Map.of("parent_token_count", "abc"), 0.3), EPS);
+    assertEquals(0.65, HybridFusionUtils.chunkBranchParentLengthMultiplier(Map.of("parent_token_count", "2560"), 0.3), EPS);
   }
 
   // ---- Tempdoc 854 W1: branch-ramp / SPLADE bound separation (F-036 §K wrong-gate fix) --------

@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,7 +25,7 @@ import org.junit.jupiter.api.Test;
 final class AgentSessionBudgetTest {
 
   private static AgentSession session(int budget) {
-    return new AgentSession(List.of(Map.of("role", "user", "content", "q")), budget);
+    return new AgentSession(List.of(Map.of("role", "user", "content", "q")), budget, EngineContextTestFixtures.AGENT_LOOP);
   }
 
   @Test
@@ -110,7 +112,7 @@ final class AgentSessionBudgetTest {
   // --- The held context gate (tempdoc 577 §2.14 Root II #14) ---
 
   private static AgentSession sessionWith(List<Map<String, Object>> messages) {
-    return new AgentSession(messages, 8192);
+    return new AgentSession(messages, 8192, EngineContextTestFixtures.AGENT_LOOP);
   }
 
   @Test

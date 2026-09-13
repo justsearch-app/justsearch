@@ -1,0 +1,81 @@
+Source: tmp/lane-f-takeover/integrated-stress-initial-snapshot/app-engine/TEST-io.justsearch.app.engine.EngineFileLockContentionTest.xml SHA-256: 3da56a91682057c0b70d599429daa9b11d2f9def9023eb1be558f2eff7cad35a Original XML line numbers follow. Non-contiguous verbatim excerpts.
+1: <?xml version="1.0" encoding="UTF-8"?>
+2: <testsuite name="io.justsearch.app.engine.EngineFileLockContentionTest" tests="2" skipped="0" failures="1" errors="0" timestamp="2026-09-08T08:17:35.043Z" hostname="DESKTOP-FA00PO7" time="188.526">
+3:   <properties/>
+4:   <testcase name="indexing survives an intruder that starts locking files mid-ingest" classname="io.justsearch.app.engine.EngineFileLockContentionTest" time="4.809"/>
+5:   <testcase name="the index half boots and indexes while an intruder holds locks under the data directory" classname="io.justsearch.app.engine.EngineFileLockContentionTest" time="183.717">
+6:     <failure message="org.opentest4j.AssertionFailedError: documents indexed while an intruder held locks under the data directory must become searchable — a writer that silently lost a segment to a locked file is exactly what the retired health-check proxy could not see ==&gt; expected: &lt;true&gt; but was: &lt;false&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: documents indexed while an intruder held locks under the data directory must become searchable — a writer that silently lost a segment to a locked file is exactly what the retired health-check proxy could not see ==&gt; expected: &lt;true&gt; but was: &lt;false&gt;
+7: 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+8: 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+9: 	at org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:63)
+10: 	at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:36)
+11: 	at org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:214)
+12: 	at io.justsearch.app.engine.EngineFileLockContentionTest.engineBootsAndIndexesWhileAnIntruderHoldsLocks(EngineFileLockContentionTest.java:119)
+13: 	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+14: 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+15: 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+16: </failure>
+7112: 10:17:45.183 [indexing-loop] ERROR io.justsearch.indexerworker.loop.IndexingLoop -- Failed to commit index
+7113: io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: Commit failed
+7114: 	at io.justsearch.adapters.lucene.runtime.CommitOps.commit(CommitOps.java:112)
+7115: 	at io.justsearch.adapters.lucene.runtime.CommitOps.commitAndTrack(CommitOps.java:166)
+7116: 	at io.justsearch.indexerworker.loop.IndexingLoop.runLoop(IndexingLoop.java:713)
+7117: 	at java.base/java.lang.Thread.run(Thread.java:1474)
+7118: Caused by: java.io.IOException: The process cannot access the file because another process has locked a portion of the file
+7119: 	at java.base/sun.nio.ch.FileDispatcherImpl.write0(Native Method)
+7120: 	at java.base/sun.nio.ch.FileDispatcherImpl.write(FileDispatcherImpl.java:74)
+7121: 	at java.base/sun.nio.ch.IOUtil.writeFromNativeBuffer(IOUtil.java:137)
+7122: 	at java.base/sun.nio.ch.IOUtil.write(IOUtil.java:102)
+7123: 	at java.base/sun.nio.ch.IOUtil.write(IOUtil.java:72)
+7124: 	at java.base/sun.nio.ch.FileChannelImpl.implWrite(FileChannelImpl.java:355)
+7125: 	at java.base/sun.nio.ch.FileChannelImpl.write(FileChannelImpl.java:335)
+7126: 	at java.base/sun.nio.ch.ChannelOutputStream.writeFully(ChannelOutputStream.java:68)
+7127: 	at java.base/sun.nio.ch.ChannelOutputStream.write(ChannelOutputStream.java:105)
+7128: 	at org.apache.lucene.store.FSDirectory$FSIndexOutput$1.write(FSDirectory.java:396)
+7129: 	at java.base/java.util.zip.CheckedOutputStream.write(CheckedOutputStream.java:73)
+7130: 	at java.base/java.io.BufferedOutputStream.flushBuffer(BufferedOutputStream.java:123)
+7131: 	at java.base/java.io.BufferedOutputStream.write(BufferedOutputStream.java:188)
+7132: 	at org.apache.lucene.store.OutputStreamIndexOutput.writeBytes(OutputStreamIndexOutput.java:59)
+7133: 	at org.apache.lucene.store.DataOutput.copyBytes(DataOutput.java:290)
+7134: 	at org.apache.lucene.codecs.lucene90.Lucene90CompoundFormat.writeCompoundFile(Lucene90CompoundFormat.java:145)
+7135: 	at org.apache.lucene.codecs.lucene90.Lucene90CompoundFormat.write(Lucene90CompoundFormat.java:102)
+7136: 	at org.apache.lucene.index.IndexWriter.createCompoundFile(IndexWriter.java:5921)
+7137: 	at org.apache.lucene.index.DocumentsWriterPerThread.sealFlushedSegment(DocumentsWriterPerThread.java:610)
+7138: 	at org.apache.lucene.index.DocumentsWriterPerThread.flush(DocumentsWriterPerThread.java:538)
+7139: 	at org.apache.lucene.index.DocumentsWriter.doFlush(DocumentsWriter.java:502)
+7140: 	at org.apache.lucene.index.DocumentsWriter.maybeFlush(DocumentsWriter.java:456)
+7141: 	at org.apache.lucene.index.DocumentsWriter.flushAllThreads(DocumentsWriter.java:649)
+7142: 	at org.apache.lucene.index.IndexWriter.prepareCommitInternal(IndexWriter.java:3712)
+7143: 	at org.apache.lucene.index.IndexWriter.commitInternal(IndexWriter.java:4160)
+7144: 	at org.apache.lucene.index.IndexWriter.commit(IndexWriter.java:4122)
+7145: 	at io.justsearch.adapters.lucene.runtime.CommitOps.commit(CommitOps.java:109)
+7146: 	... 3 common frames omitted
+7147: 	Suppressed: java.io.IOException: The process cannot access the file because another process has locked a portion of the file
+7264: 10:17:46.679 [indexing-loop] ERROR io.justsearch.indexerworker.loop.JobBatchWriter -- Failed to write: c:\users\elias\appdata\local\temp\junit-10323453388263200215\contention-corpus\boot-contention\boot-contention-23.txt
+7265: org.apache.lucene.store.AlreadyClosedException: this IndexWriter is closed
+7266: 	at org.apache.lucene.index.IndexWriter.ensureOpen(IndexWriter.java:918)
+7267: 	at org.apache.lucene.index.IndexWriter.ensureOpen(IndexWriter.java:931)
+7268: 	at org.apache.lucene.index.IndexWriter.updateDocuments(IndexWriter.java:1570)
+7269: 	at org.apache.lucene.index.IndexWriter.updateDocument(IndexWriter.java:1858)
+7270: 	at io.justsearch.adapters.lucene.runtime.WritePathOps.indexDocument(WritePathOps.java:103)
+7271: 	at io.justsearch.adapters.lucene.runtime.IndexingCoordinator.indexSingle(IndexingCoordinator.java:339)
+7272: 	at io.justsearch.indexerworker.loop.JobBatchWriter.write(JobBatchWriter.java:133)
+7273: 	at io.justsearch.indexerworker.loop.IndexingLoop.processBatchInner(IndexingLoop.java:945)
+7274: 	at io.justsearch.indexerworker.loop.IndexingLoop.processBatch(IndexingLoop.java:876)
+7275: 	at io.justsearch.indexerworker.loop.IndexingLoop.runLoop(IndexingLoop.java:695)
+7276: 	at java.base/java.lang.Thread.run(Thread.java:1474)
+7277: Caused by: java.io.IOException: The process cannot access the file because another process has locked a portion of the file
+7278: 	at java.base/sun.nio.ch.FileDispatcherImpl.write0(Native Method)
+34616: 10:20:43.514 [indexing-loop] ERROR io.justsearch.indexerworker.loop.IndexingLoop -- Failed final commit
+34617: org.apache.lucene.store.AlreadyClosedException: this IndexWriter is closed
+34618: 	at org.apache.lucene.index.IndexWriter.ensureOpen(IndexWriter.java:918)
+34619: 	at org.apache.lucene.index.IndexWriter.ensureOpen(IndexWriter.java:931)
+34620: 	at org.apache.lucene.index.IndexWriter.commit(IndexWriter.java:4121)
+34621: 	at io.justsearch.adapters.lucene.runtime.CommitOps.commit(CommitOps.java:109)
+34622: 	at io.justsearch.adapters.lucene.runtime.CommitOps.commitAndTrack(CommitOps.java:166)
+34623: 	at io.justsearch.indexerworker.loop.IndexingLoop.finalizeShutdownCommit(IndexingLoop.java:812)
+34624: 	at io.justsearch.indexerworker.loop.IndexingLoop.runLoop(IndexingLoop.java:778)
+34625: 	at java.base/java.lang.Thread.run(Thread.java:1474)
+34626: Caused by: java.io.IOException: The process cannot access the file because another process has locked a portion of the file
+34627: 	at java.base/sun.nio.ch.FileDispatcherImpl.write0(Native Method)
+34628: 	at java.base/sun.nio.ch.FileDispatcherImpl.write(FileDispatcherImpl.java:74)

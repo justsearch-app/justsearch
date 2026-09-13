@@ -30,7 +30,7 @@ import io.justsearch.app.api.status.VisualExtractionView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.contract.wire.LifecycleState;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -164,8 +164,8 @@ final class StatusReadinessStalenessTest {
     // the numbers below would be ~10 minutes, so this distinguishes the right reason.
     Instant headStart = Instant.now().minusSeconds(600);
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(ks.client()).thenReturn(client);
 
     StatusLifecycleHandler handler = newReachableHandler(indexBase, headStart, ks);
@@ -267,8 +267,8 @@ final class StatusReadinessStalenessTest {
 
   private static StatusLifecycleHandler reachableHandler(Path indexBase, Instant headStart) {
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(ks.client()).thenReturn(client);
     return newReachableHandler(indexBase, headStart, ks);
   }
