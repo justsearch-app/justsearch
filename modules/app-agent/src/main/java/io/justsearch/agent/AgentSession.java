@@ -751,10 +751,6 @@ final class AgentSession {
    * approve/reject. Tempdoc 834 §6.2 — {@code detail} is the same call description the caller just
    * emitted as {@code tool_call_pending}, retained so the state snapshot can carry the open gate.
    */
-  CompletableFuture<Boolean> createApprovalGate(String callId, AgentEvent.PendingApproval detail) {
-    return createApprovalGate(callId, detail, java.util.Optional.empty());
-  }
-
   CompletableFuture<Boolean> createApprovalGate(String callId, AgentEvent.PendingApproval detail,
       java.util.Optional<io.justsearch.agent.api.registry.OperationApprovalPreview> preview) {
     var gate = new CompletableFuture<Boolean>();

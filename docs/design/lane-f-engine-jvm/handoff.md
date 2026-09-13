@@ -60,6 +60,10 @@ Nested background posture through LlmStep/engine/agent shape delegation now pass
 represented cases at1029 after negative1028; [posture proof](evidence/C2/background-shape.md).
 Frontend private lookup now passes6490 tests at1036 plus typecheck/lint, with
 stale-response and raw-display negative controls; [client lookup proof](evidence/C2/private-approval-client.md).
+Full1038 reports one architecture failure among10292 cases: three obsolete agent
+overloads. Their removal passes772 executed agent/launcher cases at1039;
+[cleanup proof](evidence/C2/agent-cleanup.md). Next fix persisted workflow background
+metadata and late/replaced-stream approval delivery, then repeat integrated proof.
 Next: remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.

@@ -56,10 +56,10 @@ class AgentApprovalPreviewTest {
             AuditPolicy.NONE, RetryPolicy.noRetry(), Set.of(), false), OperationAvailability.empty(),
         OperationLineage.empty(), Binding.of(id), Provenance.core("1"), Set.of(ExecutorTag.AGENT));
     var dispatcher = new AgentToolDispatcher(null, AgentTelemetry.noop(), () -> null, () -> null, () -> null);
-    var failure = assertThrows(IllegalStateException.class, () -> dispatcher.handleSafetyGate(session,
+    var failure = assertThrows(IllegalStateException.class, () -> dispatcher.prepareAndApprove(session,
         new ToolCallRequest("call", "core_gate_fixture", "{}"), op, event -> {
           throw new IllegalStateException("fixture announcement failed");
-        }));
+        }, false));
     assertEquals("fixture announcement failed", failure.getMessage());
     assertTrue(session.pendingToolApproval("call").isEmpty(), "An abandoned gate must not remain readable or answerable");
     assertTrue(session.pendingApprovals().isEmpty());

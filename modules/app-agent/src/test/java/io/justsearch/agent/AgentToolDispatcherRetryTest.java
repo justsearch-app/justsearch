@@ -110,7 +110,7 @@ final class AgentToolDispatcherRetryTest {
             op,
             new ToolCallRequest("call_1", "core_retry_probe", "{}"),
             "session-1",
-            EngineContextTestFixtures.AGENT_LOOP);
+            EngineContextTestFixtures.AGENT_LOOP, null);
 
     assertFalse(result.success(), "an always-throwing handler must surface as a failure result");
     return dispatcher.dispatches.get();

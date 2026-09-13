@@ -86,10 +86,6 @@ final class AgentToolDispatcher {
     this.intentPreviewerSupplier = intentPreviewerSupplier;
   }
 
-  OperationResult executeOperationWithPolicy(Operation op, ToolCallRequest call, String sessionId, EngineContext engineContext) {
-    return executeOperationWithPolicy(op, call, sessionId, engineContext, null);
-  }
-
   OperationResult executeOperationWithPolicy(Operation op, ToolCallRequest call, String sessionId,
       EngineContext engineContext, OperationDispatchPlan plan) {
     Span toolSpan = GlobalOpenTelemetry.getTracer(AgentLoopService.TRACER_SCOPE).spanBuilder("execute_tool " + call.toolName())
@@ -150,7 +146,7 @@ final class AgentToolDispatcher {
    *
    * <p>The confirmation token {@code "agent-loop-handleSafetyGate-approved"} is
    * the agent's signal to the dispatcher's trust lattice that user approval was
-   * obtained pre-dispatch via {@link #handleSafetyGate}. Without it, the lattice
+   * obtained pre-dispatch via {@link #prepareAndApprove}. Without it, the lattice
    * would throw {@link
    * io.justsearch.agent.api.registry.ConfirmationRequiredException} for any
    * UNTRUSTED × MEDIUM/HIGH dispatch — but the agent loop's own gate has
@@ -230,15 +226,6 @@ final class AgentToolDispatcher {
       LOG.warn("Failed to merge docIds scope into tool-call arguments; dispatching unscoped", e);
       return null;
     }
-  }
-
-  boolean handleSafetyGate(
-      AgentSession session,
-      ToolCallRequest call,
-      Operation op,
-      Consumer<AgentEvent> eventConsumer) {
-
-    return awaitSafetyGate(session, call, op, eventConsumer, approvalBehavior(session, op), Optional.empty());
   }
 
   /** Stack-only continuation; null plan is reserved for workflow streaming and unwired legacy tests. */
