@@ -1,8 +1,6 @@
 // OperationHistoryEntry (slice 444b).
 //
-// EVENT_STREAM × RING_BUFFER Resource. Reclassified post-impl from HISTORY
-// to EVENT_STREAM per slice 444b §B.B (in-memory ring-buffer implementation
-// contradicts DURABLE's persistent-store semantic).
+// EVENT_STREAM Resource backed by the durable operations table (lane F C2-4).
 //
 // Wire shape rewritten 2026-05-06 per proto-correctness pass against
 // `modules/app-observability/.../operations/OperationHistoryEntry.java:34-57`.
@@ -68,6 +66,9 @@ message OperationHistoryEntry {
   // produced entry carries it). Closes the record↔proto drift where OperationHistoryEntry.provenance
   // had no proto counterpart (563 §3 V3). Message field → wire presence; additive-optional.
   InvocationProvenance provenance = 10 [json_name = "provenance"];
+
+  // Stable accepted invocation identity. Absent on legacy/uncommitted live observations.
+  optional string operation_key = 11 [json_name = "operationKey"];
 }
 
 // Invocation-side provenance — mirrors app-agent-api InvocationProvenance. transport/executor are

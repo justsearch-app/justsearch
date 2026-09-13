@@ -591,7 +591,7 @@ public final class HeadAssembly implements AutoCloseable {
                 "substrate",
                 () ->
                     io.justsearch.app.services.bootstrap.phases.SubstratePhase.runWithOutcome(
-                        attempts, engineAdmission, executors,
+                        operations, attempts, engineAdmission, executors,
             telemetry,
             () -> this.knowledgeServerBootstrap,
             () -> this.knowledgeClient,
@@ -1035,7 +1035,7 @@ public final class HeadAssembly implements AutoCloseable {
             io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext());
     var metricsOut = io.justsearch.app.services.bootstrap.phases.MetricSubstrateInit.run(executors, telemetry);
     var operationOut =
-        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(attempts, engineAdmission,
+        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(operations, attempts, engineAdmission,
             executors,
             handlers,
             operationCatalog,

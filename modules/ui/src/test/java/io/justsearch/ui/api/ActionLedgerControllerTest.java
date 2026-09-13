@@ -63,7 +63,7 @@ final class ActionLedgerControllerTest {
   private ActionLedgerController wiredController(ActionLedgerChangeRegistry changes) {
     return new ActionLedgerController(
             processExecutors,
-              new OperationHistoryStore(), new NavigationHistoryStore(), null, changes, Clock.systemUTC());
+              new OperationHistoryStore(mock(io.justsearch.app.api.operations.OperationStore.class)), new NavigationHistoryStore(), null, changes, Clock.systemUTC());
   }
 
   /** Captures the byte[] the controller writes via {@code ctx.result(byte[])}. */

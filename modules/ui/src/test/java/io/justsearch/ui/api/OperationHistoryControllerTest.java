@@ -45,7 +45,7 @@ final class OperationHistoryControllerTest {
 
   @BeforeEach
   void setUp() {
-    store = new OperationHistoryStore();
+    store = new OperationHistoryStore(mock(io.justsearch.app.api.operations.OperationStore.class));
     registry = new OperationHistoryChangeRegistry();
     controller = new OperationHistoryController(
             processExecutors,

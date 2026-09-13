@@ -370,6 +370,15 @@ Endpoints:
 - `GET /api/agent/hard-stop` — Global Hard Stop state (E2). <!-- drift-allow:/api/agent -->
 - `POST /api/agent/hard-stop` — Engage/disengage the Global Hard Stop. Engaging is a global revocation over all NON-USER (UNTRUSTED) grants — it revokes non-user capsules + durable grants and makes the lattice deny-all-non-user; a user-mediated approval (MEDIUM/TRUSTED) survives an emergency stop, matching the gate's hard-stop scope. <!-- drift-allow:/api/agent -->
 - `GET /api/operation-history` + `GET /api/operation-history/stream` (SSE) — Operation Outcome read-view snapshot + append stream (Slice 444b).
+  Recent snapshots read the latest200 visible terminal rows from `operations.db`,
+  in completion order, and survive restart. The Resource declares durable30-day
+  retention;200 is the display bound, not a second persistent store cap. Committed
+  entries carry optional `operationKey` (the accepted invocation identity), while
+  `operationId` continues to name the operation declaration. Legacy/uncommitted live
+  failure observations have no committed key. No caller/preparation payload or
+  signed intent token is projected. SSE retains its bounded process-local frame
+  window; durable completion catch-up and atomic reconnect remain C2-4 continuation.
+
 
 `GET /api/navigation-history` (Slice F1) was removed (tempdoc 689 teardown): superseded by `GET /api/action-ledger` kind:'navigation' — the FE reads Navigation entries there now, and the backend `ActionLedgerProjection` still consumes `NavigationHistoryStore` in-process (the store itself is unchanged, only the standalone REST snapshot was torn down for having zero consumers).
 

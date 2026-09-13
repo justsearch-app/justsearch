@@ -111,7 +111,8 @@ public final class OperationSubstrateInit {
    *     reads from {@code WorkerCapability} + {@code InferenceCapability}.
    * @return bundled substrate values for the caller to assign into bootstrap state.
    */
-  public static Output run(io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+  public static Output run(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.app.api.EngineAdmissionService admission, io.justsearch.core.execution.EngineExecutorRegistry executors,
       HandlerRegistry operationHandlers,
       OperationCatalog operationCatalog,
@@ -125,7 +126,7 @@ public final class OperationSubstrateInit {
     // consumes so its Altitude.TRUST is DERIVED, not declared (closes the §8 R1 out-of-band gap).
     io.justsearch.app.observability.ledger.ActionLedgerResourceCatalog actionLedgerResourceCatalog =
         new io.justsearch.app.observability.ledger.ActionLedgerResourceCatalog();
-    OperationHistoryStore operationHistoryStore = new OperationHistoryStore();
+    OperationHistoryStore operationHistoryStore = new OperationHistoryStore(operations);
     // Tempdoc 550 Slice F1 (Outcome face): the Navigation sibling ledger.
     NavigationHistoryStore navigationHistoryStore = new NavigationHistoryStore();
     OperationHistoryChangeRegistry operationHistoryChangeRegistry =

@@ -8,6 +8,12 @@ import java.io.IOException;
  * neither the application nor index half may close it before the index drain has finished.
  */
 public interface OperationStore extends AutoCloseable {
+  int RECENT_HISTORY_LIMIT = 200;
+  java.time.Duration HISTORY_RETENTION = java.time.Duration.ofDays(30);
+
+  /** Latest visible terminal rows, oldest first, bounded to RECENT_HISTORY_LIMIT; no private payload SELECT. */
+  java.util.List<OperationHistoryRow> recentHistory(int limit);
+
   /** Acceptance commits before this returns. Existing keys compare the entire canonical identity. */
   Acceptance accept(String key, OperationDescriptor descriptor,
       io.justsearch.core.context.EngineContext context,

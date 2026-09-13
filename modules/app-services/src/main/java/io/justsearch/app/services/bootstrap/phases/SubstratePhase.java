@@ -76,6 +76,7 @@ public final class SubstratePhase {
    * otherwise Ready. No clear Degraded scenario at the surface today.
    */
   public static io.justsearch.app.services.bootstrap.PhaseOutcome<Output> runWithOutcome(
+      io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.app.api.EngineAdmissionService admission,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
@@ -100,7 +101,7 @@ public final class SubstratePhase {
     try {
       return new io.justsearch.app.services.bootstrap.PhaseOutcome.Ready<>(
           runInternal(
-              attempts, admission, executors,
+              operations, attempts, admission, executors,
               telemetry,
               knowledgeServerSupplier,
               knowledgeClientSupplier,
@@ -129,6 +130,7 @@ public final class SubstratePhase {
    * the single entry point is the sealed-sum {@code runWithOutcome(...)} above.
    */
   private static Output runInternal(
+      io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.app.api.EngineAdmissionService admission,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
@@ -230,7 +232,7 @@ public final class SubstratePhase {
     // Runs BEFORE the indexing-jobs bridge so its ActionLedgerChangeRegistry is available to the
     // bridge's terminal-outcome translator (tempdoc 550 thesis I); neither depends on the other.
     OperationSubstrateInit.Output operationOut =
-        OperationSubstrateInit.run(attempts, admission, executors,
+        OperationSubstrateInit.run(operations, attempts, admission, executors,
             operationHandlers,
             operationCatalog,
             agentToolsCatalog,

@@ -35,18 +35,16 @@ final class OperationOutcomeTransportTest {
       String key = OperationKeys.generate(Clock.systemUTC());
       EngineContext context = TestRequestContexts.mcp("query-session");
       var accepted = operations.accept(key, OperationDescriptor.invocation(OperationKind.MEMORY,
-          "core.remember", "{\"private\":\"must-not-appear\"}", false), context, null).record();
+          "core.remember", "{\"private\":\"must-not-appear\"}", false), context, InvocationProvenance.fromEngineContext(context,
+              ExecutorTag.AGENT, Instant.now(), Optional.empty()),
+          OperationHistoryMode.STANDARD).record();
       assertTrue(operations.finish(accepted.id(), OperationState.COMPLETE,
           new OperationReceipt("SUCCESS", "receipt-id")).isPresent());
       var facade = mock(HeadAssembly.class);
       when(facade.operationOutcome(key)).thenAnswer(unused -> operations.outcome(key));
       var dispatcher = mock(OperationDispatcher.class);
       var surface = new McpToolSurface(List.of(), dispatcher, () -> null, () -> facade, Clock.systemUTC());
-      var history = new OperationHistoryStore();
-      var entry = new OperationHistoryEntry(new OperationRef("core.remember"), "head", Instant.EPOCH,
-          Instant.EPOCH.plusSeconds(1), OperationOutcome.SUCCESS, Optional.empty(),
-          InvocationProvenance.systemInternal(Instant.EPOCH), Optional.empty());
-      history.append(entry);
+      var history = new OperationHistoryStore(operations);
       var changes = new OperationHistoryChangeRegistry();
       var controller = new OperationHistoryController(executors, history, changes, facade::operationOutcome);
       try {
@@ -75,6 +73,8 @@ final class OperationOutcomeTransportTest {
         assertEquals(changes.currentSeq(), snapshotJson.path("catalogVersion").asLong());
         assertEquals(JSON.readTree(JSON.writeValueAsBytes(history.recent())), snapshotJson.path("entries"));
         assertEquals(1, snapshotJson.path("entries").size());
+        assertEquals(key, snapshotJson.path("entries").get(0).path("operationKey").asText());
+        assertFalse(snapshotJson.toString().contains("must-not-appear"));
       } finally {
         controller.shutdown();
       }
@@ -89,7 +89,7 @@ final class OperationOutcomeTransportTest {
       when(facade.operationOutcome("execution-id")).thenAnswer(unused -> operations.outcome("execution-id"));
       var dispatcher = mock(OperationDispatcher.class);
       var surface = new McpToolSurface(List.of(), dispatcher, () -> null, () -> facade, Clock.systemUTC());
-      var controller = new OperationHistoryController(executors, new OperationHistoryStore(),
+      var controller = new OperationHistoryController(executors, new OperationHistoryStore(operations),
           new OperationHistoryChangeRegistry(), facade::operationOutcome);
       try {
         Context http = mock(Context.class, RETURNS_SELF);

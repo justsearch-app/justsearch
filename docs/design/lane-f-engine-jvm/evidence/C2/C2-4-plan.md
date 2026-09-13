@@ -197,3 +197,32 @@ negative self-tests and a real mismatched-register run precede the corrected v4
 row. Preserve all jobs checks. Include current updater, release descriptor and
 Java upgrade-lifecycle consumer tests; the installed-v4 recovery campaign remains
 required at its existing integrated/hosted tier.
+
+## Durable recent reader and invocation identity
+
+Decision, 2026-09-13, at7b5248442: OperationHistoryStore becomes a read/listener
+facade over the existing operations owner. Its bounded SELECT includes only the
+metadata needed by OperationHistoryRow; identity JSON and preparation never enter
+that projection. Filter NONE and nonterminal states, order by completion time then
+row id, select the latest200 and return oldest first. An older accepted row that
+completes later must appear; no row-id high-water mark is used. Display capacity
+does not delete source rows. The Resource declares DURABLE with30-day retention,
+while its bounded live frame window remains five minutes.
+
+OperationHistoryEntry gains optional operationKey, also proto field11 and the
+schema. operationId remains the operation declaration; it cannot identify an
+invocation or suppress a repeated legitimate dispatch. Committed SQL and live
+history use one projection from accepted row metadata, with no signed intent token.
+The action-ledger id for new committed entries is operation:<accepted UUIDv7 key>;
+legacy and uncommitted failure observations retain their existing fallback id.
+R1 STORAGE_FAILED still emits a live observation, but append cannot add a fictitious
+terminal row to SQL recent(). Preserve advisory delivery including audit NONE.
+
+Retire the deque and default authority-free constructor. Both production bootstrap
+paths pass the one OperationStore; tests seed actual terminal rows or explicitly
+mock that read port. Keep addAppendListener/append as the existing live fan-in until
+the following completion-source cut replaces dispatcher-only publication. Prove
+restart, query bounds/retention, privacy, repeated-operation identities, late older
+completion, and HTTP snapshot parity. Wire/schema/register guards and live capture
+are owed in this cut. Source acknowledgement/catch-up and atomic SSE reconnect are
+not claimed merely because reads are now durable.

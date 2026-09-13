@@ -3,6 +3,7 @@ package io.justsearch.app.observability.operations;
 
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.OperationHistoryMode;
+import io.justsearch.app.api.operations.OperationHistoryRow;
 import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.operations.OperationPreparedPayload;
 import io.justsearch.app.api.operations.OperationDescriptor;
@@ -44,7 +45,7 @@ public final class SqliteOperationStore implements OperationStore {
       .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
   private static final Logger LOG = LoggerFactory.getLogger(SqliteOperationStore.class);
   private static final long FUTURE_SKEW_MS = Duration.ofMinutes(5).toMillis();
-  private static final long RETENTION_MS = Duration.ofDays(30).toMillis();
+  private static final long RETENTION_MS = HISTORY_RETENTION.toMillis();
   private static final int ROW_CAP = 100000;
   private static final int PREPARATION_CAP = 512;
   private static final long PREPARATION_TTL_MS = Duration.ofMinutes(5).toMillis();
@@ -681,6 +682,40 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
+  public List<OperationHistoryRow> recentHistory(int limit) {
+    if (limit < 0) throw new IllegalArgumentException("History limit must be non-negative");
+    return locked(() -> {
+      if (limit == 0) return List.of();
+      // Identity/preparation columns deliberately stay outside this bounded read projection.
+      String sql = """
+          SELECT id, operation_key, kind, operation_ref, survival, urgency, client_kind, client_id,
+            session_id, grant_ref, source_tier, transport, executor, initiator, correlation_id,
+            state, history_mode, accepted_at, completed_at, provenance_occurred_at, failure_reason, result_json
+          FROM operations WHERE history_mode != 'NONE' AND
+          """ + TERMINAL + " ORDER BY completed_at DESC, id DESC LIMIT ?";
+      try (var query = connection.prepareStatement(sql)) {
+        query.setInt(1, Math.min(limit, RECENT_HISTORY_LIMIT));
+        var rows = new java.util.ArrayList<OperationHistoryRow>();
+        try (var result = query.executeQuery()) {
+          while (result.next()) {
+            String receiptJson = result.getString("result_json");
+            rows.add(new OperationHistoryRow(result.getLong("id"), result.getString("operation_key"),
+                OperationKind.fromWire(result.getString("kind")), result.getString("operation_ref"),
+                readContext(result), result.getString("executor"), result.getString("initiator"),
+                result.getString("correlation_id"), OperationState.valueOf(result.getString("state")),
+                OperationHistoryMode.valueOf(result.getString("history_mode")), result.getLong("accepted_at"),
+                Objects.requireNonNull(nullableLong(result, "completed_at"), "completed_at"),
+                java.time.Instant.parse(result.getString("provenance_occurred_at")), result.getString("failure_reason"),
+                receiptJson == null ? null : JSON.readValue(receiptJson, OperationReceipt.class)));
+          }
+        }
+        java.util.Collections.reverse(rows);
+        return List.copyOf(rows);
+      }
+    });
+  }
+
+  @Override
   public List<OperationRecord> openRecords() {
     return locked(() -> {
       List<OperationRecord> records = new java.util.ArrayList<>();
@@ -748,12 +783,7 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   private static OperationRecord readRecord(ResultSet result) throws SQLException {
-    EngineContext context = new EngineContext(
-        EngineContext.ClientKind.valueOf(result.getString("client_kind")), result.getString("client_id"),
-        java.util.Optional.ofNullable(result.getString("session_id")),
-        java.util.Optional.ofNullable(result.getString("grant_ref")), result.getString("source_tier"),
-        result.getString("transport"), EngineContext.Survival.valueOf(result.getString("survival")),
-        EngineContext.Urgency.valueOf(result.getString("urgency")));
+    EngineContext context = readContext(result);
     String receiptJson = result.getString("result_json");
     return new OperationRecord(result.getLong("id"), result.getString("operation_key"),
         new OperationDescriptor(OperationKind.fromWire(result.getString("kind")),
@@ -767,6 +797,15 @@ public final class SqliteOperationStore implements OperationStore {
         OperationHistoryMode.valueOf(result.getString("history_mode")),
         result.getString("provenance_occurred_at") == null ? null
             : java.time.Instant.parse(result.getString("provenance_occurred_at")));
+  }
+
+  private static EngineContext readContext(ResultSet result) throws SQLException {
+    return new EngineContext(
+        EngineContext.ClientKind.valueOf(result.getString("client_kind")), result.getString("client_id"),
+        java.util.Optional.ofNullable(result.getString("session_id")),
+        java.util.Optional.ofNullable(result.getString("grant_ref")), result.getString("source_tier"),
+        result.getString("transport"), EngineContext.Survival.valueOf(result.getString("survival")),
+        EngineContext.Urgency.valueOf(result.getString("urgency")));
   }
 
   private static Long nullableLong(ResultSet result, String column) throws SQLException {

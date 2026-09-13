@@ -17,29 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * The Resource entry surfacing the head's {@link OperationHistoryStore} as an
- * {@link Category#EVENT_STREAM} Resource.
- *
- * <p>Per slice 444b post-implementation §B.B reclassification (2026-05-05): originally
- * declared HISTORY × DURABLE, but the underlying store is an in-memory ring buffer —
- * declaring DURABLE Mode for an in-memory store contradicts {@link HistoryPolicy}'s
- * javadoc (DURABLE = "Persistent store"). The structurally correct framing is
- * EVENT_STREAM × RING_BUFFER, matching {@code core.health-events}'s shape exactly.
- * Conforms to {@code 30-agent-workflows/01b-add-event-stream-resource.md}:
- *
- * <ul>
- *   <li>{@link Category#EVENT_STREAM} Category.
- *   <li>{@link SubscriptionMode#SSE_STREAM} subscription mode (live tail of new appends);
- *       snapshot reads served at {@code /api/operation-history}.
- *   <li>{@link HistoryPolicy} declares {@link HistoryPolicy.Mode#RING_BUFFER} with
- *       capacity 200 — matches the bounded-in-memory implementation in
- *       {@link OperationHistoryStore}.
- * </ul>
- *
- * <p>Recovery cross-link is empty — operation history doesn't have a singular per-Resource
- * recovery; per-entry remediation is the Operation that was invoked.
- */
+/** Durable operation-history Resource, with bounded snapshots and a five-minute live frame window. */
 public final class OperationHistoryResourceCatalog implements ResourceCatalog {
 
   /** Stable namespace for the operation-history Resource entry. */
@@ -59,12 +37,8 @@ public final class OperationHistoryResourceCatalog implements ResourceCatalog {
   /** Discriminates the renderer in the FE generic dispatcher. */
   public static final String KIND = "operation-history";
 
-  /**
-   * Ring-buffer capacity for {@link OperationHistoryStore} — pinned here so the declared
-   * {@link HistoryPolicy} matches the implementation. If
-   * {@code OperationHistoryStore.DEFAULT_CAPACITY} ever changes, update both in lockstep.
-   */
-  public static final int HISTORY_CAPACITY = 200;
+  /** Retention belongs to the operations table; the recent-read limit is not a persistence cap. */
+  public static final Duration RETENTION = io.justsearch.app.api.operations.OperationStore.HISTORY_RETENTION;
 
   /** Resume window — same shape as {@link io.justsearch.app.observability.health.HealthResourceCatalog}. */
   public static final Duration RESUME_WINDOW = Duration.ofMinutes(5);
@@ -83,9 +57,9 @@ public final class OperationHistoryResourceCatalog implements ResourceCatalog {
               KIND,
               Optional.of(
                   new HistoryPolicy(
-                      HistoryPolicy.Mode.RING_BUFFER,
-                      Optional.of(HISTORY_CAPACITY),
+                      HistoryPolicy.Mode.DURABLE,
                       Optional.empty(),
+                      Optional.of(RETENTION),
                       OnOverflow.EVICT_OLDEST,
                       RESUME_WINDOW)),
               Optional.empty(),

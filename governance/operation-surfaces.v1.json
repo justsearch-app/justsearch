@@ -47,6 +47,12 @@
       "definition": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationRecord.java",
       "store": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
       "note": "Lane F C2: operations.db is the sole acceptance/checkpoint/outcome authority. The shared attempt runner writes terminal transitions after actual completion; history and UI project these rows. Job lifecycle and ActionEvent remain sibling records, not alternate operation acceptance stores."
+    },
+    {
+      "name": "OperationHistoryEntry",
+      "definition": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryEntry.java",
+      "store": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "note": "Lane F C2-4: committed invocation history derives from the one operations table through a bounded metadata projection. operationKey identifies an invocation; operationId names its declaration. The existing live listener facade also carries uncommitted STORAGE_FAILED observations, which never become durable terminal rows. Source catch-up/acknowledgement and atomic SSE replay remain required before C2-4 closure."
     }
   ],
   "forbiddenReintroduction": [
@@ -83,7 +89,9 @@
       "io.justsearch.agent.api.memory.MemoryStore",
       "io.justsearch.app.api.operations.OperationRecord",
       "io.justsearch.app.api.operations.OperationAttemptRunner",
-      "io.justsearch.app.api.operations.OperationOutcomeView"
+      "io.justsearch.app.api.operations.OperationOutcomeView",
+      "io.justsearch.app.observability.operations.OperationHistoryEntry",
+      "io.justsearch.app.api.operations.OperationHistoryRow"
     ],
     "javaMainRoots": [
       "modules"
@@ -729,7 +737,7 @@
       "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationHistoryController.java",
       "guard": "test:OperationOutcomeTransportTest",
       "consumesProjection": "operation-outcome-view",
-      "note": "Existing history controller serves the shared keyed outcome. Recent-history/SSE durability remains the C2-4 swap obligation."
+      "note": "The keyed outcome and durable recent-history snapshot share the operations owner. Atomic SSE reconnect remains the C2-4 continuation."
     },
     {
       "id": "operation-outcome-mcp",
@@ -739,6 +747,69 @@
       "guard": "test:OperationOutcomeTransportTest",
       "consumesProjection": "operation-outcome-view",
       "note": "Curated read-only outcome query uses HeadAssembly and the same store observation, never dispatch acceptance."
+    },
+    {
+      "id": "operation-history-row",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationHistoryRow.java",
+      "guard": "test:OperationHistoryReadTest",
+      "consumesProjection": "operation-record-store",
+      "note": "Narrow committed metadata projection excludes identity JSON and preparation; no independent lifecycle."
+    },
+    {
+      "id": "operation-history-entry",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryEntry.java",
+      "guard": "test:OperationHistoryWireContractConformanceTest",
+      "consumesProjection": "operation-history-row",
+      "note": "Wire projection with optional accepted invocation key; legacy and uncommitted live observations have no committed key."
+    },
+    {
+      "id": "operation-history-projection",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryProjection.java",
+      "guard": "test:OperationHistoryReadTest",
+      "consumesProjection": "operation-history-row",
+      "note": "Same mapping for SQL snapshots and committed live rows, using frozen audit mode and token-free provenance."
+    },
+    {
+      "id": "operation-history-reader",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryStore.java",
+      "guard": "test:OperationHistoryReadTest",
+      "consumesProjection": "operation-history-projection",
+      "note": "Bounded SQL read plus the retained listener API. Live append cannot write a fictitious terminal result or own retention."
+    },
+    {
+      "id": "operation-history-changes",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryChangeRegistry.java",
+      "guard": "test:OperationHistoryChangeRegistryTest",
+      "consumesProjection": "operation-history-entry",
+      "note": "Bounded live frame stream; not a durable outcome or frame-journal authority."
+    },
+    {
+      "id": "operation-history-resource",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryResourceCatalog.java",
+      "guard": "test:OperationHistoryResourceCatalogTest",
+      "consumesProjection": "operation-history-reader",
+      "note": "DURABLE thirty-day source retention and five-minute live frame window; display reads remain bounded separately."
+    },
+    {
+      "id": "operation-history-http",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationHistoryController.java",
+      "guard": "test:OperationOutcomeTransportTest",
+      "consumesProjection": "operation-history-reader",
+      "note": "Existing GET/SSE snapshots read the durable facade. Atomic SSE reconnect is the following C2-4 cut."
     }
   ]
 }

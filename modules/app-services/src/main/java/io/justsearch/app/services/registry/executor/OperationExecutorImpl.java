@@ -480,7 +480,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     }
     var _ = prepared.completion().whenComplete((row, failure) -> {
       if (failure != null) {
-        emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty());
+        emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty(), null);
         return;
       }
       boolean success = row.state() == OperationState.COMPLETE;
@@ -489,7 +489,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Optional<String> undoExecution = success && undoId == null && op.policy().undoSupported()
           ? Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::executionId)
           : Optional.empty();
-      emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution);
+      emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution, row);
     });
     try {
       OperationResult refusal = preflight(op, invocation.refusal());
@@ -628,8 +628,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       OperationOutcome outcome,
       String diagnosticsLink,
       InvocationProvenance provenance,
-      Optional<String> executionId) {
-    Instant completedAt = clock.instant();
+      Optional<String> executionId, io.justsearch.app.api.operations.OperationRecord row) {
+    Instant completedAt = row == null ? clock.instant() : Instant.ofEpochMilli(row.completedAt());
     // Tempdoc 879: the declared {@code OperationPolicy.audit} axis is the authority for
     // whether an invocation is recorded. AuditPolicy.NONE means "no audit record", so the
     // history entry is suppressed; METADATA_ONLY emits the metadata-shaped entry below
@@ -644,8 +644,10 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     boolean auditSuppressed = op.policy().audit() == AuditPolicy.NONE;
     if (!auditSuppressed && historyEmitter != null) {
       try {
-        historyEmitter.accept(
-            new OperationHistoryEntry(
+        historyEmitter.accept(row != null
+            ? io.justsearch.app.observability.operations.OperationHistoryProjection.entry(
+                io.justsearch.app.api.operations.OperationHistoryRow.from(row))
+            : new OperationHistoryEntry(
                 op.id(),
                 // Slice 444b: head-process identifier. Per slice 490 §4.B the canonical
                 // answer to "who triggered this?" is the typed {@code provenance} field
@@ -658,7 +660,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
                 completedAt,
                 outcome,
                 Optional.ofNullable(diagnosticsLink),
-                provenance,
+                new InvocationProvenance(provenance.transport(), provenance.executor(), provenance.initiator(),
+                    provenance.occurredAt(), Optional.empty(), provenance.correlationId()),
                 // Tempdoc 550 G6: carry the backend execution id (undo-supported ops) so the
                 // unified ledger can collapse this row with the FE Effect Journal entry that
                 // dispatched it (journalEntryId ↔ executionId).
