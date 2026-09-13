@@ -21,7 +21,11 @@ Live1198 passes15 checks with a blocked sink, repair/restart, HTTP/MCP parity an
 durable pending1-to0 transition. Both owned stacks are stopped. [Consumer proof](evidence/C2/history-consumer.md).
 Live1195 was stale because only app-launcher:installDist was refreshed: the dev runner
 uses **:modules:ui:installDist**. UI install1197 and matched installed jar hashes correct
-the witness. Full green/installed-v5/hosted remain owed; C2-4 and the lane stay open.
+the witness. Full1202 now passes at4c6389be4 with stress enabled:10362 represented
+cases (10195 execute,167 cached), zero failures/errors and35 inherited skips.
+PMD and UI integration checks pass. [Integrated proof](evidence/C2/integrated1202.md).
+Installed-v5/hosted remain owed; C2-4 and the lane stay open. The next mechanism
+and its required regressions are settled in the [SSE plan](evidence/C2/C2-4-sse-plan.md).
 
 **Prior effect identity cut (2026-09-13):** ingress rejects server
 namespaces, and new frontend effects persist UUID identities while old entries keep
@@ -33,7 +37,7 @@ controlled clock. Negative1178 catches disabled expiry; full1179 passes6511.
 [Separate test correction](evidence/C2/watchdog-test.md). Full JVM1180 finishes with
 one unused journal factory failure among10342 represented tests; all other checks
 pass. The consolidated factory passes64 focused cases in1182. [Integrated finding
-and correction](evidence/C2/integrated1180.md). A new full green boundary remains owed.
+and correction](evidence/C2/integrated1180.md). Full1202 above supplies the new green boundary.
 The pending-source review found no defects. Journal force/retry is now verified:
 negative1155/1157, final1158 passes47 represented cases (32 execute), independent
 review clear after adding rotated-generation proof. [Sink proof](evidence/C2/journal-force.md).
@@ -61,7 +65,7 @@ atomic SSE reconnect from the [C2-4 plan](evidence/C2/C2-4-plan.md). No projecti
 acknowledgement is active yet. Installed-v4, coherent full, independent batch review
 and hosted proof remain owed; C2-4 and the lane remain open.
 
-**Latest local boundary (2026-09-13):** full1059 passes at13b6bd680 in10m36s,
+**Prior local boundary (2026-09-13; superseded by full1202 above):** full1059 passes at13b6bd680 in10m36s,
 10301 represented cases, zero failures/errors and35 inherited skips; eight test
 tasks execute and30 reuse unchanged successful inputs. PMD and integration-test
 compilation pass. [Integrated proof](evidence/C2/integrated1059.md) and the latest

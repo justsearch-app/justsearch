@@ -31,6 +31,8 @@ and the owning C2-6/8/10 checklists. Merge placement remains F/PR1.
    reconnect and restart; update the resource retention declaration, schemas,
    operation-surface/register guards and canonical docs with the implementation.
    Run the item gates, live HTTP/MCP capture and one independent batch review.
+   The current [SSE investigation and owning proof obligations](C2-4-sse-plan.md)
+   include the multiplexed product path, token incarnation and frontend keyed merge.
 
 Every cut compiles independently, has a substantive commit body and retained
 proof inventory, and is pushed immediately. Full suite at the coherent batch
