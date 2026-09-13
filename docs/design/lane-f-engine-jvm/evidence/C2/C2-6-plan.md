@@ -235,3 +235,25 @@ side-effect-free reconciliation read, since unrelated cleanup intentionally no l
 Continue directly with the typed witness and confirmed recovery-reset amendment above, then
 all-producer/Health composition and wire consumers. The current scalar-only owner foundation
 is not production-composed and does not discharge the amended recovery or all-producer contract.
+
+
+## 2026-09-13 recovery evidence reader cut
+
+The next bounded cut adds a read-only UiSettingsStore fingerprint of the complete preserved
+quarantine sibling set. It is evidence, not reset authority. Reuse SHA-256 and streaming file
+reads: sorted names are UTF-8 length-prefixed, file contents contribute fixed-width digests,
+and the versioned domain/count prevents ambiguous concatenation. Require proven live-file
+absence, writable persistence, a nonempty regular non-symlink set, successful reads, unchanged
+attributes during each read and unchanged membership/live absence afterwards. The owner must
+recompute against the frozen accepted value before arming. No extra persistent file, marker,
+allocator or writer is introduced. Hostile concurrent filesystem replacement is not made an
+atomic transaction by this reader; unknown or detected changes refuse proof. The application's
+single physical owner supplies the mutation serialization.
+
+The following cut reuses PreparedInvocationCodec's existing envelope validation for a narrow
+metadata-only decode, without an arbitrary caller decoder, SQL access in the owner, a second
+JSON envelope or an early cipher dependency. The runner will supply its actual accepted
+preparation beside each settings recovery row outside SQL locks. The fixed settings reset
+schema is validated before authorizing absent-history recovery; exact live commitment is
+classified first and does not depend on decoding. Reset producer classification, confirmation,
+Health and full public writer migration remain required in C2-6.

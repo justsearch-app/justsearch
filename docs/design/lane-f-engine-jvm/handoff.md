@@ -22,6 +22,10 @@ rejects an eighth tool; fresh hosted success remains required. [Evidence](eviden
 Windows-native success is not installed-v5 recovery proof.
 
 **Immediate next items (2026-09-13): C2-6 recovery reset, then producer and Health migration.**
+The [quarantine identity reader](evidence/C2/settings-quarantine.md) now passes71 executed
+cases plus PMD/format, with a content-digest negative control and byte-exact restoration.
+It supplies read-only evidence; fixed accepted-preparation decoding and reset owner integration
+are next. It does not authorize reset or close C2-6.
 The shared witness-pair foundation now passes152 cases (83 executed/69 reused in1293),
 plus format/PMD; negative1297 rejects revision-only comparison. Restored1298 reuses the same
 152 passing cases with identical source hashes. [Proof](evidence/C2/settings-witness.md).

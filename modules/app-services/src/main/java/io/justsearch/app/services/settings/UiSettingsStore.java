@@ -14,6 +14,16 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.SerializationFeature;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
 import java.io.UncheckedIOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -155,6 +165,67 @@ public final class UiSettingsStore {
       }
     }
     return new Snapshot(new UiSettings(), new SettingsWitness(0, null));
+  }
+
+  /**
+   * Frozen identity of all preserved corruption evidence, only while the live file is proven absent.
+   * This does not authorize a reset: the fixed owner must bind it to accepted server preparation
+   * and revalidate it before arming. Unknown, empty or non-regular evidence cannot prove precommit.
+   */
+  public String recoveryFingerprint() throws IOException {
+    if (!mode.isWritable() || !Files.notExists(settingsFile, LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Recovery requires writable storage and a proven absent settings file");
+    }
+    List<Path> siblings = quarantineFiles();
+    if (siblings.isEmpty()) throw new IOException("Recovery requires preserved quarantine evidence");
+    MessageDigest evidence = sha256();
+    evidence.update("justsearch-settings-quarantine-v1".getBytes(StandardCharsets.UTF_8));
+    evidence.update(ByteBuffer.allocate(Integer.BYTES).putInt(siblings.size()).array());
+    for (Path sibling : siblings) {
+      BasicFileAttributes before = Files.readAttributes(sibling, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      if (!before.isRegularFile()) throw new IOException("Quarantine evidence must be a regular file");
+      MessageDigest content = sha256();
+      try (var input = new DigestInputStream(Files.newInputStream(sibling, LinkOption.NOFOLLOW_LINKS), content)) {
+        input.transferTo(OutputStream.nullOutputStream());
+      }
+      BasicFileAttributes after = Files.readAttributes(sibling, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      if (!after.isRegularFile() || before.size() != after.size()
+          || !before.lastModifiedTime().equals(after.lastModifiedTime())
+          || !Objects.equals(before.fileKey(), after.fileKey())) {
+        throw new IOException("Quarantine evidence changed while reading");
+      }
+      byte[] name = sibling.getFileName().toString().getBytes(StandardCharsets.UTF_8);
+      evidence.update(ByteBuffer.allocate(Integer.BYTES).putInt(name.length).array());
+      evidence.update(name);
+      evidence.update(content.digest());
+    }
+    requireSameQuarantineNames(siblings, quarantineFiles());
+    if (!Files.notExists(settingsFile, LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Settings recovery evidence changed while reading");
+    }
+    return HexFormat.of().formatHex(evidence.digest());
+  }
+
+  // Compare exact names: Windows Path equality would hide a case-only rename after hashing.
+  static void requireSameQuarantineNames(List<Path> before, List<Path> after) throws IOException {
+    if (!before.stream().map(path -> path.getFileName().toString()).toList()
+        .equals(after.stream().map(path -> path.getFileName().toString()).toList())) {
+      throw new IOException("Quarantine names changed while reading");
+    }
+  }
+
+  private List<Path> quarantineFiles() throws IOException {
+    Path parent = settingsFile.toAbsolutePath().getParent();
+    String prefix = settingsFile.getFileName() + ".corrupt-";
+    try (var siblings = Files.list(parent)) {
+      return siblings.filter(path -> path.getFileName().toString().startsWith(prefix))
+          .sorted(java.util.Comparator.comparing(path -> path.getFileName().toString())).toList();
+    }
+  }
+
+  private static MessageDigest sha256() {
+    try { return MessageDigest.getInstance("SHA-256"); }
+    catch (NoSuchAlgorithmException failure) { throw new AssertionError("SHA-256 is required by Java", failure); }
   }
 
   private Snapshot parseOrThrow() {
