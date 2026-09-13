@@ -1,0 +1,46 @@
+{
+  "revision": "9eacf1099 + final prepared approval presentation diff",
+  "visualWitness": "tmp/c2-3-preview-ui1007/witness.json",
+  "visualCases": 4,
+  "visualResult": "All four preserve exact text, fit the viewport without horizontal overflow, enable approval after typed confirmation, and keep the button reachable; zero axe violations and console errors.",
+  "frontend": "tmp/c2-3-preview-ui-unit1008.json:6480 passed,0 failed/pending/todo;483 files",
+  "commands": [
+    "python docs/design/lane-f-engine-jvm/evidence/C2/verify-prepared-preview-ui.py --output-dir tmp/c2-3-preview-ui1007",
+    "npm run typecheck",
+    "npx --no-install eslint src/shell-v0/components/AuthorizationHost.ts src/shell-v0/operations/authorizationBroker.ts",
+    "npm run test:unit:run -- --reporter=json --outputFile=../../tmp/c2-3-preview-ui-unit1008.json",
+    "python -m jseval ui-shot --affected modules/ui-web/src/shell-v0/components/AuthorizationHost.ts",
+    "node scripts/ci/check-ui-step-coverage.mjs"
+  ],
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-preview-ui-negative998",
+    "c2-3-preview-ui-negative999",
+    "c2-3-preview-ui1000",
+    "c2-3-preview-ui1002",
+    "c2-3-preview-ui1003",
+    "c2-3-preview-ui1004",
+    "c2-3-preview-ui-negative1006",
+    "c2-3-preview-ui1007",
+    "c2-3-preview-ui-unit1001",
+    "c2-3-preview-ui-unit1008",
+    "c2-3-preview-ui-typecheck1008",
+    "c2-3-preview-ui-eslint1008",
+    "c2-3-preview-ui-affected1008",
+    "c2-3-preview-ui-coverage1008"
+  ],
+  "sources": [
+    {
+      "path": "modules/ui-web/src/shell-v0/components/AuthorizationHost.ts",
+      "sha256": "1b4671d97a5ab8903bb9dd10575f70cca22c8195d7c98193dfd663fd4a0a2596"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/operations/authorizationBroker.ts",
+      "sha256": "20ff331b0eb55903f6f694d0156b916c0e6d995ac025d0bd244ac48b7197c2be"
+    },
+    {
+      "path": "docs/design/lane-f-engine-jvm/evidence/C2/verify-prepared-preview-ui.py",
+      "sha256": "b95bd76465f601a7e172b3ef44d5971b6a6c18990f30dfbe9c8e27020c78ced2"
+    }
+  ]
+}
