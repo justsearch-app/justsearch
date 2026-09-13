@@ -6,26 +6,24 @@ The orchestrator verifies, reviews and merges autonomously through the repositor
 queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 complete including the later MCP quota correction, verified at
-the R10 boundary; C2 is open. Batch1's historical foundation proof is
-reopened for the C2-11 operations-row witness (R7) and later schema reproof (R9);
-C2-2 implementation remains in progress.
+the R10 boundary; C2 is open. R7's installed operations-row foundation witness
+and R9's later schema reproof are accepted with the correction batch. C2-3 is
+next; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-Final-review corrections now take priority over the pre-review green checkpoint below.
-R3's ignored start/resume is corrected with two negative controls and105 passing
-cases at877. R10 canonical index-root aliases and dangling junction refusal pass18
-cases at881, with negative controls878/880. Lock close/metadata ownership and index
-shutdown propagation pass87 cases at887 after negative884/886. Queue transaction
-cleanup passes78 cases at899 after negative889/892/898 and a corrected native cleanup
-ordering crash at890. The living schema checklist and54-entry historical
-commit-proof mapping are reconciled. Full900 at2168d1245 has10156 represented cases
-with no test failures/errors and35 inherited skips, but fails only lock-test whitespace;
-focused formatting902 passes. Correction review's remaining queue close/open finding
-is corrected: negative903 reproduces both paths; final904 executes100 passing cases
-with PMD, formatting and UI integration-test compilation. The same reviewer must
-verify that final correction plus the schema/history documentation records, then
-fresh full/hosted proof completes this correction batch. The latest full summary
-still records900 as FAILED; no new producer is activated yet. Fresh integrated
-proof follows the consolidated corrections.
+Final independent correction verification is clear at **b713307ea**. Full905 passes
+in9m30s with10158 represented cases, zero failures/errors and35 inherited skips;
+seven test tasks execute2040 cases and31 reuse unchanged successful inputs. PMD,
+formatting and UI integration-test compilation pass. The full905 XML is preserved,
+and the latest full-run summary records it; full900's formatting failure remains
+historical failed evidence. Source inventories identify53 raw Git blobs atb713307ea.
+Hosted CI34734430973 passes all13 jobs with fresh installed recovery and orphan
+witnesses. The R1–R10 correction batch is accepted.
+See [the final review record](evidence/C2/final-independent-review.md). No new
+producer is activated yet. Continue C2-3's keyed
+lookup before preparation, separated prepared payload and approval carry-through.
+
+The following paragraphs retain the pre-review correction checkpoints; current
+acceptance is governed by the summary above and the correction batch checklist.
 
 Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),
 adopted at429115fec. New ingestion work is paused. R1 async persistence observability passes its named

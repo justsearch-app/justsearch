@@ -1,5 +1,5 @@
 {
-  "base": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+  "base": "b713307eada7f56f772aaf7a9b715846802ba736",
   "status": "R10 corrected source inventory from committed Git blobs; this identifies current sources and does not relabel historical test runs.",
   "supersedes": {
     "snapshotAt": "6b109c27c",
@@ -32,5 +32,9 @@
       "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/OperationResumeE2ETest.java",
       "sha256": "861e886236b63c2691968869647d4167276cd957d0393b73a93479e87006a1cd"
     }
-  ]
+  ],
+  "previousSnapshot": {
+    "base": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+    "retrieval": "git show b713307eada7f56f772aaf7a9b715846802ba736:docs/design/lane-f-engine-jvm/evidence/C2/C2-11-source-snapshot.json"
+  }
 }

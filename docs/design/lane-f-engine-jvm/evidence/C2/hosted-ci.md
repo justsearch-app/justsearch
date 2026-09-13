@@ -1,5 +1,44 @@
 # C2 hosted verification
 
+## Current correction-batch acceptance: b713307ea
+
+[CI34734430973](https://github.com/justsearch-app/justsearch/actions/runs/34734430973)
+completes **success**, all13 jobs, at
+`b713307eada7f56f772aaf7a9b715846802ba736`. This is the final corrected product
+revision, including queue close ownership, canonical index aliases and native-lock
+error handling. Local full905 and the final independent review also pass at this
+revision. This closes the R1–R10 correction batch; whole C2 remains open.
+
+Actual Linux task logs show app-util, app-observability, app-launcher, UI and
+indexer-worker test tasks execute. Retained XML has zero failures, errors, skips or
+retry elements for the named correction suites: queue change stream13, server close
+completion8, index exclusion7, index lock failures5, index lock unit5, app exclusion4,
+app lock failures5, launcher close11, operation runner16, MCP admission9 and request
+context6. The alias suite includes both ownership orders. Windows-native also
+passes111 cases with no skips; its selected AppInstanceLockTest has4 cases. The
+new alias/error suites run locally on Windows and in the full Linux unit lane;
+they are not claimed as additional Windows-native job selections.
+
+The installed integration task executes successfully on its first attempt. Its
+OperationResumeE2ETest has1 unskipped case (32.721s), and
+ExtractionSandboxOrphanE2ETest has1 unskipped case (5.072s), both without retry
+entries. This is the fresh installed R7 foundation witness after the queue/lock
+corrections. The six keyed C2-11 scenarios still belong to later C2 acceptance.
+Artifact totals are app-ui5345/811 suites/4 skips, search-worker3385/599/43,
+Windows-native111/9/0 and integration89/21/42, all with zero failures/errors.
+Unrelated environment-gated skips are retained, not counted as named proof.
+
+Metadata, artifact ids/expiry and exact named counts:
+`tmp/c2-review-hosted-b713-status.json`, `tmp/c2-review-hosted-b713-artifacts.json`,
+and `tmp/c2-review-hosted-b713-named-counts.json`. Retained XML and job logs:
+`tmp/c2-review-hosted-b713-{app-ui,search-worker,windows,integration}/` and
+`tmp/c2-review-hosted-b713-{app-ui,search-worker,windows,integration}-log.txt`.
+Windows-native artifacts expire October13; the other test artifacts expire
+December12,2026. Local copies remain through lane acceptance plus30 days and must
+be exported before worktree release.
+
+## Historical pre-review checkpoint
+
 September13 final code checkpoint: [CI34731185342](https://github.com/justsearch-app/justsearch/actions/runs/34731185342)
 atc56e1a838 completes **success**, all13 jobs, after the lifecycle fixture correction.
 Metadata: `tmp/c2-review-r10-hosted-c56e1-status.json`. This resolves the earlier

@@ -1,5 +1,5 @@
 {
-  "base": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+  "base": "b713307eada7f56f772aaf7a9b715846802ba736",
   "status": "R10 corrected source inventory from committed Git blobs; this identifies current sources and does not relabel historical test runs.",
   "supersedes": {
     "snapshotAt": "6b109c27c",
@@ -196,5 +196,9 @@
       "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IngestionProvenancePersistenceTest.java",
       "sha256": "99ee5507b3c3c7fdabb401eed7e1485a8df41894b8061a58a756330d6528d90c"
     }
-  ]
+  ],
+  "previousSnapshot": {
+    "base": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+    "retrieval": "git show b713307eada7f56f772aaf7a9b715846802ba736:docs/design/lane-f-engine-jvm/evidence/C2/C2-1-source-snapshot.json"
+  }
 }

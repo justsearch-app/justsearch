@@ -1,6 +1,15 @@
 # C2 independent-review correction batch — September 13
 
 Accepted review range: c9f5e3e93..c6556fa02; intake checked at429115fec.
+**Accepted 2026-09-13 at b713307ea.** All R1–R10 correction items are closed.
+Named negative controls and focused gates are preserved below; full905 passes,
+CI34734430973 passes all13 jobs with fresh installed witnesses, and the final
+independent correction verification has no remaining findings. See
+[the final review](final-independent-review.md), [full/source evidence](review-r10-evidence.md)
+and [hosted execution](hosted-ci.md). C2-3 is next; whole C2 and the six keyed
+C2-11 recovery scenarios remain open. Later dated pending statements below describe
+their original checkpoints, not the current acceptance state.
+
 This batch precedes further C2-2 producer work. C2-2 remains open; recorded ingest
 and reindex activation move to their C2-8/C2-10 owners. No new owner approval is needed.
 The supplied independent review is the batch's initial review; root owns correction.
@@ -9,7 +18,7 @@ scope addition is recorded under the next item's section0.1, never silently expa
 
 ## Ordered work and acceptance
 
-1. **R1 OPEN — asynchronous persistence failure.** Named test first: fail the effect
+1. **R1 CLOSED — asynchronous persistence failure.** Named test first: fail the effect
    and terminal write, assert the storage failure retains the effect cause, ERROR log
    identifies key and intended state, the Health condition reports unresolved outcome,
    and dispatcher history emits FAILURE. Reuse OperationRecoveryNotice. A single
@@ -21,37 +30,37 @@ scope addition is recorded under the next item's section0.1, never silently expa
    The prior synchronousCompletionWriteFailureCannotReturnSuccess assertion that
    history stays empty is superseded by the supplied review's explicit FAILURE
    publication contract; retain its thrown-error, one-effect and RUNNING-row assertions.
-2. **R2 OPEN — launcher exclusion.** Acquire AppInstanceLock before operations open;
+2. **R2 CLOSED — launcher exclusion.** Acquire AppInstanceLock before operations open;
    two-runner test proves no live sweep/quarantine. Preserve orderly lock release.
    [R2 proof](review-r2-launcher-lock.md): final795 executes45 cases and passes the item gate.
-3. **R3 OPEN — transition refusal.** Re-read all ignored lifecycle booleans, reject
+3. **R3 CLOSED — transition refusal.** Re-read all ignored lifecycle booleans, reject
    unexpected terminal-write refusal and prove the failure is observable.
    [R3 proof](review-r3-transition-refusal.md): three intended negative failures; final797 passes.
-4. **R4 OPEN — audit/admission.** Audit NONE cannot bypass durable mutation acceptance;
+4. **R4 CLOSED — audit/admission.** Audit NONE cannot bypass durable mutation acceptance;
    admission failures preserve their reason. Preserve deliberate audit suppression.
    [R4 proof](review-r4-audit-admission.md): five intended negative failures; final800
    passes88 cases, PMD and UI integration-test compilation. Batch review pending.
-5. **R5 OPEN — bounded history.** Add identity/checkpoint SQL bounds, inspect SQLite
+5. **R5 CLOSED — bounded history.** Add identity/checkpoint SQL bounds, inspect SQLite
    efficiently without violating snapshot ownership, bring C2-5 retention/cap/fence
    acceptance forward before any more producers.
    [R5 proof](review-r5-bounded-history.md): final810 passes228 cases, PMD and UI
    integration-test compilation; named negative controls expose retention and
    terminal-publication races. Store/port gates pass; batch review pending.
-6. **R6 OPEN — named crash test.** Halt a child JVM after acceptance before its first
+6. **R6 CLOSED — named crash test.** Halt a child JVM after acceptance before its first
    effect, reopen: same key ACCEPTED and effect store empty.
    [R6 proof](review-r6-acceptance-crash.md): final814 executes20 cases, including
    two wrong-side crash witnesses; PMD and UI integration-test compilation pass.
-7. **R7 OPEN — installed proof/status.** C2-11 must inspect operations and fail on
+7. **R7 CLOSED — installed proof/status.** C2-11 must inspect operations and fail on
    substrate reversion; correct batch1/handoff claims and execute its specified tier.
    [Installed816 and bypass-negative817](review-r7-installed-row.md) prove the
    foundation witness; six keyed C2-11 scenarios and final batch review remain open.
-8. **R8 OPEN — swallowed failures.** Background terminalization, failed root walks,
+8. **R8 CLOSED — swallowed failures.** Background terminalization, failed root walks,
    post-commit queue notifications, bridge snapshot reset/coalescing and launcher close
    all need their specific runnable regressions without suppressing failures.
    [R8 proof](review-r8-failure-boundaries.md): final821 passes136 cases and the
    item gate; negative819/820 expose five boundaries and822 proves coalescing
    is required. Restore823 passes. Batch review remains pending.
-9. **R9 OPEN — checklist/design reconciliation.** Reopen/reprove C2-1 schema16; name
+9. **R9 CLOSED — checklist/design reconciliation.** Reopen/reprove C2-1 schema16; name
    content_hash's C2-8 consumer/absence. Record generation predicate in D1 section1
    as replaceable. Record replacement-null window in C2-12 and D1 removal. Stop
    ingestion work in C2-2; assign C2-8/C2-10. Resolve prepared replay/public-key
@@ -62,7 +71,7 @@ scope addition is recorded under the next item's section0.1, never silently expa
    [R9 proof](review-r9-reconciliation.md): final835 represents281 passing cases;
    Rust85, store/release compatibility, ports and canonical links pass. Held source
    reconstructs from its packet. Final batch review remains pending.
-10. **R10 OPEN — evidence/build/CI.** Generate and commit C2 raw-artifact SHA inventory
+10. **R10 CLOSED — evidence/build/CI.** Generate and commit C2 raw-artifact SHA inventory
     plus latest full-run summary; repair source snapshots from a committed tree;
     include ui:compileIntegrationTestJava in every implementation item's gate;
     correct final hosted outcomes and record successful runs; wire release-assets

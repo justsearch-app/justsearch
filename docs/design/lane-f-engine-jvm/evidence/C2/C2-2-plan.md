@@ -1,9 +1,10 @@
 # C2-2: implementation seams and verification plan
 
-Status: September13 correction batch in progress. C2-2 ends at the dispatcher and
+Status: September13 correction batch accepted atb713307ea: full905, final independent
+verification and hosted CI34734430973 pass. C2-3 is next. C2-2 ends at the dispatcher and
 background-agent producers. The earlier dated remaining-work statements below are
-historical; ingest/reindex activation belongs to C2-8/C2-10. R9 reconciles held
-preparation surfaces; R10 and the final independent review precede batch closure.
+historical; ingest/reindex activation belongs to C2-8/C2-10. R9 holds preparation surfaces until the separated keyed identity/replay mechanism
+is implemented. The detailed correction acceptance is in review-correction-september13.md.
 The root owns all edits/builds. A read-only explorer mapped the seams; decisions
 below resolve its returned ambiguities without owner gates.
 

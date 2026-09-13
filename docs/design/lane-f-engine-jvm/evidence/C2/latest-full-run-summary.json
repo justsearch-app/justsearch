@@ -1,8 +1,8 @@
 {
-  "revision": "2168d124588de7e7afb0e6d90ae6f53485639b15",
+  "revision": "b713307eada7f56f772aaf7a9b715846802ba736",
   "command": "gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
   "summary": {
-    "tests": 10156,
+    "tests": 10158,
     "failures": 0,
     "errors": 0,
     "skipped": 35,
@@ -42,7 +42,7 @@
     {
       "module": "app-agent",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 674,
       "failures": 0,
       "errors": 0,
@@ -80,16 +80,6 @@
       "suites": 1
     },
     {
-      "module": "app-engine",
-      "task": "test",
-      "status": "EXECUTED",
-      "tests": 231,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 47
-    },
-    {
       "module": "app-inference",
       "task": "test",
       "status": "UP-TO-DATE",
@@ -110,9 +100,19 @@
       "suites": 23
     },
     {
-      "module": "app-observability",
+      "module": "app-engine",
       "task": "test",
       "status": "EXECUTED",
+      "tests": 231,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 47
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "UP-TO-DATE",
       "tests": 443,
       "failures": 0,
       "errors": 0,
@@ -122,7 +122,7 @@
     {
       "module": "app-services",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 2646,
       "failures": 0,
       "errors": 0,
@@ -132,7 +132,7 @@
     {
       "module": "app-services",
       "task": "integrationTest",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 3,
       "failures": 0,
       "errors": 0,
@@ -142,7 +142,7 @@
     {
       "module": "app-util",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 20,
       "failures": 0,
       "errors": 0,
@@ -223,7 +223,7 @@
       "module": "indexer-worker",
       "task": "test",
       "status": "EXECUTED",
-      "tests": 480,
+      "tests": 482,
       "failures": 0,
       "errors": 0,
       "skipped": 12,
@@ -390,24 +390,23 @@
       "suites": 256
     }
   ],
-  "buildResult": "FAILED",
-  "failure": ":modules:indexer-worker:spotlessJavaSourcesCheck: two whitespace-only blank lines in IndexRootLockFailureTest",
-  "elapsed": "10m52s",
+  "buildResult": "SUCCESS",
+  "elapsed": "9m30s",
   "raw": {
-    "log": "tmp/c2-review-final-full900.txt",
-    "xml": "tmp/c2-review-final-full900-xml/",
-    "counts": "tmp/c2-review-final-full900-counts.json"
+    "log": "tmp/c2-review-final-full905.txt",
+    "xml": "tmp/c2-review-final-full905-xml/",
+    "counts": "tmp/c2-review-final-full905-counts.json"
   },
   "reuse": {
-    "executedTasks": 12,
-    "executedCases": 5824,
-    "unchangedTasks": 26
+    "executedTasks": 7,
+    "executedCases": 2040,
+    "unchangedTasks": 31
   },
   "supersedes": {
-    "revision": "c56e1a838",
-    "run": "869",
-    "retrieval": "git show 21fbe728a:docs/design/lane-f-engine-jvm/evidence/C2/latest-full-run-summary.json",
-    "result": "SUCCESS, historical before final-review corrections"
+    "revision": "2168d124588de7e7afb0e6d90ae6f53485639b15",
+    "run": "900",
+    "retrieval": "git show b713307ea:docs/design/lane-f-engine-jvm/evidence/C2/latest-full-run-summary.json",
+    "result": "FAILED: formatting, with no test failures; not retroactively relabeled"
   },
-  "next": "Whitespace correction902 passes its focused gate; queue owner correction from the final review and fresh integrated verification remain owed."
+  "next": "R1-R10 correction batch accepted: final independent verification and hosted CI34734430973 pass at b713307ea. Continue C2-3; whole C2 remains open."
 }

@@ -1,5 +1,22 @@
 # R10 evidence, build and hosted reconciliation
 
+Current source checkpoint: **b713307ea**. Final independent correction verification
+is clear; [the consolidated review record](final-independent-review.md) accounts for
+all findings and both correction rounds. Full905 at this revision passes in9m30s:
+10158 cases across1649 suites, zero failures/errors and35 inherited skips. Seven test
+tasks execute2040 cases;31 test tasks reuse unchanged results. PMD, formatting and
+UI integration-test compilation pass as part of the full command below. Source
+snapshots identify all53 raw committed Git blobs atb713307ea and preserve retrieval
+of the prior c56e1a838 snapshots. Hosted CI34734430973 passes all13 jobs, with named unskipped Linux and installed
+proof in hosted-ci.md. R1–R10 are accepted; C2-3 is next.
+
+Raw: `tmp/c2-review-final-full905.txt`, `tmp/c2-review-final-full905-xml/` and
+`tmp/c2-review-final-full905-counts.json`. latest-full-run-summary.json records this
+successful run. The failed900 summary remains retrievable fromb713307ea; its test
+results do not turn that failed formatting gate into success.
+
+## Historical correction checkpoints
+
 September13 final-review correction boundary supersedes the pre-review status below.
 Full900 at2168d1245 represents10156 cases/1649 suites, zero test failures/errors and35
 inherited skips, but the build FAILS on two whitespace-only blank lines in the new
