@@ -714,6 +714,16 @@ final class OperationSettingsRunnerTest {
       return new OperationAttemptRunner.Reconciliation.Wait();
     }
 
-    private record Token(long id, String key, SettingsWitness expected) implements Reservation {}
+    @Override
+    public Reservation reserveReset(OperationRecord row, io.justsearch.app.api.operations.OperationStore.Preparation accepted) {
+      throw new UnsupportedOperationException("Ordinary settings fixture");
+    }
+    @Override
+    public void applyReset(Reservation reservation, AttemptControl control) {
+      throw new UnsupportedOperationException("Ordinary settings fixture");
+    }
+    private record Token(long id, String key, SettingsWitness expected) implements Reservation {
+      @Override public long expectedRevision() { return expected.acceptedRevision(); }
+    }
   }
 }

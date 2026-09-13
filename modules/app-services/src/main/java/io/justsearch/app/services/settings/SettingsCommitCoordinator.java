@@ -7,6 +7,7 @@ import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationRecord;
+import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
@@ -38,9 +39,17 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     private final SettingsWitness prior;
     private Phase phase = Phase.PREPARING;
     private boolean preparationStarted;
+    private final String quarantineFingerprint;
+    private final boolean reset;
+    @Override public long expectedRevision() { return prior.acceptedRevision(); }
+    private boolean recoveryReset() { return quarantineFingerprint != null; }
 
     private SettingsCommitFence(long id, String key, SettingsWitness prior) {
+      this(id, key, prior, null, false);
+    }
+    private SettingsCommitFence(long id, String key, SettingsWitness prior, String fingerprint, boolean reset) {
       this.id = id; this.key = key; this.prior = prior;
+      this.quarantineFingerprint = fingerprint; this.reset = reset;
     }
   }
 
@@ -111,14 +120,75 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   }
 
   @Override
+  public Reservation reserveReset(OperationRecord row, OperationStore.Preparation accepted) {
+    var intent = SettingsResetPreparation.decode(row, accepted);
+    if (!intent.recovery()) {
+      // Reserve through the same full-witness comparison, then retain its fixed reset purpose.
+      if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      try {
+        var normal = (SettingsCommitFence) reserve(row.id(), row.key(), intent.expected());
+        fence = new SettingsCommitFence(normal.id, normal.key, normal.prior, null, true);
+        return fence;
+      } finally { mutex.unlock(); publishIssue(); }
+    }
+    if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    try {
+      if (!inspected || recoveredId != null
+          || (blocked && (issue == null || issue.reason() != RecoveryReason.UNREADABLE_WITNESS))) {
+        throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery is unresolved", Map.of());
+      }
+      if (fence != null) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
+      if (row.id() <= 0) throw new IllegalArgumentException("Invalid settings reservation");
+      if (!matchesQuarantine(intent.quarantineFingerprint())) {
+        throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings quarantine evidence changed", Map.of());
+      }
+      block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));
+      fence = new SettingsCommitFence(row.id(), row.key(), new SettingsWitness(0, null),
+          intent.quarantineFingerprint(), true);
+      return fence;
+    } finally { mutex.unlock(); publishIssue(); }
+  }
+
+  @Override
+  public void applyReset(Reservation reservation, AttemptControl control) {
+    applyOwned(reservation, null, control, true);
+  }
+
+  @Override
   public void apply(Reservation reservation, UiSettings candidate, AttemptControl control) {
+    applyOwned(reservation, candidate, control, false);
+  }
+
+  private void applyOwned(Reservation reservation, UiSettings candidate, AttemptControl control, boolean reset) {
     Objects.requireNonNull(control, "control");
     ConfigChangedEvent event;
     mutex.lock();
     try {
       SettingsCommitFence active = requireFence(reservation);
+      if (active.reset != reset) throw new IllegalArgumentException("Settings reservation purpose mismatch");
       if (active.preparationStarted) throw new IllegalStateException("Settings preparation already started");
       active.preparationStarted = true;
+      if (reset) {
+        if (active.recoveryReset()) {
+          if (!matchesQuarantine(active.quarantineFingerprint)) {
+            throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings quarantine evidence changed", Map.of());
+          }
+          candidate = new UiSettings();
+        } else {
+          final UiSettingsStore.Snapshot snapshot;
+          try { snapshot = store.inspect(); }
+          catch (RuntimeException unreadable) {
+            block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, active.id));
+            throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings witness became unreadable", Map.of());
+          }
+          if (!active.prior.equals(snapshot.witness())) {
+            throw refused("VERSION_CONFLICT", "Settings changed since reset was prepared", Map.of());
+          }
+          candidate = snapshot.settings();
+          SettingsResetDefaults.applyTo(candidate);
+        }
+      }
       var next = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
       var prepared = store.prepare(candidate, next);
       ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(prepared.settings()), "Prepared config");
@@ -129,12 +199,15 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         final SettingsWitness observed;
         try { observed = store.inspect().witness(); }
         catch (RuntimeException inspectionFailure) {
+          if (active.recoveryReset() && matchesQuarantine(active.quarantineFingerprint)) {
+            throw new IllegalStateException("Settings recovery replacement did not commit", failure);
+          }
           if (failure != inspectionFailure) failure.addSuppressed(inspectionFailure);
           uncertain(active, control, RecoveryReason.UNREADABLE_WITNESS);
           throw new IllegalStateException("Settings replacement has no readable witness", failure);
         }
         if (!next.equals(observed)) {
-          if (active.prior.equals(observed)) throw new IllegalStateException("Settings replacement did not commit", failure);
+          if (!active.recoveryReset() && active.prior.equals(observed)) throw new IllegalStateException("Settings replacement did not commit", failure);
           uncertain(active, control, RecoveryReason.CONTRADICTORY_WITNESS);
           throw new IllegalStateException("Settings replacement has a contradictory witness", failure);
         }
@@ -149,12 +222,11 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     }
     // Arbitrary notification code is outside the physical mutex, with the logical fence retained.
     config.notifyListeners(event);
-    store.notifyRecoveryCleared();
   }
 
   private SettingsCommitFence requireFence(Reservation reservation) {
     if (!(reservation instanceof SettingsCommitFence active) || active != fence
-        || active.phase != Phase.PREPARING || blocked) {
+        || active.phase != Phase.PREPARING || (blocked && !active.recoveryReset())) {
       throw new IllegalArgumentException("Settings reservation is foreign, retired or unresolved");
     }
     return active;
@@ -172,10 +244,38 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     // for another transaction's preparation merely to perform unrelated cleanup.
     SettingsCommitFence observed = fence;
     if (observed == null || observed.id != id) return;
+    boolean clear = false;
+    boolean request = false;
     mutex.lock();
     try {
-      if (fence != null && fence.id == id && !blocked) fence = null;
+      if (fence != null && fence.id == id && fence.phase != Phase.UNCERTAIN) {
+        clear = fence.phase == Phase.COMMITTED;
+        if (clear && fence.recoveryReset()) {
+          blocked = false;
+          if (!restartIssued) { restartIssued = true; request = true; }
+        }
+        fence = null;
+        if (Objects.equals(recoveredId, id)) recoveredId = null;
+      }
     } finally { mutex.unlock(); }
+    // Only durable COMPLETE may clear recovery; callback faults cannot undo that outcome.
+    Error fatal = null;
+    try {
+      if (clear) store.notifyRecoveryCleared();
+    } catch (RuntimeException notificationFailure) {
+      LOG.warn("Settings recovery notification failed after durable completion", notificationFailure);
+    } catch (Error failure) {
+      fatal = failure;
+      throw failure;
+    } finally {
+      if (request) {
+        try { restart.run(); }
+        catch (RuntimeException | Error restartFailure) {
+          if (fatal == null) throw restartFailure;
+          if (fatal != restartFailure) fatal.addSuppressed(restartFailure);
+        }
+      }
+    }
   }
 
   @Override
@@ -219,6 +319,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       final SettingsWitness witness;
       try { witness = store.inspect().witness(); }
       catch (RuntimeException failure) {
+        var reset = recoveryIntent(armed.getFirst());
+        if (reset != null && matchesQuarantine(reset.quarantineFingerprint())) {
+          recoveredDecision = precommitFailure();
+          fence = new SettingsCommitFence(row.id(), row.key(), new SettingsWitness(0, null),
+              reset.quarantineFingerprint(), true);
+        }
         block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));
         return;
       }
@@ -229,7 +335,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       if (row.key().equals(witness.lastCommittedOperationKey()) && witness.acceptedRevision() == expected + 1) {
         recoveredDecision = new OperationAttemptRunner.Reconciliation.Complete(new OperationReceipt("SUCCESS", null));
-      } else if (witness.acceptedRevision() == expected) {
+      } else if (witness.acceptedRevision() == expected
+          && normalResetBaseMatches(armed.getFirst(), witness)) {
         recoveredDecision = precommitFailure();
       } else {
         block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, row.id()));
@@ -237,6 +344,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       // Keep the bounded witness reserved until the runner persists the recovery result.
       fence = new SettingsCommitFence(row.id(), row.key(), witness);
+      if (recoveredDecision instanceof OperationAttemptRunner.Reconciliation.Complete) fence.phase = Phase.COMMITTED;
     } finally {
       mutex.unlock();
       publishIssue();
@@ -251,6 +359,30 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (row.expectedSettingsRevision() == null) return precommitFailure();
       return Objects.equals(recoveredId, row.id()) ? recoveredDecision : new OperationAttemptRunner.Reconciliation.Wait();
     } finally { mutex.unlock(); }
+  }
+
+  private static boolean normalResetBaseMatches(RecoveryInput input, SettingsWitness witness) {
+    if (!SettingsResetPreparation.OPERATION_ID.equals(input.row().descriptor().operationRef())) return true;
+    if (input.preparation().isEmpty()) return false;
+    try {
+      var intent = SettingsResetPreparation.decode(input.row(), input.preparation().orElseThrow());
+      return !intent.recovery() && witness.equals(intent.expected());
+    } catch (IllegalArgumentException unavailable) { return false; }
+  }
+
+  private static SettingsResetPreparation.Intent recoveryIntent(RecoveryInput input) {
+    if (input.preparation().isEmpty()) return null;
+    try {
+      var intent = SettingsResetPreparation.decode(input.row(), input.preparation().orElseThrow());
+      return intent.recovery() ? intent : null;
+    } catch (IllegalArgumentException unavailable) {
+      return null;
+    }
+  }
+
+  private boolean matchesQuarantine(String fingerprint) {
+    try { return fingerprint.equals(store.recoveryFingerprint()); }
+    catch (IOException | RuntimeException unavailable) { return false; }
   }
 
   private static OperationAttemptRunner.Reconciliation precommitFailure() {

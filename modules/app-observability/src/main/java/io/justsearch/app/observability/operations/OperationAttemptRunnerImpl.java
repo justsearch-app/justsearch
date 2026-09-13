@@ -303,6 +303,17 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   @Override
   public OperationResult applySettings(OperationRecordHandle handle,
       SettingsWitness expected, io.justsearch.app.api.UiSettings candidate) {
+    Objects.requireNonNull(expected, "expected settings witness");
+    return applySettingsOwned(handle, expected, candidate, false);
+  }
+
+  @Override
+  public OperationResult applySettingsReset(OperationRecordHandle handle) {
+    return applySettingsOwned(handle, null, null, true);
+  }
+
+  private OperationResult applySettingsOwned(OperationRecordHandle handle, SettingsWitness expected,
+      io.justsearch.app.api.UiSettings candidate, boolean reset) {
     if (settingsOwner == null) throw new IllegalStateException("Settings owner is not composed");
     if (!(handle instanceof OperationAttemptRunnerImpl.Control control)
         || active.get(control.id) != control || control.bodyThread != Thread.currentThread()
@@ -313,22 +324,28 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (row.state() != OperationState.RUNNING || !settingsKind(row.descriptor().kind())) {
       throw new IllegalStateException("Settings commitment refused for this attempt");
     }
-    Objects.requireNonNull(expected, "expected settings witness");
-    long expectedRevision = expected.acceptedRevision();
-    if (expectedRevision == Long.MAX_VALUE) {
+    if (!reset && expected.acceptedRevision() == Long.MAX_VALUE) {
       throw new IllegalArgumentException("Invalid expected settings revision");
     }
     if (!control.settingsStarted.compareAndSet(false, true)) {
       throw new IllegalStateException("Settings commitment already attempted");
     }
-    control.settingsExpected = expectedRevision;
     try {
-      var reservation = Objects.requireNonNull(
-          settingsOwner.reserve(control.id, control.key, expected), "Settings reservation");
+      var reservation = Objects.requireNonNull(reset
+          ? settingsOwner.reserveReset(row, store.acceptedPreparation(control.id).orElseThrow(
+              () -> new IllegalArgumentException("Settings reset requires accepted preparation")))
+          : settingsOwner.reserve(control.id, control.key, expected), "Settings reservation");
+      long expectedRevision = reservation.expectedRevision();
+      if (expectedRevision < 0 || expectedRevision == Long.MAX_VALUE
+          || (!reset && expectedRevision != expected.acceptedRevision())) {
+        throw new IllegalArgumentException("Settings reservation marker mismatch");
+      }
+      control.settingsExpected = expectedRevision;
       if (!store.armSettingsRevision(control.id, expectedRevision)) {
         throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
       }
-      settingsOwner.apply(reservation, candidate, control.settingsControl);
+      if (reset) settingsOwner.applyReset(reservation, control.settingsControl);
+      else settingsOwner.apply(reservation, candidate, control.settingsControl);
       if (control.settingsUncertain) throw new IllegalStateException("Settings commitment remains unresolved");
       if (control.settingsReceipt == null) {
         control.settingsUncertain = true;

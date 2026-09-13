@@ -22,7 +22,7 @@ public interface SettingsCommitOwner {
   java.util.concurrent.CompletionStage<RecoveryIssue> recoveryIssue();
 
   /** Opaque identity issued by this owner after durable revision validation, before SQL arming. */
-  interface Reservation {}
+  interface Reservation { long expectedRevision(); }
 
   /** Prebuilt before replacement and published to the runner at the exact commitment boundary. */
   record Receipt(String operationKey, long acceptedRevision, OperationResult response) {
@@ -71,6 +71,12 @@ public interface SettingsCommitOwner {
 
   /** Compare both persisted witness fields before the runner may arm its numeric SQL marker. */
   Reservation reserve(long id, String key, SettingsWitness expected);
+
+  /** Decode the actual accepted fixed reset invocation before reserving its witnessed base. */
+  Reservation reserveReset(OperationRecord row, OperationStore.Preparation accepted);
+
+  /** Build the fixed reset candidate only after reservation and durable SQL arming. */
+  void applyReset(Reservation reservation, AttemptControl control);
 
   /** Prepare, replace and publish synchronously; arbitrary notifications run outside owner locks. */
   void apply(Reservation reservation, UiSettings candidate, AttemptControl control);

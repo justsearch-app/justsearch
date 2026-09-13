@@ -325,3 +325,11 @@ previously refused startup writers, not just a callback counter or exit request.
 The [fixed metadata helper](settings-reset-schema.md) now implements settings-reset-v1 and
 strict normal/recovery intent validation. It consumes the existing accepted envelope and row;
 root continues directly with owner reserve/apply/reconciliation, then production/wire/Health.
+
+
+The [fixed reset owner cut](settings-reset-owner.md) now implements reservation, post-arm
+candidate creation, ambiguity classification, full-pair normal reset recovery and durable
+clear/restart ordering. Independent review and negative1335 are clear;1336 restores196 passing
+cases. The next cut is production owner/producer/Health composition and public witness/key
+flows, followed by actual successor-bootstrap proof. The new main identity policy requires
+PR1 publication-lineage repair; it changes neither stage order nor final F merge readiness.

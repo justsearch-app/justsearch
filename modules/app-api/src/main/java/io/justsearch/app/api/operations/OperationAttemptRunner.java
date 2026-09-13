@@ -85,6 +85,9 @@ public interface OperationAttemptRunner {
   OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
       io.justsearch.app.api.UiSettings candidate);
 
+  /** Fixed reset from this executing attempt's persisted server preparation; no caller authority flags. */
+  OperationResult applySettingsReset(OperationRecordHandle handle);
+
   /** A scheduling, validation or admission refusal cannot overwrite work that already started. */
   void rejectBeforeStart(PreparedAttempt attempt, String reason);
 

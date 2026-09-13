@@ -26,16 +26,17 @@ Latest hosted checkpoint ae46f6919: CI34778431996 all13 jobs and CLA34778430639 
 The queue delay has cleared and public-claims/app-ui corrections are hosted green. This
 predates the fixed reset schema diff and does not satisfy installed-v5 recovery proof.
 
-**Immediate next items (2026-09-13): C2-6 recovery reset, then producer and Health migration.**
-The real SQLite reset roundtrip exposed raw descriptor-order mismatch. The separate
-[canonical identity correction](evidence/C2/settings-reset-identity.md) passes48 cases/PMD/format,
-with its negative check and independent review clear. Reset-owner work is still uncommitted;
-its first192-case integrated pass is development evidence, not completed C2-6.
+**Immediate next items (2026-09-13): integrate main privacy safeguards and repair PR1 publication lineage, then C2-6 producer/Health migration.**
+The [fixed reset owner](evidence/C2/settings-reset-owner.md) implements reserve/apply/recovery
+and durable clear/restart ordering.1334 executes155 settings cases plus41 unchanged runner/UI
+cases; negative1335 has five intended failures, restored1336 passes196. Independent review is
+clear. Production composition, every settings producer/public wire, Health and installed
+successor-bootstrap proof remain required; this is not C2-6 completion.
 
-The [fixed settings-reset-v1 helper](evidence/C2/settings-reset-schema.md) now passes47 cases,
-PMD/format and register gates. Negative1320 protects five binding/type assertions; negative1327
-protects four duplicate/trailing parser assertions. Independent correction review is clear. It supplies metadata only. Owner reservation/apply/reconciliation and the
-all-producer/Health/installed migration remain next.
+Origin main b4d972b6b adds the identity gate that now rejects365 historical lane commits.
+Current effective identity and latest commits already comply. The original per-item checkpoint
+history/evidence is retained; root is repairing publication without force-push or gate exceptions.
+
 The fixed reset reservation/clear/restart mechanism passed independent review: preserve
 quarantine block through precommit failure, clear only after durable COMPLETE, then use the
 existing process-owned ordered restart. [Mechanism and required fault matrix](evidence/C2/C2-6-plan.md#2026-09-13-fixed-reset-reservation-and-recovery-clear-order).
