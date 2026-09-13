@@ -50,7 +50,10 @@ represented cases at1014 after four intended negative1012 failures;
 Private live approval lookup now passes427 represented cases at1021, including
 reply/announcement/cancellation lifetime and private full-target display;
 [lookup proof](evidence/C2/private-approval.md).
-Next: connect agent/workflow preparation-reference carry-through and the frontend private lookup,
+Agent preparation-reference carry-through now passes978 represented cases at1024,
+including the full684-case agent suite and the scope-order negative1022;
+[agent proof](evidence/C2/agent-continuation.md).
+Next: connect workflow preparation-reference carry-through and the frontend private lookup,
 including nested approval snapshot reattachment,
 then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.

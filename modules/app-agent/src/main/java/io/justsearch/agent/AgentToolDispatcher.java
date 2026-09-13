@@ -13,6 +13,8 @@ import io.justsearch.agent.api.registry.GatedOperationExecutor;
 import io.justsearch.agent.api.registry.IntentPreviewer;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationDispatcher;
+import io.justsearch.agent.api.registry.OperationDispatchPlan;
+import io.justsearch.agent.api.registry.OperationApprovalPreview;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
@@ -22,6 +24,7 @@ import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Scope;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -84,6 +87,11 @@ final class AgentToolDispatcher {
   }
 
   OperationResult executeOperationWithPolicy(Operation op, ToolCallRequest call, String sessionId, EngineContext engineContext) {
+    return executeOperationWithPolicy(op, call, sessionId, engineContext, null);
+  }
+
+  OperationResult executeOperationWithPolicy(Operation op, ToolCallRequest call, String sessionId,
+      EngineContext engineContext, OperationDispatchPlan plan) {
     Span toolSpan = GlobalOpenTelemetry.getTracer(AgentLoopService.TRACER_SCOPE).spanBuilder("execute_tool " + call.toolName())
         .setSpanKind(SpanKind.INTERNAL)
         .setAttribute("gen_ai.operation.name", "execute_tool")
@@ -104,7 +112,8 @@ final class AgentToolDispatcher {
       int attempt = 0;
       while (true) {
         try {
-          OperationResult result = dispatchToolCall(op, call, sessionId, engineContext);
+          OperationResult result = plan == null ? dispatchToolCall(op, call, sessionId, engineContext)
+              : gatedExecutor.routePrepared(op, call.arguments(), plan, engineContext);
           toolSpan.setStatus(StatusCode.OK);
           return result;
         } catch (Exception e) {
@@ -167,8 +176,8 @@ final class AgentToolDispatcher {
           op,
           call.arguments(),
           sessionId == null || sessionId.isBlank()
-              ? java.util.Optional.empty()
-              : java.util.Optional.of(sessionId), engineContext);
+              ? Optional.empty()
+              : Optional.of(sessionId), engineContext);
     }
     // Legacy fallback for test wiring without the intent router. Slice 487
     // Phase 1.7 audit-test gate ratifies this is the ONLY direct dispatcher
@@ -229,6 +238,30 @@ final class AgentToolDispatcher {
       Operation op,
       Consumer<AgentEvent> eventConsumer) {
 
+    return awaitSafetyGate(session, call, op, eventConsumer, approvalBehavior(session, op), Optional.empty());
+  }
+
+  /** Stack-only continuation; null plan is reserved for workflow streaming and unwired legacy tests. */
+  record ToolApproval(boolean approved, OperationDispatchPlan plan) {}
+
+  ToolApproval prepareAndApprove(AgentSession session, ToolCallRequest call, Operation op,
+      Consumer<AgentEvent> eventConsumer, boolean streamingWorkflow) {
+    GateBehavior behavior = approvalBehavior(session, op);
+    boolean readFastPath = op.policy().risk() == RiskTier.LOW
+        && (behavior == null || behavior == GateBehavior.AUTO);
+    // Preserve background refusal before preparing anything that needs a watcher.
+    if (session.isBackground() && !readFastPath) {
+      return new ToolApproval(awaitSafetyGate(session, call, op, eventConsumer, behavior, Optional.empty()), null);
+    }
+    OperationDispatchPlan plan = streamingWorkflow || routerSupplier.get() == null ? null
+        : gatedExecutor.prepare(op, call.arguments(), session.engineContext(), null, !readFastPath);
+    if (plan instanceof OperationDispatchPlan.Recorded) return new ToolApproval(true, plan);
+    Optional<OperationApprovalPreview> preview = plan instanceof OperationDispatchPlan.Ready ready
+        ? ready.approvalPreview() : Optional.empty();
+    return new ToolApproval(awaitSafetyGate(session, call, op, eventConsumer, behavior, preview), plan);
+  }
+
+  private GateBehavior approvalBehavior(AgentSession session, Operation op) {
     RiskTier risk = op.policy().risk();
 
     // Tempdoc 561 P-D: ask the ONE intent-gate authority for the ISSUANCE verdict under the user's
@@ -243,16 +276,22 @@ final class AgentToolDispatcher {
         op.policy().undoSupported() || op.policy().inverseOperationRef().isPresent();
     // Tempdoc 879: the op's declared ConfirmStrategy rides in as an absolute FLOOR — the dial can
     // tighten the verdict but can no longer approve past what the operation itself asked for.
-    GateBehavior gateBehavior =
+    return
         previewer == null
             ? null
             : previewer.previewAgentGate(
                 risk, session.autonomyLevel(), reversible, op.policy().confirm());
 
+  }
+
+  private boolean awaitSafetyGate(AgentSession session, ToolCallRequest call, Operation op,
+      Consumer<AgentEvent> eventConsumer, GateBehavior gateBehavior,
+      Optional<OperationApprovalPreview> preview) {
+    RiskTier risk = op.policy().risk();
     // Capsule-free fast path: a base-AUTO read-only dispatch needs neither approval nor a consent
     // capsule (UNTRUSTED × LOW = AUTO in the enforcement lattice). Auto-run it. (WATCH tightens reads
     // to INLINE_CONFIRM, so this path is skipped under WATCH — the user then acknowledges the read.)
-    if (risk == RiskTier.LOW && (gateBehavior == GateBehavior.AUTO || previewer == null)) {
+    if (risk == RiskTier.LOW && (gateBehavior == GateBehavior.AUTO || gateBehavior == null)) {
       return true;
     }
 
@@ -285,7 +324,7 @@ final class AgentToolDispatcher {
                 call.toolName(),
                 call.arguments(),
                 risk == null ? null : risk.name().toLowerCase(java.util.Locale.ROOT),
-                gateBehavior == null ? null : gateBehavior.name().toLowerCase(java.util.Locale.ROOT)));
+                gateBehavior == null ? null : gateBehavior.name().toLowerCase(java.util.Locale.ROOT)), preview);
 
     // Emit the pending-approval carrying the backend's issuance verdict. The FE auto-approves (which
     // mints the consent capsule via the normal approve path enforcement requires) iff gateBehavior is

@@ -774,6 +774,60 @@ class AgentLoopServiceTest {
   // ---------------------------------------------------------------------------
 
   @Test
+  void preparedToolScopeIsFrozenBeforeTheHumanGateInTheRealLoop() {
+    var ai = new ScriptedAiService(List.of(
+        ScriptedResponse.toolCall("scoped-call", "core_search_index", "{\"query\":\"test\"}"),
+        ScriptedResponse.textOnly("done")));
+    var service = buildService(ai, new StubTool("search_index", RiskTier.LOW, "legacy must not execute"));
+    var preparedArgs = new java.util.concurrent.atomic.AtomicReference<String>();
+    var sessionId = new java.util.concurrent.atomic.AtomicReference<String>();
+    var dispatched = new java.util.concurrent.atomic.AtomicInteger();
+    var pending = new java.util.concurrent.atomic.AtomicInteger();
+    service.setIntentPreviewer((risk, autonomy, reversible, confirm) ->
+        io.justsearch.agent.api.registry.GateBehavior.INLINE_CONFIRM);
+    service.setBackendIntentRouter(new io.justsearch.agent.api.registry.BackendIntentRouter() {
+      @Override public io.justsearch.agent.api.registry.OperationDispatchPlan prepare(
+          io.justsearch.agent.api.registry.Intent intent,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance,
+          EngineContext context, String key, boolean includePreview) {
+        String args = ((io.justsearch.agent.api.registry.ShellAddress.Invocation) intent.address()).argsJson();
+        assertTrue(args.contains("docIds")); assertTrue(args.contains("selected-document"));
+        assertEquals(0, pending.get()); assertEquals(0, dispatched.get());
+        preparedArgs.set(args);
+        return new io.justsearch.agent.api.registry.OperationDispatchPlan.Ready("loop-key", null, Optional.empty());
+      }
+      @Override public io.justsearch.agent.api.registry.IntentDispatchResult dispatch(
+          io.justsearch.agent.api.registry.Intent intent,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance, EngineContext context) {
+        throw new AssertionError("Real loop lost its prepared continuation");
+      }
+      @Override public io.justsearch.agent.api.registry.IntentDispatchResult dispatch(
+          io.justsearch.agent.api.registry.Intent intent,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance, EngineContext context,
+          String key, java.util.UUID nonce) {
+        assertEquals("loop-key", key); assertEquals(1, pending.get());
+        assertEquals(preparedArgs.get(),
+            ((io.justsearch.agent.api.registry.ShellAddress.Invocation) intent.address()).argsJson());
+        dispatched.incrementAndGet();
+        return new io.justsearch.agent.api.registry.IntentDispatchResult.Dispatched(OperationResult.success("found"));
+      }
+    });
+    var request = new AgentRequest(userMessage("search"), List.of(), 3, List.of(), null,
+        null, null, "watch", List.of("selected-document"), null, false, null);
+    var events = new ArrayList<AgentEvent>();
+    service.runAgent(request, event -> {
+      events.add(event);
+      if (event instanceof AgentEvent.SessionStarted started) sessionId.set(started.sessionId());
+      if (event instanceof AgentEvent.ToolCallPendingApproval gate) {
+        pending.incrementAndGet(); assertEquals(preparedArgs.get(), gate.arguments());
+        service.approveToolCall(sessionId.get(), gate.callId());
+      }
+    }, EngineContextTestFixtures.AGENT_LOOP);
+    assertNotNull(lastEventOfType(events, AgentEvent.AgentDone.class));
+    assertEquals(1, pending.get()); assertEquals(1, dispatched.get());
+  }
+
+  @Test
   void safetyGate_rejectedMediumRiskCall_isNeverDispatched() throws Exception {
     var ai = new ScriptedAiService(List.of(
         ScriptedResponse.toolCall("call_1", "core_danger", "{}"),

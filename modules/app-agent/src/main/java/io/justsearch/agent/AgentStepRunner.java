@@ -912,12 +912,17 @@ final class AgentStepRunner {
             continue;
           }
 
+          // Scope belongs to the canonical invocation before preparation and human approval.
+          // The original model call still owns loop-guard and conversation-history semantics.
+          ToolCallRequest scopedCall = toolDispatcher.scopeToolCall(op, call, session);
+          io.justsearch.agent.api.registry.WorkflowToolRunner wfRunner = this.workflowToolRunner;
+          boolean streamingWorkflow = wfRunner != null && wfRunner.handles(op.id());
           // Safety gate
           if (op.policy().risk() != RiskTier.LOW) {
             checkpointer.checkpoint(sessionId, session, "WAITING_APPROVAL", "Waiting for tool approval: " + call.toolName());
           }
-          boolean approved = toolDispatcher.handleSafetyGate(session, call, op, sink);
-          if (!approved) {
+          var approval = toolDispatcher.prepareAndApprove(session, scopedCall, op, sink, streamingWorkflow);
+          if (!approval.approved()) {
             sink.accept(
                 new AgentEvent.ToolCallRejected(call.id(), "User rejected"));
             // Append rejection to conversation and continue
@@ -974,19 +979,17 @@ final class AgentStepRunner {
           // events) instead of the synchronous executor. The safety gate + approval above already ran
           // for it like any other tool; only the execution channel differs. The vop_* branch earlier
           // is the precedent for sink-aware special tool handling.
-          io.justsearch.agent.api.registry.WorkflowToolRunner wfRunner = this.workflowToolRunner;
           OperationResult toolResult;
           // Tempdoc S7 — when this run carries a docIds scope (FE scope chips), scopeToolCall
           // merges it into the search tool's own arguments; a no-op copy of `call` for any other
           // operation or an unscoped run. `call` itself (used below for loop-guard/history) stays
           // the LLM's original, unscoped arguments.
-          ToolCallRequest scopedCall = toolDispatcher.scopeToolCall(op, call, session);
-          if (wfRunner != null && wfRunner.handles(op.id())) {
+          if (streamingWorkflow) {
             toolResult = wfRunner.run(op.id(), scopedCall.arguments(), sink, session.engineContext());
           } else {
             // Tempdoc 561 P-A1: thread the agent sessionId so the dispatched call stamps it as the
             // ledger correlationId (the History join key).
-            toolResult = toolDispatcher.executeOperationWithPolicy(op, scopedCall, sessionId, session.engineContext());
+            toolResult = toolDispatcher.executeOperationWithPolicy(op, scopedCall, sessionId, session.engineContext(), approval.plan());
           }
           // Tempdoc 415: tool_failure_total counts post-policy-retry failures of executed calls.
           if (!toolResult.success()) {
