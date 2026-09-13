@@ -320,3 +320,8 @@ callback Error cannot suppress restart; preserve the primary Error if restart al
 Boot reconciliation of a prior committed recovery does not request another restart because
 that process already re-entered bootstrap. Installed proof must show successor bootstrap and
 previously refused startup writers, not just a callback counter or exit request.
+
+
+The [fixed metadata helper](settings-reset-schema.md) now implements settings-reset-v1 and
+strict normal/recovery intent validation. It consumes the existing accepted envelope and row;
+root continues directly with owner reserve/apply/reconciliation, then production/wire/Health.

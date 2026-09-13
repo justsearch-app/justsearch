@@ -22,7 +22,15 @@ allthree cases green with PMD/format; negative1316 still catches lost detach not
 [Hosted diagnosis/local proof](evidence/C2/raw-detach-barrier.md). Fresh hosted success remains
 required. Windows-native success is not installed-v5 recovery proof.
 
+Latest hosted checkpoint ae46f6919: CI34778431996 all13 jobs and CLA34778430639 pass.
+The queue delay has cleared and public-claims/app-ui corrections are hosted green. This
+predates the fixed reset schema diff and does not satisfy installed-v5 recovery proof.
+
 **Immediate next items (2026-09-13): C2-6 recovery reset, then producer and Health migration.**
+The [fixed settings-reset-v1 helper](evidence/C2/settings-reset-schema.md) now passes47 cases,
+PMD/format and register gates. Negative1320 protects five binding/type assertions; negative1327
+protects four duplicate/trailing parser assertions. Independent correction review is clear. It supplies metadata only. Owner reservation/apply/reconciliation and the
+all-producer/Health/installed migration remain next.
 The fixed reset reservation/clear/restart mechanism passed independent review: preserve
 quarantine block through precommit failure, clear only after durable COMPLETE, then use the
 existing process-owned ordered restart. [Mechanism and required fault matrix](evidence/C2/C2-6-plan.md#2026-09-13-fixed-reset-reservation-and-recovery-clear-order).
