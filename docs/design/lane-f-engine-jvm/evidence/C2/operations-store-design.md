@@ -223,14 +223,16 @@ step 1, and "pointer swapped, successor missing" is unreachable.
 C2-6 is an app-api port owning the serialization of every production settings write,
 including install/import and runtime-spec writers. Its apply accepts expected revision,
 operation key and target UiSettings; D1 supplies already-prepared component installation.
-The implementation owns one apply mutex and a typed `SettingsCommitFence`: read current
-persisted revision, compare, prepare, arm the fence, commit and publish under the mutex.
+The implementation owns one apply mutex and a typed `SettingsCommitFence`. Install its
+attempt-scoped PREPARING guard before any copy, builder or preparation callback (the
+mutex is reentrant); read the persisted revision, compare, prepare, commit and publish
+under the mutex, promoting the same guard to COMMITTED at the replacement boundary.
 Release the physical mutex after publishing; the logical fence refuses further settings
 mutations until the runner durably records the result. Reject nested applies, including
 preparation callbacks that attempt to save settings. Holding only a controller lock
 cannot order the other production callers.
 
-All ordinary fallible work precedes persistence: copy settings, prepare serialized bytes
+All ordinary fallible preparation precedes settings-file replacement: copy settings, prepare serialized bytes
 and a non-null ResolvedConfig, and validate/compose each candidate. Split
 ConfigStoreRebuilder.rebuild into preparation and publication; remove its swallowed
 preparation failure. Retire the direct public save bypass once all writers use the owner.
@@ -238,16 +240,33 @@ Install-time/internal calls enter the same runner with a server operation key; t
 cannot call the raw port with a fabricated attempt. Catalog reconfigure reuses its
 existing runner-owned attempt, never creates a second row.
 
-The existing PersistedSettings envelope gains additive acceptedRevision and
-lastCommittedOperationKey fields (not UiSettings.version, the schema integer). Atomically
-replace the settings file with both fields and the prepared settings in the same write.
+The PersistedSettings envelope advances from schema2 to schema3, with schema2 added to
+readable legacy versions, and gains acceptedRevision and lastCommittedOperationKey
+(not UiSettings.version). An older binary must refuse the new envelope instead of
+silently stripping the witness. Valid metadata is zero/no key or positive revision/a
+canonical UUIDv7 key. Use a strict atomic replacement with forced temporary bytes and
+no fallback to ordinary move; unrelated AtomicFileWrites callers retain their contract.
+Replace the settings and witness in the same write. If a move reports failure, validate
+the actual file: exact new witness means committed, exact prior means precommit, any
+third/corrupt state is unresolved. Required proof covers process termination/restart;
+physical power-loss durability is not inferred from atomic rename or those tests.
 This replacement is the commitment point: only fully composed settings reach disk.
-After it, publish the prepared ConfigStore snapshot and prepared component handles;
-no validation or other ordinary fallible work belongs in publication. Recovery-cleared
+After it, swap the prepared ConfigStore snapshot and prepared component handles;
+no validation or other ordinary fallible work belongs in publication. Split ConfigStore
+swap from listener notification; notify outside the apply mutex while the logical
+guard still excludes another mutation. Recovery-cleared
 notifications currently called after UiSettingsStore.save must not turn a committed write
-into a reported failed apply. Fatal Error is not swallowed: restart reads the committed
-file and reconciles the row. D1 must prove its handle installation has this same property.
+into a reported failed apply. Fatal Error is not swallowed: explicitly request ordered restart before rethrowing
+any Error after the SQL marker or PREPARING guard is installed, since an Error on a
+request thread need not terminate the process. Retain the guard until boot reconciliation.
+Restart reads the committed file and reconciles the row. D1 must prove its handle installation has this same property.
 
+The runner validates its own live handle and conditionally writes the existing
+accepted_settings_revision column on a RUNNING SETTINGS_APPLY/RECONFIGURE row before
+calling the fixed owner; this nonterminal marker emits no completion callbacks. No
+generic OperationPreparation extension or second acceptance is required. Catalog reset
+overrides executeRecorded and reuses its dispatcher handle. Null marker at boot proves
+no settings preparation/effect. Derive the next revision with Math.addExact(storedExpected,1).
 Before file replacement, prepare an immutable receipt of key, next revision and result;
 mark it committed in runner-owned AttemptControl immediately after replacement succeeds.
 Only a committed receipt is an effect witness; arming the fence alone is not commitment.
@@ -266,7 +285,10 @@ settings mutation and request the existing ordered restart; never report FAILED 
 attempt a cross-file rollback of a committed apply. On boot the settings owner runs
 before the generic interactive-row rule: matching key and expectedRevision+1 completes
 the row; unchanged revision means interrupted before commitment and fails it; an advanced
-revision with another witness is an invariant violation and fails closed. A later
+revision with another witness is an invariant violation and fails closed. Armed rows
+whose settings were quarantined or have contradictory metadata remain unresolved,
+block settings mutation and surface recovery Health. Do not mark them FAILED or loop
+restarts against missing evidence; null-marker rows may safely fail precommit. A later
 settings commit may overwrite the witness only after the preceding outcome is durable.
 The witness is necessary because two stores cannot commit atomically; another journal,
 unbounded commit-key list and compensating file rollback are rejected. Holding the mutex
