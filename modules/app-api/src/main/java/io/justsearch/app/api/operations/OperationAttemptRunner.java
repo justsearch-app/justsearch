@@ -8,6 +8,7 @@ import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.app.api.settings.SettingsWitness;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
@@ -78,8 +79,10 @@ public interface OperationAttemptRunner {
    * Synchronous settings commitment inside this runner's currently executing body. The capability
    * must be live, issued by this runner, and used on that body thread. A retained handle cannot
    * race later terminal completion. Async producers perform this step before returning their stage.
+   * Expected must be the full witness read with the candidate's base snapshot; refreshing only
+   * its revision/key would allow a stale whole-document candidate to overwrite a newer change.
    */
-  OperationResult applySettings(OperationRecordHandle handle, long expectedRevision,
+  OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
       io.justsearch.app.api.UiSettings candidate);
 
   /** A scheduling, validation or admission refusal cannot overwrite work that already started. */

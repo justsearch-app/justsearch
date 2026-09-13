@@ -6,6 +6,7 @@ import static io.justsearch.app.services.settings.UiSettingsStore.PersistenceMod
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.StoreFormatVersions;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
@@ -29,7 +30,7 @@ class UiSettingsStoreRevisionTest {
     UiSettings next = store.load();
     next.setMaxTokens(200);
     next.setExcludePatterns(new java.util.ArrayList<>(java.util.List.of("original")));
-    var prepared = store.prepare(next, new UiSettingsStore.Witness(1, KEY));
+    var prepared = store.prepare(next, new SettingsWitness(1, KEY));
     next.setMaxTokens(300);
     next.getExcludePatterns().add("mutated-original");
     prepared.settings().setMaxTokens(400);
@@ -40,7 +41,7 @@ class UiSettingsStoreRevisionTest {
     var snapshot = new UiSettingsStore(READ_WRITE, path).inspect();
     assertEquals(200, snapshot.settings().getMaxTokens());
     assertEquals(java.util.List.of("original"), snapshot.settings().getExcludePatterns());
-    assertEquals(new UiSettingsStore.Witness(1, KEY), snapshot.witness());
+    assertEquals(new SettingsWitness(1, KEY), snapshot.witness());
     assertThrows(IllegalStateException.class, () -> store.save(initial));
     assertEquals(snapshot.witness(), store.inspect().witness());
   }
@@ -50,7 +51,7 @@ class UiSettingsStoreRevisionTest {
     Path path = directory.resolve("settings.json");
     Files.writeString(path, "{\"schemaVersion\":2,\"settings\":{\"contextLength\":4096}}");
     UiSettingsStore store = new UiSettingsStore(READ_WRITE, path);
-    assertEquals(new UiSettingsStore.Witness(0, null), store.inspect().witness());
+    assertEquals(new SettingsWitness(0, null), store.inspect().witness());
     assertEquals(4096, store.load().getContextLength());
     store.save(store.load());
     assertTrue(Files.readString(path).contains("\"schemaVersion\" : 3"));
@@ -111,7 +112,7 @@ class UiSettingsStoreRevisionTest {
     assertThrows(UnsupportedStoreVersionException.class, store::inspect);
     Files.writeString(path, "{\"schemaVersion\":1,\"maxTokens\":987}");
     assertEquals(987, store.inspect().settings().getMaxTokens());
-    assertEquals(new UiSettingsStore.Witness(0, null), store.inspect().witness());
+    assertEquals(new SettingsWitness(0, null), store.inspect().witness());
   }
 
   @Test
@@ -126,12 +127,12 @@ class UiSettingsStoreRevisionTest {
   void foreignPreparationAndReadOnlyModeCannotWrite() throws Exception {
     UiSettingsStore first = new UiSettingsStore(READ_WRITE, directory.resolve("a.json"));
     UiSettingsStore second = new UiSettingsStore(READ_WRITE, directory.resolve("b.json"));
-    var prepared = first.prepare(new UiSettings(), new UiSettingsStore.Witness(1, KEY));
+    var prepared = first.prepare(new UiSettings(), new SettingsWitness(1, KEY));
     assertThrows(IllegalArgumentException.class, () -> second.replacePrepared(prepared));
     assertFalse(Files.exists(second.settingsPath()));
     UiSettingsStore memory = new UiSettingsStore(IN_MEMORY, directory.resolve("memory.json"));
     assertThrows(IllegalStateException.class,
-        () -> memory.prepare(new UiSettings(), new UiSettingsStore.Witness(1, KEY)));
+        () -> memory.prepare(new UiSettings(), new SettingsWitness(1, KEY)));
     memory.save(new UiSettings());
     assertFalse(Files.exists(memory.settingsPath()));
   }
@@ -143,10 +144,10 @@ class UiSettingsStoreRevisionTest {
     UiSettingsStore store = new UiSettingsStore(READ_WRITE, path);
     UiSettings recovered = store.load();
     store.setOnRecoveryCleared(() -> { throw new IllegalStateException("listener"); });
-    var prepared = store.prepare(recovered, new UiSettingsStore.Witness(1, KEY));
+    var prepared = store.prepare(recovered, new SettingsWitness(1, KEY));
     store.replacePrepared(prepared);
-    assertEquals(new UiSettingsStore.Witness(1, KEY), store.inspect().witness());
+    assertEquals(new SettingsWitness(1, KEY), store.inspect().witness());
     assertThrows(IllegalStateException.class, store::notifyRecoveryCleared);
-    assertEquals(new UiSettingsStore.Witness(1, KEY), store.inspect().witness());
+    assertEquals(new SettingsWitness(1, KEY), store.inspect().witness());
   }
 }

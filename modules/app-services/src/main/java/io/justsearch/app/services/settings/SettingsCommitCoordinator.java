@@ -8,6 +8,7 @@ import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ConfigChangedEvent;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -34,11 +35,11 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private static final class SettingsCommitFence implements Reservation {
     private final long id;
     private final String key;
-    private final UiSettingsStore.Witness prior;
+    private final SettingsWitness prior;
     private Phase phase = Phase.PREPARING;
     private boolean preparationStarted;
 
-    private SettingsCommitFence(long id, String key, UiSettingsStore.Witness prior) {
+    private SettingsCommitFence(long id, String key, SettingsWitness prior) {
       this.id = id; this.key = key; this.prior = prior;
     }
   }
@@ -79,23 +80,24 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   @Override public CompletionStage<RecoveryIssue> recoveryIssue() { return recoveryIssue.minimalCompletionStage(); }
 
   @Override
-  public Reservation reserve(long id, String key, long expectedRevision) {
+  public Reservation reserve(long id, String key, SettingsWitness expected) {
     if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
     try {
       if (!inspected || blocked) throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery is unresolved", Map.of());
       if (fence != null) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
       if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
       OperationKeys.timestampMillis(key);
-      if (id <= 0 || expectedRevision < 0 || expectedRevision == Long.MAX_VALUE) {
+      Objects.requireNonNull(expected, "expected settings witness");
+      if (id <= 0 || expected.acceptedRevision() == Long.MAX_VALUE) {
         throw new IllegalArgumentException("Invalid settings reservation");
       }
-      final UiSettingsStore.Witness prior;
+      final SettingsWitness prior;
       try { prior = store.inspect().witness(); }
       catch (RuntimeException failure) {
         block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, id));
         throw refused("SETTINGS_RECOVERY_REQUIRED", "The settings revision cannot be verified", Map.of());
       }
-      if (prior.acceptedRevision() != expectedRevision) {
+      if (!prior.equals(expected)) {
         throw refused("VERSION_CONFLICT", "Settings changed since this candidate was read",
             Map.of("currentRevision", prior.acceptedRevision()));
       }
@@ -117,14 +119,14 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       SettingsCommitFence active = requireFence(reservation);
       if (active.preparationStarted) throw new IllegalStateException("Settings preparation already started");
       active.preparationStarted = true;
-      var next = new UiSettingsStore.Witness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
+      var next = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
       var prepared = store.prepare(candidate, next);
       ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(prepared.settings()), "Prepared config");
       var receipt = new Receipt(active.key, next.acceptedRevision(), prepareResponse.apply(prepared.settings()));
       try {
         replacement.replace(prepared);
       } catch (IOException | RuntimeException failure) {
-        final UiSettingsStore.Witness observed;
+        final SettingsWitness observed;
         try { observed = store.inspect().witness(); }
         catch (RuntimeException inspectionFailure) {
           if (failure != inspectionFailure) failure.addSuppressed(inspectionFailure);
@@ -214,7 +216,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         block(new RecoveryIssue(RecoveryReason.PERSISTENCE_DISABLED, row.id()));
         return;
       }
-      final UiSettingsStore.Witness witness;
+      final SettingsWitness witness;
       try { witness = store.inspect().witness(); }
       catch (RuntimeException failure) {
         block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));

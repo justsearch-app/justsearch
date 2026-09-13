@@ -67,7 +67,8 @@ public interface SettingsCommitOwner {
     void uncertain();
   }
 
-  Reservation reserve(long id, String key, long expectedRevision);
+  /** Compare both persisted witness fields before the runner may arm its numeric SQL marker. */
+  Reservation reserve(long id, String key, SettingsWitness expected);
 
   /** Prepare, replace and publish synchronously; arbitrary notifications run outside owner locks. */
   void apply(Reservation reservation, UiSettings candidate, AttemptControl control);

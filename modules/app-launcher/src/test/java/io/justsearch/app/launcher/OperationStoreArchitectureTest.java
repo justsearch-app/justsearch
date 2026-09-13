@@ -15,6 +15,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.settings.SettingsWitness;
 import org.junit.jupiter.api.Test;
 
 /** C2's database has one implementation; producers depend on its app-api port. */
@@ -101,7 +102,9 @@ class OperationStoreArchitectureTest {
   }
 
   static final class UnauthorizedSettingsOwner {
-    void reserve(io.justsearch.app.api.settings.SettingsCommitOwner owner) { owner.reserve(1, "foreign", 0); }
+    void reserve(io.justsearch.app.api.settings.SettingsCommitOwner owner) {
+      owner.reserve(1, "foreign", new SettingsWitness(0, null));
+    }
   }
 
   static final class UnauthorizedSettingsReceipt {

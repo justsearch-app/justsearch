@@ -1,5 +1,9 @@
 # C2-6: accepted settings revision implementation plan
 
+2026-09-13 implementation checkpoint: [typed witness foundation](settings-witness.md) is
+locally verified; confirmed recovery reset, producer composition, Health and public wire
+projection remain the next required cuts. This does not close C2-6.
+
 2026-09-13 investigation at e7edaf503 (unchanged production at028be4ac8).
 The governing protocol remains [operations-store-design §1.8](operations-store-design.md#18-the-accepted-settings-revision-port-amended-2026-09-12).
 This record is implementation planning, not implementation or verification proof.

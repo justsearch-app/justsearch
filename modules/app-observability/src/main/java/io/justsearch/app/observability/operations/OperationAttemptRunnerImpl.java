@@ -6,6 +6,7 @@ import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationReceipt;
@@ -283,7 +284,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   @Override
   public OperationResult applySettings(OperationRecordHandle handle,
-      long expectedRevision, io.justsearch.app.api.UiSettings candidate) {
+      SettingsWitness expected, io.justsearch.app.api.UiSettings candidate) {
     if (settingsOwner == null) throw new IllegalStateException("Settings owner is not composed");
     if (!(handle instanceof OperationAttemptRunnerImpl.Control control)
         || active.get(control.id) != control || control.bodyThread != Thread.currentThread()
@@ -294,7 +295,9 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (row.state() != OperationState.RUNNING || !settingsKind(row.descriptor().kind())) {
       throw new IllegalStateException("Settings commitment refused for this attempt");
     }
-    if (expectedRevision < 0 || expectedRevision == Long.MAX_VALUE) {
+    Objects.requireNonNull(expected, "expected settings witness");
+    long expectedRevision = expected.acceptedRevision();
+    if (expectedRevision == Long.MAX_VALUE) {
       throw new IllegalArgumentException("Invalid expected settings revision");
     }
     if (!control.settingsStarted.compareAndSet(false, true)) {
@@ -303,7 +306,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     control.settingsExpected = expectedRevision;
     try {
       var reservation = Objects.requireNonNull(
-          settingsOwner.reserve(control.id, control.key, expectedRevision), "Settings reservation");
+          settingsOwner.reserve(control.id, control.key, expected), "Settings reservation");
       if (!store.armSettingsRevision(control.id, expectedRevision)) {
         throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
       }

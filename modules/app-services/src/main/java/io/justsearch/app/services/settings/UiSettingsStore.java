@@ -2,7 +2,7 @@
 package io.justsearch.app.services.settings;
 
 import io.justsearch.app.api.UiSettings;
-import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
@@ -127,22 +127,12 @@ public final class UiSettingsStore {
     this.onRecoveryCleared = r;
   }
 
-  /** Revision and commit identity read from the same envelope as the settings payload. */
-  public record Witness(long acceptedRevision, String lastCommittedOperationKey) {
-    public Witness {
-      if (acceptedRevision < 0 || (acceptedRevision == 0 && lastCommittedOperationKey != null)) {
-        throw new IllegalArgumentException("Invalid settings revision witness");
-      }
-      if (acceptedRevision > 0) OperationKeys.timestampMillis(lastCommittedOperationKey);
-    }
-  }
-
-  public record Snapshot(UiSettings settings, Witness witness) {}
+  public record Snapshot(UiSettings settings, SettingsWitness witness) {}
 
   /** Reads without quarantine/default recovery, for commitment classification by the apply owner. */
   public Snapshot inspect() {
     if (mode == PersistenceMode.IN_MEMORY) {
-      return new Snapshot(new UiSettings(), new Witness(0, null));
+      return new Snapshot(new UiSettings(), new SettingsWitness(0, null));
     }
     if (!Files.notExists(settingsFile)) {
       // Unknown accessibility is not absence. Parsing fails closed if the file cannot be read.
@@ -164,7 +154,7 @@ public final class UiSettingsStore {
         throw new UncheckedIOException("Cannot inspect settings quarantine evidence", failure);
       }
     }
-    return new Snapshot(new UiSettings(), new Witness(0, null));
+    return new Snapshot(new UiSettings(), new SettingsWitness(0, null));
   }
 
   private Snapshot parseOrThrow() {
@@ -202,7 +192,7 @@ public final class UiSettingsStore {
       if (settings == null) {
         throw new CorruptDurableStoreException("ui-settings", "settings payload is missing");
       }
-      Witness witness = new Witness(0, null);
+      SettingsWitness witness = new SettingsWitness(0, null);
       if (resolvedVersion < 3 && (root.has("acceptedRevision") || root.has("lastCommittedOperationKey"))) {
         throw new CorruptDurableStoreException("ui-settings", "legacy schema cannot carry a revision witness");
       }
@@ -213,7 +203,7 @@ public final class UiSettingsStore {
             || key == null || !(key.isNull() || key.isTextual())) {
           throw new CorruptDurableStoreException("ui-settings", "invalid revision witness fields");
         }
-        witness = new Witness(revision.longValue(), key.isNull() ? null : key.asText());
+        witness = new SettingsWitness(revision.longValue(), key.isNull() ? null : key.asText());
       }
       return new Snapshot(migrate(settings, resolvedVersion), witness);
     } catch (CorruptDurableStoreException
@@ -284,10 +274,10 @@ public final class UiSettingsStore {
   public static final class PreparedSettings {
     private final UiSettingsStore owner;
     private final UiSettings settings;
-    private final Witness witness;
+    private final SettingsWitness witness;
     private final byte[] bytes;
 
-    private PreparedSettings(UiSettingsStore owner, UiSettings settings, Witness witness, byte[] bytes) {
+    private PreparedSettings(UiSettingsStore owner, UiSettings settings, SettingsWitness witness, byte[] bytes) {
       this.owner = owner;
       this.settings = settings;
       this.witness = witness;
@@ -295,10 +285,10 @@ public final class UiSettingsStore {
     }
 
     public UiSettings settings() { return copy(settings); }
-    public Witness witness() { return witness; }
+    public SettingsWitness witness() { return witness; }
   }
 
-  public PreparedSettings prepare(UiSettings settings, Witness witness) {
+  public PreparedSettings prepare(UiSettings settings, SettingsWitness witness) {
     if (!mode.isWritable()) throw new IllegalStateException("Settings store is read-only");
     UiSettings candidate = copy(Objects.requireNonNull(settings, "settings"));
     Objects.requireNonNull(witness, "witness");
@@ -334,7 +324,7 @@ public final class UiSettingsStore {
   public void save(UiSettings settings) {
     if (settings == null || mode == PersistenceMode.IN_MEMORY) return;
     // Once recorded settings exist, this legacy path must never erase their witness.
-    Witness witness = inspect().witness();
+    SettingsWitness witness = inspect().witness();
     if (witness.acceptedRevision() != 0) {
       throw new IllegalStateException("Recorded settings require the accepted-revision owner");
     }

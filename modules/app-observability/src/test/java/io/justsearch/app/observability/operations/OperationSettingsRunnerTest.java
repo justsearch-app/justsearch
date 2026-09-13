@@ -15,6 +15,7 @@ import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.core.context.EngineContext;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -38,6 +39,7 @@ final class OperationSettingsRunnerTest {
   private static final Set<OperationKind> SETTINGS_KINDS =
       Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE);
   private static final UiSettings CANDIDATE = new UiSettings();
+  private static final String PRIOR_KEY = "0194f72c-0000-7000-8000-000000000001";
 
   @TempDir Path temp;
 
@@ -49,7 +51,7 @@ final class OperationSettingsRunnerTest {
       var request = request(OperationKind.SETTINGS_APPLY);
       var attempt = runner.accept(request);
 
-      var result = runner.start(attempt, handle -> runner.applySettings(handle, 4, CANDIDATE)
+      var result = runner.start(attempt, handle -> runner.applySettings(handle, witness(4), CANDIDATE)
           .success() ? OperationExecution.finished(OperationResult.success("handler"))
               : OperationExecution.finished(OperationResult.failure("unexpected")));
 
@@ -87,18 +89,18 @@ final class OperationSettingsRunnerTest {
         assertThrows(ClassCastException.class,
             () -> SettingsCommitOwner.AttemptControl.class.cast(handle));
         assertThrows(IllegalArgumentException.class,
-            () -> firstRunner.applySettings(foreign.get(), 0, CANDIDATE));
+            () -> firstRunner.applySettings(foreign.get(), witness(0), CANDIDATE));
         OperationRecordHandle fabricated = new OperationRecordHandle() {
           @Override public long id() { return handle.id(); }
           @Override public String key() { return handle.key(); }
           @Override public void checkpoint(String cursor, long completed, long failed) {}
         };
         assertThrows(IllegalArgumentException.class,
-            () -> firstRunner.applySettings(fabricated, 0, CANDIDATE));
+            () -> firstRunner.applySettings(fabricated, witness(0), CANDIDATE));
         AtomicReference<Throwable> offThreadFailure = new AtomicReference<>();
         Thread thread = new Thread(() -> {
           try {
-            firstRunner.applySettings(handle, 0, CANDIDATE);
+            firstRunner.applySettings(handle, witness(0), CANDIDATE);
           } catch (Throwable failure) {
             offThreadFailure.set(failure);
           }
@@ -108,11 +110,11 @@ final class OperationSettingsRunnerTest {
         catch (InterruptedException failure) { Thread.currentThread().interrupt(); throw new AssertionError(failure); }
         assertFalse(thread.isAlive(), "Off-thread refusal must not wait for body completion");
         assertInstanceOf(IllegalArgumentException.class, offThreadFailure.get());
-        firstRunner.applySettings(handle, 0, CANDIDATE);
+        firstRunner.applySettings(handle, witness(0), CANDIDATE);
         return OperationExecution.finished(OperationResult.success("done"));
       });
       assertThrows(IllegalArgumentException.class,
-          () -> firstRunner.applySettings(retained.get(), 0, CANDIDATE));
+          () -> firstRunner.applySettings(retained.get(), witness(0), CANDIDATE));
       secondFuture.complete(OperationResult.success("done"));
       assertEquals(OperationState.COMPLETE,
           second.completion().toCompletableFuture().join().state());
@@ -127,9 +129,9 @@ final class OperationSettingsRunnerTest {
       var request = request(OperationKind.SETTINGS_APPLY);
       var attempt = runner.accept(request);
       var result = runner.start(attempt, handle -> {
-        runner.applySettings(handle, 2, CANDIDATE);
+        runner.applySettings(handle, witness(2), CANDIDATE);
         assertThrows(IllegalStateException.class,
-            () -> runner.applySettings(handle, 2, CANDIDATE));
+            () -> runner.applySettings(handle, witness(2), CANDIDATE));
         return OperationExecution.finished(OperationResult.success("done"));
       });
       assertEquals(OperationState.COMPLETE, result.completion().toCompletableFuture().join().state());
@@ -153,7 +155,7 @@ final class OperationSettingsRunnerTest {
       var runner = runner(store, owner);
       var attempt = runner.accept(request);
       runner.start(attempt, handle -> {
-        runner.applySettings(handle, 10, CANDIDATE);
+        runner.applySettings(handle, witness(10), CANDIDATE);
         return OperationExecution.finished(OperationResult.success("done"));
       });
       assertEquals(1, owner.applyCalls);
@@ -179,7 +181,7 @@ final class OperationSettingsRunnerTest {
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(IllegalStateException.class, () -> runner.start(attempt,
           handle -> {
-            runner.applySettings(handle, 7, CANDIDATE);
+            runner.applySettings(handle, witness(7), CANDIDATE);
             return OperationExecution.finished(OperationResult.success("unreachable"));
           }));
       var row = store.find(attempt.accepted().key()).orElseThrow();
@@ -197,7 +199,7 @@ final class OperationSettingsRunnerTest {
       var runner = runner(store, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       var result = runner.start(attempt, handle -> {
-        runner.applySettings(handle, 8, CANDIDATE);
+        runner.applySettings(handle, witness(8), CANDIDATE);
         return OperationExecution.finished(OperationResult.success("unreachable"));
       });
       assertEquals(OperationState.COMPLETE, result.record().state());
@@ -228,7 +230,7 @@ final class OperationSettingsRunnerTest {
       if (outcome == PendingSettingsOutcome.UNCERTAIN) {
         assertThrows(RuntimeException.class, () -> runner.start(attempt, handle -> {
           try {
-            runner.applySettings(handle, 12, CANDIDATE);
+            runner.applySettings(handle, witness(12), CANDIDATE);
           } catch (RuntimeException swallowed) {
             // The pending adapter stage cannot turn an uncertain owner into success.
           }
@@ -239,7 +241,7 @@ final class OperationSettingsRunnerTest {
       } else {
         OperationAttemptRunner.Result result = assertDoesNotThrow(() -> runner.start(attempt, handle -> {
           try {
-            runner.applySettings(handle, 12, CANDIDATE);
+            runner.applySettings(handle, witness(12), CANDIDATE);
           } catch (RuntimeException swallowed) {
             assertEquals(PendingSettingsOutcome.FAILED, outcome);
           }
@@ -271,7 +273,7 @@ final class OperationSettingsRunnerTest {
               + "BEGIN SELECT RAISE(ABORT, 'fixture'); END");
       assertThrows(OperationStoreException.class, () -> runner.start(attempt,
           handle -> {
-            runner.applySettings(handle, 3, CANDIDATE);
+            runner.applySettings(handle, witness(3), CANDIDATE);
             return OperationExecution.finished(OperationResult.success("unreachable"));
           }));
       assertEquals(OperationState.FAILED, store.find(attempt.accepted().key()).orElseThrow().state());
@@ -296,7 +298,7 @@ final class OperationSettingsRunnerTest {
           "CREATE TRIGGER refuse_settings_terminal BEFORE UPDATE OF state ON operations "
               + "WHEN NEW.state = '" + terminal + "' BEGIN SELECT RAISE(ABORT, 'fixture'); END");
       assertThrows(RuntimeException.class, () -> runner.start(attempt, handle -> {
-        runner.applySettings(handle, 1, CANDIDATE);
+        runner.applySettings(handle, witness(1), CANDIDATE);
         return OperationExecution.finished(OperationResult.success("unreachable"));
       }));
       assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
@@ -315,7 +317,7 @@ final class OperationSettingsRunnerTest {
       var runner = runner(store, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(AssertionError.class, () -> runner.start(attempt, handle -> {
-        runner.applySettings(handle, 2, CANDIDATE);
+        runner.applySettings(handle, witness(2), CANDIDATE);
         return OperationExecution.finished(OperationResult.success("unreachable"));
       }));
       assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
@@ -332,7 +334,7 @@ final class OperationSettingsRunnerTest {
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(RuntimeException.class, () -> runner.start(attempt, handle -> {
         try {
-          runner.applySettings(handle, 6, CANDIDATE);
+          runner.applySettings(handle, witness(6), CANDIDATE);
         } catch (RuntimeException swallowed) {
           // The handler cannot turn an owner uncertainty into a terminal outcome.
         }
@@ -372,7 +374,7 @@ final class OperationSettingsRunnerTest {
       var runner = runner(store, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(IllegalStateException.class, () -> runner.start(attempt, handle -> {
-        assertThrows(AssertionError.class, () -> runner.applySettings(handle, 0, CANDIDATE));
+        assertThrows(AssertionError.class, () -> runner.applySettings(handle, witness(0), CANDIDATE));
         assertEquals(1, owner.retainCalls, "Restart must be requested even if the handler does not return promptly");
         return OperationExecution.finished(OperationResult.success("swallowed fatal"));
       }));
@@ -391,7 +393,7 @@ final class OperationSettingsRunnerTest {
       var runner = runner(store, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       var result = runner.start(attempt, handle -> {
-        try { runner.applySettings(handle, 4, CANDIDATE); }
+        try { runner.applySettings(handle, witness(4), CANDIDATE); }
         catch (SettingsCommitOwner.Refused refused) { if (!swallowed) throw refused; }
         return OperationExecution.finished(OperationResult.success("wrong success"));
       });
@@ -413,7 +415,7 @@ final class OperationSettingsRunnerTest {
       var runner = runner(store, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       var fatal = assertThrows(AssertionError.class, () -> runner.start(attempt, handle -> {
-        runner.applySettings(handle, 0, CANDIDATE);
+        runner.applySettings(handle, witness(0), CANDIDATE);
         return OperationExecution.finished(OperationResult.success("unreachable"));
       }));
       assertEquals("fatal after reservation", fatal.getMessage());
@@ -444,7 +446,7 @@ final class OperationSettingsRunnerTest {
       var runner = runner(store, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(IllegalStateException.class, () -> runner.start(attempt, handle -> {
-        runner.applySettings(handle, 0, CANDIDATE);
+        runner.applySettings(handle, witness(0), CANDIDATE);
         return OperationExecution.finished(OperationResult.success("unreachable"));
       }));
       assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
@@ -463,7 +465,7 @@ final class OperationSettingsRunnerTest {
           Set.of(OperationKind.INGEST, OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE), owner);
       runner.reconcile(OperationKind.INGEST, row -> new OperationAttemptRunner.Reconciliation.Resume(handle -> {
         var child = runner.accept(request(OperationKind.SETTINGS_APPLY));
-        var result = runner.start(child, childHandle -> OperationExecution.finished(runner.applySettings(childHandle, 0, CANDIDATE)));
+        var result = runner.start(child, childHandle -> OperationExecution.finished(runner.applySettings(childHandle, witness(0), CANDIDATE)));
         assertEquals(OperationState.COMPLETE, result.record().state());
         return OperationExecution.finished(OperationResult.success("resumed owner"));
       }));
@@ -471,9 +473,9 @@ final class OperationSettingsRunnerTest {
       var parent = runner.accept(request(OperationKind.OPERATION));
       var pending = new CompletableFuture<OperationResult>();
       runner.start(parent, handle -> {
-        assertThrows(IllegalStateException.class, () -> runner.applySettings(handle, 1, CANDIDATE));
+        assertThrows(IllegalStateException.class, () -> runner.applySettings(handle, witness(1), CANDIDATE));
         var child = runner.accept(request(OperationKind.SETTINGS_APPLY));
-        var result = runner.start(child, childHandle -> OperationExecution.finished(runner.applySettings(childHandle, 1, CANDIDATE)));
+        var result = runner.start(child, childHandle -> OperationExecution.finished(runner.applySettings(childHandle, witness(1), CANDIDATE)));
         assertEquals(OperationState.COMPLETE, result.record().state());
         return new OperationExecution(OperationResult.success("parent still running"), pending);
       });
@@ -544,6 +546,10 @@ final class OperationSettingsRunnerTest {
     return new OperationDescriptor(kind, "core.settings", "{}");
   }
 
+  private static SettingsWitness witness(long revision) {
+    return revision == 0 ? new SettingsWitness(0, null) : new SettingsWitness(revision, PRIOR_KEY);
+  }
+
   private static EngineContext context() {
     return new EngineContext(EngineContext.ClientKind.INTERNAL, "settings-test", Optional.empty(),
         Optional.empty(), "system", "SYSTEM_INTERNAL", EngineContext.Survival.INTERACTIVE,
@@ -591,11 +597,11 @@ final class OperationSettingsRunnerTest {
     }
 
     @Override
-    public Reservation reserve(long id, String key, long expectedRevision) {
+    public Reservation reserve(long id, String key, SettingsWitness expected) {
       events.add("reserve");
       keys.put(id, key);
       markerObservations.add(store.find(key).orElseThrow().expectedSettingsRevision());
-      return new Token(id, key, expectedRevision);
+      return new Token(id, key, expected);
     }
 
     @Override
@@ -606,7 +612,7 @@ final class OperationSettingsRunnerTest {
       markerObservations.add(store.find(token.key()).orElseThrow().expectedSettingsRevision());
       switch (mode) {
         case TYPED_REFUSAL -> throw new Refused(OperationResult.failure("Revision changed", "VERSION_CONFLICT",
-            Map.of("currentRevision", token.expectedRevision() + 1), false));
+            Map.of("currentRevision", token.expected().acceptedRevision() + 1), false));
         case NULL_RECEIPT -> control.committed(null);
         case NO_RECEIPT -> { /* Simulate a defective owner returning without a commitment verdict. */ }
         case THROW_BEFORE_COMMIT -> throw new IllegalStateException("before commit");
@@ -616,11 +622,11 @@ final class OperationSettingsRunnerTest {
           throw new IllegalStateException("uncertain owner");
         }
         case COMMIT_THEN_THROW -> {
-          control.committed(new Receipt(token.key(), Math.addExact(token.expectedRevision(), 1),
+          control.committed(new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1),
               OperationResult.success("Prepared settings result", Map.of("restartScheduled", true, "ui", Map.of("theme", "dark")))));
           throw new IllegalStateException("after commit");
         }
-        case COMMIT -> control.committed(new Receipt(token.key(), Math.addExact(token.expectedRevision(), 1),
+        case COMMIT -> control.committed(new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1),
               OperationResult.success("Prepared settings result", Map.of("restartScheduled", true, "ui", Map.of("theme", "dark")))));
       }
     }
@@ -654,6 +660,6 @@ final class OperationSettingsRunnerTest {
       return new OperationAttemptRunner.Reconciliation.Wait();
     }
 
-    private record Token(long id, String key, long expectedRevision) implements Reservation {}
+    private record Token(long id, String key, SettingsWitness expected) implements Reservation {}
   }
 }

@@ -13,6 +13,7 @@ import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
@@ -58,14 +59,14 @@ final class SettingsCommitCoordinatorTest {
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
 
       var result = runner.start(attempt, handle -> {
-        runner.applySettings(handle, 0, candidate);
+        runner.applySettings(handle, currentWitness(settings), candidate);
         return OperationExecution.finished(OperationResult.success("handler"));
       });
 
       assertEquals(OperationState.COMPLETE, result.record().state());
       assertTrue(Files.exists(settingsPath));
       var snapshot = settings.inspect();
-      assertEquals(new UiSettingsStore.Witness(1, attempt.accepted().key()), snapshot.witness());
+      assertEquals(new SettingsWitness(1, attempt.accepted().key()), snapshot.witness());
       assertEquals("dark", snapshot.settings().getTheme());
       assertEquals("[\"*.tmp\"]", config.get().ui().excludePatterns());
       assertEquals("prepared", result.response().message());
@@ -86,21 +87,36 @@ final class SettingsCommitCoordinatorTest {
       var firstRequest = request(OperationKind.SETTINGS_APPLY);
       var first = runner.accept(firstRequest);
       runner.start(first, handle -> OperationExecution.finished(
-          runner.applySettings(handle, 0, candidate("dark", List.of()))));
+          runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()))));
       var second = runner.accept(request(OperationKind.SETTINGS_APPLY));
       runner.start(second, handle -> OperationExecution.finished(
-          runner.applySettings(handle, 1, candidate("light", List.of()))));
+          runner.applySettings(handle, currentWitness(settings), candidate("light", List.of()))));
+
+      SettingsWitness committedWitness = currentWitness(settings);
+      var replacement = runner.accept(request(OperationKind.SETTINGS_APPLY));
+      var replacementKey = OperationKeys.generate(CLOCK);
+      assertNotEquals(committedWitness.lastCommittedOperationKey(), replacementKey);
+      var pairRefusal = runner.start(replacement, handle -> OperationExecution.finished(
+          runner.applySettings(handle,
+              new SettingsWitness(committedWitness.acceptedRevision(), replacementKey),
+              candidate("replacement", List.of()))));
+      assertFalse(pairRefusal.response().success());
+      assertEquals(OperationState.FAILED, pairRefusal.record().state());
+      assertEquals("VERSION_CONFLICT", pairRefusal.response().errorCode().orElseThrow());
+      assertNull(operations.find(replacement.accepted().key()).orElseThrow().expectedSettingsRevision());
+      assertEquals(committedWitness, settings.inspect().witness());
 
       var retry = runner.start(runner.accept(firstRequest), handle -> {
         throw new AssertionError("A recorded outcome must not execute its body again");
       });
       assertEquals(OperationState.COMPLETE, retry.record().state());
+      assertEquals(first.accepted().key(), retry.response().structuredData().get("operationKey"));
       assertEquals(1L, retry.response().structuredData().get("acceptedRevision"));
-      assertEquals(new UiSettingsStore.Witness(2, second.accepted().key()), settings.inspect().witness());
+      assertEquals(new SettingsWitness(2, second.accepted().key()), settings.inspect().witness());
       assertEquals("light", settings.inspect().settings().getTheme());
       var stale = runner.accept(request(OperationKind.SETTINGS_APPLY));
       var refusal = runner.start(stale, handle -> OperationExecution.finished(
-          runner.applySettings(handle, 0, candidate("dark", List.of()))));
+          runner.applySettings(handle, new SettingsWitness(0, null), candidate("dark", List.of()))));
       assertEquals("VERSION_CONFLICT", refusal.response().errorCode().orElseThrow());
       assertEquals(OperationState.FAILED, refusal.record().state());
       assertNull(refusal.record().expectedSettingsRevision());
@@ -124,7 +140,7 @@ final class SettingsCommitCoordinatorTest {
       var runner = runner(operations, owner);
       var first = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(IllegalStateException.class, () -> runner.start(first, handle -> {
-        runner.applySettings(handle, 0, candidate("dark", List.of()));
+        runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()));
         return OperationExecution.finished(OperationResult.success("unreachable"));
       }));
       assertEquals(OperationState.FAILED, operations.find(first.accepted().key()).orElseThrow().state());
@@ -133,7 +149,7 @@ final class SettingsCommitCoordinatorTest {
 
       var second = runner.accept(request(OperationKind.SETTINGS_APPLY));
       var committed = runner.start(second, handle -> {
-        runner.applySettings(handle, 0, candidate("dark", List.of()));
+        runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()));
         return OperationExecution.finished(OperationResult.success("done"));
       });
       assertEquals(OperationState.COMPLETE, committed.record().state());
@@ -150,19 +166,20 @@ final class SettingsCommitCoordinatorTest {
       owner.inspectRecovery(List.of());
       var first = row(operations, OperationKind.SETTINGS_APPLY);
       var second = row(operations, OperationKind.SETTINGS_APPLY);
-      owner.reserve(first.id(), first.key(), 0);
+      owner.reserve(first.id(), first.key(), new SettingsWitness(0, null));
       var occupied = assertThrows(SettingsCommitOwner.Refused.class,
-          () -> owner.reserve(second.id(), second.key(), 0));
+          () -> owner.reserve(second.id(), second.key(), new SettingsWitness(0, null)));
       assertEquals("RECONFIGURE_IN_PROGRESS", occupied.response().errorCode().orElseThrow());
       assertNull(operations.find(first.key()).orElseThrow().expectedSettingsRevision());
       assertNull(operations.find(second.key()).orElseThrow().expectedSettingsRevision());
       owner.releaseAfterTerminal(first.id());
 
+      var staleWitness = currentWitness(settings);
       UiSettingsStore.PreparedSettings prepared = settings.prepare(candidate("old", List.of()),
-          new UiSettingsStore.Witness(1, OperationKeys.generate(CLOCK)));
+          new SettingsWitness(1, OperationKeys.generate(CLOCK)));
       settings.replacePrepared(prepared);
       var stale = assertThrows(SettingsCommitOwner.Refused.class,
-          () -> owner.reserve(second.id(), second.key(), 0));
+          () -> owner.reserve(second.id(), second.key(), staleWitness));
       assertEquals("VERSION_CONFLICT", stale.response().errorCode().orElseThrow());
       assertNull(operations.find(second.key()).orElseThrow().expectedSettingsRevision());
     }
@@ -196,13 +213,13 @@ final class SettingsCommitCoordinatorTest {
       Thread writer = new Thread(() -> {
         try {
           runner.start(first, handle -> OperationExecution.finished(
-              runner.applySettings(handle, 0, candidate("dark", List.of()))));
+              runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()))));
         } catch (Throwable failure) { firstFailure.set(failure); }
       }, "settings-transaction-writer");
       Thread contender = new Thread(() -> {
         try {
           secondResult.set(runner.start(second, handle -> OperationExecution.finished(
-              runner.applySettings(handle, 0, candidate("light", List.of())))));
+              runner.applySettings(handle, currentWitness(settings), candidate("light", List.of())))));
         } catch (Throwable failure) { secondFailure.set(failure); }
         finally { refused.countDown(); }
       }, "settings-transaction-contender");
@@ -224,7 +241,7 @@ final class SettingsCommitCoordinatorTest {
       assertNull(secondFailure.get());
       assertEquals("RECONFIGURE_IN_PROGRESS", secondResult.get().response().errorCode().orElseThrow());
       assertNull(secondResult.get().record().expectedSettingsRevision());
-      assertEquals(new UiSettingsStore.Witness(1, first.accepted().key()), settings.inspect().witness());
+      assertEquals(new SettingsWitness(1, first.accepted().key()), settings.inspect().witness());
     }
   }
 
@@ -245,13 +262,13 @@ final class SettingsCommitCoordinatorTest {
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       key = attempt.accepted().key();
       assertThrows(AssertionError.class, () -> runner.start(attempt, handle -> OperationExecution.finished(
-          runner.applySettings(handle, 0, candidate("dark", List.of())))));
+          runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of())))));
       assertEquals(1, restarts.get());
       assertEquals(OperationState.RUNNING, operations.find(key).orElseThrow().state());
       assertEquals(0L, operations.find(key).orElseThrow().expectedSettingsRevision());
       assertFalse(Files.exists(path));
       assertThrows(SettingsCommitOwner.Refused.class,
-          () -> owner.reserve(999, OperationKeys.generate(CLOCK), 0));
+          () -> owner.reserve(999, OperationKeys.generate(CLOCK), new SettingsWitness(0, null)));
     }
     try (var reopened = new SqliteOperationStore(db)) {
       var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, path);
@@ -287,7 +304,7 @@ final class SettingsCommitCoordinatorTest {
       Thread probe = new Thread(() -> {
         try {
           ownerRef.get().reconcile(probeRow);
-          ownerRef.get().reserve(100, OperationKeys.generate(CLOCK), 1);
+          ownerRef.get().reserve(100, OperationKeys.generate(CLOCK), currentWitness(settings));
         } catch (Throwable failure) {
           notificationProbe.set(failure);
         } finally {
@@ -302,7 +319,7 @@ final class SettingsCommitCoordinatorTest {
       }
     });
     owner.inspectRecovery(List.of());
-    var reservation = owner.reserve(1, OperationKeys.generate(CLOCK), 0);
+    var reservation = owner.reserve(1, OperationKeys.generate(CLOCK), new SettingsWitness(0, null));
     reservationRef.set(reservation);
     var control = new RecordingControl();
     owner.apply(reservation, candidate("dark", List.of()), control);
@@ -332,7 +349,7 @@ final class SettingsCommitCoordinatorTest {
       Thread probeThread = new Thread(() -> {
         try {
           owner.reconcile(probeRow);
-          owner.reserve(7, OperationKeys.generate(CLOCK), 0);
+          owner.reserve(7, OperationKeys.generate(CLOCK), new SettingsWitness(0, null));
         } catch (Throwable failure) {
           probe.set(failure);
         } finally {
@@ -349,7 +366,7 @@ final class SettingsCommitCoordinatorTest {
       }
     });
     assertThrows(SettingsCommitOwner.Refused.class,
-        () -> owner.reserve(6, OperationKeys.generate(CLOCK), 0));
+        () -> owner.reserve(6, OperationKeys.generate(CLOCK), new SettingsWitness(0, null)));
     assertTrue(callback.await(5, TimeUnit.SECONDS));
     assertTrue(callbackSawThreadDone.get(), "recovery subscriber ran after physical mutex release");
     assertInstanceOf(SettingsCommitOwner.Refused.class, probe.get());
@@ -369,7 +386,7 @@ final class SettingsCommitCoordinatorTest {
       var runner = runner(operations, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(IllegalStateException.class, () -> runner.start(attempt, handle -> {
-        runner.applySettings(handle, 0, candidate("dark", List.of()));
+        runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()));
         return OperationExecution.finished(OperationResult.success("unreachable"));
       }));
       assertEquals(OperationState.FAILED, operations.find(attempt.accepted().key()).orElseThrow().state());
@@ -386,11 +403,11 @@ final class SettingsCommitCoordinatorTest {
       var runner = runner(operations, owner);
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       var result = runner.start(attempt, handle -> {
-        runner.applySettings(handle, 0, candidate("dark", List.of()));
+        runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()));
         return OperationExecution.finished(OperationResult.success("done"));
       });
       assertEquals(OperationState.COMPLETE, result.record().state());
-      assertEquals(new UiSettingsStore.Witness(1, attempt.accepted().key()), settings.inspect().witness());
+      assertEquals(new SettingsWitness(1, attempt.accepted().key()), settings.inspect().witness());
     }
   }
 
@@ -408,13 +425,13 @@ final class SettingsCommitCoordinatorTest {
               settings.replacePrepared(prepared);
               if (corrupt) Files.writeString(path, "broken");
               else settings.replacePrepared(settings.prepare(prepared.settings(),
-                  new UiSettingsStore.Witness(9, OperationKeys.generate(CLOCK))));
+                  new SettingsWitness(9, OperationKeys.generate(CLOCK))));
               throw new IOException("ambiguous move");
             });
         var runner = runner(operations, owner);
         var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
         assertThrows(IllegalStateException.class, () -> runner.start(attempt, handle -> {
-          runner.applySettings(handle, 0, candidate("dark", List.of()));
+          runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()));
           return OperationExecution.finished(OperationResult.success("unreachable"));
         }));
         assertEquals(OperationState.RUNNING, operations.find(attempt.accepted().key()).orElseThrow().state());
@@ -423,7 +440,7 @@ final class SettingsCommitCoordinatorTest {
         assertEquals(corrupt ? SettingsCommitOwner.RecoveryReason.UNREADABLE_WITNESS
             : SettingsCommitOwner.RecoveryReason.CONTRADICTORY_WITNESS, issue.reason());
         assertThrows(SettingsCommitOwner.Refused.class,
-            () -> owner.reserve(55, OperationKeys.generate(CLOCK), 0));
+            () -> owner.reserve(55, OperationKeys.generate(CLOCK), new SettingsWitness(0, null)));
       }
     }
   }
@@ -450,7 +467,7 @@ final class SettingsCommitCoordinatorTest {
       var first = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
           () -> runner.start(first, handle -> OperationExecution.finished(
-              runner.applySettings(handle, 0, candidate("dark", List.of())))));
+              runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of())))));
       assertEquals(OperationState.FAILED, operations.find(first.accepted().key()).orElseThrow().state());
       assertNull(operations.find(first.accepted().key()).orElseThrow().expectedSettingsRevision());
       assertEquals(0, preparations.get());
@@ -459,7 +476,7 @@ final class SettingsCommitCoordinatorTest {
       statement.execute("DROP TRIGGER reject_settings_arm");
       var second = runner.accept(request(OperationKind.SETTINGS_APPLY));
       var committed = runner.start(second, handle -> OperationExecution.finished(
-          runner.applySettings(handle, 0, candidate("dark", List.of()))));
+          runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()))));
       assertEquals(OperationState.COMPLETE, committed.record().state());
       assertEquals(1, preparations.get());
     }
@@ -483,13 +500,13 @@ final class SettingsCommitCoordinatorTest {
       }
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       assertThrows(RuntimeException.class, () -> runner.start(attempt, handle -> {
-        runner.applySettings(handle, 0, candidate("dark", List.of()));
+        runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()));
         return OperationExecution.finished(OperationResult.success("done"));
       }));
       assertEquals(OperationState.RUNNING, operations.find(attempt.accepted().key()).orElseThrow().state());
       assertEquals(1, restarts.get());
       assertThrows(SettingsCommitOwner.Refused.class,
-          () -> owner.reserve(88, OperationKeys.generate(CLOCK), 1));
+          () -> owner.reserve(88, OperationKeys.generate(CLOCK), currentWitness(settings)));
     }
   }
 
@@ -511,7 +528,7 @@ final class SettingsCommitCoordinatorTest {
       var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
       key = attempt.accepted().key();
       assertThrows(AssertionError.class, () -> runner.start(attempt, handle -> {
-        runner.applySettings(handle, 0, candidate("dark", List.of()));
+        runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()));
         return OperationExecution.finished(OperationResult.success("unreachable"));
       }));
       assertEquals(OperationState.RUNNING, operations.find(key).orElseThrow().state());
@@ -570,7 +587,7 @@ final class SettingsCommitCoordinatorTest {
       assertEquals(OperationState.RUNNING, operations.find(first.key()).orElseThrow().state());
       assertEquals(OperationState.RUNNING, operations.find(second.key()).orElseThrow().state());
       var blocked = assertThrows(SettingsCommitOwner.Refused.class,
-          () -> owner.reserve(999, OperationKeys.generate(CLOCK), 0));
+          () -> owner.reserve(999, OperationKeys.generate(CLOCK), new SettingsWitness(0, null)));
       assertEquals("SETTINGS_RECOVERY_REQUIRED", blocked.response().errorCode().orElseThrow());
     }
   }
@@ -584,7 +601,7 @@ final class SettingsCommitCoordinatorTest {
     first.inspectRecovery(List.of());
     second.inspectRecovery(List.of());
     String key = OperationKeys.generate(CLOCK);
-    var reservation = first.reserve(1, key, 0);
+    var reservation = first.reserve(1, key, new SettingsWitness(0, null));
     var control = new RecordingControl();
     assertThrows(IllegalArgumentException.class,
         () -> second.apply(reservation, candidate("dark", List.of()), control));
@@ -639,13 +656,17 @@ final class SettingsCommitCoordinatorTest {
 
   private static void writeWitness(UiSettingsStore settings, long revision, String key) throws Exception {
     var prepared = settings.prepare(candidate("dark", List.of()),
-        new UiSettingsStore.Witness(revision, revision == 0 ? null : key));
+        new SettingsWitness(revision, revision == 0 ? null : key));
     settings.replacePrepared(prepared);
   }
 
   private SettingsCommitCoordinator coordinator(UiSettingsStore settings, ConfigStore config) {
     return new SettingsCommitCoordinator(settings, config, () -> {},
         candidate -> OperationResult.success("prepared"));
+  }
+
+  private static SettingsWitness currentWitness(UiSettingsStore settings) {
+    return settings.inspect().witness();
   }
 
   private OperationRecord unarmedProbeRow(String name) throws Exception {

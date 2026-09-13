@@ -21,14 +21,18 @@ failure is corrected. The independently reviewed seven-tool amendment passes loc
 rejects an eighth tool; fresh hosted success remains required. [Evidence](evidence/C2/mcp-adr.md).
 Windows-native success is not installed-v5 recovery proof.
 
-**Immediate next items (2026-09-13): C2-6 typed witness/recovery reset, then producer and Health migration.**
+**Immediate next items (2026-09-13): C2-6 recovery reset, then producer and Health migration.**
+The shared witness-pair foundation now passes152 cases (83 executed/69 reused in1293),
+plus format/PMD; negative1297 rejects revision-only comparison. Restored1298 reuses the same
+152 passing cases with identical source hashes. [Proof](evidence/C2/settings-witness.md).
+The physical owner is still uncomposed; confirmed recovery reset and public producers are next.
 The [physical file/config owner foundation](evidence/C2/settings-owner.md) passes Owner1286:
 100 cases/23 suites (71 executed,29 reused), no failures/errors/skips, PMD/format and independent
 source review clear. A real concurrent regression exposed blocking cleanup of an unrelated
 refused attempt in1285; the owner now returns promptly for mismatched fence ids. Negative1287
 fails at all four intended assertions; restored1288 passes via unchanged/cache reuse with the
-same source hashes. This owner remains uncomposed; its current scalar expected revision must
-be upgraded to the reviewed witness-pair protocol before all producers migrate. No full/live/
+same source hashes. This owner remains uncomposed; the subsequent witness-pair cut above supersedes its scalar
+expected-revision API before producers migrate. No full/live/
 installed/hosted or recovery-genesis proof is claimed by this local foundation slice.
 Atomic snapshot/reconnect and retirement production is at e7edaf503. Live1238 passes17
 protocol checks; full UI1248 passes6520/typecheck. Full1249 now passes10403 represented
