@@ -202,10 +202,13 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       throw failure;
     }
     OperationExecution execution;
+    OperationResult committedResponse;
     control.bodyThread = Thread.currentThread();
     try {
       try {
         execution = Objects.requireNonNull(body.apply(control), "Operation execution");
+        committedResponse = control.settingsReceipt == null ? null
+            : settingsResponse(control.settingsReceipt, execution.response());
       } finally {
         control.bodyThread = null;
       }
@@ -250,7 +253,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
           committed ? receipt(control.settingsReceipt.response())
               : new OperationReceipt(failureCode(control.settingsFailure), null));
       OperationRecord row = current(control);
-      OperationResult response = committed ? settingsResponse(control.settingsReceipt)
+      OperationResult response = committed ? committedResponse
           : control.settingsFailure instanceof SettingsCommitOwner.Refused refused ? refused.response() : receiptResponse(row);
       return new Result(row, response,
           control.done.minimalCompletionStage());
@@ -368,6 +371,16 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   private static OperationResult settingsResponse(SettingsCommitOwner.Receipt receipt) {
     return receipt.response();
+  }
+
+  /** First-response observations never replace the owner's prepared commitment or durable receipt. */
+  private static OperationResult settingsResponse(SettingsCommitOwner.Receipt receipt, OperationResult observation) {
+    OperationResult committed = receipt.response();
+    if (!observation.success() || observation.structuredData().isEmpty()) return committed;
+    Map<String, Object> data = new java.util.LinkedHashMap<>(observation.structuredData());
+    data.putAll(committed.structuredData());
+    return new OperationResult(committed.success(), committed.message(), committed.executionId(), data,
+        committed.errorCode(), committed.errorDetails(), committed.retryable());
   }
 
   private void fatalSettings(Control control, Throwable failure) {

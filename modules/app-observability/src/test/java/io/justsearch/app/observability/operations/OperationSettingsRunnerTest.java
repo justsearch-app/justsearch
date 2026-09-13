@@ -68,6 +68,70 @@ final class OperationSettingsRunnerTest {
   }
 
   @Test
+  void successfulSettingsObservationCannotOverrideCommittedFieldsOrReappearOnRetry() throws Exception {
+    try (var store = store("observed-response")) {
+      var owner = new FakeOwner(store, ApplyMode.COMMIT);
+      var runner = runner(store, owner);
+      var request = request(OperationKind.SETTINGS_APPLY);
+      var result = runner.start(runner.accept(request), handle -> {
+        runner.applySettings(handle, witness(4), CANDIDATE);
+        return OperationExecution.finished(OperationResult.success("handler observation", Map.of(
+            "engineState", "Down", "chatEnabled", true, "operationKey", "untrusted observation",
+            "acceptedRevision", -1L, "restartScheduled", false, "ui", Map.of("theme", "wrong"))));
+      });
+      assertEquals("Down", result.response().structuredData().get("engineState"));
+      assertEquals(true, result.response().structuredData().get("chatEnabled"));
+      assertEquals(request.key(), result.response().structuredData().get("operationKey"));
+      assertEquals(5L, result.response().structuredData().get("acceptedRevision"));
+      assertEquals(true, result.response().structuredData().get("restartScheduled"));
+      assertEquals(Map.of("theme", "dark"), result.response().structuredData().get("ui"));
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      var retry = runner.start(runner.accept(request), handle -> { throw new AssertionError("Must not resample observations"); });
+      assertEquals(5L, retry.response().structuredData().get("acceptedRevision"));
+      assertFalse(retry.response().structuredData().containsKey("engineState"));
+      assertFalse(retry.response().structuredData().containsKey("chatEnabled"));
+    }
+  }
+
+  @Test
+  void fatalObservationProjectionRetainsCommittedFenceAndRequestsRestart() throws Exception {
+    try (var store = store("fatal-observation")) {
+      var owner = new FakeOwner(store, ApplyMode.COMMIT);
+      var runner = runner(store, owner);
+      var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
+      var fatal = new OutOfMemoryError("simulated response projection failure");
+      var observation = org.mockito.Mockito.mock(OperationResult.class);
+      org.mockito.Mockito.when(observation.success()).thenReturn(true);
+      org.mockito.Mockito.when(observation.structuredData()).thenThrow(fatal);
+      assertSame(fatal, assertThrows(OutOfMemoryError.class, () -> runner.start(attempt, handle -> {
+        runner.applySettings(handle, witness(4), CANDIDATE);
+        return OperationExecution.finished(observation);
+      })));
+      assertEquals(1, owner.retainCalls);
+      assertEquals(0, owner.releaseCalls);
+      assertTrue(attempt.completion().toCompletableFuture().isCompletedExceptionally());
+      assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+    }
+  }
+
+  @Test
+  void failedSettingsBodyCannotPublishItsObservationAfterCommit() throws Exception {
+    try (var store = store("failed-observation")) {
+      var owner = new FakeOwner(store, ApplyMode.COMMIT);
+      var runner = runner(store, owner);
+      var result = runner.start(runner.accept(request(OperationKind.SETTINGS_APPLY)), handle -> {
+        runner.applySettings(handle, witness(4), CANDIDATE);
+        return OperationExecution.finished(new OperationResult(false, "failed observation", Optional.empty(),
+            Map.of("engineState", "Unknown"), Optional.of("OBSERVATION_FAILED"), Map.of(), Optional.of(false)));
+      });
+      assertTrue(result.response().success());
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(5L, result.response().structuredData().get("acceptedRevision"));
+      assertFalse(result.response().structuredData().containsKey("engineState"));
+    }
+  }
+
+  @Test
   void foreignFabricatedRetainedAndOffBodyThreadHandlesAreRefusedAndHandlerCannotCastControl()
       throws Exception {
     try (var store = store("handles")) {

@@ -32,6 +32,9 @@ PowerShell fixture startup timeout before the Java tests, with the root cause un
 Local1387 supervisor and local1388 all10 dev-runner files pass. Keep current Windows
 hosted proof open; [queue/failure evidence](evidence/C2/hosted-runner-recovery.json). The next producer cuts are grounded in
 [C2-6 next producer plan](evidence/C2/C2-6-plan.md#2026-09-14-next-producer-cuts-after-reset-and-health).
+The response observation prerequisite is reviewed and locally verified:560 tests pass,
+including an allocation-Error regression; the committed receipt always wins collisions.
+[Proof](evidence/C2/settings-response-observations.json).
 Migrate runtime intent as one family, including recorded handlers, REST and boot seed;
 a recovery refusal must keep startup alive for Health/reset. Then migrate other writers
 using their captured full witness, expose atomic snapshot/witness GET and

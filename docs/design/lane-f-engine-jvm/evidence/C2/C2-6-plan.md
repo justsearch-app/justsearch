@@ -378,3 +378,41 @@ The launcher fallback remains IN_MEMORY and has no restart owner. No constructor
 fallback may create an uncomposed writable runner or silently write raw settings.
 Root retains shared composition and Gradle ownership; each implementation batch gets
 one independent review, explicit-path commit with proof body, and immediate push.
+
+## 2026-09-14 runtime-intent response preparation
+
+The runtime-intent migration exposes a response ownership mismatch:
+SetChatEnabledHandler returns chatEnabled plus the observed engineState, while
+OperationAttemptRunnerImpl:240-257 deliberately replaces a settings body's result
+with the fixed owner's prepared committed receipt. That receipt currently projects
+SettingsV2 from HeadlessApp:1082-1089. Returning only that projection would silently
+remove the operation's existing observation fields; letting the handler replace the
+receipt would let a postcommit failure contradict a proven commitment.
+
+The selected mechanism enriches only the first successful synchronous response
+with non-colliding handler observation fields. The fixed receipt wins every collision
+and retains success, message, execution identity, revision/key and all prepared
+settings fields. Build the merged response before terminal completion callbacks.
+A thrown body or returned failure uses the prepared receipt unchanged. Persist only
+the existing bounded receipt; keyed retries report that recorded outcome, never new
+engine observations. No handler gains terminal-write or committed-witness authority.
+
+Alternatives: a per-operation response callback/registry on the physical settings
+owner adds lifecycle dependencies to commitment; changing chat intent to SettingsV2
+alone drops an existing contract. Reusing the normal successful handler's already
+computed observation requires neither. The scope is response projection after a
+proven commitment, not a new effect/transaction abstraction. It earns its keep if
+runtime intent retains its observed-state response while collisions and postcommit
+failures cannot alter commitment. Retire it if settings-producing operations no
+longer have supplemental response contracts.
+
+Required focused proofs: successful observation retained; conflicting witness,
+settings and receipt fields ignored; failed/thrown response cannot publish its
+observations; same-key retry cannot invoke the observation producer again. The
+existing reservation, callback ordering and fault matrix must remain green.
+
+Independent review found the new projection allocation initially outside the fatal guard.
+The regression1394 reproduced missing restart retention; the correction moves projection
+inside the existing body guard. Final1395 executes560 cases/83 suites with zero skips,
+failures or errors; PMD/format/UI integration compilation pass. No new fault callback
+was needed: a mocked response supplies the synthetic allocation-path Error.

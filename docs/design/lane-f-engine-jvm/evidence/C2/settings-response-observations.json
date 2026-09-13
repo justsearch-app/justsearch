@@ -1,0 +1,225 @@
+{
+  "base": "98a27626ef5b998b42acee2d2626469757cb7e77",
+  "item": "C2-6 runtime-intent response prerequisite",
+  "review": "Independent reviewer clear after one correction round; no reviewer-executed builds.",
+  "root": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "retention": "Through lane acceptance plus30 days; export before worktree release.",
+  "limits": "No live, installed successor or final-head hosted proof; runtime-intent producers remain next.",
+  "sources": [
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+      "sha256": "9c90d604f8546323fbea8056668e14f63628fcc10b1e0b8aff149ecf3f27006e"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationSettingsRunnerTest.java",
+      "sha256": "a21992326aa15b4b86b1234484deae87f254c8f639628a1d2a344cb4ce82f552"
+    }
+  ],
+  "runs": [
+    {
+      "label": "c2-settings-observation1391",
+      "revision": "98a27626e + observation diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests *OperationSettingsRunnerTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 34,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-settings-observation1391.txt",
+          "bytes": 40727,
+          "sha256": "c51fd2128ed7e51a150e3e874314d199bd0610ade7d4095039fd6170ae8538e9"
+        },
+        {
+          "path": "tmp/c2-settings-observation1391-counts.json",
+          "bytes": 656,
+          "sha256": "42a6506ffc532645171470f3cda14495fa0043cc974f34ee7b4435e9661a233e"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-settings-observation1391-xml.zip",
+          "bytes": 13412,
+          "sha256": "664a80a91fde065c5336425abbf05f4d7fc5870591fcb2349858a3bd94c120aa"
+        }
+      ]
+    },
+    {
+      "label": "c2-settings-observation-negative1392",
+      "revision": "98a27626e + deliberate receipt-collision mutant",
+      "command": "./gradlew.bat :modules:app-observability:test --tests *OperationSettingsRunnerTest.successfulSettingsObservationCannotOverrideCommittedFieldsOrReappearOnRetry --console=plain",
+      "summary": {
+        "tests": 2,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-settings-observation-negative1392.txt",
+          "bytes": 35323,
+          "sha256": "259cff3ee55fe63f7d4f45ab2d2ffd0acb67e73f560448ab8a8040371c4ca00b"
+        },
+        {
+          "path": "tmp/c2-settings-observation-negative1392-counts.json",
+          "bytes": 599,
+          "sha256": "98ba83f23fb22859a21017f258e845ea09a3451926eca59ca93156723acc16bd"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-settings-observation-negative1392-xml.zip",
+          "bytes": 8583,
+          "sha256": "f551c623418f00c9096acf9bc6cdc506b9760963de9b170627b40418af4236b6"
+        }
+      ]
+    },
+    {
+      "label": "c2-settings-observation1393",
+      "revision": "98a27626e + observation diff before Error correction",
+      "command": "./gradlew.bat :modules:app-observability:test :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 559,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 83
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 559,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 83
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-settings-observation1393.txt",
+          "bytes": 36567,
+          "sha256": "a3475a7302e64f73ff20bc049e39a4d7ac5ece55eceb3012c41c30edddcebbf0"
+        },
+        {
+          "path": "tmp/c2-settings-observation1393-counts.json",
+          "bytes": 647,
+          "sha256": "65efe5ad36bb7a7f4417c7eaf925b83e80ea9c06603b58ee2a1b3e07c23cd604"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-settings-observation1393-xml.zip",
+          "bytes": 94334,
+          "sha256": "f3e64a0c2c89b6fa987c8d6bbd7bd8c009e1767638067376b20d676aa48614e4"
+        }
+      ]
+    },
+    {
+      "label": "c2-settings-observation-review-red1394",
+      "revision": "98a27626e + unguarded observation projection",
+      "command": "./gradlew.bat :modules:app-observability:test --tests *OperationSettingsRunnerTest.fatalObservationProjectionRetainsCommittedFenceAndRequestsRestart --console=plain",
+      "summary": {
+        "tests": 2,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-settings-observation-review-red1394.txt",
+          "bytes": 35446,
+          "sha256": "b5759854500a96635dabcf9a4693a2162aa88a82d1987969ecda22aa25f79ba1"
+        },
+        {
+          "path": "tmp/c2-settings-observation-review-red1394-counts.json",
+          "bytes": 586,
+          "sha256": "0bc5a00154f412fc86ff9e8088c4c3e7570eeda224a9e7b87d385bbb8398e7ef"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-settings-observation-review-red1394-xml.zip",
+          "bytes": 8938,
+          "sha256": "258d3cb4f4527102da2c878e040d822ee0c019eb03649411a89f7cf3efb97b02"
+        }
+      ]
+    },
+    {
+      "label": "c2-settings-observation1395",
+      "revision": "98a27626e + reviewed guarded observation diff",
+      "command": "./gradlew.bat :modules:app-observability:test :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 560,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 83
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 560,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 83
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-settings-observation1395.txt",
+          "bytes": 36333,
+          "sha256": "4bfb89ab0c9cb6149e170e27807039cd3f604db721aa2d7a6fc12cd6e75b7f1d"
+        },
+        {
+          "path": "tmp/c2-settings-observation1395-counts.json",
+          "bytes": 640,
+          "sha256": "08c7a9d84b9449dd51972341ab9b5c48b8cd4c51315d19c691b5e50c57284a52"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-settings-observation1395-xml.zip",
+          "bytes": 94519,
+          "sha256": "961743d2098f5e948f4010f04699d9f14b71a0bf645d49082871893b98b302f0"
+        }
+      ]
+    }
+  ]
+}
