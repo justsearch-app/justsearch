@@ -1,22 +1,79 @@
-# JustSearch public-repo gitleaks config → ships as `.gitleaks.toml` in the public repo root.
-# Extends gitleaks' built-in ruleset; allowlists known-safe matches so the secret-scan is
-# zero-false-positive on the published snapshot (so a real hit always means a real secret).
+# JustSearch public-repo gitleaks config.
+#
+# The default rules remain enabled. First-party exceptions are rule-targeted
+# and require both an anchored path and a documented, non-secret context.
 
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Known-safe matches: vendored upstream + public IR corpora"
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Generated jseval cohort SHA-256 fields: match must be the named digest field"
+condition = "AND"
+regexTarget = "match"
+regexes = ['''(?i)(?:agent_cohort_key|config_cohort_key|search_config_cohort_key)"\s*:\s*"[0-9a-f]{64}"''']
 paths = [
-  '''third_party/.*''',     # vendored upstream (llama.cpp etc.) — not our secrets
-  '''datasets/.*''',        # public IR corpora (Enron-QA, CourtListener are public record)
-  '''.*\.onnx''',           # model binaries (excluded from the repo anyway; belt-and-braces)
-  '''.*tokenizer\.json''',  # tokenizer vocabularies contain high-entropy tokens, not secrets
-  '''reports/.*''',          # eval run output (PIT pagination cursors, run hashes) — not secrets (634 dry-run)
-  '''scripts/jseval/.*''',   # eval harness + smoke fixtures + release.v1.json content hashes — not secrets
-  '''.*Test\.(java|ts|tsx)''', # test fixtures (e.g. StoreCipherTest's literal 0123… demo key) — not secrets
-  # Individually-vetted false positives (634 dry-run): a doc example token, a tempdoc title line, an i18n identifier.
-  '''docs/reference/ui/frontend-kernel/kernel/05-streaming-envelope\.md''', # example resumeToken (b64 "surface:health-events:42")
-  '''docs/tempdocs/586-frontend-live-uiux-audit\.md''',                     # title-line high-entropy FP
-  '''.*/registry/validator/ValidationContext\.java''',                      # i18n-key identifier FP (generic-api-key noise)
+  '''^scripts/jseval/(?:[^/]+/)*(?:calibration(?:-[^/]+)?|[^/]*utility-comparison[^/]*|release\.v1)\.json$''',
+  '''^scripts/jseval/(?:[^/]+/)*observations\.v1\.jsonl$''',
 ]
+
+[[allowlists]]
+targetRules = ["sourcegraph-access-token"]
+description = "Generated jseval commit identity field, which is a public source revision"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''(?i)^\s*"git_sha"\s*:\s*"[0-9a-f]{40}",?\s*$''']
+paths = [
+  '''^scripts/jseval/(?:[^/]+/)*(?:calibration(?:-[^/]+)?|[^/]*utility-comparison[^/]*)\.json$''',
+]
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Streaming envelope documentation's fixed resumeToken example"
+condition = "AND"
+regexTarget = "match"
+regexes = ['''(?i)resumeToken"\s*:\s*"c3VyZmFjZTpoZWFsdGgtZXZlbnRzOjQy"''']
+paths = ['''^docs/reference/ui/frontend-kernel/kernel/05-streaming-envelope\.md$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Historical audit title wording that contains key terminology"
+condition = "AND"
+regexTarget = "match"
+regexes = ['''keys,\s+shortcut/keycap''']
+paths = ['''^docs/tempdocs/586-frontend-live-uiux-audit\.md$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "StoreCipherTest's fixed demo key declaration"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\s*private\s+static\s+final\s+byte\[\]\s+KEY\s*=\s*"0123456789abcdef0123456789abcdef"\.getBytes\(java\.nio\.charset\.StandardCharsets\.UTF_8\);\s*$''']
+paths = ['''^modules/app-agent-api/src/test/java/io/justsearch/agent/api/encryption/StoreCipherTest\.java$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "ValidationContext's i18n-key set identifier"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\s*validI18nKeys\s*=\s*validI18nKeys\s*==\s*null\s*\?\s*Set\.of\(\)\s*:\s*Set\.copyOf\(validI18nKeys\);\s*$''']
+paths = ['''^modules/app-services/src/main/java/io/justsearch/app/services/registry/validator/ValidationContext\.java$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "jseval index-cache fixture key examples"
+condition = "AND"
+regexTarget = "line"
+regexes = [
+  '''^\s*return\s+\{"key"\s*:\s*"abc123def456"\s*,\s*"components"\s*:\s*\{"git_sha"\s*:\s*"deadbeef"\s*,\s*"git_dirty"\s*:\s*False\}\}\s*$''',
+  '''^\s*pin_selector_key\s*=\s*"PINNED-KEY-abc123",\s*$''',
+]
+paths = ['''^scripts/jseval/tests/test_index_cache\.py$''']
+
+[[allowlists]]
+targetRules = ["github-pat"]
+description = "Generated entity-bank collision index digest chunk"
+condition = "AND"
+regexTarget = "match"
+regexes = ['''\x67\x68\x70\x5f\x4f\x73\x67\x69\x30\x76\x4d\x73\x67\x69\x4b\x56\x6a\x73\x67\x69\x79\x58\x53\x73\x67\x6a\x34\x6c\x7a\x73\x67\x6a\x65\x5a\x76\x73\x67\x6a\x73\x6e''']
+paths = ['''^scripts/jseval/707-corpora/en-legal-clerc/entity-bank/entity-bank\.v2\.json$''']

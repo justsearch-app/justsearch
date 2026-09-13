@@ -79,15 +79,14 @@ function Exit-SigningBudget {
   $script:ledgerLockHeld = $false
 }
 
-# Last-resort diagnosability: ANY terminating error that escapes normal handling gets tee'd with
-# its position before the script dies — under the bundler, stderr is swallowed, so without this a
-# terminating error is invisible (the failure mode that cost CI runs 29911439832 + 29912444815).
+# Exception messages, source excerpts and native output can contain credentials.
+# Keep structural diagnostics only, including when the trap handles a launch failure.
 trap {
-  Write-SignLog ("TRAP terminating error: " + $_.Exception.GetType().Name + ": " + $_.Exception.Message +
-    " at " + (([string]$_.InvocationInfo.PositionMessage) -replace "\r?\n", " "))
+  $safeError = "Signing terminated: " + $_.Exception.GetType().Name + " at line " + $_.InvocationInfo.ScriptLineNumber
+  Write-SignLog $safeError
   Remove-ExtensionShim
   Exit-SigningBudget
-  Write-Error $_
+  Write-Error $safeError -ErrorAction Continue
   exit 1
 }
 
@@ -112,16 +111,17 @@ function Fail([string]$Message) {
   Write-SignLog ("FAIL: " + $Message)
   Remove-ExtensionShim
   Exit-SigningBudget
-  Write-Error $Message
+  Write-Error $Message -ErrorAction Continue
   exit 1
 }
 
-# Runs a native command with stderr made NON-TERMINATING and all output captured. Under
+# Runs a native command with stderr made NON-TERMINATING and output discarded. Under
 # $ErrorActionPreference=Stop with a piped stderr (exactly how Tauri's bundler runs this script),
 # a native process's first stderr line becomes a terminating NativeCommandError BEFORE our
 # exit-code check runs — the script dies mid-call and the real error is swallowed (tempdoc 760
 # rehearsal run 29911439832: tee log ends at "Signing (pfx):", no FAIL line ever written).
-# Deliberately does NOT log the arguments (pfx passwords travel in them) — only exe, exit, output.
+# Neither arguments nor output have a safe diagnostic contract: vendor tools can echo
+# individual or transformed credentials. Withhold them before any file/console sink.
 function Invoke-Native {
   param(
     [Parameter(Mandatory = $true)][string]$Exe,
@@ -129,19 +129,17 @@ function Invoke-Native {
   )
   $prevEap = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
-  $output = @()
   $exit = -1
   try {
-    $output = @(& $Exe @Arguments 2>&1 | ForEach-Object { "$_" })
+    & $Exe @Arguments 2>&1 | Out-Null
     $exit = $LASTEXITCODE
   } catch {
-    $output = @("launch failed: " + $_.Exception.Message)
     $exit = -1
   } finally {
     $ErrorActionPreference = $prevEap
   }
-  Write-SignLog (([System.IO.Path]::GetFileName($Exe)) + " exit=" + $exit + " :: " + (($output | Select-Object -First 12) -join " || "))
-  return [pscustomobject]@{ ExitCode = $exit; Output = $output }
+  Write-SignLog ("Native signing tool exit=" + $exit + " (output withheld)")
+  return [pscustomobject]@{ ExitCode = $exit }
 }
 
 # Sign attempts hit the timestamp server once per file; 100+ sequential requests from one CI IP
@@ -461,7 +459,7 @@ function Assert-Signed([string]$Path, [string]$SigntoolPath) {
         $sig = Get-AuthenticodeSignature -FilePath $Path -ErrorAction Stop
         break
       } catch {
-        Write-SignLog ("Get-AuthenticodeSignature attempt " + $attempt + "/3 failed: " + $_.Exception.Message)
+        Write-SignLog ("Get-AuthenticodeSignature attempt " + $attempt + "/3 failed: " + $_.Exception.GetType().Name)
         if ($attempt -lt 3) { Start-Sleep -Milliseconds 500 }
       }
     }
@@ -484,7 +482,7 @@ function Assert-Signed([string]$Path, [string]$SigntoolPath) {
   }
   $verifyRes = Invoke-Native -Exe $SigntoolPath -Arguments @("verify", "/pa", "/v", $Path)
   if ($verifyRes.ExitCode -ne 0) {
-    Fail ("signtool verify failed (exit=" + $verifyRes.ExitCode + ") for " + $Path + " :: " + (($verifyRes.Output | Select-Object -First 4) -join " | "))
+    Fail ("signtool verify failed (exit=" + $verifyRes.ExitCode + ") for " + $Path)
   }
   Info "Signed OK: $Path"
 }
@@ -529,7 +527,7 @@ switch ($mode) {
         "sign", "/fd", "SHA256", "/td", "SHA256", "/tr", $timestampUrl,
         "/f", $pfxToUse, "/p", $pfxPassword, $resolvedBinary)
       if ($signRes.ExitCode -ne 0) {
-        Fail ("signtool sign failed (exit=" + $signRes.ExitCode + ") for " + $resolvedBinary + " :: " + (($signRes.Output | Select-Object -First 4) -join " | "))
+        Fail ("signtool sign failed (exit=" + $signRes.ExitCode + ") for " + $resolvedBinary)
       }
 
       Assert-Signed $resolvedBinary $signtoolPath
@@ -564,7 +562,7 @@ switch ($mode) {
     $signingTarget = if ($script:originalBinary) { $script:originalBinary } else { $resolvedBinary }
     $signRes = Invoke-NativeWithRetry -Exe $signtoolPath -SigningTarget $signingTarget -SignerMode $mode -Arguments $signArgs
     if ($signRes.ExitCode -ne 0) {
-      Fail ("signtool sign failed (exit=" + $signRes.ExitCode + ") for " + $resolvedBinary + " :: " + (($signRes.Output | Select-Object -First 4) -join " | "))
+      Fail ("signtool sign failed (exit=" + $signRes.ExitCode + ") for " + $resolvedBinary)
     }
 
     Assert-Signed $resolvedBinary $signtoolPath
@@ -590,9 +588,8 @@ switch ($mode) {
       # NEVER log the rendered command: the template embeds vendor credentials, and once {file}
       # is substituted the line no longer exactly matches the stored secret string, so CI
       # secret-masking cannot redact it (credential leak observed in the on-failure log dump of
-      # run 31603929359). Log only the tool head and the target binary.
-      $commandHead = ($commandTemplate.TrimStart() -split '\s+', 2)[0]
-      Info ("Signing (command, tool '" + $commandHead + "'): " + $resolvedBinary)
+      # run 31603929359). Even a template's first token is not guaranteed safe.
+      Info ("Signing (command): " + $resolvedBinary)
       $cmdRes = Invoke-CommandSignerRestricted -BatchPath $batch
       $cmdExit = $cmdRes.ExitCode
       Write-SigningAttemptOutcome -Outcome $(if ($cmdExit -eq 0) { "vendor-exit-zero" } else { "vendor-failed" }) -ExitCode $cmdExit
@@ -600,7 +597,7 @@ switch ($mode) {
       try { Remove-Item -LiteralPath $batch -Force -ErrorAction SilentlyContinue } catch { }
     }
     if ($cmdExit -ne 0) {
-      Fail ("Signing command failed (exit=" + $cmdExit + ") for " + $resolvedBinary + " :: " + (($cmdRes.Output | Select-Object -First 4) -join " | "))
+      Fail ("Signing command failed (exit=" + $cmdExit + ") for " + $resolvedBinary)
     }
 
     # A vendor CLI may or may not ship signtool; locate it for the strict verify path (the
