@@ -276,9 +276,21 @@ no settings preparation/effect. Derive the next revision with Math.addExact(stor
 Before file replacement, prepare an immutable receipt of key, next revision and result;
 mark it committed in runner-owned AttemptControl immediately after replacement succeeds.
 Only a committed receipt is an effect witness; arming the fence alone is not commitment.
+The settings apply is synchronous on that capability's executing body thread; clear its
+thread association before terminalization. A retained or foreign-thread handle is refused.
+Background install/import owners create a fresh internal settings attempt at the write point;
+their parent operation may remain asynchronous. Commit control is a separate private runner
+object, never an interface implemented by the handler-visible handle.
 After the handler returns, the runner completes from that receipt and invokes the fixed
-settings coordinator's `releaseAfterTerminal(receipt)` outside every mutex. Even a later
+settings coordinator's `releaseAfterTerminal(attemptId)` outside every mutex. Even a later
 RuntimeException must complete from the committed receipt rather than report FAILED.
+An unrelated pending adapter completion stage cannot postpone or overwrite this synchronous
+settings verdict. A swallowed uncertain/precommit failure cannot become a successful outcome.
+A composed settings handler that skips the owner fails precommit; an owner that returns without
+a receipt is uncertain. Preserve the prebuilt result and typed refusal details in the immediate
+response while durable rows retain only bounded outcome metadata. Request restart inside the
+runner's apply call on owner Error/uncertainty, before a handler can swallow it; deduplicate
+requests and preserve the primary throwable if the restart callback itself fails.
 Precommit failure has no committed receipt: the runner durably fails the attempt before
 clearing its matching fence outside the mutex. If terminal persistence fails even before
 file commitment, retain the fence and request ordered restart. Fatal process failure is reconciled from the file at boot.
@@ -291,7 +303,8 @@ that completion write fails after file replacement, retain RUNNING, refuse furth
 settings mutation and request the existing ordered restart; never report FAILED or
 attempt a cross-file rollback of a committed apply. On boot the settings owner runs
 before the generic interactive-row rule and classifies the complete open settings-row
-set first. Multiple armed open rows violate the single-fence invariant: keep settings
+set first. Only the fixed owner supplies these settings recovery verdicts; public generic
+reconciliation rejects both settings kinds. Multiple armed open rows violate the single-fence invariant: keep settings
 blocked and surface recovery Health, without sequentially normalizing them. Null-marker
 rows remain safe precommit failures. With exactly one armed row, matching key and expectedRevision+1 completes
 the row; unchanged revision means interrupted before commitment and fails it; an advanced

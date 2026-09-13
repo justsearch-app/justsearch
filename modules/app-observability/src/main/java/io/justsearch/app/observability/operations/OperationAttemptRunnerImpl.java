@@ -5,6 +5,7 @@ import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationReceipt;
@@ -36,6 +37,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
           .toArray(java.util.concurrent.locks.ReentrantLock[]::new);
   private final OperationStore store;
   private final Clock clock;
+  private final SettingsCommitOwner settingsOwner;
   private final Set<OperationKind> ownedKinds;
   private final List<OperationRecord> interrupted;
   private final Map<Long, Control> active = new ConcurrentHashMap<>();
@@ -48,10 +50,25 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   /** Construct synchronously before the index fork; kind ownership is declared before the sweep. */
   public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds) {
+    this(store, clock, ownedKinds, null);
+  }
+
+  /** The fixed settings owner is composed before this runner and inspects all boot rows first. */
+  public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds,
+      SettingsCommitOwner settingsOwner) {
     this.store = Objects.requireNonNull(store, "store");
+    this.settingsOwner = settingsOwner;
     this.clock = Objects.requireNonNull(clock, "clock");
     this.ownedKinds = Set.copyOf(ownedKinds);
     interrupted = store.openRecords();
+    if (settingsOwner != null) {
+      if (!this.ownedKinds.containsAll(Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE))) {
+        throw new IllegalArgumentException("Settings owner requires both settings kinds");
+      }
+      settingsOwner.inspectRecovery(interrupted.stream().filter(row -> settingsKind(row.descriptor().kind())).toList());
+      reconcileOwned(OperationKind.SETTINGS_APPLY, settingsOwner::reconcile);
+      reconcileOwned(OperationKind.RECONFIGURE, settingsOwner::reconcile);
+    }
     for (OperationRecord row : interrupted) {
       if (row.context().survival() == EngineContext.Survival.INTERACTIVE
           && !this.ownedKinds.contains(row.descriptor().kind())) {
@@ -166,9 +183,32 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       throw failure;
     }
     OperationExecution execution;
+    control.bodyThread = Thread.currentThread();
     try {
-      execution = Objects.requireNonNull(body.apply(control), "Operation execution");
+      try {
+        execution = Objects.requireNonNull(body.apply(control), "Operation execution");
+      } finally {
+        control.bodyThread = null;
+      }
+    } catch (Error fatal) {
+      fatalSettings(control, fatal);
+      failObservation(control, fatal);
+      throw fatal;
     } catch (RuntimeException failure) {
+      if (control.settingsUncertain) {
+        persistenceFailed(control, OperationState.RUNNING, failure);
+        throw failure;
+      }
+      if (control.settingsReceipt != null) {
+        finishObserved(control, OperationState.COMPLETE, receipt(control.settingsReceipt.response()));
+        OperationRecord row = current(control);
+        return new Result(row, settingsResponse(control.settingsReceipt), control.done.minimalCompletionStage());
+      }
+      if (control.settingsFailure instanceof SettingsCommitOwner.Refused refused) {
+        finishObserved(control, OperationState.FAILED, receipt(refused.response()));
+        OperationRecord row = current(control);
+        return new Result(row, refused.response(), control.done.minimalCompletionStage());
+      }
       try { finish(control, failure instanceof CancellationException ? OperationState.CANCELLED : OperationState.FAILED,
           new OperationReceipt(failureCode(failure), null)); }
       catch (RuntimeException storageFailure) {
@@ -178,10 +218,36 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       }
       throw failure;
     }
+    // The settings transaction is synchronous. Its fixed owner's verdict is final when the
+    // body returns; an unrelated pending adapter stage cannot retain the bounded witness forever.
+    if (control.settingsUncertain) {
+      var failure = new IllegalStateException("Settings commitment remains unresolved");
+      persistenceFailed(control, OperationState.RUNNING, failure);
+      throw failure;
+    }
+    if (control.settingsReceipt != null || control.settingsFailure != null) {
+      boolean committed = control.settingsReceipt != null;
+      finishObserved(control, committed ? OperationState.COMPLETE : OperationState.FAILED,
+          committed ? receipt(control.settingsReceipt.response())
+              : new OperationReceipt(failureCode(control.settingsFailure), null));
+      OperationRecord row = current(control);
+      OperationResult response = committed ? settingsResponse(control.settingsReceipt)
+          : control.settingsFailure instanceof SettingsCommitOwner.Refused refused ? refused.response() : receiptResponse(row);
+      return new Result(row, response,
+          control.done.minimalCompletionStage());
+    }
+    if (settingsOwner != null && settingsKind(control.kind)) {
+      OperationResult refusal = execution.response().success()
+          ? OperationResult.failure("Settings operation did not use its commit owner", "SETTINGS_NOT_APPLIED", Map.of(), false)
+          : execution.response();
+      finishObserved(control, OperationState.FAILED, receipt(refusal));
+      return new Result(current(control), refusal, control.done.minimalCompletionStage());
+    }
     execution.completion().whenComplete((outcome, failure) -> {
       Throwable cause = failure instanceof CompletionException ? failure.getCause() : failure;
       if (cause instanceof Error) {
         // Fatal errors are not a failure receipt. The durable RUNNING row is reconciled at boot.
+        fatalSettings(control, cause);
         failObservation(control, cause);
         return;
       }
@@ -216,6 +282,69 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   @Override
+  public OperationResult applySettings(OperationRecordHandle handle,
+      long expectedRevision, io.justsearch.app.api.UiSettings candidate) {
+    if (settingsOwner == null) throw new IllegalStateException("Settings owner is not composed");
+    if (!(handle instanceof OperationAttemptRunnerImpl.Control control)
+        || active.get(control.id) != control || control.bodyThread != Thread.currentThread()
+        || control.done.isDone()) {
+      throw new IllegalArgumentException("Settings require this runner's executing body capability");
+    }
+    OperationRecord row = current(control);
+    if (row.state() != OperationState.RUNNING || !settingsKind(row.descriptor().kind())) {
+      throw new IllegalStateException("Settings commitment refused for this attempt");
+    }
+    if (expectedRevision < 0 || expectedRevision == Long.MAX_VALUE) {
+      throw new IllegalArgumentException("Invalid expected settings revision");
+    }
+    if (!control.settingsStarted.compareAndSet(false, true)) {
+      throw new IllegalStateException("Settings commitment already attempted");
+    }
+    control.settingsExpected = expectedRevision;
+    try {
+      var reservation = Objects.requireNonNull(
+          settingsOwner.reserve(control.id, control.key, expectedRevision), "Settings reservation");
+      if (!store.armSettingsRevision(control.id, expectedRevision)) {
+        throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+      }
+      settingsOwner.apply(reservation, candidate, control.settingsControl);
+      if (control.settingsUncertain) throw new IllegalStateException("Settings commitment remains unresolved");
+      if (control.settingsReceipt == null) {
+        control.settingsUncertain = true;
+        throw new IllegalStateException("Settings owner returned without a receipt");
+      }
+      return settingsResponse(control.settingsReceipt);
+    } catch (RuntimeException failure) {
+      control.settingsFailure = failure;
+      if (control.settingsUncertain) fatalSettings(control, failure);
+      throw failure;
+    } catch (Error fatal) {
+      fatalSettings(control, fatal);
+      throw fatal;
+    }
+  }
+
+  private static boolean settingsKind(OperationKind kind) {
+    return kind == OperationKind.SETTINGS_APPLY || kind == OperationKind.RECONFIGURE;
+  }
+
+  private static OperationResult settingsResponse(SettingsCommitOwner.Receipt receipt) {
+    return receipt.response();
+  }
+
+  private void fatalSettings(Control control, Throwable failure) {
+    if (settingsOwner != null && (control.settingsStarted.get() || control.settingsRecovery)
+        && control.settingsRestartRequested.compareAndSet(false, true)) {
+      control.settingsUncertain = true;
+      try {
+        settingsOwner.retainForRestart(control.id, failure);
+      } catch (RuntimeException | Error restartFailure) {
+        if (restartFailure != failure) failure.addSuppressed(restartFailure);
+      }
+    }
+  }
+
+  @Override
   public void rejectBeforeStart(PreparedAttempt attempt, String reason) {
     Prepared prepared = requirePrepared(attempt);
     if (prepared.existing) return;
@@ -237,6 +366,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   @Override
   public void reconcile(OperationKind kind, Function<OperationRecord, Reconciliation> reconciler) {
+    if (settingsKind(kind)) throw new IllegalArgumentException("Settings recovery belongs to the fixed owner");
+    reconcileOwned(kind, reconciler);
+  }
+
+  private void reconcileOwned(OperationKind kind, Function<OperationRecord, Reconciliation> reconciler) {
     if (!ownedKinds.contains(kind)) throw new IllegalArgumentException("Kind has no declared owner");
     for (OperationRecord previous : interrupted) {
       if (previous.descriptor().kind() != kind) continue;
@@ -259,9 +393,18 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private void finish(Control control, OperationState state, OperationReceipt receipt) {
-    OperationRecord row = store.finish(control.id, state, receipt).orElseThrow(
-        () -> new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null));
-    publishIfTerminal(control, row);
+    try {
+      OperationRecord row = store.finish(control.id, state, receipt).orElseThrow(
+          () -> new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null));
+      if (settingsOwner != null && settingsKind(row.descriptor().kind())) {
+        settingsOwner.releaseAfterTerminal(control.id);
+      }
+      publishIfTerminal(control, row);
+    } catch (Error fatal) {
+      fatalSettings(control, fatal);
+      failObservation(control, fatal);
+      throw fatal;
+    }
   }
 
   private void finishObserved(Control control, OperationState state, OperationReceipt receipt) {
@@ -284,6 +427,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private void persistenceFailed(Control control, OperationState intendedState, Throwable failure) {
+    fatalSettings(control, failure);
     LOG.error("Operation durable transition failed: key={} intendedState={}; outcome remains unresolved",
         control.key, intendedState, failure);
     persistenceFailure.complete(new PersistenceFailure(control.key, intendedState));
@@ -310,6 +454,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   private static String failureCode(Throwable failure) {
     if (failure instanceof CancellationException) return "cancelled";
+    if (failure instanceof SettingsCommitOwner.Refused refused) return refused.response().errorCode().orElseThrow();
     if (failure instanceof OperationStoreException storeFailure) {
       return storeFailure.code().name();
     }
@@ -318,10 +463,16 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   private static OperationResult receiptResponse(OperationRecord row) {
     boolean failed = row.state() == OperationState.FAILED || row.state() == OperationState.CANCELLED;
+    Map<String, Object> data = new java.util.LinkedHashMap<>(Map.of("operationKey", row.key(),
+        "operationRecordId", row.id(), "state", row.state().name(),
+        "unitsCompleted", row.unitsCompleted(), "unitsFailed", row.unitsFailed()));
+    if (row.state() == OperationState.COMPLETE && settingsKind(row.descriptor().kind())
+        && row.expectedSettingsRevision() != null) {
+      data.put("acceptedRevision", Math.addExact(row.expectedSettingsRevision(), 1));
+    }
     return new OperationResult(!failed, "Operation " + row.state().name(),
         Optional.ofNullable(row.receipt()).map(OperationReceipt::executionId),
-        Map.of("operationKey", row.key(), "operationRecordId", row.id(), "state", row.state().name(),
-            "unitsCompleted", row.unitsCompleted(), "unitsFailed", row.unitsFailed()),
+        Map.copyOf(data),
         failed ? Optional.ofNullable(row.failureReason()) : Optional.empty(), Map.of(), Optional.empty());
   }
 
@@ -348,9 +499,33 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   private final class Control implements OperationRecordHandle {
     private final long id;
     private final String key;
+    private final OperationKind kind;
+    private final boolean settingsRecovery;
     private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicBoolean settingsStarted = new AtomicBoolean();
+    private final AtomicBoolean settingsRestartRequested = new AtomicBoolean();
+    private volatile Thread bodyThread;
+    private volatile SettingsCommitOwner.Receipt settingsReceipt;
+    private volatile boolean settingsUncertain;
+    private volatile RuntimeException settingsFailure;
+    private long settingsExpected;
+    // Kept separate from the handler-visible Control: casting its handle must not expose commit authority.
+    private final SettingsCommitOwner.AttemptControl settingsControl = new SettingsCommitOwner.AttemptControl() {
+      @Override public void committed(SettingsCommitOwner.Receipt receipt) {
+        if (receipt == null || settingsReceipt != null || !key.equals(receipt.operationKey())
+            || receipt.acceptedRevision() != Math.addExact(settingsExpected, 1)) {
+          settingsUncertain = true;
+          throw new IllegalStateException("Settings owner supplied a contradictory receipt");
+        }
+        settingsReceipt = receipt;
+      }
+      @Override public void uncertain() { settingsUncertain = true; }
+    };
     private final CompletableFuture<OperationRecord> done = new CompletableFuture<>();
-    private Control(OperationRecord row) { id = row.id(); key = row.key(); }
+    private Control(OperationRecord row) {
+      id = row.id(); key = row.key(); kind = row.descriptor().kind();
+      settingsRecovery = settingsKind(row.descriptor().kind()) && row.expectedSettingsRevision() != null;
+    }
     @Override public long id() { return id; }
     @Override public String key() { return key; }
     @Override public void checkpoint(String cursor, long completed, long failed) {

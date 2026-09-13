@@ -74,6 +74,14 @@ public interface OperationAttemptRunner {
    */
   Result start(PreparedAttempt attempt, Function<OperationRecordHandle, OperationExecution> body);
 
+  /**
+   * Synchronous settings commitment inside this runner's currently executing body. The capability
+   * must be live, issued by this runner, and used on that body thread. A retained handle cannot
+   * race later terminal completion. Async producers perform this step before returning their stage.
+   */
+  OperationResult applySettings(OperationRecordHandle handle, long expectedRevision,
+      io.justsearch.app.api.UiSettings candidate);
+
   /** A scheduling, validation or admission refusal cannot overwrite work that already started. */
   void rejectBeforeStart(PreparedAttempt attempt, String reason);
 

@@ -67,6 +67,49 @@ class OperationStoreArchitectureTest {
   });
 
   @ArchTest
+  static final ArchRule SETTINGS_COMMIT_OWNER = classes().should(new ArchCondition<JavaClass>(
+      "enter settings ownership only through the runner and mark commitment only through the fixed owner") {
+    @Override public void check(JavaClass item, ConditionEvents events) {
+      for (var call : item.getCodeUnitAccessesFromSelf()) {
+        boolean ownerEntry = call.getTargetOwner().isAssignableTo(
+            io.justsearch.app.api.settings.SettingsCommitOwner.class)
+            && java.util.Set.of("reserve", "apply", "releaseAfterTerminal", "retainForRestart",
+                "inspectRecovery", "reconcile").contains(call.getName());
+        boolean commitment = call.getTargetOwner().isAssignableTo(
+            io.justsearch.app.api.settings.SettingsCommitOwner.AttemptControl.class)
+            && java.util.Set.of("committed", "uncertain").contains(call.getName());
+        boolean runner = item.getFullName().equals(RUNNER) || item.getFullName().startsWith(RUNNER + "$" );
+        boolean owner = item.getFullName().equals(
+            "io.justsearch.app.services.settings.SettingsCommitCoordinator");
+        if ((ownerEntry && !runner) || (commitment && !owner)) {
+          events.add(SimpleConditionEvent.violated(item,
+              item.getFullName() + " bypasses settings commit authority at " + call.getSourceCodeLocation()));
+        }
+      }
+    }
+  });
+
+  @Test
+  void settingsRuleRejectsProducerReservationAndForgedReceipt() {
+    var imported = new ClassFileImporter().importClasses(UnauthorizedSettingsOwner.class,
+        UnauthorizedSettingsReceipt.class, io.justsearch.app.api.settings.SettingsCommitOwner.class,
+        io.justsearch.app.api.settings.SettingsCommitOwner.AttemptControl.class);
+    var result = SETTINGS_COMMIT_OWNER.evaluate(imported);
+    assertTrue(result.hasViolation());
+    assertTrue(result.getFailureReport().getDetails().stream().anyMatch(line -> line.contains("UnauthorizedSettingsOwner")));
+    assertTrue(result.getFailureReport().getDetails().stream().anyMatch(line -> line.contains("UnauthorizedSettingsReceipt")));
+  }
+
+  static final class UnauthorizedSettingsOwner {
+    void reserve(io.justsearch.app.api.settings.SettingsCommitOwner owner) { owner.reserve(1, "foreign", 0); }
+  }
+
+  static final class UnauthorizedSettingsReceipt {
+    void commit(io.justsearch.app.api.settings.SettingsCommitOwner.AttemptControl control,
+        io.justsearch.app.api.settings.SettingsCommitOwner.Receipt receipt) { control.committed(receipt); }
+  }
+
+  @ArchTest
   static final ArchRule IMPLEMENTATION_OWNER = classes().that().implement(OperationStore.class)
       .should().resideInAPackage("io.justsearch.app.observability.operations");
 

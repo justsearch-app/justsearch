@@ -10,7 +10,7 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-**Immediate next items (2026-09-13): C2-6 runner/owner fence and reconciliation.**
+**Immediate next items (2026-09-13): C2-6 physical file/config owner and reconciliation, then producer migration.**
 Atomic snapshot/reconnect and retirement production is at e7edaf503. Live1238 passes17
 protocol checks; full UI1248 passes6520/typecheck. Full1249 now passes10403 represented
 cases (1310 in executed tasks,9093 reused), zero failures/errors and35 inherited skips,
@@ -27,15 +27,19 @@ Installed-v5 and hosted proof remain owed; no C2-4/stage closure is claimed.
 C2-6 cut1 now implements the preparation/storage foundation with Final1259 green (85
 represented cases, 76 executed/9 cached) and six intended negative1258 failures. Independent
 review is clear. [Storage proof](evidence/C2/settings-preparation.md). The [SQL marker](evidence/C2/settings-marker.md) now passes Marker1268 (45 represented,
-all executed, no failures/errors/skips), with PMD and format checks. Next: runner/owner
-attempt fence and reconciliation, then producer migration. Activity corrections now pass
+all executed, no failures/errors/skips), with PMD and format checks. The runner protocol now
+passes Final1281 (91 cases/19 suites, all execute, no failures/errors/skips), with PMD/format
+and independent source/evidence review. Negative1280 fails at three intended assertions;
+failed1277 and earlier passing snapshots remain retained. [Runner proof](evidence/C2/settings-runner.md).
+Next is the concrete file/config owner and witness reconciliation, then producer migration;
+no actual file-owner/composition or public wire-outcome proof is claimed by the runner slice. Activity corrections now pass
 Browser1266/light and1267/dark (nine checks each, zero axe/console findings and no page overflow).
 Typecheck1273 and full unit1276 pass6521 cases/485 files; the full unit log retains inherited
 connection/abort warnings. Focused Shell fixtures pass36 cases without AggregateError.
 Independent source/evidence review is clear. [Correction proof](evidence/C2/activity-accessibility.md)
 retains failed intermediates and binds browser binaries to868ca9f85 plus the listed UI source;
 the later SQL-marker commit is outside that browser proof.
-The next runner cut must reserve and validate the durable revision before arming SQL;
+The runner now reserves and validates through its fixed owner before arming SQL;
 [the reviewed correction](evidence/C2/C2-6-plan.md#2026-09-13-reservation-order-correction)
 closes refused/stale-contender crash ambiguity and requires whole-set boot classification.
 C2-6's independently refuted [implementation plan](evidence/C2/C2-6-plan.md) and owning

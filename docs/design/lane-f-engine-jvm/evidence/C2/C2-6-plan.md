@@ -61,6 +61,13 @@ The runner validates its own live OperationRecordHandle before invoking the fixe
 settings owner. Only that call supplies runner-owned AttemptControl to the owner;
 handlers cannot fabricate a committed receipt or write a terminal state themselves.
 This avoids a circular service lookup, a second writer and a registry of attempts.
+The settings call is synchronous inside the exact runner capability's executing body
+thread, which is cleared before completion callbacks are attached. Retained or foreign-thread
+handles cannot race terminalization. Background install/import owners start a fresh internal
+settings attempt at their mutation point; the parent may remain asynchronous. Commit authority
+is a separate private runner object, not an interface implemented by the handler-visible handle.
+An independent caller/D1 check confirmed this restriction does not exclude a required producer.
+
 
 Before SQL arming or any copy, builder or preparation callback, reserve under the apply
 mutex: refuse active/unresolved fences, inspect the durable witness, compare expected
@@ -149,6 +156,14 @@ precommit. Armed rows with quarantine or contradictory metadata stay unresolved 
 settings mutation with a recovery Health condition. Do not loop restarts against missing
 evidence or report a false failed outcome. Receipt revision is Math.addExact(storedExpected,1),
 never caller-supplied. Internal writers enter exactly the same path with a server key.
+
+The fixed owner alone supplies settings boot verdicts; generic public reconciliation rejects
+both settings kinds. With an owner composed, a settings body that skips applySettings cannot
+report success. Missing owner callbacks are uncertain, not proof of precommit failure. Owner
+Errors request restart inside applySettings even if a handler catches them, and callback failure
+cannot replace the primary fault or strand the observation. The in-memory prepared receipt
+preserves the successful result; typed precommit refusals preserve their code/details. Durable
+rows retain bounded metadata only. [Runner implementation and verification](settings-runner.md).
 
 The native-property preparation seam remains root implementation investigation within cut3.
 No operator question or external approval is required to settle it; no direct writer is
