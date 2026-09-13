@@ -1,5 +1,7 @@
 package io.justsearch.ui.api;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -7,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +21,9 @@ import io.justsearch.core.execution.TestEngineExecutors;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +32,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for {@link CapabilitiesStreamController} per tempdoc 429 §A.4 + §F.6 closure +
  * slice 436 envelope retrofit. Verifies the connected/snapshot lifecycle, UPDATE
- * forwarding, and onClose/keepAlive lifecycle hooks under the universal envelope wire
+ * forwarding, and request-future/onClose lifecycle hooks under the universal envelope wire
  * shape (constant SSE event name {@code "frame"}).
  */
 @DisplayName("CapabilitiesStreamController")
@@ -106,11 +112,38 @@ final class CapabilitiesStreamControllerTest {
   }
 
   @Test
-  @DisplayName("subscribe calls keepAlive to hold the connection")
-  void subscribeCallsKeepAlive() {
+  @DisplayName("subscribe registers an incomplete request future completed by onClose")
+  void subscribeRegistersRequestFutureCompletedByOnClose() {
     SseClient client = mockSseClient();
+    Context context = client.ctx();
+    AtomicReference<CompletableFuture<?>> registeredFuture = new AtomicReference<>();
+    AtomicReference<Runnable> closeCallback = new AtomicReference<>();
+    doAnswer(
+            invocation -> {
+              Supplier<? extends CompletableFuture<?>> factory = invocation.getArgument(0);
+              registeredFuture.set(factory.get());
+              return null;
+            })
+        .when(context)
+        .future(any());
+    doAnswer(
+            invocation -> {
+              closeCallback.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(client)
+        .onClose(any());
+
     controller.handle(client);
-    verify(client).keepAlive();
+
+    verify(client.ctx()).future(any());
+    assertNotNull(registeredFuture.get(), "SSE request future must be registered");
+    assertFalse(registeredFuture.get().isDone(), "request must remain open until onClose");
+    verify(client, never()).keepAlive();
+
+    assertNotNull(closeCallback.get(), "SSE onClose callback must be captured");
+    closeCallback.get().run();
+    assertTrue(registeredFuture.get().isDone(), "onClose must complete the request future");
   }
 
   @Test

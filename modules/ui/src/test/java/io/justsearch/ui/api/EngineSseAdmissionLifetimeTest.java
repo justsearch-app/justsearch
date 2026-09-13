@@ -30,6 +30,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Real managed-SSE admission lifetime and durable foreground ownership regressions. */
 @DisplayName("Engine admission lifetime for managed SSE")
@@ -81,10 +83,11 @@ final class EngineSseAdmissionLifetimeTest {
     }
   }
 
-  @Test
-  @DisplayName("managed SSE keepAlive holds admission until the actual client closes")
-  void managedSseKeepAliveHoldsAdmissionUntilClientClose() throws Exception {
-    try (var fixture = new SseFixture(false)) {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @DisplayName("managed SSE holds admission until the actual client closes")
+  void managedSseHoldsAdmissionUntilClientClose(boolean connectionOwner) throws Exception {
+    try (var fixture = new SseFixture(false, connectionOwner)) {
       HttpRequest request =
           HttpRequest.newBuilder(fixture.uri(SSE_PATH))
               .header("Accept", "text/event-stream")
@@ -100,7 +103,7 @@ final class EngineSseAdmissionLifetimeTest {
 
       assertEquals(200, response.statusCode());
       assertTrue(fixture.callbackEntered.await(5, TimeUnit.SECONDS));
-      assertNull(fixture.callbackFailure.get(), "keepAlive callback failed");
+      assertNull(fixture.callbackFailure.get(), "managed callback failed");
       assertNotNull(fixture.managedClient.get(), "the fixture must expose the actual managed client");
       assertNull(
           fixture.callbackRetained.get(),
@@ -108,10 +111,10 @@ final class EngineSseAdmissionLifetimeTest {
       assertEquals(
           1,
           fixture.afterFilterReached.getCount(),
-          "Javalin must defer the front after filter while keepAlive keeps the stream open");
+          "Javalin must defer the front after filter while the retained request keeps the stream open");
       assertTrue(fixture.callbackFinished.await(5, TimeUnit.SECONDS));
 
-      // The callback has returned, but keepAlive keeps the HTTP stream open. Admission must remain
+      // The callback has returned, but the retained request keeps the stream open. Admission must remain
       // occupied until the actual managed SseClient is closed.
       assertEquals(429, fixture.postProbe().statusCode());
       assertEquals(200, fixture.getHealth().statusCode());
@@ -151,13 +154,19 @@ final class EngineSseAdmissionLifetimeTest {
     final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
     final Javalin app;
     private final boolean blockCallback;
+    private final boolean connectionOwner;
 
     SseFixture() {
       this(true);
     }
 
     SseFixture(boolean blockCallback) {
+      this(blockCallback, false);
+    }
+
+    SseFixture(boolean blockCallback, boolean connectionOwner) {
       this.blockCallback = blockCallback;
+      this.connectionOwner = connectionOwner;
       app = Javalin.create(config -> config.showJavalinBanner = false);
       app.exception(
           io.javalin.http.HttpResponseException.class,
@@ -210,7 +219,12 @@ final class EngineSseAdmissionLifetimeTest {
         if (blockCallback) callbackRetained.set(work.retain());
         callbackEntered.countDown();
         if (!blockCallback) {
-          client.keepAlive();
+          if (connectionOwner) {
+            new SseConnection(client, () -> {}).start();
+            client.sendEvent("ready", "first");
+          } else {
+            client.keepAlive();
+          }
           return;
         }
         if (!callbackRelease.await(10, TimeUnit.SECONDS)) {

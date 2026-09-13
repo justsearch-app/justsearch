@@ -10,19 +10,21 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-**Immediate next item (2026-09-13): coherent full/stress proof, then C2-6 settings.**
-Atomic snapshot attachment, incarnation validation, safe lifecycle checkpoints and transport
-retirement are committed at e7edaf503. Compatibility1231 passes756 represented cases
-(665 execute,91 cached); negative1226/1230 catch the snapshot and retirement defects.
-Live1238 now passes17 checks over14 connections, including disconnect-before-replay,
-restart after replacement sequence growth, HTTP/MCP parity and keyed retry convergence.
-Both managed runs are stopped. UI1241 passes typecheck and6520 tests, including rendered
-snapshot/update overlap; negative1239 catches duplicate visible rows. These are separate
-protocol and HappyDOM witnesses, not a single browser campaign.
-[Live/rendered proof and retained failed attempts](evidence/C2/sse-live-rendered.md).
-Full1202 predates the SSE changes; coherent full/stress, installed-v5 and hosted remain owed.
-CI34766087351 is pending and CLA34766085813 queued at e7edaf503; no hosted success is
-inferred. Continue autonomously; no C2-4 or stage closure is claimed.
+**Immediate next item (2026-09-13): finish Activity browser proof, then implement C2-6.**
+Atomic snapshot/reconnect and retirement production is at e7edaf503. Live1238 passes17
+protocol checks; full UI1248 passes6520/typecheck. Full1249 now passes10403 represented
+cases (1310 in executed tasks,9093 reused), zero failures/errors and35 inherited skips,
+including PMD and UI integration tests. Full1242 remains FAILED on three stale keepAlive
+assertions; their replacements verify request-future lifetime, and real Javalin now proves
+SseConnection retains admission until close. Negative1250 catches premature completion;
+1245's wrong-reason fixture failure remains recorded. [Integrated proof](evidence/C2/integrated1249.md).
+Browser1247 renders the second row once after a controlled native-source disconnect and
+real checkpoint replay. Reload selects System Health by the current routing contract;
+the next harness selects Activity again before asserting the retained snapshot. Browser1244's ineffective offline toggle attempt remains FAILED. Both owned stacks
+are stopped. Installed-v5 and hosted proof remain owed; no C2-4/stage closure is claimed.
+C2-6's independently refuted [implementation plan](evidence/C2/C2-6-plan.md) and owning
+protocol are committed at6db0fd2b1, including the SQL marker, preparation guard, strict atomic
+replace, schema-v3 witness and explicit fatal/corrupt recovery. No owner input is pending.
 
 The completion
 consumer now attaches at the end of both Head constructors, publishes memory/note
@@ -38,30 +40,31 @@ uses **:modules:ui:installDist**. UI install1197 and matched installed jar hashe
 the witness. Full1202 now passes at4c6389be4 with stress enabled:10362 represented
 cases (10195 execute,167 cached), zero failures/errors and35 inherited skips.
 PMD and UI integration checks pass. [Integrated proof](evidence/C2/integrated1202.md).
-Installed-v5/hosted remain owed; C2-4 and the lane stay open. The next mechanism
-and its required regressions are settled in the [SSE plan](evidence/C2/C2-4-sse-plan.md).
+Installed-v5/hosted remain owed; C2-4 and the lane stay open. The subsequent SSE
+implementation and proof are summarized above and in the [SSE plan](evidence/C2/C2-4-sse-plan.md).
 
 The first SSE sub-item now serializes publication and gives each listener one bounded
 drainer outside channel locks. Negative1204 exposes the prior ordering/fan-out races;
 final1210 and compatibility1213 pass, including actual-eviction numeric run-zero proof.
 Independent channel review is clear. [Ordering proof](evidence/C2/sse-ordering.md).
-Continue the bounded snapshot/replay attachment and incarnation/checkpoint work in the
-SSE plan; ordering alone does not close the durable snapshot race.
+The later snapshot/replay attachment and incarnation/checkpoint cut is implemented
+and verified above; the ordering cut alone was not its proof.
 
 Frontend keyed convergence is implemented separately: operation history declares
 operationKey through Resource.primaryKey, and EVENT_STREAM/HISTORY merge overlap
 without collapsing distinct invocations or unkeyed rows. Negative1211 catches disabled
 key routing; restored1212 passes19 and full UI1209 passes6516. Independent review
 verifies the catalog-to-ResourceView path and finds no substantive defect.
-[Keyed-merge proof](evidence/C2/history-keyed-merge.md). Real streamed/rendered overlap
-and restart proof remain with the atomic-SSE campaign, alongside installed/hosted tiers.
+[Keyed-merge proof](evidence/C2/history-keyed-merge.md). The later1238/1241 campaign proves
+live reconnect/restart and simulated-source DOM overlap; browser/installed/hosted tiers
+remain as stated in the current status.
 
 Frontend checkpoint recovery now clears the failed logical token and reconnects through
 the existing physical owner. Independent review's reentrant-start defect is reproduced
 innegative1220 and fixed; final1221 passes46, full1222 passes6519 and typecheck is green.
 [Checkpoint recovery](evidence/C2/checkpoint-recovery.md). Backend snapshot boundaries,
 incarnation validation and lifecycle checkpoint tokens now have the focused proof above;
-real SSE/restart/rendered overlap and installed/hosted proof remain owed.
+live1238 and rendered1241 now pass; browser/installed/hosted proof remains as stated above.
 
 **Prior effect identity cut (2026-09-13):** ingress rejects server
 namespaces, and new frontend effects persist UUID identities while old entries keep
