@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-13: C2-6 corrects corruption re-authoring: an explicitly confirmed reset may establish a new settings history only with no armed dependency on the lost witness. Version conflict compares the existing revision/key pair; the number remains global within intact history. A frozen quarantine fingerprint distinguishes precommit reset recovery from a newly quarantined committed file. This amends §7.4's scalar-only identity under delegated decision authority; no stage/merge placement changes. [Owning protocol](evidence/C2/operations-store-design.md#settings-history-recovery), [alternatives and required proof](evidence/C2/C2-6-plan.md#2026-09-13-settings-history-recovery).
+
 - 2026-09-13: C2-6 reserves and validates the durable settings revision before SQL arming; this prevents refused/stale contenders from leaving ambiguous armed rows after a crash. Boot evaluates the whole open settings set and blocks multiple armed rows. [Owning protocol](evidence/C2/operations-store-design.md#18-the-accepted-settings-revision-port-amended-2026-09-12), [counterexamples and required regressions](evidence/C2/C2-6-plan.md#2026-09-13-reservation-order-correction). Mechanism amendment only; stage/merge placement unchanged.
 
 - 2026-09-13: C2-6 grounds the settings commit boundary in a pre-preparation guard, the existing SQL expected-revision marker, strict atomic replacement and a schema-v3 witness; corruption stays unresolved when commitment cannot be proved. [Owning protocol](evidence/C2/operations-store-design.md#18-the-accepted-settings-revision-port-amended-2026-09-12) and [implementation plan](evidence/C2/C2-6-plan.md). No stage or merge placement changes.
@@ -1200,7 +1202,7 @@ carries one:
 essential property is per dependency, as 7.5's identity rule already is. The first draft kept
 a global version as a chosen simplification. *(decided 2026-09-07, lock)* The design now keeps
 **two things apart**: the **applied configuration revision**, one global number that is the
-accepted-settings record the user reasons about ("revision 42 is applied") and the value a
+accepted-settings record the user reasons about ("revision 42 is applied") and the numerical part of the witness a
 reconfigure names in its `version conflict` check (7.6); and **coherence, which is
 dependency-scoped**: each component declares in the register (7.5) which settings it depends
 on, and a component's applied version moves only when a declared setting moves. A settings
@@ -1210,6 +1212,16 @@ organising principle), and the user-facing story does not change. Generation-bou
 are outside both: the active generation is their applied value (above). "One applied version
 throughout" in 16's reconfigure row therefore reads per component: a request never meets a
 component whose applied version differs from the one its inputs were made against.
+
+*(amended 2026-09-13, C2-6 corruption recovery)* The accepted-settings identity is the
+existing pair `(acceptedRevision, lastCommittedOperationKey)`. Every new-key mutation
+compares both fields; GET returns both. The number increments once per committed settings
+change across all producers within intact history. Explicitly confirmed recovery reset may
+start at revision1 with its own operation key after history is lost, only under the bounded
+[settings-history recovery protocol](evidence/C2/operations-store-design.md#settings-history-recovery).
+It never claims to recover the old numeric high-watermark. Pair comparison refuses a stale
+client holding the same number from before corruption. Same-key lookup still returns the
+recorded outcome before preparation/comparison. This refines identity, not component coherence.
 
 **Continuity is conditional, and the condition is stated per component.** Two things break an
 unconditional compose-before-close, and the design claims neither away:

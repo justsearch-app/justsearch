@@ -183,3 +183,37 @@ Health; one uses the existing witness rules; null-marker rows safely fail precom
 Required regressions add occupied/stale reservation leaves a null marker, reservation-to-arm
 failure retains the guard until durable failure, and multiple armed boot rows fail closed.
 This is a reviewed mechanism decision, not executable proof; no stage/merge cut changes.
+
+## 2026-09-13 settings history recovery
+
+Independent design review found that permanent refusal after quarantine conflicts with explicit
+re-authoring, while treating defaults as revisionzero accepts stale numeric revisions. The
+[owning protocol](operations-store-design.md#settings-history-recovery) now requires typed witness
+comparison for every new-key producer and a confirmed recovery reset with frozen quarantine
+evidence. This is a C2-6 contract correction under delegated authority; implementation remains
+in cuts2–4 and no external decision is pending.
+
+Rejected alternatives: defaults-as-zero fabricates history; permanent refusal loses the reset
+path; retained SQL rows cannot prove a maximum after retention; a second revision allocator
+adds another authority and changes the two-store protocol. Reusing both existing witness fields
+and the existing accepted preparation is the smaller ownership change. A Boolean recovery flag
+alone was refuted: reset may commit, lose SQL completion, then be quarantined at boot. A digest
+of the original complete quarantine set prevents falsely failing that committed reset.
+
+Extend the owner/runner API to typed expected witness and immutable accepted recovery preparation;
+use the fixed versioned settings codec, never public recovery flags. Return both witness fields
+on GET and migrate HTTP, reset/reconfigure, internal writers, compensation and all UI producers.
+The numerical part still occupies the existing SQL marker and determines successful receipt
+revision as expected+1. Fingerprint the sorted regular sibling set with unambiguous encoding;
+revalidate before arming, and pass unknown evidence through as unresolved. Exact live commitment
+wins even when the recovery payload cannot be decoded. Wire the recovery notice lifecycle so
+only committed explicit re-authoring clears its condition.
+
+Required proof in addition to the existing matrix: stale same-number/different-key conflict;
+normal/internal refusal while recovery is required; armed row blocks reset before marking;
+reset termination before/after file commitment; terminal SQL failure; same-key reset idempotency
+and changed-input refusal; changed/added/removed/unreadable/non-regular quarantine evidence WAIT;
+postcommit corruption/quarantine cannot become precommit FAILED; exact live witness completes
+with invalid/missing preparation; future/inaccessible file refusal; ordinary fresh absencezero.
+No runtime or verification claim is made by this design amendment. Update ADR0008 and canonical
+configuration behavior with the producer implementation, not ahead of its shipped behavior.

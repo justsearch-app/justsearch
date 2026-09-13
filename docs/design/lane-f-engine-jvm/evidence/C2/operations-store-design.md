@@ -221,7 +221,7 @@ step 1, and "pointer swapped, successor missing" is unreachable.
 ### 1.8 The accepted-settings revision port (amended 2026-09-12)
 
 C2-6 is an app-api port owning the serialization of every production settings write,
-including install/import and runtime-spec writers. Its apply accepts expected revision,
+including install/import and runtime-spec writers. Its apply accepts the typed expected witness (revision and last committed key),
 operation key and target UiSettings; D1 supplies already-prepared component installation.
 The implementation owns one apply mutex and a typed `SettingsCommitFence`. Install its
 attempt-scoped PREPARING guard during reservation, before SQL arming and before any copy,
@@ -319,10 +319,48 @@ through a handler return would transfer lock ownership across layers; allowing t
 handler to complete its own row would duplicate the executor's terminal authority.
 The bounded in-process fence preserves one terminal owner without either mechanism.
 
-GET and successful apply return acceptedRevision. Same-key retry checks canonical input
+GET returns acceptedRevision and lastCommittedOperationKey; successful apply returns the committed
+witness (the operation key is the last committed key). Same-key retry checks canonical input
 identity and returns the stored outcome before comparing current revisions. A new key
-compares expectedRevision normally. The settings/reconfigure row records the expected
+compares both fields of its typed expected witness; scalar-only comparison is insufficient. The settings/reconfigure row records the expected
 revision and completion carries the committed revision.
+
+#### Settings history recovery
+
+Amended2026-09-13 under delegated lane authority. Runtime defaults after quarantine do not
+reconstruct settings history. Refuse ordinary/internal mutation while the witness is unknown.
+The existing confirmed `core.reset-settings` operation is the sole recovery re-authoring path:
+with proven absent live settings, preserved readable regular quarantine evidence and no armed
+settings dependency, it may write defaults directly as `(1, resetOperationKey)`. A normal reset
+of readable settings still increments the current revision. Never write an intermediate zero
+file. Future-version, inaccessible/unknown evidence, and any existing armed/unresolved fence
+remain refused. The zero SQL expected marker is an explicit recovery sentinel for this path,
+not an inferred lost revision. Reservation revalidates evidence before SQL arming.
+
+Freeze versioned recovery intent plus a SHA-256 fingerprint of the exact quarantine evidence
+in the existing server-prepared accepted payload before any effect. Fingerprinting uses stable
+ordering and unambiguous length-prefixed sibling names and content digests; unreadable or
+non-regular evidence cannot qualify. Include the whole matching sibling set: added, removed
+or changed evidence invalidates its precommit proof. Public flags/operation references alone
+cannot authorize recovery. The fixed settings codec validates the server-prepared envelope;
+the runner reads existing `acceptedPreparation(id)` and passes immutable accepted preparation
+beside the recovery row outside SQL locks, without widening generic OperationRecord or wire
+outcomes with raw payloads. Invalid/missing intent cannot authorize execution or special
+precommit recovery.
+
+At boot, exact live `(expected+1, row.key)` proves COMPLETE independently of recovery-payload
+decode. For an armed recovery reset only, proven absence plus the unchanged frozen quarantine
+fingerprint proves precommit FAILED. Changed evidence (including a newly quarantined committed
+file), inaccessible/corrupt/third live state, or missing/invalid intent stays WAIT with Health.
+Ordinary armed rows with lost witnesses always stay unresolved and forbid reset. Preparation
+and acceptance may coexist with another row; they have no settings effect. Reservation is the
+mandatory exclusion point before arming. Null-marker rows remain precommit failures.
+
+One global number survives within intact history; the existing pair is the version-conflict
+identity across recovery. No second allocator, epoch store or inferred high-watermark from
+retained operations rows is introduced. Plain absence with no quarantine remains the fresh
+zero assumption; external deletion/rollback without preserved evidence is outside this contract.
+The [implementation plan](C2-6-plan.md#2026-09-13-settings-history-recovery) owns tests and migration.
 
 Primary sources at35d03f7c4: UiSettingsStore.java:222-245 (file replace plus a fallible
 post-write notification); ConfigStoreRebuilder.java:72-84 (build/update swallowed together);

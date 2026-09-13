@@ -10,6 +10,11 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
+C2-6's [reviewed corruption-recovery amendment](evidence/C2/C2-6-plan.md#2026-09-13-settings-history-recovery)
+requires typed witness comparison and confirmed reset with exact frozen quarantine evidence.
+It is design authority, not implemented recovery proof. Root owns the remaining migration;
+no owner input is pending and no armed ambiguous operation may be guessed FAILED.
+
 **Immediate next items (2026-09-13): C2-6 physical file/config owner and reconciliation, then producer migration.**
 Atomic snapshot/reconnect and retirement production is at e7edaf503. Live1238 passes17
 protocol checks; full UI1248 passes6520/typecheck. Full1249 now passes10403 represented
