@@ -10,4 +10,4 @@ public record OperationRecord(
     String checkpointCursor, long unitsCompleted, long unitsFailed, int attempts,
     long acceptedAt, Long startedAt, long updatedAt, Long completedAt,
     String failureReason, OperationReceipt receipt, OperationHistoryMode historyMode,
-    java.time.Instant provenanceOccurredAt) {}
+    java.time.Instant provenanceOccurredAt, Long expectedSettingsRevision) {}

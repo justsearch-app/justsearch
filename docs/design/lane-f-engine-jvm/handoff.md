@@ -26,8 +26,9 @@ and1247 remain retained. All owned stacks are stopped. Integrated tests are push
 Installed-v5 and hosted proof remain owed; no C2-4/stage closure is claimed.
 C2-6 cut1 now implements the preparation/storage foundation with Final1259 green (85
 represented cases, 76 executed/9 cached) and six intended negative1258 failures. Independent
-review is clear. [Storage proof](evidence/C2/settings-preparation.md). Next: runner marker,
-attempt fence/reconciliation, then producer migration. Browser1260's actual binary fingerprints
+review is clear. [Storage proof](evidence/C2/settings-preparation.md). The [SQL marker](evidence/C2/settings-marker.md) now passes Marker1268 (45 represented,
+all executed, no failures/errors/skips), with PMD and format checks. Next: runner/owner
+attempt fence and reconciliation, then producer migration. Browser1260's actual binary fingerprints
 match; its accessibility assertion catches additional contrast defects now being corrected.
 C2-6's independently refuted [implementation plan](evidence/C2/C2-6-plan.md) and owning
 protocol are committed at6db0fd2b1, including the SQL marker, preparation guard, strict atomic

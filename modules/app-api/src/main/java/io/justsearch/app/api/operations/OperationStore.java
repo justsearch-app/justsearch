@@ -97,6 +97,13 @@ public interface OperationStore extends AutoCloseable {
   /** Only ACCEPTED can start; repeated starts cannot execute another body. */
   boolean start(long id);
 
+  /**
+   * Runner-only, one-shot marker before settings preparation. Only a RUNNING settings-apply or
+   * reconfigure row with no prior marker may be armed. The column stores the expected revision;
+   * committed revision is expected+1. This nonterminal transition emits no completion event.
+   */
+  boolean armSettingsRevision(long id, long expectedRevision);
+
   /** A reconciler has revalidated a recoverable open attempt before scheduling its next body. */
   boolean resume(long id);
 

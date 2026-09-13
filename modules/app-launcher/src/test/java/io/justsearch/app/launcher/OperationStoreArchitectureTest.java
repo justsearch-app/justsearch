@@ -55,7 +55,7 @@ class OperationStoreArchitectureTest {
     @Override public void check(JavaClass item, ConditionEvents events) {
       for (var call : item.getCodeUnitAccessesFromSelf()) {
         if (call.getTargetOwner().isAssignableTo(OperationStore.class)
-            && java.util.Set.of("accept", "start", "resume", "rejectBeforeStart", "finish")
+            && java.util.Set.of("accept", "start", "resume", "rejectBeforeStart", "finish", "armSettingsRevision")
                 .contains(call.getName())
             && !item.getFullName().equals(RUNNER) && !item.getFullName().startsWith(RUNNER + "$")) {
           events.add(SimpleConditionEvent.violated(item,
@@ -89,6 +89,16 @@ class OperationStoreArchitectureTest {
     assertTrue(ATTEMPT_WRITER.evaluate(imported).hasViolation());
   }
 
+  @Test
+  void attemptWriterRuleRejectsAProducerArmingSettings() {
+    var imported = new ClassFileImporter().importClasses(UnauthorizedSettingsMarker.class, OperationStore.class);
+    assertTrue(ATTEMPT_WRITER.evaluate(imported).hasViolation());
+  }
+
+  static final class UnauthorizedSettingsMarker {
+    void arm(OperationStore store) { store.armSettingsRevision(1, 0); }
+  }
+
   static final class UnauthorizedWriter {
     void finish(OperationStore store) {
       store.finish(1, io.justsearch.app.api.operations.OperationState.COMPLETE,
@@ -97,6 +107,7 @@ class OperationStoreArchitectureTest {
   }
 
   static final class UnauthorizedStore implements OperationStore {
+    @Override public boolean armSettingsRevision(long id, long expectedRevision) { return false; }
     @Override public java.util.List<io.justsearch.app.api.operations.OperationHistoryRow> recentHistory(int limit) {
       return java.util.List.of();
     }

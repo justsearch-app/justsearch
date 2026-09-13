@@ -582,6 +582,23 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
+  public boolean armSettingsRevision(long id, long expectedRevision) {
+    if (expectedRevision < 0 || expectedRevision == Long.MAX_VALUE) {
+      throw new IllegalArgumentException("Expected settings revision cannot advance");
+    }
+    return locked(() -> {
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET accepted_settings_revision = ?, updated_at = ?
+          WHERE id = ? AND state = 'RUNNING' AND kind IN ('settings-apply', 'reconfigure')
+            AND accepted_settings_revision IS NULL
+          """)) {
+        update.setLong(1, expectedRevision); update.setLong(2, clock.millis()); update.setLong(3, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
   public boolean resume(long id) {
     return locked(() -> {
       try (var update = connection.prepareStatement("""
@@ -855,7 +872,8 @@ public final class SqliteOperationStore implements OperationStore {
         receiptJson == null ? null : JSON.readValue(receiptJson, OperationReceipt.class),
         OperationHistoryMode.valueOf(result.getString("history_mode")),
         result.getString("provenance_occurred_at") == null ? null
-            : java.time.Instant.parse(result.getString("provenance_occurred_at")));
+            : java.time.Instant.parse(result.getString("provenance_occurred_at")),
+        nullableLong(result, "accepted_settings_revision"));
   }
 
   private static EngineContext readContext(ResultSet result) throws SQLException {
