@@ -2469,13 +2469,10 @@ public final class KnowledgeServer implements Closeable {
           }
         }
 
-        // Close job queue
+        // Retain the queue and index exclusion if native connection cleanup needs retry.
+        // EngineRoot must not observe completed shutdown while this mutable owner remains live.
         if (jobQueue != null) {
-          try {
-            jobQueue.close();
-          } catch (Exception e) {
-            log.warn("Error closing job queue", e);
-          }
+          jobQueue.close();
         }
 
         // Close signal bus

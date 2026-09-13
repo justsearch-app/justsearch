@@ -44,6 +44,36 @@ final class KnowledgeServerCloseCompletionTest {
   }
 
   @Test
+  void failedQueueCloseRetainsServerAndIndexExclusionUntilRetry(@TempDir Path tempDir) throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var queue = org.mockito.Mockito.mock(io.justsearch.indexerworker.queue.JobQueue.class);
+    var queueField = KnowledgeServer.class.getDeclaredField("jobQueue");
+    queueField.setAccessible(true);
+    queueField.set(server, queue);
+    var rootLock = org.mockito.Mockito.mock(io.justsearch.indexerworker.util.IndexRootLock.class);
+    var lockField = KnowledgeServer.class.getDeclaredField("indexRootLock");
+    lockField.setAccessible(true);
+    lockField.set(server, rootLock);
+    var failure = new java.io.IOException("queue connection still live");
+    org.mockito.Mockito.doThrow(failure).doNothing().when(queue).close();
+    try {
+      org.junit.jupiter.api.Assertions.assertSame(failure,
+          org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close));
+      assertFalse(server.awaitClosed(0));
+      org.junit.jupiter.api.Assertions.assertSame(queue, queueField.get(server));
+      org.junit.jupiter.api.Assertions.assertSame(rootLock, lockField.get(server));
+      org.mockito.Mockito.verify(rootLock, org.mockito.Mockito.never()).close();
+    } finally {
+      server.close();
+    }
+    assertTrue(server.awaitClosed(0));
+    var order = org.mockito.Mockito.inOrder(queue, rootLock);
+    order.verify(queue, org.mockito.Mockito.times(2)).close();
+    order.verify(rootLock).close();
+  }
+
+  @Test
   void failedIndexLockCloseRetainsOwnerAndShutdownRemainsIncomplete(@TempDir Path tempDir) throws Exception {
     var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
         WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);

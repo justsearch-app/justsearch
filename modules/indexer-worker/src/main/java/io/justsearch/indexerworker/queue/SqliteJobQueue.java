@@ -88,7 +88,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private final ReentrantLock lock = new ReentrantLock();
   private final int maxAttempts;
   private Connection connection;
-  private Throwable transactionFailure;
+  private Throwable connectionFailure;
   // Only live processing capabilities: object identity prevents an older commit from finishing
   // a replacement claim for the same path. Dead JVMs cannot deliver callbacks after restart.
   private final Map<String, IndexJob> activeClaims = new HashMap<>();
@@ -240,8 +240,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public void open() throws SQLException, IOException {
     lock.lock();
     try {
-      if (transactionFailure != null) throw new SQLException(
-          "Queue transaction cleanup requires successful close before open", transactionFailure);
+      if (connectionFailure != null) throw new SQLException(
+          "Queue connection cleanup requires successful close before open", connectionFailure);
       Files.createDirectories(dbPath.getParent());
 
       // Capture whether DB existed BEFORE opening (JDBC will create empty file if missing)
@@ -1225,18 +1225,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (lock.getHoldCount() == 1 && changeStream != null) {
         try { changeStream.drainCommitted(); }
         catch (RuntimeException | Error deliveryFailure) {
-          if (transactionFailure == null) throw deliveryFailure;
-          if (transactionFailure != deliveryFailure) transactionFailure.addSuppressed(deliveryFailure);
+          if (connectionFailure == null) throw deliveryFailure;
+          if (connectionFailure != deliveryFailure) connectionFailure.addSuppressed(deliveryFailure);
         } finally {
-          if (transactionFailure != null) {
+          if (connectionFailure != null) {
             // Xerial listener removal needs the native connection alive. Freeze/deliver confirmed
             // deltas first, detach capture next, and only then close the failed connection.
             try { changeStream.close(); }
             catch (RuntimeException | Error feedFailure) {
-              if (transactionFailure != feedFailure) transactionFailure.addSuppressed(feedFailure);
+              if (connectionFailure != feedFailure) connectionFailure.addSuppressed(feedFailure);
             } finally {
               changeStream = null;
-              closeFailedTransactionConnection();
+              closeFailedConnection();
             }
           }
         }
@@ -1270,11 +1270,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       catch (SQLException | RuntimeException | Error restoreFailure) {
         if (failure == null) failure = restoreFailure;
         else if (failure != restoreFailure) failure.addSuppressed(restoreFailure);
-        transactionFailure = failure;
+        connectionFailure = failure;
       }
     } else {
       // Restoring auto-commit here could commit work whose rollback was never confirmed.
-      transactionFailure = failure;
+      connectionFailure = failure;
     }
     // Materialize confirmed rows while the connection is still available. A reset failure
     // cannot turn a successful commit into rollback or silently omit its projection.
@@ -1285,9 +1285,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         else if (failure != projectionFailure) failure.addSuppressed(projectionFailure);
       }
     }
-    if (transactionFailure != null) {
+    if (connectionFailure != null) {
       recordDbError();
-      if (changeStream == null) closeFailedTransactionConnection();
+      if (changeStream == null) closeFailedConnection();
     }
     if (failure instanceof SQLException sql) throw sql;
     if (failure instanceof RuntimeException runtime) throw runtime;
@@ -1295,10 +1295,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return result;
   }
 
-  private void closeFailedTransactionConnection() {
+  private void closeFailedConnection() {
     try { connection.close(); }
     catch (SQLException | RuntimeException | Error closeFailure) {
-      if (transactionFailure != closeFailure) transactionFailure.addSuppressed(closeFailure);
+      if (connectionFailure != closeFailure) connectionFailure.addSuppressed(closeFailure);
     }
   }
 
@@ -2174,8 +2174,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private void ensureOpen() {
-    if (transactionFailure != null) throw new IllegalStateException(
-        "SqliteJobQueue transaction cleanup remains unresolved", transactionFailure);
+    if (connectionFailure != null) throw new IllegalStateException(
+        "SqliteJobQueue connection cleanup remains unresolved", connectionFailure);
     if (connection == null) {
       throw new IllegalStateException("SqliteJobQueue is not open");
     }
@@ -2335,11 +2335,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           checkpointWalBestEffort();
           connection.close();
           connection = null;
-          transactionFailure = null;
+          connectionFailure = null;
           activeClaims.clear();
           log.info("SqliteJobQueue closed");
-        } catch (SQLException e) {
-          throw new IOException("Failed to close SqliteJobQueue", e);
+        } catch (SQLException | RuntimeException | Error failure) {
+          if (connectionFailure == null) connectionFailure = failure;
+          else if (connectionFailure != failure) connectionFailure.addSuppressed(failure);
+          recordDbError();
+          if (failure instanceof SQLException sql) throw new IOException("Failed to close SqliteJobQueue", sql);
+          if (failure instanceof RuntimeException runtime) throw runtime;
+          throw (Error) failure;
         }
       }
     } finally {

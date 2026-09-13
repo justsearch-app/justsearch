@@ -112,6 +112,36 @@ final class IndexingJobsChangeStreamTest {
   }
 
   @Test
+  void failedNormalCloseRefusesReopenUntilTheRetainedConnectionCloses() throws Exception {
+    Path jobPath = tempDir.resolve("close-reopen.txt");
+    jobQueue.enqueue(List.of(jobPath));
+    Connection original = readField("connection", Connection.class);
+    Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+        org.mockito.AdditionalAnswers.delegatesTo(original));
+    var failure = new java.sql.SQLException("native queue close unavailable");
+    var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+    org.mockito.Mockito.doAnswer(call -> {
+      if (first.getAndSet(false)) throw failure;
+      original.close();
+      return null;
+    }).when(intercepted).close();
+    writeField("connection", intercepted);
+    try {
+      assertSame(failure, assertThrows(java.io.IOException.class, jobQueue::close).getCause());
+      assertSame(intercepted, readField("connection", Connection.class));
+      assertSame(failure, assertThrows(java.sql.SQLException.class, jobQueue::open).getCause());
+      assertThrows(IllegalStateException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+      assertFalse(jobQueue.queueDbHealthSnapshot().healthy());
+    } finally {
+      jobQueue.close();
+      original.close();
+    }
+    assertTrue(original.isClosed());
+    jobQueue.open();
+    assertEquals("PENDING", observedJobState());
+  }
+
+  @Test
   void errorAfterSqlWriteRollsBackWithoutAnImplicitCommit() throws Exception {
     transactionWorkFailure(false, false);
   }

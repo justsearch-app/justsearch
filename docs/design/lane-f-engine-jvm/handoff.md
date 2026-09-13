@@ -19,10 +19,12 @@ cleanup passes78 cases at899 after negative889/892/898 and a corrected native cl
 ordering crash at890. The living schema checklist and54-entry historical
 commit-proof mapping are reconciled. Full900 at2168d1245 has10156 represented cases
 with no test failures/errors and35 inherited skips, but fails only lock-test whitespace;
-focused formatting902 passes. Correction review resolves the other implementation
-findings but requires queue close/open ownership: retain normal close failures and
-propagate a failed queue close through KnowledgeServer. Root owns that correction
-next, followed by fresh full/hosted proof. The latest full summary records900 as FAILED. Fresh integrated
+focused formatting902 passes. Correction review's remaining queue close/open finding
+is corrected: negative903 reproduces both paths; final904 executes100 passing cases
+with PMD, formatting and UI integration-test compilation. The same reviewer must
+verify that final correction plus the schema/history documentation records, then
+fresh full/hosted proof completes this correction batch. The latest full summary
+still records900 as FAILED; no new producer is activated yet. Fresh integrated
 proof follows the consolidated corrections.
 
 Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),

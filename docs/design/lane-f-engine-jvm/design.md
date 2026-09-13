@@ -413,6 +413,8 @@ it is history, not a second current contract. Evidence records retain the experi
 
 | 2026-09-13 | **C2 R10 final-review correction: historical commit proof.** The73-commit reviewed range has54 empty bodies. Preserve published history and supply an immutable hash-to-item/result/command-evidence index for each, including historical failures, reuse and later retirement. The body-and-immediate-push requirement applies to every new correction commit from5a10b9dc9 onward; do not claim it was met retroactively. The mapping is a projection of existing Git evidence, not new execution proof. | R10; final review finding7; historical-commit-proof-map.md/json;85 verified Markdown blobs |
 
+| 2026-09-13 | **C2 R8 correction-review follow-up: queue close ownership.** The correction review proves two remaining paths can discard a live queue owner: normal close failure was not recorded by the reuse guard, and KnowledgeServer swallowed queue-close failure before releasing index exclusion. Use the same in-memory connection failure for transaction retirement and normal close, refuse open/use until confirmed cleanup, retain the failed handle, and report Health degradation. Propagate queue-close failure through KnowledgeServer before executor/index-lock release and shutdown completion; a later close retries the same owner. Rename the existing cause for this actual connection-wide scope rather than adding another lifecycle flag. | R8; final review correction round1; negative903 reproduces both paths; root owns final correction |
+
 
 **2026-09-10 corrections from the inference-host design audits** (four read-only audits at
 `4229f1091`, `docs/design/inference-host/evidence/audits/`), inside decided lines: (a) sections
