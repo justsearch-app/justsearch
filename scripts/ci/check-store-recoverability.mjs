@@ -286,25 +286,28 @@ export function checkDurableStoreRegister({
 
     failures.push(...checkPathAgreement({ root, row, label, readableSources, readSource }));
     failures.push(...checkEncryptionDisposition({ row, label, authoredCatalogDirs }));
-    if (row.id === 'jobs-db') {
+    if (row.id === 'jobs-db' || row.id === 'operations-db') {
+      const constantName = row.id === 'jobs-db' ? 'TARGET_VERSION' : 'VERSION';
       if (typeof row.versionAuthority !== 'string' || !row.versionAuthority.trim()
           || !pathExists(resolve(root, row.versionAuthority))) {
-        failures.push(`${label}: versionAuthority must resolve to the jobs schema source.`);
+        failures.push(`${label}: versionAuthority must resolve to the ${row.id} schema source.`);
       } else {
         try {
           const code = stripJavaComments(readSource(resolve(root, row.versionAuthority)),
             { stripLiterals: true });
           // This authority uses positive decimal literals. Reject other Java bases rather
           // than interpreting (for example) octal 017 as decimal 17.
-          const declarations = [...code.matchAll(
-            /^\s*public\s+static\s+final\s+int\s+TARGET_VERSION\s*=\s*([1-9](?:[\d_]*\d)?)\s*;\s*$/gm)];
+          const declaration = row.id === 'jobs-db'
+            ? /^\s*public\s+static\s+final\s+int\s+TARGET_VERSION\s*=\s*([1-9](?:[\d_]*\d)?)\s*;\s*$/gm
+            : /^\s*static\s+final\s+int\s+VERSION\s*=\s*([1-9](?:[\d_]*\d)?)\s*;\s*$/gm;
+          const declarations = [...code.matchAll(declaration)];
           if (declarations.length !== 1) {
-            failures.push(`${label}: versionAuthority must declare exactly one literal TARGET_VERSION.`);
+            failures.push(`${label}: versionAuthority must declare exactly one literal ${constantName}.`);
           } else {
             const target = Number(declarations[0][1].replaceAll('_', ''));
             if (!Number.isSafeInteger(target) || target <= 0 || row.currentVersion !== target) {
               failures.push(`${label}: currentVersion ${row.currentVersion} disagrees with `
-                  + `${row.versionAuthority} TARGET_VERSION ${target}.`);
+                  + `${row.versionAuthority} ${constantName} ${target}.`);
             }
           }
         } catch (error) {

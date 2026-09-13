@@ -75,13 +75,26 @@ class OperationStoreArchitectureTest {
     @Override public AutoCloseable subscribeCompletions(java.util.function.Consumer<io.justsearch.app.api.operations.OperationRecord> listener) {
       throw new UnsupportedOperationException();
     }
+    @Override public Acceptance accept(String key,
+        io.justsearch.app.api.operations.OperationDescriptor descriptor,
+        io.justsearch.core.context.EngineContext context,
+        io.justsearch.agent.api.registry.InvocationProvenance provenance) {
+      throw new UnsupportedOperationException();
+    }
+    @Override public Acceptance acceptPrepared(String key,
+        io.justsearch.app.api.operations.OperationDescriptor descriptor,
+        io.justsearch.core.context.EngineContext context,
+        io.justsearch.agent.api.registry.InvocationProvenance provenance, java.util.UUID nonce) {
+      throw new UnsupportedOperationException();
+    }
     @Override public io.justsearch.app.api.operations.OperationOutcomeView outcome(String key) {
       throw new UnsupportedOperationException();
     }
     @Override public Acceptance accept(String key,
         io.justsearch.app.api.operations.OperationDescriptor descriptor,
         io.justsearch.core.context.EngineContext context,
-        io.justsearch.agent.api.registry.InvocationProvenance provenance) {
+        io.justsearch.agent.api.registry.InvocationProvenance provenance,
+        io.justsearch.app.api.operations.OperationHistoryMode historyMode) {
       throw new UnsupportedOperationException();
     }
     @Override public java.util.Optional<io.justsearch.app.api.operations.OperationRecord> find(String key) {
@@ -100,7 +113,8 @@ class OperationStoreArchitectureTest {
     @Override public Acceptance acceptPrepared(String key,
         io.justsearch.app.api.operations.OperationDescriptor descriptor,
         io.justsearch.core.context.EngineContext context,
-        io.justsearch.agent.api.registry.InvocationProvenance provenance, java.util.UUID nonce) {
+        io.justsearch.agent.api.registry.InvocationProvenance provenance, java.util.UUID nonce,
+        io.justsearch.app.api.operations.OperationHistoryMode historyMode) {
       throw new UnsupportedOperationException();
     }
     @Override public java.util.Optional<Preparation> acceptedPreparation(long id) {

@@ -189,7 +189,7 @@ class OperationPreparationStoreTest {
     assertEquals(0, scalar("SELECT count(*) FROM pragma_table_info('operations') WHERE name='preparation_payload'"));
     assertEquals(0, scalar("SELECT count(*) FROM sqlite_master WHERE name='operation_preparations'"));
     try (var store = open()) {
-      assertEquals(3, scalar("PRAGMA user_version"));
+      assertEquals(4, scalar("PRAGMA user_version"));
       assertEquals(17, store.historySinceMillis());
       assertEquals(7, store.openRecords().getFirst().id());
       assertTrue(store.acceptedPreparation(7).isEmpty());

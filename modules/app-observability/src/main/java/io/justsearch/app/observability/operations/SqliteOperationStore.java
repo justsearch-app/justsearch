@@ -2,6 +2,7 @@
 package io.justsearch.app.observability.operations;
 
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.OperationHistoryMode;
 import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.operations.OperationPreparedPayload;
 import io.justsearch.app.api.operations.OperationDescriptor;
@@ -51,7 +52,7 @@ public final class SqliteOperationStore implements OperationStore {
   private static final String INSERT_OPERATION = """
       INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
         identity_json, grant_ref, client_kind, client_id, session_id, source_tier, transport,
-        executor, initiator, correlation_id, accepted_at, updated_at)
+        executor, initiator, correlation_id, accepted_at, updated_at, history_mode, provenance_occurred_at)
       """;
   private final ReentrantLock lock = new ReentrantLock();
   private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<OperationRecord>>
@@ -182,6 +183,9 @@ public final class SqliteOperationStore implements OperationStore {
         }
         if (version <= 2) {
           OperationSchema.migrateV2(statement);
+        }
+        if (version <= 3) {
+          OperationSchema.migrateV3(statement);
           statement.execute("PRAGMA user_version = " + OperationSchema.VERSION);
         }
         try (var update = connection.prepareStatement(
@@ -280,17 +284,30 @@ public final class SqliteOperationStore implements OperationStore {
   @Override
   public Acceptance accept(String key, OperationDescriptor descriptor, EngineContext context,
       InvocationProvenance provenance) {
-    return acceptInternal(key, descriptor, context, provenance, null);
+    return acceptInternal(key, descriptor, context, provenance, null, OperationHistoryMode.NONE);
   }
 
   @Override
   public Acceptance acceptPrepared(String key, OperationDescriptor descriptor, EngineContext context,
       InvocationProvenance provenance, UUID nonce) {
-    return acceptInternal(key, descriptor, context, provenance, Objects.requireNonNull(nonce, "nonce"));
+    return acceptInternal(key, descriptor, context, provenance, Objects.requireNonNull(nonce, "nonce"), OperationHistoryMode.NONE);
+  }
+
+  @Override
+  public Acceptance accept(String key, OperationDescriptor descriptor, EngineContext context,
+      InvocationProvenance provenance, OperationHistoryMode historyMode) {
+    return acceptInternal(key, descriptor, context, provenance, null, historyMode);
+  }
+
+  @Override
+  public Acceptance acceptPrepared(String key, OperationDescriptor descriptor, EngineContext context,
+      InvocationProvenance provenance, UUID nonce, OperationHistoryMode historyMode) {
+    return acceptInternal(key, descriptor, context, provenance, Objects.requireNonNull(nonce, "nonce"), historyMode);
   }
 
   private Acceptance acceptInternal(String key, OperationDescriptor descriptor, EngineContext context,
-      InvocationProvenance provenance, UUID nonce) {
+      InvocationProvenance provenance, UUID nonce, OperationHistoryMode historyMode) {
+    Objects.requireNonNull(historyMode, "historyMode");
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(descriptor, "descriptor");
     long keyTime = validatedKeyTime(key);
@@ -298,6 +315,10 @@ public final class SqliteOperationStore implements OperationStore {
     return locked(() -> transaction(() -> {
       var existing = lookupRow(key, keyTime, descriptor, identity);
       if (existing.isPresent()) return new Acceptance(existing.get(), false);
+      if (historyMode != OperationHistoryMode.NONE) {
+        Objects.requireNonNull(provenance, "Audited acceptance requires provenance");
+        Objects.requireNonNull(descriptor.operationRef(), "Audited acceptance requires an operation reference");
+      }
       Preparation pending = pendingRow(key, descriptor, identity).orElse(null);
       if ((nonce == null && pending != null)
           || (nonce != null && (pending == null || !nonce.equals(pending.nonce())))) {
@@ -313,7 +334,7 @@ public final class SqliteOperationStore implements OperationStore {
             readHistorySince() - now);
       }
       String sql = INSERT_OPERATION + """
-          VALUES (?, ?, ?, ?, 'ACCEPTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, 'ACCEPTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(operation_key) DO NOTHING
           """;
       try (var insert = connection.prepareStatement(sql)) {
@@ -323,7 +344,8 @@ public final class SqliteOperationStore implements OperationStore {
             context.sessionId().orElse(null), context.sourceTier(), context.transport(),
             provenance == null ? null : provenance.executor().name(),
             provenance == null ? null : provenance.initiator().orElse(null),
-            provenance == null ? null : provenance.correlationId().orElse(null), now, now};
+            provenance == null ? null : provenance.correlationId().orElse(null), now, now, historyMode.name(),
+            provenance == null ? null : provenance.occurredAt().toString()};
         for (int i = 0; i < values.length; i++) insert.setObject(i + 1, values[i]);
         if (insert.executeUpdate() != 1) throw new SQLException("Concurrent acceptance escaped queue ownership");
       }
@@ -741,7 +763,10 @@ public final class SqliteOperationStore implements OperationStore {
         result.getString("checkpoint_cursor"), result.getLong("units_completed"), result.getLong("units_failed"),
         result.getInt("attempts"), result.getLong("accepted_at"), nullableLong(result, "started_at"),
         result.getLong("updated_at"), nullableLong(result, "completed_at"), result.getString("failure_reason"),
-        receiptJson == null ? null : JSON.readValue(receiptJson, OperationReceipt.class));
+        receiptJson == null ? null : JSON.readValue(receiptJson, OperationReceipt.class),
+        OperationHistoryMode.valueOf(result.getString("history_mode")),
+        result.getString("provenance_occurred_at") == null ? null
+            : java.time.Instant.parse(result.getString("provenance_occurred_at")));
   }
 
   private static Long nullableLong(ResultSet result, String column) throws SQLException {

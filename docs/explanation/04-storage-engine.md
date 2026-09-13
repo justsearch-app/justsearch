@@ -309,6 +309,20 @@ Replay removes only the versions it applied and committed, preserving admissions
 during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
 roll back both.
 
+Version 3 adds the bounded pending/accepted prepared-invocation payload. Version 4
+persists the acceptance-time history mode (`NONE`, `STANDARD`, `UNDOABLE`, `UNDO`)
+and original provenance instant. The dispatcher derives the mode from its audit
+and undo declaration; an audited non-dispatched producer supplies it explicitly
+through `OperationAttemptRunner.Request`. Producers with their own ledger use NONE.
+The first accepted mode wins on keyed retry independently of public input identity.
+Legacy rows migrate to NONE because the original audit declaration is unavailable.
+The recoverability gate compares both operations and jobs register versions with
+their declared Java schema constants, ignoring comments and string literals.
+The stored context/executor/initiator/correlation fields supply attribution; signed
+intent tokens and handler content are excluded from these history metadata fields.
+This metadata supports the pending durable-history swap; recent history currently
+still uses its bounded in-memory store.
+
 Compatibility inspection copies a quiescent main file and WAL into a private temporary directory.
 SQLite reads that copy, including uncheckpointed committed versions, so refusing a future format
 cannot change the original main file, WAL or SHM. The temporary copy is removed before startup

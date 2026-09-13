@@ -901,6 +901,37 @@ final class OperationExecutorImplTest {
     assertEquals(Optional.of(reason.name()), history.getFirst().diagnosticsLink());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(io.justsearch.app.api.operations.OperationHistoryMode.class)
+  void historyDeclarationIsFrozenInTheAcceptedRow(io.justsearch.app.api.operations.OperationHistoryMode mode) {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.history-policy");
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext context) {
+        return OperationResult.success("complete");
+      }
+      @Override public OperationResult undo(String executionId, EngineContext context) {
+        return OperationResult.success("undone");
+      }
+    });
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+    var provenance = io.justsearch.app.services.intent.EngineProvenance.invocation(
+        context, ExecutorTag.UI, Instant.now(), Optional.empty());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    var op = makeOp(id, TrustTier.CORE,
+        mode == io.justsearch.app.api.operations.OperationHistoryMode.UNDOABLE
+            || mode == io.justsearch.app.api.operations.OperationHistoryMode.UNDO,
+        mode == io.justsearch.app.api.operations.OperationHistoryMode.NONE ? AuditPolicy.NONE : AuditPolicy.METADATA_ONLY);
+    var executor = new OperationExecutorImpl(attempts, admission, handlers);
+    var result = mode == io.justsearch.app.api.operations.OperationHistoryMode.UNDO
+        ? executor.undo(op, "prior-operation", provenance, Optional.empty(), context, key)
+        : executor.dispatch(op, "{}", provenance, Optional.empty(), context, key);
+    assertTrue(result.success());
+    var row = operationStore.find(key).orElseThrow();
+    assertEquals(mode, row.historyMode());
+    assertEquals(provenance.occurredAt(), row.provenanceOccurredAt());
+  }
+
   @Test
   void noneAuditSuppressesHistoryEntry() {
     HandlerRegistry handlers = new HandlerRegistry();

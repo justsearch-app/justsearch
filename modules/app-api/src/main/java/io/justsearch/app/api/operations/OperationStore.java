@@ -13,6 +13,11 @@ public interface OperationStore extends AutoCloseable {
       io.justsearch.core.context.EngineContext context,
       io.justsearch.agent.api.registry.InvocationProvenance provenance);
 
+  /** First acceptance freezes history policy; retries neither change it nor compare it as identity. */
+  Acceptance accept(String key, OperationDescriptor descriptor,
+      io.justsearch.core.context.EngineContext context,
+      io.justsearch.agent.api.registry.InvocationProvenance provenance, OperationHistoryMode historyMode);
+
   /** Opaque frozen value; its nonce binds approval to this exact preparation, not to a later replacement. */
   record Preparation(java.util.UUID nonce, OperationPreparedPayload payload) {
     public Preparation {
@@ -34,6 +39,12 @@ public interface OperationStore extends AutoCloseable {
   Acceptance acceptPrepared(String key, OperationDescriptor descriptor,
       io.justsearch.core.context.EngineContext context,
       io.justsearch.agent.api.registry.InvocationProvenance provenance, java.util.UUID nonce);
+
+  /** Prepared acceptance freezes the same policy and provenance as ordinary acceptance. */
+  Acceptance acceptPrepared(String key, OperationDescriptor descriptor,
+      io.justsearch.core.context.EngineContext context,
+      io.justsearch.agent.api.registry.InvocationProvenance provenance, java.util.UUID nonce,
+      OperationHistoryMode historyMode);
 
   /** Private owner/recovery read; receipt and history projections never include this value. */
   java.util.Optional<Preparation> acceptedPreparation(long id);

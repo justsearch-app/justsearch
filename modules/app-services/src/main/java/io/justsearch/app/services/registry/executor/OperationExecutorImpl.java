@@ -414,7 +414,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   private InvocationPlan planInvocation(Operation op, String argumentsJson, InvocationProvenance provenance,
       EngineContext context, String undoId, String key, java.util.UUID nonce) {
     var identity = OperationDescriptor.invocation(op.policy().recordKind(), op.id().value(), argumentsJson, undoId != null);
-    var request = new OperationAttemptRunner.Request(key, identity, context, provenance);
+    var historyMode = op.policy().audit() == AuditPolicy.NONE
+        ? io.justsearch.app.api.operations.OperationHistoryMode.NONE
+        : undoId != null ? io.justsearch.app.api.operations.OperationHistoryMode.UNDO
+        : op.policy().undoSupported() ? io.justsearch.app.api.operations.OperationHistoryMode.UNDOABLE
+        : io.justsearch.app.api.operations.OperationHistoryMode.STANDARD;
+    var request = new OperationAttemptRunner.Request(key, identity, context, provenance, historyMode);
     return attempts.withPreparation(request, scope -> {
       var stable = scope.request();
       if (scope.existing().isPresent()) return new InvocationPlan(stable, null, null, true);
@@ -448,7 +453,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         && origin.withWorkId(request.context().workId().orElseThrow()).equals(request.context())) {
       origin = request.context();
     }
-    var execution = new OperationAttemptRunner.Request(request.key(), request.descriptor(), origin, envelope.provenance());
+    var execution = new OperationAttemptRunner.Request(request.key(), request.descriptor(), origin, envelope.provenance(), request.historyMode());
     var handler = resolveHandler(op);
     handler.validatePreparation(envelope.preparation());
     return new InvocationPlan(execution, new PreparedInvocation(handler, envelope.preparation(), null, null), pending, false);

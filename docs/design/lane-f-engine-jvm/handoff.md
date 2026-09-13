@@ -10,13 +10,23 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
+**Latest C2-4 source cut (2026-09-13):** acceptance-time history policy/provenance
+and schema v4 are implemented. Final1115 executes198 passing cases; negative1114
+catches six policy-loss cases. The recoverability gate now detects operations/code
+version drift;77 gate assertions,85 Rust,12 release and13 Java upgrade cases pass.
+[Evidence](evidence/C2/history-policy.md). Continue bounded durable history reads,
+projection acknowledgement/retry, ledger attachment and SSE reconnect from the
+[C2-4 plan](evidence/C2/C2-4-plan.md). No source acknowledgement or durable-history
+consumer is active yet. Installed-v4, coherent full and hosted proof remain owed;
+no C2-4/batch2 closure. Do not use the prior hosted-v2 result as v4 acceptance.
+
 **Latest local boundary (2026-09-13):** full1059 passes at13b6bd680 in10m36s,
 10301 represented cases, zero failures/errors and35 inherited skips; eight test
 tasks execute and30 reuse unchanged successful inputs. PMD and integration-test
 compilation pass. [Integrated proof](evidence/C2/integrated1059.md) and the latest
 full-run summary supersede full1009 as the current successful local boundary.
-Hosted CI34748767868 remains pending; queued CLA runner allocation is externally
-blocked. No hosted success is inferred. Continue [C2-4](evidence/C2/C2-4-plan.md),
+Latest observed CI34752086954 at7fbc3df8d remains pending; CLA34752084973
+is queued awaiting external runner allocation. Superseded CI34748767868 was cancelled. No hosted success is inferred. Continue [C2-4](evidence/C2/C2-4-plan.md),
 after the UNDONE wire correction (negative1061, focused1062/schema1063 pass;
 wire gate1067 passes at eac25abb3). C2-3's remaining settings/ingestion/reindex
 consumers stay open in C2-6/8/10; no batch2 or stage closure is claimed.

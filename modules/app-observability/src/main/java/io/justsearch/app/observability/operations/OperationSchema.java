@@ -6,7 +6,7 @@ import java.sql.Statement;
 
 /** The operations database's independent version ladder; jobs.db keeps its own identity. */
 final class OperationSchema {
-  static final int VERSION = 3;
+  static final int VERSION = 4;
 
   static final String CREATE_OPERATIONS = """
       CREATE TABLE operations (
@@ -61,6 +61,7 @@ final class OperationSchema {
     statement.execute(CREATE_META);
     createIndexes(statement);
     migrateV2(statement);
+    migrateV3(statement);
   }
 
   /** Same columns, stricter payload bounds; copy and version update share the caller's transaction. */
@@ -100,6 +101,13 @@ final class OperationSchema {
         )
         """);
     statement.execute("CREATE INDEX operation_preparations_expiry ON operation_preparations(expires_at)");
+  }
+
+  /** Legacy rows have no reconstructible audit declaration; never retrospectively expose them. */
+  static void migrateV3(Statement statement) throws SQLException {
+    statement.execute("ALTER TABLE operations ADD COLUMN history_mode TEXT NOT NULL DEFAULT 'NONE' "
+        + "CHECK(history_mode IN ('NONE','STANDARD','UNDOABLE','UNDO'))");
+    statement.execute("ALTER TABLE operations ADD COLUMN provenance_occurred_at TEXT");
   }
 
   private static void createIndexes(Statement statement) throws SQLException {

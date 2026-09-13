@@ -194,6 +194,36 @@ test('jobs version authority is required and unreadable sources fail visibly', (
     && message.includes('unreadable schema')));
 });
 
+test('operations version projection follows its own schema authority and refuses drift', () => {
+  const row = readyRow({ id: 'operations-db', currentVersion: 4, versionAuthority: 'OperationSchema.java' });
+  const readSource = file => file.endsWith('OperationSchema.java')
+    ? 'static final int VERSION = 4;' : 'base.resolve("conversations");';
+  assert.deepEqual(check([row], { readSource }), []);
+  assert.ok(check([{ ...row, currentVersion: 3 }], { readSource })
+    .some(message => message.includes('currentVersion 3') && message.includes('VERSION 4')));
+});
+
+test('operations authority rejects fake ambiguous nondecimal and unreadable declarations', () => {
+  const row = readyRow({ id: 'operations-db', currentVersion: 4, versionAuthority: 'OperationSchema.java' });
+  for (const source of [
+    '// static final int VERSION = 4;',
+    '/* static final int VERSION = 4; */',
+    'String example = """\nstatic final int VERSION = 4;\n""";',
+    'static final int VERSION = 4;\nstatic final int VERSION = 5;',
+    'static final int VERSION = 04;',
+    'static final int VERSION = 0x4;',
+    'static final int VERSION = 2 + 2;',
+  ]) {
+    assert.ok(check([row], { readSource: file => file.endsWith('OperationSchema.java')
+      ? source : 'base.resolve("conversations");' })
+      .some(message => message.includes('exactly one literal VERSION')), source);
+  }
+  assert.ok(check([row], { readSource: file => {
+    if (file.endsWith('OperationSchema.java')) throw new Error('unreadable operations schema');
+    return 'base.resolve("conversations");';
+  } }).some(message => message.includes('cannot read versionAuthority')));
+});
+
 test('broad register rejects an uncovered durable Store implementation', () => {
   const result = check([readyRow()], { discovered: ['Store.java', 'NewStore.java'] });
   assert.ok(result.some((failure) => failure.includes('NewStore.java')));

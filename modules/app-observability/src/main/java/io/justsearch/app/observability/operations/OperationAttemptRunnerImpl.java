@@ -74,7 +74,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     var keyLock = preparationLocks[Math.floorMod(key.hashCode(), preparationLocks.length)];
     keyLock.lock();
     try {
-      return prepare.apply(new Request(key, request.descriptor(), request.context(), request.provenance()));
+      return prepare.apply(new Request(key, request.descriptor(), request.context(), request.provenance(), request.historyMode()));
     } finally {
       keyLock.unlock();
     }
@@ -84,14 +84,14 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   public PreparedAttempt accept(Request request) {
     requireOutsidePreparation(request);
     return prepared(withKey(request, stable -> store.accept(stable.key(), stable.descriptor(),
-        stable.context(), stable.provenance())));
+        stable.context(), stable.provenance(), stable.historyMode())));
   }
 
   @Override
   public PreparedAttempt acceptPrepared(Request request, java.util.UUID nonce) {
     requireOutsidePreparation(request);
     return prepared(withKey(request, stable -> store.acceptPrepared(stable.key(), stable.descriptor(),
-        stable.context(), stable.provenance(), nonce)));
+        stable.context(), stable.provenance(), nonce, stable.historyMode())));
   }
 
   private PreparedAttempt prepared(OperationStore.Acceptance accepted) {

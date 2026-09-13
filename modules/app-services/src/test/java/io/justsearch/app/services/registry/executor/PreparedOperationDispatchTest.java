@@ -157,6 +157,8 @@ class PreparedOperationDispatchTest {
       var row = store.find(key).orElseThrow();
       assertEquals(OperationState.COMPLETE, row.state());
       assertTrue(store.acceptedPreparation(row.id()).isPresent());
+      assertEquals(undo ? OperationHistoryMode.UNDO : OperationHistoryMode.UNDOABLE, row.historyMode());
+      assertEquals(PROVENANCE.occurredAt(), row.provenanceOccurredAt());
     }
   }
 

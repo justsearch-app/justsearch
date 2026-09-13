@@ -158,3 +158,42 @@ alternative would change the current one-log read authority. Compare both agains
 955's explicit durable-journal fan-in before choosing; no owner decision is needed.
 Numeric database-local IDs can be reused after quarantine/recovery (C2-2 already
 records this); the accepted UUIDv7 row key scopes any stable ledger source identity.
+
+## Acceptance-time history policy
+
+Decision, 2026-09-13: first acceptance persists a four-value history mode and the
+original provenance instant. The mode is a projection of the dispatcher's existing
+audit/undo declaration, not a new operation identity or permission. NONE hides the
+row; STANDARD gives ordinary history; UNDOABLE permits the successful receipt's
+executionId; UNDO projects a successful undo as UNDONE. Failure always projects
+FAILURE when visible. Direct producers use the same explicit mode parameter;
+existing background calls default NONE because AgentRun owns their history.
+An existing key returns its original mode even if the current catalog changes.
+Audited new acceptance requires an operation reference and provenance. The accepted
+context/executor/initiator/correlation columns already own attribution; add only the
+missing occurredAt, and never a signed intent token or handler content.
+
+The alternative, reconstructing the current registry's audit policy during replay,
+would expose formerly NONE operations or omit removed operations. Schema v4 adds
+these columns transactionally; v1-v3 migration defaults history to NONE because no
+reliable original declaration exists. Preserve old rows, preparation and sequence;
+prove rollback and future-version refusal. This is a source prerequisite, not the
+durable recent-history swap or a successful installed-v4 recovery claim.
+
+The next source/sink cut keeps the existing one-log ledger authority required by
+955 section4. Add only row-owned projection acknowledgement, drain bounded pending
+rows in order and stop at failed persistence before acknowledging any newer row.
+A pending row must survive startup pruning within the hard admission cap; never
+silently drop it or acknowledge without a durable append. This costs backpressure
+if the sink remains unavailable, and avoids replaying the full 30-day source into
+the much smaller journal on every boot. Direct SQL union was rejected because it
+changes the established one-log ledger read and 955 fan-in contract. Final retention
+eligibility and ordering tests precede activation; this cut does not add a marker.
+
+The schema cut also owns the operations register projection. The gate previously
+validated jobs VERSION text only (TARGET_VERSION), so an operations 3/4 mismatch
+passed1118. Extend the same stripped-source literal check to OperationSchema.VERSION;
+negative self-tests and a real mismatched-register run precede the corrected v4
+row. Preserve all jobs checks. Include current updater, release descriptor and
+Java upgrade-lifecycle consumer tests; the installed-v4 recovery campaign remains
+required at its existing integrated/hosted tier.

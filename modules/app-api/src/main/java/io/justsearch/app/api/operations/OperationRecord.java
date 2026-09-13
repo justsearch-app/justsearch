@@ -9,4 +9,5 @@ public record OperationRecord(
     String executor, String initiator, String correlationId, OperationState state, String phase,
     String checkpointCursor, long unitsCompleted, long unitsFailed, int attempts,
     long acceptedAt, Long startedAt, long updatedAt, Long completedAt,
-    String failureReason, OperationReceipt receipt) {}
+    String failureReason, OperationReceipt receipt, OperationHistoryMode historyMode,
+    java.time.Instant provenanceOccurredAt) {}

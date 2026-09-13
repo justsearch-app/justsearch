@@ -20,7 +20,17 @@ public interface OperationAttemptRunner {
   CompletionStage<PersistenceFailure> persistenceFailure();
 
   record Request(String key, OperationDescriptor descriptor, EngineContext context,
-      InvocationProvenance provenance) {}
+      InvocationProvenance provenance, OperationHistoryMode historyMode) {
+    public Request {
+      java.util.Objects.requireNonNull(historyMode, "historyMode");
+    }
+
+    /** Producers with their own history use NONE; audited direct producers supply an explicit mode. */
+    public Request(String key, OperationDescriptor descriptor, EngineContext context,
+        InvocationProvenance provenance) {
+      this(key, descriptor, context, provenance, OperationHistoryMode.NONE);
+    }
+  }
 
   /** Opaque runner-issued capability, retained between scheduling and fire-time admission. */
   interface PreparedAttempt {

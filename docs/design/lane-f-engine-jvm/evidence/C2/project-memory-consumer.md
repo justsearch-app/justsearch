@@ -97,6 +97,14 @@ target collision and is never written a second time.
 
 ## 4. Completion as a durable projection source
 
+2026-09-13 mechanism detail: MemoryAdmission supplies STANDARD history mode on its
+runner request, including non-dispatched memory mutations; the dispatcher supplies
+note/undo modes from the catalog declaration. The first accepted policy is durable,
+and a retry cannot opt an existing NONE row into history. Background producers with
+their own ledger retain NONE. Scope event identity with the accepted UUIDv7 key:
+the numeric database-local id can be reused after quarantine/recovery. The source
+acknowledgement/drain mechanism remains the next C2-4 cut, not completed delivery.
+
 C2-4's history authority exposes terminal-row catch-up plus completion subscription
 after the SQLite commit returns. Capture the bounded stream token before the durable
 snapshot, subscribe/replay atomically, and restart the snapshot if that token expires.
