@@ -54,6 +54,8 @@ public final class SqliteOperationStore implements OperationStore {
         executor, initiator, correlation_id, accepted_at, updated_at)
       """;
   private final ReentrantLock lock = new ReentrantLock();
+  private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<OperationRecord>>
+      completionListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
   private final Path path;
   private final Clock clock;
   private final OpenStepHook hook;
@@ -570,7 +572,7 @@ public final class SqliteOperationStore implements OperationStore {
 
   @Override
   public OperationRecord rejectBeforeStart(long id, OperationReceipt receipt) {
-    return locked(() -> {
+    var transition = locked(() -> {
       try (var update = connection.prepareStatement("""
           UPDATE operations SET state = 'FAILED', completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?
           WHERE id = ? AND state = 'ACCEPTED'
@@ -579,11 +581,15 @@ public final class SqliteOperationStore implements OperationStore {
         update.setLong(1, now); update.setLong(2, now);
         update.setString(3, JSON.writeValueAsString(receipt)); update.setString(4, receipt.code());
         update.setLong(5, id);
-        update.executeUpdate();
-        return rowById(id);
+        boolean changed = update.executeUpdate() == 1;
+        return new Rejection(rowById(id), changed);
       }
     });
+    if (transition.changed()) publishCompletion(transition.record());
+    return transition.record();
   }
+
+  private record Rejection(OperationRecord record, boolean changed) {}
 
   @Override
   public boolean checkpoint(long id, String cursor, long unitsCompleted, long unitsFailed) {
@@ -607,7 +613,7 @@ public final class SqliteOperationStore implements OperationStore {
     Objects.requireNonNull(receipt, "receipt");
     if (!terminalState.terminal()) throw new IllegalArgumentException("Expected a terminal operation state");
     String resultJson = JSON.writeValueAsString(receipt);
-    return locked(() -> {
+    java.util.Optional<OperationRecord> completed = locked(() -> {
       try (var update = connection.prepareStatement("""
           UPDATE operations SET state = ?, completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?
           WHERE id = ? AND state IN ('ACCEPTED', 'RUNNING', 'COMPLETE_WITH_GAPS')
@@ -620,6 +626,26 @@ public final class SqliteOperationStore implements OperationStore {
         return update.executeUpdate() == 1 ? java.util.Optional.of(rowById(id)) : java.util.Optional.empty();
       }
     });
+    completed.ifPresent(this::publishCompletion);
+    return completed;
+  }
+
+  @Override
+  public AutoCloseable subscribeCompletions(java.util.function.Consumer<OperationRecord> listener) {
+    Objects.requireNonNull(listener, "listener");
+    locked(() -> { completionListeners.add(listener); return null; });
+    return () -> completionListeners.remove(listener);
+  }
+
+  private void publishCompletion(OperationRecord record) {
+    for (var listener : completionListeners) {
+      try {
+        listener.accept(record);
+      } catch (RuntimeException failure) {
+        LOG.warn("Operations completion observer failed for row {}; retained row remains authoritative",
+            record.id(), failure);
+      }
+    }
   }
 
   private OperationRecord rowById(long id) throws SQLException {
@@ -775,6 +801,7 @@ public final class SqliteOperationStore implements OperationStore {
       try {
         connection.close();
         connection = null;
+        completionListeners.clear();
       } catch (SQLException failure) {
         throw new IOException("Could not close operations database", failure);
       }

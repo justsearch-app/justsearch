@@ -34,6 +34,14 @@ remains pending external runner allocation. A post-cut compile check caught the
 launcher architecture fixture missing outcome(String);1096 passes after its
 correction. Include launcher tests for every subsequent OperationStore port edit.
 
+**C2-4 completion hook prerequisite:** final1100 executes65 passing cases;
+negative1099 proves the callback lock test detects the regression. The operations
+store exposes a live subscription for successful terminal transitions, including
+non-dispatched memory/note producers and pre-start rejection. No replay or ledger
+consumer is activated yet. [Proof](evidence/C2/completion-subscription.md). Continue
+with acceptance-time history visibility, bounded terminal reads, retention/replay
+ordering and the ledger deduplication contract in the C2-4 plan.
+
 Final independent correction verification is clear at **b713307ea**. Full905 passes
 in9m30s with10158 represented cases, zero failures/errors and35 inherited skips;
 seven test tasks execute2040 cases and31 reuse unchanged successful inputs. PMD,

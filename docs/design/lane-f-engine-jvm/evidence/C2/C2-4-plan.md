@@ -102,3 +102,26 @@ open row below the fence, cancellation, awaiting-acceptance gaps and raw-content
 exclusion. HTTP/MCP must serialize the same narrow answer and preserve typed errors.
 The new route requires the existing local trust boundary and live capture before
 item acceptance; it never requires a mutation token for the read itself.
+
+## Store completion subscription prerequisite
+
+After the keyed-read cut, implement the generic live completion hook before
+connecting projection consumers. OperationStore owns subscriptions because direct
+non-dispatched producers, pre-start rejection and reconciler completion all commit
+through that same owner. Observe only successful state transitions, using the row
+snapshot captured with the transition; publish after the SQLite lock is released.
+Repeated/refused transitions publish nothing. A throwing observer is logged and
+cannot rewrite completion or stop another observer. Unsubscribe/close retire the
+listener reference; a notification already iterating its listener snapshot may
+still deliver that callback.
+
+This reuses synchronous post-commit notification and bounded retained source rows;
+no notification executor, second outbox, acknowledgement marker or completion
+sequence is added in this prerequisite. It is live delivery only. The next
+projection cut supplies bounded catch-up, row-identity deduplication and startup
+replay before pruning. Do not claim the hook alone closes the crash interval.
+Test the commit from an independent SQLite reader and the unlocked callback from
+another thread reading the same store. Cover non-dispatched MEMORY/NOTE rows,
+repeated finish, before-start rejection, listener failure, removal and store close.
+The launcher architecture fixture must implement every new port method and stay
+in the affected compile/test set after the query-cut omission.

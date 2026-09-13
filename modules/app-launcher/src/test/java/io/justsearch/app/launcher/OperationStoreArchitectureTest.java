@@ -72,6 +72,9 @@ class OperationStoreArchitectureTest {
   }
 
   static final class UnauthorizedStore implements OperationStore {
+    @Override public AutoCloseable subscribeCompletions(java.util.function.Consumer<io.justsearch.app.api.operations.OperationRecord> listener) {
+      throw new UnsupportedOperationException();
+    }
     @Override public io.justsearch.app.api.operations.OperationOutcomeView outcome(String key) {
       throw new UnsupportedOperationException();
     }

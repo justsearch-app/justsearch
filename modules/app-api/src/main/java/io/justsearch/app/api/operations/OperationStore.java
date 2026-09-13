@@ -72,6 +72,15 @@ public interface OperationStore extends AutoCloseable {
   /** Terminal rows are immutable. Returns the committed row snapshot, or empty when the update was refused. */
   java.util.Optional<OperationRecord> finish(long id, OperationState terminalState, OperationReceipt receipt);
 
+  /**
+   * Observe newly committed terminal transitions after the store lock is released, including
+   * non-dispatched producers and rejection before start. Refused/repeated transitions emit nothing.
+   * Listener failure cannot undo completion or prevent other observers. This is a live notification,
+   * not durable delivery: a projection must catch up retained rows after subscribing and deduplicate
+   * by row identity. Closing removes the subscription; an in-flight notification may still deliver it.
+   */
+  AutoCloseable subscribeCompletions(java.util.function.Consumer<OperationRecord> listener);
+
   /** Open rows for owner-scoped reconciliation, in acceptance order. */
   java.util.List<OperationRecord> openRecords();
 
