@@ -2,6 +2,7 @@
 package io.justsearch.app.services.settings;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
@@ -48,7 +49,7 @@ public final class UiSettingsStore {
 
   private static final Logger log = LoggerFactory.getLogger(UiSettingsStore.class);
 
-  static final int CURRENT_SCHEMA_VERSION = 2;
+  static final int CURRENT_SCHEMA_VERSION = 3;
 
   /**
    * Versions this build can still read and migrate forward. {@code 0} is the unversioned legacy
@@ -56,7 +57,7 @@ public final class UiSettingsStore {
    * fatal by {@link StoreFormatVersions#requireReadable}, so every schema bump must extend this
    * list or every existing install fails to start.
    */
-  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1};
+  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2};
 
   /**
    * The pre-883 shipped default for {@code contextLength}. Tempdoc 883 made the context window a
@@ -104,7 +105,7 @@ public final class UiSettingsStore {
       return new UiSettings();
     }
     try {
-      return parseOrThrow();
+      return parseOrThrow().settings();
     } catch (CorruptDurableStoreException e) {
       lastRecovery = quarantineCorruptFile(e);
       return new UiSettings();
@@ -126,15 +127,62 @@ public final class UiSettingsStore {
     this.onRecoveryCleared = r;
   }
 
-  private UiSettings parseOrThrow() {
+  /** Revision and commit identity read from the same envelope as the settings payload. */
+  public record Witness(long acceptedRevision, String lastCommittedOperationKey) {
+    public Witness {
+      if (acceptedRevision < 0 || (acceptedRevision == 0 && lastCommittedOperationKey != null)) {
+        throw new IllegalArgumentException("Invalid settings revision witness");
+      }
+      if (acceptedRevision > 0) OperationKeys.timestampMillis(lastCommittedOperationKey);
+    }
+  }
+
+  public record Snapshot(UiSettings settings, Witness witness) {}
+
+  /** Reads without quarantine/default recovery, for commitment classification by the apply owner. */
+  public Snapshot inspect() {
+    if (mode == PersistenceMode.IN_MEMORY) {
+      return new Snapshot(new UiSettings(), new Witness(0, null));
+    }
+    if (!Files.notExists(settingsFile)) {
+      // Unknown accessibility is not absence. Parsing fails closed if the file cannot be read.
+      return parseOrThrow();
+    }
+    if (lastRecovery != null) {
+      throw new CorruptDurableStoreException("ui-settings", "settings were quarantined; witness unavailable");
+    }
+    // The preserved sibling outlives this process. Absence after quarantine is not proof of
+    // an untouched zero-revision store. Only proven-absent parents may skip inspection.
+    Path parent = settingsFile.toAbsolutePath().getParent();
+    if (!Files.notExists(parent)) {
+      try (var siblings = Files.list(parent)) {
+        String prefix = settingsFile.getFileName() + ".corrupt-";
+        if (siblings.anyMatch(path -> path.getFileName().toString().startsWith(prefix))) {
+          throw new CorruptDurableStoreException("ui-settings", "preserved quarantine; witness unavailable");
+        }
+      } catch (IOException failure) {
+        throw new UncheckedIOException("Cannot inspect settings quarantine evidence", failure);
+      }
+    }
+    return new Snapshot(new UiSettings(), new Witness(0, null));
+  }
+
+  private Snapshot parseOrThrow() {
     try {
       JsonNode root = MAPPER.readTree(settingsFile.toFile());
       if (root == null || !root.isObject()) {
         throw new CorruptDurableStoreException("ui-settings", "expected a JSON object");
       }
-      boolean envelope = root.has("settings");
-      JsonNode versionNode = envelope ? root.get("schemaVersion") : null;
-      if (envelope && (versionNode == null || !versionNode.isIntegralNumber())) {
+      JsonNode declaredVersion = root.get("schemaVersion");
+      // Legacy raw UiSettings itself had a schemaVersion field (0/1). Preserve those
+      // payloads, but never deserialize a damaged modern envelope as empty raw settings.
+      boolean rawLegacyVersion = declaredVersion == null
+          || (declaredVersion.isIntegralNumber() && declaredVersion.canConvertToInt()
+              && (declaredVersion.intValue() == 0 || declaredVersion.intValue() == 1));
+      boolean envelope = root.has("settings") || root.has("acceptedRevision")
+          || root.has("lastCommittedOperationKey") || !rawLegacyVersion;
+      JsonNode versionNode = envelope ? declaredVersion : null;
+      if (envelope && (versionNode == null || !versionNode.isIntegralNumber() || !versionNode.canConvertToInt())) {
         throw new CorruptDurableStoreException(
             "ui-settings", "versioned envelope requires an integer schemaVersion");
       }
@@ -154,7 +202,20 @@ public final class UiSettingsStore {
       if (settings == null) {
         throw new CorruptDurableStoreException("ui-settings", "settings payload is missing");
       }
-      return migrate(settings, resolvedVersion);
+      Witness witness = new Witness(0, null);
+      if (resolvedVersion < 3 && (root.has("acceptedRevision") || root.has("lastCommittedOperationKey"))) {
+        throw new CorruptDurableStoreException("ui-settings", "legacy schema cannot carry a revision witness");
+      }
+      if (resolvedVersion >= 3) {
+        JsonNode revision = root.get("acceptedRevision");
+        JsonNode key = root.get("lastCommittedOperationKey");
+        if (revision == null || !revision.isIntegralNumber() || !revision.canConvertToLong()
+            || key == null || !(key.isNull() || key.isTextual())) {
+          throw new CorruptDurableStoreException("ui-settings", "invalid revision witness fields");
+        }
+        witness = new Witness(revision.longValue(), key.isNull() ? null : key.asText());
+      }
+      return new Snapshot(migrate(settings, resolvedVersion), witness);
     } catch (CorruptDurableStoreException
         | io.justsearch.configuration.persistence.UnsupportedStoreVersionException e) {
       throw e;
@@ -219,30 +280,75 @@ public final class UiSettingsStore {
     return candidate;
   }
 
-  public void save(UiSettings settings) {
-    if (settings == null || mode == PersistenceMode.IN_MEMORY) {
-      return;
+  /** Prepared bytes and snapshot are private copies; callers cannot alter the file candidate. */
+  public static final class PreparedSettings {
+    private final UiSettingsStore owner;
+    private final UiSettings settings;
+    private final Witness witness;
+    private final byte[] bytes;
+
+    private PreparedSettings(UiSettingsStore owner, UiSettings settings, Witness witness, byte[] bytes) {
+      this.owner = owner;
+      this.settings = settings;
+      this.witness = witness;
+      this.bytes = bytes;
     }
-    try {
-      settings.getWindow().stampLastShown();
-      byte[] bytes =
-          MAPPER
-              .writerWithDefaultPrettyPrinter()
-              .writeValueAsBytes(new PersistedSettings(CURRENT_SCHEMA_VERSION, settings));
-      AtomicFileWrites.replace(settingsFile, bytes);
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to persist UI settings to " + settingsFile, e);
-    }
+
+    public UiSettings settings() { return copy(settings); }
+    public Witness witness() { return witness; }
+  }
+
+  public PreparedSettings prepare(UiSettings settings, Witness witness) {
+    if (!mode.isWritable()) throw new IllegalStateException("Settings store is read-only");
+    UiSettings candidate = copy(Objects.requireNonNull(settings, "settings"));
+    Objects.requireNonNull(witness, "witness");
+    candidate.getWindow().stampLastShown();
+    byte[] bytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
+        new PersistedSettings(CURRENT_SCHEMA_VERSION, candidate,
+            witness.acceptedRevision(), witness.lastCommittedOperationKey()));
+    return new PreparedSettings(this, candidate, witness, bytes);
+  }
+
+  /** Performs only strict replacement; the owner resolves ambiguous errors using inspect(). */
+  public void replacePrepared(PreparedSettings prepared) throws IOException {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.owner != this) throw new IllegalArgumentException("Foreign settings preparation");
+    if (!mode.isWritable()) throw new IllegalStateException("Settings store is read-only");
+    AtomicFileWrites.replaceStrict(settingsFile, prepared.bytes);
+  }
+
+  /** Notification is deliberately separate from file replacement and may invoke arbitrary code. */
+  public void notifyRecoveryCleared() {
     if (lastRecovery != null) {
       lastRecovery = null;
       Runnable cleared = onRecoveryCleared;
-      if (cleared != null) {
-        cleared.run();
-      }
+      if (cleared != null) cleared.run();
     }
   }
 
-  private record PersistedSettings(int schemaVersion, UiSettings settings) {}
+  private static UiSettings copy(UiSettings settings) {
+    return MAPPER.convertValue(settings, UiSettings.class);
+  }
+
+  /** Transitional unrecorded writer, removed by C2-6's all-producer migration. */
+  public void save(UiSettings settings) {
+    if (settings == null || mode == PersistenceMode.IN_MEMORY) return;
+    // Once recorded settings exist, this legacy path must never erase their witness.
+    Witness witness = inspect().witness();
+    if (witness.acceptedRevision() != 0) {
+      throw new IllegalStateException("Recorded settings require the accepted-revision owner");
+    }
+    PreparedSettings prepared = prepare(settings, witness);
+    try {
+      replacePrepared(prepared);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to persist UI settings to " + settingsFile, e);
+    }
+    notifyRecoveryCleared();
+  }
+
+  private record PersistedSettings(
+      int schemaVersion, UiSettings settings, long acceptedRevision, String lastCommittedOperationKey) {}
 
   private static Path resolveSettingsFile() {
     // Tempdoc 519 §9 Block B3.0.d: moved from io.justsearch.ui.settings to app-services.

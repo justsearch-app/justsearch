@@ -82,6 +82,29 @@ int gpuLayers = EnvRegistry.GPU_LAYERS.getInt(0);
 Path llmModel = Path.of(EnvRegistry.LLM_MODEL_PATH.getString("Qwen_Qwen3.5-9B-Q4_K_M.gguf"));
 ```
 
+## Settings preparation and storage
+
+`UiSettingsStore` writes a schema-v3 envelope containing settings, `acceptedRevision`, and
+`lastCommittedOperationKey`. Legacy raw settings and v1/v2 envelopes remain readable;
+legacy envelopes cannot carry revision fields. A witness is either revision zero with no
+key or a positive revision with a canonical UUIDv7 key. Future versions are refused.
+
+Preparation copies the mutable settings and serializes the candidate before touching the
+file. `replacePrepared` forces temporary bytes and requires atomic sibling replacement;
+it never falls back to an ordinary move. This is not a guarantee against physical power
+loss. Recovery notification is a separate call after replacement. `inspect` reads the
+actual witness without substituting defaults for corrupt, inaccessible, or quarantined
+state; a preserved corrupt sibling prevents an absent file from masquerading as a fresh
+store after restart. The transitional raw `save` refuses recorded revisions and ambiguous
+recovery state. The application owner must establish recovery authority before explicitly
+replacing a quarantined document.
+
+`ConfigStoreRebuilder.prepare` builds an immutable resolved snapshot without publishing it
+and propagates preparation failures. `ConfigStore.swap` replaces the snapshot and returns
+a change event; `notifyListeners` is separate so an owner can release its publication lock
+before arbitrary callbacks run. The convenience `update` and `rebuild` APIs retain their
+swap-then-notify behavior.
+
 ## Platform Paths
 To ensure seamless operation across operating systems, we use `PlatformPaths` to resolve data directories.
 *   **Windows:** `%LOCALAPPDATA%/JustSearch` (e.g., `C:\Users\Name\AppData\Local\JustSearch`).

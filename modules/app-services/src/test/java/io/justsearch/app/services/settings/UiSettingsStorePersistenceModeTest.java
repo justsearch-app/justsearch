@@ -323,7 +323,7 @@ class UiSettingsStorePersistenceModeTest {
 
       String persisted = Files.readString(settingsFile);
       // Bumped to 2 by tempdoc 883 (contextLength 4096 -> 0 = auto migration).
-      assertTrue(persisted.contains("\"schemaVersion\" : 2"));
+      assertTrue(persisted.contains("\"schemaVersion\" : 3"));
       assertTrue(persisted.contains("\"settings\""));
       assertEquals(777, new UiSettingsStore(READ_WRITE, settingsFile).load().getMaxTokens());
     }
@@ -377,8 +377,8 @@ class UiSettingsStorePersistenceModeTest {
     }
 
     @Test
-    @DisplayName("a save after recovery clears lastRecovery and fires the cleared callback")
-    void readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback() throws Exception {
+    @DisplayName("prepared replacement after recovery clears lastRecovery when notification runs")
+    void readWrite_preparedRecoveryClearsRecoveryAndFiresCallback() throws Exception {
       Path settingsFile = tempDir.resolve("settings.json");
       Files.writeString(settingsFile, "{not-json");
 
@@ -390,7 +390,9 @@ class UiSettingsStorePersistenceModeTest {
       assertTrue(store.lastRecovery().isPresent());
       assertFalse(cleared.get(), "nothing is cleared until the user re-authors settings");
 
-      store.save(recovered);
+      store.replacePrepared(store.prepare(recovered, new UiSettingsStore.Witness(0, null)));
+      assertFalse(cleared.get(), "replacement must not run notification under the apply lock");
+      store.notifyRecoveryCleared();
 
       assertTrue(store.lastRecovery().isEmpty(), "a successful save supersedes the recovery");
       assertTrue(cleared.get(), "the condition-clearing callback must fire exactly on that save");

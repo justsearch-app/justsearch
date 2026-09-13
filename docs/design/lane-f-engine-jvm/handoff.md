@@ -24,6 +24,11 @@ capture has three existing but unbaselined accessibility rules and inaccurate th
 [the browser record](evidence/C2/activity-browser.md) assigns the next corrections. Failed1244
 and1247 remain retained. All owned stacks are stopped. Integrated tests are pushed at478a41c41.
 Installed-v5 and hosted proof remain owed; no C2-4/stage closure is claimed.
+C2-6 cut1 now implements the preparation/storage foundation with Final1259 green (85
+represented cases, 76 executed/9 cached) and six intended negative1258 failures. Independent
+review is clear. [Storage proof](evidence/C2/settings-preparation.md). Next: runner marker,
+attempt fence/reconciliation, then producer migration. Browser1260's actual binary fingerprints
+match; its accessibility assertion catches additional contrast defects now being corrected.
 C2-6's independently refuted [implementation plan](evidence/C2/C2-6-plan.md) and owning
 protocol are committed at6db0fd2b1, including the SQL marker, preparation guard, strict atomic
 replace, schema-v3 witness and explicit fatal/corrupt recovery. No owner input is pending.
