@@ -76,7 +76,7 @@ public record OperationInvocationResponse(
     };
     String errorClass = switch (failure.code()) {
       case INVALID_OPERATION_KEY -> "BAD_REQUEST";
-      case OPERATION_EXPIRED, OPERATION_KEY_REUSED -> "CONFLICT";
+      case OPERATION_EXPIRED, OPERATION_KEY_REUSED, OPERATION_PREPARATION_UNAVAILABLE -> "CONFLICT";
       case OPERATIONS_CAPACITY -> "UNAVAILABLE";
       case STORAGE_FAILED -> "HANDLER_ERROR";
     };

@@ -85,6 +85,21 @@ class OperationStoreArchitectureTest {
         io.justsearch.app.api.operations.OperationDescriptor descriptor) {
       return java.util.Optional.empty();
     }
+    @Override public java.util.Optional<Preparation> pendingPreparation(String key,
+        io.justsearch.app.api.operations.OperationDescriptor descriptor) { return java.util.Optional.empty(); }
+    @Override public java.util.Optional<Preparation> savePreparation(String key,
+        io.justsearch.app.api.operations.OperationDescriptor descriptor, Preparation preparation) {
+      return java.util.Optional.empty();
+    }
+    @Override public Acceptance acceptPrepared(String key,
+        io.justsearch.app.api.operations.OperationDescriptor descriptor,
+        io.justsearch.core.context.EngineContext context,
+        io.justsearch.agent.api.registry.InvocationProvenance provenance, java.util.UUID nonce) {
+      throw new UnsupportedOperationException();
+    }
+    @Override public java.util.Optional<Preparation> acceptedPreparation(long id) {
+      return java.util.Optional.empty();
+    }
     @Override public boolean start(long id) { return false; }
     @Override public boolean resume(long id) { return false; }
     @Override public io.justsearch.app.api.operations.OperationRecord rejectBeforeStart(long id, io.justsearch.app.api.operations.OperationReceipt receipt) {

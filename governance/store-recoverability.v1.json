@@ -1502,7 +1502,7 @@
       "pathVerification": "COMPOSED",
       "pathVerificationNote": "HeadlessApp and LauncherEnvironment resolve operations.db under DATA_DIR; SqliteOperationStore composes SQLite sidecars and timestamped preservation directories.",
       "encryption": "UNSEALED_GAP",
-      "encryptionNote": "Plaintext SQLite contains operation identity, root paths in identity_json, grant references, checkpoints, and bounded results; it does not contain document content.",
+      "encryptionNote": "Plaintext metadata contains canonical public identities, grant references, checkpoints and bounded receipts. V3 adds separate bounded preparation payloads and five-minute pending preparation storage. The application codec requires content-bearing envelopes to use the existing data-key cipher; metadata preparations remain plaintext. Prepared producer activation and approval wiring follow the store prerequisite in C2-3.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
@@ -1513,9 +1513,9 @@
       ],
       "recoverability": "MIXED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "SQLite WAL schema v2",
-      "currentVersion": 2,
-      "readableLegacyVersions": [1],
+      "format": "SQLite WAL schema v3",
+      "currentVersion": 3,
+      "readableLegacyVersions": [1, 2],
       "versionAuthority": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
       "futureVersionRefusalTest": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
       "writeMode": "TRANSACTIONAL",
@@ -1534,7 +1534,7 @@
       "tests": [
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java"
       ],
-      "fixtures": []
+      "fixtures": ["modules/app-observability/src/test/resources/operations-v1.sql", "modules/app-observability/src/test/resources/operations-v2.sql"]
     }
   ],
   "nonDurableWriteSites": [

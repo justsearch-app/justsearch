@@ -2,6 +2,7 @@
 package io.justsearch.app.observability.operations;
 
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.OperationPreparedPayload;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.agent.api.registry.OperationKind;
@@ -43,6 +44,8 @@ public final class SqliteOperationStore implements OperationStore {
   private static final long FUTURE_SKEW_MS = Duration.ofMinutes(5).toMillis();
   private static final long RETENTION_MS = Duration.ofDays(30).toMillis();
   private static final int ROW_CAP = 100000;
+  private static final int PREPARATION_CAP = 512;
+  private static final long PREPARATION_TTL_MS = Duration.ofMinutes(5).toMillis();
   private static final String TERMINAL = "state IN ('COMPLETE', 'FAILED', 'CANCELLED')";
   private static final String INSERT_OPERATION = """
       INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
@@ -173,6 +176,9 @@ public final class SqliteOperationStore implements OperationStore {
       } else {
         if (version == 1) {
           OperationSchema.migrateV1(statement);
+        }
+        if (version <= 2) {
+          OperationSchema.migrateV2(statement);
           statement.execute("PRAGMA user_version = " + OperationSchema.VERSION);
         }
         try (var update = connection.prepareStatement(
@@ -271,6 +277,17 @@ public final class SqliteOperationStore implements OperationStore {
   @Override
   public Acceptance accept(String key, OperationDescriptor descriptor, EngineContext context,
       InvocationProvenance provenance) {
+    return acceptInternal(key, descriptor, context, provenance, null);
+  }
+
+  @Override
+  public Acceptance acceptPrepared(String key, OperationDescriptor descriptor, EngineContext context,
+      InvocationProvenance provenance, UUID nonce) {
+    return acceptInternal(key, descriptor, context, provenance, Objects.requireNonNull(nonce, "nonce"));
+  }
+
+  private Acceptance acceptInternal(String key, OperationDescriptor descriptor, EngineContext context,
+      InvocationProvenance provenance, UUID nonce) {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(descriptor, "descriptor");
     long keyTime = validatedKeyTime(key);
@@ -278,6 +295,11 @@ public final class SqliteOperationStore implements OperationStore {
     return locked(() -> transaction(() -> {
       var existing = lookupRow(key, keyTime, descriptor, identity);
       if (existing.isPresent()) return new Acceptance(existing.get(), false);
+      Preparation pending = pendingRow(key, descriptor, identity).orElse(null);
+      if ((nonce == null && pending != null)
+          || (nonce != null && (pending == null || !nonce.equals(pending.nonce())))) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_PREPARATION_UNAVAILABLE, null);
+      }
       long now = clock.millis();
       pruneToLimit(ROW_CAP - 1);
       if (rowCount() >= ROW_CAP) {
@@ -302,8 +324,102 @@ public final class SqliteOperationStore implements OperationStore {
         for (int i = 0; i < values.length; i++) insert.setObject(i + 1, values[i]);
         if (insert.executeUpdate() != 1) throw new SQLException("Concurrent acceptance escaped queue ownership");
       }
+      if (pending != null) {
+        try (var update = connection.prepareStatement("UPDATE operations SET preparation_nonce = ?, "
+            + "preparation_sealed = ?, preparation_payload = ? WHERE operation_key = ?")) {
+          update.setString(1, pending.nonce().toString());
+          update.setInt(2, pending.payload().sealed() ? 1 : 0);
+          update.setString(3, pending.payload().value());
+          update.setString(4, key);
+          if (update.executeUpdate() != 1) throw new SQLException("Accepted preparation is missing");
+        }
+      }
+      try (var delete = connection.prepareStatement("DELETE FROM operation_preparations WHERE operation_key = ?")) {
+        delete.setString(1, key);
+        delete.executeUpdate();
+      }
       return new Acceptance(findRow(key).orElseThrow(() -> new SQLException("Accepted row is missing")), true);
     }));
+  }
+
+  @Override
+  public java.util.Optional<Preparation> pendingPreparation(String key, OperationDescriptor descriptor) {
+    long keyTime = validatedKeyTime(key);
+    String identity = canonicalIdentity(descriptor.identityJson());
+    return locked(() -> {
+      if (lookupRow(key, keyTime, descriptor, identity).isPresent()) return java.util.Optional.empty();
+      return pendingRow(key, descriptor, identity);
+    });
+  }
+
+  @Override
+  public java.util.Optional<Preparation> savePreparation(String key, OperationDescriptor descriptor,
+      Preparation preparation) {
+    Objects.requireNonNull(preparation, "preparation");
+    long keyTime = validatedKeyTime(key);
+    String identity = canonicalIdentity(descriptor.identityJson());
+    return locked(() -> transaction(() -> {
+      if (lookupRow(key, keyTime, descriptor, identity).isPresent()) return java.util.Optional.empty();
+      var prior = pendingRow(key, descriptor, identity);
+      if (prior.isPresent()) return prior;
+      prunePreparations(PREPARATION_CAP - 1);
+      try (var insert = connection.prepareStatement("""
+          INSERT INTO operation_preparations(operation_key, kind, operation_ref, identity_json,
+            nonce, sealed, payload, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          """)) {
+        long now = clock.millis();
+        Object[] values = {key, descriptor.kind().wireValue(), descriptor.operationRef(), identity,
+            preparation.nonce().toString(), preparation.payload().sealed() ? 1 : 0, preparation.payload().value(),
+            now, now + PREPARATION_TTL_MS};
+        for (int i = 0; i < values.length; i++) insert.setObject(i + 1, values[i]);
+        if (insert.executeUpdate() != 1) throw new SQLException("Preparation was not stored");
+      }
+      return java.util.Optional.of(preparation);
+    }));
+  }
+
+  private java.util.Optional<Preparation> pendingRow(String key, OperationDescriptor descriptor,
+      String identity) throws SQLException {
+    try (var query = connection.prepareStatement("SELECT * FROM operation_preparations "
+        + "WHERE operation_key = ? AND expires_at > ?")) {
+      query.setString(1, key); query.setLong(2, clock.millis());
+      try (var row = query.executeQuery()) {
+        if (!row.next()) return java.util.Optional.empty();
+        if (!descriptor.kind().wireValue().equals(row.getString("kind"))
+            || !Objects.equals(descriptor.operationRef(), row.getString("operation_ref"))
+            || !identity.equals(row.getString("identity_json"))) {
+          throw new OperationStoreException(OperationStoreException.Code.OPERATION_KEY_REUSED, null);
+        }
+        return java.util.Optional.of(new Preparation(UUID.fromString(row.getString("nonce")),
+            new OperationPreparedPayload(row.getInt("sealed") == 1, row.getString("payload"))));
+      }
+    }
+  }
+
+  @Override
+  public java.util.Optional<Preparation> acceptedPreparation(long id) {
+    return locked(() -> {
+      try (var query = connection.prepareStatement("SELECT preparation_nonce, preparation_sealed, "
+          + "preparation_payload FROM operations WHERE id = ?")) {
+        query.setLong(1, id);
+        try (var row = query.executeQuery()) {
+          if (!row.next() || row.getString("preparation_nonce") == null) return java.util.Optional.empty();
+          return java.util.Optional.of(new Preparation(UUID.fromString(row.getString("preparation_nonce")),
+              new OperationPreparedPayload(row.getInt("preparation_sealed") == 1, row.getString("preparation_payload"))));
+        }
+      }
+    });
+  }
+
+  private void prunePreparations(int limit) throws SQLException {
+    try (var delete = connection.prepareStatement("DELETE FROM operation_preparations WHERE expires_at <= ?")) {
+      delete.setLong(1, clock.millis()); delete.executeUpdate();
+    }
+    try (var delete = connection.prepareStatement("DELETE FROM operation_preparations WHERE operation_key IN "
+        + "(SELECT operation_key FROM operation_preparations ORDER BY created_at, operation_key "
+        + "LIMIT MAX(0, (SELECT count(*) FROM operation_preparations) - ?))")) {
+      delete.setInt(1, limit); delete.executeUpdate();
+    }
   }
 
   @Override
@@ -476,7 +592,7 @@ public final class SqliteOperationStore implements OperationStore {
 
   @Override
   public void pruneHistory() {
-    locked(() -> transaction(() -> { pruneToLimit(ROW_CAP); return null; }));
+    locked(() -> transaction(() -> { pruneToLimit(ROW_CAP); prunePreparations(PREPARATION_CAP); return null; }));
   }
 
   /** Called only inside the store lock and a transaction, including acceptance's reservation. */

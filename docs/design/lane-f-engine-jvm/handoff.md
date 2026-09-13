@@ -30,8 +30,11 @@ MCP key delivery, pending approval and failure receipt projection pass278 repres
 numeric row-id correction passes74 cases at942 after negative941.
 See [MCP key proof](evidence/C2/mcp-key.md). The bounded prepared-envelope codec
 prerequisite passes548 represented cases at950; [codec proof](evidence/C2/prepared-codec.md).
-Next: operations.db v3 persistence, runner serialization and frozen approval
-transfer, then remaining ingress and integrated acceptance.
+Operations.db v3 prepared storage passes363 represented cases at958, with atomic
+transfer, stale nonce, retention and migration proof; [store proof](evidence/C2/prepared-store.md).
+Next: runner key serialization, dispatcher/cipher wiring and frozen approval nonce
+transfer, then remaining ingress and integrated acceptance. Hosted v3 proof remains
+required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 
 The following paragraphs retain the pre-review correction checkpoints; current

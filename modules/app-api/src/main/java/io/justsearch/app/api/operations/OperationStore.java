@@ -13,6 +13,31 @@ public interface OperationStore extends AutoCloseable {
       io.justsearch.core.context.EngineContext context,
       io.justsearch.agent.api.registry.InvocationProvenance provenance);
 
+  /** Opaque frozen value; its nonce binds approval to this exact preparation, not to a later replacement. */
+  record Preparation(java.util.UUID nonce, OperationPreparedPayload payload) {
+    public Preparation {
+      java.util.Objects.requireNonNull(nonce, "nonce");
+      java.util.Objects.requireNonNull(payload, "payload");
+    }
+  }
+
+  /** Pending preparation is not an accepted operation or a history outcome. */
+  java.util.Optional<Preparation> pendingPreparation(String key, OperationDescriptor descriptor);
+
+  /**
+   * Preserve the first unexpired preparation. Empty means a matching operation is already accepted;
+   * changed public identity always conflicts. The store never invokes a handler inside its lock.
+   */
+  java.util.Optional<Preparation> savePreparation(String key, OperationDescriptor descriptor, Preparation preparation);
+
+  /** Atomically copy the exact unexpired pending payload into acceptance and delete its pending row. */
+  Acceptance acceptPrepared(String key, OperationDescriptor descriptor,
+      io.justsearch.core.context.EngineContext context,
+      io.justsearch.agent.api.registry.InvocationProvenance provenance, java.util.UUID nonce);
+
+  /** Private owner/recovery read; receipt and history projections never include this value. */
+  java.util.Optional<Preparation> acceptedPreparation(long id);
+
   record Acceptance(OperationRecord record, boolean created) {}
 
   /** Row-first lookup: callers compare a missing key's timestamp with historySinceMillis(). */
