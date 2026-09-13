@@ -21,13 +21,20 @@ Final1376 passes71 focused cases (cached,3 existing skips), PMD/format/UI integr
 adjacent1375 executes3175 cases/505 suites,3 existing skips, no failures/errors.
 [Producer evidence and exact limits](evidence/C2/settings-reset-producer.md).
 
-Reset producer is pushed at `a9509882a`. The sticky recovery Health projection passes
+Reset producer is pushed at `a9509882a`; its hosted CI34785762868 and CLA34785761557 pass. The sticky recovery Health projection passes
 independent review,235 focused cases and full build1379; live1384 proves the initial
 Health SSE error and retained contradictory row/witness. [Health proof/limits](evidence/C2/settings-recovery-health.md).
 Use a revision-local MCP client for live work; the app-attached server still runs main's
 retired two-process tooling. Keep that client alive through capture and owned shutdown.
 
-Next: migrate every other settings writer using its captured full witness, expose atomic snapshot/witness GET and
+Health is pushed at `5198da953`. CLA passes; CI34786933226 has a Windows
+PowerShell fixture startup timeout before the Java tests, with the root cause unproven.
+Local1387 supervisor and local1388 all10 dev-runner files pass. Keep current Windows
+hosted proof open; [queue/failure evidence](evidence/C2/hosted-runner-recovery.json). The next producer cuts are grounded in
+[C2-6 next producer plan](evidence/C2/C2-6-plan.md#2026-09-14-next-producer-cuts-after-reset-and-health).
+Migrate runtime intent as one family, including recorded handlers, REST and boot seed;
+a recovery refusal must keep startup alive for Health/reset. Then migrate other writers
+using their captured full witness, expose atomic snapshot/witness GET and
 keyed frontend ingress, then run live public-wire and installed successor-bootstrap proof.
 C2-6/C2-11 and D1/D2/E/F remain open. Do not substitute callback tests for installed proof.
 

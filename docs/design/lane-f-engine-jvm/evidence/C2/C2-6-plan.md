@@ -333,3 +333,48 @@ clear/restart ordering. Independent review and negative1335 are clear;1336 resto
 cases. The next cut is production owner/producer/Health composition and public witness/key
 flows, followed by actual successor-bootstrap proof. The new main identity policy requires
 PR1 publication-lineage repair; it changes neither stage order nor final F merge readiness.
+
+## 2026-09-14 next producer cuts after reset and Health
+
+Grounding at `5198da953` confirms that runtime intent must migrate as one family,
+not as a store-only replacement. Read-only independent discovery and the root's
+source inspection agree on the following per-item commits. All remain required;
+this plan does not claim implementation or authorize a second commitment owner.
+
+1. **Runtime intent.** Migrate RuntimeSpecStore:29-70, SetChatEnabledHandler:73-85,
+   SwitchInferenceModeHandler, BrainRuntimeServiceImpl:114-130, the ServicePhase:211
+   composition and InferenceWiring:72-103 autostart seed together. Recorded handlers
+   consume their existing runner-issued capability (OperationExecutorImpl:501-504,
+   593-603); direct boot/REST producers accept before effects. Include activation's
+   RuntimeSpecStore construction at RuntimeActivationService:1015 in this injection
+   cut. Preserve provenance and the one captured full witness through the no-op
+   predicate and mutation: recordUserEnabled and seedAutostartIfUnset must not read
+   again to refresh metadata for an older decision. A typed recovery refusal from
+   boot seeding must leave startup able to expose Health and the confirmed reset UI.
+   It must not falsely report that the seed persisted. Verify real SQLite acceptance,
+   stale refusal, operation-key replay, seed refusal followed by reachable startup,
+   and existing runtime intent/reconciler/procedure behavior.
+2. **Activation and compensation.** Migrate RuntimeActivationService:960-979,
+   1055-1059 and 1081-1085; delete the separate ConfigStore rebuilds at 1008,1066,1108.
+   Capture the committed full witness for compensation. Refuse an intervening write
+   instead of restoring the previous whole document. Preserve the procedure bracket,
+   profile selection and native system-property order; assert those effects separately.
+3. **Installer and import.** Migrate AiInstallService:876-898,1853-1868,1893-1949,
+   1998-2006 and AiPackImportService:631-650. The five ONNX properties at1928-1943
+   still have real readers. Pack recording at617-626 remains after settings durability.
+   Carry candidate/witness together and propagate refused or uncertain commitment;
+   no successful install/import claim may hide a failed settings apply.
+4. **Public settings ingress and consumers.** Replace SettingsController:109-145's
+   direct save, carry one key and original witness through every frontend producer,
+   and expose an atomic snapshot/witness read. Preserve the existing per-client mode
+   sequence/LRU behavior. Update Java DTOs and generated schema/type projections
+   together, with public A/B/C retry and changed-input proof.
+5. **Retirement and integrated acceptance.** Remove public raw-save/config-rebuild
+   bypasses after the caller sweep, run an executable no-bypass guard, then the
+   required full/stress/frontend/live/installed/hosted checks. Installed successor
+   bootstrap and all C2-11 scenarios remain owed; callback counters do not substitute.
+
+The launcher fallback remains IN_MEMORY and has no restart owner. No constructor
+fallback may create an uncomposed writable runner or silently write raw settings.
+Root retains shared composition and Gradle ownership; each implementation batch gets
+one independent review, explicit-path commit with proof body, and immediate push.

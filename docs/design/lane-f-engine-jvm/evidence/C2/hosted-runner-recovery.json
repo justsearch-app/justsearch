@@ -1,0 +1,61 @@
+{
+  "revision": "5198da95369baf72431ee7428d6f90327d8c28c0",
+  "observedDate": "2026-09-14",
+  "queuedCla": {
+    "runId": 34746837244,
+    "createdAt": "2026-09-13T08:05:52Z",
+    "jobStartedAt": "2026-09-13T11:43:17Z",
+    "jobCompletedAt": "2026-09-13T11:43:25Z",
+    "conclusion": "success"
+  },
+  "resetProducerHosted": {
+    "revision": "a9509882a2cf315d8dade8c336d30fc7ca06c78b",
+    "ci": 34785762868,
+    "cla": 34785761557,
+    "conclusion": "success"
+  },
+  "healthHosted": {
+    "ci": 34786933226,
+    "cla": 34786931891,
+    "claConclusion": "success",
+    "ciConclusion": "pending; first Windows job failed",
+    "failedJob": 103803994880,
+    "symptom": "PowerShell file-handle fixture produced no held line before its ten-second wait expired. Root cause not established.",
+    "limits": "Remaining Windows-native Java and supervisor conformance steps were skipped. Do not transfer older Windows success to this revision."
+  },
+  "local": [
+    {
+      "command": "node scripts/dev/test-dev-runner-supervisor.mjs",
+      "result": "PASS; real Windows held-reader cases execute"
+    },
+    {
+      "command": "node scripts/dev/run-dev-runner-tests.mjs --verbose",
+      "result": "PASS 10/10 discovered files"
+    }
+  ],
+  "rerun": "Targeted job rerun requested while workflow was active; GitHub refused it. No rerun success claimed.",
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "retention": "Through lane acceptance plus 30 days; export before worktree release.",
+  "artifacts": [
+    {
+      "path": "tmp/c2-health-hosted1386.json",
+      "bytes": 46047,
+      "sha256": "49e33a662243328250dcca51d901f6f566394a04f4a563e32a5ea3e165da0668"
+    },
+    {
+      "path": "tmp/c2-health-hosted1386-windows.txt",
+      "bytes": 29760,
+      "sha256": "c61cc723456ee74d688c31e3d8f740c434647ebaddbabdb5a31741c85f4ac253"
+    },
+    {
+      "path": "tmp/c2-supervisor-local1387.txt",
+      "bytes": 1358,
+      "sha256": "c5ec868f952d4b275db6d58a40419fb7cb32b9c0bc73e0bc9b69fc3f5605acb3"
+    },
+    {
+      "path": "tmp/c2-supervisor-suite1388.txt",
+      "bytes": 660,
+      "sha256": "2d9d53d064db7e1cf40845fb1f7d01379050e893889bcaf9887bdd96c53a4d41"
+    }
+  ]
+}
