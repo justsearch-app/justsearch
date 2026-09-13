@@ -57,6 +57,17 @@ replaced stream cannot prompt for approval or end the new run. Pending frames ne
 a live run. Reattaching to the same run preserves its pending approval; replacing
 the run clears queued AUTO calls until the new run establishes its own identity.
 
+### Projected workflow delegation
+
+`WorkflowToolRunnerImpl` resolves an agent-facing workflow operation back to its
+catalog declaration. Delegated shapes use that workflow's declared audience;
+the operation projection's AGENT exposure does not replace the composition audience.
+`ConversationEngine` still checks each target shape's audience, and workflow tool
+nodes still use the intent gate. The server-owned background posture reaches nested
+shapes and persisted run metadata. If execution throws before a terminal event,
+`WorkflowShapeRunner` finalizes that metadata as ERROR and preserves the exception
+for the existing transport error handler.
+
 ### Engine admission and cancellation
 
 `EngineAdmissionController` is the shared owner for HTTP/MCP admission and upgrade freezing.

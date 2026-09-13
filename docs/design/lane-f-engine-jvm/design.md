@@ -445,6 +445,8 @@ it is history, not a second current contract. Evidence records retain the experi
 
 | 2026-09-13 | **C2-3 stream-owner correction.** A read revision alone cannot identify a late frame or old cleanup. Bind all five stream paths to their existing AbortController object, require live state for pending calls and ignore stale callbacks/catch/finally. Replacement clears unknown AUTO work and invalidates approval reads; same-run reattach preserves its gate. Finish local cancellation before awaiting DELETE. This reuses the existing stream owner instead of adding another generation registry. | C2-3c; [stream proof](evidence/C2/stream-owner.md); negative1044/1051 and full1050 |
 
+| 2026-09-13 | **C2-3 declared workflow composition and failure retirement.** The AGENT-facing operation projection must delegate using its catalog workflow audience, not replace that source declaration with AGENT. Keep engine audience checks and tool intent gates unchanged. A finally block retires still-RUNNING workflow metadata to ERROR when execution throws, preserving the exception and existing terminal states. Retain a primary execution exception on the stack and attach any cleanup-write failure as suppressed; otherwise propagate cleanup failure. This uses the existing run metadata instead of another recovery marker or a swallowed error. | C2-3c; [delegation proof](evidence/C2/workflow-delegation.md); negative1054, final1055/1056 |
+
 **2026-09-10 corrections from the inference-host design audits** (four read-only audits at
 `4229f1091`, `docs/design/inference-host/evidence/audits/`), inside decided lines: (a) sections
 4 and 5 name "query NER" as a request-time consumer; `NerService` is reached only from

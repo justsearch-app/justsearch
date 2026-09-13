@@ -175,90 +175,109 @@ public final class WorkflowShapeRunner implements ShapeRunner {
             runEvents.writeRunMeta(sessionId, runMeta);
           }
         };
-    psink.accept(new SseEvent("session_started", Map.of("sessionId", sessionId)));
-    psink.accept(
-        new SseEvent(
-            "workflow_started",
-            Map.of("workflowId", workflowId.value(), "nodeCount", workflow.nodes().size())));
-
-    String lastOutput = "";
-    int index = 0;
-    for (WorkflowNode node : workflow.nodes()) {
+    Throwable executionFailure = null;
+    try {
+      psink.accept(new SseEvent("session_started", Map.of("sessionId", sessionId)));
       psink.accept(
           new SseEvent(
-              "node_started",
-              Map.of("nodeId", node.nodeId(), "kind", kindOf(node), "index", index)));
-      try {
-        switch (node) {
-          case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink, engineContext, background);
-          case WorkflowNode.GateStep step -> {
-            if (!runGateStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background)) {
-              // User declined at the gate — terminate the workflow cleanly.
-              psink.accept(
-                  new SseEvent(
-                      "done",
-                      Map.of(
-                          "finalResponse",
-                          "Workflow cancelled by the user at gate '" + step.nodeId() + "'.",
-                          "nodesExecuted",
-                          index,
-                          "cancelled",
-                          true)));
-              return;
-            }
-          }
-          case WorkflowNode.ToolStep step -> {
-            ToolOutcome outcome = runToolStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background);
-            if (outcome.cancelled()) {
-              psink.accept(
-                  new SseEvent(
-                      "done",
-                      Map.of(
-                          "finalResponse",
-                          "Workflow cancelled by the user at tool step '" + step.nodeId() + "'.",
-                          "nodesExecuted",
-                          index,
-                          "cancelled",
-                          true)));
-              return;
-            }
-            lastOutput = outcome.output();
-          }
-        }
-      } catch (WorkflowAbortedException aborted) {
-        emitError(psink, aborted.getMessage(), "WORKFLOW_FAILED");
-        return;
-      }
-      // Tempdoc 565 §26.I (Fix A) — an LlmStep's text output is streamed live (chunks) but otherwise
-      // persisted nowhere durable, so a RELOADED workflow run bracketed empty nodes. Emit the node's
-      // FULL output as a durable `node_output` event INSIDE the start/end bracket (before node_completed,
-      // so its timestamp sorts within); the record-side mapper projects it as the node's ASSISTANT_MESSAGE,
-      // making reload identical to live. ToolStep output already persists (tool_exec_completed); GateStep
-      // has none. The live view ignores `node_output` (no dispatch handler) — it already shows the chunks.
-      if (node instanceof WorkflowNode.LlmStep && !lastOutput.isEmpty()) {
+              "workflow_started",
+              Map.of("workflowId", workflowId.value(), "nodeCount", workflow.nodes().size())));
+
+      String lastOutput = "";
+      int index = 0;
+      for (WorkflowNode node : workflow.nodes()) {
         psink.accept(
             new SseEvent(
-                "node_output",
+                "node_started",
+                Map.of("nodeId", node.nodeId(), "kind", kindOf(node), "index", index)));
+        try {
+          switch (node) {
+            case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink, engineContext, background);
+            case WorkflowNode.GateStep step -> {
+              if (!runGateStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background)) {
+                // User declined at the gate — terminate the workflow cleanly.
+                psink.accept(
+                    new SseEvent(
+                        "done",
+                        Map.of(
+                            "finalResponse",
+                            "Workflow cancelled by the user at gate '" + step.nodeId() + "'.",
+                            "nodesExecuted",
+                            index,
+                            "cancelled",
+                            true)));
+                return;
+              }
+            }
+            case WorkflowNode.ToolStep step -> {
+              ToolOutcome outcome = runToolStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background);
+              if (outcome.cancelled()) {
+                psink.accept(
+                    new SseEvent(
+                        "done",
+                        Map.of(
+                            "finalResponse",
+                            "Workflow cancelled by the user at tool step '" + step.nodeId() + "'.",
+                            "nodesExecuted",
+                            index,
+                            "cancelled",
+                            true)));
+                return;
+              }
+              lastOutput = outcome.output();
+            }
+          }
+        } catch (WorkflowAbortedException aborted) {
+          emitError(psink, aborted.getMessage(), "WORKFLOW_FAILED");
+          return;
+        }
+        // Tempdoc 565 §26.I (Fix A) — an LlmStep's text output is streamed live (chunks) but otherwise
+        // persisted nowhere durable, so a RELOADED workflow run bracketed empty nodes. Emit the node's
+        // FULL output as a durable `node_output` event INSIDE the start/end bracket (before node_completed,
+        // so its timestamp sorts within); the record-side mapper projects it as the node's ASSISTANT_MESSAGE,
+        // making reload identical to live. ToolStep output already persists (tool_exec_completed); GateStep
+        // has none. The live view ignores `node_output` (no dispatch handler) — it already shows the chunks.
+        if (node instanceof WorkflowNode.LlmStep && !lastOutput.isEmpty()) {
+          psink.accept(
+              new SseEvent(
+                  "node_output",
+                  Map.of(
+                      "nodeId", node.nodeId(),
+                      "kind", kindOf(node),
+                      "index", index,
+                      "output", lastOutput)));
+        }
+        psink.accept(
+            new SseEvent(
+                "node_completed",
                 Map.of(
                     "nodeId", node.nodeId(),
                     "kind", kindOf(node),
                     "index", index,
-                    "output", lastOutput)));
+                    "output", preview(lastOutput))));
+        index++;
       }
+
       psink.accept(
           new SseEvent(
-              "node_completed",
-              Map.of(
-                  "nodeId", node.nodeId(),
-                  "kind", kindOf(node),
-                  "index", index,
-                  "output", preview(lastOutput))));
-      index++;
+              "done", Map.of("finalResponse", lastOutput, "nodesExecuted", workflow.nodes().size())));
+    } catch (RuntimeException | Error failure) {
+      executionFailure = failure;
+      throw failure;
+    } finally {
+      // Keep the original exception and existing transport error handling. The durable run
+      // must nevertheless leave RUNNING when a node or observer aborts this invocation.
+      if ("RUNNING".equals(runMeta.get("state"))) {
+        runMeta.put("state", "ERROR");
+        runMeta.put("updatedAt", java.time.Instant.now().toString());
+        try {
+          runEvents.writeRunMeta(sessionId, runMeta);
+        } catch (RuntimeException | Error cleanupFailure) {
+          if (executionFailure == null) throw cleanupFailure;
+          executionFailure.addSuppressed(cleanupFailure);
+        }
+      }
     }
-
-    psink.accept(
-        new SseEvent(
-            "done", Map.of("finalResponse", lastOutput, "nodesExecuted", workflow.nodes().size())));
   }
 
   // ---- node executors ----

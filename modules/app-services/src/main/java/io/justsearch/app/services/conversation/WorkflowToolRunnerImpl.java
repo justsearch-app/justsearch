@@ -67,7 +67,8 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
   public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink,
       EngineContext engineContext, boolean background) {
     WorkflowRef workflowRef = WorkflowOperationProjection.workflowRefFor(ref).orElse(null);
-    if (workflowRef == null || workflowCatalog.findById(workflowRef).isEmpty()) {
+    var workflow = workflowRef == null ? null : workflowCatalog.findById(workflowRef).orElse(null);
+    if (workflow == null) {
       return OperationResult.failure("Not a projected workflow tool: " + ref.value());
     }
     // Mutable capture cells for the terminal outcome the workflow streams.
@@ -108,8 +109,10 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
       // Workflows take no model-supplied arguments today; the runner sets the body itself. The
       // model's argumentsJson is intentionally not threaded through (an empty-object schema is
       // projected) — see WorkflowOperationProjection.
+      // The projected operation's AGENT exposure does not replace the source workflow's
+      // declared composition audience. The engine still validates every delegated shape.
       executor.run(
-          Map.of("workflowId", workflowRef.value()), Audience.AGENT, sseSink, engineContext, background);
+          Map.of("workflowId", workflowRef.value()), workflow.audience(), sseSink, engineContext, background);
     } catch (RuntimeException e) {
       // Host owns truth (§4.5): a runner failure becomes a result the model can recover from, never
       // an exception that tears down the agent loop.

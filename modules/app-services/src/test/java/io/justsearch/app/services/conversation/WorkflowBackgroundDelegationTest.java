@@ -92,6 +92,81 @@ class WorkflowBackgroundDelegationTest {
 
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+  void projectedWorkflowUsesItsDeclaredAudienceForLlmDelegation(
+      boolean background, @org.junit.jupiter.api.io.TempDir Path directory) {
+    var store = new RunEventStore(directory.resolve("runs"));
+    var initial = new HashMap<String, tools.jackson.databind.JsonNode>();
+    store.addEventListener((sessionId, event) -> {
+      if ("session_started".equals(event.get("eventType"))) initial.put(sessionId, readMeta(store, sessionId));
+    });
+    var f = new Fixture(store, false);
+    var bridge = new WorkflowToolRunnerImpl(WorkflowCatalog.of("core", List.of(f.workflow)),
+        f.workflowRunner::run, f.gates);
+    var op = WorkflowOperationProjection.toOperation(f.workflow, ref -> Optional.empty()).orElseThrow();
+    var result = bridge.run(op.id(), "{}", event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal(), background);
+    assertTrue(result.success(), result.toString());
+    assertEquals(List.of(background), f.observedPostures);
+    assertEquals(1, initial.size());
+    var opening = initial.entrySet().iterator().next();
+    assertEquals("RUNNING", opening.getValue().get("state").asText());
+    assertEquals(background, opening.getValue().get("background").asBoolean());
+    var completed = readMeta(store, opening.getKey());
+    assertEquals("DONE", completed.get("state").asText());
+    assertEquals(background, completed.get("background").asBoolean());
+  }
+
+  @Test void aThrownNodeRetiresItsMetadataAndPreservesTheOriginalFailure(
+      @org.junit.jupiter.api.io.TempDir Path directory) {
+    var store = new RunEventStore(directory.resolve("runs"));
+    var runId = new AtomicReference<String>();
+    store.addEventListener((sessionId, event) -> runId.compareAndSet(null, sessionId));
+    var f = new Fixture(store, false);
+    var failure = new IllegalStateException("fixture node failure");
+    doThrow(failure).when(f.agent).runAgent(any(), any(), anyBoolean(), any());
+    assertSame(failure, assertThrows(IllegalStateException.class, () -> f.engine.run(WorkflowRunShape.ID,
+        Map.of("workflowId", f.workflow.id().value()), Audience.USER, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal(), true)));
+    assertNotNull(runId.get());
+    var terminal = readMeta(store, runId.get());
+    assertEquals("ERROR", terminal.get("state").asText());
+    assertTrue(terminal.get("background").asBoolean());
+  }
+
+  @Test void agentCallersStillCannotDirectlyEnterAUserOnlyShape() {
+    var f = new Fixture();
+    assertThrows(ConversationEngine.AudienceDeniedException.class, () -> f.engine.run(AgentRunShape.ID,
+        Map.of("messages", List.of()), Audience.AGENT, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal()));
+    verify(f.agent, never()).runAgent(any(), any(), anyBoolean(), any());
+  }
+
+  @Test void failedMetadataCleanupCannotReplaceTheNodeFailure(
+      @org.junit.jupiter.api.io.TempDir Path directory) {
+    var store = new RunEventStore(directory.resolve("runs"));
+    var runId = new AtomicReference<String>();
+    store.addEventListener((sessionId, event) -> runId.compareAndSet(null, sessionId));
+    var f = new Fixture(store, false);
+    var failure = new IllegalStateException("fixture primary node failure");
+    doAnswer(invocation -> {
+      var metadata = store.metaPath(runId.get());
+      Files.delete(metadata);
+      Files.createDirectory(metadata);
+      Files.writeString(metadata.resolve("fixture-blocker"), "prevent replacement on every platform");
+      throw failure;
+    }).when(f.agent).runAgent(any(), any(), anyBoolean(), any());
+    var thrown = assertThrows(RuntimeException.class, () -> f.engine.run(WorkflowRunShape.ID,
+        Map.of("workflowId", f.workflow.id().value()), Audience.USER, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal(), true));
+    assertSame(failure, thrown);
+    assertEquals(1, thrown.getSuppressed().length);
+    assertInstanceOf(io.justsearch.configuration.persistence.CorruptDurableStoreException.class,
+        thrown.getSuppressed()[0]);
+    assertTrue(Files.isDirectory(store.metaPath(runId.get())), "The actual metadata target must reject replacement");
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
   void serverPostureSurvivesWorkflowAndLlmDelegationDespiteOppositeCallerInput(boolean background) {
     var f = new Fixture(); var events = new ArrayList<SseEvent>();
     f.engine.run(WorkflowRunShape.ID,
