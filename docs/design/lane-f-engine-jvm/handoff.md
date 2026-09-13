@@ -53,6 +53,12 @@ then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 
+The shared GatedOperationExecutor preparation/route kernel passes525 represented cases
+at1017 after the public-only capsule negative for both agent/workflow transports;
+[shared route proof](evidence/C2/gated-preparation.md). The loops must now retain that
+same plan through their approval/retry paths; private display and nested snapshot
+delivery remain required before activating prepared producers.
+
 The following paragraphs retain the pre-review correction checkpoints; current
 acceptance is governed by the summary above and the correction batch checklist.
 

@@ -148,6 +148,14 @@ frozen-display privacy rule still applies; settle its per-run delivery explicitl
 before changing event/history serialization. No consumer activation is claimed by
 the prerequisite alone.
 
+The shared GatedOperationExecutor now exposes prepare and routePrepared using this
+same OperationDispatchPlan directly. No extra prepared-call/ticket representation is
+needed: the caller already owns its immutable operation and public argument string.
+Ready plans mint the exact prepared capsule when a nonce exists; the legacy sentinel
+cannot satisfy that path. Recorded plans query through the router again without any
+capsule, so a later hard-stop or receipt change is observed rather than returning a
+cached result. Agent/workflow loop wiring and private display lookup follow.
+
 ## Reach and teardown
 
 The useful principle is stable input identity with separately frozen execution

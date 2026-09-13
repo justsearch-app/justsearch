@@ -275,6 +275,37 @@ class PreparedOperationDispatchTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(value = TransportTag.class, names = {"AGENT_LOOP", "WORKFLOW"})
+  void orchestratorCarriesTheFrozenReferenceThroughTheRealRouterAndCapsuleAuthority(TransportTag transport) throws Exception {
+    var fixture = new Fixture(); var capsules = new ConsentCapsuleService();
+    var context = transport == TransportTag.AGENT_LOOP ? TestEngineContexts.agent() : TestEngineContexts.workflow();
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      var dispatcher = executor(store, fixture.registry(), capsules);
+      var router = new BackendIntentRouterImpl(OperationCatalog.of("core", java.util.List.of(operation())),
+          dispatcher, CoreIntentSourceCatalog.catalog(),
+          new io.justsearch.app.observability.intent.IntentEnvelopeChangeRegistry());
+      var gated = new GatedOperationExecutor(() -> router, () -> capsules, transport);
+      var plan = assertInstanceOf(OperationDispatchPlan.Ready.class,
+          gated.prepare(operation(), "{}", context, null, true));
+      assertEquals(0, fixture.effects.get()); assertTrue(store.find(plan.operationKey()).isEmpty());
+      assertEquals("Write to original-target", plan.approvalPreview().orElseThrow().summary());
+      fixture.target.set("replacement");
+      assertTrue(gated.routePrepared(operation(), "{}", plan, context).success());
+      assertEquals(1, fixture.prepares.get()); assertEquals(1, fixture.effects.get());
+      assertTrue(fixture.used.get().contains("original-target"));
+      assertEquals(transport, fixture.usedProvenance.get().transport());
+      assertEquals(context.sessionId(), fixture.usedProvenance.get().correlationId());
+      fixture.previewSupported = false;
+      var receipt = assertInstanceOf(OperationDispatchPlan.Recorded.class,
+          gated.prepare(operation(), "{}", context, plan.operationKey(), true));
+      assertTrue(gated.routePrepared(operation(), "{}", receipt, context).success());
+      var stop = new GlobalHardStop(); dispatcher.setGlobalHardStop(stop); stop.engage();
+      assertThrows(TrustGateDeniedException.class, () -> gated.routePrepared(operation(), "{}", receipt, context));
+      assertEquals(1, fixture.effects.get());
+    }
+  }
+
   @Test
   void staleOrUnknownApprovalNeverPreparesAReplacement() throws Exception {
     var fixture = new Fixture(); var capsules = new ConsentCapsuleService();
