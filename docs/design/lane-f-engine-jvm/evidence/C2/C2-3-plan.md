@@ -213,3 +213,31 @@ the server-side overload. Dispatcher activation and all remaining gate consumers
 frontend invoke/undo carry-through, preview and nonce-before-preparation negatives
 remain required in the connected follow-on item. This prerequisite cannot activate
 a prepared producer by itself.
+
+## Connected dispatcher decisions (September13)
+
+Current request provenance and the current hard-stop/grant/capsule boundary authorize
+the invocation. Frozen EngineContext and executor/time remain original attribution,
+not a grant. Persist the original detached envelope and use it for accepted row and
+handler attribution; never restore its old process workId or signed intent token.
+If the current admitted context has exactly the same attribution and work axes, attach
+that current work. Otherwise admit a separate child using the frozen detached context,
+as the existing approval controller does, preserving its quota/survival without
+relabeling another client's live work. Current caller authorization still runs first.
+
+DurableGrantScope gains an explicit prepared-value scope check; its default refuses
+the shortcut because public arguments cannot prove containment of a server-selected
+target. A scope implementation that understands a prepared schema may prove coverage
+against that frozen value. The955 composite notes scope can therefore see its frozen
+path, while every current raw-input scope retains its existing behavior. Unproved
+prepared scope uses the ordinary confirmation ceremony, never a silent grant.
+
+Return the runner's metadata snapshot decision before attaching completion controls.
+Pending decode/reuse and fresh preparation/persistence run in its pure same-key scope.
+An explicitly supplied approval nonce must match pending state before any preparation;
+an existing accepted row still returns metadata first. Acceptance consumes the saved
+nonce outside the scope and before effects. Generic passthrough preparation remains
+transient. This connected item retires the temporary replay-schema blocker only with
+negative tests, exact cipher wiring and backend approval delivery. Frozen preview and
+remaining frontend/agent/workflow callers are separate named follow-on commits before
+C2-3 acceptance; no actual new producer is activated by the generic mechanism.

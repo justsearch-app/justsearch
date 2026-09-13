@@ -117,7 +117,8 @@ public final class OperationSubstrateInit {
       OperationCatalog operationCatalog,
       OperationCatalog agentToolsCatalog,
       Function<RequiredCapability, Boolean> capabilityResolver,
-      io.justsearch.agent.api.registry.SurfaceCatalog coreSurfaceCatalog) {
+      io.justsearch.agent.api.registry.SurfaceCatalog coreSurfaceCatalog,
+      io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
     OperationHistoryResourceCatalog operationHistoryResourceCatalog =
         new OperationHistoryResourceCatalog();
     // Tempdoc 571 §4c: the action-ledger Resource — the TRUST-role authority the Activity surface
@@ -263,7 +264,7 @@ public final class OperationSubstrateInit {
             capabilityResolver,
             consentCapsuleService,
             // F5: append fans the gate firing into the one log via the store's listener.
-            authorizationOutcomeStore::append);
+            authorizationOutcomeStore::append, preparationCipher);
     operationExecutorImpl.setGlobalHardStop(globalHardStop);
     // Tempdoc 550 thesis IV: the gate consults the durable allow-always grants before requiring a
     // fresh capsule. Tempdoc 875 C.3: paired with the argument scope that bounds them — the wiring

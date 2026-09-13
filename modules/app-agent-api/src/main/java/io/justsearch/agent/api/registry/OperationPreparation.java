@@ -6,13 +6,14 @@ import java.util.Objects;
 /**
  * Immutable value prepared before an operation is accepted.
  *
- * <p>{@code argumentsJson} is the raw invocation input and is transient: callers must not persist
- * it in an operation row. A replay payload is optional, but when present its schema and payload are
+ * <p>{@code argumentsJson} is the invocation input. Passthrough values remain transient; a
+ * replay value persists only in the classified prepared envelope, separate from the public-input
+ * digest used for key comparison. A replay payload is optional, but its schema and payload are
  * both required and bounded in UTF-8 bytes. METADATA is for paths, roots, generation, collection
  * and policy. A server handler with prompts or document content must declare CONTENT, which
  * requires the whole persisted preparation to be sealed using the existing data-key authority.
- * The current dispatcher refuses non-null replay schemas until C2-3 provides separate persisted
- * preparation and public-input key comparison; this value alone does not activate replay.
+ * A replay handler must explicitly validate its schema and implement prepared execution. An
+ * accepted incomplete row never authorizes caller-driven re-execution; reconciliation owns replay.
  */
 public record OperationPreparation(
     String argumentsJson, String replaySchema, String replayPayloadJson, Content content) {

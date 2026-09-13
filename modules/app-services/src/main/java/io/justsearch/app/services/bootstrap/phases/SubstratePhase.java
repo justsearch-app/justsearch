@@ -96,7 +96,7 @@ public final class SubstratePhase {
       AgentToolFactory.Output agentTools,
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
-      List<McpServerConfig> mcpServers) {
+      List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
     try {
       return new io.justsearch.app.services.bootstrap.PhaseOutcome.Ready<>(
           runInternal(
@@ -118,7 +118,7 @@ public final class SubstratePhase {
               agentTools,
               capabilityResolver,
               operationLeaseService,
-              mcpServers));
+              mcpServers, preparationCipher));
     } catch (RuntimeException e) {
       return io.justsearch.app.services.bootstrap.PhaseOutcome.Failed.of(e);
     }
@@ -149,7 +149,7 @@ public final class SubstratePhase {
       AgentToolFactory.Output agentTools,
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
-      List<McpServerConfig> mcpServers) {
+      List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
     // Operation registry inputs (consumed by OperationSubstrateInit).
     HandlerRegistry operationHandlers = new HandlerRegistry();
     OperationHandlerRegistrations.registerWorker(
@@ -236,7 +236,7 @@ public final class SubstratePhase {
             agentToolsCatalog,
             capabilityResolver,
             // Tempdoc 550 WA-4: surface catalog (built above) keys navigation gating.
-            resourceOut.coreSurfaceCatalog());
+            resourceOut.coreSurfaceCatalog(), preparationCipher);
 
     // Indexing-jobs bridge — needs Worker client (lazy) + resource change registry + the unified
     // action-ledger registry (terminal indexing outcomes fan into the ONE log; tempdoc 550 thesis I).

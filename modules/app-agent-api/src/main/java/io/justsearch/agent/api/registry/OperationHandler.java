@@ -91,6 +91,31 @@ public interface OperationHandler {
     return OperationExecution.finished(execute(argumentsJson, provenance, engineContext));
   }
 
+  /**
+   * Validate only the frozen format/version/content classification, before persistence and after
+   * decode. This is pure and must not re-resolve a target or inspect changing execution state.
+   * A replay owner opts in by validating its schemas; unsupported preparations refuse by default.
+   */
+  default void validatePreparation(OperationPreparation prepared) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.replaySchema() != null) throw new IllegalArgumentException("Handler has no validated preparation schema");
+  }
+
+  /** Pure undo preparation has the same frozen-value contract as forward preparation. */
+  default OperationPreparation prepareUndo(String executionId, InvocationProvenance provenance,
+      EngineContext engineContext) {
+    return OperationPreparation.passthrough(OperationDispatcher.undoArguments(executionId));
+  }
+
+  /** A replay-capable undo owner must consume its frozen value explicitly. */
+  default OperationExecution undoPrepared(OperationPreparation prepared, String executionId,
+      InvocationProvenance provenance, EngineContext engineContext, OperationRecordHandle record) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.replaySchema() != null) throw new UnsupportedOperationException("Handler must override undoPrepared for replay-capable preparation");
+    return record == null ? OperationExecution.finished(undo(executionId, engineContext))
+        : undoRecorded(executionId, engineContext, record);
+  }
+
   /** Undo participates in the same runner-owned attempt and actual-completion contract. */
   default OperationExecution undoRecorded(String executionId, EngineContext engineContext,
       OperationRecordHandle record) {

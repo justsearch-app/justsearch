@@ -36,7 +36,8 @@ Runner serialization and completion publication outside the key lock pass336 rep
 cases at966 (reuse explicitly recorded); [runner proof](evidence/C2/prepared-runner.md).
 Frozen approval reference delivery and domain-separated consent pass422 represented
 cases at975; [approval prerequisite proof](evidence/C2/prepared-approval.md).
-Next: dispatcher/cipher wiring and remaining frontend/agent/workflow approval carry-through, then remaining ingress and integrated acceptance. Hosted v3 proof remains
+Connected dispatcher/cipher wiring now passes424 cases at984, including real admission ownership and two negative controls; [dispatcher proof](evidence/C2/prepared-dispatch.md).
+Next: frozen approval preview, HTTP/frontend exact-reference retries, agent/workflow carry-through and typed locked ingress, then integrated acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 

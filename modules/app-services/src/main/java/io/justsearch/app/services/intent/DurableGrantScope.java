@@ -40,4 +40,10 @@ public interface DurableGrantScope {
    *     silent action.
    */
   boolean coversArguments(Operation op, String argumentsJson, EngineContext engineContext);
+
+  /** A public-input scope cannot prove containment of a server-selected frozen target. */
+  default boolean coversPreparation(Operation op, io.justsearch.agent.api.registry.OperationPreparation prepared,
+      EngineContext engineContext) {
+    return false;
+  }
 }

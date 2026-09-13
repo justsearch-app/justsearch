@@ -23,7 +23,8 @@ class OperationSubstrateInitTest {
             ops,
             agentTools,
             req -> true,
-            new io.justsearch.app.observability.surface.CoreSurfaceCatalog());
+            new io.justsearch.app.observability.surface.CoreSurfaceCatalog(),
+            io.justsearch.agent.api.encryption.StoreCipher.disabled());
 
     assertNotNull(out.operationHistoryResourceCatalog());
     assertNotNull(out.operationHistoryStore());

@@ -616,7 +616,8 @@ public final class HeadAssembly implements AutoCloseable {
                     // MCP-host servers (tempdoc 560 §6): resolved by the config authority here at
                     // the allowlisted entrypoint, parsed downstream (app-services may not read env).
                     io.justsearch.app.services.mcphost.McpHostConfig.fromPath(
-                        io.justsearch.configuration.EnvRegistry.MCP_HOST_CONFIG.getPath())))
+                        io.justsearch.configuration.EnvRegistry.MCP_HOST_CONFIG.getPath()),
+                    new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager)))
             .orThrow();
 
     // Tempdoc 560 Phase 1 — wire the host LLM as the MCP sampling answerer (an external MCP server
@@ -1040,7 +1041,7 @@ public final class HeadAssembly implements AutoCloseable {
             operationCatalog,
             agentToolsCatalog,
             buildCapabilityResolver(),
-            resourceOut.coreSurfaceCatalog());
+            resourceOut.coreSurfaceCatalog(), io.justsearch.agent.api.encryption.StoreCipher.disabled());
     // Bridge wired after operationOut so its ActionLedgerChangeRegistry feeds the terminal-outcome
     // translator (tempdoc 550 thesis I); neither phase depends on the other.
     var bridgeOut =
