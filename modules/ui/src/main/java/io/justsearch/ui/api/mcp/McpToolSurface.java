@@ -1516,9 +1516,11 @@ public final class McpToolSurface {
         failure.put("error", ApiErrorHandler.sanitizeMessage(opResult.message()));
         opResult.errorCode().ifPresent(code -> failure.put("errorCode", code));
         opResult.retryable().ifPresent(retryable -> failure.put("retryable", retryable));
-        for (String field : List.of("operationKey", "operationRecordId")) {
-          Object value = opResult.structuredData().get(field);
-          if (value instanceof String) failure.put(field, value);
+        if (opResult.structuredData().get("operationKey") instanceof String key) {
+          failure.put("operationKey", key);
+        }
+        if (opResult.structuredData().get("operationRecordId") instanceof Long id) {
+          failure.put("operationRecordId", id);
         }
         // OperationResult carries no API error class. Preserve its optional facts without
         // guessing a classification for a handler-specific or absent code.

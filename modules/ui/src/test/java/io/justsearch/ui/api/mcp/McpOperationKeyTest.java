@@ -89,15 +89,15 @@ class McpOperationKeyTest {
   void failedUnkeyedAttemptStillReturnsItsReceiptInBothDeliveryTiers() {
     when(dispatcher.dispatch(any(), any(), any(), any()))
         .thenReturn(new OperationResult(false, "failed", Optional.empty(),
-            Map.of("operationKey", KEY, "operationRecordId", "record-1", "privatePayload", "secret"),
+            Map.of("operationKey", KEY, "operationRecordId", 17L, "privatePayload", "secret"),
             Optional.of("EFFECT_FAILED"), Map.of(), Optional.of(false)));
     var response = surface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/notes")),
         "session", TestRequestContexts.mcp("session"));
     Map<?, ?> facts = (Map<?, ?>) response.get("structuredContent");
     assertEquals(KEY, facts.get("operationKey"));
-    assertEquals("record-1", facts.get("operationRecordId"));
+    assertEquals(17L, facts.get("operationRecordId"));
     assertTrue(response.get("content").toString().contains(KEY));
-    assertTrue(response.get("content").toString().contains("record-1"));
+    assertTrue(response.get("content").toString().contains("17"));
     assertFalse(response.toString().contains("secret"));
   }
 

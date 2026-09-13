@@ -27,7 +27,8 @@ represented cases at909. The keyed dispatcher SPI/receipt branch passes333 cases
 at913 after negative910/912. HTTP invoke/undo key delivery, typed failures and approval key/mode carry-through
 and approved-result key/error projection now pass265 represented cases at923.
 MCP key delivery, pending approval and failure receipt projection pass278 represented cases at936;
-see [MCP key proof](evidence/C2/mcp-key.md). Next: prepared persistence and frozen
+numeric row-id correction passes74 cases at942 after negative941.
+See [MCP key proof](evidence/C2/mcp-key.md). Next: prepared persistence and frozen
 approval payloads, then remaining ingress and integrated acceptance.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 

@@ -57,3 +57,15 @@ Raw logs/counts/XML: `tmp/c2-3-mcp-negative{924,925,929}.txt` (no XML from924),
 Docs output is `tmp/c2-3-mcp-docs{928,931,932,933,937,938,939,940}.txt`.
 All paths are under the lane worktree; retain until lane acceptance plus30days and
 export before worktree release. They are accessible local artifacts, not Git blobs.
+
+## Numeric receipt correction
+
+Root's reread of OperationAttemptRunnerImpl.receiptResponse and
+OperationExecutorImpl.recordedResponse found that operationRecordId is a boxed long.
+The original failure-projection witness mistakenly used a string, so936 did not
+establish numeric row-id carriage. Negative941 changes the witness to the real type
+and fails at the missing row id (3 represented cases,1 failure). Final942 passes74
+cases, UI PMD and integration-test compilation; its XML and counts are preserved at
+`tmp/c2-3-mcp942{.txt,-xml/,-counts.json}` and negative941's matching paths.
+The projection checks string key and Long row id separately. No payload widening.
+This correction is based oncf54aa6b1 and supersedes936 for failure row-id projection.
