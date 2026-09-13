@@ -164,7 +164,15 @@ The constraint matrix between Category and `SubscriptionMode` is
 documented in `20-systems/01-resources.md` §"Resource Policy
 Vocabulary".
 
-Resources with `subscriptionMode = SSE_STREAM` adopt the universal
+`primaryKey` is required for TABULAR resources and is an optional
+identity declaration for EVENT_STREAM and HISTORY. Those event strategies merge
+snapshot/update overlap by the explicitly declared key, keeping the latest value
+for each identity within their bounded window. Missing or blank row keys append
+independently; a blank declaration preserves append semantics for the entire stream.
+Operation history declares `operationKey`, which identifies an invocation rather
+than the operation definition shared by many invocations.
+
+SSE_STREAM resources use the universal
 SSE envelope (single JSON object with `streamId` / `frameKind` /
 `seq` / `ts` / `payload` / `resumeToken`; constant SSE event name
 `"frame"`). Canonical wire-format reference:

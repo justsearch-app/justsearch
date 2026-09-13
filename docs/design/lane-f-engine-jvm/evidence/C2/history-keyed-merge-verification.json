@@ -1,0 +1,247 @@
+{
+  "baseRevision": "f3c07654bdbb4f462f6f962ea442b912a858df90",
+  "testedSource": "Base plus the source files hashed below; no production changes during these checks.",
+  "retention": "Retain raw artifacts through lane acceptance plus 30 days; export before worktree release.",
+  "limits": [
+    "Local focused/compatibility proof; full1202 predates these source changes.",
+    "Atomic snapshot/reconnect, incarnation tokens, live SSE and installed/hosted proof remain owed."
+  ],
+  "javaRuns": [
+    {
+      "revision": "f3c07654b + ordered channel and keyed resource diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*Sse*Test' --tests '*OperationHistoryResourceCatalogTest' :modules:app-services:test --tests '*ResourceJacksonProjectionTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:app-agent-api:spotlessCheck :modules:ui:compileIntegrationTestJava --continue --console=plain",
+      "summary": {
+        "tests": 70,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 11
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 55,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "result": "PASS",
+      "executedCases": 70,
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1206.txt",
+          "bytes": 69702,
+          "sha256": "df3233b39d7dc0b8b925bcaf86ddd8f83d23063b5d4d584885c4435caec26428"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1206-xml.zip",
+          "bytes": 50289,
+          "sha256": "82e6d38b2575bd511243a460eb249809a15e2ebf2fa94a7b82a53e6930e95ff3"
+        }
+      ]
+    },
+    {
+      "revision": "f3c07654b + final ordered channel and keyed resource diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*Sse*Test' --tests '*OperationHistoryResourceCatalogTest' :modules:app-services:test --tests '*ResourceJacksonProjectionTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:app-agent-api:spotlessCheck :modules:ui:compileIntegrationTestJava --continue --console=plain",
+      "summary": {
+        "tests": 71,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 11
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 56,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        }
+      ],
+      "result": "PASS",
+      "executedCases": 56,
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1210.txt",
+          "bytes": 38657,
+          "sha256": "f9340793f66abdbb3015b5724aed45fa53dd946a30154bf8e2ae453ace69ba75"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1210-xml.zip",
+          "bytes": 50206,
+          "sha256": "cfe4a1655169c702b66995c2d9fbf6ad409124d42bd645b44b28c11e4570f44e"
+        }
+      ]
+    },
+    {
+      "revision": "f3c07654b + final ordered channel and keyed resource diff",
+      "command": "./gradlew.bat :modules:app-observability:test :modules:ui:test --tests '*Sse*Test' --tests '*RunStreamWriterTest' --continue --console=plain",
+      "summary": {
+        "tests": 572,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 89
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 62,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 10
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 510,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 79
+        }
+      ],
+      "result": "PASS",
+      "executedCases": 572,
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-compatibility1213.txt",
+          "bytes": 38658,
+          "sha256": "7453f49fc3f6a821317389366c196cf394a80c45a7d008732c7687a98f851666"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-compatibility1213-xml.zip",
+          "bytes": 95029,
+          "sha256": "fc25b4208aa4f224b6ae94585de313016a22bda416a5c5d66af0db3c0674b9dc"
+        }
+      ]
+    }
+  ],
+  "uiRuns": [
+    {
+      "command": "npm run test:unit:run",
+      "result": "PASS:6516 tests/484 files",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-keyed-full-ui1209.txt",
+        "bytes": 685206,
+        "sha256": "ac45e971da1a40c2cc7a14412f00e9230dcbc6f5abbc36145ba39286b92cf19c"
+      }
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "PASS",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-keyed-merge-worker-typecheck-v3.txt",
+        "bytes": 63,
+        "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+      }
+    },
+    {
+      "command": "npm run test:unit:run -- --run src/shell-v0/strategies/subscriptionStrategy.test.ts",
+      "result": "EXPECTED_FAILURE:2 failed/17 passed; strategyFor ignores declared key",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-keyed-negative1211.txt",
+        "bytes": 2219,
+        "sha256": "2f688d425f96fee36a9d671d74498b661a6a08946d6efae823ba587ce5ff491f"
+      }
+    },
+    {
+      "command": "npm run test:unit:run -- --run src/shell-v0/strategies/subscriptionStrategy.test.ts",
+      "result": "PASS:19 tests after byte-identical restoration",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-keyed-restored1212.txt",
+        "bytes": 363,
+        "sha256": "74583a8c669f87ef79bc7688103b2d4172ec156c65d860b120fdff9428ff30fb"
+      }
+    },
+    {
+      "command": "python -m jseval ui-shot --affected modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.ts",
+      "result": "FAILED:editable jseval import points at foreign worktree; guard correctly refused",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-keyed-ui-affected1207.txt",
+        "bytes": 605,
+        "sha256": "216e92ad429df44abc9fa44f8c85ece5589faeae48b4acb32d1ba2c662b1ec44"
+      }
+    },
+    {
+      "command": "PYTHONPATH=<lane worktree>/scripts/jseval python -m jseval ui-shot --affected modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.ts",
+      "result": "PASS:no affected steps; no visual proof claimed",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-keyed-ui-affected1208.txt",
+        "bytes": 179,
+        "sha256": "375f04545e4b8d2f03d0d801ec5f91d3dc9562c54c0592b3c79729e3ea8e51f7"
+      }
+    }
+  ],
+  "sourceHashes": [
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/Resource.java",
+      "bytes": 16390,
+      "sha256": "1b5edeb4db43ea3ad00a218fd31c33aadabc8b93410b556dbda21fa724e8f585"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryResourceCatalog.java",
+      "bytes": 3266,
+      "sha256": "2ddfd4ba3ef5ae5d7defea01fcc7a6f556f1cae05ecc115cb746e39b40129830"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryResourceCatalogTest.java",
+      "bytes": 4442,
+      "sha256": "9f25e99d43e07cfc2eef3796facd39d092559a3ab3cfba08c6be73c6847ce9fe"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/src/api/types/registry.ts",
+      "bytes": 17962,
+      "sha256": "15790a171efd93370da0f8f4d49441c076b63311f87b805a10ffc0c65ac05129"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.ts",
+      "bytes": 16609,
+      "sha256": "5b5f1e4d623392e17ef76759bbeeb06cd82cceecc2dcad2d399cdc6b8e33cfeb"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.test.ts",
+      "bytes": 12978,
+      "sha256": "e652d654e4242713d91fb65ac9c5520eca7c53cccb5a8fdb9a73d2cfc2e53bd8"
+    }
+  ],
+  "restoredSourceMatches": true,
+  "negativeHarness": {
+    "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-keyed-negative1211.py",
+    "bytes": 486,
+    "sha256": "9538b141b2db6d71c4639cf9875fed9cd4a6323031129ff78eaf24d528969648"
+  },
+  "advisories": "Full Vitest emits fixture connection-refused/Happy DOM teardown diagnostics but exits0 with6516 passing cases. No warning suppressed."
+}

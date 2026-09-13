@@ -69,7 +69,7 @@ public final class OperationHistoryResourceCatalog implements ResourceCatalog {
               Privacy.noPaths(),
               Set.of(),
               Set.of(),
-              ""));
+              "operationKey"));
 
   @Override
   public String namespace() {

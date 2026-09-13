@@ -2,8 +2,13 @@
 
 Investigation,2026-09-13, grounded at4c6389be4. The completion consumer is committed
 and locally/live verified. Full/stress1202 passes on that unchanged source.
-This record owns the next C2-4 mechanism; implementation and its proof remain open.
+This record owns the next C2-4 mechanism; attachment/checkpoint implementation and proof remain open.
 The root is making these decisions autonomously within the existing reconnect item.
+
+Current cuts: [ordered publication](sse-ordering.md) and
+[frontend keyed convergence](history-keyed-merge.md) are implemented with focused,
+negative and compatibility evidence and independent review. Next: strong snapshot/token
+attachment, safe lifecycle/reducer checkpoints and real SSE reconnect/restart proof.
 
 ## Verified reach
 

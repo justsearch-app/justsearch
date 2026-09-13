@@ -252,7 +252,7 @@ export const KIND_ADVISORY = 'advisory-event-stream';
  * `modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/Resource.java`.
  *
  * Slice 3a.1.9 additions: `primaryKey` field (required non-blank for TABULAR;
- * empty string for non-TABULAR Resources where the concept doesn't apply).
+ * optional for EVENT_STREAM/HISTORY snapshot-update key merging; blank keeps append semantics).
  */
 /**
  * Wire shape of a Resource catalog entry — a GENERATED single-authority projection (tempdoc 560

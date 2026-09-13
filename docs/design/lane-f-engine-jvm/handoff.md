@@ -10,7 +10,7 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-**Immediate next item (2026-09-13): atomic SSE and frontend keyed merge.** The completion
+**Immediate next item (2026-09-13): atomic SSE attachment and safe checkpoints.** The completion
 consumer now attaches at the end of both Head constructors, publishes memory/note
 completions through the source hook, and owns bounded forced-append/ack retry and
 startup catch-up. Independent review corrected failed-bootstrap ownership and
@@ -33,6 +33,14 @@ final1210 and compatibility1213 pass, including actual-eviction numeric run-zero
 Independent channel review is clear. [Ordering proof](evidence/C2/sse-ordering.md).
 Continue the bounded snapshot/replay attachment and incarnation/checkpoint work in the
 SSE plan; ordering alone does not close the durable snapshot race.
+
+Frontend keyed convergence is implemented separately: operation history declares
+operationKey through Resource.primaryKey, and EVENT_STREAM/HISTORY merge overlap
+without collapsing distinct invocations or unkeyed rows. Negative1211 catches disabled
+key routing; restored1212 passes19 and full UI1209 passes6516. Independent review
+verifies the catalog-to-ResourceView path and finds no substantive defect.
+[Keyed-merge proof](evidence/C2/history-keyed-merge.md). Real streamed/rendered overlap
+and restart proof remain with the atomic-SSE campaign, alongside installed/hosted tiers.
 
 **Prior effect identity cut (2026-09-13):** ingress rejects server
 namespaces, and new frontend effects persist UUID identities while old entries keep

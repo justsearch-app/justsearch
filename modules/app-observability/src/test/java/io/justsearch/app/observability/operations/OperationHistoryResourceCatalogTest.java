@@ -14,8 +14,10 @@ import io.justsearch.agent.api.registry.Resource;
 import io.justsearch.agent.api.registry.ResourceCatalog;
 import io.justsearch.agent.api.registry.SubscriptionMode;
 import java.time.Duration;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("OperationHistoryResourceCatalog")
 final class OperationHistoryResourceCatalogTest {
@@ -48,6 +50,15 @@ final class OperationHistoryResourceCatalogTest {
     assertNotNull(e.schema());
     assertFalse(e.schema().isBlank());
     assertTrue(e.schema().endsWith("operation-history-entry.v1.json"));
+  }
+
+  @Test
+  void eventStreamDeclaresAndPublishesInvocationIdentity() {
+    Resource resource = entry();
+    assertEquals(Category.EVENT_STREAM, resource.category());
+    assertEquals("operationKey", resource.primaryKey());
+    Map<?, ?> wire = JsonMapper.builder().build().convertValue(resource, Map.class);
+    assertEquals("operationKey", wire.get("primaryKey"));
   }
 
   @Test
