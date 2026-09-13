@@ -18,8 +18,19 @@ full-run summary supersede full1009 as the current successful local boundary.
 Hosted CI34748767868 remains pending; queued CLA runner allocation is externally
 blocked. No hosted success is inferred. Continue [C2-4](evidence/C2/C2-4-plan.md),
 after the UNDONE wire correction (negative1061, focused1062/schema1063 pass;
-wire gate still next). C2-3's remaining settings/ingestion/reindex
+wire gate1067 passes at eac25abb3). C2-3's remaining settings/ingestion/reindex
 consumers stay open in C2-6/8/10; no batch2 or stage closure is claimed.
+
+**C2-4 keyed query (2026-09-13):** the row/fence read, six-state DTO, HTTP route,
+seventh read-only MCP tool and published schema are implemented. Final1079 passes
+78 represented cases (71 execute, seven reuse successful unchanged inputs), PMD,
+integration compilation and installDist. Negative1077 detects the row-first defect.
+Live1089 proves discovery, HTTP/MCP parity, invalid-key errors, served schema and
+Host/Origin rejection; the owned stack is stopped. Route captures now reflect the
+live Engine. [Query proof](evidence/C2/keyed-outcome-query.md) records intermediate
+failures and evidence. Continue the C2-4 durable recent-history swap, completion
+projection/replay and SSE boundary; neither C2-4 nor batch2 is closed. Hosted proof
+remains pending external runner allocation.
 
 Final independent correction verification is clear at **b713307ea**. Full905 passes
 in9m30s with10158 represented cases, zero failures/errors and35 inherited skips;

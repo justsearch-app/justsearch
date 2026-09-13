@@ -193,7 +193,8 @@ final class ResourceApiModule implements ApiModule {
     this.operationHistoryController =
         new OperationHistoryController(headAssembly.executors(),
             headAssembly.substrate().conversation().operationHistoryStore(),
-            headAssembly.substrate().conversation().operationHistoryChanges());
+            headAssembly.substrate().conversation().operationHistoryChanges(),
+            headAssembly::operationOutcome);
     // Tempdoc 550 C3 / 655: shared pending-authorization registry — the backend records a
     // gated dispatch here and the FE approves by its id, so a capsule can only be minted
     // against an op the backend actually gated (WA-5). Shared between the invoke
@@ -475,6 +476,7 @@ final class ResourceApiModule implements ApiModule {
     // Slice 444b: operation-history REST + SSE endpoints (HISTORY Resource: append stream).
     app.get("/api/operation-history", operationHistoryController::handleGet);
     app.sse("/api/operation-history/stream", operationHistoryController::handleStream);
+    app.get("/api/operation-history/{operationKey}", operationHistoryController::handleOutcome);
 
     // Slice 494: per-class advisory SSE endpoints.
     app.sse(

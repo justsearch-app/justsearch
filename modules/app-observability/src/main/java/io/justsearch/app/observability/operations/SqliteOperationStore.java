@@ -2,6 +2,7 @@
 package io.justsearch.app.observability.operations;
 
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.operations.OperationPreparedPayload;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
@@ -465,6 +466,62 @@ public final class SqliteOperationStore implements OperationStore {
     var value = JSON.readTree(json);
     if (value == null || !value.isObject()) throw new IllegalArgumentException("Operation identity must be an object");
     return JSON.writeValueAsString(JSON.convertValue(value, java.util.Map.class));
+  }
+
+  @Override
+  public OperationOutcomeView outcome(String key) {
+    long keyTime = validatedKeyTime(key);
+    return locked(() -> {
+      // A single SQLite statement observes the selected row and its eviction fence together.
+      // Select only the public projection columns: identity and prepared content stay private.
+      try (var query = connection.prepareStatement("""
+          SELECT m.history_since_ms, o.state, o.phase, o.accepted_at, o.completed_at,
+            o.units_completed, o.units_failed, o.failure_reason, o.result_json, o.gaps_json
+          FROM operations_meta m LEFT JOIN operations o ON o.operation_key = ?
+          WHERE m.singleton = 1
+          """)) {
+        query.setString(1, key);
+        try (var result = query.executeQuery()) {
+          if (!result.next()) throw new SQLException("Operations metadata is missing");
+          long fence = result.getLong("history_since_ms");
+          String state = result.getString("state");
+          if (state != null) return projectOutcome(result, OperationState.valueOf(state), fence);
+          if (keyTime > clock.millis() + FUTURE_SKEW_MS) {
+            throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
+          }
+          return new OperationOutcomeView(keyTime < fence
+              ? OperationOutcomeView.State.EXPIRED : OperationOutcomeView.State.UNKNOWN, null, fence,
+              null, null, null, null, null, null);
+        }
+      }
+    });
+  }
+
+  private static OperationOutcomeView projectOutcome(ResultSet row, OperationState state, long fence)
+      throws SQLException {
+    OperationOutcomeView.State wireState = switch (state) {
+      case ACCEPTED -> OperationOutcomeView.State.ACCEPTED;
+      case RUNNING, COMPLETE_WITH_GAPS -> OperationOutcomeView.State.RUNNING;
+      case COMPLETE -> OperationOutcomeView.State.COMPLETE;
+      case FAILED, CANCELLED -> OperationOutcomeView.State.FAILED;
+    };
+    OperationOutcomeView.Result result = null;
+    if (state == OperationState.COMPLETE_WITH_GAPS) {
+      String gaps = row.getString("gaps_json");
+      if (gaps != null) result = new OperationOutcomeView.Result(null, null,
+          List.of(JSON.readValue(gaps, OperationOutcomeView.Gap[].class)));
+    } else {
+      String receiptJson = row.getString("result_json");
+      if (receiptJson != null) {
+        OperationReceipt receipt = JSON.readValue(receiptJson, OperationReceipt.class);
+        result = new OperationOutcomeView.Result(receipt.code(), receipt.executionId(), null);
+      }
+    }
+    return new OperationOutcomeView(wireState,
+        state == OperationState.COMPLETE_WITH_GAPS ? "awaiting_acceptance" : row.getString("phase"),
+        fence, row.getLong("accepted_at"), nullableLong(row, "completed_at"),
+        row.getLong("units_completed"), row.getLong("units_failed"),
+        state == OperationState.CANCELLED ? "cancelled" : row.getString("failure_reason"), result);
   }
 
   @Override

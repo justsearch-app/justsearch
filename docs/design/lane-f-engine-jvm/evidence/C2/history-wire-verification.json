@@ -23,7 +23,7 @@
   "result": "BUILD SUCCESSFUL in20s;8 executed cases in5 suites, including the2 conformance tests and mandatory service guards.0 failures/errors/skips.",
   "negative": "1061 has8 represented cases and1 expected failure: OPERATION_OUTCOME_UNDONE missing; existing record-field parity passes.",
   "schema": "1063 executes2 cases in2 suites;OperationHistorySchemaTest and its required companion pass.",
-  "limits": "Wire gate still pending at this record creation; hosted runner allocation remains pending. Durable history/query and register coverage are subsequent C2-4 cuts.",
+  "limits": "Wire gate1067 passes at eac25abb3. Hosted runner allocation remains pending; durable history/query and register coverage remain subsequent C2-4 cuts.",
   "sources": [
     {
       "path": "contracts/wire/VERSION",
@@ -132,6 +132,21 @@
       "path": "tmp/c2-4-history-schema1063.txt",
       "bytes": 34691,
       "sha256": "0d4b7552e28ebf0cb3c5cb9cb50be37e4682697f897315fb42489fc31de0ae19"
+    },
+    {
+      "path": "tmp/c2-4-wire-gate1067.txt",
+      "bytes": 101,
+      "sha256": "209f81d58058e9b7303c8a1e3bb1c03733d9f60fcc35d8d850dd8b1dd69079eb"
+    },
+    {
+      "path": "tmp/c2-4-wire-gate1067.sarif",
+      "bytes": 503,
+      "sha256": "9f3fddc05993f4a779e705658bfcf307b22e5290e7cee79653da92b9afe0a7eb"
     }
-  ]
+  ],
+  "wireGate": {
+    "revision": "eac25abb3",
+    "command": "node scripts/governance/run.mjs --gate wire --mode gate --out tmp/c2-4-wire-gate1067.sarif",
+    "result": "1 gate,0 failures/findings;buf1.69.0"
+  }
 }

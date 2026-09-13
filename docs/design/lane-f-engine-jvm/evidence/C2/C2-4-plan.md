@@ -77,3 +77,28 @@ and action-ledger fan-in. Crash/retry and reconnect tests demonstrate its value;
 remove any added projection-only mechanism if the retained source directly serves
 that view and the second durable append is retired. Do not generalize this work
 into another event bus, completion-sequence ledger or product-specific memory store.
+
+## Keyed query cut
+
+The shared port returns OperationOutcomeView from one SELECT joining the selected
+operations row and singleton operations_meta. A present row wins below the fence;
+a missing valid key compares its UUIDv7 time with the fence, with no lookup margin.
+Malformed/non-v7 and missing far-future keys are typed invalid-key failures.
+Timestamps use UTC epoch milliseconds. The typed result contains only code,
+executionId and/or a list of Gap(unitId, reason), with bounded identifier/code
+components; gaps are read from the reserved gaps_json column, not a handler map.
+D1 produces this gap projection with its generation activation mechanism. No
+arbitrary content or sealed preparation enters the SELECT's projection columns.
+
+HeadAssembly forwards this narrow read to both the existing history controller
+and justsearch_operation_outcome, a seventh curated read-only MCP tool. Querying
+never dispatches or accepts an operation. Existing recent-history and SSE remain
+until their durable swap cut; this keyed query is not that swap's acceptance.
+
+Use app-engine's existing test access to both halves for the named store cross-check:
+real SqliteOperationStore plus real SqliteJobQueue, no new module edge. Cover six
+states, units matched to completed/failed jobs, restart, missing-key fence, older
+open row below the fence, cancellation, awaiting-acceptance gaps and raw-content
+exclusion. HTTP/MCP must serialize the same narrow answer and preserve typed errors.
+The new route requires the existing local trust boundary and live capture before
+item acceptance; it never requires a mutation token for the read itself.

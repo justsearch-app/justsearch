@@ -132,7 +132,8 @@ final class SchemaControllerTest {
     assertTrue(names.contains("runtime-live-response.v1.json"));
     assertTrue(names.contains("runtime-manifest-public.v2.json"));
     assertTrue(names.contains("runtime-ready-response.v1.json"));
-    assertEquals(17, names.size());
+    assertTrue(names.contains("operation-outcome-view.v1.json"));
+    assertEquals(18, names.size());
     assertFalse(names.contains("nonexistent.v1.json"));
   }
 }

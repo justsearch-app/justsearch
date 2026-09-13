@@ -19,6 +19,10 @@ tmp/c2-4-wire-negative1061-xml/, tmp/c2-4-wire1062.txt, tmp/c2-4-wire1062-xml/,
 tmp/c2-4-history-schema1063.txt, tmp/c2-4-history-schema1063-xml/.
 Retain through lane acceptance plus30 days and export before worktree release.
 
-The wire gate remains required; this first cut does not close C2-4. The durable
+The wire gate passed after this commit, as recorded below; this cut does not close C2-4. The durable
 store swap, six-state HTTP/MCP query, completion projection/replay, SSE boundary
 and registered history lineage remain in C2-4-plan.md. No hosted proof is inferred.
+
+Post-commit wire gate1067 passes at eac25abb3:1 gate,0 failures/findings, buf1.69.0.
+Evidence: tmp/c2-4-wire-gate1067.txt and tmp/c2-4-wire-gate1067.sarif. The wire
+correction is locally proved; the remaining C2-4 cuts and hosted proof stay open.

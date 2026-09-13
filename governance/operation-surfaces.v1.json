@@ -82,7 +82,8 @@
       "io.justsearch.agent.api.interaction.InteractionEvent",
       "io.justsearch.agent.api.memory.MemoryStore",
       "io.justsearch.app.api.operations.OperationRecord",
-      "io.justsearch.app.api.operations.OperationAttemptRunner"
+      "io.justsearch.app.api.operations.OperationAttemptRunner",
+      "io.justsearch.app.api.operations.OperationOutcomeView"
     ],
     "javaMainRoots": [
       "modules"
@@ -711,6 +712,33 @@
       "guard": "test:VduProcedureExecutorLifetimeTest",
       "consumesProjection": "offline-procedure-owner",
       "note": "Timer-only pacing producer; manual and automatic attempts share coordinator single-flight and its one procedure executor."
+    },
+    {
+      "id": "operation-outcome-view",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationOutcomeView.java",
+      "guard": "test:OperationOutcomeQueryTest",
+      "consumesProjection": "operation-record-store",
+      "note": "Typed six-state receipt read from the operations row and retention fence. Never another lifecycle authority."
+    },
+    {
+      "id": "operation-outcome-http",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationHistoryController.java",
+      "guard": "test:OperationOutcomeTransportTest",
+      "consumesProjection": "operation-outcome-view",
+      "note": "Existing history controller serves the shared keyed outcome. Recent-history/SSE durability remains the C2-4 swap obligation."
+    },
+    {
+      "id": "operation-outcome-mcp",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
+      "guard": "test:OperationOutcomeTransportTest",
+      "consumesProjection": "operation-outcome-view",
+      "note": "Curated read-only outcome query uses HeadAssembly and the same store observation, never dispatch acceptance."
     }
   ]
 }

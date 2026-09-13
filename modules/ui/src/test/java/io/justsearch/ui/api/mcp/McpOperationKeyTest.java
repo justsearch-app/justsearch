@@ -170,7 +170,12 @@ class McpOperationKeyTest {
       Map<?, ?> schema = (Map<?, ?>) tool.get("inputSchema");
       Map<?, ?> properties = (Map<?, ?>) schema.get("properties");
       boolean operation = List.of("justsearch_ingest", "justsearch_browse").contains(tool.get("name"));
-      assertEquals(operation, properties.containsKey("operationKey"));
+      boolean query = "justsearch_operation_outcome".equals(tool.get("name"));
+      assertEquals(operation || query, properties.containsKey("operationKey"));
+      if (query) {
+        assertEquals("string", ((Map<?, ?>) properties.get("operationKey")).get("type"));
+        assertTrue(((List<?>) schema.get("required")).contains("operationKey"));
+      }
       if (operation) {
         assertEquals("string", ((Map<?, ?>) properties.get("operationKey")).get("type"));
         assertFalse(schema.get("required") != null

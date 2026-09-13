@@ -13,7 +13,7 @@ export interface ApiRoute {
   readonly requiredCapabilities: readonly string[];
 }
 
-/** Every route the Head exposes, keyed by "<METHOD> <path>". Snapshot schema v?. */
+/** Every route the Head exposes, keyed by "<METHOD> <path>". Snapshot schema v2.0. */
 export const API_ROUTES = {
   "DELETE /api/ai/install/packages/{packageId}/decline": { method: "DELETE", path: "/api/ai/install/packages/{packageId}/decline", cohort: "ai-runtime", requiredCapabilities: [] },
   "DELETE /api/authorizations/grants": { method: "DELETE", path: "/api/authorizations/grants", cohort: "resource", requiredCapabilities: [] },
@@ -48,6 +48,7 @@ export const API_ROUTES = {
   "GET /api/chat/agent/history/{batchId}": { method: "GET", path: "/api/chat/agent/history/{batchId}", cohort: "agent", requiredCapabilities: [] },
   "GET /api/chat/agent/tools": { method: "GET", path: "/api/chat/agent/tools", cohort: "agent", requiredCapabilities: [] },
   "GET /api/chat/agent/virtual-operations": { method: "GET", path: "/api/chat/agent/virtual-operations", cohort: "agent", requiredCapabilities: [] },
+  "GET /api/chat/approval": { method: "GET", path: "/api/chat/approval", cohort: "conversation", requiredCapabilities: [] },
   "GET /api/chat/conversations": { method: "GET", path: "/api/chat/conversations", cohort: "conversation", requiredCapabilities: [] },
   "GET /api/chat/conversations/{sessionId}/history": { method: "GET", path: "/api/chat/conversations/{sessionId}/history", cohort: "conversation", requiredCapabilities: [] },
   "GET /api/chat/runs/live": { method: "GET", path: "/api/chat/runs/live", cohort: "conversation", requiredCapabilities: [] },
@@ -116,6 +117,7 @@ export const API_ROUTES = {
   "GET /api/metrics/worker.job_queue.depth/stream": { method: "GET", path: "/api/metrics/worker.job_queue.depth/stream", cohort: "observability", requiredCapabilities: [] },
   "GET /api/operation-history": { method: "GET", path: "/api/operation-history", cohort: "resource", requiredCapabilities: [] },
   "GET /api/operation-history/stream": { method: "GET", path: "/api/operation-history/stream", cohort: "resource", requiredCapabilities: [] },
+  "GET /api/operation-history/{operationKey}": { method: "GET", path: "/api/operation-history/{operationKey}", cohort: "resource", requiredCapabilities: [] },
   "GET /api/operations/{id}/preview": { method: "GET", path: "/api/operations/{id}/preview", cohort: "resource", requiredCapabilities: [] },
   "GET /api/plugins/allowlist": { method: "GET", path: "/api/plugins/allowlist", cohort: "plugins", requiredCapabilities: [] },
   "GET /api/policy/effective": { method: "GET", path: "/api/policy/effective", cohort: "config", requiredCapabilities: [] },
@@ -211,6 +213,7 @@ export const API_ROUTES = {
   "POST /api/conversations/encryption/setup": { method: "POST", path: "/api/conversations/encryption/setup", cohort: "other", requiredCapabilities: [] },
   "POST /api/conversations/encryption/unlock": { method: "POST", path: "/api/conversations/encryption/unlock", cohort: "other", requiredCapabilities: [] },
   "POST /api/debug/clear-condition": { method: "POST", path: "/api/debug/clear-condition", cohort: "debug", requiredCapabilities: [] },
+  "POST /api/debug/eval/document-ids": { method: "POST", path: "/api/debug/eval/document-ids", cohort: "debug", requiredCapabilities: [] },
   "POST /api/debug/logging": { method: "POST", path: "/api/debug/logging", cohort: "debug", requiredCapabilities: [] },
   "POST /api/debug/reset-index": { method: "POST", path: "/api/debug/reset-index", cohort: "debug", requiredCapabilities: [] },
   "POST /api/debug/trip-condition": { method: "POST", path: "/api/debug/trip-condition", cohort: "debug", requiredCapabilities: [] },

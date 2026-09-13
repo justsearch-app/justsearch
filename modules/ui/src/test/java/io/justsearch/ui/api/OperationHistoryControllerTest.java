@@ -49,7 +49,9 @@ final class OperationHistoryControllerTest {
     registry = new OperationHistoryChangeRegistry();
     controller = new OperationHistoryController(
             processExecutors,
-              store, registry);
+              store, registry, key -> new io.justsearch.app.api.operations.OperationOutcomeView(
+                  io.justsearch.app.api.operations.OperationOutcomeView.State.UNKNOWN,
+                  null, 0, null, null, null, null, null, null));
   }
 
   @AfterEach

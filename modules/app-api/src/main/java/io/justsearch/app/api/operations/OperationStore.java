@@ -40,6 +40,13 @@ public interface OperationStore extends AutoCloseable {
 
   record Acceptance(OperationRecord record, boolean created) {}
 
+  /**
+   * One consistent observation of a row and the missing-key retention fence. A present row wins.
+   * Unknown means no acceptance record and therefore no effect only because every producer must
+   * commit acceptance before its first effect. This read never grants permission to execute.
+   */
+  OperationOutcomeView outcome(String key);
+
   /** Row-first lookup: callers compare a missing key's timestamp with historySinceMillis(). */
   java.util.Optional<OperationRecord> find(String key);
 

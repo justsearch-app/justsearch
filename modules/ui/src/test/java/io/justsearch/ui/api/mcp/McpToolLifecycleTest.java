@@ -82,7 +82,7 @@ class McpToolLifecycleTest {
     var surface =
         new McpToolSurface(List.of(), null, () -> null, () -> null, java.time.Clock.systemUTC());
 
-    assertEquals(6, listedTools(surface).size());
+    assertEquals(7, listedTools(surface).size());
     assertTrue(
         listedTools(surface).stream().noneMatch(tool -> tool.containsKey("_meta")),
         "no production tool is deprecated");

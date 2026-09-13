@@ -1,8 +1,8 @@
 {
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
-  "count": 243,
+  "count": 246,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:d9eac490a2cfa06aad7217cd4b5b5236ec6da389747fdbd99423ee508c642403",
+  "routeDigest": "sha256:808aac191a9383af58d242bda38631fc35d709c1a912c38401ece242b95c1d75",
   "routes": [
     {
       "method": "GET",
@@ -600,6 +600,20 @@
       "lifecycle": null
     },
     {
+      "method": "GET",
+      "path": "/api/chat/approval",
+      "cohort": "conversation",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
       "method": "POST",
       "path": "/api/chat/approve",
       "cohort": "conversation",
@@ -1147,6 +1161,34 @@
     },
     {
       "method": "GET",
+      "path": "/api/debug/engine-log",
+      "cohort": "debug",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/debug/eval/document-ids",
+      "cohort": "debug",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "GET",
       "path": "/api/debug/events",
       "cohort": "debug",
       "owningModule": null,
@@ -1262,20 +1304,6 @@
       "path": "/api/debug/trip-condition",
       "cohort": "debug",
       "owningModule": "ResourceApiModule",
-      "requiredCapabilities": [],
-      "responseSchema": null,
-      "stability": null,
-      "sdkOperationId": null,
-      "requestSchema": null,
-      "queryParameters": null,
-      "responseSchemas": null,
-      "lifecycle": null
-    },
-    {
-      "method": "GET",
-      "path": "/api/debug/engine-log",
-      "cohort": "debug",
-      "owningModule": null,
       "requiredCapabilities": [],
       "responseSchema": null,
       "stability": null,
@@ -3263,6 +3291,25 @@
       "lifecycle": null
     },
     {
+      "method": "GET",
+      "path": "/api/operation-history/{operationKey}",
+      "cohort": "resource",
+      "owningModule": "ResourceApiModule",
+      "requiredCapabilities": [],
+      "responseSchema": "operation-outcome-view.v1.json",
+      "stability": "reference-client",
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": [],
+      "responseSchemas": {
+        "200": "operation-outcome-view.v1.json",
+        "400": "api-error-response.v1.json",
+        "403": "api-error-response.v1.json",
+        "500": "api-error-response.v1.json"
+      },
+      "lifecycle": null
+    },
+    {
       "method": "POST",
       "path": "/api/operations/{id}/invoke",
       "cohort": "resource",
@@ -3491,5 +3538,6 @@
       "responseSchemas": null,
       "lifecycle": null
     }
-  ]
+  ],
+  "schemaVersion": "2.0"
 }

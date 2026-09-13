@@ -39,6 +39,7 @@ public final class OperationHistoryController {
   private static final long HEARTBEAT_SECONDS = StreamLivenessWindows.STREAM_HEARTBEAT_INTERVAL_SECONDS;
 
   private final OperationHistoryStore store;
+  private final java.util.function.Function<String, io.justsearch.app.api.operations.OperationOutcomeView> outcomes;
   private final OperationHistoryChangeRegistry changes;
   private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
@@ -46,14 +47,17 @@ public final class OperationHistoryController {
 
   public OperationHistoryController(
       EngineExecutorRegistry processExecutors,
-      OperationHistoryStore store, OperationHistoryChangeRegistry changes) {
-    this(processExecutors, store, changes, Clock.systemUTC());
+      OperationHistoryStore store, OperationHistoryChangeRegistry changes,
+      java.util.function.Function<String, io.justsearch.app.api.operations.OperationOutcomeView> outcomes) {
+    this(processExecutors, store, changes, outcomes, Clock.systemUTC());
   }
 
   public OperationHistoryController(
       EngineExecutorRegistry processExecutors,
-      OperationHistoryStore store, OperationHistoryChangeRegistry changes, Clock clock) {
+      OperationHistoryStore store, OperationHistoryChangeRegistry changes,
+      java.util.function.Function<String, io.justsearch.app.api.operations.OperationOutcomeView> outcomes, Clock clock) {
     this.store = Objects.requireNonNull(store, "store");
+    this.outcomes = Objects.requireNonNull(outcomes, "outcomes");
     this.changes = Objects.requireNonNull(changes, "changes");
     this.clock = Objects.requireNonNull(clock, "clock");
     SchedulerResources resources =
@@ -75,6 +79,21 @@ public final class OperationHistoryController {
     } catch (Exception e) {
       log.error("Failed to serialize operation-history snapshot", e);
       throw new IllegalStateException("Operation-history snapshot serialization failed", e);
+    }
+  }
+
+  /** Handles the read-only client-key query; a failed operation remains a successful query. */
+  public void handleOutcome(Context ctx) {
+    ctx.header("Cache-Control", "no-store");
+    ctx.contentType("application/json");
+    try {
+      ctx.result(REST_MAPPER.writeValueAsBytes(outcomes.apply(ctx.pathParam("operationKey"))));
+    } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
+      var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
+      ctx.status("BAD_REQUEST".equals(response.errorClass()) ? 400 : 500);
+      ctx.result(REST_MAPPER.writeValueAsBytes(Map.of("error", response.message(),
+          "errorCode", response.errorCode(), "errorClass", response.errorClass(),
+          "retryable", response.retryable())));
     }
   }
 

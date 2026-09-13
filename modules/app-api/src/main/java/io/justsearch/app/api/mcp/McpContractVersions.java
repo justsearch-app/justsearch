@@ -115,8 +115,10 @@ public final class McpContractVersions {
    * <p>0.8.0: browse/ingest gain optional operationKey transport metadata, preserved through
    * approval and excluded from handler public input. Failed attempts retain receipt identity
    * in both delivery tiers. Existing calls without the property retain their behavior.
+   *
+   * <p>0.9.0: adds justsearch_operation_outcome, the read-only client-key history query.
    */
-  public static final String TOOL_SURFACE_VERSION = "0.8.0";
+  public static final String TOOL_SURFACE_VERSION = "0.9.0";
 
   private McpContractVersions() {}
 }

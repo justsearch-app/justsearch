@@ -267,7 +267,7 @@ public final class McpToolSurface {
   }
 
   // =========================================================================
-  // tools/list — 6 curated tools, position-bias ordered
+  // tools/list — 7 curated tools, position-bias ordered
   // =========================================================================
 
   public Map<String, Object> listTools() {
@@ -382,6 +382,10 @@ public final class McpToolSurface {
 
   private static final Map<String, Object> RUNTIME_MANIFEST_SCHEMA = schema(Map.of(), List.of());
 
+  private static final Map<String, Object> OUTCOME_SCHEMA = schema(
+      Map.of("operationKey", prop("string", "The original UUIDv7 operation key, never an executionId")),
+      List.of("operationKey"));
+
   private static final String TOOL_LIFECYCLE_EXTENSION_VERSION = "1.0";
 
   private static final List<ToolDefinition> PRODUCTION_TOOL_DEFINITIONS =
@@ -426,6 +430,17 @@ public final class McpToolSurface {
               "justsearch_runtime_manifest",
               RUNTIME_MANIFEST_DESC,
               RUNTIME_MANIFEST_SCHEMA,
+              Map.of("readOnlyHint", true)),
+          new ToolDefinition(
+              "justsearch_operation_outcome",
+              "Read the recorded outcome for an operation key after a lost response or restart. "
+                  + "Returns accepted, running, complete, failed, unknown or expired with the retained "
+                  + "history boundary and available unit counts. Unknown means no acceptance record "
+                  + "and no effect; expired means the retained history cannot answer. This read never "
+                  + "starts or retries work. Use the original UUIDv7 operationKey, not executionId. "
+                  + "Timestamps are UTC epoch milliseconds. The answer matches "
+                  + "GET /api/operation-history/{operationKey} and contains metadata only.",
+              OUTCOME_SCHEMA,
               Map.of("readOnlyHint", true)));
 
   /** No production tool is deprecated; fake lifecycle rows are injected only by focused tests. */
@@ -462,6 +477,7 @@ public final class McpToolSurface {
           case "justsearch_search" -> SEARCH_SCHEMA;
           case "justsearch_status" -> STATUS_SCHEMA;
           case "justsearch_runtime_manifest" -> RUNTIME_MANIFEST_SCHEMA;
+          case "justsearch_operation_outcome" -> OUTCOME_SCHEMA;
           default -> null;
         };
     if (schemaForDirectDispatch != null) {
@@ -479,6 +495,7 @@ public final class McpToolSurface {
           callOperation("core.ingest-files", arguments, requestedBy, engineContext);
       case "justsearch_status" -> callStatus(engineContext);
       case "justsearch_runtime_manifest" -> callRuntimeManifest();
+      case "justsearch_operation_outcome" -> callOperationOutcome(arguments);
       default -> unknownToolWithSuggestions(name);
     };
   }
@@ -526,6 +543,23 @@ public final class McpToolSurface {
   // (tempdoc 501 Phase 15). Returns the same shape served at
   // GET /api/runtime/manifest — sessionToken stripped.
   // =========================================================================
+
+  private Map<String, Object> callOperationOutcome(Map<String, Object> arguments) {
+    HeadAssembly facade = appFacadeLookup.get();
+    if (facade == null) return errorContent("Operation history is unavailable", ApiErrorCode.SERVICE_UNAVAILABLE);
+    try {
+      var outcome = facade.operationOutcome((String) arguments.get("operationKey"));
+      return Map.of("content", List.of(Map.of("type", "text", "text", MAPPER.writeValueAsString(outcome))),
+          "structuredContent", outcome);
+    } catch (OperationStoreException e) {
+      var failure = OperationInvocationResponse.fromStoreFailure(e);
+      return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
+          "errorClass", failure.errorClass(), "retryable", failure.retryable()));
+    } catch (Exception e) {
+      log.warn("MCP operation outcome query failed", e);
+      return toolFailureContent("Operation outcome query", e);
+    }
+  }
 
   private Map<String, Object> callRuntimeManifest() {
     io.justsearch.ui.runtime.RuntimeManifestPublisher publisher = manifestPublisherLookup.get();

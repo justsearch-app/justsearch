@@ -61,6 +61,7 @@ public final class SchemaController {
           "health-event.v1.json",
           "indexing-job-view.v1.json",
           "operation-history-entry.v1.json",
+          "operation-outcome-view.v1.json",
           "operation.v1.json",
           "prompt.v1.json",
           "resource.v1.json",

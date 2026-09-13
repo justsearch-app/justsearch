@@ -1253,6 +1253,11 @@ public final class HeadAssembly implements AutoCloseable {
     this.authoredStores.add(descriptor);
   }
 
+  /** Shared metadata-only query for the HTTP and MCP history surfaces; never dispatches an effect. */
+  public io.justsearch.app.api.operations.OperationOutcomeView operationOutcome(String key) {
+    return operations.outcome(key);
+  }
+
   /** The aggregated AUTHORED store list, read by the backup export/import. */
   public List<io.justsearch.agent.api.encryption.StoreDescriptor> authoredStores() {
     return List.copyOf(this.authoredStores);

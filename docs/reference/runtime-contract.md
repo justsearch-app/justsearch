@@ -43,9 +43,10 @@ is the row of constituent versions below. The current build:
 
 | Runtime Contract | manifest schema | lifecycle schema | MCP protocol | MCP tool surface |
 |---|---|---|---|---|
-| `0.3.0` | `2` | `1` | `2025-11-25` | `0.8.0` |
+| `0.3.0` | `2` | `1` | `2025-11-25` | `0.9.0` |
 
-MCP tool surface `0.8.0` adds optional `operationKey` to browse/ingest and preserves
+MCP tool surface `0.9.0` adds the read-only `justsearch_operation_outcome` key query.
+The preceding `0.8.0` addition provides optional `operationKey` to browse/ingest and preserves
 receipt identity through approval and failure responses. The umbrella version stays
 `0.3.0`: existing calls remain valid under the bump-only-on-break policy below.
 

@@ -372,6 +372,39 @@ Endpoints:
 
 `GET /api/navigation-history` (Slice F1) was removed (tempdoc 689 teardown): superseded by `GET /api/action-ledger` kind:'navigation' — the FE reads Navigation entries there now, and the backend `ActionLedgerProjection` still consumes `NavigationHistoryStore` in-process (the store itself is unchanged, only the standalone REST snapshot was torn down for having zero consumers).
 
+### Keyed operation outcome
+
+`GET /api/operation-history/{operationKey}` and MCP `justsearch_operation_outcome`
+read the same `OperationOutcomeView` from the operations database. The key is the
+original UUIDv7 operation key; an undo executionId is not a query key. This read
+never dispatches, retries or accepts work. HTTP marks it `Cache-Control: no-store`.
+
+The answer contains `state` and `historySince`, with optional `phase`, `acceptedAt`,
+`completedAt`, `unitsCompleted`, `unitsFailed`, `reason` and `result`. Timestamps are
+UTC epoch milliseconds. A present row always wins, including below the retention
+boundary. A missing key earlier than that boundary answers `expired`; a missing
+retained-window key answers `unknown`. Unknown means no acceptance and no effect
+because producers must persist acceptance before effects. Expired makes no such
+claim. Malformed/non-v7 keys and missing far-future keys return `OPERATION_KEY_INVALID`.
+
+| Durable state | Public state | Additional projection |
+|---|---|---|
+| ACCEPTED | accepted | Acceptance time and committed unit counts |
+| RUNNING | running | Current phase and committed unit counts |
+| COMPLETE | complete | Completion time and safe receipt |
+| FAILED | failed | Reason, completion time and committed unit counts |
+| CANCELLED | failed | `reason: cancelled` |
+| COMPLETE_WITH_GAPS | running | `phase: awaiting_acceptance`; recorded gaps when present |
+
+`result` carries only receipt `code`/optional `executionId`, or a pending gap list
+of `{unitId, reason}`. The read excludes public input, arbitrary handler results
+and sealed preparation. HTTP returns200 for every successful query, including a
+recorded failed operation; invalid keys return400 and store failures500. MCP uses
+the same body as `structuredContent` and serializes it into its text block.
+
+The existing recent-history snapshot and SSE remain separate read views; the keyed
+query's durability does not make the current process-local snapshot survive restart.
+
 ### Agent API
 
 **Source of truth:**

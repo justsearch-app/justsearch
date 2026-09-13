@@ -336,14 +336,15 @@ class McpProtocolHandlerTest {
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> tools = (List<Map<String, Object>>) result.get("tools");
 
-    // Tempdoc 501 Phase 15 added justsearch_runtime_manifest as the sixth tool.
-    assertEquals(6, tools.size());
+    // Lane F C2 adds the recorded-outcome read as the seventh tool.
+    assertEquals(7, tools.size());
     assertEquals("justsearch_answer", tools.get(0).get("name"));
     assertEquals("justsearch_search", tools.get(1).get("name"));
     assertEquals("justsearch_browse", tools.get(2).get("name"));
     assertEquals("justsearch_ingest", tools.get(3).get("name"));
     assertEquals("justsearch_status", tools.get(4).get("name"));
     assertEquals("justsearch_runtime_manifest", tools.get(5).get("name"));
+    assertEquals("justsearch_operation_outcome", tools.get(6).get("name"));
 
     String answerDesc = (String) tools.get(0).get("description");
     assertTrue(answerDesc.contains("primary tool for question-answering"));
