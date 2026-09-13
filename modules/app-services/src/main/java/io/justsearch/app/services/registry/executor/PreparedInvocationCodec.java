@@ -43,7 +43,7 @@ public final class PreparedInvocationCodec {
       if (!mode.equals("invoke") && !mode.equals("undo")) {
         throw new IllegalArgumentException("Invalid preparation mode");
       }
-      if (!descriptor.equals(OperationDescriptor.invocation(descriptor.kind(), descriptor.operationRef(),
+      if (!descriptor.hasSameIdentity(OperationDescriptor.invocation(descriptor.kind(), descriptor.operationRef(),
           preparation.argumentsJson(), mode.equals("undo")))) {
         throw new IllegalArgumentException("Preparation public identity mismatch");
       }
@@ -91,7 +91,7 @@ public final class PreparedInvocationCodec {
       checkEnvelopeSize(json);
       Envelope envelope = JSON.readValue(json, Envelope.class);
       if (!envelope.key().equals(key) || !envelope.nonce().equals(nonce)
-          || !envelope.descriptor().equals(descriptor)
+          || !envelope.descriptor().hasSameIdentity(descriptor)
           || stored.sealed() != (envelope.preparation().content() == OperationPreparation.Content.CONTENT)) {
         throw new IllegalArgumentException("Preparation binding mismatch");
       }

@@ -20,6 +20,12 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
         "{\"mode\":\"" + (undo ? "undo" : "invoke") + "\",\"argumentsSha256\":\"" + digest + "\"}");
   }
 
+  /** Compare the same canonical JSON identity used by keyed retries, independent of member order. */
+  public boolean hasSameIdentity(OperationDescriptor other) {
+    return other != null && kind == other.kind && Objects.equals(operationRef, other.operationRef)
+        && CanonicalOperationArguments.digest(identityJson).equals(CanonicalOperationArguments.digest(other.identityJson));
+  }
+
   public OperationDescriptor {
     Objects.requireNonNull(kind, "kind");
     Objects.requireNonNull(identityJson, "identityJson");

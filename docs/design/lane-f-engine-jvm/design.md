@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-13: C2 accepted-preparation binding compares canonical identity rather than raw JSON member order, matching the SQLite keyed-retry contract. The real accepted reset roundtrip exposed the mismatch; no persisted envelope format changes. [Correction, independent review and proof](evidence/C2/settings-reset-identity.md). Mechanism detail; stage and merge placement unchanged.
+
 - 2026-09-13: C2-6's fixed recovery reservation retains the quarantine block through precommit failure and clears it only after committed-row durability, then uses the existing ordered restart to re-enter bootstrap. This closes premature Health clearing and avoids a second recovery-state authority. [Owning protocol](evidence/C2/operations-store-design.md#settings-history-recovery), [review counterexamples and proof obligations](evidence/C2/C2-6-plan.md#2026-09-13-fixed-reset-reservation-and-recovery-clear-order). Mechanism detail; stage/merge placement unchanged.
 
 - 2026-09-13: C2's read-only `justsearch_operation_outcome` is the seventh curated MCP tool. The ADR-0015 six-tool premise correctly failed; its dated amendment records the distinct recovery task, rejected status/write-mode alternatives, retained answer-first order and lack of new selection-quality measurements. The exact-count probe advances to seven, so an eighth still requires decision review. [Canonical amendment](../../decisions/0015-mcp-tool-surface-design.md#amendment-2026-09-13-a-separate-operation-outcome-recovery-query); C2-4 owns the query and its remaining live/model proof. No stage/merge placement change.

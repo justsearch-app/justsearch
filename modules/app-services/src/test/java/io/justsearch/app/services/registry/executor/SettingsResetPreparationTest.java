@@ -47,6 +47,24 @@ class SettingsResetPreparationTest {
     assertFalse(recovery.accepted().payload().sealed());
   }
 
+  @Test
+  void actualSqliteAcceptedIdentityStillDecodesAfterCanonicalMemberReordering(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+    var fixture = fixture(SettingsResetPreparation.recovery("{}", FINGERPRINT), OperationKind.SETTINGS_APPLY,
+        CoreOperationCatalog.RESET_SETTINGS.value(), false, null);
+    try (var store = new io.justsearch.app.observability.operations.SqliteOperationStore(directory.resolve("operations.db"))) {
+      var descriptor = fixture.row().descriptor();
+      store.savePreparation(fixture.row().key(), descriptor, fixture.accepted());
+      var accepted = store.acceptPrepared(fixture.row().key(), descriptor, CONTEXT,
+          EngineProvenance.invocation(CONTEXT, ExecutorTag.UI, Instant.EPOCH, Optional.empty()), fixture.accepted().nonce());
+      assertNotEquals(descriptor.identityJson(), accepted.record().descriptor().identityJson(),
+          "The production store changes member order; a fabricated row would miss this boundary");
+      assertTrue(descriptor.hasSameIdentity(accepted.record().descriptor()));
+      assertEquals(FINGERPRINT, SettingsResetPreparation.decode(accepted.record(),
+          store.acceptedPreparation(accepted.record().id()).orElseThrow()).quarantineFingerprint());
+    }
+  }
+
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(strings = {"kind", "operation", "undo", "schema", "marker"})
   void validEnvelopeForAnotherOperationModeSchemaOrMarkerCannotAuthorizeReset(String changed) {

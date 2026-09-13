@@ -27,6 +27,11 @@ The queue delay has cleared and public-claims/app-ui corrections are hosted gree
 predates the fixed reset schema diff and does not satisfy installed-v5 recovery proof.
 
 **Immediate next items (2026-09-13): C2-6 recovery reset, then producer and Health migration.**
+The real SQLite reset roundtrip exposed raw descriptor-order mismatch. The separate
+[canonical identity correction](evidence/C2/settings-reset-identity.md) passes48 cases/PMD/format,
+with its negative check and independent review clear. Reset-owner work is still uncommitted;
+its first192-case integrated pass is development evidence, not completed C2-6.
+
 The [fixed settings-reset-v1 helper](evidence/C2/settings-reset-schema.md) now passes47 cases,
 PMD/format and register gates. Negative1320 protects five binding/type assertions; negative1327
 protects four duplicate/trailing parser assertions. Independent correction review is clear. It supplies metadata only. Owner reservation/apply/reconciliation and the

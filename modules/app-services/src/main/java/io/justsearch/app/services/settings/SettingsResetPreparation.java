@@ -61,7 +61,7 @@ public final class SettingsResetPreparation {
           accepted.nonce(), row.descriptor());
       if (!SCHEMA.equals(preparation.replaySchema())
           || preparation.content() != OperationPreparation.Content.METADATA
-          || !row.descriptor().equals(OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+          || !row.descriptor().hasSameIdentity(OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
               OPERATION_ID, preparation.argumentsJson(), false))) {
         throw new IllegalArgumentException("Settings reset preparation binding mismatch");
       }
