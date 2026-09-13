@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, R1-R10 corrections accepted at b713307ea with full905 and hosted34734430973; C2-3 active; D1-F remain. Merge placement stays F/PR1; a privacy-compliant successor draft is being prepared to replace PR718 as the active publication candidate, with PR718 retained as checkpoint history."
+status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, C2-3 active; D1-F remain. The privacy-compliant successor candidate is draft PR727 at 29d4c8233, with product/build sources matching cfa4a78b8 and 8bf81ea2d; full/build/frontend/stress and isolated publication-preflight proof are recorded, while hosted run34783675186 remains in progress. PR718 remains checkpoint history; merge placement stays F."
 created: 2026-09-06
 updated: 2026-09-13
 lane: F (decision re-examination programme, wave 4)
@@ -26,6 +26,18 @@ document is the lane's contract: the design and the considerations that shaped i
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-13: The isolated successor-candidate preflight completed at `cfa4a78b8` in
+  `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`; current branch head is
+  `29d4c8233`. Public claims, frontend dependency installation and `checkLicense` passed in1355,
+  Cargo metadata then failed because no default Rust toolchain was configured, and resume1358
+  passed with process-only `RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-msvc`. The continuation
+  records 10,262 Java cases across 33 tasks/1,626 suites, 25 skips and zero failures/errors (31 cached
+  tasks, 2 executed), plus Python 3,669 passed/16 skipped/82 warnings in 465.02s. Full1346, build1351,
+  frontend1347 and stress1350 are reused; the app-engine preflight omission is covered by full1346.
+  Exact roots, commands, hashes, environment and limits are in [the preflight completion manifest](evidence/C2/publication-preflight-completion.json). Hosted run34783675186 is still in progress;
+  no final hosted success is claimed. The next implementation item is the pure SettingsV2 response
+  mapper, then shared fixed-reset pure validation and production producer/public-wire/Health migration.
 
 - 2026-09-13: Main PR726 applies the owner identity guard to the entire introduced PR range;365 historical lane commits predate that policy. Preserve the original branch/PR718 checkpoints and create a successor PR1 candidate from current main with the reviewed lane snapshot, then resume per-item commits there. No force-push, historical rewrite or gate exception; final merge remains F. [Owning placement and proof](#173-pr-1-the-engine-one-branch-seven-checkpoints), [candidate protocol](evidence/C2/publication-lineage.md). Authorized lane decision, independently investigated.
 
@@ -2151,6 +2163,17 @@ resumes per-item checkpoint commits. This is a PR1 lineage replacement, not anot
 Its identity/tree/full/hosted checks must pass independently; earlier green runs cannot waive
 new policy. Keep the successor PR reference in handoff after creation and preserve all old
 artifact locations. Final readiness and the only Engine merge remain at F.
+
+**Current successor candidate, 2026-09-13.** Draft PR727 is at `29d4c8233` on
+`codex/lane-f-pr1`, checked out in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`.
+Its product/build sources match `cfa4a78b8` and `8bf81ea2d`; only docs and both `ci-triage` skill
+projections differ since `cfa4a78b8`. Full1346/build1351/frontend1347/stress1350 are recorded
+candidate proof. The isolated preflight completed through resume1358 with the process-only pinned
+Rust toolchain; its exact evidence and artifact roots are in
+[the completion manifest](evidence/C2/publication-preflight-completion.json). Hosted run34783675186
+is still in progress, so final hosted success and readiness are open. The next implementation item
+is the pure SettingsV2 response mapper, followed by shared fixed-reset pure validation and the
+production producer/public-wire/Health migration.
 
 Stage order is risk-first: the spine is the change most likely to surface an unknown, so it
 precedes the compensation work that assumes one process. (Sequencing stages are lettered A to
