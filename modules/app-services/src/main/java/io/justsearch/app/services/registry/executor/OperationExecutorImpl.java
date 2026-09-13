@@ -3,6 +3,7 @@ package io.justsearch.app.services.registry.executor;
 
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationDispatchPlan;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationPreparation;
 import io.justsearch.agent.api.registry.OperationPreparationRefused;
@@ -380,9 +381,41 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Optional<String> confirmationToken, EngineContext context, String undoId, String key, java.util.UUID nonce) {
     var existing = existingInvocation(op, argumentsJson, provenance, context, key, undoId != null);
     if (existing.isPresent()) return existing.get();
+    InvocationPlan plan = planInvocation(op, argumentsJson, provenance, context, undoId, key, nonce);
+    // A winner can accept while this request leaves its pure scope. Receipt lookup never
+    // publishes under a preparation lock and never consumes another mutation capsule.
+    existing = existingInvocation(op, argumentsJson, provenance, context, plan.request().key(), undoId != null);
+    if (existing.isPresent()) return existing.get();
+    if (plan.existing()) throw preparationUnavailable();
+    if (intentGateEvaluator != null) {
+      enforceTrustLattice(op, argumentsJson, provenance, confirmationToken, context,
+          plan.invocation().value(), plan.request().key(), plan.pending() == null ? null : plan.pending().nonce());
+    }
+    return executeAttempt(op, plan, undoId);
+  }
+
+  @Override
+  public OperationDispatchPlan prepare(Operation op, String argumentsJson, InvocationProvenance provenance,
+      EngineContext context, String operationKey, boolean includeApprovalPreview) {
+    validateRequest(op, argumentsJson, provenance, Optional.empty(), context);
+    var existing = existingInvocation(op, argumentsJson, provenance, context, operationKey, false);
+    if (existing.isPresent()) return new OperationDispatchPlan.Recorded(operationKey, existing.get());
+    InvocationPlan plan = planInvocation(op, argumentsJson, provenance, context, null, operationKey, null);
+    String stableKey = plan.request().key();
+    existing = existingInvocation(op, argumentsJson, provenance, context, stableKey, false);
+    if (existing.isPresent()) return new OperationDispatchPlan.Recorded(stableKey, existing.get());
+    if (plan.existing()) throw preparationUnavailable();
+    var nonce = plan.pending() == null ? null : plan.pending().nonce();
+    var preview = !includeApprovalPreview || nonce == null ? null
+        : Objects.requireNonNull(plan.invocation().handler().approvalPreview(plan.invocation().value()), "approvalPreview");
+    return new OperationDispatchPlan.Ready(stableKey, nonce, Optional.ofNullable(preview));
+  }
+
+  private InvocationPlan planInvocation(Operation op, String argumentsJson, InvocationProvenance provenance,
+      EngineContext context, String undoId, String key, java.util.UUID nonce) {
     var identity = OperationDescriptor.invocation(op.policy().recordKind(), op.id().value(), argumentsJson, undoId != null);
     var request = new OperationAttemptRunner.Request(key, identity, context, provenance);
-    InvocationPlan plan = attempts.withPreparation(request, scope -> {
+    return attempts.withPreparation(request, scope -> {
       var stable = scope.request();
       if (scope.existing().isPresent()) return new InvocationPlan(stable, null, null, true);
       var pending = attempts.pendingPreparation(stable);
@@ -400,16 +433,6 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       var saved = attempts.savePreparation(stable, stored);
       return saved.isEmpty() ? new InvocationPlan(stable, null, null, true) : persistedPlan(op, stable, saved.get());
     });
-    // A winner can accept while this request leaves its pure scope. Receipt lookup never
-    // publishes under a preparation lock and never consumes another mutation capsule.
-    existing = existingInvocation(op, argumentsJson, provenance, context, plan.request().key(), undoId != null);
-    if (existing.isPresent()) return existing.get();
-    if (plan.existing()) throw preparationUnavailable();
-    if (intentGateEvaluator != null) {
-      enforceTrustLattice(op, argumentsJson, provenance, confirmationToken, context,
-          plan.invocation().value(), plan.request().key(), plan.pending() == null ? null : plan.pending().nonce());
-    }
-    return executeAttempt(op, plan, undoId);
   }
 
   private record InvocationPlan(OperationAttemptRunner.Request request, PreparedInvocation invocation,

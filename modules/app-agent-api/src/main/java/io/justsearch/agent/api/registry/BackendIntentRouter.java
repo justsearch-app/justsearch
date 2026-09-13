@@ -28,6 +28,21 @@ import io.justsearch.core.context.EngineContext;
  */
 public interface BackendIntentRouter {
 
+  /** Backend-only preparation. Never forward a navigation or execute an invocation to plan it. */
+  default OperationDispatchPlan prepare(Intent intent, InvocationProvenance provenance,
+      EngineContext engineContext, String operationKey, boolean includeApprovalPreview) {
+    throw new UnsupportedOperationException("Intent preparation is unavailable");
+  }
+
+  /** Carry the server continuation outside ShellAddress and public operation arguments. */
+  default IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance,
+      EngineContext engineContext, String operationKey, java.util.UUID preparationNonce) {
+    if (operationKey != null || preparationNonce != null) {
+      throw new UnsupportedOperationException("Keyed intent dispatch is unavailable");
+    }
+    return dispatch(intent, provenance, engineContext);
+  }
+
   /**
    * Dispatch an intent envelope.
    *

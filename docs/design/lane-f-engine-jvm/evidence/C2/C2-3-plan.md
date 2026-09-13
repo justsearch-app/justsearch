@@ -119,6 +119,35 @@ Commit the item and its exact evidence; push immediately. Keep failed/crashed/re
 runs honest. Root owns all shared-state and migration implementation; read-only
 exploration can resolve the remaining authorization mapping independently.
 
+## Orchestrator preparation entry (September13)
+
+The agent's WATCH and declared confirmation floors can require approval even when
+the dispatcher's base lattice says AUTO. Calling dispatch to discover a frozen target
+would therefore execute before the prompt. Keep issuance policy in its present owner
+and expose preparation-only through OperationDispatcher and BackendIntentRouter.
+The result is either the existing receipt or a ready reference (stable key, optional
+nonce, optional bounded display). It contains no execution payload and is not authority.
+Reuse InvocationPlan, the runner key scope and operations.db; a new ticket store or
+persisted orchestrator lifecycle is unnecessary. ShellAddress stays the public intent
+shape; backend continuation references use a separate router overload.
+
+Preparation validates current provenance/hard-stop and checks identity before reading
+or freezing payload. It never accepts work, performs an effect, or consumes/mints a
+capsule. Display is requested only for a pending prompt; receipt and non-display paths
+bypass the handler's projection. Dispatch revalidates current authority and exact
+key/nonce. Passthrough handlers retain transient preparation; invalid preparation has
+no effect and the eventual dispatch owns its ordinary recorded refusal.
+
+First commit the dispatcher/router entry and focused proof: LOW preparation leaves
+no accepted row/effect, restart preserves the target, changed keyed public input
+conflicts, receipts bypass preparation/display, and the router preserves the reference
+without forwarding an event. Then connect the agent/workflow consumers: scope before
+preparation, unchanged autonomy/background policy, one continuation through retries,
+registration before announcement, and answerable nested workflow gates. The existing
+frozen-display privacy rule still applies; settle its per-run delivery explicitly
+before changing event/history serialization. No consumer activation is claimed by
+the prerequisite alone.
+
 ## Reach and teardown
 
 The useful principle is stable input identity with separately frozen execution

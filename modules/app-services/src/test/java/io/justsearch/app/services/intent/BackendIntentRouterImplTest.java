@@ -183,6 +183,57 @@ final class BackendIntentRouterImplTest {
   }
 
   @Test
+  void preparedInvocationPlansWithoutDispatchAndCarriesThePrivateReference() {
+    var op = makeOp("core.prepared-router");
+    var dispatcher = org.mockito.Mockito.mock(OperationDispatcher.class);
+    var registry = new IntentEnvelopeChangeRegistry();
+    var forwarded = new AtomicReference<SseEnvelope>(); registry.subscribe(forwarded::set);
+    var router = new BackendIntentRouterImpl(OperationCatalog.of("core", List.of(op)), dispatcher,
+        IntentSourceCatalog.of("core", List.of()), registry);
+    var intent = new Intent(ShellAddress.Invocation.of(op.id(), "{\"public\":true}"),
+        TransportTag.valueOf(UI_CONTEXT.transport()));
+    var nonce = java.util.UUID.randomUUID();
+    var plan = new io.justsearch.agent.api.registry.OperationDispatchPlan.Ready("stable-key", nonce,
+        Optional.of(new io.justsearch.agent.api.registry.OperationApprovalPreview("Selected target")));
+    org.mockito.Mockito.when(dispatcher.prepare(op, "{\"public\":true}", UI_PROV, UI_CONTEXT, null, true)).thenReturn(plan);
+    assertSame(plan, router.prepare(intent, UI_PROV, UI_CONTEXT, null, true));
+    org.mockito.Mockito.verify(dispatcher).prepare(op, "{\"public\":true}", UI_PROV, UI_CONTEXT, null, true);
+    org.mockito.Mockito.verifyNoMoreInteractions(dispatcher);
+    var approved = new Intent(new ShellAddress.Invocation(op.id(), "{\"public\":true}", Optional.of("capsule")),
+        intent.transport());
+    var receipt = OperationResult.success("recorded");
+    org.mockito.Mockito.when(dispatcher.dispatch(op, "{\"public\":true}", UI_PROV, Optional.of("capsule"),
+        UI_CONTEXT, plan.operationKey(), nonce)).thenReturn(receipt);
+    assertSame(receipt, assertInstanceOf(IntentDispatchResult.Dispatched.class,
+        router.dispatch(approved, UI_PROV, UI_CONTEXT, plan.operationKey(), nonce)).result());
+    org.mockito.Mockito.verify(dispatcher).dispatch(op, "{\"public\":true}", UI_PROV, Optional.of("capsule"),
+        UI_CONTEXT, plan.operationKey(), nonce);
+    org.mockito.Mockito.verifyNoMoreInteractions(dispatcher);
+    org.junit.jupiter.api.Assertions.assertNull(forwarded.get(), "Planning and continuation never broadcast display or intent");
+  }
+
+  @Test
+  void preparationRejectsNavigationAndInconsistentTransportWithoutForwarding() {
+    var op = makeOp("core.prepared-router");
+    var dispatcher = org.mockito.Mockito.mock(OperationDispatcher.class);
+    var registry = new IntentEnvelopeChangeRegistry();
+    var forwarded = new AtomicReference<SseEnvelope>(); registry.subscribe(forwarded::set);
+    var router = new BackendIntentRouterImpl(OperationCatalog.of("core", List.of(op)), dispatcher,
+        IntentSourceCatalog.of("core", List.of()), registry);
+    var navigation = new Intent(new ShellAddress.Navigation(new SurfaceRef("core.library"), new StateSnapshot(Map.of())),
+        TransportTag.valueOf(UI_CONTEXT.transport()));
+    assertThrows(IllegalArgumentException.class, () -> router.prepare(navigation, UI_PROV, UI_CONTEXT, null, true));
+    assertThrows(IllegalArgumentException.class, () -> router.dispatch(navigation, UI_PROV, UI_CONTEXT, "key", null));
+    var wrongTransport = new Intent(ShellAddress.Invocation.of(op.id(), "{}"), TransportTag.MCP);
+    assertThrows(IllegalArgumentException.class, () -> router.prepare(wrongTransport, UI_PROV, UI_CONTEXT, null, true));
+    var invocation = new Intent(ShellAddress.Invocation.of(op.id(), "{}"), TransportTag.valueOf(UI_CONTEXT.transport()));
+    assertThrows(IllegalArgumentException.class,
+        () -> router.dispatch(invocation, UI_PROV, UI_CONTEXT, null, java.util.UUID.randomUUID()));
+    org.mockito.Mockito.verifyNoInteractions(dispatcher);
+    org.junit.jupiter.api.Assertions.assertNull(forwarded.get());
+  }
+
+  @Test
   void invocationWithUnknownOperationRefThrows() {
     OperationCatalog ops = OperationCatalog.of("core", List.of());
     IntentSourceCatalog sources = IntentSourceCatalog.of("core", List.of());

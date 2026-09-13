@@ -33,9 +33,13 @@ class PreparedOperationDispatchTest {
       ORIGIN, ExecutorTag.AGENT, CLOCK.instant(), Optional.empty());
 
   private static Operation operation() {
+    return operation(RiskTier.MEDIUM);
+  }
+
+  private static Operation operation(RiskTier risk) {
     return new Operation(ID, Presentation.of(new I18nKey("test.prepared"), new I18nKey("test.prepared.desc")),
         Interface.of("{\"type\":\"object\"}", "{\"type\":\"object\"}"),
-        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE, AuditPolicy.METADATA_ONLY,
+        new OperationPolicy(risk, ConfirmStrategy.None.INSTANCE, AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(), Set.of(), true).withRecordKind(OperationKind.NOTE),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(ID),
         new Provenance(TrustTier.CORE, "test", "1"), Set.of(ExecutorTag.AGENT));
@@ -195,6 +199,79 @@ class PreparedOperationDispatchTest {
     try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("operations.db"));
         var update = connection.prepareStatement("UPDATE operation_preparations SET expires_at=0 WHERE operation_key=?")) {
       update.setString(1, key); assertEquals(1, update.executeUpdate());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(value = RiskTier.class, names = {"LOW", "MEDIUM"})
+  void planningFreezesBeforeApprovalWithoutAcceptingEvenAnAutoOperation(RiskTier risk) throws Exception {
+    var fixture = new Fixture(); var capsules = spy(new ConsentCapsuleService());
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      var executor = executor(store, fixture.registry(), capsules);
+      var outcome = executor.prepare(operation(risk), "{}", PROVENANCE, ORIGIN, null, true);
+      assertEquals(0, fixture.effects.get(), "WATCH must be able to approve before a base-AUTO effect");
+      var plan = assertInstanceOf(OperationDispatchPlan.Ready.class, outcome);
+      assertTrue(store.find(plan.operationKey()).isEmpty(), "Planning must not accept work");
+      assertNotNull(plan.preparationNonce());
+      assertEquals("Write to original-target", plan.approvalPreview().orElseThrow().summary());
+      fixture.target.set("changed-target");
+      var retry = assertInstanceOf(OperationDispatchPlan.Ready.class,
+          executor.prepare(operation(risk), "{}", PROVENANCE, ORIGIN, plan.operationKey(), true));
+      assertEquals(plan, retry); assertEquals(1, fixture.prepares.get());
+      assertEquals(0, fixture.effects.get()); verifyNoInteractions(capsules);
+      assertEquals(OperationStoreException.Code.OPERATION_KEY_REUSED,
+          assertThrows(OperationStoreException.class, () -> executor.prepare(operation(risk), "{\"changed\":true}",
+              PROVENANCE, ORIGIN, plan.operationKey(), true)).code());
+      assertEquals(1, fixture.prepares.get());
+    }
+  }
+
+  @Test
+  void planningReopensTheFrozenTargetAndTerminalReceiptsSkipDisplay() throws Exception {
+    var fixture = new Fixture(); var capsules = new ConsentCapsuleService();
+    OperationDispatchPlan.Ready first;
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      first = assertInstanceOf(OperationDispatchPlan.Ready.class,
+          executor(store, fixture.registry(), capsules).prepare(operation(), "{}", PROVENANCE, ORIGIN, null, true));
+    }
+    fixture.target.set("replacement");
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      var executor = executor(store, fixture.registry(), capsules);
+      assertEquals(first, executor.prepare(operation(), "{}", PROVENANCE, ORIGIN, first.operationKey(), true));
+      String token = capsules.mintPrepared(ID.value(), "{}", SourceTier.UNTRUSTED,
+          first.operationKey(), first.preparationNonce());
+      fixture.previewSupported = false;
+      assertTrue(executor.dispatch(operation(), "{}", PROVENANCE, Optional.of(token), ORIGIN,
+          first.operationKey(), first.preparationNonce()).success());
+      var receipt = assertInstanceOf(OperationDispatchPlan.Recorded.class,
+          executor.prepare(operation(), "{}", PROVENANCE, ORIGIN, first.operationKey(), true));
+      assertEquals(first.operationKey(), receipt.operationKey()); assertTrue(receipt.result().success());
+      assertEquals(1, fixture.prepares.get()); assertEquals(1, fixture.effects.get());
+      assertTrue(fixture.used.get().contains("original-target"));
+      assertEquals(OperationStoreException.Code.OPERATION_KEY_REUSED,
+          assertThrows(OperationStoreException.class, () -> executor.prepare(operation(), "{\"changed\":true}",
+              PROVENANCE, ORIGIN, first.operationKey(), true)).code());
+      var hardStop = new GlobalHardStop(); executor.setGlobalHardStop(hardStop); hardStop.engage();
+      assertThrows(TrustGateDeniedException.class,
+          () -> executor.prepare(operation(), "{}", PROVENANCE, ORIGIN, first.operationKey(), true));
+      assertThrows(TrustGateDeniedException.class,
+          () -> executor.prepare(operation(), "{}", PROVENANCE, ORIGIN, null, true));
+      assertEquals(1, fixture.prepares.get()); assertEquals(1, fixture.effects.get());
+    }
+  }
+
+  @Test
+  void planningWithoutDisplayDoesNotRequireTheApprovalProjection() throws Exception {
+    var fixture = new Fixture(); fixture.previewSupported = false;
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      var executor = executor(store, fixture.registry(), new ConsentCapsuleService());
+      var plan = assertInstanceOf(OperationDispatchPlan.Ready.class,
+          executor.prepare(operation(), "{}", PROVENANCE, ORIGIN, null, false));
+      assertTrue(plan.approvalPreview().isEmpty()); assertNotNull(plan.preparationNonce());
+      assertThrows(UnsupportedOperationException.class,
+          () -> executor.prepare(operation(), "{}", PROVENANCE, ORIGIN, plan.operationKey(), true));
+      assertEquals(1, fixture.prepares.get()); assertEquals(0, fixture.effects.get());
+      assertTrue(store.find(plan.operationKey()).isEmpty());
     }
   }
 

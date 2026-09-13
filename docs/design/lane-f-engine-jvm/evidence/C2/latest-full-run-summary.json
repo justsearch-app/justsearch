@@ -1,12 +1,12 @@
 {
-  "revision": "b713307eada7f56f772aaf7a9b715846802ba736",
+  "revision": "852916d16f36906471f377ab6ef3479f818aaf90",
   "command": "gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
   "summary": {
-    "tests": 10158,
+    "tests": 10252,
     "failures": 0,
     "errors": 0,
     "skipped": 35,
-    "suites": 1649
+    "suites": 1657
   },
   "tasks": [
     {
@@ -32,7 +32,7 @@
     {
       "module": "ai-backend",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 62,
       "failures": 0,
       "errors": 0,
@@ -42,7 +42,7 @@
     {
       "module": "app-agent",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 674,
       "failures": 0,
       "errors": 0,
@@ -53,16 +53,16 @@
       "module": "app-agent-api",
       "task": "test",
       "status": "UP-TO-DATE",
-      "tests": 239,
+      "tests": 240,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 41
+      "suites": 42
     },
     {
       "module": "app-api",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 204,
       "failures": 0,
       "errors": 0,
@@ -80,9 +80,19 @@
       "suites": 1
     },
     {
+      "module": "app-engine",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 231,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 47
+    },
+    {
       "module": "app-inference",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 320,
       "failures": 0,
       "errors": 0,
@@ -100,39 +110,29 @@
       "suites": 23
     },
     {
-      "module": "app-engine",
-      "task": "test",
-      "status": "EXECUTED",
-      "tests": 231,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 47
-    },
-    {
       "module": "app-observability",
       "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 443,
+      "status": "EXECUTED",
+      "tests": 464,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 68
+      "suites": 71
     },
     {
       "module": "app-services",
       "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 2646,
+      "status": "EXECUTED",
+      "tests": 2673,
       "failures": 0,
       "errors": 0,
       "skipped": 3,
-      "suites": 411
+      "suites": 413
     },
     {
       "module": "app-services",
       "task": "integrationTest",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 3,
       "failures": 0,
       "errors": 0,
@@ -262,7 +262,7 @@
     {
       "module": "ipc-common",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 4,
       "failures": 0,
       "errors": 0,
@@ -353,11 +353,11 @@
       "module": "ui",
       "task": "test",
       "status": "EXECUTED",
-      "tests": 1133,
+      "tests": 1178,
       "failures": 0,
       "errors": 0,
       "skipped": 1,
-      "suites": 177
+      "suites": 179
     },
     {
       "module": "ui",
@@ -372,7 +372,7 @@
     {
       "module": "worker-core",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 342,
       "failures": 0,
       "errors": 0,
@@ -382,7 +382,7 @@
     {
       "module": "worker-services",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 1347,
       "failures": 0,
       "errors": 0,
@@ -390,23 +390,11 @@
       "suites": 256
     }
   ],
-  "buildResult": "SUCCESS",
-  "elapsed": "9m30s",
-  "raw": {
-    "log": "tmp/c2-review-final-full905.txt",
-    "xml": "tmp/c2-review-final-full905-xml/",
-    "counts": "tmp/c2-review-final-full905-counts.json"
-  },
-  "reuse": {
-    "executedTasks": 7,
-    "executedCases": 2040,
-    "unchangedTasks": 31
-  },
-  "supersedes": {
-    "revision": "2168d124588de7e7afb0e6d90ae6f53485639b15",
-    "run": "900",
-    "retrieval": "git show b713307ea:docs/design/lane-f-engine-jvm/evidence/C2/latest-full-run-summary.json",
-    "result": "FAILED: formatting, with no test failures; not retroactively relabeled"
-  },
-  "next": "R1-R10 correction batch accepted: final independent verification and hosted CI34734430973 pass at b713307ea. Continue C2-3; whole C2 remains open."
+  "log": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-preparation-full1009.txt",
+  "xmlRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-preparation-full1009-xml",
+  "result": "BUILD SUCCESSFUL in 16m 7s; 367 tasks, 75 executed and 292 up-to-date",
+  "executedTests": 8178,
+  "reuse": "21 test tasks were UP-TO-DATE with unchanged successful inputs; their represented XML is distinguished per task. The other 17 test tasks executed.",
+  "limits": "Local Java integrated proof at 852916d16. Hosted CI34742373815 was still pending at 06:32 UTC; no live/model or hosted success is inferred. C2-3 agent/workflow and remaining producer work is open.",
+  "warnings": "Existing SmokeDriver diagnostics unused parameter, dependency/JDK Unsafe warnings, LightGBM small-fixture warnings and incompatible-PMD configuration-cache discard remain visible in the successful log."
 }

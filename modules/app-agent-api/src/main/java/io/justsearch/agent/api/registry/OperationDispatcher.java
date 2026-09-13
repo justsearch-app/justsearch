@@ -31,6 +31,18 @@ import io.justsearch.core.context.EngineContext;
 public interface OperationDispatcher {
 
   /**
+   * Validate current authority and public key identity, then freeze unknown input without accepting
+   * or executing work or consuming consent. Orchestrators use this before their stricter issuance
+   * gate (for example WATCH on a LOW operation). Only an unknown key prepares; a retained row
+   * returns its receipt. Request display only when a prompt needs the frozen target.
+   */
+  default OperationDispatchPlan prepare(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineContext engineContext, String operationKey,
+      boolean includeApprovalPreview) {
+    throw new UnsupportedOperationException("Preparation-only dispatch is unavailable");
+  }
+
+  /**
    * Execute with provenance projected from the required context and the implementation's clock.
    * Callers with an explicit executor or signed intent use the provenance overload.
    */

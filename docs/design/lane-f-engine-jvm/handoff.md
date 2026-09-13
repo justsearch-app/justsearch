@@ -41,7 +41,12 @@ HTTP exact-reference delivery and typed locked ingress pass284 cases at988; [ing
 Frontend exact-reference retries and immutable approval input pass6480 tests at992, with typecheck/lint and UI coverage green; [client proof](evidence/C2/prepared-client.md).
 Frozen approval preview backend passes463 cases at997, including actual MCP pending/SSE privacy and full HTTP target delivery; [preview proof](evidence/C2/prepared-preview.md).
 Long-target wrapping and control reachability pass four measured UI cases at1007 (zero axe/console errors), with6480 frontend tests at1008; [presentation proof](evidence/C2/prepared-preview-ui.md).
-Next: agent/workflow preparation-reference carry-through, then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
+Full1009 at852916d16 passes10252 represented cases (8178 executed), zero failures/errors
+and35 inherited skips, with PMD/integration compilation. Preparation-only dispatcher/router
+entry points pass358 cases at1011 after the route-first LOW-effect negative; [planning proof](evidence/C2/prepared-planning.md).
+Next: connect agent/workflow preparation-reference carry-through and private preview lookup,
+including workflow registration-before-announcement and nested approval delivery/reattach,
+then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 
