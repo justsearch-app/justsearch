@@ -71,6 +71,7 @@ class PreparedOperationDispatchTest {
     final AtomicReference<InvocationProvenance> usedProvenance = new AtomicReference<>();
     final OperationPreparation.Content content;
     Runnable beforePrepare = () -> {};
+    boolean previewSupported = true;
     Fixture() { this(OperationPreparation.Content.METADATA); }
     Fixture(OperationPreparation.Content content) { this.content = content; }
     @Override public OperationResult execute(String args, EngineContext context) {
@@ -82,6 +83,13 @@ class PreparedOperationDispatchTest {
     }
     @Override public OperationPreparation prepareUndo(String id, InvocationProvenance provenance, EngineContext context) {
       return prepare(OperationDispatcher.undoArguments(id), provenance, context);
+    }
+    @Override public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+      if (!previewSupported) return OperationHandler.super.approvalPreview(prepared);
+      String selected = tools.jackson.databind.json.JsonMapper.builder().build()
+          .readTree(prepared.replayPayloadJson()).path("target").asText();
+      return new OperationApprovalPreview(content == OperationPreparation.Content.CONTENT
+          ? "Write to the selected private note target" : "Write to " + selected);
     }
     @Override public void validatePreparation(OperationPreparation prepared) {
       if (!"fixture.v1".equals(prepared.replaySchema()) || prepared.content() != content)
@@ -130,6 +138,7 @@ class PreparedOperationDispatchTest {
       assertTrue(store.openRecords().isEmpty(), "An unapproved preparation is not an accepted attempt");
     }
     fixture.target.set("changed-target");
+    fixture.previewSupported = false; // approved execution and receipts must not compute display again
     try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
       var executor = executor(store, handlers, capsules);
       String token = capsules.mintPrepared(ID.value(), undo ? OperationDispatcher.undoArguments("prior-operation") : "{}", SourceTier.UNTRUSTED, key, nonce);
@@ -144,6 +153,41 @@ class PreparedOperationDispatchTest {
       var row = store.find(key).orElseThrow();
       assertEquals(OperationState.COMPLETE, row.state());
       assertTrue(store.acceptedPreparation(row.id()).isPresent());
+    }
+  }
+
+  @Test
+  void approvalPreviewComesFromFrozenValueAfterReopen() throws Exception {
+    var fixture = new Fixture(); var capsules = new ConsentCapsuleService();
+    String key = OperationKeys.generate(CLOCK);
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      var executor = executor(store, fixture.registry(), capsules);
+      var gate = assertThrows(ConfirmationRequiredException.class,
+          () -> invoke(executor, false, key, null, Optional.empty()));
+      assertNotNull(gate.approvalPreview(), "The gate must display the server-selected target");
+      assertEquals("Write to original-target", gate.approvalPreview().summary());
+      assertFalse(gate.toString().contains("original-target"));
+    }
+    fixture.target.set("different-target");
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      var executor = executor(store, fixture.registry(), capsules);
+      var gate = assertThrows(ConfirmationRequiredException.class,
+          () -> invoke(executor, false, key, null, Optional.empty()));
+      assertNotNull(gate.approvalPreview(), "The gate must display the server-selected target");
+      assertEquals("Write to original-target", gate.approvalPreview().summary());
+      assertEquals(1, fixture.prepares.get()); assertEquals(0, fixture.effects.get());
+    }
+  }
+
+  @Test
+  void replayHandlerWithoutPreviewCannotOfferAnIncompleteApproval() throws Exception {
+    var fixture = new Fixture(); fixture.previewSupported = false;
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
+      var executor = executor(store, fixture.registry(), new ConsentCapsuleService());
+      assertThrows(UnsupportedOperationException.class,
+          () -> invoke(executor, false, OperationKeys.generate(CLOCK), null, Optional.empty()));
+      assertEquals(1, fixture.prepares.get()); assertEquals(0, fixture.effects.get());
+      assertTrue(store.openRecords().isEmpty());
     }
   }
 

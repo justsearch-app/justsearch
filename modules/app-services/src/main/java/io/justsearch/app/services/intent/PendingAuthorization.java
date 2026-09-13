@@ -68,7 +68,8 @@ public record PendingAuthorization(
     io.justsearch.agent.api.registry.InvocationProvenance provenance,
     String operationKey,
     boolean undo,
-    java.util.UUID preparationNonce) {
+    java.util.UUID preparationNonce,
+    io.justsearch.agent.api.registry.OperationApprovalPreview approvalPreview) {
 
   public PendingAuthorization {
     Objects.requireNonNull(id, "id");
@@ -89,6 +90,7 @@ public record PendingAuthorization(
       throw new IllegalArgumentException("Pending authorization attribution disagrees");
     }
     if (preparationNonce != null) Objects.requireNonNull(operationKey, "operationKey");
+    if (approvalPreview != null) Objects.requireNonNull(preparationNonce, "preparationNonce");
     rationale = rationale == null ? "" : rationale;
     requestedBy = requestedBy == null || requestedBy.isBlank() ? null : requestedBy;
   }

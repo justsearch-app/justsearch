@@ -92,6 +92,16 @@ public interface OperationHandler {
   }
 
   /**
+   * Project approval metadata from this frozen value only: never re-resolve a path or read
+   * changing state, and never include document content. A replay owner must explicitly supply
+   * its target/scope when confirmation is needed; public JSON cannot describe a server target.
+   */
+  default OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+    Objects.requireNonNull(prepared, "prepared");
+    throw new UnsupportedOperationException("Prepared handler must supply an approval preview");
+  }
+
+  /**
    * Validate only the frozen format/version/content classification, before persistence and after
    * decode. This is pure and must not re-resolve a target or inspect changing execution state.
    * A replay owner opts in by validating its schemas; unsupported preparations refuse by default.

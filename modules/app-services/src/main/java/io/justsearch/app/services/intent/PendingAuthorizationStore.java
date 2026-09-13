@@ -129,6 +129,16 @@ public final class PendingAuthorizationStore {
       GateBehavior gateBehavior, String rationale, String requestedBy, TransportTag transport,
       EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance,
       String operationKey, boolean undo, UUID preparationNonce) {
+    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, requestedBy,
+        transport, engineContext, provenance, operationKey, undo, preparationNonce, null);
+  }
+
+  /** The preview is a bounded projection for point-to-point approval, never routing broadcast. */
+  public String create(String operationId, String argsJson, SourceTier sourceTier, RiskTier riskTier,
+      GateBehavior gateBehavior, String rationale, String requestedBy, TransportTag transport,
+      EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance,
+      String operationKey, boolean undo, UUID preparationNonce,
+      io.justsearch.agent.api.registry.OperationApprovalPreview approvalPreview) {
     Instant now = clock.instant();
     // Evict expired entries here — expiry is otherwise only checked lazily on peek/consume of
     // a specific id, so a pending that is gated-then-abandoned (never approved) would never be
@@ -156,7 +166,7 @@ public final class PendingAuthorizationStore {
             now,
             now.plus(ttl),
             requestedBy,
-            transport, engineContext, provenance, operationKey, undo, preparationNonce));
+            transport, engineContext, provenance, operationKey, undo, preparationNonce, approvalPreview));
     return id;
   }
 

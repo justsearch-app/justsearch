@@ -42,6 +42,34 @@ class McpOperationKeyTest {
     assertEquals(false, facts.get("retryable"));
   }
 
+  @Test
+  void preparedTargetPreviewReachesPendingStorageButNotMcpRoutingResponse() {
+    var nonce = java.util.UUID.randomUUID();
+    var preview = new OperationApprovalPreview("Write F:/private-designated-root/frozen-note.md");
+    var stored = new PendingAuthorizationStore();
+    var changes = new io.justsearch.app.observability.operations.PendingAuthorizationChangeRegistry();
+    var announced = new java.util.concurrent.atomic.AtomicReference<io.justsearch.app.observability.operations.PendingAuthorizationEvent>();
+    var previewSurface = new McpToolSurface(List.of(new AgentToolsOperationCatalog()), dispatcher,
+        () -> null, () -> null, Clock.systemUTC(), () -> null, stored, changes);
+    when(dispatcher.dispatch(any(), any(), any(), any()))
+        .thenThrow(new ConfirmationRequiredException(AgentToolsOperationCatalog.INGEST_FILES,
+            GateBehavior.TYPED_CONFIRM, ConfirmStrategy.None.INSTANCE, SourceTier.UNTRUSTED, KEY, nonce, preview));
+    var subscription = changes.subscribeTyped(announced::set);
+    try {
+      var response = previewSurface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/notes")),
+          "session", TestRequestContexts.mcp("session"));
+      assertNotNull(announced.get());
+      var saved = stored.peek(announced.get().pendingId()).orElseThrow();
+      assertEquals(preview, saved.approvalPreview()); assertEquals(nonce, saved.preparationNonce());
+      assertFalse(response.toString().contains("private-designated-root"));
+      String routing = JsonMapper.builder().build().writeValueAsString(announced.get());
+      assertFalse(routing.contains("private-designated-root"));
+      assertFalse(routing.contains("argsSummary")); assertFalse(routing.contains("approvalPreview"));
+    } finally {
+      subscription.unsubscribe();
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"justsearch_ingest", "justsearch_browse"})
   void keyIsDeliveredSeparatelyFromPublicArguments(String tool) {
@@ -65,14 +93,14 @@ class McpOperationKeyTest {
         .thenThrow(new ConfirmationRequiredException(AgentToolsOperationCatalog.INGEST_FILES,
             GateBehavior.TYPED_CONFIRM,
             ConfirmStrategy.typedForId(AgentToolsOperationCatalog.INGEST_FILES), SourceTier.UNTRUSTED));
-    when(pending.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), isNull()))
+    when(pending.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), isNull(), isNull()))
         .thenReturn("pending-key");
     var response = surface.callTool("justsearch_ingest",
         Map.of("paths", List.of("C:/notes"), "operationKey", KEY), "session", TestRequestContexts.mcp("session"));
     assertEquals(true, response.get("isError"));
     var publicJson = ArgumentCaptor.forClass(String.class);
     verify(pending).create(eq("core.ingest-files"), publicJson.capture(), any(), any(), any(), any(),
-        isNull(), eq(TransportTag.MCP), any(), any(), eq(KEY), eq(false), isNull());
+        isNull(), eq(TransportTag.MCP), any(), any(), eq(KEY), eq(false), isNull(), isNull());
     assertFalse(JsonMapper.builder().build().readTree(publicJson.getValue()).has("operationKey"));
     assertTrue(response.toString().contains("JustSearch app"));
   }
@@ -86,7 +114,7 @@ class McpOperationKeyTest {
     surface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/notes")),
         "session", TestRequestContexts.mcp("session"));
     verify(pending).create(eq("core.ingest-files"), any(), any(), any(), any(), any(),
-        isNull(), eq(TransportTag.MCP), any(), any(), eq(KEY), eq(false), eq(nonce));
+        isNull(), eq(TransportTag.MCP), any(), any(), eq(KEY), eq(false), eq(nonce), isNull());
   }
 
   @ParameterizedTest

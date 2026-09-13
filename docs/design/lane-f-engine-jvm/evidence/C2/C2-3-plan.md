@@ -250,3 +250,20 @@ at operation ingress; MCP and approved-execution use the same common typed proje
 Unlock is required before a retry; do not silently re-prepare or log content as an
 uncaught handler failure. Frontend consent retries next consume the full approval
 reference, including server-minted keys, while keeping the original public input.
+
+## Frozen approval preview projection (September13)
+
+Use a pure handler projection of the already-frozen preparation, rather than adding
+another copy of the target or a new envelope version. OperationApprovalPreview is a
+small bounded display value: one nonblank summary, at most8192 UTF-8 bytes, redacted
+from toString. It contains target/root/scope metadata needed for approval, never note
+body, prompts or credentials. Overlong metadata refuses rather than truncating a target
+into ambiguity. A replay handler must explicitly provide this projection when a gate
+needs it; receipt, AUTO and successful-capsule paths do not compute it.
+
+Carry that value in the existing gate exception and TTL-bounded pending authorization.
+HTTP428 and pending-by-id GET use it as their existing argsSummary, instead of rendering
+public JSON for a prepared call. SSE and ledger remain routing/metadata only. This is
+a derived display projection, not a second execution authority or durable payload.
+Backend transport proof owns this item; long-path visual presentation must be checked
+and wrapped before C2-3 acceptance, alongside agent/workflow gate consumers.

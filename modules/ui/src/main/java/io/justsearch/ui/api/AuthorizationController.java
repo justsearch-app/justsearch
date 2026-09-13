@@ -266,7 +266,8 @@ public final class AuthorizationController {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("pendingId", p.id());
     payload.put("operationId", p.operationId());
-    payload.put("argsSummary", ArgsSummary.summarize(p.argsJson()));
+    payload.put("argsSummary", p.approvalPreview() == null
+        ? ArgsSummary.summarize(p.argsJson()) : p.approvalPreview().summary());
     payload.put("sourceTier", p.sourceTier().name());
     payload.put("riskTier", p.riskTier().name());
     payload.put("gateBehavior", p.gateBehavior().name());

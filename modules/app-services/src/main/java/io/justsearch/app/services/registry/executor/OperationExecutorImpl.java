@@ -873,9 +873,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
           return; // capsule-satisfied
         }
+        var preview = preparationNonce == null ? null
+            : Objects.requireNonNull(resolveHandler(op).approvalPreview(prepared), "approvalPreview");
         emitGateOutcome(op, provenance, sourceTier, gate,
             io.justsearch.app.observability.operations.AuthorizationDisposition.GATED);
-        throw new ConfirmationRequiredException(op.id(), gate, op.policy().confirm(), sourceTier, operationKey, preparationNonce);
+        throw new ConfirmationRequiredException(op.id(), gate, op.policy().confirm(), sourceTier,
+            operationKey, preparationNonce, preview);
       }
       case DENY -> {
         emitGateOutcome(op, provenance, sourceTier, gate,

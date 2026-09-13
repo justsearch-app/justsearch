@@ -1571,7 +1571,7 @@ public final class McpToolSurface {
               op.id().value(), argsJson, e.sourceTier(), op.policy().risk(), e.gateBehavior(),
               e.getMessage(), requestedBy,
               io.justsearch.agent.api.registry.TransportTag.MCP, engineContext, provenance,
-              e.operationKey() == null ? operationKey : e.operationKey(), false, e.preparationNonce());
+              e.operationKey() == null ? operationKey : e.operationKey(), false, e.preparationNonce(), e.approvalPreview());
       if (pendingAuthorizationChanges != null) {
         // Tempdoc 655 fix pass: routing info only — no argsSummary/rationale on the broadcast
         // (see PendingAuthorizationEvent's doc comment for why). A subscriber fetches the

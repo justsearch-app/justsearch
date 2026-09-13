@@ -48,6 +48,9 @@ class PreparedDispatchAdmissionTest {
       @Override public OperationPreparation prepare(String args, InvocationProvenance provenance, EngineContext context) {
         return new OperationPreparation(args, "admission-proof.v1", "{}");
       }
+      @Override public OperationApprovalPreview approvalPreview(OperationPreparation value) {
+        return new OperationApprovalPreview("Use the frozen admission proof target");
+      }
       @Override public void validatePreparation(OperationPreparation value) {
         if (!"admission-proof.v1".equals(value.replaySchema()) || !"{}".equals(value.replayPayloadJson())
             || value.content() != OperationPreparation.Content.METADATA) throw new IllegalArgumentException("Unsupported proof payload");

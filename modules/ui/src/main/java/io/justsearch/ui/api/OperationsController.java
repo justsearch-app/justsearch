@@ -423,7 +423,8 @@ public final class OperationsController {
     // instead of just the operation id.
     body.put("riskTier", op.policy().risk().name());
     body.put("undoSupported", op.policy().undoSupported());
-    body.put("argsSummary", ArgsSummary.summarize(argumentsJson));
+    body.put("argsSummary", e.approvalPreview() == null
+        ? ArgsSummary.summarize(argumentsJson) : e.approvalPreview().summary());
     // Tempdoc 550 C3: register a pending authorization and hand the FE its id. The FE
     // approves by this id (POST /api/authorizations/approve {pendingId}); the capsule is
     // then minted against the STORED (operationId, argsJson), so the approve gesture cannot
@@ -438,7 +439,7 @@ public final class OperationsController {
               e.gateBehavior(),
               e.getMessage(),
               null,
-              provenance.transport(), RequestEngineContext.get(ctx), provenance, stableKey, undo, e.preparationNonce());
+              provenance.transport(), RequestEngineContext.get(ctx), provenance, stableKey, undo, e.preparationNonce(), e.approvalPreview());
       body.put("pendingId", pendingId);
       // Tempdoc 655: also broadcast on the pending-authorization SSE stream, so the shell
       // (already open, potentially on a different view than whatever triggered this 428) has one

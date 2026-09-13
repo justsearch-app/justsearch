@@ -67,6 +67,38 @@ final class OperationsControllerTest {
 
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void preparedPreviewReplacesRawContentInGateAndPendingPeek(boolean undo) throws Exception {
+    var pending = new io.justsearch.app.services.intent.PendingAuthorizationStore();
+    var catalog = new CoreOperationCatalog();
+    controller = new OperationsController(List.of(catalog), dispatcher, java.time.Clock.systemUTC(), pending);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.randomUUID();
+    String target = "Write F:/notes/" + "long-target-".repeat(30) + ".md in designated root F:/notes";
+    var preview = new io.justsearch.agent.api.registry.OperationApprovalPreview(target);
+    var gate = new io.justsearch.agent.api.registry.ConfirmationRequiredException(
+        new io.justsearch.agent.api.registry.OperationRef("core.ping-backend"),
+        io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM,
+        io.justsearch.agent.api.registry.ConfirmStrategy.None.INSTANCE,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED, key, nonce, preview);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any())).thenThrow(gate);
+    when(dispatcher.undo(any(), any(), any(), any(), any())).thenThrow(gate);
+    var ctx = mockContext("core.ping-backend", undo ? "{\"executionId\":\"private-body\"}"
+        : "{\"args\":{\"content\":\"private-body\"}}");
+    if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+    var response = capture(ctx);
+    assertEquals(target, response.path("argsSummary").asText());
+    org.junit.jupiter.api.Assertions.assertFalse(response.toString().contains("private-body"));
+    String id = response.path("pendingId").asText();
+    var approval = new AuthorizationController(new io.justsearch.app.services.intent.ConsentCapsuleService(), pending);
+    var peek = mockContext(id, ""); approval.handlePeekPending(peek);
+    var detail = capture(peek);
+    assertEquals(target, detail.path("argsSummary").asText());
+    org.junit.jupiter.api.Assertions.assertFalse(detail.toString().contains("private-body"));
+    assertEquals(preview, pending.peek(id).orElseThrow().approvalPreview());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void preparedRetryForwardsExactReferenceOutsidePublicInput(boolean undo) throws Exception {
     String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
     var nonce = java.util.UUID.randomUUID();
