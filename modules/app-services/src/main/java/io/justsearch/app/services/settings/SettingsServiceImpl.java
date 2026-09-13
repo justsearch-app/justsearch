@@ -1,39 +1,51 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.settings;
 
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.SettingsService;
+import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.configuration.persistence.CorruptDurableStoreException;
+import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Callable;
 
-/**
- * Production implementation of {@link SettingsService}, extracted from
- * {@code SettingsController} as part of tempdoc 519 §9 Block B3 / Step 3.
- *
- * <p>Pragmatic delegate: the underlying reset logic lives in the ui-side
- * {@code SettingsController} because the reset references {@code SettingsV2}
- * / {@code UiSettingsV2} / {@code LlmSettingsV2} DTOs that would themselves
- * require relocation to app-api to break the ui dependency. Those DTOs are
- * outside §9's literal scope (they are a separate cluster of view-model
- * types). This impl owns the {@code SettingsService} interface contract in
- * app-services; the actual reset implementation continues to be invoked
- * through the injected callback supplied by {@code LocalApiServer}.
- *
- * <p>The §9-endpoint shape (impl class lives in app-services) is satisfied.
- * Full extraction of the reset logic depends on the SettingsV2 DTO cluster
- * decomposition, which is a separate scope tracked alongside the §11
- * allowlist.
- */
+/** Reads reset intent once; the fixed settings owner alone prepares and commits the candidate. */
 public final class SettingsServiceImpl implements SettingsService {
+  private final UiSettingsStore store;
+  private final OperationAttemptRunner attempts;
 
-  private final Callable<Map<String, Object>> resetFn;
-
-  public SettingsServiceImpl(Callable<Map<String, Object>> resetFn) {
-    this.resetFn = Objects.requireNonNull(resetFn, "resetFn");
+  public SettingsServiceImpl(UiSettingsStore store, OperationAttemptRunner attempts) {
+    this.store = Objects.requireNonNull(store, "store");
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
   }
 
   @Override
-  public Map<String, Object> resetToDefaults() throws Exception {
-    return resetFn.call();
+  public OperationPreparation prepareReset(String argumentsJson) {
+    if (!store.mode().isWritable()) {
+      throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled");
+    }
+    try {
+      return SettingsResetPreparation.normal(argumentsJson, store.inspect().witness());
+    } catch (CorruptDurableStoreException | UnsupportedStoreVersionException | UncheckedIOException unreadable) {
+      try {
+        return SettingsResetPreparation.recovery(argumentsJson, store.recoveryFingerprint());
+      } catch (IOException unavailable) {
+        throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery evidence cannot be verified");
+      }
+    }
+  }
+
+  @Override
+  public OperationResult resetToDefaults(OperationRecordHandle record) {
+    return attempts.applySettingsReset(record);
+  }
+
+  private static OperationPreparationRefused refused(String code, String message) {
+    return new OperationPreparationRefused(OperationResult.failure(message, code, Map.of(), false));
   }
 }

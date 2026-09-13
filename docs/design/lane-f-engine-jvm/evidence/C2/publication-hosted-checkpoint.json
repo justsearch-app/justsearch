@@ -1,0 +1,100 @@
+{
+  "recorded": "2026-09-13",
+  "testedRevision": "29d4c8233f1992927222b14e4f911c7c0d34d547",
+  "conclusion": "success",
+  "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186",
+  "jobs": [
+    {
+      "name": "Measured axe (advisory)",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:27:25Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327283"
+    },
+    {
+      "name": "Windows-native tests",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:50Z",
+      "completedAt": "2026-09-13T21:34:17Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327411"
+    },
+    {
+      "name": "Unit tests (platform-contracts)",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:30:19Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327459"
+    },
+    {
+      "name": "Build (no model blobs)",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:33:18Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327480"
+    },
+    {
+      "name": "Integration tests (system-tests tier)",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:37:00Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327484"
+    },
+    {
+      "name": "Shell crate tests (Rust)",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:30:30Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327485"
+    },
+    {
+      "name": "Secret scan",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:26:01Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327520"
+    },
+    {
+      "name": "License and notices",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:28:43Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327541"
+    },
+    {
+      "name": "Unit tests (app-ui)",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:48Z",
+      "completedAt": "2026-09-13T21:33:31Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327576"
+    },
+    {
+      "name": "Unit tests (search-worker)",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:33:03Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327583"
+    },
+    {
+      "name": "Public claims",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:27:52Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327614"
+    },
+    {
+      "name": "jseval Python suite",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:24:49Z",
+      "completedAt": "2026-09-13T21:32:08Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103795327625"
+    },
+    {
+      "name": "CI wall-clock attribution",
+      "conclusion": "success",
+      "startedAt": "2026-09-13T21:37:04Z",
+      "completedAt": "2026-09-13T21:37:29Z",
+      "url": "https://github.com/justsearch-app/justsearch/actions/runs/34783675186/job/103797019869"
+    }
+  ],
+  "limit": "This hosted success binds29d4c8233 only. Newer mapper, validator and producer changes require their own current-head checks. Installed successor-bootstrap and remaining lane acceptance are open."
+}

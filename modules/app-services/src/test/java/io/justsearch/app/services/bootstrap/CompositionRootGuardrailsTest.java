@@ -162,8 +162,8 @@ class CompositionRootGuardrailsTest {
             + instanceFields
             + " > MAX_LATE_BINDINGS="
             + MAX_LATE_BINDINGS
-            + ". The 3 §31-design holders (settingsResetFn, debugStateProvider,"
-            + " statusSnapshotProvider) are inherent. Growth requires a 530-kernel"
+            + ". The diagnostic holders (debugStateProvider,"
+            + " statusSnapshotProvider) remain. Growth requires a 530-kernel"
             + " changeset row.");
   }
 

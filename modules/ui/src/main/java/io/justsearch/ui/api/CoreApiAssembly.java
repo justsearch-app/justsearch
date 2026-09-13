@@ -440,12 +440,10 @@ final class CoreApiAssembly {
                 packAllowlistService);
     AiPackController aiPackController = new AiPackController(aiPackImportHelper, telemetry);
     // §31 Phase 3: services are constructed by ServicePhase from boot. LocalApiServer no
-    // longer constructs services or calls registerLateBoundHandlers. Only 3 controller
-    // back-refs need publishing: settings reset callback (used by SettingsServiceImpl),
-    // DebugStateProvider + StatusSnapshotProvider SPIs (used by DiagnosticsServiceImpl).
+    // longer constructs services or calls registerLateBoundHandlers. Only diagnostic
+    // controller SPIs (DebugStateProvider and StatusSnapshotProvider) need publishing.
     if (headAssemblyRef != null) {
       var lateBindings = headAssemblyRef.lateBindings();
-      lateBindings.setSettingsResetFn(settingsController::resetToDefaults);
       lateBindings.setDebugStateProvider(debugStateController);
       lateBindings.setStatusSnapshotProvider(statusLifecycleHandler);
       // Tempdoc 876 §B.2a: give the readiness-reconciliation trigger its thunk. This is the first

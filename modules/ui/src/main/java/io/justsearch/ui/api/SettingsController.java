@@ -6,7 +6,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import io.javalin.http.Context;
 import io.justsearch.app.api.ApiErrorCode;
-import io.justsearch.app.api.SettingsService;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.telemetry.Telemetry;
@@ -25,9 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * HTTP routing layer for settings endpoints. SettingsServiceImpl currently forwards
- * reset to {@link #resetToDefaults} through a method reference. Response DTOs belong
- * to app-api and their shared projection belongs to app-services. HTTP default-index
+ * HTTP routing layer for settings endpoints. Reset is owned by SettingsServiceImpl.
+ * Response DTOs belong to app-api and their shared projection belongs to app-services.
+ * HTTP default-index
  * injection and per-client UI-mode intent ordering remain in this controller.
  */
 public class SettingsController {
@@ -305,31 +304,4 @@ public class SettingsController {
     }
   }
 
-  // ==========================================================================
-  // SettingsService impl (slice 3a-2-c continuation).
-  //
-  // Reset FE-controlled fields to their canonical default values while
-  // preserving admin-set fields (server exe, model path, llama lib path,
-  // index base path, schema/version metadata, splits, window geometry).
-  // The defaults match what UiSettings's field initializers declare; we
-  // explicitly enumerate the FE-controlled subset rather than copying the
-  // entire object so admin-managed fields are preserved by construction.
-  // ==========================================================================
-  public Map<String, Object> resetToDefaults() throws Exception {
-    if (!settingsStore.mode().isWritable()) {
-      throw new IllegalStateException(
-          "Settings are read-only in " + settingsStore.mode().name() + " mode");
-    }
-    UiSettings current = settingsStore.load();
-
-    io.justsearch.app.services.settings.SettingsResetDefaults.applyTo(current);
-
-    settingsStore.save(current);
-    rebuildConfigStore(current);
-
-    SettingsV2 v2 = toSettingsV2(current);
-    @SuppressWarnings("unchecked")
-    Map<String, Object> out = MAPPER.convertValue(v2, Map.class);
-    return out;
-  }
 }

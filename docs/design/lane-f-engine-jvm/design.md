@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, C2-3 active; D1-F remain. The privacy-compliant successor candidate is draft PR727 at 29d4c8233, with product/build sources matching cfa4a78b8 and 8bf81ea2d; full/build/frontend/stress and isolated publication-preflight proof are recorded, while hosted run34783675186 remains in progress. PR718 remains checkpoint history; merge placement stays F."
+status: "LOCKED; A/B/C1 complete; C2-6 reset producer integrated and locally reviewed, all-writer/witness/Health/installed proof open; D1-F remain. Draft PR727, merge at F. Hosted checkpoint29d4c8233 passed; later changes require their own final-head proof."
 created: 2026-09-06
 updated: 2026-09-13
 lane: F (decision re-examination programme, wave 4)
@@ -26,6 +26,10 @@ document is the lane's contract: the design and the considerations that shaped i
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-14: C2-6 reset producer is integrated with direct service/runner injection and pre-startup owner composition; independent review is clear. Focused1376 and adjacent1375 pass. Hosted checkpoint29d4c8233 passed all13 CI jobs; later code retains its own proof obligations. [Current handoff](handoff.md), [producer evidence](evidence/C2/settings-reset-producer.md).
+
+- 2026-09-13: C2-6 retires the settingsResetFn controller callback and its formerly inherent composition slot. Direct ServicePhase injection of UiSettingsStore and the existing OperationAttemptRunner is simpler than another late-binding holder; HeadlessApp composes the fixed SettingsCommitCoordinator before runner recovery and the index fork. Launcher keeps its IN_MEMORY settings mode and refuses reset preparation; it has no ordered restart authority. No second writer or restart service is introduced. Production reset proof and remaining all-writer/witness/Health acceptance are tracked in C2.
 
 - 2026-09-13: The isolated successor-candidate preflight completed at `cfa4a78b8` in
   `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`; current branch head is
@@ -2164,16 +2168,12 @@ Its identity/tree/full/hosted checks must pass independently; earlier green runs
 new policy. Keep the successor PR reference in handoff after creation and preserve all old
 artifact locations. Final readiness and the only Engine merge remain at F.
 
-**Current successor candidate, 2026-09-13.** Draft PR727 is at `29d4c8233` on
-`codex/lane-f-pr1`, checked out in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`.
-Its product/build sources match `cfa4a78b8` and `8bf81ea2d`; only docs and both `ci-triage` skill
-projections differ since `cfa4a78b8`. Full1346/build1351/frontend1347/stress1350 are recorded
-candidate proof. The isolated preflight completed through resume1358 with the process-only pinned
-Rust toolchain; its exact evidence and artifact roots are in
-[the completion manifest](evidence/C2/publication-preflight-completion.json). Hosted run34783675186
-is still in progress, so final hosted success and readiness are open. The next implementation item
-is the pure SettingsV2 response mapper, followed by shared fixed-reset pure validation and the
-production producer/public-wire/Health migration.
+**Current successor candidate, 2026-09-14.** Draft PR727 uses `codex/lane-f-pr1` in
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`. Initial candidate sources matched
+`8bf81ea2d`; checkpoint `29d4c8233` passed isolated preflight and all13 hosted CI jobs.
+Subsequent mapper, validator and reset-producer changes have focused and adjacent proof;
+current-head hosted and remaining lane acceptance are still required. [Current handoff](handoff.md)
+and [producer evidence](evidence/C2/settings-reset-producer.md) name the remaining work.
 
 Stage order is risk-first: the spine is the change most likely to surface an unknown, so it
 precedes the compensation work that assumes one process. (Sequencing stages are lettered A to

@@ -1145,7 +1145,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(RESET_SETTINGS),

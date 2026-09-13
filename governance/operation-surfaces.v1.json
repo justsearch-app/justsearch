@@ -839,6 +839,15 @@
       "note": "Lane F C2-6 serializes the settings-file witness and projects recovery verdicts from the existing operation row. It never writes operation state; the runner terminalizes before releasing the fence."
     },
     {
+      "id": "settings-reset-producer",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsServiceImpl.java",
+      "guard": "test:SettingsResetProducerTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "C2-6 prepares fixed reset metadata without effects and delegates accepted execution to the existing runner. It owns neither operation terminal state nor settings replacement."
+    },
+    {
       "id": "settings-reset-preparation",
       "kind": "consumer",
       "lang": "java",

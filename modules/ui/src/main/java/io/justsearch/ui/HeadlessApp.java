@@ -1078,6 +1078,15 @@ public class HeadlessApp {
       var ksConfig = io.justsearch.app.services.worker.KnowledgeServerConfig.load();
       operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
           configPhase.dataDir().resolve("operations.db"));
+      final var resetSettingsStore = settingsStore;
+      var settingsOwner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(
+          resetSettingsStore, configStore, requestedRestartAction, candidate -> {
+            var response = io.justsearch.app.services.settings.SettingsV2Projection.toSettingsV2(
+                candidate, resetSettingsStore.mode());
+            return io.justsearch.agent.api.registry.OperationResult.success("Settings committed", Map.of(
+                "ui", response.ui(), "llm", response.llm(), "indexPaths", response.indexPaths(),
+                "settingsMode", response.settingsMode()));
+          });
       var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
           operations, java.time.Clock.systemUTC(), java.util.Set.of(
               io.justsearch.agent.api.registry.OperationKind.INGEST,
@@ -1085,7 +1094,7 @@ public class HeadlessApp {
               io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
               io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
               io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
-              io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
+              io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN), settingsOwner);
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
           childRegistry, requestedRestartAction);

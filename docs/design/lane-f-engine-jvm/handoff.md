@@ -1,38 +1,37 @@
 # Lane F handoff: from the design orchestrator to the implementation orchestrator
 
-## Current state (2026-09-13)
+## Current state (2026-09-14)
 
-The active publication candidate is draft [PR727](https://github.com/justsearch-app/justsearch/pull/727),
-branch `codex/lane-f-pr1` at `29d4c8233f1992927222b14e4f911c7c0d34d547`, checked out in
-`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`. Its product and build sources match
-`cfa4a78b8da6323d2852a9997cd82d2b1a1e7d07` and `8bf81ea2dec08b9ecc6569bec29c416d30764222`;
-the changes since `cfa4a78b8` are documentation and the two `ci-triage` skill projections.
-Merge placement remains F. The original `worktree-lane-F-A` is cleanly back at pushed
-`8bf81ea2d` and held through 2026-09-20 for PR718/raw evidence and foreign helper resources.
+Active worktree: `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
+`codex/lane-f-pr1`, draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
+Merge stays at F. Original `worktree-lane-F-A` remains at pushed `8bf81ea2d`, held through
+2026-09-20 for PR718, raw evidence and foreign helper resources. Do not kill those helpers
+or resume implementation in that old checkout. Main remains foreign dirty work.
 
-Full1346, build1351, frontend1347 and stress1350 already provide the recorded candidate proof;
-they are retained in the publication manifest and are not being rerun. Original-root preflight1353
-passed Public claims then hit EPERM unlinking the loaded `lightningcss` module; 11 foreign helpers
-were identified as owner-unknown and none was killed. Isolated preflight1355
-passed Public claims, frontend `npm ci` and Gradle `checkLicense`, then stopped at Cargo license
-metadata because no default Rust toolchain was configured. Resume1358 used only the process
-`RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-msvc` setting and exited 0. Its retained counts are
-10,262 Java cases across 33 tasks/1,626 suites, 25 skips and zero failures/errors (31 tasks from
-cache, 2 executed); Python reports 3,669 passed, 16 skipped and 82 warnings in 465.02s. The app-engine
-check is absent from the preflight inventory; full1346 covers it. Exact roots, commands, hashes,
-limits and retained artifacts are in [the completion manifest](evidence/C2/publication-preflight-completion.json).
+Checkpoint `29d4c8233` passed all13 hosted CI jobs in run34783675186, including Windows-native
+and Shell crate tests. [Hosted record](evidence/C2/publication-hosted-checkpoint.json).
+Local full1346/build1351/frontend1347/stress1350 and isolated preflight1358 passed at their
+recorded sources. [Preflight record](evidence/C2/publication-preflight-completion.json).
+Later code has its own focused proof; this earlier full/hosted success is not final-head proof.
 
-Hosted run34783440507 for the superseded `e411e0702` push was cancelled after CLA/Secret had passed.
-Current run34783675186 for `29d4c8233` is still in progress; latest known CLA, Secret and
-Measured-axe checks pass, so no final hosted success is claimed. Managed PR727 review comment
-5656214902 is current at this head and the squash preview passes.
+The response projection (`5c644508c`) and shared fixed-reset validator (`7f4182005`) are
+committed and pushed. The reset producer now directly composes service, runner and fixed
+owner before Engine startup; its controller callback is removed. Independent review is clear.
+Final1376 passes71 focused cases (cached,3 existing skips), PMD/format/UI integration compile;
+adjacent1375 executes3175 cases/505 suites,3 existing skips, no failures/errors.
+[Producer evidence and exact limits](evidence/C2/settings-reset-producer.md).
 
-The next implementation item is the pure SettingsV2 response mapper, followed by shared fixed-reset
-pure validation and the production producer/public-wire/Health migration. C2-6 and C2-11 installed
-successor-bootstrap proof remain open, as do D1, D2, E and F. Every item commit needs a non-empty
-item/command/result body; one independent review applies per batch, with focused item gates and UI
-integration compilation before the integrated full suite. Retain raw evidence through lane acceptance
-plus 30 days and export it before release; do not commit raw reports, logs or private identity values.
+Next: project the fixed owner's sticky recovery issue into Health, migrate every other
+settings writer using its captured full witness, expose atomic snapshot/witness GET and
+keyed frontend ingress, then run live public-wire and installed successor-bootstrap proof.
+C2-6/C2-11 and D1/D2/E/F remain open. Do not substitute callback tests for installed proof.
+
+Push each per-item commit with a non-empty item/command/result body; WIP at least hourly.
+One independent review per batch, at most two correction rounds, then root owns the diff.
+Only root runs Gradle; no compiled-source edits during builds. Set the process
+`JUSTSEARCH_AGENT_SESSION_ID` from `CODEX_SESSION_ID` for helper ownership, since the old
+fallback stamp identifies another session. Raw evidence is in the explicitly named old/new
+worktree tmp roots; retain through lane acceptance plus30 days and export before release.
 
 ## Historical handoff record (preserved)
 

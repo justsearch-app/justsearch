@@ -1,0 +1,199 @@
+{
+  "recorded": "2026-09-14",
+  "base": "7f4182005",
+  "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "sources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/SettingsService.java",
+      "sha256": "d0987d53a58de8e3d354329e0cd8443669db68cc2cd8dff5ff57f646a74756e6"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+      "sha256": "5aed7b7c6fa740c9dbe0d349199ab1d643af5c4262e1fcc31ef6d38f32914f60"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/BootstrapLateBindings.java",
+      "sha256": "ecda3eca3e1f00e93b1a1cb34fc0c0c4d02bcc0188cd69334b12775e454fee59"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServicePhase.java",
+      "sha256": "a4987ac68717a63286aadcc323a9d0e051c74101e70261a9fb5842e0caf11046"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java",
+      "sha256": "66d0f2057b52ec3ca98339d334c823e2e69af882f7330a0fcd0f5f60444af83b"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ResetSettingsHandler.java",
+      "sha256": "c43266d4132388ab78d9a3197c57bcdfbcb8958c53420463c4876cd762ba05f2"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsServiceImpl.java",
+      "sha256": "b1b5576d73bd9f5dab58fbbc0f87df661a69555dc666385ec284f0bde0d4f100"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/CompositionRootGuardrailsTest.java",
+      "sha256": "65c20db88116d80a486e473d92416f5d2c9958da9caab1a11e79f3e98b1a6c0c"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+      "sha256": "f90eea6e070963c73f71104195a26ea2bca5d64a5af8f7bec4e3fe64b70f9aa9"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/CoreApiAssembly.java",
+      "sha256": "4813d9acb478f1e54ab90e7237adb719668f5bcd34a427b00681a3b3a5743c0b"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SettingsController.java",
+      "sha256": "aadc890fef7b819c74880a519195d6945892f6935a7003fb44d379ecf7ab45e2"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetProducerTest.java",
+      "sha256": "89d1128cfbbf4f3e35fb64e869f9de7fca4b6446fc378704e6a2f55a26fae925"
+    }
+  ],
+  "focused": {
+    "revision": "7f4182005 + final reset producer diff",
+    "command": "./gradlew.bat :modules:app-services:test --tests '*SettingsResetProducerTest' --tests '*SettingsResetPreparationTest' --tests '*SettingsResetCoordinatorTest' --tests '*ValidatorRunnerTest' --tests '*CompositionRootGuardrailsTest' :modules:ui:compileIntegrationTestJava :modules:app-api:pmdMain :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:ui:spotlessCheck --console=plain",
+    "summary": {
+      "tests": 71,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "suites": 9
+    },
+    "tasks": [
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "FROM-CACHE",
+        "tests": 71,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "suites": 9
+      }
+    ]
+  },
+  "adjacent": {
+    "revision": "7f4182005 + reset producer diff",
+    "command": "./gradlew.bat :modules:app-api:test :modules:app-launcher:test :modules:app-services:test :modules:ui:test --tests 'io.justsearch.*Settings*' --tests 'io.justsearch.*Headless*' --tests 'io.justsearch.*LocalRestart*' :modules:ui:compileIntegrationTestJava --console=plain",
+    "summary": {
+      "tests": 3175,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "suites": 505
+    },
+    "tasks": [
+      {
+        "module": "app-api",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 204,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 42
+      },
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 78,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 18
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 2801,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "suites": 422
+      },
+      {
+        "module": "app-launcher",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 92,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "tmp/c2-reset-producer1370.txt",
+      "sha256": "9fae8a185ac0b080dc628b91e453b966734d3cf325b50f77012e3dfe3b36fd60"
+    },
+    {
+      "path": "tmp/c2-reset-producer1370-counts.json",
+      "sha256": "f571da14143aeda8126e2d271bac54cc55b7103d97b97f14ab4f23f7e79c9150"
+    },
+    {
+      "path": "tmp/c2-reset-producer1370-xml.zip",
+      "sha256": "b1ea9b70101315c240c6c4899b6e640211b0be037284409f2ef2b47d7767bfa8"
+    },
+    {
+      "path": "tmp/c2-reset-producer1372.txt",
+      "sha256": "192aa406eabb3340fdbe17bde2fcf0865df6b09c3d30212233a265e54375e936"
+    },
+    {
+      "path": "tmp/c2-reset-producer1372-counts.json",
+      "sha256": "98ea6dafcc5fe51c394dff14a80d4c7bd1551dd5b41d929e31e0bf0e429d26ce"
+    },
+    {
+      "path": "tmp/c2-reset-producer1372-xml.zip",
+      "sha256": "594b0f83f0eb0d5dd33f1a771d16dc74473ebbb7ae3a24ab36f77c5ba45ada82"
+    },
+    {
+      "path": "tmp/c2-reset-producer1375-adjacent.txt",
+      "sha256": "01ac7097bbb6e7f760f2d9a2f390446f593bdbaa404403536aba4921b402c73c"
+    },
+    {
+      "path": "tmp/c2-reset-producer1375-adjacent-counts.json",
+      "sha256": "46e0245fea69803dfe93f4d9ca62d6273c339fa403545936bc9954248642d517"
+    },
+    {
+      "path": "tmp/c2-reset-producer1375-adjacent-xml.zip",
+      "sha256": "d94bdc1ebaffd6e0b639e483715b58fca0aae4e229768a09c44a669b4ede3941"
+    },
+    {
+      "path": "tmp/c2-reset-producer1376.txt",
+      "sha256": "614db0be391eb7e2a73641cc7a53348671d293ec17c79e33c619360114625008"
+    },
+    {
+      "path": "tmp/c2-reset-producer1376-counts.json",
+      "sha256": "669a51791fdf54e86c8935c4c9258156b1bfd80125f19ff6457f6cf95432c507"
+    },
+    {
+      "path": "tmp/c2-reset-producer1376-xml.zip",
+      "sha256": "2b2b63a0f6565112f15dac1be1cb7289d69c8fda852c0d2d3eebc2a4799954f5"
+    },
+    {
+      "path": "tmp/c2-reset-producer1371.txt",
+      "sha256": "20f47a858f6dd90ed0473b51ce17a929e7b6f73701dc593e6126290a6433c14d"
+    },
+    {
+      "path": "tmp/c2-reset-producer1374-adjacent.txt",
+      "sha256": "57a6df2e108ce1389d2d2000b547b7fb354a386854916eb3142246b7e514aef5"
+    },
+    {
+      "path": "tmp/c2-reset-producer1373-operation.sarif",
+      "sha256": "0376592616f5bf551f45978de894aab6582639b09f036fa66e44782ba0e7ce3f"
+    },
+    {
+      "path": "tmp/c2-reset-producer1374-operation.sarif",
+      "sha256": "75b68052e0054997348122bdd336e197718feab8681a541e1b05744a6aafa0e4"
+    }
+  ],
+  "limit": "Focused71 includes3 existing skipped architecture placeholders; final focused tests FROM-CACHE. Adjacent3175 all execute,3 existing skips. No installed successor-bootstrap, all-writer, public witness or full lane acceptance claim.",
+  "retention": "Lane acceptance plus30 days; export before worktree release"
+}

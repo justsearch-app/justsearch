@@ -52,7 +52,6 @@ import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.telemetry.Telemetry;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
 /**
@@ -88,6 +87,7 @@ public final class ServicePhase {
       InferenceLifecycleManager inferenceManager,
       InferenceCapability inferenceCapability,
       UiSettingsStore settingsStore,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       BootstrapLateBindings lateBindings,
       // Tempdoc 672: live supplier for the VDU offline coordinator, mirroring
       // indexingServiceSupplier — the Worker client is null at bootstrap (async connect) and
@@ -325,19 +325,7 @@ public final class ServicePhase {
     aiInstallHelper.setFunctionalStatusSource(runtimeActivationHelper::functionalStatusByPackage);
 
     // §31 Phase 3: 7 controller-services constructed here.
-    // SettingsService: callable wraps the late-bound resetFn (set by LocalApiServer after
-    // SettingsController exists).
-    Callable<Map<String, Object>> deferredResetFn =
-        () -> {
-          Callable<Map<String, Object>> resetFn = in.lateBindings().settingsResetFn();
-          if (resetFn == null) {
-            throw new IllegalStateException(
-                "Settings reset callback not yet bound (LocalApiServer must publish after"
-                    + " constructing SettingsController)");
-          }
-          return resetFn.call();
-        };
-    SettingsService settings = new SettingsServiceImpl(deferredResetFn);
+    SettingsService settings = new SettingsServiceImpl(in.settingsStore(), in.attempts());
 
     // DiagnosticsService: SPI suppliers read from the late-bindings holder.
     Supplier<DebugStateProvider> debugProviderSupplier = in.lateBindings()::debugStateProvider;

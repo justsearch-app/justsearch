@@ -1,29 +1,20 @@
 # PR1 publication lineage correction
 
-## Current state (2026-09-13)
+## Current state (2026-09-14)
 
-Draft [PR727](https://github.com/justsearch-app/justsearch/pull/727) is the active successor
-candidate at `29d4c8233f1992927222b14e4f911c7c0d34d547` on `codex/lane-f-pr1`, checked out in
-`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`. Product/build sources remain identical
-to `cfa4a78b8da6323d2852a9997cd82d2b1a1e7d07` and `8bf81ea2dec08b9ecc6569bec29c416d30764222`;
-only docs and both `ci-triage` skill projections differ since `cfa4a78b8`. Merge placement stays F.
+Draft [PR727](https://github.com/justsearch-app/justsearch/pull/727) is active on
+`codex/lane-f-pr1` in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`.
+Initial candidate cfa4a78b8 matched the original pushed8bf81ea2d product/build sources.
+Checkpoint29d4c8233 passed all13 jobs in CI34783675186; see
+[hosted record](publication-hosted-checkpoint.json). Isolated preflight1358 passed;
+[its manifest](publication-preflight-completion.json) retains the earlier dependency-lock
+and Rust-selection failures without claiming those invocations succeeded.
 
-The isolated publication preflight is complete. Public claims, frontend dependency installation and
-`checkLicense` passed in1355; Cargo metadata then failed there because no default Rust toolchain was
-configured. Resume1358 selected `RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-msvc` for that process and
-exited 0. The continuation reports 10,262 Java cases across 33 tasks/1,626 suites, 25 skips and zero
-failures/errors, with 31 tasks from cache and 2 executed; Python reports 3,669 passed, 16 skipped and 82 warnings in
-465.02s. Full1346/build1351/frontend1347/stress1350 remain the reused candidate proof. The complete
-hashed manifest gives exact command, environment, result, limit and artifact-root details:
-[publication-preflight-completion.json](publication-preflight-completion.json).
-
-The original `worktree-lane-F-A` remains cleanly switched back to pushed `8bf81ea2d` and held through
-2026-09-20 for PR718/raw evidence/foreign helper resources. Hosted run34783440507 for `e411e0702` was
-cancelled after CLA/Secret passed; run34783675186 for the current head is still in progress, with only
-CLA, Secret and Measured-axe known passing. Managed review comment5656214902 is current and its squash
-preview passes. Final hosted success, C2-6/C2-11 installed successor-bootstrap proof and the remaining
-C2/D1/D2/E/F acceptance are still open. The next implementation item is the pure SettingsV2 response
-mapper, then shared fixed-reset pure validation and production producer/public-wire/Health migration.
+Later response-mapper, reset-validator and producer changes have their own focused proof.
+They are not covered by the earlier checkpoint's hosted success. The current
+[handoff](../../handoff.md) names exact roots, limits and next work. PR718 and the original
+checkpoint branch remain preserved. Stage-F merge placement and remaining lane acceptance
+are unchanged; this draft is not ready to merge.
 
 ## Historical lineage and prior evidence (preserved)
 

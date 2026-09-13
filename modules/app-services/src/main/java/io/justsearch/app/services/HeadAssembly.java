@@ -70,8 +70,8 @@ public final class HeadAssembly implements AutoCloseable {
   private volatile KnowledgeClient knowledgeClient;
   private volatile KnowledgeServerBootstrap knowledgeServerBootstrap;
   // §31 Phase 3: LateBoundServices DELETED. The 7 controller-services are constructed by
-  // ServicePhase and held via this.serviceOut. The 3 controller back-refs (settings reset
-  // callback, DebugStateProvider, StatusSnapshotProvider) flow through this.lateBindings.
+  // ServicePhase and held via this.serviceOut. Diagnostic controller back-refs
+  // (DebugStateProvider, StatusSnapshotProvider) flow through this.lateBindings.
   private volatile io.justsearch.app.api.ServiceGraph services;
   private final io.justsearch.app.services.bootstrap.CapabilityGraph capabilities;
   private io.justsearch.app.services.bootstrap.SubstrateGraph substrateGraph;
@@ -155,8 +155,8 @@ public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.app.services.encryption.DataKeyManager dataKeyManager;
   private volatile AutoCloseable gplAutoTrigger;
 
-  // §31 Phase 2 — late-bindings holder for SettingsController::resetToDefaults +
-  // DebugStateProvider SPI + StatusSnapshotProvider SPI. Set by LocalApiServer after it
+  // Late-bindings holder for DebugStateProvider and StatusSnapshotProvider SPIs.
+  // Set by LocalApiServer after it
   // constructs the relevant controllers.
   private final io.justsearch.app.services.bootstrap.BootstrapLateBindings lateBindings =
       new io.justsearch.app.services.bootstrap.BootstrapLateBindings();
@@ -477,6 +477,7 @@ public final class HeadAssembly implements AutoCloseable {
                             managerFinal,
                             this.capabilities.inference(),
                             settingsStoreFinal,
+                            attempts,
                             this.lateBindings,
                             () -> this.knowledgeClient,
                             this::currentKnowledgeServer, operationLeases)))
