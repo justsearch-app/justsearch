@@ -398,6 +398,70 @@ final class RunStreamWriterTest {
     assertTrue(h.connectionFuture().isDone());
   }
 
+  @Test
+  @org.junit.jupiter.api.Timeout(10)
+  void prefixOverflowClosesRequestBeforeBlockedRunStartedReturns() throws Exception {
+    RunChannel run = registry.open(new RunId("prefix-overflow"),
+        new RunDescriptor("core.test", "", 1), new RunChannelPolicy(2, 10_000, false));
+    Harness h = new Harness(null, null);
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    h.onSend = event -> {
+      if (RunStreamWriter.RUN_STARTED_EVENT.equals(event)) {
+        entered.countDown();
+        try { assertTrue(release.await(5, TimeUnit.SECONDS)); }
+        catch (InterruptedException failure) { throw new AssertionError(failure); }
+      }
+    };
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      var attaching = executor.submit(() -> RunStreamWriter.attach(h.client, run, h.scheduler, 15));
+      try {
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        for (int n = 0; n < 3; n++) run.publish(RunFrame.of("chunk"));
+        assertTrue(h.connectionFuture().isDone());
+        assertEquals(0, run.observerCount());
+        assertFalse(attaching.isDone());
+      } finally {
+        release.countDown();
+        var failed = org.junit.jupiter.api.Assertions.assertThrows(
+            java.util.concurrent.ExecutionException.class, () -> attaching.get(5, TimeUnit.SECONDS));
+        org.junit.jupiter.api.Assertions.assertInstanceOf(IllegalStateException.class, failed.getCause());
+        h.simulateClientClose();
+      }
+    }
+  }
+
+  @Test
+  @org.junit.jupiter.api.Timeout(10)
+  void terminalRetirementClosesDuringBlockedInitialReplay() throws Exception {
+    RunChannel run = openAsk("terminal-during-replay");
+    run.publish(RunFrame.of("chunk"));
+    Harness h = new Harness(null, null);
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    h.onSend = event -> {
+      if ("chunk".equals(event)) {
+        entered.countDown();
+        try { assertTrue(release.await(5, TimeUnit.SECONDS)); }
+        catch (InterruptedException failure) { throw new AssertionError(failure); }
+      }
+    };
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      var attaching = executor.submit(() -> RunStreamWriter.attach(h.client, run, h.scheduler, 15));
+      try {
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        registry.retire(run.id());
+        assertTrue(h.connectionFuture().isDone());
+        assertEquals(0, run.observerCount());
+        assertFalse(attaching.isDone());
+      } finally {
+        release.countDown();
+        assertTrue(attaching.get(5, TimeUnit.SECONDS).isPresent());
+        h.simulateClientClose();
+      }
+    }
+  }
+
   // ── harness ──────────────────────────────────────────────────────────────────────────────────
 
   private record Frame(String event, String data) {}

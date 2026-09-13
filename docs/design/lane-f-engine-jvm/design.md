@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-13: C2-4 makes snapshot/replay and checkpoints source-owned and propagates listener retirement to existing connection owners; [bounded mechanism and connection scope](evidence/C2/C2-4-sse-plan.md#retirement-and-connection-scope). Numeric run replay remains a separate contract; no stage or merge placement changes.
+
 - 2026-09-13: independent C2-4 reader review requires reserving frontend effect IDs at ingress so clients cannot shadow keyed operation history; [correction and scope](evidence/C2/C2-4-plan.md#client-effect-identity-boundary).
 - 2026-09-13: C2-4 completion delivery uses one Head-owned projector, immediate live hook and bounded scheduled append-before-ack retry; [ownership, exclusions, lifecycle and proof](evidence/C2/C2-4-plan.md#completion-consumer-ownership).
 

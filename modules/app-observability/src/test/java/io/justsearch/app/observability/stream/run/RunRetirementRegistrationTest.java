@@ -112,6 +112,8 @@ final class RunRetirementRegistrationTest {
       Future<?> lateRegistration = threads.submit(() -> run.onRetire(lateCalls::incrementAndGet));
       lateRegistration.get(5, TimeUnit.SECONDS);
       assertEquals(1, lateCalls.get(), "late callback must run outside the listener-owner lock");
+      assertEquals(1, threads.submit(registry::size).get(5, TimeUnit.SECONDS),
+          "blocked retirement callback must not hold the registry monitor either");
 
       releaseFirst.countDown();
       retirement.get(5, TimeUnit.SECONDS);
@@ -142,6 +144,27 @@ final class RunRetirementRegistrationTest {
 
     assertEquals(1, reached.get());
     assertTrue(run.retired());
+  }
+
+  @Test
+  void fatalCallbackStillClosesSiblingsAndAllRunsBeforeRethrowing() {
+    var registry = new RunChannelRegistry();
+    RunChannel first = registry.open(new RunId("first-fatal"),
+        new RunDescriptor("core.test", "", 1), RunChannelPolicy.conversational());
+    RunChannel second = registry.open(new RunId("second-fatal"),
+        new RunDescriptor("core.test", "", 1), RunChannelPolicy.conversational());
+    var shared = new AssertionError("close failed");
+    AtomicInteger closed = new AtomicInteger();
+    first.onRetire(() -> { throw shared; });
+    first.onRetire(() -> { throw shared; });
+    first.onRetire(closed::incrementAndGet);
+    second.onRetire(closed::incrementAndGet);
+    org.junit.jupiter.api.Assertions.assertSame(shared,
+        org.junit.jupiter.api.Assertions.assertThrows(AssertionError.class, registry::clear));
+    assertEquals(2, closed.get());
+    assertEquals(0, registry.size());
+    assertTrue(first.retired());
+    assertTrue(second.retired());
   }
 
   private static void await(CyclicBarrier barrier) {

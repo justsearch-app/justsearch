@@ -10,7 +10,19 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-**Immediate next item (2026-09-13): atomic SSE attachment and safe checkpoints.** The completion
+**Immediate next item (2026-09-13): live SSE reconnect/restart and coherent integrated proof.**
+Atomic snapshot attachment, incarnation validation, safe lifecycle checkpoints and transport
+retirement are implemented. Final compatibility1231 passes756 represented cases (665 execute,
+91 cached), zero failures/errors/skips, with affected PMD/format and UI integration compilation.
+Negative1226 exposes the four original snapshot/checkpoint failures; negative1230 catches five
+ownership/registry-lock regressions. Both mutated sources were restored byte-for-byte before
+the final run. Independent refutation is clear after initial/run/raw-prefix ownership and
+registry callback corrections. [Snapshot and retirement proof](evidence/C2/snapshot-retirement.md).
+Full1202 predates this cut; live reconnect/rendered overlap, full/stress, installed-v5 and hosted
+proof remain required. No owned stack is running. GitHub CI34763600936 remains pending and
+CLA34763599477 queued at40d1b75cd; no hosted success is inferred. Continue autonomously.
+
+The completion
 consumer now attaches at the end of both Head constructors, publishes memory/note
 completions through the source hook, and owns bounded forced-append/ack retry and
 startup catch-up. Independent review corrected failed-bootstrap ownership and
@@ -46,8 +58,8 @@ Frontend checkpoint recovery now clears the failed logical token and reconnects 
 the existing physical owner. Independent review's reentrant-start defect is reproduced
 innegative1220 and fixed; final1221 passes46, full1222 passes6519 and typecheck is green.
 [Checkpoint recovery](evidence/C2/checkpoint-recovery.md). Backend snapshot boundaries,
-incarnation validation and lifecycle checkpoint tokens are the immediate implementation
-next; real SSE/restart/rendered overlap and installed/hosted proof remain owed.
+incarnation validation and lifecycle checkpoint tokens now have the focused proof above;
+real SSE/restart/rendered overlap and installed/hosted proof remain owed.
 
 **Prior effect identity cut (2026-09-13):** ingress rejects server
 namespaces, and new frontend effects persist UUID identities while old entries keep

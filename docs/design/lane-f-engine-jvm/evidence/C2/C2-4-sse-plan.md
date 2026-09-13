@@ -2,14 +2,16 @@
 
 Investigation,2026-09-13, grounded at4c6389be4. The completion consumer is committed
 and locally/live verified. Full/stress1202 passes on that unchanged source.
-This record owns the next C2-4 mechanism; attachment/checkpoint implementation and proof remain open.
+This record owns the C2-4 attachment/checkpoint mechanism. Implementation and focused proof
+are recorded in [snapshot-retirement](snapshot-retirement.md); live and integrated proof remain open.
 The root is making these decisions autonomously within the existing reconnect item.
 
 Current cuts: [ordered publication](sse-ordering.md),
 [frontend keyed convergence](history-keyed-merge.md), and
 [frontend checkpoint recovery](checkpoint-recovery.md) are implemented with focused,
-negative and compatibility evidence and independent review. Next: strong snapshot/token
-attachment, safe backend lifecycle checkpoints and real SSE reconnect/restart proof.
+negative and compatibility evidence and independent review. Strong snapshot/token attachment,
+safe backend lifecycle checkpoints and transport retirement now pass compatibility1231.
+Next: real SSE reconnect/restart, rendered overlap and coherent full/stress proof.
 
 ## Verified reach
 
@@ -113,3 +115,44 @@ Do not keep the old replay-then-subscribe implementation as a second path.
 
 Independent read-only mapping and design refutation are complete at4c6389be4; neither
 is executed implementation proof. Root owns implementation and verification next.
+
+## Retirement and connection scope
+
+2026-09-13 root amendment, re-grounded after40d1b75cd. Permanent queue overflow exposes
+a real ownership defect: removing a listener leaves an independent SSE heartbeat running.
+This affects standalone, multiplexed, RunStreamWriter and raw native/AG-UI run attaches.
+The raw path is RunObservation.Handle.observe → AgentSessionRegistry.attachToRun,
+whose existing completion latch releases SseHeartbeat.around's finally cleanup.
+
+Use a per-subscription retirement callback, staged under the channel gate and invoked
+outside it, with registration-after-retirement delivering the signal immediately.
+Existing connection owners close on that signal; raw run attaches count down their
+existing latch. This preserves numeric run-zero replay and terminal run ownership.
+Heartbeat polling would delay recovery and fail to cover non-heartbeat observers;
+an additional executor/event bus or a second run-terminal event is unnecessary.
+Registry consumers keep their existing eviction-on-failure policy; the new callback
+provides transport ownership notification and does not invent a durable registry retry loop.
+
+Generic standalone/multiplexed connection cleanup must cover close before/during attach,
+prefix failure, heartbeat rejection and partial acquisition. Reuse the owned close-future
+pattern already proven by RunStreamWriter instead of Javalin's unsafe keepAlive ordering.
+Keep run snapshot/primer and numeric cursor behavior in their existing owner. Compare
+shared cleanup extraction against copying it before implementing the generic helper;
+record the final scope and its proof here. Required regressions include retirement outside
+the channel lock, exactly-once notification, raw attach release, and connection cleanup.
+
+Final ownership choice (2026-09-13): extract RunStreamWriter's pre-created future and
+one-shot resource cleanup into package-private SseConnection, shared by all three UI
+writers. This supersedes duplicate cleanup and generic keepAlive calls; it adds no executor
+or registry. Source attachment supplies onRegistered outside the source gate, before
+prefix/replay I/O, so the transport acquires its subscription and retirement notification
+before a blocked initial write can overflow. A callback installed only after subscribeAndReplay
+returns would leave that initial-delivery hole. RunObservation passes its existing detach
+latch callback through the same registration point; terminal run callbacks remain separate.
+Numeric run/raw primers also move after ownership registration and before captured replay.
+Live-at-entry run retirement is registered before writes; already-retired lingering runs replay
+before closing. Run registry state/bookkeeping stages terminal callbacks under its monitor and
+invokes them outside it; fatal errors are aggregated after sibling cleanup, preserving identity.
+Raw detach signals promptly but cannot interrupt an already-blocked synchronous callback.
+Final compatibility1231 and negative1226/1230 provide focused execution; independent review
+has no remaining substantive finding. The linked proof preserves failed1227/1228/1229 attempts.

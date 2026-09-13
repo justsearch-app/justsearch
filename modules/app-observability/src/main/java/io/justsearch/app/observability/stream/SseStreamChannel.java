@@ -5,12 +5,15 @@ import io.justsearch.app.api.stream.SseEnvelope;
 import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.api.stream.StreamId;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Consumer;
 
@@ -32,6 +35,7 @@ public final class SseStreamChannel {
   private final Set<HandoffListener> listeners = new LinkedHashSet<>();
   private final Clock clock;
   private final Object publicationGate = new Object();
+  private final UUID incarnation = UUID.randomUUID();
 
   public SseStreamChannel(StreamId streamId) {
     this(streamId, new StreamSequenceTracker(), new FrameHistoryRingBuffer(), Clock.systemUTC());
@@ -69,6 +73,17 @@ public final class SseStreamChannel {
       }
     }
     Error fatal = null;
+    // Notify overflow owners before any target can block in a socket write.
+    for (HandoffListener listener : targets) {
+      try {
+        listener.notifyRetirement();
+      } catch (RuntimeException ignored) {
+        // Other owners and healthy listeners must still be notified/drained.
+      } catch (Error failure) {
+        if (fatal == null) fatal = failure;
+        else if (fatal != failure) fatal.addSuppressed(failure);
+      }
+    }
     for (HandoffListener listener : targets) {
       try {
         // Claim only when this listener can actually be drained. Claiming all targets
@@ -95,7 +110,7 @@ public final class SseStreamChannel {
     synchronized (publicationGate) {
       long seq = sequence.next();
       return new SseEnvelope(streamId, frameKind, seq, clock.instant(), payload,
-          ResumeTokenCodec.encode(streamId, seq));
+          ResumeTokenCodec.encode(streamId, seq, incarnation));
     }
   }
 
@@ -130,11 +145,101 @@ public final class SseStreamChannel {
     synchronized (publicationGate) {
       listeners.add(handoff);
     }
-    return handoff::retire;
+    return handoff;
+  }
+
+  /** Capture before reading external state; no source query or socket write holds this lock. */
+  public SnapshotBoundary captureSnapshotBoundary() {
+    synchronized (publicationGate) {
+      return new SnapshotBoundary(this, currentSeq());
+    }
+  }
+
+  /** Strong resume: a missing/foreign incarnation can never identify this channel's history. */
+  public Optional<Subscription> subscribeAndReplay(
+      Consumer<SseEnvelope> listener, String token, Runnable beforeReplay) {
+    return subscribeAndReplay(listener, token, beforeReplay, subscription -> {});
+  }
+
+  /** Registers transport ownership outside the source lock, before any prefix or replay I/O. */
+  public Optional<Subscription> subscribeAndReplay(
+      Consumer<SseEnvelope> listener, String token, Runnable beforeReplay,
+      Consumer<Subscription> onRegistered) {
+    Optional<ResumeTokenCodec.Decoded> decoded = ResumeTokenCodec.decode(token);
+    if (decoded.isEmpty() || !streamId.equals(decoded.get().streamId())
+        || !incarnation.equals(decoded.get().incarnation())) {
+      return Optional.empty();
+    }
+    return subscribeAndReplay(listener, new SnapshotBoundary(this, decoded.get().seq()), beforeReplay,
+        onRegistered);
+  }
+
+  /** Validate/register before sending the candidate snapshot, then replay and drain outside locks. */
+  public Optional<Subscription> subscribeAndReplay(
+      Consumer<SseEnvelope> listener, SnapshotBoundary boundary, Runnable beforeReplay) {
+    return subscribeAndReplay(listener, boundary, beforeReplay, subscription -> {});
+  }
+
+  public Optional<Subscription> subscribeAndReplay(
+      Consumer<SseEnvelope> listener, SnapshotBoundary boundary, Runnable beforeReplay,
+      Consumer<Subscription> onRegistered) {
+    Objects.requireNonNull(boundary, "boundary");
+    Objects.requireNonNull(beforeReplay, "beforeReplay");
+    Objects.requireNonNull(onRegistered, "onRegistered");
+    HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
+    List<SseEnvelope> replay;
+    synchronized (publicationGate) {
+      if (boundary.owner != this || boundary.seq > currentSeq()
+          || boundary.seq < history.droppedThroughSeq()) {
+        return Optional.empty();
+      }
+      replay = history.framesSince(boundary.seq).stream()
+          .sorted(Comparator.comparingLong(SseEnvelope::seq)).toList();
+      handoff.draining = true;
+      listeners.add(handoff);
+    }
+    try {
+      onRegistered.accept(handoff);
+      beforeReplay.run();
+      handoff.handOff(replay);
+    } catch (RuntimeException | Error failure) {
+      handoff.retireAfter(failure);
+      throw failure;
+    }
+    return Optional.of(handoff);
+  }
+
+  /** Source-owned boundary; callers cannot construct a cursor for another channel or future state. */
+  public static final class SnapshotBoundary {
+    private final SseStreamChannel owner;
+    private final long seq;
+
+    private SnapshotBoundary(SseStreamChannel owner, long seq) {
+      this.owner = owner;
+      this.seq = seq;
+    }
+
+    public String resumeToken() {
+      return ResumeTokenCodec.encode(owner.streamId, seq, owner.incarnation);
+    }
   }
 
   /** Registers and snapshots replay atomically, then delivers outside the publication lock. */
   public Optional<Subscription> subscribeAndReplay(Consumer<SseEnvelope> listener, long sinceSeq) {
+    return subscribeAndReplay(listener, sinceSeq, subscription -> {});
+  }
+
+  /** Numeric run policy with ownership acquired before replay can block. */
+  public Optional<Subscription> subscribeAndReplay(Consumer<SseEnvelope> listener, long sinceSeq,
+      Consumer<Subscription> onRegistered) {
+    return subscribeAndReplay(listener, sinceSeq, () -> {}, onRegistered);
+  }
+
+  /** Numeric run prefix follows ownership acquisition and precedes captured replay. */
+  public Optional<Subscription> subscribeAndReplay(Consumer<SseEnvelope> listener, long sinceSeq,
+      Runnable beforeReplay, Consumer<Subscription> onRegistered) {
+    Objects.requireNonNull(onRegistered, "onRegistered");
+    Objects.requireNonNull(beforeReplay, "beforeReplay");
     HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
     List<SseEnvelope> replay;
     synchronized (publicationGate) {
@@ -145,14 +250,22 @@ public final class SseStreamChannel {
       handoff.draining = true;
       listeners.add(handoff);
     }
-    handoff.handOff(replay);
-    return Optional.of(handoff::retire);
+    try {
+      onRegistered.accept(handoff);
+      beforeReplay.run();
+      handoff.handOff(replay);
+    } catch (RuntimeException | Error failure) {
+      handoff.retireAfter(failure);
+      throw failure;
+    }
+    return Optional.of(handoff);
   }
 
   /** Permanent bounded serial delivery owner, including the initial replay handoff. */
-  private final class HandoffListener {
+  private final class HandoffListener implements Subscription {
     private final Consumer<SseEnvelope> delegate;
     private final Queue<SseEnvelope> buffered;
+    private final List<Runnable> retirementListeners = new ArrayList<>();
     private boolean draining;
     private boolean retired;
     private boolean overflowed;
@@ -166,18 +279,22 @@ public final class SseStreamChannel {
     void enqueue(SseEnvelope envelope) {
       if (!retired && !buffered.offer(envelope)) {
         overflowed = true;
-        retire();
+        retireLocked();
       }
     }
 
     void drainIfAvailable() {
-      synchronized (publicationGate) {
-        if (retired || draining) {
-          return;
+      try {
+        synchronized (publicationGate) {
+          if (retired || draining) {
+            return;
+          }
+          draining = true;
         }
-        draining = true;
+        drainOwned();
+      } finally {
+        notifyRetirement();
       }
-      drainOwned();
     }
 
     void handOff(List<SseEnvelope> replay) {
@@ -185,12 +302,13 @@ public final class SseStreamChannel {
         for (SseEnvelope frame : replay) {
           synchronized (publicationGate) {
             requireHealthy();
+            if (retired) return;
           }
           delegate.accept(frame);
         }
         drainOwned();
       } catch (RuntimeException | Error failure) {
-        retire();
+        retireAfter(failure);
         throw failure;
       }
     }
@@ -210,7 +328,7 @@ public final class SseStreamChannel {
           delegate.accept(frame);
         }
       } catch (RuntimeException | Error failure) {
-        retire();
+        retireAfter(failure);
         throw failure;
       }
     }
@@ -223,15 +341,76 @@ public final class SseStreamChannel {
 
     void retire() {
       synchronized (publicationGate) {
-        retired = true;
-        listeners.remove(this);
-        buffered.clear();
+        retireLocked();
+      }
+      notifyRetirement();
+    }
+
+    private void retireAfter(Throwable failure) {
+      try {
+        retire();
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+      }
+    }
+
+    private void retireLocked() {
+      retired = true;
+      listeners.remove(this);
+      buffered.clear();
+    }
+
+    @Override
+    public void unsubscribe() {
+      retire();
+    }
+
+    @Override
+    public void onRetire(Runnable listener) {
+      Objects.requireNonNull(listener, "listener");
+      synchronized (publicationGate) {
+        if (!retired) {
+          retirementListeners.add(listener);
+          return;
+        }
+      }
+      listener.run();
+    }
+
+    private void notifyRetirement() {
+      List<Runnable> callbacks;
+      synchronized (publicationGate) {
+        if (!retired || retirementListeners.isEmpty()) {
+          return;
+        }
+        callbacks = List.copyOf(retirementListeners);
+        retirementListeners.clear();
+      }
+      Throwable failure = null;
+      for (Runnable callback : callbacks) {
+        try {
+          callback.run();
+        } catch (RuntimeException | Error callbackFailure) {
+          if (failure == null) {
+            failure = callbackFailure;
+          } else if (failure != callbackFailure) {
+            failure.addSuppressed(callbackFailure);
+          }
+        }
+      }
+      if (failure instanceof RuntimeException runtimeFailure) {
+        throw runtimeFailure;
+      }
+      if (failure instanceof Error error) {
+        throw error;
       }
     }
   }
 
-  @FunctionalInterface
   public interface Subscription {
     void unsubscribe();
+
+    /** Fires once per registration, outside channel locks, including already-retired handles. */
+    void onRetire(Runnable listener);
   }
 }

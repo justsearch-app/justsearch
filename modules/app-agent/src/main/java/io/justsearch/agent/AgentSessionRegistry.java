@@ -206,11 +206,11 @@ final class AgentSessionRegistry {
     // here, and cannot miss a run that ends without one.
     session.observation().onRetire(done::countDown);
     java.util.Optional<Runnable> unsubscribe =
-        session.observation().observe(sinceSeq, observer);
+        session.observation().observe(sinceSeq, observer, done::countDown);
     if (unsubscribe.isEmpty()) {
       // The cursor fell outside the retained window and NOTHING was registered. Falling back to a
       // full replay is the guaranteed path; silently returning an empty stream is the failure mode.
-      unsubscribe = session.observation().observe(0L, observer);
+      unsubscribe = session.observation().observe(0L, observer, done::countDown);
       if (unsubscribe.isEmpty()) {
         return false;
       }

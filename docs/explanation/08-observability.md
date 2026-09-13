@@ -974,10 +974,29 @@ ring append and listener enqueue share that short lock, preserving concurrent pu
 Each listener permanently buffers at most `FrameHistoryRingBuffer.capacity()` incoming frames
 and has one drainer, including after replay. Socket writes run outside the lock; another
 publisher only enqueues behind a blocked socket and can drain healthy listeners independently.
-If that queue fills, the channel removes only the slow listener and clears its queued frames;
-the replay call fails when its blocked callback returns. Publishers continue, and a failed handoff
-cannot claim a successful replay with missing frames. A successful handoff preserves replay/live
-ordering. The limit counts frames; payload sizes follow each stream's existing contract.
+If that queue fills, the channel removes the slow listener, clears its queued frames and notifies
+its transport owner outside the source lock. Ownership is installed before prefix/replay delivery,
+so overflow closes even an attachment blocked in its first write. Standalone, multiplexed and run
+writers share one connection owner: closing completes the pre-created request future, releases all
+owned subscriptions and cancels heartbeat. One failed multiplexed source closes the physical
+connection. Raw agent attaches release their existing completion latch on observer retirement.
+Publishers continue healthy fan-out, and a failed handoff cannot claim replay success. The limit
+counts frames; payload sizes follow each stream's existing contract.
+
+Stateful envelope attachment captures a source boundary before querying its snapshot. It validates
+that boundary and registers buffered delivery before emitting the snapshot, then replays updates
+after the boundary. Queries and socket writes never hold the source lock. An expired boundary
+retries the query at most three times; exhaustion closes the request without emitting an invalid
+snapshot. Standalone and multiplexed streams use this same attachment path.
+
+Opaque envelope cursors bind stream, sequence and channel incarnation. Legacy or foreign-lifetime
+tokens require reset; a monotonic discarded-update fence detects gaps from frame/byte eviction and
+evidence replacement. Lifecycle frame sequences identify control emissions, while their resume
+tokens acknowledge only delivered state: connected preserves a valid requested checkpoint,
+snapshot acknowledges its pre-query boundary, and heartbeat acknowledges the last delivered
+update or snapshot. Replayed updates retain their original source sequences. Event-only fresh
+attachment starts at its captured boundary. Numeric run cursors remain a separate contract:
+zero replays the retained tail even after eviction, with the run's existing snapshot primer.
 
 ### The Ring Buffer (`EventBuffer`)
 We maintain a circular buffer of the last 50 significant events in memory.

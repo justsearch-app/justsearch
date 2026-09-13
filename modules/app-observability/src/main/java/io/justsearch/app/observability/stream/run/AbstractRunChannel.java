@@ -91,11 +91,23 @@ abstract class AbstractRunChannel {
 
   public final Optional<SseStreamChannel.Subscription> observe(
       Consumer<SseEnvelope> listener, long sinceSeq) {
+    return observe(listener, sinceSeq, subscription -> {});
+  }
+
+  public final Optional<SseStreamChannel.Subscription> observe(
+      Consumer<SseEnvelope> listener, long sinceSeq,
+      Consumer<SseStreamChannel.Subscription> onRegistered) {
+    return observe(listener, sinceSeq, () -> {}, onRegistered);
+  }
+
+  public final Optional<SseStreamChannel.Subscription> observe(
+      Consumer<SseEnvelope> listener, long sinceSeq, Runnable beforeReplay,
+      Consumer<SseStreamChannel.Subscription> onRegistered) {
     Objects.requireNonNull(listener, "listener");
     if (sinceSeq < 0) {
       throw new IllegalArgumentException("sinceSeq must be >= 0, got " + sinceSeq);
     }
-    return channel.subscribeAndReplay(listener, sinceSeq);
+    return channel.subscribeAndReplay(listener, sinceSeq, beforeReplay, onRegistered);
   }
 
   public final boolean retired() {
@@ -119,20 +131,30 @@ abstract class AbstractRunChannel {
    * terminal transition is the REGISTRY's to own (§2 — retire is two sites today, and a linger that
    * only half-applies is how "retired-but-readable" and "gone" get conflated).
    */
-  final void markRetired() {
+  final java.util.List<Runnable> markRetired() {
     java.util.List<Runnable> listeners;
     synchronized (retireListeners) {
-      if (!retired.compareAndSet(false, true)) return;
+      if (!retired.compareAndSet(false, true)) return java.util.List.of();
       listeners = java.util.List.copyOf(retireListeners);
       retireListeners.clear();
     }
+    return listeners;
+  }
+
+  /** Registry bookkeeping is complete before any external listener can block or reenter it. */
+  static void notifyRetired(java.util.List<Runnable> listeners) {
+    Error fatal = null;
     for (Runnable listener : listeners) {
       try {
         listener.run();
       } catch (RuntimeException ignored) {
         // A writer failing to close its own socket must not abort the retirement of the run or of
         // the other observers' connections.
+      } catch (Error failure) {
+        if (fatal == null) fatal = failure;
+        else if (fatal != failure) fatal.addSuppressed(failure);
       }
     }
+    if (fatal != null) throw fatal;
   }
 }
