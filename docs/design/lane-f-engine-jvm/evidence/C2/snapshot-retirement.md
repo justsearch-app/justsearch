@@ -2,7 +2,8 @@
 
 Implemented 2026-09-13 at40d1b75cd plus the source hashes in
 [verification](snapshot-retirement-verification.json). This is a C2-4 mechanism cut;
-live reconnect, coherent integrated and installed/hosted proof remain open.
+live reconnect and rendered overlap now pass [1238/1241](sse-live-rendered.md);
+coherent integrated and installed/hosted proof remain open.
 
 ## Behavior
 

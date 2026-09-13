@@ -3,7 +3,7 @@
 Investigation,2026-09-13, grounded at4c6389be4. The completion consumer is committed
 and locally/live verified. Full/stress1202 passes on that unchanged source.
 This record owns the C2-4 attachment/checkpoint mechanism. Implementation and focused proof
-are recorded in [snapshot-retirement](snapshot-retirement.md); live and integrated proof remain open.
+are recorded in [snapshot-retirement](snapshot-retirement.md); live and rendered proof now pass [1238/1241](sse-live-rendered.md); integrated proof remains open.
 The root is making these decisions autonomously within the existing reconnect item.
 
 Current cuts: [ordered publication](sse-ordering.md),
@@ -11,7 +11,8 @@ Current cuts: [ordered publication](sse-ordering.md),
 [frontend checkpoint recovery](checkpoint-recovery.md) are implemented with focused,
 negative and compatibility evidence and independent review. Strong snapshot/token attachment,
 safe backend lifecycle checkpoints and transport retirement now pass compatibility1231.
-Next: real SSE reconnect/restart, rendered overlap and coherent full/stress proof.
+Live reconnect/restart1238 and rendered overlap/full UI1241 now pass. Next: coherent
+full/stress proof, with installed-v5/hosted still required.
 
 ## Verified reach
 

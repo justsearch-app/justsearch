@@ -10,17 +10,19 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-**Immediate next item (2026-09-13): live SSE reconnect/restart and coherent integrated proof.**
+**Immediate next item (2026-09-13): coherent full/stress proof, then C2-6 settings.**
 Atomic snapshot attachment, incarnation validation, safe lifecycle checkpoints and transport
-retirement are implemented. Final compatibility1231 passes756 represented cases (665 execute,
-91 cached), zero failures/errors/skips, with affected PMD/format and UI integration compilation.
-Negative1226 exposes the four original snapshot/checkpoint failures; negative1230 catches five
-ownership/registry-lock regressions. Both mutated sources were restored byte-for-byte before
-the final run. Independent refutation is clear after initial/run/raw-prefix ownership and
-registry callback corrections. [Snapshot and retirement proof](evidence/C2/snapshot-retirement.md).
-Full1202 predates this cut; live reconnect/rendered overlap, full/stress, installed-v5 and hosted
-proof remain required. No owned stack is running. GitHub CI34763600936 remains pending and
-CLA34763599477 queued at40d1b75cd; no hosted success is inferred. Continue autonomously.
+retirement are committed at e7edaf503. Compatibility1231 passes756 represented cases
+(665 execute,91 cached); negative1226/1230 catch the snapshot and retirement defects.
+Live1238 now passes17 checks over14 connections, including disconnect-before-replay,
+restart after replacement sequence growth, HTTP/MCP parity and keyed retry convergence.
+Both managed runs are stopped. UI1241 passes typecheck and6520 tests, including rendered
+snapshot/update overlap; negative1239 catches duplicate visible rows. These are separate
+protocol and HappyDOM witnesses, not a single browser campaign.
+[Live/rendered proof and retained failed attempts](evidence/C2/sse-live-rendered.md).
+Full1202 predates the SSE changes; coherent full/stress, installed-v5 and hosted remain owed.
+CI34766087351 is pending and CLA34766085813 queued at e7edaf503; no hosted success is
+inferred. Continue autonomously; no C2-4 or stage closure is claimed.
 
 The completion
 consumer now attaches at the end of both Head constructors, publishes memory/note
