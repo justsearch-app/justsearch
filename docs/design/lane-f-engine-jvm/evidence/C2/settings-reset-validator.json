@@ -1,0 +1,50 @@
+{
+  "recorded": "2026-09-13",
+  "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "proof": {
+    "revision": "5c644508c + shared validator diff",
+    "command": "./gradlew.bat :modules:app-services:test --tests '*SettingsResetPreparationTest' --tests '*SettingsResetCoordinatorTest' :modules:ui:compileIntegrationTestJava :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck --console=plain",
+    "summary": {
+      "tests": 45,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    "tasks": [
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 45,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 6
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsResetPreparation.java",
+      "sha256": "b12f8b1d09403baca0ce5b516f41a40025828fa07a4dd58543a34c190f8f3915"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/SettingsResetPreparationTest.java",
+      "sha256": "caf350a2fd37aa5e7bb8e578cb81953069e5326bbc68ed1f8fbdb8217c79040b"
+    },
+    {
+      "path": "tmp/c2-reset-validator1369.txt",
+      "sha256": "db43652796a91d752eb992b890bd8c43bd366dec633afea3721de8c33cf938f9"
+    },
+    {
+      "path": "tmp/c2-reset-validator1369-counts.json",
+      "sha256": "ec62af6efb387f6ea42416a2d698f529f51d527bd74435f2048f08d223945196"
+    },
+    {
+      "path": "tmp/c2-reset-validator1369-xml.zip",
+      "sha256": "bcf01d3db879dde1bfe45a9097998cdbec49f1498f263ae6c4c41d4e84050d31"
+    }
+  ],
+  "limit": "Pure-format validation only; accepted decode retains row/key/nonce/descriptor/SQL marker binding. Production wiring remains owed."
+}

@@ -59,11 +59,28 @@ public final class SettingsResetPreparation {
     try {
       var preparation = PreparedInvocationCodec.decodeMetadata(accepted.payload(), row.key(),
           accepted.nonce(), row.descriptor());
-      if (!SCHEMA.equals(preparation.replaySchema())
-          || preparation.content() != OperationPreparation.Content.METADATA
-          || !row.descriptor().hasSameIdentity(OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
-              OPERATION_ID, preparation.argumentsJson(), false))) {
+      if (!row.descriptor().hasSameIdentity(OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+          OPERATION_ID, preparation.argumentsJson(), false))) {
         throw new IllegalArgumentException("Settings reset preparation binding mismatch");
+      }
+      Intent intent = validate(preparation);
+      if (row.expectedSettingsRevision() != null && row.expectedSettingsRevision() != intent.expectedRevision()) {
+        throw new IllegalArgumentException("Settings reset SQL marker mismatch");
+      }
+      return intent;
+    } catch (RuntimeException malformed) {
+      // Jackson exceptions may contain private persisted input fragments; return only a bounded cause-free error.
+      throw new IllegalArgumentException("Invalid accepted settings reset preparation");
+    }
+  }
+
+  /** Validates frozen intent without reading settings or granting accepted-row authority. */
+  public static Intent validate(OperationPreparation preparation) {
+    try {
+      Objects.requireNonNull(preparation, "preparation");
+      if (!SCHEMA.equals(preparation.replaySchema())
+          || preparation.content() != OperationPreparation.Content.METADATA) {
+        throw new IllegalArgumentException("Settings reset preparation schema mismatch");
       }
       requireEmptyArguments(preparation.argumentsJson());
       JsonNode payload = JSON.readTree(preparation.replayPayloadJson());
@@ -77,14 +94,10 @@ public final class SettingsResetPreparation {
       if (!fingerprint.isNull() && !fingerprint.isTextual()) {
         throw new IllegalArgumentException("Invalid quarantine fingerprint type");
       }
-      Intent intent = JSON.treeToValue(payload, Intent.class);
-      if (row.expectedSettingsRevision() != null && row.expectedSettingsRevision() != intent.expectedRevision()) {
-        throw new IllegalArgumentException("Settings reset SQL marker mismatch");
-      }
-      return intent;
+      return JSON.treeToValue(payload, Intent.class);
     } catch (RuntimeException malformed) {
-      // Jackson exceptions may contain private persisted input fragments; return only a bounded cause-free error.
-      throw new IllegalArgumentException("Invalid accepted settings reset preparation");
+      // Persisted input can contain private values; do not expose parser details or nested causes.
+      throw new IllegalArgumentException("Invalid settings reset preparation");
     }
   }
 

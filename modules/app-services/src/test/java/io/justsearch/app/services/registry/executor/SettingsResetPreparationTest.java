@@ -48,6 +48,20 @@ class SettingsResetPreparationTest {
   }
 
   @Test
+  void pureValidationReadsOnlyFrozenIntentAndRejectsUnclassifiedContent() {
+    var expected = new SettingsWitness(4, OperationKeys.generate(Clock.systemUTC()));
+    var normal = SettingsResetPreparation.normal("{}", expected);
+    var recovery = SettingsResetPreparation.recovery("{}", FINGERPRINT);
+    assertEquals(expected, SettingsResetPreparation.validate(normal).expected());
+    assertEquals(FINGERPRINT, SettingsResetPreparation.validate(recovery).quarantineFingerprint());
+    assertInvalidPreparation(OperationPreparation.passthrough("{}"));
+    assertInvalidPreparation(new OperationPreparation("{}", "settings-reset-v2", recovery.replayPayloadJson()));
+    assertInvalidPreparation(new OperationPreparation("{}", SettingsResetPreparation.SCHEMA,
+        recovery.replayPayloadJson(), OperationPreparation.Content.CONTENT));
+    assertInvalidPreparation(null);
+  }
+
+  @Test
   void actualSqliteAcceptedIdentityStillDecodesAfterCanonicalMemberReordering(
       @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
     var fixture = fixture(SettingsResetPreparation.recovery("{}", FINGERPRINT), OperationKind.SETTINGS_APPLY,
@@ -89,7 +103,9 @@ class SettingsResetPreparationTest {
       "{\"expected\":null,\"quarantineFingerprint\":\"bad\",\"untrusted\":\"private marker\"}"
   })
   void malformedOrCoercedIntentCannotBecomeRecoveryAuthority(String payload) {
-    assertInvalid(fixture(new OperationPreparation("{}", SettingsResetPreparation.SCHEMA, payload),
+    var preparation = new OperationPreparation("{}", SettingsResetPreparation.SCHEMA, payload);
+    assertInvalidPreparation(preparation);
+    assertInvalid(fixture(preparation,
         OperationKind.SETTINGS_APPLY, CoreOperationCatalog.RESET_SETTINGS.value(), false, null));
   }
 
@@ -98,8 +114,10 @@ class SettingsResetPreparationTest {
   void publicFlagsCannotPrepareReset(String arguments) {
     assertThrows(IllegalArgumentException.class, () -> SettingsResetPreparation.recovery(arguments, FINGERPRINT));
     assertThrows(IllegalArgumentException.class, () -> SettingsResetPreparation.normal(arguments, new SettingsWitness(0, null)));
-    assertInvalid(fixture(new OperationPreparation(arguments, SettingsResetPreparation.SCHEMA,
-        SettingsResetPreparation.recovery("{}", FINGERPRINT).replayPayloadJson()),
+    var preparation = new OperationPreparation(arguments, SettingsResetPreparation.SCHEMA,
+        SettingsResetPreparation.recovery("{}", FINGERPRINT).replayPayloadJson());
+    assertInvalidPreparation(preparation);
+    assertInvalid(fixture(preparation,
         OperationKind.SETTINGS_APPLY, CoreOperationCatalog.RESET_SETTINGS.value(), false, null));
   }
 
@@ -110,7 +128,9 @@ class SettingsResetPreparationTest {
       "{\"expected\":null,\"quarantineFingerprint\":\"" + FINGERPRINT + "\"} {}"
   })
   void duplicateFieldsAndTrailingPayloadCannotChangeAcceptedIntent(String payload) {
-    assertInvalid(fixture(new OperationPreparation("{}", SettingsResetPreparation.SCHEMA, payload),
+    var preparation = new OperationPreparation("{}", SettingsResetPreparation.SCHEMA, payload);
+    assertInvalidPreparation(preparation);
+    assertInvalid(fixture(preparation,
         OperationKind.SETTINGS_APPLY, CoreOperationCatalog.RESET_SETTINGS.value(), false, null));
   }
 
@@ -122,6 +142,13 @@ class SettingsResetPreparationTest {
     assertThrows(IllegalArgumentException.class, () -> SettingsResetPreparation.recovery("{}", ""));
     assertThrows(IllegalArgumentException.class, () -> new SettingsResetPreparation.Intent(null, null));
     assertThrows(IllegalArgumentException.class, () -> new SettingsResetPreparation.Intent(new SettingsWitness(0, null), FINGERPRINT));
+  }
+
+  private static void assertInvalidPreparation(OperationPreparation preparation) {
+    var failure = assertThrows(IllegalArgumentException.class,
+        () -> SettingsResetPreparation.validate(preparation));
+    assertEquals("Invalid settings reset preparation", failure.getMessage());
+    assertNull(failure.getCause());
   }
 
   private static void assertInvalid(Fixture fixture) {
