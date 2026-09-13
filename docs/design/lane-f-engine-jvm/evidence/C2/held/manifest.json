@@ -28,5 +28,18 @@
     "C2-3",
     "C2-8",
     "C2-10"
+  ],
+  "retirementRevision": "6b109c27ca33ec72bcb2ae444a84b74e84648d43",
+  "supplements": [
+    {
+      "base": "33e54dfcde19a205e3e6a5f3d7e2a30a24bf5f93",
+      "patch": "root-snapshot-retirement.patch",
+      "sha256": "433012cf240816914ff0aa47c66776e6ad55d40b56be62596d146ddc018be6cf",
+      "files": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java"
+      ]
+    }
   ]
 }

@@ -14,8 +14,12 @@ actual producers, survival admission, accepted scan keys and committed-unit outc
 Do not blindly apply the patch: it also restores the superseded test-only activation
 assumptions and the identity_json/payload coupling that R9 explicitly rejects.
 
-Current generic preparation, UTF-8 identity bounds, root registration/snapshot
-atomicity, generation capture and ordinary runner regressions remain compiled.
+Current generic preparation, UTF-8 identity bounds, atomic root registration,
+generation capture and ordinary runner regressions remain compiled. R10 full858
+found the now-unused frozen-binding snapshot helper: root-snapshot-retirement.patch
+holds it and its immutable/atomic-snapshot fixtures against33e54dfcd. The supplement
+also retains the direct-accessor adaptations for the live membership race tests;
+manifest.json pins both source packets independently.
 The new unactivated-replay refusal regression replaces the old assumption that a
 prepared replay schema could be accepted before its keyed replay owner existed.
 No failing test was suppressed to obtain a green run; retired feature tests remain

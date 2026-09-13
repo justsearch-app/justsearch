@@ -103,15 +103,6 @@ final class WatchedRootsState {
     return collections.get(root);
   }
 
-  /** Membership and labels share one observation; no filesystem availability work is scheduled. */
-  synchronized java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>
-      snapshotBindings() {
-    return watchedRoots.keySet().stream()
-        .map(root -> new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(
-            root, collections.get(root)))
-        .toList();
-  }
-
   /** Register membership and its label together, preserving the caller's duplicate policy. */
   synchronized boolean register(Path root, String collection, boolean onlyIfAbsent) {
     if (onlyIfAbsent && watchedRoots.containsKey(root)) return false;

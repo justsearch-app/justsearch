@@ -65,7 +65,8 @@ final class RootCompletionMembershipTest {
       walking.get(3, TimeUnit.SECONDS);
       removing.get(3, TimeUnit.SECONDS);
       assertFalse(roots.containsKey(path), "completed walk must not resurrect a removed root");
-      assertTrue(state.snapshotBindings().isEmpty());
+      assertTrue(roots.isEmpty());
+      assertNull(state.getCollection(path));
     } finally {
       roots.release.countDown();
       walker.join(Duration.ofSeconds(3));

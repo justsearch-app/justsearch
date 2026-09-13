@@ -1,5 +1,10 @@
 # R9: reconcile scope, schema and current proof
 
+September13 R10 supplement: full858 found the frozen-binding snapshot helper had
+only test callers. It and its snapshot-specific fixtures are now held in the
+[packet supplement](held/README.md); atomic registration and removal races remain
+active. The original835 proof below records the earlier R9 retirement boundary.
+
 September13, base41d0ab86d plus this item. R9's item gate passes at835; final
 batch verification and independent review remain required.
 
