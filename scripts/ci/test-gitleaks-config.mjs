@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes, createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -14,13 +14,24 @@ const gitleaks = process.env.GITLEAKS_PATH || "gitleaks";
 assert.equal(existsSync(configPath), true, "the checked-in Gitleaks config must exist");
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+let fixtureSequence = 0;
 function alpha(length) {
-  const bytes = randomBytes(length);
+  const bytes = createHash("sha512").update(`gitleaks-alpha-${fixtureSequence++}`).digest().subarray(0, length);
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
 function hex(length) {
-  return createHash("sha256").update(`${randomBytes(24).toString("hex")}:${length}`).digest("hex").slice(0, length);
+  // Random hex occasionally contains Gitleaks 8.30.1's built-in example
+  // stopwords (notably "dead" / "feed"). Such data is not detector-positive.
+  // Deterministic fixtures avoid those defaults and satisfy the entropy floor;
+  // the scanner assertions still independently prove detection at each path.
+  const stopwords = ["000000", "6fe4476ee5a1832882e326b506d14126", "aaaaaa", "dead", "feed"];
+  for (;;) {
+    const value = createHash("sha256").update(`gitleaks-hex-${fixtureSequence++}`).digest("hex").slice(0, length);
+    const counts = [...value].reduce((all, char) => ({ ...all, [char]: (all[char] || 0) + 1 }), {});
+    const entropy = Object.values(counts).reduce((sum, count) => sum - count / value.length * Math.log2(count / value.length), 0);
+    if (entropy > 3.7 && !stopwords.some((word) => value.includes(word))) return value;
+  }
 }
 
 function vettedEntityBankMatch() {
@@ -168,6 +179,9 @@ expectFinding("credential in a dataset", {
 expectFinding("credential in a report", {
   "reports/fixture.json": `{ "api_key": "${hex(64)}" }\n`,
 }, "generic-api-key");
+expectClean("upstream example stopword is not a valid positive fixture", {
+  "reports/fixture.json": `{ "api_key": "dead${hex(60)}" }\n`,
+});
 
 for (const extension of ["java", "ts", "tsx"]) {
   expectFinding(`credential in a ${extension} test`, {

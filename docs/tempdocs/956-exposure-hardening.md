@@ -265,3 +265,11 @@ merged as `58ad2e074b2ab2c4ea3e9c31e4511342eb436a13`. Hosted PRIVACY.md
 matches the candidate and uses the project mailbox. That repository has no
 CI workflows or protected-branch checks. The source PR's hosted verification
 and merge-queue result remain pending.
+
+The first hosted run exposed nondeterministic scanner fixtures: random hex can
+contain default example stopwords such as `dead`/`feed`, or miss the entropy
+threshold. Fixture generation is now deterministic, excludes the pinned
+scanner's hex stopwords, and meets its entropy requirement; detection assertions
+and production scanning configuration are unchanged. A default-stopword control
+proves why such an example is not a valid detector-positive fixture. The changed
+regression and lint are rerun locally, followed by a new hosted run.
