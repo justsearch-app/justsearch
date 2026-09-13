@@ -273,3 +273,8 @@ scanner's hex stopwords, and meets its entropy requirement; detection assertions
 and production scanning configuration are unchanged. A default-stopword control
 proves why such an example is not a valid detector-positive fixture. The changed
 regression and lint are rerun locally, followed by a new hosted run.
+
+The second hosted run passed the scanner fixtures and then exposed missing Unix
+execute bits on the Git hooks. Both privacy hooks are now tracked as executable.
+The existing direct pre-push invocation test exercises the shipped mode on Linux;
+no permission bypass was added to the fixture. Other hook contents are unchanged.
