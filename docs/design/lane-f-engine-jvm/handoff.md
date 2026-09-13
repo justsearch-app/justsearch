@@ -23,6 +23,10 @@ allthree cases green with PMD/format; negative1316 still catches lost detach not
 required. Windows-native success is not installed-v5 recovery proof.
 
 **Immediate next items (2026-09-13): C2-6 recovery reset, then producer and Health migration.**
+The fixed reset reservation/clear/restart mechanism passed independent review: preserve
+quarantine block through precommit failure, clear only after durable COMPLETE, then use the
+existing process-owned ordered restart. [Mechanism and required fault matrix](evidence/C2/C2-6-plan.md#2026-09-13-fixed-reset-reservation-and-recovery-clear-order).
+This is governing design; reset implementation and successor-bootstrap proof are next.
 The [accepted recovery input/metadata decoder](evidence/C2/settings-recovery-input.md) passes
 121 executed cases plus PMD/format; register gates also pass. Negative1309 catches lost accepted
 payload and missing key binding; negative1312 catches eager multiple-row loading and swallowed

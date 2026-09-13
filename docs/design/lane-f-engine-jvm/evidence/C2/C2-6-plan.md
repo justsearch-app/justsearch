@@ -277,3 +277,46 @@ existing disabled-cipher metadata validation, including version, key, nonce, des
 identity and content classification. No duplicate envelope, arbitrary decoder callback or
 startup cipher dependency is introduced. The next fixed settings-reset schema consumes this
 validated metadata and the quarantine fingerprint; this foundation alone grants no reset.
+
+
+## 2026-09-13 fixed reset reservation and recovery-clear order
+
+The fixed reset schema and private owner-issued expected marker reuse the existing reservation,
+SQL arming and receipt path. An accepted recovery token carries its frozen quarantine identity
+and may bypass only the quarantine/UNREADABLE block that made explicit re-authoring necessary.
+Do not clear that block during reservation. Normal/precommit failures release the attempt fence
+only after durable failure while retaining recovery-required state, so a new confirmed reset
+can retry. A COMMITTED recovery token clears the block only after its row terminalizes durably.
+Multiple armed, contradictory and persistence-disabled blocks cannot use this bypass.
+
+Independent review refuted reusing current requireFence/release unchanged: both reject/retain
+all blocked tokens, and clearing blocked early would lose recovery refusal after SQL-arm failure.
+The recovery distinction belongs on the existing opaque fence, not in another persistent flag.
+Likewise move recovery-clear notification out of apply and into matching committed-fence release
+(after SQL finish), outside the physical mutex. Terminal SQL failure keeps the condition/fence
+and invokes the existing ordered restart; it cannot publish premature recovery success.
+
+The sole successful absent-history reset also requests the composition root's existing ordered
+restart after durable completion. This rare explicit recovery re-enters normal bootstrap after
+ordinary startup writers were refused and gives the existing per-process sticky recovery future
+its correct lifetime. It avoids adding a second Health state writer, resettable future registry
+or polling authority. Successful readable-history resets need no such recovery restart. A lost
+HTTP response is answered by the recorded key outcome, as already required by C2. Callback
+RuntimeExceptions are diagnostic after durable completion, never rewritten as SQL failure;
+restart is requested even when the recovery-clear callback fails.
+
+Required regressions: arm/precommit failure preserves quarantine condition while allowing a new
+confirmed reset; committed reset plus SQL terminal failure retains condition/block/fence and
+requests restart; successful durable reset clears and requests one restart; callbacks run outside
+the mutex; exact live witness takes precedence over invalid/missing preparation at boot; changed
+quarantine cannot become precommit failure. No owner input or stage/merge placement change.
+
+
+Final independent lifetime review is clear atd9ac1c202. Grounded restart owner is
+HeadlessApp.localRestartAction:1629–1673, composed before the runner at1068–1075.
+Capture the successful recovery restart decision under the owner mutex, dispatch it outside
+from committed-fence release (never retainForRestart, which marks uncertainty). Ensure a clear
+callback Error cannot suppress restart; preserve the primary Error if restart also throws.
+Boot reconciliation of a prior committed recovery does not request another restart because
+that process already re-entered bootstrap. Installed proof must show successor bootstrap and
+previously refused startup writers, not just a callback counter or exit request.

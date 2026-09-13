@@ -356,6 +356,15 @@ Ordinary armed rows with lost witnesses always stay unresolved and forbid reset.
 and acceptance may coexist with another row; they have no settings effect. Reservation is the
 mandatory exclusion point before arming. Null-marker rows remain precommit failures.
 
+A recovery reset's opaque reservation alone may bypass the quarantine-only block; it does not
+clear that block before commitment. Durable precommit failure releases the attempt fence while
+preserving recovery-required state for a new confirmed reset. Only matching COMMITTED recovery
+release after SQL terminalization clears the block and publishes recovery-cleared notification,
+outside the mutex. SQL terminal failure retains both. After successful absent-history reset,
+request the existing ordered restart once to re-enter ordinary bootstrap and reset per-process
+sticky Health observations; no extra persistent recovery state or Health writer is introduced.
+Readable-history reset does not require this recovery restart. [Mechanism/refutation](C2-6-plan.md#2026-09-13-fixed-reset-reservation-and-recovery-clear-order).
+
 One global number survives within intact history; the existing pair is the version-conflict
 identity across recovery. No second allocator, epoch store or inferred high-watermark from
 retained operations rows is introduced. Plain absence with no quarantine remains the fresh
