@@ -183,9 +183,11 @@ public final class AuthorizationController {
       }
       // Tempdoc 550 F3: record the authorized action's source tier so an emergency Global Hard
       // Stop revokes only non-user grants — a user's own TRUSTED approval is not cancelled.
-      String capsule =
-          capsuleService.mint(
-              pending.get().operationId(), pending.get().argsJson(), pending.get().sourceTier());
+      var approved = pending.get();
+      String capsule = approved.preparationNonce() == null
+          ? capsuleService.mint(approved.operationId(), approved.argsJson(), approved.sourceTier())
+          : capsuleService.mintPrepared(approved.operationId(), approved.argsJson(), approved.sourceTier(),
+              approved.operationKey(), approved.preparationNonce());
       // Tempdoc 550 thesis IV: an explicit "allow always" gesture records a durable grant for this
       // (operation, sourceTier), so future invocations auto-approve at the gate without re-prompting.
       // Tempdoc 875 C.2: NOT for a HIGH-risk operation — the gate's risk ceiling would ignore such a
@@ -200,6 +202,8 @@ public final class AuthorizationController {
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("capsule", capsule);
       payload.put("allowAlways", allowAlways);
+      if (pending.get().operationKey() != null) payload.put("operationKey", pending.get().operationKey());
+      if (pending.get().preparationNonce() != null) payload.put("preparationNonce", pending.get().preparationNonce().toString());
       // Tempdoc 655: an approval whose origin has no client-side copy of the args to replay
       // (concretely: an MCP-originated pending — the browser was never the caller) asks the
       // server to complete the dispatch itself, right now, using the SAME argsJson the capsule
@@ -320,12 +324,18 @@ public final class AuthorizationController {
       io.justsearch.agent.api.registry.OperationResult result;
       if (pending.undo()) {
         String executionId = MAPPER.readTree(pending.argsJson()).path("executionId").asText();
-        result = pending.operationKey() == null
+        result = pending.preparationNonce() != null
+            ? dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey(), pending.preparationNonce())
+            : pending.operationKey() == null
             ? dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule), executionContext)
             : dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule),
                 executionContext, pending.operationKey());
       } else {
-        result = pending.operationKey() == null
+        result = pending.preparationNonce() != null
+            ? dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey(), pending.preparationNonce())
+            : pending.operationKey() == null
             ? dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule), executionContext)
             : dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
                 executionContext, pending.operationKey());

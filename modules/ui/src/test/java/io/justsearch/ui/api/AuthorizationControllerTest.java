@@ -56,6 +56,78 @@ class AuthorizationControllerTest {
     catalogs = List.of(new AgentToolsOperationCatalog());
   }
 
+  @Test
+  void preparedApprovalBindsServerNonceAndNeverAuthorizesPublicArgumentsAlone() throws Exception {
+    var context = TestRequestContexts.mcp("prepared-approval");
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    String args = "{\"paths\":[\"C:/tmp\"]}";
+    String id = pendingStore.create("core.ingest-paths", args, SourceTier.UNTRUSTED, RiskTier.MEDIUM,
+        GateBehavior.TYPED_CONFIRM, "approve", null, io.justsearch.agent.api.registry.TransportTag.MCP,
+        context, TestRequestContexts.provenance(context, ExecutorTag.AGENT), key, false, nonce);
+    var controller = new AuthorizationController(capsuleService, pendingStore);
+    var ctx = mockContextWithBody("{\"pendingId\":\"" + id + "\"}");
+    controller.handleApprove(ctx);
+    var response = capturedJson(ctx);
+    String token = (String) response.get("capsule");
+    assertFalse(capsuleService.verifyAndConsume(token, "core.ingest-paths", args),
+        "An approval for a frozen target cannot authorize an arbitrary preparation of the public input");
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, key, java.util.UUID.randomUUID()));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args,
+        io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK), nonce));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", "{}", key, nonce));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, key, null));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, "invalid", nonce));
+    assertTrue(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths",
+        " { \"paths\" : [ \"C:/tmp\" ] } ", key, nonce));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, key, nonce));
+    assertEquals(key, response.get("operationKey"));
+    assertEquals(nonce.toString(), response.get("preparationNonce"));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void unsupportedPreparedDispatcherCannotDiscardNonce(boolean undo) {
+    var dispatcher = mock(OperationDispatcher.class, CALLS_REAL_METHODS);
+    var context = TestRequestContexts.mcp("unsupported-prepared");
+    var provenance = TestRequestContexts.provenance(context, ExecutorTag.AGENT);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    if (undo) {
+      assertThrows(UnsupportedOperationException.class,
+          () -> dispatcher.undo(null, "exec", provenance, Optional.empty(), context, key, nonce));
+      verify(dispatcher, never()).undo(any(), any(), any(), any(), any(), any());
+    } else {
+      assertThrows(UnsupportedOperationException.class,
+          () -> dispatcher.dispatch(null, "{}", provenance, Optional.empty(), context, key, nonce));
+      verify(dispatcher, never()).dispatch(any(), any(), any(), any(), any(), any());
+    }
+  }
+
+  @Test
+  void publicCapsuleCannotImpersonatePreparedBindingJson() {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    String shapedPublicInput = MAPPER.writeValueAsString(Map.of("operationKey", key, "preparationNonce", nonce.toString(),
+        "publicDigest", io.justsearch.app.api.operations.CanonicalOperationArguments.digest("{}")));
+    String ordinary = capsuleService.mint("core.ingest-files", shapedPublicInput);
+    assertFalse(capsuleService.verifyPreparedAndConsume(ordinary, "core.ingest-files", "{}", key, nonce),
+        "Caller JSON matching the binding representation must remain ordinary consent");
+    assertTrue(capsuleService.verifyAndConsume(ordinary, "core.ingest-files", shapedPublicInput));
+  }
+
+  @Test
+  void unsupportedCapsuleAuthorityRefusesPreparedConsent() {
+    var authority = mock(io.justsearch.agent.api.registry.ConsentCapsuleAuthority.class, CALLS_REAL_METHODS);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    assertThrows(UnsupportedOperationException.class,
+        () -> authority.mintPrepared("core.ingest-files", "{}", SourceTier.UNTRUSTED, key, nonce));
+    assertFalse(authority.verifyPreparedAndConsume("token", "core.ingest-files", "{}", key, nonce));
+    verify(authority, never()).mint(any(), any(), any());
+    verify(authority, never()).verifyAndConsume(any(), any(), any());
+  }
+
   private String createPending(String operationId) {
     var context = TestRequestContexts.mcp("approval-test");
     return pendingStore.create(

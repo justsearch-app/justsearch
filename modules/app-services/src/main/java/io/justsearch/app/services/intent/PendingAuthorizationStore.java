@@ -120,6 +120,15 @@ public final class PendingAuthorizationStore {
       GateBehavior gateBehavior, String rationale, String requestedBy, TransportTag transport,
       EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance,
       String operationKey, boolean undo) {
+    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, requestedBy,
+        transport, engineContext, provenance, operationKey, undo, null);
+  }
+
+  /** Preserve the exact frozen preparation selected before the gate. */
+  public String create(String operationId, String argsJson, SourceTier sourceTier, RiskTier riskTier,
+      GateBehavior gateBehavior, String rationale, String requestedBy, TransportTag transport,
+      EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance,
+      String operationKey, boolean undo, UUID preparationNonce) {
     Instant now = clock.instant();
     // Evict expired entries here — expiry is otherwise only checked lazily on peek/consume of
     // a specific id, so a pending that is gated-then-abandoned (never approved) would never be
@@ -147,7 +156,7 @@ public final class PendingAuthorizationStore {
             now,
             now.plus(ttl),
             requestedBy,
-            transport, engineContext, provenance, operationKey, undo));
+            transport, engineContext, provenance, operationKey, undo, preparationNonce));
     return id;
   }
 

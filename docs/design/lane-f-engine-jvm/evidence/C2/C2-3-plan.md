@@ -189,3 +189,27 @@ This avoids the proven late-terminal callback deadlock without a publication que
 existing receipt; approval carries the exact preparation nonce. Generic passthrough
 handlers remain transient and do not require content encryption. Reconciliation is
 still the only owner that can authorize replay of accepted incomplete work.
+
+## Frozen approval binding cut (September13)
+
+The existing capsule's BoundAction digest uses a JSON binding of operationKey,
+preparationNonce and the existing canonical publicDigest for prepared invocations.
+The signed BoundAction argument digest is prefixed prepared-v1:, keeping it outside
+ordinary hexadecimal public-input digests even when caller JSON copies the binding
+representation. ConsentCapsuleAuthority has explicit prepared mint/verify methods;
+unsupported implementations refuse, never downgrade. ConsentCapsuleService shares
+one mint/verify implementation and its existing revocation/single-use registry across
+both domains. No second digest algorithm, grant type or token registry is added. PendingAuthorization
+keeps public args separate for the existing display and exact redispatch. Its new
+nonce is server-built at preparation time and retained with the key. A capsule that
+only covers public args cannot authorize a frozen preparation. Passthrough calls keep
+their existing binding.
+
+The first approval commit only delivers metadata, capsule binding and a fail-closed
+SPI path: default dispatch implementations reject a non-null preparation nonce instead
+of discarding it. Gate exceptions deliver the server key/nonce to HTTP/MCP pending
+records. Approval returns the reference for caller redispatch or sends it through
+the server-side overload. Dispatcher activation and all remaining gate consumers,
+frontend invoke/undo carry-through, preview and nonce-before-preparation negatives
+remain required in the connected follow-on item. This prerequisite cannot activate
+a prepared producer by itself.

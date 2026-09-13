@@ -32,8 +32,8 @@ import java.util.Objects;
  * @param id opaque server-assigned id ({@code pa-<uuid>}); the only thing the approve
  *     gesture references.
  * @param operationId the gated operation (or, for a gated Navigation, the surface target).
- * @param argsJson the exact serialized args the eventual capsule binds to — captured at
- *     gate time so the approve caller cannot substitute different args.
+ * @param argsJson public args captured at gate time, retained separately for display and dispatch.
+ *     Prepared consent additionally binds operationKey and preparationNonce in its signed scope.
  * @param sourceTier the source tier the gate evaluated (audit / trust-aware copy).
  * @param riskTier the operation's risk tier.
  * @param gateBehavior the computed gate (INLINE_CONFIRM / TYPED_CONFIRM).
@@ -67,7 +67,8 @@ public record PendingAuthorization(
     io.justsearch.core.context.EngineContext engineContext,
     io.justsearch.agent.api.registry.InvocationProvenance provenance,
     String operationKey,
-    boolean undo) {
+    boolean undo,
+    java.util.UUID preparationNonce) {
 
   public PendingAuthorization {
     Objects.requireNonNull(id, "id");
@@ -87,6 +88,7 @@ public record PendingAuthorization(
             provenance.occurredAt(), provenance.signedIntentToken()).equals(provenance)) {
       throw new IllegalArgumentException("Pending authorization attribution disagrees");
     }
+    if (preparationNonce != null) Objects.requireNonNull(operationKey, "operationKey");
     rationale = rationale == null ? "" : rationale;
     requestedBy = requestedBy == null || requestedBy.isBlank() ? null : requestedBy;
   }

@@ -45,12 +45,38 @@ import io.justsearch.app.api.operations.CanonicalOperationArguments;
  * caller is a real user gesture and not the agent self-approving (see 550).
  *
  * <p>Wire form of a capsule token: {@code base64url(payload) + "." + base64url(hmac)}
- * where {@code payload = operationId + "|" + sha256Hex(argsJson) + "|" + nonce + "|" +
- * expiryEpochMillis}. Opaque to callers; it rides in the existing {@code
+ * where {@code payload = operationId + "|" + argumentBinding + "|" + nonce + "|" +
+ * expiryEpochMillis}. The binding is a public-input digest or a domain-prefixed prepared
+ * digest. Opaque to callers; it rides in the existing {@code
  * ShellAddress.Invocation.confirmationToken} field (no new wire field).
  */
 public final class ConsentCapsuleService
     implements io.justsearch.agent.api.registry.ConsentCapsuleAuthority {
+
+  /** Prefix the signed binding itself: no ordinary SHA-256 hex digest can inhabit this domain. */
+  private static String preparedDigest(String publicArguments, String operationKey, UUID preparationNonce) {
+    Objects.requireNonNull(preparationNonce, "preparationNonce");
+    io.justsearch.app.api.operations.OperationKeys.timestampMillis(operationKey);
+    String binding = "{\"operationKey\":\"" + operationKey + "\",\"preparationNonce\":\"" + preparationNonce
+        + "\",\"publicDigest\":\"" + CanonicalOperationArguments.digest(publicArguments) + "\"}";
+    return "prepared-v1:" + CanonicalOperationArguments.digest(binding);
+  }
+
+  @Override
+  public String mintPrepared(String operationId, String argumentsJson,
+      io.justsearch.agent.api.registry.SourceTier sourceTier, String operationKey, UUID preparationNonce) {
+    return mintBound(operationId, preparedDigest(argumentsJson, operationKey, preparationNonce), sourceTier);
+  }
+
+  @Override
+  public boolean verifyPreparedAndConsume(String token, String operationId, String argumentsJson,
+      String operationKey, UUID preparationNonce) {
+    if (token == null || operationId == null || argumentsJson == null || preparationNonce == null) return false;
+    final String digest;
+    try { digest = preparedDigest(argumentsJson, operationKey, preparationNonce); }
+    catch (IllegalArgumentException invalid) { return false; }
+    return verifyBoundAndConsume(token, operationId, digest);
+  }
 
   private static final String HMAC_ALGO = "HmacSHA256";
   private static final Duration DEFAULT_TTL = Duration.ofMinutes(5);
@@ -112,8 +138,12 @@ public final class ConsentCapsuleService
   @Override
   public String mint(
       String operationId, String argsJson, io.justsearch.agent.api.registry.SourceTier sourceTier) {
+    return mintBound(operationId, CanonicalOperationArguments.digest(Objects.requireNonNull(argsJson, "argsJson")), sourceTier);
+  }
+
+  private String mintBound(String operationId, String argumentDigest,
+      io.justsearch.agent.api.registry.SourceTier sourceTier) {
     Objects.requireNonNull(operationId, "operationId");
-    Objects.requireNonNull(argsJson, "argsJson");
     Objects.requireNonNull(sourceTier, "sourceTier");
     String grantId = UUID.randomUUID().toString();
     Instant now = clock.instant();
@@ -124,7 +154,7 @@ public final class ConsentCapsuleService
     Grant capsule =
         new Grant(
             grantId,
-            new Grant.BoundAction(operationId, CanonicalOperationArguments.digest(argsJson)),
+            new Grant.BoundAction(operationId, argumentDigest),
             expiry,
             true);
     // Evict expired ids here — an id is otherwise removed only when its capsule is verified (or
@@ -201,6 +231,10 @@ public final class ConsentCapsuleService
     if (token == null || operationId == null || argsJson == null) {
       return false;
     }
+    return verifyBoundAndConsume(token, operationId, CanonicalOperationArguments.digest(argsJson));
+  }
+
+  private boolean verifyBoundAndConsume(String token, String operationId, String argumentDigest) {
     int dot = token.indexOf('.');
     if (dot <= 0 || dot == token.length() - 1) {
       return false;
@@ -236,7 +270,7 @@ public final class ConsentCapsuleService
     // Binding: the scope must authorize this exact action + arguments (canonicalized, so key
     // order / whitespace differences between mint-side and verify-side serializations of the same
     // logical args do not break the match).
-    if (!capsule.scope().authorizes(operationId, CanonicalOperationArguments.digest(argsJson))) {
+    if (!capsule.scope().authorizes(operationId, argumentDigest)) {
       return false;
     }
     // Revocation (tempdoc 550 thesis IV): a revoked grant id fails closed, before expiry/consume.

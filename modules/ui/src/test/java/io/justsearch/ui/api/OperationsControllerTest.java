@@ -168,6 +168,46 @@ final class OperationsControllerTest {
     assertTrue(pending.peek(pendingId).isEmpty());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void preparedApprovalCarriesServerMintedReferenceThroughInvokeAndUndo(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.randomUUID();
+    var catalog = new CoreOperationCatalog();
+    var pending = new io.justsearch.app.services.intent.PendingAuthorizationStore();
+    controller = new OperationsController(List.of(catalog), dispatcher, java.time.Clock.systemUTC(), pending);
+    var refusal = new io.justsearch.agent.api.registry.ConfirmationRequiredException(
+        new io.justsearch.agent.api.registry.OperationRef("core.ping-backend"),
+        io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM,
+        io.justsearch.agent.api.registry.ConfirmStrategy.None.INSTANCE,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED, key, nonce);
+    var success = OperationResult.success("approved frozen target", Map.of("operationKey", key, "operationRecordId", 7));
+    when(dispatcher.undo(any(), any(), any(), any(), any(EngineContext.class))).thenThrow(refusal);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(EngineContext.class))).thenThrow(refusal);
+    when(dispatcher.undo(any(), any(), any(), any(), any(EngineContext.class), eq(key), eq(nonce))).thenReturn(success);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(EngineContext.class), eq(key), eq(nonce))).thenReturn(success);
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context original = mockContext("core.ping-backend", "{" + input + "}");
+    if (undo) controller.handleUndo(original); else controller.handleInvoke(original);
+    var gated = capture(original);
+    assertEquals(key, gated.path("operationKey").asText());
+    assertEquals(nonce.toString(), gated.path("preparationNonce").asText());
+    String pendingId = gated.path("pendingId").asText();
+    assertEquals(nonce, pending.peek(pendingId).orElseThrow().preparationNonce());
+    var approval = new AuthorizationController(new io.justsearch.app.services.intent.ConsentCapsuleService(),
+        pending, null, dispatcher, List.of(catalog), new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1));
+    Context approve = mockContext("unused", "{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    when(approve.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+    approval.handleApprove(approve);
+    var approved = capture(approve);
+    assertTrue(approved.path("executeSuccess").asBoolean());
+    assertEquals(nonce.toString(), approved.path("preparationNonce").asText());
+    if (undo) verify(dispatcher).undo(any(), eq("exec-1"), any(), any(), any(EngineContext.class), eq(key), eq(nonce));
+    else verify(dispatcher).dispatch(any(), eq("{}"), any(), any(), any(EngineContext.class), eq(key), eq(nonce));
+    verify(dispatcher, org.mockito.Mockito.never()).dispatch(any(), any(), any(), any(), any(EngineContext.class), any());
+    verify(dispatcher, org.mockito.Mockito.never()).undo(any(), any(), any(), any(), any(EngineContext.class), any());
+  }
+
   @Test
   @DisplayName("happy path — known operation, dispatcher returns success")
   void happyPath() throws Exception {

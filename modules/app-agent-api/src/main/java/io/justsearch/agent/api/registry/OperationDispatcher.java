@@ -81,6 +81,14 @@ public interface OperationDispatcher {
     return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext);
   }
 
+  /** Server-approved reference: a missing/stale nonce must refuse before preparing a replacement. */
+  default OperationResult dispatch(Operation op, String argumentsJson, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey,
+      java.util.UUID preparationNonce) {
+    if (preparationNonce != null) throw new UnsupportedOperationException("Prepared dispatch is unavailable");
+    return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext, operationKey);
+  }
+
   /**
    * Undo a previous execution identified by {@code executionId}. Returns a typed
    * failure (not throwing) when the operation's policy does not support undo.
@@ -117,6 +125,14 @@ public interface OperationDispatcher {
       java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
     if (operationKey != null) throw new UnsupportedOperationException("Keyed undo is unavailable");
     return undo(op, executionId, provenance, confirmationToken, engineContext);
+  }
+
+  /** Undo preserves the same server preparation reference and cannot downgrade to raw dispatch. */
+  default OperationResult undo(Operation op, String executionId, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey,
+      java.util.UUID preparationNonce) {
+    if (preparationNonce != null) throw new UnsupportedOperationException("Prepared undo is unavailable");
+    return undo(op, executionId, provenance, confirmationToken, engineContext, operationKey);
   }
 
   /**

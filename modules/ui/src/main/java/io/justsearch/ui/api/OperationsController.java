@@ -394,6 +394,9 @@ public final class OperationsController {
     body.put("sourceTier", e.sourceTier().name());
     body.put("confirmStrategy", confirmStrategyName(e.declaredStrategy()));
     body.put("operationId", op.id().value());
+    String stableKey = e.operationKey() == null ? operationKey : e.operationKey();
+    if (stableKey != null) body.put("operationKey", stableKey);
+    if (e.preparationNonce() != null) body.put("preparationNonce", e.preparationNonce().toString());
     // Tempdoc 550 P1: surface the decision context the ceremony should show — the op's risk,
     // whether the action is reversible (undo-supported), and a short args summary — all already
     // known at gate time. Lets the prompt say "Reindex everything? (HIGH risk, can't be undone)"
@@ -415,7 +418,7 @@ public final class OperationsController {
               e.gateBehavior(),
               e.getMessage(),
               null,
-              provenance.transport(), RequestEngineContext.get(ctx), provenance, operationKey, undo);
+              provenance.transport(), RequestEngineContext.get(ctx), provenance, stableKey, undo, e.preparationNonce());
       body.put("pendingId", pendingId);
       // Tempdoc 655: also broadcast on the pending-authorization SSE stream, so the shell
       // (already open, potentially on a different view than whatever triggered this 428) has one
