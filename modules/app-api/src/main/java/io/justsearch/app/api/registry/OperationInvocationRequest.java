@@ -20,13 +20,23 @@ import java.util.Map;
  * {@code OperationPolicy.confirm} axis and backend trust lattice determine the gate. The token is
  * a single-use consent capsule bound to the operation and its arguments, never a typed UI string.
  *
+ * <p>{@code preparationNonce}: optional server-issued exact preparation reference, returned with
+ * the operation key by approval. It is separate from public arguments and requires that key.
+ *
  * <p>Stability: stable (API contract).
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record OperationInvocationRequest(
-    Map<String, Object> args, String idempotencyKey, String confirmationToken) {
+    Map<String, Object> args, String idempotencyKey, String confirmationToken, java.util.UUID preparationNonce) {
+
+  public OperationInvocationRequest(Map<String, Object> args, String idempotencyKey, String confirmationToken) {
+    this(args, idempotencyKey, confirmationToken, null);
+  }
 
   public OperationInvocationRequest {
     args = args == null ? Map.of() : Map.copyOf(args);
+    if (preparationNonce != null && (idempotencyKey == null || idempotencyKey.isBlank())) {
+      throw new IllegalArgumentException("A preparation nonce requires its operation key");
+    }
   }
 }

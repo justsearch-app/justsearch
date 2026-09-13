@@ -65,6 +65,13 @@ public record OperationInvocationResponse(
         false, message, null, Map.of(), errorClass, null, null, null);
   }
 
+  /** Existing STORE_LOCKED contract: unlock is required before retry, with no private content. */
+  public static OperationInvocationResponse fromLockedStore() {
+    String code = io.justsearch.app.api.ApiErrorCode.STORE_LOCKED.name();
+    return new OperationInvocationResponse(false, "Unlock encrypted storage to continue", null,
+        Map.of(), code, code, Map.of("locked", true), false);
+  }
+
   /** Public key/storage failure projection; native causes and stored invocation content stay private. */
   public static OperationInvocationResponse fromStoreFailure(
       io.justsearch.app.api.operations.OperationStoreException failure) {

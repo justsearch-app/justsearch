@@ -30,6 +30,18 @@ class McpOperationKeyTest {
       List.of(new AgentToolsOperationCatalog()), dispatcher, () -> null, () -> null,
       Clock.systemUTC(), () -> null, pending, null);
 
+  @Test
+  void lockedPreparationIsTypedAndCannotBeMistakenForAnExecutionFailure() {
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(KEY)))
+        .thenThrow(new io.justsearch.agent.api.encryption.KeyLockedException());
+    var response = surface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/notes"), "operationKey", KEY),
+        "session", TestRequestContexts.mcp("session"));
+    assertEquals(true, response.get("isError"));
+    Map<?, ?> facts = (Map<?, ?>) response.get("structuredContent");
+    assertEquals("STORE_LOCKED", facts.get("errorCode")); assertEquals("STORE_LOCKED", facts.get("errorClass"));
+    assertEquals(false, facts.get("retryable"));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"justsearch_ingest", "justsearch_browse"})
   void keyIsDeliveredSeparatelyFromPublicArguments(String tool) {

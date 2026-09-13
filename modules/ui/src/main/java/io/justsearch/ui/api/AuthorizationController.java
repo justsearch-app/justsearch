@@ -347,6 +347,14 @@ public final class AuthorizationController {
         payload.put("operationKey", key);
         payload.put("operationRecordId", result.structuredData().get("operationRecordId"));
       }
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException failure) {
+      var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromLockedStore();
+      payload.put("executed", false);
+      payload.put("executeSuccess", false);
+      payload.put("executeMessage", response.message());
+      payload.put("executeErrorClass", response.errorClass());
+      payload.put("executeErrorCode", response.errorCode());
+      payload.put("executeRetryable", response.retryable());
     } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
       var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
       payload.put("executed", false);

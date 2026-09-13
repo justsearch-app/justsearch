@@ -172,7 +172,10 @@ public final class OperationsController {
             ? Optional.empty()
             : Optional.of(request.confirmationToken());
     try {
-      result = request.idempotencyKey() == null
+      result = request.preparationNonce() != null
+          ? dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx),
+              request.idempotencyKey(), request.preparationNonce())
+          : request.idempotencyKey() == null
           ? dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx))
           : dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken,
               RequestEngineContext.get(ctx), request.idempotencyKey());
@@ -188,6 +191,9 @@ public final class OperationsController {
           403,
           "Trust gate denied operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      writeResponse(ctx, 423, OperationInvocationResponse.fromLockedStore());
       return;
     } catch (io.justsearch.app.api.operations.OperationStoreException e) {
       writeStoreFailure(ctx, e);
@@ -244,6 +250,7 @@ public final class OperationsController {
 
     String executionId;
     String operationKey;
+    java.util.UUID preparationNonce;
     Optional<String> confirmationToken;
     try {
       String body = ctx.body();
@@ -264,6 +271,13 @@ public final class OperationsController {
         return;
       }
       operationKey = keyNode == null || keyNode.isNull() ? null : keyNode.asText();
+      var nonceNode = parsed.get("preparationNonce");
+      preparationNonce = nonceNode == null || nonceNode.isNull() ? null
+          : MAPPER.treeToValue(nonceNode, java.util.UUID.class);
+      if (preparationNonce != null && (operationKey == null || operationKey.isBlank())) {
+        writeError(ctx, 400, "A preparation nonce requires its operation key", "BAD_REQUEST");
+        return;
+      }
       // Tempdoc 875 §C.7: undo now meets the trust lattice, so it accepts the same
       // confirmationToken the invoke path does — the FE re-posts with a minted capsule
       // after the 428 below.
@@ -281,7 +295,10 @@ public final class OperationsController {
     InvocationProvenance provenance = resolveProvenance(ctx);
     OperationResult result;
     try {
-      result = operationKey == null
+      result = preparationNonce != null
+          ? dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx),
+              operationKey, preparationNonce)
+          : operationKey == null
           ? dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx))
           : dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx), operationKey);
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
@@ -300,6 +317,9 @@ public final class OperationsController {
           403,
           "Trust gate denied undo of operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      writeResponse(ctx, 423, OperationInvocationResponse.fromLockedStore());
       return;
     } catch (io.justsearch.app.api.operations.OperationStoreException e) {
       writeStoreFailure(ctx, e);

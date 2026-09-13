@@ -1526,6 +1526,10 @@ public final class McpToolSurface {
         // guessing a classification for a handler-specific or absent code.
         return errorContent(failure);
       }
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      var failure = OperationInvocationResponse.fromLockedStore();
+      return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
+          "errorClass", failure.errorClass(), "retryable", failure.retryable(), "locked", true));
     } catch (OperationStoreException e) {
       var failure = OperationInvocationResponse.fromStoreFailure(e);
       return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),

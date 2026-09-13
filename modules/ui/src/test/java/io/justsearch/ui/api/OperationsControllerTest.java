@@ -67,6 +67,58 @@ final class OperationsControllerTest {
 
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void preparedRetryForwardsExactReferenceOutsidePublicInput(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.randomUUID();
+    var result = OperationResult.success("exact preparation");
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(key))).thenReturn(OperationResult.success("nonce dropped"));
+    when(dispatcher.undo(any(), any(), any(), any(), any(), eq(key))).thenReturn(OperationResult.success("nonce dropped"));
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(key), eq(nonce))).thenReturn(result);
+    when(dispatcher.undo(any(), any(), any(), any(), any(), eq(key), eq(nonce))).thenReturn(result);
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context ctx = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key
+        + "\",\"preparationNonce\":\"" + nonce + "\",\"confirmationToken\":\"capsule\"}");
+    if (undo) {
+      controller.handleUndo(ctx);
+      verify(dispatcher).undo(any(), eq("exec-1"), any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce));
+    } else {
+      controller.handleInvoke(ctx);
+      verify(dispatcher).dispatch(any(), eq("{}"), any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce));
+    }
+    verify(ctx).status(200); assertEquals("exact preparation", capture(ctx).path("message").asText());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void malformedOrUnkeyedPreparationReferenceRefusesBeforeDispatch(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    for (String reference : List.of("\"preparationNonce\":\"" + java.util.UUID.randomUUID() + "\"",
+        "\"idempotencyKey\":\"" + key + "\",\"preparationNonce\":\"invalid\"",
+        "\"idempotencyKey\":\"" + key + "\",\"preparationNonce\":7")) {
+      String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+      var ctx = mockContext("core.ping-backend", "{" + input + "," + reference + "}");
+      if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+      verify(ctx).status(400); assertEquals("BAD_REQUEST", capture(ctx).path("errorClass").asText());
+    }
+    org.mockito.Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void lockedPreparationHasTypedUnlockResponse(boolean undo) throws Exception {
+    var locked = new io.justsearch.agent.api.encryption.KeyLockedException();
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenThrow(locked);
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenThrow(locked);
+    var ctx = mockContext("core.ping-backend", undo ? "{\"executionId\":\"exec-1\"}" : "{}");
+    if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+    verify(ctx).status(423);
+    var response = capture(ctx); assertEquals("STORE_LOCKED", response.path("errorCode").asText());
+    assertEquals("STORE_LOCKED", response.path("errorClass").asText());
+    org.junit.jupiter.api.Assertions.assertFalse(response.path("retryable").asBoolean(true));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void invocationAndUndoForwardTheSuppliedKey(boolean undo) throws Exception {
     String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
     var result = OperationResult.success("recorded", Map.of("operationKey", key, "operationRecordId", 7));
@@ -95,6 +147,7 @@ final class OperationsControllerTest {
   @org.junit.jupiter.params.provider.CsvSource({
       "INVALID_OPERATION_KEY,400,BAD_REQUEST,OPERATION_KEY_INVALID,false",
       "OPERATION_KEY_REUSED,409,CONFLICT,OPERATION_KEY_REUSED,false",
+      "OPERATION_PREPARATION_UNAVAILABLE,409,CONFLICT,OPERATION_PREPARATION_UNAVAILABLE,false",
       "OPERATION_EXPIRED,409,CONFLICT,OPERATION_KEY_EXPIRED,false",
       "OPERATIONS_CAPACITY,503,UNAVAILABLE,OPERATIONS_CAPACITY,true",
       "STORAGE_FAILED,500,HANDLER_ERROR,OPERATION_STORAGE_FAILED,false"

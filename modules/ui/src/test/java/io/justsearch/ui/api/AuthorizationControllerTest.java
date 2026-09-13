@@ -57,6 +57,22 @@ class AuthorizationControllerTest {
   }
 
   @Test
+  void approvedExecutionReportsLockedPreparationAsUnlockRequired() throws Exception {
+    var dispatcher = mock(OperationDispatcher.class);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any()))
+        .thenThrow(new io.justsearch.agent.api.encryption.KeyLockedException());
+    String id = createPending("core.ingest-files");
+    var controller = new AuthorizationController(capsuleService, pendingStore, null, dispatcher, catalogs);
+    var ctx = mockContextWithBody("{\"pendingId\":\"" + id + "\",\"execute\":true}");
+    controller.handleApprove(ctx);
+    var response = capturedJson(ctx);
+    assertEquals(false, response.get("executed")); assertEquals(false, response.get("executeSuccess"));
+    assertEquals("STORE_LOCKED", response.get("executeErrorCode"));
+    assertEquals("STORE_LOCKED", response.get("executeErrorClass"));
+    assertEquals(false, response.get("executeRetryable"));
+  }
+
+  @Test
   void preparedApprovalBindsServerNonceAndNeverAuthorizesPublicArgumentsAlone() throws Exception {
     var context = TestRequestContexts.mcp("prepared-approval");
     String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);

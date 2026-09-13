@@ -241,3 +241,12 @@ transient. This connected item retires the temporary replay-schema blocker only 
 negative tests, exact cipher wiring and backend approval delivery. Frozen preview and
 remaining frontend/agent/workflow callers are separate named follow-on commits before
 C2-3 acceptance; no actual new producer is activated by the generic mechanism.
+
+## Prepared transport reference and locked projection (September13)
+
+HTTP invoke/undo take preparationNonce outside public args and require its operation
+key. Approval already returns both. Preserve the existing STORE_LOCKED/HTTP423 answer
+at operation ingress; MCP and approved-execution use the same common typed projection.
+Unlock is required before a retry; do not silently re-prepare or log content as an
+uncaught handler failure. Frontend consent retries next consume the full approval
+reference, including server-minted keys, while keeping the original public input.
