@@ -10,6 +10,11 @@ the R10 boundary; C2 is open. Batch1's historical foundation proof is
 reopened for the C2-11 operations-row witness (R7) and later schema reproof (R9);
 C2-2 implementation remains in progress.
 
+Final-review corrections now take priority over the pre-review green checkpoint below.
+R3's ignored start/resume is corrected with two negative controls and105 passing
+cases at877. The reviewer also identifies an index-root symlink-alias exclusion gap;
+root owns that next. Fresh integrated proof follows the consolidated corrections.
+
 Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),
 adopted at429115fec. New ingestion work is paused. R1 async persistence observability passes its named
 regressions and focused790 (92 cases), UI integration-test compilation and PMD.

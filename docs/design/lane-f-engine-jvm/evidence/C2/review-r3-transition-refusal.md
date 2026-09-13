@@ -1,5 +1,10 @@
 # R3: do not ignore a refused durable transition
 
+September13 final review additionally finds ignored start/resume. The
+[running-transition correction](review-r3-running-refusal.md) supplies two negative
+controls and final877,105 passing cases. The original terminal/prestart proof below
+remains historical; consolidated post-review integration is still required.
+
 September13, 90aea57bb plus this item. A false terminal update now raises STORAGE_FAILED
 instead of leaving a completion future pending. The unowned boot sweep and explicit
 reconciliation use the same checked transition and R1 observation path. Pre-start

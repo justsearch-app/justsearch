@@ -87,7 +87,14 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   private Result execute(Control control, Function<OperationRecordHandle, OperationExecution> body, boolean resume) {
     try {
-      if (!(resume ? store.resume(control.id) : store.start(control.id))) return existingResult(control);
+      if (!(resume ? store.resume(control.id) : store.start(control.id))) {
+        OperationRecord row = current(control);
+        if (!row.state().terminal()) {
+          throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+        }
+        publishIfTerminal(control, row);
+        return new Result(row, receiptResponse(row), control.done.minimalCompletionStage());
+      }
     } catch (RuntimeException failure) {
       persistenceFailed(control, OperationState.RUNNING, failure);
       throw failure;

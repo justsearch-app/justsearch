@@ -229,6 +229,94 @@ final class OperationAttemptRunnerTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void ignoredStartOrResumeCannotLeaveCompletionPending(boolean resume) throws Exception {
+    var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(OperationAttemptRunnerImpl.class);
+    var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    logs.start();
+    logger.addAppender(logs);
+    try (var store = store()) {
+      var request = request(OperationKind.INGEST, EngineContext.Survival.DURABLE);
+      if (resume) {
+        var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+        assertTrue(store.start(row.id()));
+      }
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.INGEST));
+      var attempt = runner.accept(request);
+      execute("CREATE TRIGGER ignore_running BEFORE UPDATE ON operations WHEN NEW.state = 'RUNNING' "
+          + "BEGIN SELECT RAISE(IGNORE); END");
+      AtomicInteger effects = new AtomicInteger();
+      java.util.function.Function<io.justsearch.agent.api.registry.OperationRecordHandle, OperationExecution> body = handle -> {
+        effects.incrementAndGet();
+        return OperationExecution.finished(OperationResult.success("effect"));
+      };
+      OperationStoreException failure = assertThrows(OperationStoreException.class, () -> {
+        if (resume) {
+          runner.reconcile(OperationKind.INGEST, row -> new OperationAttemptRunner.Reconciliation.Resume(body));
+        } else {
+          runner.start(attempt, body);
+        }
+      });
+      assertEquals(OperationStoreException.Code.STORAGE_FAILED, failure.code());
+      assertEquals(0, effects.get());
+      assertEquals(resume ? OperationState.RUNNING : OperationState.ACCEPTED,
+          store.find(request.key()).orElseThrow().state());
+      assertTrue(attempt.completion().toCompletableFuture().isCompletedExceptionally());
+      assertSame(failure, assertThrows(CompletionException.class,
+          () -> attempt.completion().toCompletableFuture().join()).getCause());
+      var degradation = runner.persistenceFailure().toCompletableFuture().join();
+      assertEquals(request.key(), degradation.operationKey());
+      assertEquals(OperationState.RUNNING, degradation.intendedState());
+      assertTrue(logs.list.stream().anyMatch(event -> event.getLevel() == ch.qos.logback.classic.Level.ERROR
+          && event.getFormattedMessage().contains(request.key())
+          && event.getFormattedMessage().contains("intendedState=RUNNING")));
+    } finally {
+      logger.detachAppender(logs);
+      logs.stop();
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void terminalWinnerBeforeResumePublishesReceiptWithoutRunningAgain(boolean prune) throws Exception {
+    var clock = new OperationTestClock(CLOCK.millis());
+    try (var store = new SqliteOperationStore(temp.resolve("operations.db"), clock, step -> {})) {
+      var request = request(OperationKind.INGEST, EngineContext.Survival.DURABLE);
+      var accepted = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(accepted.id()));
+      var port = (io.justsearch.app.api.operations.OperationStore) java.lang.reflect.Proxy.newProxyInstance(
+          getClass().getClassLoader(), new Class<?>[] {io.justsearch.app.api.operations.OperationStore.class},
+          (proxy, method, args) -> {
+            final Object result;
+            try { result = method.invoke(store, args); }
+            catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+            if (prune && method.getName().equals("find") && result instanceof Optional<?> optional
+                && optional.orElse(null) instanceof io.justsearch.app.api.operations.OperationRecord row
+                && row.state().terminal()) {
+              clock.setMillis(CLOCK.millis() + java.time.Duration.ofDays(31).toMillis());
+              store.pruneHistory();
+            }
+            return result;
+          });
+      var runner = new OperationAttemptRunnerImpl(port, CLOCK, Set.of(OperationKind.INGEST));
+      var attempt = runner.accept(request);
+      var receipt = new OperationReceipt("SUCCESS", "existing-effect");
+      runner.reconcile(OperationKind.INGEST, row -> {
+        assertTrue(store.finish(row.id(), OperationState.COMPLETE, receipt).isPresent());
+        return new OperationAttemptRunner.Reconciliation.Resume(handle -> {
+          fail("A terminal winner must not repeat its effect");
+          return null;
+        });
+      });
+      var terminal = attempt.completion().toCompletableFuture().join();
+      assertEquals(OperationState.COMPLETE, terminal.state());
+      assertEquals(receipt, terminal.receipt());
+      assertEquals(prune, store.find(request.key()).isEmpty());
+      assertFalse(runner.persistenceFailure().toCompletableFuture().isDone());
+    }
+  }
+
   @Test
   void ignoredPreStartRefusalIsNotMistakenForSuccessfulRefusal() throws Exception {
     try (var store = store()) {
