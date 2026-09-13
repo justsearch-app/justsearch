@@ -153,7 +153,7 @@ jobs:
           key: tauri-bundler-${{ runner.os }}-v2
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
