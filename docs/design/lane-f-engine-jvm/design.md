@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-13: C2-4 requires the existing journal durability barrier before source acknowledgement, including retained retries; [mechanism and proof](evidence/C2/C2-4-plan.md#journal-barrier-before-acknowledgement).
+
 - 2026-09-13: C2-4 records the row-owned acknowledgement, protected retention and pre-v5 historical delivery boundary in [the owning plan](evidence/C2/C2-4-plan.md#completion-acknowledgement-and-retention). This mechanism does not change stage or merge placement.
 
 Written 2026-09-06 in place (owner waived append-only while the design is unlocked). Review one

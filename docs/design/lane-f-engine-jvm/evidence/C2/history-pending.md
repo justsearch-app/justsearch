@@ -43,3 +43,14 @@ snapshot/replay still need implementation/proof. No C2-4 or lane closure. Full10
 predates these changes; coherent full, installed-v5 and hosted proof remain owed.
 Do not reuse successful installed-v2 evidence for v5. Hosted runners remain an
 external allocation gap; F/PR1 merge placement is unchanged.
+
+## Independent source review
+
+Reviewer c2_pending_source_review independently reread2bcaee280..652949e43, checked
+source SHA-256 values against the manifest, and found no actionable source defect.
+The review confirms atomic marker writes, bounded/keyed reads/ack, protected pruning,
+transactional v4 migration and fault/cap/restart evidence. Final1150 executed104
+tests; main PMD reused successful1146 inputs, while test PMD and integration compiled
+in1150. Add the sole-projector ArchUnit rule with its actual consumer; no production
+ack caller exists in this prerequisite. Full/installed-v5/hosted/consumer proof stays
+open. No reviewer test execution or completed batch review is claimed.

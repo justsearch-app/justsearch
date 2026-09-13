@@ -254,3 +254,13 @@ the journal retention is smaller than source retention. The source stays retaine
 until the sink accepts; sink failure stops a drain before newer acknowledgement.
 The subsequent attachment owns retry scheduling, shutdown and publication ordering;
 the bit alone is not an active completion consumer or finished C2-4 proof.
+
+## Journal barrier before acknowledgement
+
+Decision,2026-09-13: existing ActionEventJournal append must force its file before
+returning accepted. The ordinary atomic-replacement helper owns replacement, not
+append/rotation, so reuse this journal owner rather than introducing another writer.
+An uncertain force can leave a complete parseable line; a retained retry therefore
+forces the actual numbered/active generation before it may discharge pending source
+delivery. Injected failure/rotation tests prove ordering and no duplicate. This is
+not a claim of physical power-loss testing or a new file-format guarantee.

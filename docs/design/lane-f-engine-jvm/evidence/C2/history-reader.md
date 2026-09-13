@@ -57,3 +57,13 @@ close C2-4, batch2, stage C or the lane. Full1059 predates these C2-4 changes; a
 coherent full run and installed-v4 recovery remain required. Latest observed
 head7b5248442 CI34753477130 is pending and CLA34753476241 queued, awaiting external
 runner allocation. No hosted success is inferred; merge placement remains F/PR1.
+
+## Independent reader review: correction in progress
+
+Reviewer c2_reader_review independently reread7b5248442..2bcaee280 and found a P2
+cross-kind identity collision: ActionLedgerController accepts any Effect id, so a
+client can first post operation:<K> and suppress the real operation with key K in
+the globally deduplicated ring and ring-first snapshot. The SQL reader/projection
+and both bootstrap paths otherwise had no separate finding. Root accepted the
+ingress correction and cross-kind regression as the next item before source
+attachment. The historical live probe did not cover the ledger collision.

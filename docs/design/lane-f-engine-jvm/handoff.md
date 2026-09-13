@@ -10,6 +10,16 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
+**Immediate next item after journal force (2026-09-13):** independent reader review
+found that caller-supplied Effect ids can collide with operation:<key>, hiding a
+later operation in the ledger ring/snapshot. Root owns the ingress namespace fix
+and cross-kind regression before source attachment. [Reader finding](evidence/C2/history-reader.md#independent-reader-review-correction-in-progress).
+The pending-source review found no defects. Journal force/retry is now verified:
+negative1155/1157, final1158 passes47 represented cases (32 execute), independent
+review clear after adding rotated-generation proof. [Sink proof](evidence/C2/journal-force.md).
+No completion consumer is active yet; continue its append/ack/retry/shutdown path
+and atomic SSE after the collision correction. Full/installed-v5/hosted remain owed.
+
 **Latest C2-4 pending-source cut (2026-09-13):** schema v5 atomically marks visible
 completions and pre-start refusals as pending projection. Bounded reads and keyed
 acknowledgement share the operations owner; pending rows survive startup/age/cap

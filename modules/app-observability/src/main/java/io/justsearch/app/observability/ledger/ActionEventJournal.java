@@ -96,6 +96,7 @@ public final class ActionEventJournal {
   private final Path auditDir;
 
   private final long maxGenerationBytes;
+  private final DurabilityBarrier durability;
 
   // Newest-last mirror of the journal's newest TAIL_CAPACITY events. Guarded by `this`.
   private final Deque<ActionEvent> tailMirror = new ArrayDeque<>();
@@ -105,8 +106,13 @@ public final class ActionEventJournal {
   private boolean retainedIndexReady;
 
   private ActionEventJournal(Path auditDir, long maxGenerationBytes) {
+    this(auditDir, maxGenerationBytes, ActionEventJournal::forceFile);
+  }
+
+  private ActionEventJournal(Path auditDir, long maxGenerationBytes, DurabilityBarrier durability) {
     this.auditDir = auditDir;
     this.maxGenerationBytes = maxGenerationBytes;
+    this.durability = java.util.Objects.requireNonNull(durability, "durability");
     if (auditDir != null) {
       try {
         seedRetainedState();
@@ -143,6 +149,19 @@ public final class ActionEventJournal {
     return new ActionEventJournal(auditDir, maxGenerationBytes);
   }
 
+  static ActionEventJournal at(Path auditDir, long maxGenerationBytes, DurabilityBarrier durability) {
+    return new ActionEventJournal(auditDir, maxGenerationBytes, durability);
+  }
+
+  @FunctionalInterface
+  interface DurabilityBarrier { void force(Path path) throws IOException; }
+
+  private static void forceFile(Path path) throws IOException {
+    try (var channel = java.nio.channels.FileChannel.open(path, StandardOpenOption.WRITE)) {
+      channel.force(true);
+    }
+  }
+
   /** True when this kind's lifetime is a durable guarantee rather than ring residency. */
   public static boolean isDurableKind(ActionEvent.ActionEventKind kind) {
     return DURABLE_KINDS.contains(kind);
@@ -159,7 +178,7 @@ public final class ActionEventJournal {
   }
 
   /**
-   * Append one event if its kind is durable. Synchronous: the line is on disk when this returns.
+   * Append one event if its kind is durable. Success crosses the file durability barrier.
    * Returns true only if this event is now (or already was) retained by the durable sink.
    * Disabled/non-durable inputs return false. An IO failure is logged and returns false; it
    * cannot change the action that produced the event. Callers may retry the same id.
@@ -170,7 +189,7 @@ public final class ActionEventJournal {
     }
     try {
       if (!retainedIndexReady) seedRetainedState();
-      if (isRetained(event.id())) return true;
+      if (forceRetained(event.id())) return true;
       byte[] line =
           (MAPPER.writeValueAsString(ActionLedgerProjection.toWireRow(event)) + "\n")
               .getBytes(StandardCharsets.UTF_8);
@@ -179,6 +198,7 @@ public final class ActionEventJournal {
       preserveLineBoundary();
       Files.write(
           activeFile(), line, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+      durability.force(activeFile());
       retainedIds.computeIfAbsent(0, ignored -> new java.util.HashSet<>()).add(event.id());
       rememberInTail(event);
       return true;
@@ -193,6 +213,18 @@ public final class ActionEventJournal {
 
   private boolean isRetained(String id) {
     return retainedIds.values().stream().anyMatch(ids -> ids.contains(id));
+  }
+
+  private boolean forceRetained(String id) throws IOException {
+    for (var retained : retainedIds.entrySet()) {
+      if (retained.getValue().contains(id)) {
+        // A previous write may have reached a complete line and then failed its force/close.
+        // Parsing that line during retry cannot by itself discharge the source obligation.
+        durability.force(retained.getKey() == 0 ? activeFile() : generation(retained.getKey()));
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Keep a killed writer's trailing fragment separate from the next complete record. */

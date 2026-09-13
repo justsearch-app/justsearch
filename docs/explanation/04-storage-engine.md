@@ -324,7 +324,9 @@ Recent history is a bounded SQL projection of visible terminal rows, ordered by
 completion time and row id. Its latest200-row display window does not delete the
 underlying operations. The same metadata projection serves committed live entries;
 optional operationKey distinguishes repeated invocations of one operation and
-supplies the new committed action-ledger identity. Legacy/uncommitted live failure
+supplies the new committed action-ledger identity. The existing audit journal forces
+the record file before accepting append, including the actual retained generation
+on deduplicated retry after an uncertain write. Legacy/uncommitted live failure
 observations have no committed key. A live STORAGE_FAILED observation cannot add a
 terminal row to durable history. Version5 adds a row-owned history_pending bit:
 new visible terminal transitions and pre-start refusals set it atomically. The
