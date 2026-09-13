@@ -156,7 +156,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     runMeta.put("startedAt", startedAt);
     runMeta.put("updatedAt", startedAt);
     runMeta.put("state", "RUNNING");
-    runMeta.put("background", false);
+    runMeta.put("background", background);
     // Tempdoc 565 §15.C fix — a synthetic opening "user" turn so the RECORD-side thread projection
     // (AgentLoopService.firstUserMessage) yields the trigger row, matching the live FE turn.
     runMeta.put(
