@@ -766,7 +766,12 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   destroy(): void {
     this.approvalLookupRevision++;
     this.stopPolling();
+    if (this.sessionId) cancelAuthorizationsForRun(this.sessionId);
     this.abortController?.abort();
+    this.abortController = null;
+    this.isStreaming = false;
+    this.runKind = null;
+    this.pendingAutoApprovals = [];
     this.reasoning.destroy();
     this.autonomyUnsub?.();
     this.autonomyUnsub = null;
@@ -972,6 +977,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   private handleToolCallEntry(payload: unknown, status: 'proposed' | 'pending'): void {
+    if (status === 'pending' && !this.replayMode && !this.isStreaming) return;
     const data = payload as Record<string, unknown>;
     const callId = data.callId as string;
     // Tempdoc 834 §6.1 — a call can reach this point twice for the same hold: the `state_snapshot`
@@ -1032,7 +1038,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const revision = this.approvalLookupRevision;
     const isCurrent = (): boolean => revision === this.approvalLookupRevision
       && this.toolCalls[callId] === pendingCall && pendingCall?.status === 'pending'
-      && (this.sessionId ?? undefined) === owningRunId && !this.replayMode;
+      && (this.sessionId ?? undefined) === owningRunId && this.isStreaming && !this.replayMode;
     try {
       if (!owningRunId) throw new Error('Approval has no live run identity');
       const query = new URLSearchParams({ sessionId: owningRunId, callId });
@@ -1839,6 +1845,34 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.conversation = updated;
   }
 
+  /** The existing abort handle owns delivery and cleanup; replacing a view does not cancel its backend run. */
+  private beginStream(sessionId: string | null = null, preserveApprovals = false): AbortController {
+    if (!preserveApprovals) {
+      this.approvalLookupRevision++;
+      if (this.sessionId) cancelAuthorizationsForRun(this.sessionId);
+      this.pendingAutoApprovals = [];
+    }
+    this.abortController?.abort();
+    const stream = new AbortController();
+    this.abortController = stream;
+    this.sessionId = sessionId;
+    return stream;
+  }
+
+  private dispatchStreamEvent(stream: AbortController, event: string, payload: unknown): void {
+    if (this.abortController !== stream || stream.signal.aborted || !this.isStreaming || this.replayMode) return;
+    this.dispatchEvent(event, payload);
+  }
+
+  private finishStream(stream: AbortController): void {
+    if (this.abortController !== stream) return;
+    this.liveWatchdog.clear();
+    this.commitStreamingText();
+    this.abortController = null;
+    this.isStreaming = false;
+    this.notify();
+  }
+
   // --- HTTP dispatch ---
 
   /**
@@ -1847,6 +1881,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    *     the sizing decision in the one place that can see the model's `n_ctx`.
    */
   async send(message: string, effort?: string): Promise<void> {
+    const stream = this.beginStream();
     this.conversation = [
       ...this.conversation,
       { id: this.nextEntryId(), type: 'user', content: message, timestamp: Date.now() },
@@ -1869,7 +1904,6 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.liveWatchdogFired = false; // Tempdoc 604 — clear any stale watchdog flag from a prior run.
     this.notify();
 
-    this.abortController = new AbortController();
     this.liveWatchdog.kick(); // Tempdoc 604 — arm liveness detection even if the first frame never lands.
     try {
       // Tempdoc 521 §16.1 deeper (Phase C) — AgentView consumes
@@ -1905,10 +1939,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
           // cannot see `n_ctx`. Omitted when the caller named no rung — the backend defaults it.
           ...(effort ? { effort } : {}),
         },
-        onEvent: (event, payload) => this.dispatchEvent(event, payload),
-        signal: this.abortController.signal,
+        onEvent: (event, payload) => this.dispatchStreamEvent(stream, event, payload),
+        signal: stream.signal,
       });
     } catch (e) {
+      if (this.abortController !== stream) return;
       if ((e as Error).name === 'AbortError') {
         if (!this.liveWatchdogFired) {
           this.commitStreamingText();
@@ -1941,11 +1976,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         this.onError({ error: friendlyStreamError(e) });
       }
     } finally {
-      this.liveWatchdog.clear(); // Tempdoc 604 — the stream concluded; disarm the watchdog.
-      this.commitStreamingText();
-      this.abortController = null;
-      this.isStreaming = false;
-      this.notify();
+      this.finishStream(stream);
     }
   }
 
@@ -1958,6 +1989,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * are gracefully ignored by `dispatchEvent` (no handler = no-op).
    */
   async runWorkflow(workflowId: string): Promise<void> {
+    const stream = this.beginStream();
     this.conversation = [
       ...this.conversation,
       {
@@ -1975,7 +2007,6 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.errorHandledDuringStream = false;
     this.notify();
 
-    this.abortController = new AbortController();
     try {
       await streamViaHost({
         host_: this.host_,
@@ -1985,10 +2016,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
           workflowId,
           ...(this.conversationId ? { conversationId: this.conversationId } : {}),
         },
-        onEvent: (event, payload) => this.dispatchEvent(event, payload),
-        signal: this.abortController.signal,
+        onEvent: (event, payload) => this.dispatchStreamEvent(stream, event, payload),
+        signal: stream.signal,
       });
     } catch (e) {
+      if (this.abortController !== stream) return;
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -1997,10 +2029,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         this.onError({ error: friendlyStreamError(e) });
       }
     } finally {
-      this.commitStreamingText();
-      this.abortController = null;
-      this.isStreaming = false;
-      this.notify();
+      this.finishStream(stream);
     }
   }
 
@@ -2067,6 +2096,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    */
   private concludeRunCeremonies(runId: string | null | undefined): void {
     this.approvalLookupRevision++;
+    this.pendingAutoApprovals = [];
     if (!runId) return;
     const denied = cancelAuthorizationsForRun(runId);
     if (denied > 0) {
@@ -2081,25 +2111,30 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   async cancelSession(): Promise<void> {
-    this.abortController?.abort();
-    if (this.sessionId) {
+    const sessionId = this.sessionId;
+    const stream = this.abortController;
+    this.abortController = null;
+    stream?.abort();
+    this.commitStreamingText();
+    this.isStreaming = false;
+    this.runKind = null;
+    this.liveWatchdog.clear();
+    this.concludeRunCeremonies(sessionId);
+    this.notify();
+    if (sessionId) {
       try {
         await authorizedFetch(
-          `${this.apiBase}/api/chat/sessions/${encodeURIComponent(this.sessionId)}`,
+          `${this.apiBase}/api/chat/sessions/${encodeURIComponent(sessionId)}`,
           { method: 'DELETE' },
         );
       } catch {
-        // ignore
+        // Local cancellation is complete even when the backend is unreachable.
       }
     }
-    this.commitStreamingText();
-    this.isStreaming = false;
-    this.runKind = null; // §33 — run halted: idle again
-    this.concludeRunCeremonies(this.sessionId); // Tempdoc 605 Move 2 — halting a run drains its open ceremonies.
-    this.notify();
   }
 
   async resumeSession(sessionId: string): Promise<void> {
+    const stream = this.beginStream();
     this.streamingText = '';
     this.lastStreamedAnswer = '';
     this.isStreaming = true;
@@ -2107,15 +2142,15 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.errorHandledDuringStream = false;
     this.notify();
 
-    this.abortController = new AbortController();
     try {
       await consumeShapeStream(
         `${this.apiBase}/api/chat/sessions/${encodeURIComponent(sessionId)}/resume`,
         null,
-        (event, payload) => this.dispatchEvent(event, payload),
-        this.abortController.signal,
+        (event, payload) => this.dispatchStreamEvent(stream, event, payload),
+        stream.signal,
       );
     } catch (e) {
+      if (this.abortController !== stream) return;
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -2124,10 +2159,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         this.onError({ error: friendlyStreamError(e) });
       }
     } finally {
-      this.commitStreamingText();
-      this.abortController = null;
-      this.isStreaming = false;
-      this.notify();
+      this.finishStream(stream);
     }
   }
 
@@ -2138,6 +2170,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * fresh live run, not a replay of the source) and streams the new run through the SAME dispatch.
    */
   async forkRun(sessionId: string, editedMessage: string): Promise<void> {
+    const stream = this.beginStream();
     this.exitReplay();
     this.streamingText = '';
     this.lastStreamedAnswer = '';
@@ -2146,15 +2179,15 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.errorHandledDuringStream = false;
     this.notify();
 
-    this.abortController = new AbortController();
     try {
       await consumeShapeStream(
         `${this.apiBase}/api/chat/sessions/${encodeURIComponent(sessionId)}/fork`,
         { editedMessage },
-        (event, payload) => this.dispatchEvent(event, payload),
-        this.abortController.signal,
+        (event, payload) => this.dispatchStreamEvent(stream, event, payload),
+        stream.signal,
       );
     } catch (e) {
+      if (this.abortController !== stream) return;
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -2163,10 +2196,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         this.onError({ error: friendlyStreamError(e) });
       }
     } finally {
-      this.commitStreamingText();
-      this.abortController = null;
-      this.isStreaming = false;
-      this.notify();
+      this.finishStream(stream);
     }
   }
 
@@ -2190,7 +2220,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * emits it, `AgentController.java:486`.)
    */
   async attachToRun(sessionId: string): Promise<void> {
-    this.sessionId = sessionId;
+    const stream = this.beginStream(sessionId, this.sessionId === sessionId);
     this.streamingText = '';
     // Tempdoc 859 §A — `lastStreamedAnswer` is deliberately KEPT here, unlike at every other
     // run-start site: an attach re-joins a run that is already in flight, so prose it committed
@@ -2202,16 +2232,16 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.liveWatchdogFired = false; // Tempdoc 604 — clear any stale watchdog flag from a prior run.
     this.notify();
 
-    this.abortController = new AbortController();
     this.liveWatchdog.kick(); // Tempdoc 604 — detect a reattach that connects but never delivers a frame.
     try {
       await consumeShapeStream(
         `${this.apiBase}/api/chat/runs/${encodeURIComponent(sessionId)}/observe`,
         null,
-        (event, payload) => this.dispatchEvent(event, payload),
-        this.abortController.signal,
+        (event, payload) => this.dispatchStreamEvent(stream, event, payload),
+        stream.signal,
       );
     } catch (e) {
+      if (this.abortController !== stream) return;
       const notFound = (e as { runNotFound?: RunNotFoundDetail }).runNotFound;
       if (notFound) {
         // The managed route's answer to "that run is unknown or retired" — the same outcome the
@@ -2240,11 +2270,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         this.onError({ error: friendlyStreamError(e) });
       }
     } finally {
-      this.liveWatchdog.clear(); // Tempdoc 604 — the reattach concluded; disarm the watchdog.
-      this.commitStreamingText();
-      this.abortController = null;
-      this.isStreaming = false;
-      this.notify();
+      this.finishStream(stream);
     }
   }
 

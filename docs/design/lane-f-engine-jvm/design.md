@@ -443,6 +443,8 @@ it is history, not a second current contract. Evidence records retain the experi
 
 | 2026-09-13 | **C2-3 workflow metadata posture correction.** Persist the existing server-owned background argument in run metadata at both start and completion. The prior hardcoded false made a background workflow appear interactive. Keep caller audience enforcement unchanged; the nested LLM audience refusal exposed by the new fixture requires a separate integration/terminal-outcome check before C2-3 acceptance. | C2-3c; [metadata proof](evidence/C2/workflow-meta.md); negative1042 and final1043 |
 
+| 2026-09-13 | **C2-3 stream-owner correction.** A read revision alone cannot identify a late frame or old cleanup. Bind all five stream paths to their existing AbortController object, require live state for pending calls and ignore stale callbacks/catch/finally. Replacement clears unknown AUTO work and invalidates approval reads; same-run reattach preserves its gate. Finish local cancellation before awaiting DELETE. This reuses the existing stream owner instead of adding another generation registry. | C2-3c; [stream proof](evidence/C2/stream-owner.md); negative1044/1051 and full1050 |
+
 **2026-09-10 corrections from the inference-host design audits** (four read-only audits at
 `4229f1091`, `docs/design/inference-host/evidence/audits/`), inside decided lines: (a) sections
 4 and 5 name "query NER" as a request-time consumer; `NerService` is reached only from

@@ -167,6 +167,7 @@ afterEach(() => {
 // ==================== G1 migration: SSE event handling ====================
 
 describe('AgentSessionController SSE handlers (G1 migration)', () => {
+  beforeEach(() => { ctrl.isStreaming = true; ctrl.runKind = 'agent'; });
   // ===== 1. session_started =====
   it('onSessionStarted sets sessionId', () => {
     ctrl.onSessionStarted({ sessionId: 'sess-123' });
@@ -1496,6 +1497,7 @@ describe('AgentSessionController interaction methods', () => {
 
   // ===== auto-approval driven by the autonomy dial (§32 unify) =====
   it('backend AUTO verdict: queues callId when sessionId is null, flushes (approves) on session_started', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     // Tempdoc 561 P-D collapse: the FE OBEYS the backend gateBehavior. The backend decided AUTO
     // (e.g. a read-only call under assist) — the FE auto-approves; it no longer re-derives from risk.
     const fetchSpy = mockFetchLiveApprovals(ctrl);
@@ -1516,6 +1518,7 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('the backend verdict is the SOLE auto-approval authority: AUTO approves, non-AUTO does not', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     ctrl.sessionId = 'sess-z';
     const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
@@ -1544,6 +1547,7 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('assist + LOW: calls approveCall immediately when sessionId is set', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('assist');
     ctrl.sessionId = 'sess-y';
     const fetchSpy = mockFetchLiveApprovals(ctrl);
@@ -1558,6 +1562,7 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('assist: does NOT auto-approve MEDIUM or HIGH', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('assist');
     ctrl.sessionId = 'sess-z';
     const fetchSpy = mockFetchLiveApprovals(ctrl);
@@ -1571,6 +1576,7 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('backend AUTO: auto-approves MEDIUM directly; backend typed_confirm HIGH routes to the ceremony host', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     ctrl.sessionId = 'sess-a';
     const fetchSpy = mockFetchLiveApprovals(ctrl);
     globalThis.fetch = fetchSpy;
@@ -1597,6 +1603,7 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('watch: auto-approves NOTHING — routes even LOW through the ceremony host', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('watch'); // watch → manual approval for everything
     ctrl.sessionId = 'sess-b';
     const fetchSpy = mockFetchLiveApprovals(ctrl);
@@ -1615,6 +1622,7 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('ceremony APPROVAL drives the unified approve endpoint (tempdoc 550 C3 / 565 §15.C)', async () => {
+    ctrl.isStreaming = true; ctrl.runKind = 'agent';
     setAutonomyLevel('watch'); // everything manual → routes to the ceremony
     ctrl.sessionId = 'sess-c';
     const fetchSpy = mockFetchLiveApprovals(ctrl);
@@ -1633,6 +1641,7 @@ describe('AgentSessionController interaction methods', () => {
 });
 
 describe('private live tool approval display', () => {
+  beforeEach(() => { ctrl.isStreaming = true; ctrl.runKind = 'agent'; });
   const pending = { callId: 'private-call', toolName: 'event-alias', arguments: 'PRIVATE_INPUT',
     risk: 'LOW', gateBehavior: 'inline_confirm' };
   const detail = { callId: 'private-call', operationId: 'core.frozen-target', argsSummary: 'Frozen server target',

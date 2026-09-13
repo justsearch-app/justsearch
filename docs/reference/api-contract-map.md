@@ -52,6 +52,10 @@ complete summary and server gate/risk fields. A failed, missing or malformed loo
 refuses the pending action with a notice; replayed raw arguments cannot replace the
 private display. Run conclusion, replacement and call completion invalidate an
 in-flight lookup. Explicit backend AUTO approvals keep their existing path.
+Each stream's abort handle owns event delivery, failure handling and cleanup, so a
+replaced stream cannot prompt for approval or end the new run. Pending frames need
+a live run. Reattaching to the same run preserves its pending approval; replacing
+the run clears queued AUTO calls until the new run establishes its own identity.
 
 ### Engine admission and cancellation
 

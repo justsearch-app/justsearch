@@ -64,8 +64,12 @@ Full1038 reports one architecture failure among10292 cases: three obsolete agent
 overloads. Their removal passes772 executed agent/launcher cases at1039;
 [cleanup proof](evidence/C2/agent-cleanup.md). Workflow metadata is corrected with76 passing tests
 at1043 and real-store direct/nested proof; [metadata evidence](evidence/C2/workflow-meta.md).
-Next fix late/replaced-stream approval delivery and resolve the nested LLM audience
-refusal/terminal-record path exposed by1041, then repeat integrated proof.
+Stream ownership is corrected with6508 passing frontend tests at1050 and162
+focused tests at1052 after the cleanup negative; [stream proof](evidence/C2/stream-owner.md).
+Next resolve the nested LLM audience/refusal terminal-record path exposed by1041,
+then repeat integrated proof. The read-only mapping locates the projected workflow
+bridge passing AGENT instead of its source workflow audience; retain engine audience
+checks and terminalize workflow metadata when a node throws.
 Next: remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
