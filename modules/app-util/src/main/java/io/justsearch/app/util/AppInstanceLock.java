@@ -23,16 +23,15 @@ public final class AppInstanceLock implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(AppInstanceLock.class);
 
   /**
-   * Tempdoc 501 §3.7: tracks dataDirs for which this JVM already holds an exclusive lock.
+   * Tempdoc 501 §3.7: tracks owners and failed-close reservations for dataDirs in this JVM.
    * Required because {@code FileChannel.tryLock()} throws {@link OverlappingFileLockException}
    * on a second acquisition in the same JVM, even from a different {@link FileChannel}.
    *
    * <p>HeadlessApp acquires the lock early in boot; KnowledgeServerBootstrap (which also
-   * calls {@code .acquire()} for the standalone-test launch path) consults this set to skip
+   * calls {@code .acquire()} for the standalone-test launch path) consults these owners to skip
    * its own acquisition when the Head already holds the lock for the same dataDir.
    */
-  private static final java.util.Set<Path> HELD_IN_JVM =
-      java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+  private static final java.util.Map<Path, AppInstanceLock> HELD_IN_JVM = new java.util.HashMap<>();
 
   /**
    * Returns {@code true} if this JVM already holds an exclusive lock for {@code dataDir}.
@@ -42,7 +41,8 @@ public final class AppInstanceLock implements AutoCloseable {
   public static boolean isHeldByThisJvm(Path dataDir) {
     synchronized (HELD_IN_JVM) {
       try {
-        return HELD_IN_JVM.contains(dataDir.toRealPath());
+        var owner = HELD_IN_JVM.get(dataDir.toRealPath());
+        return owner != null && owner.isHeld();
       } catch (IOException unavailable) {
         return false;
       }
@@ -53,6 +53,7 @@ public final class AppInstanceLock implements AutoCloseable {
   private Path canonicalDataDir;
   private FileChannel channel;
   private FileLock lock;
+  private IOException closeFailure;
 
   public AppInstanceLock(Path dataDir) {
     if (dataDir == null) {
@@ -63,7 +64,7 @@ public final class AppInstanceLock implements AutoCloseable {
   }
 
   public boolean isHeld() {
-    return lock != null && lock.isValid();
+    return closeFailure == null && channel != null && channel.isOpen() && lock != null && lock.isValid();
   }
 
   /** Acquire an exclusive lock; process exit releases it without deleting the lock file. */
@@ -74,65 +75,36 @@ public final class AppInstanceLock implements AutoCloseable {
   }
 
   private void acquireExclusive() throws IOException {
+    if (closeFailure != null) throw new AppInstanceLockException("Prior app lock close failed", closeFailure);
     if (isHeld()) return;
     Files.createDirectories(canonicalDataDir);
     canonicalDataDir = canonicalDataDir.toRealPath();
     lockPath = canonicalDataDir.resolve("app.lock");
     // Never open/close a second channel for a locally held file: on POSIX that can release
     // this JVM's existing native lock, even though its FileLock object remains valid.
-    if (HELD_IN_JVM.contains(canonicalDataDir)) {
+    if (HELD_IN_JVM.containsKey(canonicalDataDir)) {
       throw new AppInstanceLockException("Another JustSearch instance is already running for dataDir="
           + canonicalDataDir);
     }
 
-    // Open/create lock file. Keep channel open for lifetime of the lock.
-    channel =
-        FileChannel.open(
-            lockPath,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE);
-
+    // Reserve before opening: even a failed acquisition must confirm channel cleanup.
+    HELD_IN_JVM.put(canonicalDataDir, this);
     try {
-      lock = channel.tryLock(); // Exclusive lock
-      if (lock == null) {
-        closeChannelQuietly();
-        throw new AppInstanceLockException(
-            "Another JustSearch instance is already running for dataDir=" + lockPath.getParent());
-      }
-    } catch (OverlappingFileLockException e) {
-      closeChannelQuietly();
-      throw new AppInstanceLockException(
-          "Another JustSearch instance is already running for dataDir=" + lockPath.getParent(), e);
-    } catch (IOException e) {
-      closeChannelQuietly();
-      // Normalize into a clearer message for common Windows cases (AccessDenied, etc.).
-      throw new AppInstanceLockException(
-          "Failed to acquire app lock at " + lockPath + " (dataDir=" + lockPath.getParent() + ")", e);
+      channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      lock = channel.tryLock();
+      if (lock == null) throw new AppInstanceLockException(
+          "Another JustSearch instance is already running for dataDir=" + canonicalDataDir);
+      writeOwnerMetadataBestEffort();
+    } catch (IOException | RuntimeException | Error failure) {
+      try { close(); } catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (failure instanceof Error error) throw error;
+      throw new AppInstanceLockException("Failed to acquire app lock at " + lockPath, failure);
     }
-
-    // Best-effort: write metadata so humans can see who holds the lock.
-    writeOwnerMetadataBestEffort();
-
-    // Tempdoc 501 §3.7: mark in-JVM holders so re-entrant acquires from other components
-    // (e.g., KnowledgeServerBootstrap inside the same Head JVM) skip cleanly.
-    HELD_IN_JVM.add(canonicalDataDir);
 
     log.info("Acquired app lock: {}", lockPath);
   }
 
-  private void closeChannelQuietly() {
-    try {
-      if (channel != null) {
-        channel.close();
-      }
-    } catch (Exception ignored) {
-      // best effort
-    } finally {
-      channel = null;
-    }
-  }
-
-  private void writeOwnerMetadataBestEffort() {
+  private void writeOwnerMetadataBestEffort() throws IOException {
     try {
       long pid = ProcessHandle.current().pid();
       String content = "pid=" + pid + "\n" + ProcessHandle.current().info().startInstant()
@@ -142,7 +114,9 @@ public final class AppInstanceLock implements AutoCloseable {
       channel.write(ByteBuffer.wrap(content.getBytes(StandardCharsets.UTF_8)));
       channel.force(true);
     } catch (Exception e) {
-      // Best-effort only; do not fail startup.
+      if (lock == null || !lock.isValid() || channel == null || !channel.isOpen()) {
+        throw new IOException("Native exclusion lost while writing lock metadata", e);
+      }
       log.debug("Failed to write app.lock metadata (best-effort): {}", e.getMessage());
     }
   }
@@ -155,31 +129,24 @@ public final class AppInstanceLock implements AutoCloseable {
   }
 
   private void closeExclusive() {
-    boolean wasHeld = (lock != null);
-    // Release lock first, then close channel.
-    if (lock != null) {
-      try {
-        lock.release();
-      } catch (Exception ignored) {
-        // best effort
-      } finally {
-        lock = null;
-      }
+    if (closeFailure != null && channel != null && !channel.isOpen()) {
+      throw new java.io.UncheckedIOException("Native lock close remains unconfirmed; process restart required", closeFailure);
     }
-    if (channel != null) {
-      try {
-        channel.close();
-      } catch (Exception ignored) {
-        // best effort
-      } finally {
-        channel = null;
-      }
+    try {
+      // Closing the owner channel releases its locks; do not release separately while leaving
+      // an old channel whose later close could release a new owner's POSIX lock.
+      if (channel != null) channel.close();
+    } catch (IOException failure) {
+      closeFailure = failure;
+      throw new java.io.UncheckedIOException("Native lock channel did not close", failure);
+    } catch (RuntimeException | Error failure) {
+      closeFailure = new IOException("Native channel cleanup failed", failure);
+      throw failure;
     }
-    // Tempdoc 501 §3.7: clear in-JVM marker so a clean restart in the same JVM can
-    // re-acquire (relevant in tests that start/stop the Head in-process).
-    if (wasHeld) {
-      HELD_IN_JVM.remove(canonicalDataDir);
-    }
+    channel = null;
+    lock = null;
+    closeFailure = null;
+    HELD_IN_JVM.remove(canonicalDataDir, this);
   }
 
   /** Thrown when the dataDir is already in use by another JustSearch instance. */

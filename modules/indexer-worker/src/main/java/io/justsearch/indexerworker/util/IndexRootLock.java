@@ -25,12 +25,13 @@ import org.slf4j.LoggerFactory;
 public final class IndexRootLock implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(IndexRootLock.class);
 
-  private static final java.util.Set<Path> HELD_IN_JVM = new java.util.HashSet<>();
+  private static final java.util.Map<Path, IndexRootLock> HELD_IN_JVM = new java.util.HashMap<>();
 
   private final Path indexBasePath;
   private Path lockFile;
   private FileChannel channel;
   private FileLock lock;
+  private IOException closeFailure;
 
   public IndexRootLock(Path indexBasePath) {
     if (indexBasePath == null) {
@@ -56,9 +57,8 @@ public final class IndexRootLock implements Closeable {
   }
 
   private void acquireExclusive() throws IOException {
-    if (lock != null) {
-      return;
-    }
+    if (closeFailure != null) throw new IOException("Prior index lock close failed", closeFailure);
+    if (lock != null && lock.isValid() && channel != null && channel.isOpen()) return;
     Files.createDirectories(indexBasePath.getParent());
     Path realBase;
     try {
@@ -72,31 +72,24 @@ public final class IndexRootLock implements Closeable {
     }
     lockFile = realBase.resolveSibling(realBase.getFileName().toString() + ".index.lock");
     // A second channel close may release this JVM's first native lock on POSIX.
-    if (HELD_IN_JVM.contains(lockFile)) {
+    if (HELD_IN_JVM.containsKey(lockFile)) {
       throw new IOException("Index base path is already locked in this JVM: " + lockFile);
     }
-    this.channel =
-        FileChannel.open(
-            lockFile,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE);
+    HELD_IN_JVM.put(lockFile, this);
     try {
-      this.lock = channel.tryLock();
-    } catch (Exception e) {
-      close();
-      throw new IOException("Failed to acquire index root lock: " + lockFile, e);
+      channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      lock = channel.tryLock();
+      if (lock == null) throw new IOException("Index base path is already locked by another process: " + lockFile);
+      writeOwnerMetadataBestEffort();
+    } catch (IOException | RuntimeException | Error failure) {
+      try { close(); } catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (failure instanceof Error error) throw error;
+      throw new IOException("Failed to acquire index root lock: " + lockFile, failure);
     }
-    if (this.lock == null) {
-      close();
-      throw new IOException("Index base path is already locked by another process: " + lockFile);
-    }
-
-    HELD_IN_JVM.add(lockFile);
-    writeOwnerMetadataBestEffort();
     log.info("Acquired index root lock: {}", lockFile);
   }
 
-  private void writeOwnerMetadataBestEffort() {
+  private void writeOwnerMetadataBestEffort() throws IOException {
     try {
       long pid = ProcessHandle.current().pid();
       String content = "pid=" + pid + "\n" + ProcessHandle.current().info().startInstant()
@@ -106,6 +99,9 @@ public final class IndexRootLock implements Closeable {
       channel.write(ByteBuffer.wrap(content.getBytes(StandardCharsets.UTF_8)));
       channel.force(true);
     } catch (Exception e) {
+      if (lock == null || !lock.isValid() || channel == null || !channel.isOpen()) {
+        throw new IOException("Native exclusion lost while writing lock metadata", e);
+      }
       log.debug("Failed to write index lock metadata (best-effort): {}", e.getMessage());
     }
   }
@@ -118,25 +114,24 @@ public final class IndexRootLock implements Closeable {
   }
 
   private void closeExclusive() {
-    boolean wasHeld = lock != null;
-    try {
-      if (lock != null) {
-        lock.release();
-      }
-    } catch (Exception e) {
-      log.debug("Failed to release file lock on {}: {}", lockFile, e.getMessage());
-    } finally {
-      lock = null;
+    if (closeFailure != null && channel != null && !channel.isOpen()) {
+      throw new java.io.UncheckedIOException("Native lock close remains unconfirmed; process restart required", closeFailure);
     }
     try {
-      if (channel != null) {
-        channel.close();
-      }
-    } catch (Exception e) {
-      log.debug("Failed to close file channel for {}: {}", lockFile, e.getMessage());
-    } finally {
-      channel = null;
+      // Closing the owner channel releases its locks; do not release separately while leaving
+      // an old channel whose later close could release a new owner's POSIX lock.
+      if (channel != null) channel.close();
+    } catch (IOException failure) {
+      closeFailure = failure;
+      throw new java.io.UncheckedIOException("Native lock channel did not close", failure);
+    } catch (RuntimeException | Error failure) {
+      closeFailure = new IOException("Native channel cleanup failed", failure);
+      throw failure;
     }
-    if (wasHeld) HELD_IN_JVM.remove(lockFile);
+    channel = null;
+    lock = null;
+    closeFailure = null;
+    HELD_IN_JVM.remove(lockFile, this);
   }
+
 }

@@ -44,6 +44,29 @@ final class KnowledgeServerCloseCompletionTest {
   }
 
   @Test
+  void failedIndexLockCloseRetainsOwnerAndShutdownRemainsIncomplete(@TempDir Path tempDir) throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var rootLock = org.mockito.Mockito.mock(io.justsearch.indexerworker.util.IndexRootLock.class);
+    var field = KnowledgeServer.class.getDeclaredField("indexRootLock");
+    field.setAccessible(true);
+    field.set(server, rootLock);
+    var failure = new java.io.UncheckedIOException(new java.io.IOException("native close uncertain"));
+    org.mockito.Mockito.doThrow(failure).doNothing().when(rootLock).close();
+    try {
+      org.junit.jupiter.api.Assertions.assertSame(failure,
+          org.junit.jupiter.api.Assertions.assertThrows(java.io.UncheckedIOException.class, server::close));
+      assertFalse(server.awaitClosed(0));
+      org.junit.jupiter.api.Assertions.assertSame(rootLock, field.get(server));
+    } finally {
+      server.close();
+    }
+    assertTrue(server.awaitClosed(0));
+    org.junit.jupiter.api.Assertions.assertNull(field.get(server));
+    org.mockito.Mockito.verify(rootLock, org.mockito.Mockito.times(2)).close();
+  }
+
+  @Test
   void shutdownAttemptsBothFailedServiceOwnersBeforeReportingIncomplete(@TempDir Path tempDir)
       throws Exception {
     KnowledgeServer server = org.mockito.Mockito.spy(new KnowledgeServer(

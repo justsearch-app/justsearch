@@ -13,8 +13,10 @@ C2-2 implementation remains in progress.
 Final-review corrections now take priority over the pre-review green checkpoint below.
 R3's ignored start/resume is corrected with two negative controls and105 passing
 cases at877. R10 canonical index-root aliases and dangling junction refusal pass18
-cases at881, with negative controls878/880. Root next owns lock close/metadata error
-handling and queue transaction cleanup from the same final review. Fresh integrated
+cases at881, with negative controls878/880. Lock close/metadata ownership and index
+shutdown propagation pass87 cases at887 after negative884/886. Root next owns queue
+transaction cleanup, the living schema checklist and historical commit-proof mapping
+from the same final review. Fresh integrated
 proof follows the consolidated corrections.
 
 Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),

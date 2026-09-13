@@ -2491,13 +2491,10 @@ public final class KnowledgeServer implements Closeable {
         finally { luceneExecutors.close(); }
 
         if (indexRootLock != null) {
-          try {
-            indexRootLock.close();
-          } catch (Exception e) {
-            log.warn("Error closing index root lock", e);
-          } finally {
-            indexRootLock = null;
-          }
+          // Keep the failed owner available for retry and never signal completed shutdown
+          // while native lock cleanup remains unconfirmed.
+          indexRootLock.close();
+          indexRootLock = null;
         }
 
         // Stage-A checkpoint (re-review). This countdown used to sit ~90 lines earlier, where the gRPC
