@@ -164,15 +164,15 @@
       ]
     },
     {
-      "id": "adr-0015-six-mcp-tools",
+      "id": "adr-0015-seven-mcp-tools",
       "adr": "0015",
-      "premise": "The MCP surface is a small curated tool list, because small models pick badly from long lists. The count IS the decision: the canonical production ToolDefinition registry has 6 tools (answer, search, browse, ingest, status, runtime_manifest).",
+      "premise": "The MCP surface stays a short task-oriented list. ADR-0015 accepts exactly 7 canonical ToolDefinition entries: answer, search, browse, ingest, status, runtime_manifest, and the read-only operation_outcome recovery query. Any eighth entry requires re-examination; the historical four-tool accuracy result does not attest this list.",
       "kind": "grep-present",
       "pattern": "new\\s+ToolDefinition\\(\\s*\"justsearch_[a-z_]+\"",
       "paths": [
         "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java"
       ],
-      "expect": 6
+      "expect": 7
     },
     {
       "id": "adr-0016-soft-boost-not-filter",

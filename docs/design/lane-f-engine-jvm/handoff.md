@@ -15,11 +15,11 @@ requires typed witness comparison and confirmed reset with exact frozen quaranti
 It is design authority, not implemented recovery proof. Root owns the remaining migration;
 no owner input is pending and no armed ambiguous operation may be guessed FAILED.
 
-Hosted availability recovered: CI34774278228 at eec44cad1 ran all13jobs;12passed, while
-Public claims failed on the missing SettingsCommitOwner operation-surface registration.
-CLA34774277424 passed. The owner cut declares both port/coordinator consumers and local1290
-passes all three register gates; fresh hosted success remains required. Windows-native success
-is not installed-v5 recovery proof. [Evidence](evidence/C2/settings-owner.md#hosted-register-correction).
+Hosted availability recovered. CI34775117498 at15bac5f90 passed12 jobs and failed
+Public claims on ADR0015's stale six-tool premise. The prior operation-surface registration
+failure is corrected. The independently reviewed seven-tool amendment passes locally and
+rejects an eighth tool; fresh hosted success remains required. [Evidence](evidence/C2/mcp-adr.md).
+Windows-native success is not installed-v5 recovery proof.
 
 **Immediate next items (2026-09-13): C2-6 typed witness/recovery reset, then producer and Health migration.**
 The [physical file/config owner foundation](evidence/C2/settings-owner.md) passes Owner1286:

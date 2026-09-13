@@ -34,7 +34,7 @@ checked by the `adr-coverage` kernel gate, make that mechanical instead of remem
 
 ```yaml
 probes:
-  - adr-0015-six-mcp-tools
+  - adr-0015-seven-mcp-tools
 last_reviewed: 2026-09-02
 ```
 
@@ -165,7 +165,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0012](0012-ui-stack-and-doc-tooling.md) | UI Stack and Documentation Tooling | Superseded | 2026-03-16 |
 | [0013](0013-synonyms-fst-placeholder.md) | Synonyms FST Placeholder | Accepted (partially superseded by ADR-0043) | 2025-10-15 |
 | [0014](0014-pipeline-definition-removal.md) | Pipeline Definition Removal | Accepted | 2026-03-16 |
-| [0015](0015-mcp-tool-surface-design.md) | MCP tool surface design | Accepted (re-examined 2026-09-04) | 2026-04-01 |
+| [0015](0015-mcp-tool-surface-design.md) | MCP tool surface design | Accepted, seven tools (re-examined 2026-09-13) | 2026-04-01 |
 | [0016](0016-query-understanding-soft-boost.md) | Query understanding soft-boost over hard-filter | Accepted | 2026-03-28 |
 | [0017](0017-ai-bridge-module-decomposition.md) | ai-bridge module decomposition | Accepted | 2026-04-06 |
 | [0018](0018-vlm-pdf-extraction-via-chat-model.md) | VLM PDF extraction via chat model | Accepted | 2026-03-23 |

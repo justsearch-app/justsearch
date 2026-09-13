@@ -165,7 +165,7 @@ public final class McpToolSurface {
       pendingAuthorizationChanges;
   private final List<ToolDefinition> toolDefinitions;
   private final Map<String, ToolLifecycle> lifecycleCatalog;
-  // Tempdoc 655: boundary schema validation, applied uniformly to all 6 tools regardless of
+  // Tempdoc 655: boundary schema validation, applied uniformly to all production tools regardless of
   // which backend path (direct in-process call vs. Operation dispatch) ultimately serves them —
   // stateless/cache-only, so a private instance per surface is fine.
   private final io.justsearch.app.services.registry.executor.OperationInputSchemaValidator
