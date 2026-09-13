@@ -38,7 +38,8 @@ Frozen approval reference delivery and domain-separated consent pass422 represen
 cases at975; [approval prerequisite proof](evidence/C2/prepared-approval.md).
 Connected dispatcher/cipher wiring now passes424 cases at984, including real admission ownership and two negative controls; [dispatcher proof](evidence/C2/prepared-dispatch.md).
 HTTP exact-reference delivery and typed locked ingress pass284 cases at988; [ingress proof](evidence/C2/prepared-ingress.md).
-Next: frontend exact-reference retries, frozen approval preview and agent/workflow carry-through, then integrated acceptance. Hosted v3 proof remains
+Frontend exact-reference retries and immutable approval input pass6480 tests at992, with typecheck/lint and UI coverage green; [client proof](evidence/C2/prepared-client.md).
+Next: frozen approval preview and agent/workflow carry-through, then integrated acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 
