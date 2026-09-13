@@ -277,10 +277,8 @@ final class RootLifecycleOps {
                 if (!watchedRoots.containsKey(normalized)) {
                     return;
                 }
-                if (admittedTotal[0] == 0) {
-                    watchedRootsState.markWalkFailed(normalized, e.getMessage());
-                    watchedRootsState.persist();
-                }
+                watchedRootsState.markWalkFailed(normalized, e.getMessage());
+                watchedRootsState.persist();
             }
         }
     }

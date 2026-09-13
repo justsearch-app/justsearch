@@ -1228,17 +1228,20 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private <T> T inTransaction(SqlWork<T> work) throws SQLException {
     boolean wasAutoCommit = connection.getAutoCommit();
     connection.setAutoCommit(false);
+    T result;
     try {
-      T result = work.run();
+      result = work.run();
       connection.commit();
-      if (changeStream != null) changeStream.commitSucceeded();
-      return result;
     } catch (SQLException | RuntimeException e) {
       connection.rollback();
       throw e;
     } finally {
       connection.setAutoCommit(wasAutoCommit);
     }
+    // Projection failure cannot roll back an already committed mutation. Preserve the failure
+    // for the caller, without executing the SQL failure/rollback path after commit succeeded.
+    if (changeStream != null) changeStream.commitSucceeded();
+    return result;
   }
 
   @Override

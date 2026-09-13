@@ -4,12 +4,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
@@ -67,6 +76,39 @@ final class IndexingJobsChangeStreamTest {
     assertEquals(1, jobQueue.changeStream().currentSeq());
 
     s.subscription().close();
+  }
+
+  @Test
+  void projectionFailureAfterCommitDoesNotRollbackPersistedJob() throws Exception {
+    Path dbPath = tempDir.resolve("jobs.db");
+    Path jobPath = tempDir.resolve("projection-failure.txt");
+    Connection originalConnection = readField("connection", Connection.class);
+    IndexingJobsChangeStream originalChangeStream = jobQueue.changeStream();
+    Connection connectionSpy = spy(originalConnection);
+    IndexingJobsChangeStream changeStreamSpy = spy(originalChangeStream);
+    RuntimeException projectionFailure = new RuntimeException("projection failure");
+    doThrow(projectionFailure).when(changeStreamSpy).commitSucceeded();
+    writeField("connection", connectionSpy);
+    writeField("changeStream", changeStreamSpy);
+
+    try {
+      RuntimeException thrown =
+          assertThrows(RuntimeException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+      assertSame(projectionFailure, thrown, "the projection failure must reach the caller intact");
+      verify(connectionSpy).commit();
+      verify(connectionSpy, never()).rollback();
+
+      try (Connection observer = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+          var statement = observer.createStatement();
+          var rows = statement.executeQuery("SELECT state FROM jobs")) {
+        assertTrue(rows.next(), "the committed job must remain visible to another connection");
+        assertEquals("PENDING", rows.getString(1));
+        assertFalse(rows.next(), "the fixture should contain exactly one inserted job");
+      }
+    } finally {
+      writeField("connection", originalConnection);
+      writeField("changeStream", originalChangeStream);
+    }
   }
 
   /**
@@ -237,5 +279,17 @@ final class IndexingJobsChangeStreamTest {
       }
       assertEquals(n, deltas.size(), "expected " + n + " deltas, got " + deltas.size());
     }
+  }
+
+  private <T> T readField(String name, Class<T> type) throws ReflectiveOperationException {
+    Field field = SqliteJobQueue.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return type.cast(field.get(jobQueue));
+  }
+
+  private void writeField(String name, Object value) throws ReflectiveOperationException {
+    Field field = SqliteJobQueue.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(jobQueue, value);
   }
 }

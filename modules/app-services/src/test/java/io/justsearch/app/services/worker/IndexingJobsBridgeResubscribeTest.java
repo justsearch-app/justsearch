@@ -45,6 +45,44 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("indexing-jobs bridge — re-subscribe after flow failure (review blocker 2)")
 final class IndexingJobsBridgeResubscribeTest {
   @Test
+  void replacementSnapshotsResetFailureCapAndKeepAutomaticRecoveryAlive() {
+    var registry = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    var registration = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.Registration.class);
+    var scheduler = org.mockito.Mockito.mock(java.util.concurrent.ScheduledExecutorService.class);
+    org.mockito.Mockito.when(registry.limits(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(new io.justsearch.core.execution.EngineExecutorRegistry.Limits(1, 32));
+    org.mockito.Mockito.when(registry.register(org.mockito.ArgumentMatchers.any())).thenReturn(registration);
+    org.mockito.Mockito.when(registration.openScheduled(org.mockito.ArgumentMatchers.any())).thenReturn(scheduler);
+    var pending = new java.util.ArrayDeque<Runnable>();
+    org.mockito.Mockito.when(scheduler.schedule(org.mockito.ArgumentMatchers.any(Runnable.class),
+        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.eq(TimeUnit.MILLISECONDS)))
+        .thenAnswer(invocation -> { pending.addLast(invocation.getArgument(0)); return null; });
+    AtomicInteger attempts = new AtomicInteger();
+    AtomicInteger closed = new AtomicInteger();
+    AtomicReference<Consumer<Throwable>> error = new AtomicReference<>();
+    IndexingJobsSource source = (onFrame, onError, onCompleted) -> {
+      error.set(onError);
+      int attempt = attempts.incrementAndGet();
+      onFrame.accept(snapshotFrame(attempt, "snapshot-" + attempt));
+      return () -> closed.incrementAndGet();
+    };
+    var bridge = new RemoteIndexingJobsBridge(registry, () -> source);
+    try {
+      bridge.start().join();
+      for (int burst = 0; burst < 10; burst++) {
+        error.get().accept(new IllegalStateException("separate overload burst " + burst));
+        assertEquals(1, pending.size(), "a successful replacement snapshot resets the retry cap");
+        pending.removeFirst().run();
+      }
+      assertEquals(11, attempts.get());
+      assertEquals(10, closed.get(), "each failed subscription is closed before replacement");
+      assertEquals("snapshot-11", bridge.latestSnapshot().getFirst().pathHash());
+    } finally {
+      bridge.stop();
+    }
+  }
+
+  @Test
   void synchronousAdmissionAndExecutorRefusalUseTheExistingRetryPath() throws Exception {
     for (RuntimeException refusal : List.of(
         new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, 1),

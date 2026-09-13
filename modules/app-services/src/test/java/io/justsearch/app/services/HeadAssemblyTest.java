@@ -120,8 +120,10 @@ class HeadAssemblyTest {
           null, null, null, null, null, null, null, () -> inferenceClosed.set(true),
           null, null, null, null, null, null, null));
       assertSame(failure, assertThrows(IllegalStateException.class, head::close));
+      assertFalse(head.isDependencyTeardownStarted());
       assertFalse(inferenceClosed.get());
       head.close();
+      assertTrue(head.isDependencyTeardownStarted());
       assertTrue(inferenceClosed.get());
       org.mockito.Mockito.verify(coordinator, org.mockito.Mockito.times(2)).close();
     }
@@ -147,8 +149,36 @@ class HeadAssemblyTest {
       handlesField.setAccessible(true);
       handlesField.set(head, handles);
       assertThrows(IllegalStateException.class, head::close);
+      assertTrue(head.isDependencyTeardownStarted());
       assertEquals(List.of("SHUTDOWN"), reasons,
           "the log must stay open through the manager's final transition and drain on failure too");
+    }
+  }
+
+  @Test
+  void retentionDrainRefusalKeepsDependencyPhaseRetryable() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var head = HeadAssembly.bootForSearchPortOnly(
+            org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+            org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), executors,
+            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry(),
+            org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+      var retention = org.mockito.Mockito.mock(AutoCloseable.class);
+      var refusal = new IllegalStateException("retention task still running");
+      org.mockito.Mockito.doThrow(refusal).doNothing().when(retention).close();
+      var inferenceClosed = new java.util.concurrent.atomic.AtomicBoolean();
+      var field = HeadAssembly.class.getDeclaredField("orchestration");
+      field.setAccessible(true);
+      field.set(head, new io.justsearch.app.services.bootstrap.OrchestrationHandles(
+          null, retention, null, null, null, null, null, () -> inferenceClosed.set(true),
+          null, null, null, null, null, null, null));
+      assertThrows(IllegalStateException.class, head::close);
+      assertFalse(head.isDependencyTeardownStarted());
+      assertFalse(inferenceClosed.get());
+      head.close();
+      assertTrue(head.isDependencyTeardownStarted());
+      assertTrue(inferenceClosed.get());
+      org.mockito.Mockito.verify(retention, org.mockito.Mockito.times(2)).close();
     }
   }
 

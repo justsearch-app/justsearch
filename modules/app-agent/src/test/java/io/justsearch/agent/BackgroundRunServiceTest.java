@@ -5,6 +5,7 @@ import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.AgentEvent;
@@ -12,11 +13,16 @@ import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.api.lifecycle.AgentLifecycle;
 import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.api.operations.OperationStoreException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +53,7 @@ final class BackgroundRunServiceTest {
   /** A fake agent loop that persists + completes a run (as the real loop does) and emits its start. */
   private static final class FakeLoop implements AgentService {
     private final AgentRunStore runStore;
+    private final AtomicInteger bodyCalls = new AtomicInteger();
 
     FakeLoop(AgentRunStore runStore) {
       this.runStore = runStore;
@@ -66,6 +73,7 @@ final class BackgroundRunServiceTest {
         Consumer<AgentEvent> eventConsumer,
         boolean background,
         EngineContext engineContext) {
+      bodyCalls.incrementAndGet();
       String sid = UUID.randomUUID().toString();
       runStore.startRun(sid, request, request.messages(), 1000);
       if (background) {
@@ -74,6 +82,10 @@ final class BackgroundRunServiceTest {
       // Complete the run (state DONE, updatedAt = now) — mirrors the real loop's terminal checkpoint.
       runStore.updateCheckpoint(sid, "DONE", request.messages(), 1, 0, 120, "");
       eventConsumer.accept(new AgentEvent.SessionStarted(sid));
+    }
+
+    int bodyCalls() {
+      return bodyCalls.get();
     }
 
     @Override
@@ -165,5 +177,70 @@ final class BackgroundRunServiceTest {
     assertTrue(
         loop.presenceSince(Instant.now().minusSeconds(3600)).isEmpty(),
         "interactive runs are not background — the presence inbox stays empty");
+  }
+
+  @Test
+  @DisplayName("a closed scheduler preserves its rejection when failed refusal persistence is injected")
+  void closedSchedulerRejectionRetainsPersistenceFailure() throws Exception {
+    var runStore = new AgentRunStore(operationDirectory.resolve("agent-runs"));
+    var loop = new FakeLoop(runStore);
+    try (var registry = new TestEngineExecutors()) {
+      var background = new BackgroundRunService(attempts, loop, registry);
+      background.shutdown();
+      refuseFailedTerminalTransition();
+
+      var rejection = assertThrows(RejectedExecutionException.class,
+          () -> background.schedule(
+              AgentRequest.singleTurn(List.of(Map.of("role", "user", "content", "closed"))),
+              java.time.Duration.ZERO, EngineContextTestFixtures.AGENT_LOOP_BACKGROUND));
+      assertTrue(java.util.Arrays.stream(rejection.getSuppressed())
+          .anyMatch(failure -> failure instanceof OperationStoreException storeFailure
+              && storeFailure.code() == OperationStoreException.Code.STORAGE_FAILED),
+          "failed durable refusal is preserved on the original scheduler rejection");
+
+      var degradation = attempts.persistenceFailure().toCompletableFuture().join();
+      assertEquals(OperationState.FAILED, degradation.intendedState());
+      assertEquals(OperationState.ACCEPTED,
+          operationStore.find(degradation.operationKey()).orElseThrow().state());
+      assertEquals(0, loop.bodyCalls(), "a rejected schedule never enters the agent body");
+    }
+  }
+
+  @Test
+  @DisplayName("shutdown reports failed refusal persistence and leaves its accepted timer unresolved")
+  void shutdownRefusalPersistenceFailureIsObservable() throws Exception {
+    var runStore = new AgentRunStore(operationDirectory.resolve("agent-runs"));
+    var loop = new FakeLoop(runStore);
+    try (var registry = new TestEngineExecutors()) {
+      var background = new BackgroundRunService(attempts, loop, registry);
+      var attempt = background.schedule(
+          AgentRequest.singleTurn(List.of(Map.of("role", "user", "content", "long delay"))),
+          java.time.Duration.ofDays(1), EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+      String key = attempt.accepted().key();
+      refuseFailedTerminalTransition();
+
+      var shutdownFailure = assertThrows(OperationStoreException.class, background::shutdown);
+      assertEquals(OperationStoreException.Code.STORAGE_FAILED, shutdownFailure.code());
+      assertTrue(attempt.completion().toCompletableFuture().isCompletedExceptionally());
+      var completionFailure = assertThrows(CompletionException.class,
+          () -> attempt.completion().toCompletableFuture().join());
+      assertTrue(completionFailure.getCause() instanceof OperationStoreException,
+          "completion exposes the failed durable refusal");
+      assertEquals(OperationState.ACCEPTED, operationStore.find(key).orElseThrow().state());
+
+      var degradation = attempts.persistenceFailure().toCompletableFuture().join();
+      assertEquals(key, degradation.operationKey());
+      assertEquals(OperationState.FAILED, degradation.intendedState());
+      assertEquals(0, loop.bodyCalls(), "shutdown refusal cancels the timer before the agent body");
+    }
+  }
+
+  private void refuseFailedTerminalTransition() throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection(
+            "jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
+        var statement = connection.createStatement()) {
+      statement.execute("CREATE TRIGGER refuse_failed_terminal BEFORE UPDATE ON operations "
+          + "WHEN NEW.state = 'FAILED' BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+    }
   }
 }

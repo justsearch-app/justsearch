@@ -141,6 +141,33 @@ final class LauncherEnvironmentCloseTest {
   }
 
   @Test
+  void failedHeadCleanupAfterDrainStillClosesDependenciesAndPreservesFailures() throws Exception {
+    var telemetry = Mockito.mock(LocalTelemetry.class);
+    var environment = allocateEnvironment(telemetry, "previous-config", "false", tempDir.resolve("cleanup"));
+    var head = Mockito.mock(io.justsearch.app.services.HeadAssembly.class);
+    var operations = Mockito.mock(io.justsearch.app.api.operations.OperationStore.class);
+    var executors = Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    var lock = Mockito.mock(io.justsearch.app.util.AppInstanceLock.class);
+    setField(environment, "HeadAssembly", head);
+    setField(environment, "operations", operations);
+    setField(environment, "executors", executors);
+    setField(environment, "instanceLock", lock);
+    Mockito.when(head.isDependencyTeardownStarted()).thenReturn(true);
+    var headFailure = new IllegalStateException("head cleanup failed after drain");
+    var telemetryFailure = new IllegalStateException("telemetry cleanup failed");
+    Mockito.doThrow(headFailure).when(head).close();
+    Mockito.doThrow(telemetryFailure).when(telemetry).close();
+    var failure = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, environment::close);
+    Mockito.verify(operations).close();
+    Mockito.verify(telemetry).close();
+    Mockito.verify(executors).close();
+    Mockito.verify(lock).close();
+    org.junit.jupiter.api.Assertions.assertSame(headFailure, failure);
+    org.junit.jupiter.api.Assertions.assertArrayEquals(new Throwable[] {telemetryFailure}, failure.getSuppressed());
+    assertEquals("previous-config", System.getProperty("justsearch.config"));
+  }
+
+  @Test
   void failedHeadDrainRetainsDependenciesAndASecondCloseRetries() throws Exception {
     System.setProperty("justsearch.config", "active-config");
     System.setProperty("egress.block_all", "true");

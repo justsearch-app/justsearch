@@ -1040,12 +1040,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     BoundedHandoff<IndexingJobsFrame> flow =
         refuseIfSaturated(
             () ->
-                new BoundedHandoff<>(
-                    "indexing-jobs-flow",
+                indexingJobsHandoff(
                     onFrame,
                     onError,
-                    body -> executeOwnedStream(work, body, true),
-                    BoundedHandoff.Backpressure.FAIL_FAST));
+                    body -> executeOwnedStream(work, body, true)));
     try {
       FlowCancelSignal cancel = new FlowCancelSignal();
       var subscriptionOwner = work.retain();
@@ -1105,6 +1103,31 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       flow.close();
       throw failure;
     }
+  }
+
+  static BoundedHandoff<IndexingJobsFrame> indexingJobsHandoff(
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError,
+      java.util.concurrent.Executor delivery) {
+    return new BoundedHandoff<>("indexing-jobs-flow", onFrame, onError, delivery,
+        BoundedHandoff.Backpressure.FAIL_FAST, EngineKnowledgeClient::indexingJobsPath,
+        (previous, latest) -> {
+          // An unobserved INSERT followed by UPDATE must still introduce the row to listeners.
+          if (previous.getDelta().hasInsert() && latest.getDelta().hasUpdate()) {
+            return latest.toBuilder().setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder()
+                .setInsert(latest.getDelta().getUpdate())).build();
+          }
+          return latest;
+        });
+  }
+
+  private static String indexingJobsPath(IndexingJobsFrame frame) {
+    if (!frame.hasDelta()) return null;
+    return switch (frame.getDelta().getChangeCase()) {
+      case INSERT -> frame.getDelta().getInsert().getPathHash();
+      case UPDATE -> frame.getDelta().getUpdate().getPathHash();
+      case DELETE_PATH_HASH -> frame.getDelta().getDeletePathHash();
+      case CHANGE_NOT_SET -> null;
+    };
   }
 
   private static io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance enqueueProvenance(

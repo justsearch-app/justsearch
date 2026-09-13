@@ -259,17 +259,41 @@ final class LauncherEnvironment implements AutoCloseable {
   public void close() {
     // A retained procedure can still write to operations and use telemetry/configuration.
     // Propagate refusal and leave a later close able to finish after the body exits.
-    if (HeadAssembly != null) HeadAssembly.close();
-    try { operations.close(); } catch (IOException failure) {
-      throw new java.io.UncheckedIOException("Operations store did not close; retaining its instance lock", failure);
+    Throwable failure = null;
+    try {
+      if (HeadAssembly != null) HeadAssembly.close();
+    } catch (RuntimeException | Error headFailure) {
+      if (!HeadAssembly.isDependencyTeardownStarted()) throw headFailure;
+      failure = headFailure;
+    }
+    try { operations.close(); } catch (IOException storeFailure) {
+      var retained = new java.io.UncheckedIOException(
+          "Operations store did not close; retaining its instance lock", storeFailure);
+      if (failure != null) retained.addSuppressed(failure);
+      throw retained;
+    } catch (RuntimeException | Error storeFailure) {
+      if (failure != null && failure != storeFailure) storeFailure.addSuppressed(failure);
+      throw storeFailure;
     }
     try {
       telemetry.close();
-    } finally {
-      try { executors.close(); } finally {
-        try { if (instanceLock != null) instanceLock.close(); } finally { restoreProperties(); }
-      }
+    } catch (RuntimeException | Error cleanupFailure) {
+      failure = appendCloseFailure(failure, cleanupFailure);
     }
+    try { executors.close(); }
+    catch (RuntimeException | Error cleanupFailure) { failure = appendCloseFailure(failure, cleanupFailure); }
+    try { if (instanceLock != null) instanceLock.close(); }
+    catch (RuntimeException | Error cleanupFailure) { failure = appendCloseFailure(failure, cleanupFailure); }
+    try { restoreProperties(); }
+    catch (RuntimeException | Error cleanupFailure) { failure = appendCloseFailure(failure, cleanupFailure); }
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    if (failure instanceof Error error) throw error;
+  }
+
+  private static Throwable appendCloseFailure(Throwable previous, Throwable failure) {
+    if (previous == null) return failure;
+    if (previous != failure) previous.addSuppressed(failure);
+    return previous;
   }
 
   static io.justsearch.core.execution.EngineExecutorRegistry loadExecutors(

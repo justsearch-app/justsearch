@@ -1507,12 +1507,23 @@ public final class HeadAssembly implements AutoCloseable {
     return substrateOut == null ? null : substrateOut.operationOut().capabilitiesChangeRegistry();
   }
 
+  /** Whether the drain barrier passed and dependency teardown began, even if cleanup then failed. */
+  public boolean isDependencyTeardownStarted() {
+    return closed.get();
+  }
+
   /** §4 F4 LIFO teardown via the typed OrchestrationHandles record. */
   @Override
   public void close() {
     // Repeatable termination barrier: an unfinished procedure must leave a later close able to
     // finish dependency teardown. Never claim the one-shot closed state before this succeeds.
     if (offlineCoordinator != null) offlineCoordinator.close();
+    io.justsearch.app.services.bootstrap.OrchestrationHandles handles = this.orchestration;
+    if (!closed.get() && handles != null && handles.operationsRetention() != null) {
+      try { handles.operationsRetention().close(); }
+      catch (RuntimeException failure) { throw failure; }
+      catch (Exception failure) { throw new IllegalStateException("Operations retention did not drain", failure); }
+    }
     if (!closed.compareAndSet(false, true)) return;
     if (serviceOut != null) {
       try {
@@ -1539,7 +1550,6 @@ public final class HeadAssembly implements AutoCloseable {
         log.warn("Failed to close ReadinessReconciliationTrigger", e);
       }
     }
-    io.justsearch.app.services.bootstrap.OrchestrationHandles handles = this.orchestration;
     try {
       RuntimeException failure = null;
       for (var scan : unlockScans) {
@@ -1549,7 +1559,7 @@ public final class HeadAssembly implements AutoCloseable {
           else failure.addSuppressed(closeFailure);
         }
       }
-      try { if (handles != null) handles.close(); }
+      try { if (handles != null) handles.withOperationsRetention(null).close(); }
       catch (RuntimeException closeFailure) {
         if (failure == null) failure = closeFailure;
         else failure.addSuppressed(closeFailure);

@@ -341,6 +341,9 @@ public final class RemoteIndexingJobsBridge {
                   }
                   List<IndexingJobView> immutable = List.copyOf(items);
                   cached.set(new CachedSnapshot(frame.getSeq(), immutable));
+                  // Separate overload bursts must not exhaust a lifetime cap after recovery.
+                  // Keep the delay backoff: snapshot-then-immediate-failure must not busy-loop.
+                  recentAttempts.clear();
                   emit(new Delta.SnapshotReplaced(frame.getSeq(), immutable));
                   if (!snapshotDelivered.isDone()) {
                     snapshotDelivered.complete(null);

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
+import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -25,8 +26,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p><b>The bound, and the two policies.</b> {@value #DEFAULT_CAPACITY} elements. What happens on a
  * full queue depends on <em>what the producer's thread is holding</em>, which is why it is a
- * constructor choice and not a global rule — see {@link Backpressure}. Neither policy drops:
- * dropping is the one option ruled out for both.
+ * constructor choice and not a global rule — see {@link Backpressure}. Neither policy drops
+ * unresolved state. The jobs feed may coalesce pending deltas for the same path into its latest
+ * state; distinct paths and snapshot barriers remain ordered and retain the same capacity bound.
  *
  * <p>Never drop-oldest, and the reason is specific to what these streams carry rather than a
  * general preference. Both are <em>ordered state deltas folded into a keyed cache by the consumer</em>
@@ -108,6 +110,8 @@ final class BoundedHandoff<T> implements AutoCloseable {
   private final ArrayBlockingQueue<T> queue;
   private final long offerTimeoutMs;
   private final Backpressure backpressure;
+  private final java.util.function.Function<T, String> coalescingKey;
+  private final java.util.function.BinaryOperator<T> coalesce;
   private final AtomicBoolean closed = new AtomicBoolean(false);
   private final AtomicBoolean failed = new AtomicBoolean(false);
   private final AtomicReference<Runnable> onClose = new AtomicReference<>();
@@ -116,14 +120,16 @@ final class BoundedHandoff<T> implements AutoCloseable {
   private final String name;
 
   /**
-   * Accepted and delivered counts, compared by {@link #drainAndClose}. Two monotonic counters
+   * Accepted and delivered counts, compared by {@link #drainAndClose}. Two counters
    * rather than "is the queue empty and is the consumer idle?": that pair has a window between the
    * delivery loop taking a frame off the queue and marking itself busy, in which a drain would
    * conclude the flow was finished and close over an in-flight frame. Counters have no such window
    * — provided {@code accepted} is incremented BEFORE the frame enters the queue, which it is; the
    * other order has the same window it was meant to remove (offer succeeds, the delivery loop takes
    * and counts the frame, and only then does the producer count it, so a concurrent drain reads
-   * {@code delivered >= accepted} over a queue that is not empty and clears it).
+   * {@code delivered >= accepted} over a queue that is not empty and clears it). Coalescing
+   * uncounts the removed pending frame only after counting its replacement, so a drain still
+   * waits for the latest logical state and never waits for a superseded frame.
    */
   private final AtomicLong accepted = new AtomicLong();
 
@@ -146,10 +152,28 @@ final class BoundedHandoff<T> implements AutoCloseable {
       Backpressure backpressure,
       int capacity,
       long offerTimeoutMs) {
+    this(name, sink, onError, deliveryThread, backpressure, capacity, offerTimeoutMs, null, null);
+  }
+
+  BoundedHandoff(
+      String name, Consumer<T> sink, Consumer<Throwable> onError, Executor deliveryThread,
+      Backpressure backpressure, java.util.function.Function<T, String> coalescingKey,
+      java.util.function.BinaryOperator<T> coalesce) {
+    this(name, sink, onError, deliveryThread, backpressure, DEFAULT_CAPACITY,
+        DEFAULT_OFFER_TIMEOUT_MS, coalescingKey, coalesce);
+  }
+
+  private BoundedHandoff(
+      String name, Consumer<T> sink, Consumer<Throwable> onError, Executor deliveryThread,
+      Backpressure backpressure, int capacity, long offerTimeoutMs,
+      java.util.function.Function<T, String> coalescingKey,
+      java.util.function.BinaryOperator<T> coalesce) {
     this.name = name;
     this.sink = sink;
     this.onError = onError;
     this.backpressure = backpressure;
+    this.coalescingKey = coalescingKey;
+    this.coalesce = coalesce;
     this.queue = new ArrayBlockingQueue<>(capacity);
     this.offerTimeoutMs = offerTimeoutMs;
     deliveryThread.execute(this::deliver);
@@ -216,7 +240,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
    */
   private boolean offerUnderPolicy(T frame) throws InterruptedException {
     if (backpressure == Backpressure.FAIL_FAST) {
-      return queue.offer(frame);
+      return offerWithoutWaiting(frame);
     }
     long remainingMs = offerTimeoutMs;
     while (remainingMs > 0) {
@@ -230,6 +254,36 @@ final class BoundedHandoff<T> implements AutoCloseable {
       remainingMs -= slice;
     }
     return false;
+  }
+
+  /**
+   * Replace pending keyed state only; a null key is an ordering barrier (the initial snapshot).
+   * Removal and appending preserve sequence order across other paths. The consumer may take a
+   * candidate concurrently; failed removal then leaves it delivered and enqueues the new frame.
+   * No second keyed cache is retained and the producer never waits for delivery or queue space.
+   */
+  private boolean offerWithoutWaiting(T frame) {
+    if (coalescingKey == null) return queue.offer(frame);
+    synchronized (queue) {
+      String key = coalescingKey.apply(frame);
+      if (key != null) {
+        var pending = new ArrayList<T>(queue);
+        for (int i = pending.size() - 1; i >= 0; i--) {
+          T previous = pending.get(i);
+          String previousKey = coalescingKey.apply(previous);
+          if (previousKey == null) break;
+          if (key.equals(previousKey)) {
+            T replacement = coalesce.apply(previous, frame);
+            if (queue.remove(previous)) {
+              accepted.decrementAndGet();
+              frame = replacement;
+            }
+            break;
+          }
+        }
+      }
+      return queue.offer(frame);
+    }
   }
 
   /**
