@@ -12,14 +12,13 @@ import java.util.Map;
  * is a free-shape JSON object whose schema is operation-specific and declared on the
  * Operation registry entry.
  *
- * <p>{@code idempotencyKey}: opt-in client-supplied UUID for backend deduplication. V1
- * accepts the field but does not yet enforce dedup (tracked as deferred follow-up; per
- * slice 3a-1-2 §A.5, OperationExecutorImpl has no dedup map).
+ * <p>{@code idempotencyKey}: optional canonical UUIDv7 for durable operation lookup. Matching
+ * public input returns the recorded outcome without preparing or executing again; changed input
+ * conflicts. Unkeyed accepted calls receive an Engine-minted key in the response metadata.
  *
  * <p>{@code confirmationToken}: opt-in for HIGH-risk operations. The
- * {@code OperationPolicy.confirm} axis (per the registry entry) determines whether the
- * controller enforces presence; V1 trusts the FE ActionButton to gate UX and forwards
- * the typed-confirmation string here. Future slices add backend enforcement.
+ * {@code OperationPolicy.confirm} axis and backend trust lattice determine the gate. The token is
+ * a single-use consent capsule bound to the operation and its arguments, never a typed UI string.
  *
  * <p>Stability: stable (API contract).
  */

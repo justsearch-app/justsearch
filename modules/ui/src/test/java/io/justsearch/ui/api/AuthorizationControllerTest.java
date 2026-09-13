@@ -132,6 +132,26 @@ class AuthorizationControllerTest {
   }
 
   @Test
+  void approvedDispatchRetainsTypedKeyFailureWithoutItsPrivateCause() throws Exception {
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
+    var dispatcher = mock(OperationDispatcher.class);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any()))
+        .thenThrow(new io.justsearch.app.api.operations.OperationStoreException(
+            io.justsearch.app.api.operations.OperationStoreException.Code.OPERATION_KEY_REUSED,
+            new IllegalStateException("private prepared content")));
+    var controller = new AuthorizationController(capsuleService, pendingStore, null, dispatcher, catalogs, admission);
+    String pendingId = createPending("core.ingest-files");
+    var ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+    controller.handleApprove(ctx);
+    var body = capturedJson(ctx);
+    assertEquals(Boolean.FALSE, body.get("executeSuccess"));
+    assertEquals("OPERATION_KEY_REUSED", body.get("executeErrorCode"));
+    assertEquals("CONFLICT", body.get("executeErrorClass"));
+    assertFalse(body.toString().contains("private prepared content"));
+  }
+
+  @Test
   void approve_withExecuteTrue_dispatchesUsingStoredArgsAndReportsSuccess() throws Exception {
     var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);

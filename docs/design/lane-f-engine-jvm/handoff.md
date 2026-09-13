@@ -24,8 +24,9 @@ lookup before preparation, separated prepared payload and approval carry-through
 
 C2-3 is now in progress: validated lookup is committed at382b19a5c with294 passing
 represented cases at909. The keyed dispatcher SPI/receipt branch passes333 cases
-at913 after negative910/912. Next: connect HTTP invoke/undo key delivery and typed
-failure mapping, then prepared persistence, pending approval and remaining ingress.
+at913 after negative910/912. HTTP invoke/undo key delivery, typed failures and approval key/mode carry-through
+and approved-result key/error projection now pass265 represented cases at923.
+Next: MCP key delivery, then prepared persistence and frozen approval payloads.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 
 The following paragraphs retain the pre-review correction checkpoints; current

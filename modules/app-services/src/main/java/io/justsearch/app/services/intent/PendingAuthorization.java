@@ -65,7 +65,9 @@ public record PendingAuthorization(
     String requestedBy,
     TransportTag transport,
     io.justsearch.core.context.EngineContext engineContext,
-    io.justsearch.agent.api.registry.InvocationProvenance provenance) {
+    io.justsearch.agent.api.registry.InvocationProvenance provenance,
+    String operationKey,
+    boolean undo) {
 
   public PendingAuthorization {
     Objects.requireNonNull(id, "id");

@@ -317,12 +317,34 @@ public final class AuthorizationController {
       // request shape it originally used, capsule added.
       io.justsearch.agent.api.registry.InvocationProvenance provenance =
           pending.provenance();
-      io.justsearch.agent.api.registry.OperationResult result =
-          dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
-              executionContext);
+      io.justsearch.agent.api.registry.OperationResult result;
+      if (pending.undo()) {
+        String executionId = MAPPER.readTree(pending.argsJson()).path("executionId").asText();
+        result = pending.operationKey() == null
+            ? dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule), executionContext)
+            : dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey());
+      } else {
+        result = pending.operationKey() == null
+            ? dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule), executionContext)
+            : dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey());
+      }
       payload.put("executed", true);
       payload.put("executeSuccess", result.success());
       payload.put("executeMessage", result.message());
+      if (result.structuredData().get("operationKey") instanceof String key) {
+        payload.put("operationKey", key);
+        payload.put("operationRecordId", result.structuredData().get("operationRecordId"));
+      }
+    } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
+      var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
+      payload.put("executed", false);
+      payload.put("executeSuccess", false);
+      payload.put("executeMessage", response.message());
+      payload.put("executeErrorClass", response.errorClass());
+      payload.put("executeErrorCode", response.errorCode());
+      payload.put("executeRetryable", response.retryable());
     } catch (Exception e) {
       log.warn("Tempdoc 655: server-side execution of approved pending {} failed", pending.id(), e);
       payload.put("executed", false);

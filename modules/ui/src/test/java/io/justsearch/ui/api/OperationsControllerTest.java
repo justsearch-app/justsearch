@@ -65,6 +65,109 @@ final class OperationsControllerTest {
     return MAPPER.readTree(body.getValue());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void invocationAndUndoForwardTheSuppliedKey(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var result = OperationResult.success("recorded", Map.of("operationKey", key, "operationRecordId", 7));
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
+        .thenReturn(OperationResult.success("key was dropped"));
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
+        .thenReturn(OperationResult.success("key was dropped"));
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenReturn(result);
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenReturn(result);
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context ctx = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key + "\"}");
+    if (undo) {
+      controller.handleUndo(ctx);
+      verify(dispatcher).undo(any(), eq("exec-1"), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key));
+    } else {
+      controller.handleInvoke(ctx);
+      verify(dispatcher).dispatch(any(), eq("{}"), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key));
+    }
+    verify(ctx).status(200);
+    assertEquals(key, capture(ctx).path("structuredData").path("operationKey").asText());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "INVALID_OPERATION_KEY,400,BAD_REQUEST,OPERATION_KEY_INVALID,false",
+      "OPERATION_KEY_REUSED,409,CONFLICT,OPERATION_KEY_REUSED,false",
+      "OPERATION_EXPIRED,409,CONFLICT,OPERATION_KEY_EXPIRED,false",
+      "OPERATIONS_CAPACITY,503,UNAVAILABLE,OPERATIONS_CAPACITY,true",
+      "STORAGE_FAILED,500,HANDLER_ERROR,OPERATION_STORAGE_FAILED,false"
+  })
+  void keyFailuresKeepTheirPublicCodeAndDoNotExposeNativeCauses(
+      io.justsearch.app.api.operations.OperationStoreException.Code code,
+      int status, String errorClass, String publicCode, boolean retryable) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var failure = new io.justsearch.app.api.operations.OperationStoreException(code,
+        new IllegalStateException("private SQL and invocation contents"));
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenThrow(failure);
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenThrow(failure);
+    for (boolean undo : new boolean[] {false, true}) {
+      String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+      Context ctx = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key + "\"}");
+      if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+      verify(ctx).status(status);
+      var response = capture(ctx);
+      assertEquals(errorClass, response.path("errorClass").asText());
+      assertEquals(publicCode, response.path("errorCode").asText());
+      assertEquals(retryable, response.path("retryable").asBoolean());
+      org.junit.jupiter.api.Assertions.assertFalse(response.toString().contains("private SQL"));
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void approvalRetainsTheOriginalKeyAndInvokeOrUndoMode(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var catalog = new CoreOperationCatalog();
+    var pending = new io.justsearch.app.services.intent.PendingAuthorizationStore();
+    controller = new OperationsController(List.of(catalog), dispatcher, java.time.Clock.systemUTC(), pending);
+    var refusal = new io.justsearch.agent.api.registry.ConfirmationRequiredException(
+        new io.justsearch.agent.api.registry.OperationRef("core.ping-backend"),
+        io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM,
+        io.justsearch.agent.api.registry.ConfirmStrategy.None.INSTANCE,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED);
+    var success = OperationResult.success("approved once", Map.of("operationKey", key, "operationRecordId", 7));
+    if (undo) {
+      when(dispatcher.undo(any(), eq("exec-1"), any(), any(), any(EngineContext.class), eq(key)))
+          .thenThrow(refusal).thenReturn(success);
+    } else {
+      when(dispatcher.dispatch(any(), eq("{}"), any(), any(), any(EngineContext.class), eq(key)))
+          .thenThrow(refusal).thenReturn(success);
+    }
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context original = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key + "\"}");
+    if (undo) controller.handleUndo(original); else controller.handleInvoke(original);
+    String pendingId = capture(original).path("pendingId").asText();
+    var recorded = pending.peek(pendingId).orElseThrow();
+    assertEquals(key, recorded.operationKey());
+    assertEquals(undo, recorded.undo());
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
+    var approval = new AuthorizationController(new io.justsearch.app.services.intent.ConsentCapsuleService(),
+        pending, null, dispatcher, List.of(catalog), admission);
+    Context approve = mockContext("unused", "{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    when(approve.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+    approval.handleApprove(approve);
+    var approved = capture(approve);
+    assertTrue(approved.path("executeSuccess").asBoolean());
+    assertEquals(key, approved.path("operationKey").asText());
+    assertEquals(7, approved.path("operationRecordId").asLong());
+    if (undo) {
+      verify(dispatcher, org.mockito.Mockito.times(2)).undo(any(), eq("exec-1"), any(), any(), any(EngineContext.class), eq(key));
+      verify(dispatcher, org.mockito.Mockito.never()).dispatch(any(), any(), any(), any(), any(EngineContext.class), any());
+    } else {
+      verify(dispatcher, org.mockito.Mockito.times(2)).dispatch(any(), eq("{}"), any(), any(), any(EngineContext.class), eq(key));
+    }
+    assertTrue(pending.peek(pendingId).isEmpty());
+  }
+
   @Test
   @DisplayName("happy path — known operation, dispatcher returns success")
   void happyPath() throws Exception {

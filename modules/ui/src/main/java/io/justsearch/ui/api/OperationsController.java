@@ -32,8 +32,8 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <ul>
  *   <li>Request body: {@link OperationInvocationRequest} with {@code args},
- *       {@code idempotencyKey} (deferred per §A.5), {@code confirmationToken} (FE-trust
- *       in V1; backend enforcement is a follow-up).
+ *       {@code idempotencyKey} (durable UUIDv7 identity), {@code confirmationToken} (backend-verified
+ *       single-use consent capsule).
  *   <li>Success response (HTTP 200): {@link OperationInvocationResponse} with
  *       {@code success=true} carrying handler {@code message} + optional
  *       {@code executionId} + {@code structuredData}.
@@ -47,10 +47,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>Handler threw uncaught (HTTP 500): {@code errorClass=HANDLER_ERROR}.
  * </ul>
  *
- * <p>HIGH-risk confirmation enforcement is the FE ActionButton's responsibility in V1
- * (per slice 3a-1-2 §A.7); the controller forwards {@code confirmationToken} unchanged
- * to the dispatcher (which currently ignores it). Backend defense-in-depth lands in a
- * future slice.
+ * <p>The dispatcher enforces the backend trust lattice and consumes bound consent capsules.
+ * A known operation key returns its metadata receipt without authorizing a second effect.
  */
 public final class OperationsController {
 
@@ -174,12 +172,15 @@ public final class OperationsController {
             ? Optional.empty()
             : Optional.of(request.confirmationToken());
     try {
-      result = dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx));
+      result = request.idempotencyKey() == null
+          ? dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx))
+          : dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken,
+              RequestEngineContext.get(ctx), request.idempotencyKey());
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Slice 487 §4.4: the lattice produced a non-AUTO gate and no token was supplied.
       // Surface the gate behavior + the destination's ConfirmStrategy so the FE can
       // render trust-aware elicitation UX and re-invoke with the token.
-      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance);
+      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance, request.idempotencyKey(), false);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -187,6 +188,9 @@ public final class OperationsController {
           403,
           "Trust gate denied operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+      writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
       log.warn("Operation handler threw for id={}", op.id().value(), e);
@@ -224,7 +228,7 @@ public final class OperationsController {
         engineContext, executor, clock.instant(), Optional.empty());
   }
 
-  /** Handles {@code POST /api/operations/{id}/undo}. */
+  /** Handles {@code POST /api/undo/{id}}. */
   public void handleUndo(Context ctx) {
     String idValue = ctx.pathParam("id");
     if (idValue == null || idValue.isBlank()) {
@@ -239,6 +243,7 @@ public final class OperationsController {
     }
 
     String executionId;
+    String operationKey;
     Optional<String> confirmationToken;
     try {
       String body = ctx.body();
@@ -253,6 +258,12 @@ public final class OperationsController {
         return;
       }
       executionId = eidNode.asText();
+      var keyNode = parsed.get("idempotencyKey");
+      if (keyNode != null && !keyNode.isNull() && !keyNode.isTextual()) {
+        writeError(ctx, 400, "idempotencyKey must be a string", "BAD_REQUEST");
+        return;
+      }
+      operationKey = keyNode == null || keyNode.isNull() ? null : keyNode.asText();
       // Tempdoc 875 §C.7: undo now meets the trust lattice, so it accepts the same
       // confirmationToken the invoke path does — the FE re-posts with a minted capsule
       // after the 428 below.
@@ -270,7 +281,9 @@ public final class OperationsController {
     InvocationProvenance provenance = resolveProvenance(ctx);
     OperationResult result;
     try {
-      result = dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx));
+      result = operationKey == null
+          ? dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx))
+          : dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx), operationKey);
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Same typed 428 the invoke path emits — the capsule the FE mints must bind to the
       // reversal's canonical arguments, which is what is echoed here.
@@ -279,7 +292,7 @@ public final class OperationsController {
           op,
           e,
           OperationDispatcher.undoArguments(executionId),
-          provenance);
+          provenance, operationKey, true);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -287,6 +300,9 @@ public final class OperationsController {
           403,
           "Trust gate denied undo of operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+      writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
       log.warn("Undo handler threw for id={}, executionId={}", op.id().value(), executionId, e);
@@ -336,6 +352,17 @@ public final class OperationsController {
     writeResponse(ctx, status, OperationInvocationResponse.error(message, errorClass));
   }
 
+  private void writeStoreFailure(Context ctx, io.justsearch.app.api.operations.OperationStoreException failure) {
+    var response = OperationInvocationResponse.fromStoreFailure(failure);
+    int status = switch (response.errorClass()) {
+      case "BAD_REQUEST" -> 400;
+      case "CONFLICT" -> 409;
+      case "UNAVAILABLE" -> 503;
+      default -> 500;
+    };
+    writeResponse(ctx, status, response);
+  }
+
   /**
    * Slice 487 §4.4: surface a non-AUTO gate decision as a typed HTTP response so
    * the FE can render trust-aware elicitation UX and re-invoke with a token.
@@ -358,7 +385,7 @@ public final class OperationsController {
       Operation op,
       io.justsearch.agent.api.registry.ConfirmationRequiredException e,
       String argumentsJson,
-      InvocationProvenance provenance) {
+      InvocationProvenance provenance, String operationKey, boolean undo) {
     java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("success", false);
     body.put("errorClass", io.justsearch.app.api.ApiErrorCode.CONFIRMATION_REQUIRED.name());
@@ -388,7 +415,7 @@ public final class OperationsController {
               e.gateBehavior(),
               e.getMessage(),
               null,
-              provenance.transport(), RequestEngineContext.get(ctx), provenance);
+              provenance.transport(), RequestEngineContext.get(ctx), provenance, operationKey, undo);
       body.put("pendingId", pendingId);
       // Tempdoc 655: also broadcast on the pending-authorization SSE stream, so the shell
       // (already open, potentially on a different view than whatever triggered this 428) has one
