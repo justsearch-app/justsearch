@@ -157,6 +157,7 @@ final class OperationHistoryReadTest {
       String narrow = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(store.recentHistory(200));
       assertFalse(narrow.contains("private-prepared-target"));
       assertFalse(narrow.contains(pending.nonce().toString()));
+      assertTrue(store.acknowledgeHistoryProjection(key));
       clock.setMillis(clock.millis() + OperationStore.HISTORY_RETENTION.toMillis() + 1);
       store.pruneHistory();
       assertTrue(history.recent().isEmpty());

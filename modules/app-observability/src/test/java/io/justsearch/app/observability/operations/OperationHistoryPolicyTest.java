@@ -115,7 +115,7 @@ final class OperationHistoryPolicyTest {
     assertEquals(0, scalar("SELECT count(*) FROM pragma_table_info('operations') WHERE name='history_mode'"));
     assertEquals(1, scalar("SELECT count(*) FROM operations WHERE preparation_payload='frozen'"));
     try (var store = new SqliteOperationStore(path())) {
-      assertEquals(4, scalar("PRAGMA user_version"));
+      assertEquals(5, scalar("PRAGMA user_version"));
       var legacy = store.find(key).orElseThrow();
       assertEquals(OperationHistoryMode.NONE, legacy.historyMode());
       assertNull(legacy.provenanceOccurredAt());

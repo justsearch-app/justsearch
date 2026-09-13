@@ -187,6 +187,9 @@ public final class SqliteOperationStore implements OperationStore {
         }
         if (version <= 3) {
           OperationSchema.migrateV3(statement);
+        }
+        if (version <= 4) {
+          OperationSchema.migrateV4(statement);
           statement.execute("PRAGMA user_version = " + OperationSchema.VERSION);
         }
         try (var update = connection.prepareStatement(
@@ -597,7 +600,8 @@ public final class SqliteOperationStore implements OperationStore {
   public OperationRecord rejectBeforeStart(long id, OperationReceipt receipt) {
     var transition = locked(() -> {
       try (var update = connection.prepareStatement("""
-          UPDATE operations SET state = 'FAILED', completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?
+          UPDATE operations SET state = 'FAILED', completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?,
+            history_pending = CASE WHEN history_mode = 'NONE' THEN 0 ELSE 1 END
           WHERE id = ? AND state = 'ACCEPTED'
           """)) {
         long now = clock.millis();
@@ -638,7 +642,8 @@ public final class SqliteOperationStore implements OperationStore {
     String resultJson = JSON.writeValueAsString(receipt);
     java.util.Optional<OperationRecord> completed = locked(() -> {
       try (var update = connection.prepareStatement("""
-          UPDATE operations SET state = ?, completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?
+          UPDATE operations SET state = ?, completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?,
+            history_pending = CASE WHEN history_mode = 'NONE' THEN 0 ELSE 1 END
           WHERE id = ? AND state IN ('ACCEPTED', 'RUNNING', 'COMPLETE_WITH_GAPS')
           """)) {
         long now = clock.millis();
@@ -683,6 +688,27 @@ public final class SqliteOperationStore implements OperationStore {
 
   @Override
   public List<OperationHistoryRow> recentHistory(int limit) {
+    return historyRows(limit, false);
+  }
+
+  @Override
+  public List<OperationHistoryRow> pendingHistoryProjection(int limit) {
+    return historyRows(limit, true);
+  }
+
+  @Override
+  public boolean acknowledgeHistoryProjection(String key) {
+    Objects.requireNonNull(key, "key");
+    return locked(() -> {
+      try (var update = connection.prepareStatement("UPDATE operations SET history_pending = 0 "
+          + "WHERE operation_key = ? AND history_pending = 1 AND " + TERMINAL)) {
+        update.setString(1, key);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  private List<OperationHistoryRow> historyRows(int limit, boolean pending) {
     if (limit < 0) throw new IllegalArgumentException("History limit must be non-negative");
     return locked(() -> {
       if (limit == 0) return List.of();
@@ -692,9 +718,11 @@ public final class SqliteOperationStore implements OperationStore {
             session_id, grant_ref, source_tier, transport, executor, initiator, correlation_id,
             state, history_mode, accepted_at, completed_at, provenance_occurred_at, failure_reason, result_json
           FROM operations WHERE history_mode != 'NONE' AND
-          """ + TERMINAL + " ORDER BY completed_at DESC, id DESC LIMIT ?";
+          """ + TERMINAL + (pending
+              ? " AND history_pending = 1 ORDER BY completed_at, id LIMIT ?"
+              : " ORDER BY completed_at DESC, id DESC LIMIT ?");
       try (var query = connection.prepareStatement(sql)) {
-        query.setInt(1, Math.min(limit, RECENT_HISTORY_LIMIT));
+        query.setInt(1, Math.min(limit, pending ? HISTORY_PROJECTION_BATCH_LIMIT : RECENT_HISTORY_LIMIT));
         var rows = new java.util.ArrayList<OperationHistoryRow>();
         try (var result = query.executeQuery()) {
           while (result.next()) {
@@ -709,7 +737,7 @@ public final class SqliteOperationStore implements OperationStore {
                 receiptJson == null ? null : JSON.readValue(receiptJson, OperationReceipt.class)));
           }
         }
-        java.util.Collections.reverse(rows);
+        if (!pending) java.util.Collections.reverse(rows);
         return List.copyOf(rows);
       }
     });
@@ -739,7 +767,7 @@ public final class SqliteOperationStore implements OperationStore {
   private void pruneToLimit(int limit) throws SQLException {
     long fence = readHistorySince();
     try (var delete = connection.prepareStatement("DELETE FROM operations WHERE " + TERMINAL
-        + " AND completed_at < ? RETURNING operation_key")) {
+        + " AND history_pending = 0 AND completed_at < ? RETURNING operation_key")) {
       delete.setLong(1, clock.millis() - RETENTION_MS);
       try (var rows = delete.executeQuery()) { fence = evictedFence(rows, fence); }
     }
@@ -747,7 +775,7 @@ public final class SqliteOperationStore implements OperationStore {
     if (excess > 0) {
       try (var delete = connection.prepareStatement("DELETE FROM operations WHERE id IN "
           + "(SELECT id FROM operations WHERE " + TERMINAL
-          + " ORDER BY completed_at, id LIMIT ?) RETURNING operation_key")) {
+          + " AND history_pending = 0 ORDER BY completed_at, id LIMIT ?) RETURNING operation_key")) {
         delete.setLong(1, excess);
         try (var rows = delete.executeQuery()) { fence = evictedFence(rows, fence); }
       }

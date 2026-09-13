@@ -226,3 +226,31 @@ restart, query bounds/retention, privacy, repeated-operation identities, late ol
 completion, and HTTP snapshot parity. Wire/schema/register guards and live capture
 are owed in this cut. Source acknowledgement/catch-up and atomic SSE reconnect are
 not claimed merely because reads are now durable.
+
+## Completion acknowledgement and retention
+
+Decision, 2026-09-13, at2bcaee280: schema v5 adds one history_pending bit to the
+operations owner. Every new visible terminal transition, including pre-start
+rejection, sets it in the same SQL statement. Hidden NONE rows owe no history
+projection. The single projector reads bounded batches ordered by completion then
+id, uses the accepted key as sink identity, and acknowledges only durable append
+or the explicit AgentRun ownership exclusion. Memory/note kinds remain eligible
+even with AGENT_LOOP provenance. No outcome field or timestamp changes on ack.
+Pending rows survive both startup/age pruning and cap pruning; if protected/open
+rows exhaust100000 slots, admission refuses rather than losing accepted history.
+
+Earlier schema versions had no source delivery acknowledgement. Migration leaves
+already-terminal v4 rows with their prior best-effort ledger guarantee and existing
+durable recent-history visibility; it does not replay them into a possibly already
+populated legacy-id journal. Such replay cannot distinguish an old collision from
+a missing event. Open v4 rows acquire pending delivery on their eventual terminal
+transition. v1-v3 visibility remains NONE as previously decided. This explicit
+upgrade boundary avoids inventing retroactive exactly-once delivery or duplicating
+historical events. Prove the migration and rollback using a frozen v4 fixture.
+
+This bit replaces the rejected completion watermark/full-source boot replay: old
+accepted rows may complete late, numeric ids can be reused after quarantine, and
+the journal retention is smaller than source retention. The source stays retained
+until the sink accepts; sink failure stops a drain before newer acknowledgement.
+The subsequent attachment owns retry scheduling, shutdown and publication ordering;
+the bit alone is not an active completion consumer or finished C2-4 proof.

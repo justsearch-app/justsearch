@@ -10,6 +10,16 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
+**Latest C2-4 pending-source cut (2026-09-13):** schema v5 atomically marks visible
+completions and pre-start refusals as pending projection. Bounded reads and keyed
+acknowledgement share the operations owner; pending rows survive startup/age/cap
+pruning. Final1150 executes104 passing cases, with PMD/integration compilation;
+negative1148 catches both pruning regressions. Register77, release12, Rust85 and
+Java upgrade13 checks pass. [Source proof](evidence/C2/history-pending.md).
+Continue completion consumer attachment, durable sink/ack ordering, idle retry,
+memory/note fan-in, shutdown and atomic SSE. The source bit alone is not delivery.
+Installed-v5/coherent full/hosted proof remain required; no C2-4 or lane closure.
+
 **Latest C2-4 reader cut (2026-09-13):** recent history now reads bounded committed
 operations metadata; SQL/live entries share optional operationKey and the ledger
 uses it as invocation identity. Schema remains v4. Final1139 passes213 represented

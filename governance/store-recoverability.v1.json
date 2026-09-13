@@ -1513,9 +1513,9 @@
       ],
       "recoverability": "MIXED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "SQLite WAL schema v4",
-      "currentVersion": 4,
-      "readableLegacyVersions": [1, 2, 3],
+      "format": "SQLite WAL schema v5",
+      "currentVersion": 5,
+      "readableLegacyVersions": [1, 2, 3, 4],
       "versionAuthority": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
       "futureVersionRefusalTest": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
       "writeMode": "TRANSACTIONAL",
@@ -1533,9 +1533,10 @@
       ],
       "tests": [
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
-        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java"
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPendingTest.java"
       ],
-      "fixtures": ["modules/app-observability/src/test/resources/operations-v1.sql", "modules/app-observability/src/test/resources/operations-v2.sql", "modules/app-observability/src/test/resources/operations-v3.sql"]
+      "fixtures": ["modules/app-observability/src/test/resources/operations-v1.sql", "modules/app-observability/src/test/resources/operations-v2.sql", "modules/app-observability/src/test/resources/operations-v3.sql", "modules/app-observability/src/test/resources/operations-v4.sql"]
     }
   ],
   "nonDurableWriteSites": [

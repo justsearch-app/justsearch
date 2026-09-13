@@ -105,6 +105,13 @@ their own ledger retain NONE. Scope event identity with the accepted UUIDv7 key:
 the numeric database-local id can be reused after quarantine/recovery. The source
 acknowledgement/drain mechanism remains the next C2-4 cut, not completed delivery.
 
+2026-09-13: schema v5 now supplies bounded pending completion reads, keyed
+acknowledgement and retention protection. The next single projection consumer owns
+durable append before acknowledgement;955 adapts that consumer for ActionEvent.Memory
+and typed metadata rather than adding a competing acknowledgement owner. Earlier
+terminal v4 rows keep their prior best-effort ledger guarantee and recent-history
+visibility; open rows acquire the obligation when they complete after migration.
+
 C2-4's history authority exposes terminal-row catch-up plus completion subscription
 after the SQLite commit returns. Capture the bounded stream token before the durable
 snapshot, subscribe/replay atomically, and restart the snapshot if that token expires.

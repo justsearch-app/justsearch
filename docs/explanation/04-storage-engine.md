@@ -326,8 +326,15 @@ underlying operations. The same metadata projection serves committed live entrie
 optional operationKey distinguishes repeated invocations of one operation and
 supplies the new committed action-ledger identity. Legacy/uncommitted live failure
 observations have no committed key. A live STORAGE_FAILED observation cannot add a
-terminal row to durable history. Source projection catch-up and atomic SSE replay
-remain the next C2-4 mechanisms.
+terminal row to durable history. Version5 adds a row-owned history_pending bit:
+new visible terminal transitions and pre-start refusals set it atomically. The
+bounded pending read excludes private payloads; acknowledgement changes only this
+bit after sink acceptance or an explicit projection ownership exclusion. Existing
+terminal v4 rows retain their prior best-effort ledger guarantee and durable recent
+visibility; open rows acquire the obligation when they finish after migration.
+Migration does not replay old legacy ledger identities or invent past delivery.
+The source bit is implemented; completion-source attachment/catch-up and atomic SSE
+replay remain the next C2-4 mechanisms.
 
 Compatibility inspection copies a quiescent main file and WAL into a private temporary directory.
 SQLite reads that copy, including uncheckpointed committed versions, so refusing a future format
@@ -337,9 +344,11 @@ hand-written WAL parsing and SQLite's otherwise writable shared-memory side effe
 mode. Callers must exclude concurrent writers during inspection. The operations
 store uses SQLite `quick_check` for startup integrity inspection.
 
-Terminal operation rows expire after 30 days by completion time. A 100000-row cap
-evicts the oldest terminal rows first; open work and COMPLETE_WITH_GAPS are never
-evicted. If only open work fills the cap, acceptance refuses with OPERATIONS_CAPACITY.
+Terminal operation rows expire after30 days by completion time once their history
+projection is acknowledged (or the row owes no projection). A100000-row cap evicts
+eligible terminal rows first; open work, COMPLETE_WITH_GAPS and pending history
+projection survive age and capacity pruning. If protected rows fill the cap,
+acceptance refuses with OPERATIONS_CAPACITY; it never drops undelivered history.
 Pruning runs once at store open and hourly through the registered
 `head.operations-retention` timer; acceptance reserves capacity under the same store
 lock. Timer failures log ERROR and retry on the next tick. Its owner cancels and
@@ -350,7 +359,7 @@ key's UUIDv7 timestamp plus one millisecond. A present row wins over that fence;
 an absent older key is expired. A fence ahead of the clock includes its remaining
 retry delay in the store refusal. Terminal transitions return their committed row
 snapshot under the store lock, so eviction cannot erase an outcome before live
-completion publication. There is no extra retention window for those observers.
+completion publication. The pending bit retains rows until projection acknowledgement; ordinary completion observers alone do not extend retention.
 
 An unreadable operations database is preserved with its WAL and SHM in one timestamped directory.
 An interrupted `.pending` directory is resumed before creating a replacement. The replacement's

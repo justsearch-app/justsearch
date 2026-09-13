@@ -14,6 +14,17 @@ public interface OperationStore extends AutoCloseable {
   /** Latest visible terminal rows, oldest first, bounded to RECENT_HISTORY_LIMIT; no private payload SELECT. */
   java.util.List<OperationHistoryRow> recentHistory(int limit);
 
+  int HISTORY_PROJECTION_BATCH_LIMIT = 256;
+
+  /** Unacknowledged visible completions, oldest completion first; no private payload SELECT. */
+  java.util.List<OperationHistoryRow> pendingHistoryProjection(int limit);
+
+  /**
+   * The single history projector calls this only after durable sink acceptance or an explicit
+   * ownership exclusion. Key-scoped and idempotent; never changes outcome, identity or timestamps.
+   */
+  boolean acknowledgeHistoryProjection(String key);
+
   /** Acceptance commits before this returns. Existing keys compare the entire canonical identity. */
   Acceptance accept(String key, OperationDescriptor descriptor,
       io.justsearch.core.context.EngineContext context,

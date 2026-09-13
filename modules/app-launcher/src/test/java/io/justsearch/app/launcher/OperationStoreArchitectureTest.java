@@ -75,6 +75,10 @@ class OperationStoreArchitectureTest {
     @Override public java.util.List<io.justsearch.app.api.operations.OperationHistoryRow> recentHistory(int limit) {
       return java.util.List.of();
     }
+    @Override public java.util.List<io.justsearch.app.api.operations.OperationHistoryRow> pendingHistoryProjection(int limit) {
+      return java.util.List.of();
+    }
+    @Override public boolean acknowledgeHistoryProjection(String key) { return false; }
     @Override public AutoCloseable subscribeCompletions(java.util.function.Consumer<io.justsearch.app.api.operations.OperationRecord> listener) {
       throw new UnsupportedOperationException();
     }
