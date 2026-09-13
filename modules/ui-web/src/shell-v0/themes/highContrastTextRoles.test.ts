@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseColor, contrastRatio, WCAG_AAA, type Rgb } from './contrast.js';
+import { parseColor, contrastRatio, WCAG_AAA, WCAG_AA, type Rgb } from './contrast.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TOKENS_CSS = join(HERE, '../../styles/tokens.css');
@@ -113,4 +113,27 @@ describe('high-contrast text grades — tokens.css closure', () => {
       });
     });
   }
+});
+
+// Ordinary light metadata uses an alpha grade. Validate its actual composited contrast on
+// every declared elevation, preserving the dimmer-than-tertiary hierarchy.
+describe('ordinary light muted text', () => {
+  it('clears AA across all light elevations without outshining tertiary', () => {
+    const light = parseBlock(css, '[data-theme="light"] {');
+    const base = rgb(`rgb(${light['p-text']})`, 'light text base');
+    const opacity = (grade: string): number => {
+      const match = light[grade]?.match(/rgba\(var\(--p-text\),\s*([\d.]+)\)/);
+      if (!match) throw new Error(`Unrecognized light text grade: ${grade}`);
+      return Number(match[1]);
+    };
+    const muted = opacity('text-muted');
+    const tertiary = opacity('text-tertiary');
+    expect(muted).toBeLessThan(tertiary);
+    for (let level = 0; level <= 4; level += 1) {
+      const bg = rgb(light[`surface-${level}`], `light surface-${level}`);
+      const blend = (i: 0 | 1 | 2): number => Math.round(base[i] * muted + bg[i] * (1 - muted));
+      const fg: Rgb = [blend(0), blend(1), blend(2)];
+      expect(contrastRatio(fg, bg), `light muted on surface-${level}`).toBeGreaterThanOrEqual(WCAG_AA);
+    }
+  });
 });
