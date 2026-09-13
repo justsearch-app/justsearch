@@ -42,6 +42,13 @@ verifies the catalog-to-ResourceView path and finds no substantive defect.
 [Keyed-merge proof](evidence/C2/history-keyed-merge.md). Real streamed/rendered overlap
 and restart proof remain with the atomic-SSE campaign, alongside installed/hosted tiers.
 
+Frontend checkpoint recovery now clears the failed logical token and reconnects through
+the existing physical owner. Independent review's reentrant-start defect is reproduced
+innegative1220 and fixed; final1221 passes46, full1222 passes6519 and typecheck is green.
+[Checkpoint recovery](evidence/C2/checkpoint-recovery.md). Backend snapshot boundaries,
+incarnation validation and lifecycle checkpoint tokens are the immediate implementation
+next; real SSE/restart/rendered overlap and installed/hosted proof remain owed.
+
 **Prior effect identity cut (2026-09-13):** ingress rejects server
 namespaces, and new frontend effects persist UUID identities while old entries keep
 their prior wire identity. Final1172 passes33 represented cases (21 execute), live1173

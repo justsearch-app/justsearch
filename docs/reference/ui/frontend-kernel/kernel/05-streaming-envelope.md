@@ -123,15 +123,25 @@ client whose token references seq from a previous server lifetime
 must not receive a false-positive "you're up to date" response when
 the new server's buffer is empty.
 
-Case 1 is **atomic** as of tempdoc 834 S3a: the window check, the
-replay snapshot and the listener registration happen under one
-channel write lock (`SseStreamChannel.subscribeAndReplay`), which
-`publish` excludes via the read lock, so a frame broadcast mid-attach
+Case 1 is **atomic** for single-channel attachment: the window check, the
+replay snapshot and the listener registration share the channel's short
+publication boundary (`SseStreamChannel.subscribeAndReplay`), so a frame broadcast mid-attach
 reaches the client either through the replay or through the live
 fan-out — never both, never neither. The replay itself is written
-**outside** the lock (two-phase handoff: buffer while draining, flip
-to pass-through under the lock with the buffer empty), so a
+**outside** the lock. The listener retains one bounded serial delivery queue
+after replay, so a
 slow-but-alive reattacher cannot stall publishers behind its socket.
+
+Frontend reducers acknowledge a frame's resume token only after applying the frame.
+If a reducer throws, EnvelopeStream preserves the prior payload, clears its checkpoint,
+marks the connection disconnected and detaches the source before notifying listeners.
+Its existing reconnect/backoff owner opens a fresh connection without that token;
+late frames from the detached source cannot advance it. If a listener reopens the stream
+during notification, a later failure
+still detaches that replacement source while reusing the single pending reconnect timer.
+The observed sequence remains available for diagnostics and is not a delivery acknowledgement. On a multiplexed
+connection, only the failed logical stream loses its token; unaffected streams retain
+their checkpoints in the reconnect bundle.
 
 `resumeToken` is opaque on the wire (base64-URL-encoded
 `(streamId, seq)` tuple internally; consumers MUST NOT parse it).
