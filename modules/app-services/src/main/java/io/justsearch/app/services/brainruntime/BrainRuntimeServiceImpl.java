@@ -111,7 +111,8 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
    * inside the reconciler, not an intent-time denial (§12b).
    */
   @Override
-  public ModeTransitionOutcome switchInferenceMode(String mode) throws Exception {
+  public ModeTransitionOutcome switchInferenceMode(String mode,
+      io.justsearch.core.context.EngineContext context, String idempotencyKey) throws Exception {
     if (mode == null || mode.isBlank()) {
       throw new IllegalArgumentException("Missing 'mode' field");
     }
@@ -126,7 +127,26 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
     if (runtimeSpecStore == null || runtimeReconciler == null) {
       throw new IllegalStateException("Runtime authority unavailable (AI runtime not configured)");
     }
-    SetChatEnabledHandler.RuntimeIntentWrite.writeIntent(runtimeSpecStore, runtimeReconciler, enabled);
-    return ModeTransitionOutcome.of(mode, onlineAi.getCurrentMode());
+    var observed = new java.util.concurrent.atomic.AtomicReference<ModeTransitionOutcome>();
+    var result = runtimeSpecStore.writeIntent(enabled, context, idempotencyKey, () -> {
+      runtimeReconciler.specChanged();
+      observed.set(ModeTransitionOutcome.of(mode, onlineAi.getCurrentMode()));
+    });
+    if (!result.response().success()) {
+      var response = result.response();
+      var metadata = new java.util.LinkedHashMap<>(response.structuredData());
+      metadata.put("operationKey", result.record().key());
+      metadata.put("operationRecordId", result.record().id());
+      throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(
+          new io.justsearch.agent.api.registry.OperationResult(false, response.message(), response.executionId(),
+              metadata, response.errorCode(), response.errorDetails(), response.retryable()));
+    }
+    var outcome = observed.get();
+    if (outcome == null) outcome = ModeTransitionOutcome.of(mode, null);
+    if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
+      outcome = new ModeTransitionOutcome(outcome.requested(), null, ModeTransitionOutcome.STATE_ACCEPTED);
+    }
+    var revision = result.response().structuredData().get("acceptedRevision");
+    return outcome.withReceipt(result.record().key(), revision instanceof Number value ? value.longValue() : null);
   }
 }

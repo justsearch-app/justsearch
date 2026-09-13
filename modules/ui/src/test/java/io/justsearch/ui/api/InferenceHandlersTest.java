@@ -124,6 +124,7 @@ final class InferenceHandlersTest {
       when(ctx.status(any(int.class))).thenReturn(ctx);
       when(ctx.json(any())).thenReturn(ctx);
       when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", requested));
+      when(ctx.path()).thenReturn("/api/inference/mode");
 
       InferenceHandlers handlers =
           new InferenceHandlers(
@@ -134,6 +135,89 @@ final class InferenceHandlersTest {
       verify(ctx).json(captor.capture());
       return captor.getValue();
     }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void modeWriteForwardsRequestIdentityAndKeyAndReturnsWitness() throws Exception {
+    var context = io.justsearch.app.services.intent.EngineProvenance.internal("mode-wire-test",
+        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+    var key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var service = mock(BrainRuntimeService.class);
+    when(service.switchInferenceMode("online", context, key))
+        .thenReturn(ModeTransitionOutcome.of("online", "indexing").withReceipt(key, 7L));
+    Context ctx = mock(Context.class);
+    when(ctx.json(any())).thenReturn(ctx);
+    when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(context);
+    when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online", "idempotencyKey", key));
+    new InferenceHandlers(null, null, null, null, null, null, null, service).handleSetInferenceMode(ctx);
+    var captor = ArgumentCaptor.forClass(Map.class);
+    verify(ctx).json(captor.capture());
+    assertEquals(key, captor.getValue().get("operationKey"));
+    assertEquals(7L, captor.getValue().get("acceptedRevision"));
+    assertEquals("recorded", captor.getValue().get("state"));
+    verify(service).switchInferenceMode("online", context, key);
+  }
+
+  @Test
+  void settingsRefusalUsesTheRestErrorContract() throws Exception {
+    var failure = io.justsearch.agent.api.registry.OperationResult.failure(
+        "Settings refused", "SETTINGS_READ_ONLY", Map.of(), false);
+    assertModeFailure(new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(failure),
+        409, "SETTINGS_READ_ONLY", "POLICY", false);
+  }
+
+  @Test
+  void acceptedRefusalPreservesQueryIdentityOnTheWire() throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var failure = new io.justsearch.agent.api.registry.OperationResult(false, "Settings changed",
+        java.util.Optional.empty(), Map.of("operationKey", key, "operationRecordId", 23L),
+        java.util.Optional.of("VERSION_CONFLICT"), Map.of(), java.util.Optional.of(false));
+    var payload = assertModeFailure(new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(failure),
+        409, "VERSION_CONFLICT", "VALIDATION", false);
+    assertEquals(key, payload.get("operationKey"));
+    assertEquals(23L, payload.get("operationRecordId"));
+  }
+
+  @Test
+  void storageRefusalsUseTheRestErrorContract() throws Exception {
+    for (var code : io.justsearch.app.api.operations.OperationStoreException.Code.values()) {
+      boolean capacity = code == io.justsearch.app.api.operations.OperationStoreException.Code.OPERATIONS_CAPACITY;
+      boolean storage = code == io.justsearch.app.api.operations.OperationStoreException.Code.STORAGE_FAILED;
+      boolean invalid = code == io.justsearch.app.api.operations.OperationStoreException.Code.INVALID_OPERATION_KEY;
+      String publicCode = switch (code) {
+        case INVALID_OPERATION_KEY -> "OPERATION_KEY_INVALID";
+        case OPERATION_EXPIRED -> "OPERATION_KEY_EXPIRED";
+        case STORAGE_FAILED -> "OPERATION_STORAGE_FAILED";
+        default -> code.name();
+      };
+      assertModeFailure(new io.justsearch.app.api.operations.OperationStoreException(code, null),
+          capacity ? 503 : storage ? 500 : invalid ? 400 : 409,
+          publicCode,
+          capacity ? "TRANSIENT" : storage ? "PERMANENT" : "VALIDATION", capacity);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> assertModeFailure(RuntimeException failure, int status, String code,
+      String classification, boolean retryable) throws Exception {
+    var service = mock(BrainRuntimeService.class);
+    when(service.switchInferenceMode(any(), any(), any())).thenThrow(failure);
+    Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/inference/mode");
+    when(ctx.status(any(int.class))).thenReturn(ctx);
+    when(ctx.json(any())).thenReturn(ctx);
+    when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online"));
+    new InferenceHandlers(null, null, null, null, null, null, null, service).handleSetInferenceMode(ctx);
+    verify(ctx).status(status);
+    var captor = ArgumentCaptor.forClass(Map.class);
+    verify(ctx).json(captor.capture());
+    assertTrue(captor.getValue().get("error") instanceof String);
+    assertEquals(code, captor.getValue().get("errorCode"));
+    assertEquals(classification, captor.getValue().get("errorClass"));
+    assertEquals(retryable, captor.getValue().get("retryable"));
+    return captor.getValue();
   }
 
   /** Returns a fixed live mode so the outcome's converged/recorded branch is deterministic. */
@@ -150,7 +234,8 @@ final class InferenceHandlersTest {
     }
 
     @Override
-    public ModeTransitionOutcome switchInferenceMode(String mode) {
+    public ModeTransitionOutcome switchInferenceMode(String mode,
+        io.justsearch.core.context.EngineContext context, String idempotencyKey) {
       return ModeTransitionOutcome.of(mode, liveMode);
     }
 

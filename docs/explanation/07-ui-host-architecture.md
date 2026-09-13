@@ -103,6 +103,19 @@ The `LocalApiServer` exposes REST endpoints that map to controllers:
 
 ## REST contract boundaries (DTO direction)
 
+`POST /api/inference/mode` accepts `mode` (`online` or `indexing`) and an optional
+`idempotencyKey`. The production runtime service records the settings intent before
+nudging convergence. Its response includes `operationKey` and, after durable
+completion, `acceptedRevision`. `state=accepted` means the row is still incomplete;
+`recorded` means the settings intent committed; `converged` additionally reflects a
+first-execution observation that the live mode matches. A completed keyed retry
+returns the receipt with `state=recorded` and an empty `mode`, without sampling the
+engine again. Reusing the key for a different target is a conflict.
+Accepted refusals retain the operation key for outcome lookup. Mode errors use the
+REST `error`, `errorCode`, `errorClass` and `retryable` fields; read-only settings
+and stale revisions return409, and unresolved settings recovery returns503 with
+automatic retry disabled.
+
 JustSearch uses **two** API layers:
 
 - **REST (`/api/*`)**: the stable, UI-facing contract owned by the Head process.

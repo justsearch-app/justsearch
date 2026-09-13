@@ -63,9 +63,11 @@ final class RuntimeActivationServiceChatProfileTest {
 
   private final Map<String, String> prevProps = new HashMap<>();
   private ConfigStore prevStore;
+  private final List<io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture> intentFixtures = new ArrayList<>();
 
   @AfterEach
-  void restore() {
+  void restore() throws Exception {
+    for (var fixture : intentFixtures) fixture.close();
     for (var e : prevProps.entrySet()) {
       if (e.getValue() == null) {
         System.clearProperty(e.getKey());
@@ -336,12 +338,16 @@ final class RuntimeActivationServiceChatProfileTest {
         UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
   }
 
-  private RuntimeActivationService newService(OnlineAiService onlineAi) {
+  private RuntimeActivationService newService(OnlineAiService onlineAi) throws Exception {
     return newService(onlineAi, settingsStore());
   }
 
-  private RuntimeActivationService newService(OnlineAiService onlineAi, UiSettingsStore store) {
-    return new RuntimeActivationService(processExecutors, onlineAi, store, null, null);
+  private RuntimeActivationService newService(OnlineAiService onlineAi, UiSettingsStore store) throws Exception {
+    var fixture = new io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture(
+        tmp.resolve("intent-" + intentFixtures.size()), store, ConfigStore.globalOrNull());
+    intentFixtures.add(fixture);
+    return new RuntimeActivationService(processExecutors, onlineAi, store, null, null,
+        null, null, null, null, fixture.spec());
   }
 
   private static RuntimeActivationService.SelfTestResult passingSelfTest() {

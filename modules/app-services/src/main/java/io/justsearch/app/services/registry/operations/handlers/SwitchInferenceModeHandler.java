@@ -2,72 +2,69 @@
 package io.justsearch.app.services.registry.operations.handlers;
 
 import io.justsearch.core.context.EngineContext;
-
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationApprovalPreview;
+import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.app.services.runtimestate.RuntimeIntentPreparation;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tools.jackson.databind.JsonNode;
 
-/**
- * Handler for {@code core.switch-inference-mode} — a <b>temporary alias</b> superseded by
- * {@code core.set-chat-enabled} (tempdoc 737 §12b/§12d; retirement per §12d once the FE has fully
- * migrated off the {@code mode} vocabulary).
- *
- * <p>It maps the legacy {@code mode} argument onto the one runtime-authority intent write:
- * {@code online} → {@code chatEnabled=true}, {@code indexing} → {@code chatEnabled=false}, routed
- * through the SAME spec-write path as {@link SetChatEnabledHandler} (write via
- * {@link RuntimeSpecStore}, nudge {@link RuntimeReconciler#specChanged()}). It no longer calls
- * {@code BrainRuntimeService.switchInferenceMode} directly — the mode transition is now the
- * reconciler's business, so the alias cannot re-introduce the §3b circular denial. (The
- * {@code /api/inference/mode} REST endpoint still calls {@code BrainRuntimeServiceImpl
- * .switchInferenceMode} for any remaining internal callers.)
- *
- * <p>Args: {@code {"mode": "online" | "indexing"}}. Returns {@code structuredData} carrying the
- * now-current {@code chatEnabled} spec bit and the observed {@code engineState}.
- */
+/** Compatibility operation spelling for the same accepted chat-intent writer. */
 public final class SwitchInferenceModeHandler implements OperationHandler {
-
-  private static final Logger log = LoggerFactory.getLogger(SwitchInferenceModeHandler.class);
-
   private final Supplier<RuntimeSpecStore> specStoreSupplier;
   private final Supplier<RuntimeReconciler> reconcilerSupplier;
 
-  public SwitchInferenceModeHandler(
-      Supplier<RuntimeSpecStore> specStoreSupplier,
+  public SwitchInferenceModeHandler(Supplier<RuntimeSpecStore> specStoreSupplier,
       Supplier<RuntimeReconciler> reconcilerSupplier) {
     this.specStoreSupplier = Objects.requireNonNull(specStoreSupplier, "specStoreSupplier");
     this.reconcilerSupplier = Objects.requireNonNull(reconcilerSupplier, "reconcilerSupplier");
   }
 
-  @Override
-  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
-    boolean enabled;
+  @Override public OperationResult execute(String argumentsJson, EngineContext context) {
+    throw new IllegalStateException("Runtime intent requires an accepted prepared invocation");
+  }
+
+  @Override public OperationPreparation prepare(String argumentsJson, InvocationProvenance provenance, EngineContext context) {
+    enabledOf(argumentsJson);
+    return SetChatEnabledHandler.RuntimeIntentWrite.spec(specStoreSupplier).prepareIntent(argumentsJson);
+  }
+
+  @Override public void validatePreparation(OperationPreparation prepared) {
+    RuntimeIntentPreparation.validate(prepared);
+    enabledOf(prepared.argumentsJson());
+  }
+
+  @Override public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+    validatePreparation(prepared);
+    return new OperationApprovalPreview(enabledOf(prepared.argumentsJson()) ? "Enable chat AI" : "Disable chat AI");
+  }
+
+  @Override public OperationExecution executePrepared(OperationPreparation prepared, InvocationProvenance provenance,
+      EngineContext context, OperationRecordHandle record) {
+    validatePreparation(prepared);
+    return SetChatEnabledHandler.RuntimeIntentWrite.apply(specStoreSupplier, reconcilerSupplier, prepared,
+        enabledOf(prepared.argumentsJson()), Objects.requireNonNull(record, "accepted record"));
+  }
+
+  private static boolean enabledOf(String argumentsJson) {
     try {
-      JsonNode root =
-          HandlerJson.MAPPER.readTree(
-              argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson);
-      JsonNode modeNode = root.get("mode");
-      if (modeNode == null || !modeNode.isTextual() || modeNode.asString().isBlank()) {
-        return OperationResult.failure("Missing required arg: mode (use 'online' or 'indexing')");
+      var root = HandlerJson.MAPPER.readTree(argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson);
+      var node = root == null ? null : root.get("mode");
+      if (node != null && node.isTextual()) {
+        if ("online".equalsIgnoreCase(node.asString())) return true;
+        if ("indexing".equalsIgnoreCase(node.asString())) return false;
       }
-      String mode = modeNode.asString();
-      if ("online".equalsIgnoreCase(mode)) {
-        enabled = true;
-      } else if ("indexing".equalsIgnoreCase(mode)) {
-        enabled = false;
-      } else {
-        return OperationResult.failure(
-            "Invalid mode. Use 'online' or 'indexing'", "INVALID_REQUEST", null, false);
-      }
-    } catch (Exception e) {
-      return HandlerJson.invalidArgs(e);
-    }
-    return SetChatEnabledHandler.RuntimeIntentWrite.apply(
-        specStoreSupplier, reconcilerSupplier, enabled, log);
+      throw new OperationPreparationRefused(OperationResult.failure("Invalid mode. Use 'online' or 'indexing'",
+          "INVALID_REQUEST", Map.of(), false));
+    } catch (OperationPreparationRefused refusal) { throw refusal; }
+    catch (RuntimeException malformed) { throw new OperationPreparationRefused(HandlerJson.invalidArgs(malformed)); }
   }
 }

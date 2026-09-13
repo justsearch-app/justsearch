@@ -3,96 +3,126 @@ package io.justsearch.app.services.registry.operations.handlers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.agent.api.registry.OperationDispatchPlan;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
+import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
-import io.justsearch.app.services.settings.UiSettingsStore;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Tests for {@link SetChatEnabledHandler} (tempdoc 737 §12b): the intent write persists the
- * {@code chatEnabled} spec bit and fires the reconciler nudge; it carries no preconditions.
- */
+/** Prepared-dispatch tests for the recorded chat-intent writer. */
 final class SetChatEnabledHandlerTest {
-
   @TempDir Path tmp;
 
-  private RuntimeSpecStore specStore() {
-    return new RuntimeSpecStore(
-        new UiSettingsStore(
-            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json")));
-  }
-
-  /** A reconciler without a running thread — enough for specChanged()/currentSpec()/current(). */
   private RuntimeReconciler reconciler(RuntimeSpecStore spec) {
     return new RuntimeReconciler(
         null, () -> Mode.OFFLINE, () -> false, null, null, spec, new RuntimeGpuLease());
   }
 
   @Test
-  void enableWritesSpecTrueAndFiresNudge() {
-    RuntimeSpecStore spec = specStore();
-    RuntimeReconciler r = reconciler(spec);
-    AtomicInteger nudges = new AtomicInteger();
-    r.addSpecChangeListener(nudges::incrementAndGet);
+  void enableWritesOnlyAfterAcceptanceAndRetryDoesNotNudgeAgain() throws Exception {
+    try (var fixture = new RuntimeIntentTestFixture(tmp.resolve("enable"))) {
+      RuntimeSpecStore spec = fixture.spec();
+      RuntimeReconciler reconciler = reconciler(spec);
+      AtomicInteger nudges = new AtomicInteger();
+      reconciler.addSpecChangeListener(nudges::incrementAndGet);
+      var handler = new SetChatEnabledHandler(() -> spec, () -> reconciler);
+      var dispatch = fixture.dispatcher(CoreOperationCatalog.SET_CHAT_ENABLED.value(), handler);
+      assertEquals(OperationKind.SETTINGS_APPLY, dispatch.operation().policy().recordKind());
+      String key = OperationKeys.generate(Clock.systemUTC());
 
-    SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> r);
-    OperationResult result = handler.execute("{\"enabled\":true}", io.justsearch.app.services.TestEngineContexts.internal());
+      var ready = (OperationDispatchPlan.Ready) dispatch.prepare("{\"enabled\":true}", key);
+      assertFalse(spec.load().chatEnabled(), "preparation cannot apply the effect");
+      var result = dispatch.dispatch("{\"enabled\":true}", key, ready.preparationNonce());
 
-    assertTrue(result.success());
-    assertTrue(spec.load().chatEnabled(), "spec bit persisted true");
-    assertTrue(spec.load().chatEnabledExplicit(), "written explicitly");
-    assertEquals(1, nudges.get(), "reconciler nudge fired exactly once");
-    assertEquals(Boolean.TRUE, result.structuredData().get("chatEnabled"));
-    assertEquals("Down", result.structuredData().get("engineState"), "observed engine still down");
+      assertTrue(result.success());
+      assertTrue(spec.load().chatEnabled(), "spec bit persisted true");
+      assertTrue(spec.load().chatEnabledExplicit(), "written explicitly");
+      assertEquals(1, nudges.get(), "reconciler nudge fired exactly once");
+      assertEquals(Boolean.TRUE, result.structuredData().get("chatEnabled"));
+      assertEquals("Down", result.structuredData().get("engineState"));
+
+      assertTrue(dispatch.dispatch("{\"enabled\":true}", key).success());
+      assertEquals(1, nudges.get(), "recorded retry cannot execute or observe again");
+      assertThrows(IllegalStateException.class,
+          () -> handler.execute("{\"enabled\":true}", TestEngineContexts.internal()));
+    }
   }
 
   @Test
-  void disableWritesSpecFalseAndFiresNudge() {
-    RuntimeSpecStore spec = specStore();
-    spec.setChatEnabled(true); // start enabled
-    RuntimeReconciler r = reconciler(spec);
-    AtomicInteger nudges = new AtomicInteger();
-    r.addSpecChangeListener(nudges::incrementAndGet);
+  void disableWritesSpecFalseAndFiresNudge() throws Exception {
+    try (var fixture = new RuntimeIntentTestFixture(tmp.resolve("disable"), true)) {
+      RuntimeSpecStore spec = fixture.spec();
+      RuntimeReconciler reconciler = reconciler(spec);
+      AtomicInteger nudges = new AtomicInteger();
+      reconciler.addSpecChangeListener(nudges::incrementAndGet);
+      var dispatch = fixture.dispatcher(CoreOperationCatalog.SET_CHAT_ENABLED.value(),
+          new SetChatEnabledHandler(() -> spec, () -> reconciler));
 
-    SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> r);
-    OperationResult result = handler.execute("{\"enabled\":false}", io.justsearch.app.services.TestEngineContexts.internal());
+      var result = dispatch.dispatch("{\"enabled\":false}",
+          OperationKeys.generate(Clock.systemUTC()));
 
-    assertTrue(result.success());
-    assertFalse(spec.load().chatEnabled(), "spec bit persisted false");
-    assertEquals(1, nudges.get());
-    assertEquals(Boolean.FALSE, result.structuredData().get("chatEnabled"));
+      assertTrue(result.success());
+      assertFalse(spec.load().chatEnabled());
+      assertEquals(1, nudges.get());
+      assertEquals(Boolean.FALSE, result.structuredData().get("chatEnabled"));
+    }
   }
 
   @Test
-  void missingEnabledArgFails() {
-    RuntimeSpecStore spec = specStore();
-    SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> reconciler(spec));
-    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
-    assertFalse(result.success());
-    assertTrue(result.message().contains("enabled"));
+  void stalePreparedFullWitnessRefusesWithoutOverwritingNewerIntent() throws Exception {
+    try (var fixture = new RuntimeIntentTestFixture(tmp.resolve("stale"), false)) {
+      RuntimeSpecStore spec = fixture.spec();
+      RuntimeReconciler reconciler = reconciler(spec);
+      AtomicInteger nudges = new AtomicInteger();
+      reconciler.addSpecChangeListener(nudges::incrementAndGet);
+      var dispatch = fixture.dispatcher(CoreOperationCatalog.SET_CHAT_ENABLED.value(),
+          new SetChatEnabledHandler(() -> spec, () -> reconciler));
+      String staleKey = OperationKeys.generate(Clock.systemUTC());
+      var stale = (OperationDispatchPlan.Ready) dispatch.prepare("{\"enabled\":true}", staleKey);
+
+      assertTrue(dispatch.dispatch("{\"enabled\":true}",
+          OperationKeys.generate(Clock.systemUTC())).success());
+      assertEquals(1, nudges.get());
+      var current = fixture.settings().inspect().witness();
+
+      var refused = dispatch.dispatch("{\"enabled\":true}", staleKey, stale.preparationNonce());
+      assertEquals("VERSION_CONFLICT", refused.errorCode().orElseThrow());
+      assertEquals(current, fixture.settings().inspect().witness(), "stale full witness cannot write");
+      assertEquals(1, nudges.get(), "refused stale intent cannot nudge convergence");
+    }
   }
 
   @Test
-  void nonBooleanEnabledArgFails() {
-    RuntimeSpecStore spec = specStore();
-    SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> reconciler(spec));
-    OperationResult result = handler.execute("{\"enabled\":\"yes\"}", io.justsearch.app.services.TestEngineContexts.internal());
-    assertFalse(result.success());
-  }
+  void invalidAndUnavailableRequestsFailWithoutRawExecution() throws Exception {
+    try (var fixture = new RuntimeIntentTestFixture(tmp.resolve("invalid"))) {
+      var spec = fixture.spec();
+      var validAuthority = fixture.dispatcher(CoreOperationCatalog.SET_CHAT_ENABLED.value(),
+          new SetChatEnabledHandler(() -> spec, () -> reconciler(spec)));
+      var missing = validAuthority.dispatch("{}", OperationKeys.generate(Clock.systemUTC()));
+      assertFalse(missing.success());
+      assertTrue(missing.message().contains("enabled"));
+      assertFalse(validAuthority.dispatch("{\"enabled\":\"yes\"}",
+          OperationKeys.generate(Clock.systemUTC())).success());
 
-  @Test
-  void unavailableRuntimeAuthorityFailsGracefully() {
-    SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> null, () -> null);
-    OperationResult result = handler.execute("{\"enabled\":true}", io.justsearch.app.services.TestEngineContexts.internal());
-    assertFalse(result.success());
-    assertTrue(result.message().contains("unavailable"));
+      var unavailable = fixture.dispatcher(CoreOperationCatalog.SET_CHAT_ENABLED.value(),
+          new SetChatEnabledHandler(() -> null, () -> null));
+      var result = unavailable.dispatch("{\"enabled\":true}",
+          OperationKeys.generate(Clock.systemUTC()));
+      assertFalse(result.success());
+      assertTrue(result.message().contains("unavailable"));
+    }
   }
 }

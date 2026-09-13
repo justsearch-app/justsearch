@@ -208,7 +208,7 @@ public final class ServicePhase {
       // its mode listener attaches (mirror-initial-then-forward) before the first boot convergence.
       // The env autostart flag seeds the persisted spec (item 1); the reconciler then converges the
       // engine toward spec — replacing the former direct InferenceWiring.tryStartOnlineMode switch.
-      runtimeSpecStore = new RuntimeSpecStore(in.settingsStore());
+      runtimeSpecStore = new RuntimeSpecStore(in.settingsStore(), in.attempts());
       RuntimeGpuLease runtimeGpuLease = new RuntimeGpuLease();
       InferenceLifecycleManager manager = in.inferenceManager();
       runtimeReconciler =
@@ -305,7 +305,7 @@ public final class ServicePhase {
             // Tempdoc 737 fix pack (fix 2): brackets the activation engine-online + intent-write
             // window in an ACTIVATION procedure and nudges specChanged (null in the no-inference
             // branch).
-            runtimeReconciler);
+            runtimeReconciler, runtimeSpecStore);
     // Tempdoc 805 G.3: observed ONNX execution provider beside the intent fields on
     // /api/ai/runtime/status. Same live-supplier shape as workerFeatureCache above — the RPC client
     // is null at bootstrap, so it must not be captured by value.

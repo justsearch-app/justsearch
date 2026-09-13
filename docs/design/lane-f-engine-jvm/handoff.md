@@ -2,6 +2,15 @@
 
 ## Current state (2026-09-14)
 
+The runtime-intent family checkpoint follows pushed `0ad7e1914` (response observations,
+hosted CI34788273439 and CLA34788272070 successful). Independent review is clear;
+final1405 represents4,235 cases, four existing skips, zero failures/errors, with
+PMD/format/UI integration compilation passing. [Proof and limits](evidence/C2/runtime-intent-producer.md).
+Continue immediately into activation/deactivation/compensation: its remaining raw
+saves refuse after a recorded witness, so this checkpoint cannot ship independently.
+Docs checkpoint `98a27626e` now has successful hosted CI34787367490, including Windows;
+this clears the later hosted checkpoint but does not establish the current dirty head.
+
 Active worktree: `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
 `codex/lane-f-pr1`, draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
 Merge stays at F. Original `worktree-lane-F-A` remains at pushed `8bf81ea2d`, held through
@@ -35,8 +44,8 @@ hosted proof open; [queue/failure evidence](evidence/C2/hosted-runner-recovery.j
 The response observation prerequisite is reviewed and locally verified:560 tests pass,
 including an allocation-Error regression; the committed receipt always wins collisions.
 [Proof](evidence/C2/settings-response-observations.json).
-Migrate runtime intent as one family, including recorded handlers, REST and boot seed;
-a recovery refusal must keep startup alive for Health/reset. Then migrate other writers
+Runtime intent now includes recorded handlers, REST and boot seed; typed recovery
+refusal keeps startup alive for Health/reset. Now migrate activation and other writers
 using their captured full witness, expose atomic snapshot/witness GET and
 keyed frontend ingress, then run live public-wire and installed successor-bootstrap proof.
 C2-6/C2-11 and D1/D2/E/F remain open. Do not substitute callback tests for installed proof.

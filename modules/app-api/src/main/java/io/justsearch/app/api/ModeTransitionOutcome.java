@@ -14,15 +14,30 @@ import java.util.Locale;
  * <i>what is live</i> and says whether the two already agree.
  *
  * @param requested normalized target mode ({@code "online"} / {@code "indexing"})
- * @param mode the live mode at return time — may still be the previous one
+ * @param mode the first-execution live mode; absent on a recorded retry
  * @param state {@link #STATE_CONVERGED} when {@code mode} already equals {@code requested},
  *     {@link #STATE_RECORDED} when the intent is persisted but the engine has not converged yet.
- *     A vocabulary, not a boolean, so a future deferral state can be added without changing shape.
+ *     {@link #STATE_ACCEPTED} when the row is still incomplete.
+ * @param operationKey the accepted row's issued key, absent only in non-writing compatibility projections
+ * @param acceptedRevision the committed settings revision, absent for incomplete rows
  */
-public record ModeTransitionOutcome(String requested, String mode, String state) {
+public record ModeTransitionOutcome(String requested, String mode, String state,
+    String operationKey, Long acceptedRevision) {
+
+  public ModeTransitionOutcome(String requested, String mode, String state) {
+    this(requested, mode, state, null, null);
+  }
+
+  /** Attach the durable settings receipt; live observations are absent on replay. */
+  public ModeTransitionOutcome withReceipt(String key, Long revision) {
+    return new ModeTransitionOutcome(requested, mode, state, key, revision);
+  }
 
   /** The intent is durably recorded; the engine has not reached it yet. */
   public static final String STATE_RECORDED = "recorded";
+
+  /** The row exists, but settings commitment has not been durably completed. */
+  public static final String STATE_ACCEPTED = "accepted";
 
   /** The live mode already equals the requested mode. */
   public static final String STATE_CONVERGED = "converged";

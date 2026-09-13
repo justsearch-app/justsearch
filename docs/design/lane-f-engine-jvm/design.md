@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-6 runtime-intent writers use the existing settings owner and runner. Dispatch freezes the full witness in server preparation; direct REST looks up its key before capturing a candidate. Boot seed and activation intent bind the no-op predicate to the same captured witness and use fresh internal attempts. REST returns the issued key and committed revision; incomplete replay says `accepted`, completed replay says `recorded` without sampling runtime observations. No second writer or durable receipt representation is introduced. [Owning mechanism and checks](evidence/C2/C2-6-plan.md#2026-09-14-runtime-intent-writer-cut).
+
 - 2026-09-14: C2-6 permits non-colliding first-response observations from a successful synchronous settings body, while the fixed committed receipt retains every authoritative field and durable outcome. Projection stays inside the existing fatal guard; retries never resample observations. This preserves runtime-intent response fields without adding callbacks to the physical writer. [Mechanism, alternatives and proof](evidence/C2/C2-6-plan.md#2026-09-14-runtime-intent-response-preparation).
 
 - 2026-09-14: C2-6 projects the fixed owner's sticky recovery signal into the existing Health ConditionStore from HeadlessApp, where both owner and Health already exist. One settings.recovery_required condition carries the four typed owner causes as PascalCase condition reasons and plain messages. It survives ordinary corruption-notice clearing and resets with the successor process; no new durable marker, observer registry or HeadAssembly parameter is needed. Implementation proof remains in the C2 checklist.

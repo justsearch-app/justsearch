@@ -162,6 +162,7 @@ public final class RuntimeActivationService
   // persisted the intent — and nudges specChanged() so the persisted intent is honored
   // deterministically, not via a racy mode-drift event. Nullable for graceful degradation / tests.
   private final RuntimeReconciler runtimeReconciler;
+  private final RuntimeSpecStore runtimeSpecStore;
 
   private final Path aiHome;
   private final Path statusPath;
@@ -429,6 +430,21 @@ public final class RuntimeActivationService
       InferenceCapability inferenceCapability,
       AiInstallService aiInstallService,
       RuntimeReconciler runtimeReconciler) {
+    this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService,
+        workerFeatureCache, inferenceCapability, aiInstallService, runtimeReconciler, null);
+  }
+
+  public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
+      OnlineAiService onlineAi,
+      UiSettingsStore settingsStore,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      EnterprisePolicyService policyService,
+      WorkerFeatureCache workerFeatureCache,
+      InferenceCapability inferenceCapability,
+      AiInstallService aiInstallService,
+      RuntimeReconciler runtimeReconciler,
+      RuntimeSpecStore runtimeSpecStore) {
     Objects.requireNonNull(processExecutors, "processExecutors");
     this.onlineAi = Objects.requireNonNull(onlineAi, "onlineAi");
     this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
@@ -438,6 +454,7 @@ public final class RuntimeActivationService
     this.inferenceCapability = inferenceCapability; // may be null (graceful degradation)
     this.aiInstallService = aiInstallService; // may be null (graceful degradation)
     this.runtimeReconciler = runtimeReconciler; // may be null (graceful degradation)
+    this.runtimeSpecStore = runtimeSpecStore;
     this.aiHome = resolveAiHome();
     this.statusPath = aiHome.resolve("ai").resolve(STATUS_FILE);
     loadStatusBestEffort();
@@ -1012,7 +1029,10 @@ public final class RuntimeActivationService
         // restarts — persist the desired-state so the reconciler brings it back at boot (fixes the
         // documented "AI offline after reopen" confusion). Null-safe; idempotent.
         if (settingsStore != null) {
-          new RuntimeSpecStore(settingsStore).recordUserEnabled();
+          if (runtimeSpecStore == null) {
+            throw new IllegalStateException("Recorded runtime intent owner unavailable");
+          }
+          runtimeSpecStore.recordUserEnabled();
         }
         // Nudge the reconciler so the persisted intent is honored via specChanged (an explicit
         // convergence), not only via the racy mode-drift event. Deferred while the procedure is

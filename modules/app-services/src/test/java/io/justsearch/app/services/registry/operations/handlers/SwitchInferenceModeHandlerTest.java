@@ -3,33 +3,27 @@ package io.justsearch.app.services.registry.operations.handlers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
+import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
-import io.justsearch.app.services.settings.UiSettingsStore;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Tests for the superseded {@link SwitchInferenceModeHandler} alias (tempdoc 737 §12b): it maps
- * {@code online}/{@code indexing} onto the {@code chatEnabled} spec write through the SAME path as
- * {@link SetChatEnabledHandler}, no longer touching {@code BrainRuntimeService} directly.
- */
+/** Prepared-dispatch tests for the legacy inference-mode alias. */
 final class SwitchInferenceModeHandlerTest {
-
   @TempDir Path tmp;
-
-  private RuntimeSpecStore specStore() {
-    return new RuntimeSpecStore(
-        new UiSettingsStore(
-            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json")));
-  }
 
   private RuntimeReconciler reconciler(RuntimeSpecStore spec) {
     return new RuntimeReconciler(
@@ -37,51 +31,65 @@ final class SwitchInferenceModeHandlerTest {
   }
 
   @Test
-  void onlineMapsToChatEnabledTrue() {
-    RuntimeSpecStore spec = specStore();
-    RuntimeReconciler r = reconciler(spec);
-    AtomicInteger nudges = new AtomicInteger();
-    r.addSpecChangeListener(nudges::incrementAndGet);
+  void onlineMapsToChatEnabledTrueAndRetryDoesNotNudgeAgain() throws Exception {
+    try (var fixture = new RuntimeIntentTestFixture(tmp.resolve("online"))) {
+      RuntimeSpecStore spec = fixture.spec();
+      RuntimeReconciler reconciler = reconciler(spec);
+      AtomicInteger nudges = new AtomicInteger();
+      reconciler.addSpecChangeListener(nudges::incrementAndGet);
+      var handler = new SwitchInferenceModeHandler(() -> spec, () -> reconciler);
+      var dispatch = fixture.dispatcher(CoreOperationCatalog.SWITCH_INFERENCE_MODE.value(), handler);
+      assertEquals(OperationKind.SETTINGS_APPLY, dispatch.operation().policy().recordKind());
+      String key = OperationKeys.generate(Clock.systemUTC());
 
-    OperationResult result =
-        new SwitchInferenceModeHandler(() -> spec, () -> r).execute("{\"mode\":\"online\"}", io.justsearch.app.services.TestEngineContexts.internal());
+      var result = dispatch.dispatch("{\"mode\":\"online\"}", key);
 
-    assertTrue(result.success());
-    assertTrue(spec.load().chatEnabled(), "online → chatEnabled true");
-    assertEquals(1, nudges.get(), "routed through the spec-write path (nudge fired)");
-    assertEquals(Boolean.TRUE, result.structuredData().get("chatEnabled"));
+      assertTrue(result.success());
+      assertTrue(spec.load().chatEnabled(), "online maps to chatEnabled true");
+      assertEquals(1, nudges.get());
+      assertEquals(Boolean.TRUE, result.structuredData().get("chatEnabled"));
+      assertTrue(dispatch.dispatch("{\"mode\":\"online\"}", key).success());
+      assertEquals(1, nudges.get(), "recorded alias retry cannot nudge twice");
+      assertThrows(IllegalStateException.class,
+          () -> handler.execute("{\"mode\":\"online\"}", TestEngineContexts.internal()));
+    }
   }
 
   @Test
-  void indexingMapsToChatEnabledFalse() {
-    RuntimeSpecStore spec = specStore();
-    spec.setChatEnabled(true);
-    RuntimeReconciler r = reconciler(spec);
+  void indexingMapsToChatEnabledFalse() throws Exception {
+    try (var fixture = new RuntimeIntentTestFixture(tmp.resolve("indexing"), true)) {
+      RuntimeSpecStore spec = fixture.spec();
+      RuntimeReconciler reconciler = reconciler(spec);
+      var dispatch = fixture.dispatcher(CoreOperationCatalog.SWITCH_INFERENCE_MODE.value(),
+          new SwitchInferenceModeHandler(() -> spec, () -> reconciler));
 
-    OperationResult result =
-        new SwitchInferenceModeHandler(() -> spec, () -> r).execute("{\"mode\":\"indexing\"}", io.justsearch.app.services.TestEngineContexts.internal());
+      var result = dispatch.dispatch("{\"mode\":\"indexing\"}",
+          OperationKeys.generate(Clock.systemUTC()));
 
-    assertTrue(result.success());
-    assertFalse(spec.load().chatEnabled(), "indexing → chatEnabled false");
-    assertEquals(Boolean.FALSE, result.structuredData().get("chatEnabled"));
+      assertTrue(result.success());
+      assertFalse(spec.load().chatEnabled());
+      assertEquals(Boolean.FALSE, result.structuredData().get("chatEnabled"));
+    }
   }
 
   @Test
-  void unknownModeFails() {
-    RuntimeSpecStore spec = specStore();
-    OperationResult result =
-        new SwitchInferenceModeHandler(() -> spec, () -> reconciler(spec))
-            .execute("{\"mode\":\"bananas\"}", io.justsearch.app.services.TestEngineContexts.internal());
-    assertFalse(result.success());
-    assertTrue(result.message().contains("Invalid mode"));
-  }
+  void invalidModesFailThroughDispatcher() throws Exception {
+    try (var fixture = new RuntimeIntentTestFixture(tmp.resolve("invalid"))) {
+      RuntimeSpecStore spec = fixture.spec();
+      var dispatch = fixture.dispatcher(CoreOperationCatalog.SWITCH_INFERENCE_MODE.value(),
+          new SwitchInferenceModeHandler(() -> spec, () -> reconciler(spec)));
 
-  @Test
-  void missingModeFails() {
-    RuntimeSpecStore spec = specStore();
-    OperationResult result =
-        new SwitchInferenceModeHandler(() -> spec, () -> reconciler(spec)).execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
-    assertFalse(result.success());
-    assertTrue(result.message().contains("mode"));
+      var unknown = dispatch.dispatch("{\"mode\":\"bananas\"}",
+          OperationKeys.generate(Clock.systemUTC()));
+      assertFalse(unknown.success());
+      assertEquals("BAD_REQUEST", unknown.errorCode().orElseThrow(), "catalog validation precedes handler preparation");
+      var invalid = assertThrows(io.justsearch.agent.api.registry.OperationPreparationRefused.class,
+          () -> new SwitchInferenceModeHandler(() -> spec, () -> reconciler(spec))
+              .prepare("{\"mode\":\"bananas\"}", null, TestEngineContexts.internal()));
+      assertTrue(invalid.refusal().message().contains("Invalid mode"));
+      var missing = dispatch.dispatch("{}", OperationKeys.generate(Clock.systemUTC()));
+      assertFalse(missing.success());
+      assertTrue(missing.message().contains("mode"));
+    }
   }
 }

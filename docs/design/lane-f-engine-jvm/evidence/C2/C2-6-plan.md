@@ -1,5 +1,55 @@
 # C2-6: accepted settings revision implementation plan
 
+## 2026-09-14 runtime-intent writer cut
+
+The runtime spec remains a settings projection. Writable composition receives the
+existing attempt runner; a read-only constructor never fabricates an owner.
+Both catalog handlers declare SETTINGS_APPLY and consume their dispatcher-issued
+record. Server preparation freezes the full witness in strict
+`settings-runtime-intent-v1` metadata, preserving public retry arguments.
+Execution checks that pair before changing chatEnabled on its captured snapshot;
+the existing settings owner performs the final compare and atomic commitment.
+
+Direct mode REST passes request EngineContext and optional idempotencyKey.
+Its normalized enabled bit is the public identity of `core.set-chat-enabled`.
+Look up before settings inspection: changed target with an existing key is refused;
+known outcomes never prepare or nudge again. Unknown keys capture one snapshot,
+accept a row, then mutate inside that runner body. Per-call observation runs after
+commitment inside the normal body error guard, not inside the physical writer.
+The response returns operationKey and, on COMPLETE, acceptedRevision. Incomplete
+retry answers `accepted` without joining its unresolved completion future.
+Completed replay answers `recorded` without a live mode observation; only the
+first execution can say `converged`.
+
+An accepted failure still returns its server-issued operationKey and operationRecordId
+for outcome lookup. Direct REST projects bounded operation/settings errors through
+the sanitized REST error shape (`error`, `errorCode`, `errorClass`, `retryable`),
+not the generic invocation DTO. Keep existing public tokens OPERATION_KEY_INVALID
+and OPERATION_KEY_EXPIRED. Read-only/version conflicts are409; malformed input400;
+recovery503 without automatic retry; capacity503 is retryable; storage failure500.
+
+Boot autostart and activation's final intent use fresh internal settings attempts.
+Their no-op predicate and candidate share one captured witness. Typed recovery or
+read-only refusal leaves autostart bootstrap alive for Health/reset. Activation
+receives the same composed spec; missing ownership fails closed. Its whole-document
+apply, deactivation and compensation remain the next required writer cut.
+The runtime-intent checkpoint cannot ship independently: its recorded witness makes
+those remaining legacy saves refuse. Continue straight into that cut and the other
+writers before C2-6 acceptance; final merge remains F.
+
+Rejected alternatives: raw save bypasses the witness; refreshing only the witness
+permits a stale candidate to erase a concurrent edit; another runtime-intent store
+forks the settings authority. Reuse existing runner, preparation and settings owner.
+
+Required checks: existing intent/convergence tests through real runner/owner;
+acceptance before effect, stale frozen refusal, complete retry without preparation
+or observation, changed-target key reuse, incomplete retry without blocking,
+boot refusal preserving startup, request context/key and response witness wire
+coverage. Run affected service/UI suites, PMD/format and independent batch review.
+The reviewed checkpoint passes final1405:4,235 represented cases, four existing
+skips, zero failures/errors, with applicable PMD/format/UI integration compilation.
+[Evidence and precise limits](runtime-intent-producer.md). C2-6 remains open.
+
 2026-09-13 implementation checkpoint: [typed witness foundation](settings-witness.md) is
 locally verified; confirmed recovery reset, producer composition, Health and public wire
 projection remain the next required cuts. This does not close C2-6.

@@ -49,11 +49,14 @@ public interface BrainRuntimeService {
    * the target state has been reached (tempdoc 804 §B6).
    *
    * @param mode {@code "online"} or {@code "indexing"} (case-insensitive)
-   * @return the requested mode, the live mode at return time, and whether they already agree
+   * @param context request identity inherited by the accepted operation
+   * @param idempotencyKey optional stable retry key; missing keys are issued by the runner
+   * @return the row receipt and first-execution observation, without resampling on replay
    * @throws IllegalArgumentException for an invalid mode string
    * @throws Exception when the intent cannot be recorded (runtime authority unavailable)
    */
-  ModeTransitionOutcome switchInferenceMode(String mode) throws Exception;
+  ModeTransitionOutcome switchInferenceMode(String mode,
+      io.justsearch.core.context.EngineContext context, String idempotencyKey) throws Exception;
 
   /**
    * Start one captured enrichment pass and return its actual completion after owner cleanup.

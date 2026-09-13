@@ -4,7 +4,14 @@
   "review": "Independent reviewer clear after one correction round; no reviewer-executed builds.",
   "root": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
   "retention": "Through lane acceptance plus30 days; export before worktree release.",
-  "limits": "No live, installed successor or final-head hosted proof; runtime-intent producers remain next.",
+  "limits": "No live or installed successor proof; runtime-intent producers remain next. Hosted success covers the committed prerequisite, not later dirty work.",
+  "hosted": {
+    "revision": "0ad7e19140ebb57749c2b87046346d69acc27964",
+    "ci": "https://github.com/justsearch-app/justsearch/actions/runs/34788273439",
+    "cla": "https://github.com/justsearch-app/justsearch/actions/runs/34788272070",
+    "result": "success",
+    "capture": "tmp/c2-observation-hosted1396.json"
+  },
   "sources": [
     {
       "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",

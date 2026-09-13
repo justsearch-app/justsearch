@@ -95,7 +95,15 @@ public final class InferenceWiring {
               + " JUSTSEARCH_AI_AUTOSTART_ENABLED=true to seed chat-on for a fresh profile.");
       return;
     }
-    boolean seeded = specStore.seedAutostartIfUnset();
+    final boolean seeded;
+    try { seeded = specStore.seedAutostartIfUnset(); }
+    catch (io.justsearch.agent.api.registry.OperationPreparationRefused refusal) {
+      log.warn("AI auto-start seed refused: {}", refusal.refusal().errorCode().orElse("SETTINGS_RECOVERY_REQUIRED"));
+      return;
+    } catch (io.justsearch.app.api.settings.SettingsCommitOwner.Refused refusal) {
+      log.warn("AI auto-start seed refused: {}", refusal.response().errorCode().orElse("SETTINGS_RECOVERY_REQUIRED"));
+      return;
+    }
     log.info(
         seeded
             ? "AI auto-start seeded runtime spec chatEnabled=true (fresh profile)."

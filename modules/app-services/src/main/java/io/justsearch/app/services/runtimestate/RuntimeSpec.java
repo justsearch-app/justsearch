@@ -14,7 +14,7 @@ import io.justsearch.app.api.UiSettings;
  * autostart-seed only fires when it was not (see {@code RuntimeSpecStore}).
  *
  * <p>This is a read projection of {@link UiSettings}; it is not a second authority. Writes go
- * through {@code RuntimeSpecStore}, which load-mutates-saves the single field.
+ * through {@code RuntimeSpecStore}, which submits the single-field candidate to the accepted settings owner.
  */
 public record RuntimeSpec(boolean chatEnabled, boolean chatEnabledExplicit, String llmModelPath) {
 

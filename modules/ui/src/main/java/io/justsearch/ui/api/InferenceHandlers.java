@@ -393,9 +393,16 @@ final class InferenceHandlers {
       return;
     }
 
-    String mode = (String) body.get("mode");
+    String mode = body != null && body.get("mode") instanceof String value ? value : null;
     if (mode == null || mode.isBlank()) {
       ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "Missing 'mode' field", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+
+    Object suppliedKey = body.get("idempotencyKey");
+    if (suppliedKey != null && !(suppliedKey instanceof String)) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "idempotencyKey must be a string", telemetry, ApiErrorHandler.routeOf(ctx)));
       return;
     }
 
@@ -406,7 +413,16 @@ final class InferenceHandlers {
     BrainRuntimeService brainRuntime = this.brainRuntimeService;
     if (brainRuntime != null) {
       try {
-        ctx.json(modeTransitionPayload(brainRuntime.switchInferenceMode(mode)));
+        ctx.json(modeTransitionPayload(brainRuntime.switchInferenceMode(mode, RequestEngineContext.get(ctx),
+            (String) suppliedKey)));
+      } catch (io.justsearch.agent.api.registry.OperationPreparationRefused e) {
+        writeIntentRefusal(ctx, e.refusal());
+      } catch (io.justsearch.app.api.settings.SettingsCommitOwner.Refused e) {
+        writeIntentRefusal(ctx, e.response());
+      } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+        var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(e);
+        writeIntentRefusal(ctx, io.justsearch.agent.api.registry.OperationResult.failure(
+            response.message(), response.errorCode(), Map.of(), Boolean.TRUE.equals(response.retryable())));
       } catch (IllegalArgumentException e) {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
             e.getMessage() == null ? "Invalid mode" : e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -502,11 +518,40 @@ final class InferenceHandlers {
    * (round-10 evidence).
    */
   private static Map<String, Object> modeTransitionPayload(ModeTransitionOutcome outcome) {
-    return Map.of(
+    var payload = new java.util.LinkedHashMap<String, Object>(Map.of(
         "success", true,
         "requested", outcome.requested() == null ? "" : outcome.requested(),
         "mode", outcome.mode() == null ? "" : outcome.mode(),
-        "state", outcome.state());
+        "state", outcome.state()));
+    if (outcome.operationKey() != null) payload.put("operationKey", outcome.operationKey());
+    if (outcome.acceptedRevision() != null) payload.put("acceptedRevision", outcome.acceptedRevision());
+    return payload;
+  }
+
+  private void writeIntentRefusal(Context ctx, io.justsearch.agent.api.registry.OperationResult refusal) {
+    String code = refusal.errorCode().orElse("SETTINGS_RECOVERY_REQUIRED");
+    int status = switch (code) {
+      case "INVALID_REQUEST", "OPERATION_KEY_INVALID" -> 400;
+      case "SETTINGS_READ_ONLY", "VERSION_CONFLICT", "RECONFIGURE_IN_PROGRESS",
+          "OPERATION_KEY_EXPIRED", "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> 409;
+      case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY" -> 503;
+      default -> 500;
+    };
+    ApiErrorCode classification = switch (code) {
+      case "SETTINGS_READ_ONLY" -> ApiErrorCode.SETTINGS_READ_ONLY;
+      case "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT", "OPERATION_KEY_EXPIRED",
+          "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> ApiErrorCode.INVALID_REQUEST;
+      case "RECONFIGURE_IN_PROGRESS", "OPERATIONS_CAPACITY" -> ApiErrorCode.SERVICE_UNAVAILABLE;
+      default -> ApiErrorCode.INVALID_STATE;
+    };
+    var payload = ApiErrorHandler.toResponse(classification, refusal.message(), telemetry, ApiErrorHandler.routeOf(ctx));
+    payload.put("errorCode", code);
+    payload.put("retryable", refusal.retryable().orElse(false));
+    for (String field : java.util.List.of("operationKey", "operationRecordId")) {
+      Object value = refusal.structuredData().get(field);
+      if (value != null) payload.put(field, value);
+    }
+    ctx.status(status).json(payload);
   }
 
   /**
