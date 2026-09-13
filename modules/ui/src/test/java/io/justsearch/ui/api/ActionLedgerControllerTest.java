@@ -48,6 +48,63 @@ final class ActionLedgerControllerTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  private static int invokePost(ActionLedgerController controller, String id) throws Exception {
+    Context ctx = mock(Context.class);
+    when(ctx.body()).thenReturn(MAPPER.writeValueAsString(java.util.Map.of("id", id, "effectKind", "navigate")));
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    var status = new java.util.concurrent.atomic.AtomicInteger();
+    when(ctx.status(org.mockito.ArgumentMatchers.anyInt())).thenAnswer(call -> { status.set(call.getArgument(0)); return ctx; });
+    when(ctx.result(anyString())).thenReturn(ctx);
+    controller.handlePostEvent(ctx);
+    return status.get();
+  }
+
+  @Test
+  void clientEffectCannotShadowTheAcceptedOperationKeyInSnapshotOrLiveDelivery(@TempDir Path dir) throws Exception {
+    var changes = new ActionLedgerChangeRegistry(ActionEventJournal.at(dir));
+    var controller = wiredController(changes);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    var delivered = new java.util.ArrayList<ActionEvent>();
+    changes.addEventListener(delivered::add);
+    try {
+      int forgedStatus = invokePost(controller, "operation:" + key);
+      var entry = new io.justsearch.app.observability.operations.OperationHistoryEntry(
+          new io.justsearch.agent.api.registry.OperationRef("core.remember"), "head", Instant.EPOCH, Instant.EPOCH,
+          io.justsearch.app.observability.operations.OperationOutcome.SUCCESS, Optional.empty(),
+          io.justsearch.agent.api.registry.InvocationProvenance.systemInternal(Instant.EPOCH), Optional.empty(), Optional.of(key));
+      changes.broadcastOperation(entry);
+      var snapshot = invokeGet(controller, null, null).get("entries");
+      assertEquals("operation", snapshot.get(0).get("kind").asString(), "A client effect must not shadow the committed operation");
+      assertEquals(1, snapshot.size());
+      assertEquals("operation:" + key, snapshot.get(0).get("id").asString());
+      assertEquals(1, delivered.size());
+      assertTrue(delivered.getFirst() instanceof ActionEvent.Operation, "The real operation must reach live observers");
+      assertEquals(400, forgedStatus);
+      assertEquals(1, ActionEventJournal.at(dir).tail(10).size());
+    } finally { controller.shutdown(); }
+  }
+
+  @Test
+  void effectNamespaceAcceptsFrontendIdsIdempotentlyAndRejectsOtherNamespaces() throws Exception {
+    var changes = new ActionLedgerChangeRegistry();
+    var controller = wiredController(changes);
+    try {
+      assertEquals(202, invokePost(controller, "fe-effect:1"));
+      assertEquals(202, invokePost(controller, "fe-effect:1"));
+      assertEquals(1, changes.store().recent().size());
+      for (String epochId : List.of("fe-effect:00000000-0000-4000-8000-000000000001", "fe-effect:00000000-0000-4000-8000-000000000002")) {
+        assertEquals(202, invokePost(controller, epochId));
+        assertEquals(202, invokePost(controller, epochId));
+      }
+      assertEquals(3, changes.store().recent().size(), "Independent frontend journal identities must survive separately");
+      for (String invalid : List.of("operation:chosen", "gate:chosen", "navigation:chosen", "grant:chosen", "fe-effect:",
+          "fe-effect:-1", "fe-effect:0", "fe-effect:01", "fe-effect:1.5", "fe-effect:12345678901234567", "other")) {
+        assertEquals(400, invokePost(controller, invalid), invalid);
+      }
+      assertEquals(3, changes.store().recent().size());
+    } finally { controller.shutdown(); }
+  }
+
   private static ActionEvent op(String id, String originator, String transport, String corr) {
     return new ActionEvent.Operation(
         id,

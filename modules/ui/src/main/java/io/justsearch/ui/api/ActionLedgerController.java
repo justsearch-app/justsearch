@@ -182,6 +182,13 @@ public final class ActionLedgerController {
         ctx.status(400).contentType("application/json").result("{\"error\":\"id + effectKind required\"}");
         return;
       }
+      // The FE journal owns only this namespace. Server operation/grant/gate ids share the
+      // ledger's idempotency index and must never be claimable through client effect ingest.
+      if (!id.matches("fe-effect:(?:[1-9][0-9]{0,15}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})")) {
+        ctx.status(400).contentType("application/json")
+            .result("{\"error\":\"id must be fe-effect:<UUIDv4> or a legacy positive integer of at most 16 digits\"}");
+        return;
+      }
       String originator = asString(body.get("originator"));
       if (originator == null || originator.isBlank()) {
         originator = "user";

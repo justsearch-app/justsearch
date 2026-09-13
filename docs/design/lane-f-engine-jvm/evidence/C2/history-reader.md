@@ -67,3 +67,8 @@ the globally deduplicated ring and ring-first snapshot. The SQL reader/projectio
 and both bootstrap paths otherwise had no separate finding. Root accepted the
 ingress correction and cross-kind regression as the next item before source
 attachment. The historical live probe did not cover the ledger collision.
+
+Closed by the [effect identity correction](effect-identity.md): ingress isolation,
+persisted UUIDs for new frontend entries, legacy re-ingest compatibility, negative
+regressions and live1173/restart proof. Final independent review finds no residual
+identity defect; the original reader's consumer/SSE/platform limits still apply.

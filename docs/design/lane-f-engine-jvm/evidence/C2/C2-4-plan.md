@@ -264,3 +264,23 @@ An uncertain force can leave a complete parseable line; a retained retry therefo
 forces the actual numbered/active generation before it may discharge pending source
 delivery. Injected failure/rotation tests prove ordering and no duplicate. This is
 not a claim of physical power-loss testing or a new file-format guarantee.
+
+## Client effect identity boundary
+
+Correction,2026-09-13, independent reader review at2bcaee280: effect ingest accepted
+any nonblank id, while the ledger deduplicates globally. A caller could post
+operation:<K> before invoking K and hide the actual operation in the ring-first
+snapshot and live publication. Reserve the frontend's existing namespace at ingress:
+fe-effect followed by a canonical lowercase UUIDv4 for new entries, or the prior
+positive numeric journal id (at most16 decimal digits) for persisted legacy entries.
+The follow-up review also demonstrated that the local counter restarts at1 in a
+fresh client, so a numeric wire id aliases another client's effect. Mint each new
+ledgerId once and persist it in the existing journal entry; retain numeric id for
+local undo/causation. A per-client persistent epoch or another registry adds ownership
+without benefit over this per-entry identity. All three client projections (local
+row, backend-copy dedup, ingest) use the same persisted ledgerId. Legacy entries
+retain their old wire identity on reload, avoiding duplicate old events; this does
+not promise retroactive repair of old-client collisions. No new journal version,
+store, or per-kind ledger dedup fork is needed.
+Reject before publication, prove forged-effect-first/operation-second and valid
+frontend retries, and verify the product endpoint on the current Engine.

@@ -17,6 +17,7 @@
 
 import {
   listJournal,
+  journalEventId,
   getUndoableOperation,
   subscribeJournal,
   type JournalEntry,
@@ -339,7 +340,7 @@ function projectEffect(j: JournalEntry): UnifiedActionEntry {
   const vetoed = j.pendingOutcome === 'rejected' ? ' (rejected)' : '';
   return {
     // FE-local effects key off the journal entry id (the FE half of the one schema).
-    id: `fe-effect:${j.id}`,
+    id: journalEventId(j),
     source: 'fe-effect',
     kind: e.kind,
     occurredAt: j.invokedAt,
@@ -389,13 +390,13 @@ export function unifiedActivity(
       .map((e) => e.executionId as string),
   );
   // Tempdoc 577 §2.9 V6 root-cause — Effect→Effect collapse: `startEffectIngest` posts each FE
-  // journal entry to the backend log under the SAME deterministic id (`fe-effect:<journalId>`),
+  // journal entry to the backend log under the SAME persisted event id (legacy entries keep their numeric id),
   // and it returns here as an authoritative kind='effect' row. The id was designed as the dedup
   // handle; without this filter the one act rendered twice ("Navigate to Chat" backend row +
   // "navigate: Chat" journal row, identical timestamps — the live-audit Timeline duplication).
   const backendIds = new Set(backend.map((e) => e.id));
   const collapsedJournal = journal.filter((j) => {
-    if (backendIds.has(`fe-effect:${j.id}`)) return false; // ingested copy stands for both
+    if (backendIds.has(journalEventId(j))) return false; // ingested copy stands for both
     const exec = executionIdOf(j.id);
     return !(exec !== undefined && backendExecutionIds.has(exec));
   });
@@ -535,7 +536,7 @@ export function startEffectIngest(config: { apiBase?: string; fetchImpl?: typeof
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: `fe-effect:${j.id}`,
+          id: journalEventId(j),
           effectKind: j.effect.kind,
           originator: j.originator,
           subject,
