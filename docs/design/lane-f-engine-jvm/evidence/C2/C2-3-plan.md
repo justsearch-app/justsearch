@@ -119,6 +119,15 @@ Commit the item and its exact evidence; push immediately. Keep failed/crashed/re
 runs honest. Root owns all shared-state and migration implementation; read-only
 exploration can resolve the remaining authorization mapping independently.
 
+## Remaining consumer placement (September13, at13b6bd680)
+
+C2-3d remains open. Settings delivery and its A/B/C retry proof land in C2-6;
+ingestion/scheduling delivery lands with C2-8's recorded root producer; reindex
+retries land with C2-10's prepared bundle. R9 continues to forbid premature
+producer activation in C2-2. C2-4 proceeds with the history/query authority while
+these consumers remain required. The full batch2 gate and hosted recovery proof
+are still owed; local generic fixtures do not establish product activation.
+
 ## Orchestrator preparation entry (September13)
 
 The agent's WATCH and declared confirmation floors can require approval even when

@@ -1,12 +1,12 @@
 {
-  "revision": "852916d16f36906471f377ab6ef3479f818aaf90",
+  "revision": "13b6bd6802c860dcb5a891bcab730891f19464c7",
   "command": "gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
   "summary": {
-    "tests": 10252,
+    "tests": 10301,
     "failures": 0,
     "errors": 0,
     "skipped": 35,
-    "suites": 1657
+    "suites": 1662
   },
   "tasks": [
     {
@@ -32,7 +32,7 @@
     {
       "module": "ai-backend",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 62,
       "failures": 0,
       "errors": 0,
@@ -42,18 +42,18 @@
     {
       "module": "app-agent",
       "task": "test",
-      "status": "EXECUTED",
-      "tests": 674,
+      "status": "UP-TO-DATE",
+      "tests": 685,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 49
+      "suites": 51
     },
     {
       "module": "app-agent-api",
       "task": "test",
       "status": "UP-TO-DATE",
-      "tests": 240,
+      "tests": 243,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
@@ -62,7 +62,7 @@
     {
       "module": "app-api",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 204,
       "failures": 0,
       "errors": 0,
@@ -80,6 +80,16 @@
       "suites": 1
     },
     {
+      "module": "app-inference",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 320,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 30
+    },
+    {
       "module": "app-engine",
       "task": "test",
       "status": "EXECUTED",
@@ -88,16 +98,6 @@
       "errors": 0,
       "skipped": 0,
       "suites": 47
-    },
-    {
-      "module": "app-inference",
-      "task": "test",
-      "status": "EXECUTED",
-      "tests": 320,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 30
     },
     {
       "module": "app-launcher",
@@ -112,7 +112,7 @@
     {
       "module": "app-observability",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 464,
       "failures": 0,
       "errors": 0,
@@ -123,11 +123,11 @@
       "module": "app-services",
       "task": "test",
       "status": "EXECUTED",
-      "tests": 2673,
+      "tests": 2703,
       "failures": 0,
       "errors": 0,
       "skipped": 3,
-      "suites": 413
+      "suites": 415
     },
     {
       "module": "app-services",
@@ -222,7 +222,7 @@
     {
       "module": "indexer-worker",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 482,
       "failures": 0,
       "errors": 0,
@@ -262,7 +262,7 @@
     {
       "module": "ipc-common",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 4,
       "failures": 0,
       "errors": 0,
@@ -353,11 +353,11 @@
       "module": "ui",
       "task": "test",
       "status": "EXECUTED",
-      "tests": 1178,
+      "tests": 1183,
       "failures": 0,
       "errors": 0,
       "skipped": 1,
-      "suites": 179
+      "suites": 180
     },
     {
       "module": "ui",
@@ -372,7 +372,7 @@
     {
       "module": "worker-core",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 342,
       "failures": 0,
       "errors": 0,
@@ -382,7 +382,7 @@
     {
       "module": "worker-services",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 1347,
       "failures": 0,
       "errors": 0,
@@ -390,11 +390,11 @@
       "suites": 256
     }
   ],
-  "log": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-preparation-full1009.txt",
-  "xmlRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-preparation-full1009-xml",
-  "result": "BUILD SUCCESSFUL in 16m 7s; 367 tasks, 75 executed and 292 up-to-date",
-  "executedTests": 8178,
-  "reuse": "21 test tasks were UP-TO-DATE with unchanged successful inputs; their represented XML is distinguished per task. The other 17 test tasks executed.",
-  "limits": "Local Java integrated proof at 852916d16. Hosted CI34742373815 was still pending at 06:32 UTC; no live/model or hosted success is inferred. C2-3 agent/workflow and remaining producer work is open.",
-  "warnings": "Existing SmokeDriver diagnostics unused parameter, dependency/JDK Unsafe warnings, LightGBM small-fixture warnings and incompatible-PMD configuration-cache discard remain visible in the successful log."
+  "log": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-full1059.txt",
+  "xmlRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-full1059-xml",
+  "result": "BUILD SUCCESSFUL in 10m 36s; 367 tasks, 30 executed and 337 up-to-date",
+  "executedTests": 4314,
+  "reuse": "30 test tasks UP-TO-DATE with unchanged successful inputs; eight test tasks executed. Per-task represented counts distinguish reuse.",
+  "limits": "Local integrated Java proof at13b6bd680. CI34748767868 remains pending with no jobs assigned; CLA34748767771 is queued on ubuntu-latest without a runner. C2-3 producer delivery and C2-4 onward remain open. Full1038 remains failed historical evidence.",
+  "warnings": "Existing JDK/dependency Unsafe, LightGBM small-fixture and configuration-cache incompatibility warnings remain visible in the successful log."
 }

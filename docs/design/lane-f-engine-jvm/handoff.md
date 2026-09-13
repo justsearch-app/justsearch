@@ -10,6 +10,17 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
+**Latest local boundary (2026-09-13):** full1059 passes at13b6bd680 in10m36s,
+10301 represented cases, zero failures/errors and35 inherited skips; eight test
+tasks execute and30 reuse unchanged successful inputs. PMD and integration-test
+compilation pass. [Integrated proof](evidence/C2/integrated1059.md) and the latest
+full-run summary supersede full1009 as the current successful local boundary.
+Hosted CI34748767868 remains pending; queued CLA runner allocation is externally
+blocked. No hosted success is inferred. Continue [C2-4](evidence/C2/C2-4-plan.md),
+after the UNDONE wire correction (negative1061, focused1062/schema1063 pass;
+wire gate still next). C2-3's remaining settings/ingestion/reindex
+consumers stay open in C2-6/8/10; no batch2 or stage closure is claimed.
+
 Final independent correction verification is clear at **b713307ea**. Full905 passes
 in9m30s with10158 represented cases, zero failures/errors and35 inherited skips;
 seven test tasks execute2040 cases and31 reuse unchanged successful inputs. PMD,
