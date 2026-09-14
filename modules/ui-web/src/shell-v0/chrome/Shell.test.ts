@@ -88,6 +88,37 @@ const LEGACY_ASK: Surface = {
 const LEGACY_FREE_CHAT: Surface = { ...LEGACY_ASK, id: 'core.free-chat-surface' };
 const LEGACY_EXTRACT: Surface = { ...LEGACY_ASK, id: 'core.extract-surface' };
 
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+let settingsAcceptedRevision = 0;
+let settingsLastCommittedOperationKey: string | null = null;
+
+function settingsSnapshot(): Response {
+  return new Response(JSON.stringify({
+    ui: { mode: 'simple' },
+    witness: {
+      acceptedRevision: settingsAcceptedRevision,
+      lastCommittedOperationKey: settingsLastCommittedOperationKey,
+    },
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+function completeSettings(init?: RequestInit): Response {
+  const request = JSON.parse(String(init?.body ?? '{}')) as {
+    operationKey?: string;
+    witness?: { acceptedRevision?: number };
+  };
+  settingsAcceptedRevision = (request.witness?.acceptedRevision ?? 0) + 1;
+  settingsLastCommittedOperationKey = request.operationKey ?? null;
+  return new Response(JSON.stringify({
+    state: 'COMPLETE',
+    operationKey: request.operationKey,
+    witness: {
+      acceptedRevision: settingsAcceptedRevision,
+      lastCommittedOperationKey: settingsLastCommittedOperationKey,
+    },
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
 function seedTwoSurfaces(): void {
   const catalog: SurfaceCatalog = {
     schemaVersion: '1.0.0',
@@ -127,6 +158,8 @@ describe('Shell — slice 492 substrate integration', () => {
     __resetStoreRegistryForTest();
     __resetSurfaceSchemasForTest();
     __resetBootstrapForTest();
+    settingsAcceptedRevision = 0;
+    settingsLastCommittedOperationKey = null;
     deactivateProjection();
     window.location.hash = '';
     seedTwoSurfaces();
@@ -139,12 +172,15 @@ describe('Shell — slice 492 substrate integration', () => {
     // empty entries, so the manual schema persists.
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ entries: [] }), {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith('/api/settings/v2')) {
+          return init?.method === 'POST' ? completeSettings(init) : settingsSnapshot();
+        }
+        return new Response(JSON.stringify({ entries: [] }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
+        });
+      }),
     );
   });
 
@@ -257,6 +293,17 @@ describe('Shell — slice 492 substrate integration', () => {
     await blocker;
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(settingsPosts()).toHaveLength(1);
+    const request = JSON.parse(String((settingsPosts()[0]?.[1] as RequestInit | undefined)?.body)) as {
+      ui: { mode: string };
+      witness: { acceptedRevision: number; lastCommittedOperationKey: string | null };
+      operationKey: string;
+    };
+    expect(request).toEqual({
+      ui: { mode: 'advanced' },
+      witness: { acceptedRevision: 0, lastCommittedOperationKey: null },
+      operationKey: expect.stringMatching(UUID_V7),
+    });
+    expect(request.operationKey).toMatch(UUID_V7);
     expect(new Headers((settingsPosts()[0]?.[1] as RequestInit | undefined)?.headers)
       .get(UI_MODE_INTENT_HEADER)).toMatch(/:2$/);
   });

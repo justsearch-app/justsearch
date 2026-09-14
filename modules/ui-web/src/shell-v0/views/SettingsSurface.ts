@@ -19,6 +19,7 @@
  */
 
 import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
+import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch } from '../../api/settingsAttempt.js';
 // Tempdoc 883 D-A.7 — the override field must resync to STATE, not to Lit's memo of the last
 // committed value: a rejected/floored/collapsed write leaves the DOM value the user typed, and a
 // plain `.value=` binding sees no change and skips the update. `live()` compares against the live
@@ -46,8 +47,7 @@ import { applyAppearance, getSurfaceMode, setSurfaceMode } from '../state/themeS
 // Tempdoc 874 — the Search v3 chat-column width preset (FE-only, user-state document).
 import { getChatWidth, setChatWidth, type ChatWidth } from '../state/chatWidthState.js';
 import {
-  enqueueUiModePersistence,
-  UI_MODE_INTENT_HEADER,
+  enqueueUiModeSettings,
   setUiMode,
   getUiMode,
   getUiModeRevision,
@@ -159,7 +159,7 @@ interface UISettings {
 
 /**
  * Tempdoc 883 D-A.7 — the LLM slice of `GET/POST /api/settings/v2` this surface reads and writes.
- * `contextWindow` is the wire name; `SettingsController.mergeV2Into` maps it onto
+ * `contextWindow` is the wire name; `SettingsPatch.merge` maps it onto
  * `UiSettings.contextLength`, where `0` means AUTO (the window is derived at launch) and a positive
  * value is an explicit override floored at 512.
  */
@@ -901,21 +901,17 @@ export class SettingsSurface extends JfElement {
       if (!settings || this.readOnly) return;
       // This surface owns the persist lifecycle the statechart's save-settings edge triggers:
       // optimistic apply already happened (set-appearance effect); persistence is best-effort.
+      let patch: SettingsPatch;
+      try {
+        patch = captureSettingsPatch(settings);
+      } catch (err) {
+        this.error = err instanceof Error ? err.message : String(err);
+        return;
+      }
       this.saving = true;
-      const persist = (signal?: AbortSignal, intent?: string): Promise<Response> => this.doFetch('/api/settings/v2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(intent ? { [UI_MODE_INTENT_HEADER]: intent } : {}),
-        },
-        body: JSON.stringify(settings),
-        signal,
-      });
-      const ui = settings['ui'];
-      const writesMode = typeof ui === 'object' && ui !== null && 'mode' in ui;
-      // Mode writes share one queue with Brain and the top bar. Other settings retain their existing
-      // independent lifecycle because they do not compete for the `ui.mode` field.
-      void (writesMode ? enqueueUiModePersistence(persist) : persist())
+      const send = (path: string, init?: RequestInit) => this.doFetch(path, init);
+      const writesMode = patch.ui != null && 'mode' in patch.ui;
+      void (writesMode ? enqueueUiModeSettings(send, patch) : saveAbsoluteSettings(send, patch))
         .catch((err: unknown) => {
           this.error = err instanceof Error ? err.message : String(err);
         })
@@ -2962,7 +2958,7 @@ export class SettingsSurface extends JfElement {
    * too, so the field cannot post a number the backend will silently rewrite.
    *
    * Written straight through `POST /api/settings/v2` (not the appearance statechart, which owns the
-   * `ui` block only). The body carries just the `llm` slice; `SettingsController.mergeV2Into` merges
+   * `ui` block only). The body carries just the `llm` slice; `SettingsPatch.merge` merges
    * field-by-field, so nothing else is clobbered.
    */
   private async saveContextOverride(raw: string): Promise<void> {
@@ -2973,18 +2969,7 @@ export class SettingsSurface extends JfElement {
     this.llm = { ...this.llm, contextWindow: next };
     this.saving = true;
     try {
-      const res = await this.doFetch('/api/settings/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ llm: { contextWindow: next } }),
-      });
-      // Revert on a rejected save (the `toggleFeedbackCapture` pattern): a field left showing a
-      // value the backend does not hold is the same class of lie as an optimistic toggle that
-      // never persisted (tempdoc 806 B.2).
-      if (!res.ok) {
-        this.llm = previous;
-        this.error = `Couldn't save the context-window override (HTTP ${res.status}).`;
-      }
+      await saveAbsoluteSettings((path, init) => this.doFetch(path, init), { llm: { contextWindow: next } });
     } catch (err) {
       this.llm = previous;
       this.error = err instanceof Error ? err.message : String(err);

@@ -17,9 +17,35 @@ interface SettingsHost extends HTMLElement {
   updateComplete: Promise<unknown>;
 }
 
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const INITIAL_WITNESS = { acceptedRevision: 0, lastCommittedOperationKey: null };
+
+function completeSettings(init?: { body?: unknown; method?: string }): Response {
+  const request = JSON.parse(String(init?.body ?? '{}')) as {
+    operationKey?: string;
+    witness?: { acceptedRevision?: number };
+  };
+  return new Response(JSON.stringify({
+    state: 'COMPLETE',
+    operationKey: request.operationKey,
+    witness: {
+      acceptedRevision: (request.witness?.acceptedRevision ?? 0) + 1,
+      lastCommittedOperationKey: request.operationKey,
+    },
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
+function settingsSnapshot(): Response {
+  return new Response(JSON.stringify({ ui: { mode: 'simple' }, llm: {}, witness: INITIAL_WITNESS }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 beforeEach(() => {
   __resetUiModeForTest();
-  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+  vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+    init?.method === 'POST' ? completeSettings(init) : settingsSnapshot()));
 });
 
 afterEach(() => {
@@ -43,7 +69,7 @@ describe('SettingsSurface shared detail level', () => {
             settingsRequested = true;
             return settingsResponse;
           }
-          return Promise.resolve(new Response('{}', { status: 200 }));
+          return Promise.resolve(init?.method === 'POST' ? completeSettings(init) : settingsSnapshot());
         },
       },
     });
@@ -54,7 +80,7 @@ describe('SettingsSurface shared detail level', () => {
     // Simulate a later top-bar/Brain choice while Settings' mount-time GET is still in flight.
     setUiMode('advanced');
     resolveSettings(
-      new Response(JSON.stringify({ ui: { mode: 'simple' } }), {
+      new Response(JSON.stringify({ ui: { mode: 'simple' }, witness: INITIAL_WITNESS }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       }),
@@ -81,13 +107,11 @@ describe('SettingsSurface shared detail level', () => {
               body: String(init.body),
               intent: new Headers(init.headers).get(UI_MODE_INTENT_HEADER),
             });
+            return Promise.resolve(completeSettings(init));
           }
-          return Promise.resolve(
-            new Response(JSON.stringify({ ui: { mode: 'simple' } }), {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }),
-          );
+          return Promise.resolve(path === '/api/settings/v2'
+            ? settingsSnapshot()
+            : new Response('{}', { status: 200 }));
         },
       },
     });
@@ -110,7 +134,19 @@ describe('SettingsSurface shared detail level', () => {
     release(new Response('{}', { status: 200 }));
     await blocker;
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(posts.map(({ body }) => JSON.parse(body))).toEqual([{ ui: { mode: 'advanced' } }]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const firstBody = JSON.parse(posts[0]!.body) as {
+      ui: { mode: string };
+      witness: { acceptedRevision: number; lastCommittedOperationKey: string | null };
+      operationKey: string;
+    };
+    expect(firstBody).toEqual({
+      ui: { mode: 'advanced' },
+      witness: { acceptedRevision: 0, lastCommittedOperationKey: null },
+      operationKey: expect.stringMatching(UUID_V7),
+    });
+    expect(firstBody.operationKey).toMatch(UUID_V7);
+    expect(posts[0]?.intent).toMatch(/:\d+$/);
     expect(posts[0]?.intent).toMatch(/:2$/);
   });
 });
