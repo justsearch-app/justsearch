@@ -41,3 +41,35 @@ supervision must be investigated before claiming it fixed.
 Raw evidence retains the tested head/distribution stamp and exact run identities. Retain
 through lane final reconciliation plus30 days, at least2026-10-14. These failures stay in
 active C2/installed repair work and are not owner-gated or accepted deferrals.
+
+## Installed1578 correction and retained startup evidence
+
+At043b05bc0 plus the migration barrier and lock-evidence fixture changes, all six cases
+execute:writer, migration (real model), lock-ingest, processing and operation pass;
+lock-boot fails, no skips. This verifies the queue reservation and migration barrier in
+the installed Windows path, but is not a full installed pass. Logs/XML are retained at
+tmp/installed-recovery1578*; quick1579 finds ABSENT/no foreign runs or inference orphan.
+
+The fixture now retains the primary assertion and attaches cleanup/evidence failures as
+suppressed exceptions. FileIntruder snapshots successful shared/exclusive locks by relative
+path after close, capped at256 paths with exact omitted-acquisition accounting. Serialization
+uses the existing Jackson dependency; evidence cannot be written inside the attacked tree.
+Victim selection, timings, lock modes and exclusions are unchanged. Compile-integration,
+PMD-integration and Spotless pass in1577. Installed1578 exercises the instrumentation; its
+21,085 lock acquisitions reconcile exactly across total/shared/exclusive/per-path counts.
+
+Local failing fixture writer-junit-28bae079-631b-449e-916f-e762328345e3,
+run a87df812-0638-4ef1-a737-982849238b1c, acquires locks on operations.db,
+operations.db-wal, operations.db-shm, engine.log and start.log. Publisher PID42864
+constructs at08:36:43.047Z and closes at08:36:43.521Z, before discovery. The operations
+DB remains empty and no jobs DB exists. The Engine exception and exit code are still
+missing; lock acquisition proves the workload occurred, not the exact failing SQL statement.
+The next repair must preserve startup diagnostics before choosing a bounded retry owner.
+A log-only directory is still misclassified as a run by both cleanup callers; that separate
+ownership correction is pending and no cleanup success is fabricated here.
+
+Independent migration review also found two inherited paths under active repair: a resumed
+empty corruption-recovery Green loses its boot-local waiver, and a zero-root enumeration
+returns before marking done. Reapplying the waiver needs exact recovery provenance and a
+trustworthy empty opened Green. Normal empty migration gains no new waiver. Root-loading
+failures must not become successful empty enumeration when repairing the done transition.

@@ -1,6 +1,6 @@
 {
   "base": "112d2e05d0772936b6e9a2d6f75653e52c3ba2b2",
-  "status": "assertion corrected; installed suite still red with migration and lock admission failures",
+  "status": "migration and lock-ingest corrected; installed1578 5/6 pass, lock-boot reproduced with per-file evidence",
   "run": {
     "revision": "112d2e05d+dirty",
     "command": "gradlew system-tests integrationTest EngineSupervisedRecoveryE2ETest OperationResumeE2ETest",
@@ -35,5 +35,11 @@
     "lock-ingest"
   ],
   "hostedArtifact": "tmp/hosted-integration1561",
-  "localHealth": "tmp/quick1569.json"
+  "localHealth": "tmp/quick1569.json",
+  "latestInstalled": "tmp/installed-recovery1578-counts.json",
+  "latestFailed": [
+    "lock-boot"
+  ],
+  "latestHealth": "tmp/quick1579.json",
+  "lockEvidence": "tmp/lane-f-takeover/writer-junit-28bae079-631b-449e-916f-e762328345e3/intruder-acquisitions.json"
 }

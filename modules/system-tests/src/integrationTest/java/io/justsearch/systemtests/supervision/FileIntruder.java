@@ -1,13 +1,18 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.systemtests.supervision;
 
+import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,9 +43,22 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 final class FileIntruder implements AutoCloseable {
 
+  private static final int MAX_EVIDENCE_PATHS = 256;
+
+  private static final class LockEvidence {
+    private long total;
+    private long shared;
+    private long exclusive;
+  }
+
   private final Path targetDir;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicLong acquiredLocks = new AtomicLong();
+  private final Object evidenceMonitor = new Object();
+  private final Map<String, LockEvidence> evidenceByPath = new LinkedHashMap<>();
+  private long omittedAcquisitions;
+  private long sharedAcquisitions;
+  private long exclusiveAcquisitions;
   private final List<Thread> intruderThreads = new ArrayList<>();
   private final Random random = new Random();
 
@@ -54,6 +72,46 @@ final class FileIntruder implements AutoCloseable {
 
   long acquiredLockCount() {
     return acquiredLocks.get();
+  }
+
+  /**
+   * Writes bounded evidence of successful file-lock acquisitions. Call only after {@link #close()}
+   * so no intruder thread can mutate the snapshot while it is being serialized.
+   * The path list is capped at the first 256 distinct paths; {@code omittedAcquisitions} counts
+   * successful locks whose path was outside that bounded list.
+   *
+   * @param destination path outside the attacked data directory
+   */
+  void writeEvidence(Path destination) throws IOException {
+    Objects.requireNonNull(destination, "destination");
+    Path absoluteDestination = destination.toAbsolutePath().normalize();
+    if (absoluteDestination.startsWith(targetDir.toAbsolutePath().normalize())) {
+      throw new IllegalArgumentException("evidence must be outside the attacked directory");
+    }
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    synchronized (evidenceMonitor) {
+      snapshot.put("totalAcquired", acquiredLocks.get());
+      snapshot.put("sharedAcquired", sharedAcquisitions);
+      snapshot.put("exclusiveAcquired", exclusiveAcquisitions);
+      snapshot.put("truncated", omittedAcquisitions > 0);
+      snapshot.put("omittedAcquisitions", omittedAcquisitions);
+      List<Map<String, Object>> paths = new ArrayList<>();
+      evidenceByPath.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+        LockEvidence evidence = entry.getValue();
+        Map<String, Object> counts = new LinkedHashMap<>();
+        counts.put("path", entry.getKey());
+        counts.put("total", evidence.total);
+        counts.put("shared", evidence.shared);
+        counts.put("exclusive", evidence.exclusive);
+        paths.add(counts);
+      });
+      snapshot.put("paths", paths);
+    }
+    Path parent = absoluteDestination.getParent();
+    if (parent != null) Files.createDirectories(parent);
+    Files.writeString(absoluteDestination,
+        new tools.jackson.databind.ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(snapshot),
+        StandardCharsets.UTF_8);
   }
 
   /**
@@ -128,7 +186,32 @@ final class FileIntruder implements AutoCloseable {
       try {
         FileLock lock = channel.tryLock(0, Long.MAX_VALUE, !exclusive);
         if (lock != null) {
-          acquiredLocks.incrementAndGet();
+          String relativePath = relativePath(file);
+          synchronized (evidenceMonitor) {
+            acquiredLocks.incrementAndGet();
+            if (exclusive) {
+              exclusiveAcquisitions++;
+            } else {
+              sharedAcquisitions++;
+            }
+            LockEvidence evidence = evidenceByPath.get(relativePath);
+            if (evidence == null) {
+              if (evidenceByPath.size() < MAX_EVIDENCE_PATHS) {
+                evidence = new LockEvidence();
+                evidenceByPath.put(relativePath, evidence);
+              } else {
+                omittedAcquisitions++;
+              }
+            }
+            if (evidence != null) {
+              evidence.total++;
+              if (exclusive) {
+                evidence.exclusive++;
+              } else {
+                evidence.shared++;
+              }
+            }
+          }
           activeLocks.add(lock);
           Thread.sleep(random.nextInt(durationMs) + 1);
           lock.release();
@@ -143,6 +226,12 @@ final class FileIntruder implements AutoCloseable {
     } catch (Exception e) {
       // The lock failed (the file is already locked by the index half?). Expected.
     }
+  }
+
+  private String relativePath(Path file) {
+    Path absoluteTarget = targetDir.toAbsolutePath().normalize();
+    Path absoluteFile = file.toAbsolutePath().normalize();
+    return absoluteTarget.relativize(absoluteFile).toString().replace('\\', '/');
   }
 
   @Override

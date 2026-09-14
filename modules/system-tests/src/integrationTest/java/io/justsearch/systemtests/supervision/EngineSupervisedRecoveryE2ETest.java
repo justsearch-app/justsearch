@@ -74,6 +74,7 @@ final class EngineSupervisedRecoveryE2ETest {
     Process process = null;
     int exit;
     boolean interrupted = false;
+    Throwable primaryFailure = null;
     try {
       process = builder.start();
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(330);
@@ -94,9 +95,14 @@ final class EngineSupervisedRecoveryE2ETest {
         }
       }
       exit = process.exitValue();
+      assertEquals(0, exit, Files.readString(outputFile, StandardCharsets.UTF_8));
     } catch (InterruptedException e) {
       interrupted = true;
+      primaryFailure = e;
       throw e;
+    } catch (Exception | AssertionError failure) {
+      primaryFailure = failure;
+      throw failure;
     } finally {
       if (intruder != null) intruder.close();
       if (process != null && process.isAlive()) {
@@ -109,15 +115,27 @@ final class EngineSupervisedRecoveryE2ETest {
       }
       try {
         stopOwnedRun(repo, work);
+      } catch (Exception cleanupFailure) {
+        if (primaryFailure == null) {
+          primaryFailure = cleanupFailure;
+          throw cleanupFailure;
+        }
+        primaryFailure.addSuppressed(cleanupFailure);
       } finally {
-        if (interrupted) {
-          Thread.currentThread().interrupt();
+        try {
+          if (intruder != null) intruder.writeEvidence(work.resolve("intruder-acquisitions.json"));
+        } catch (Exception evidenceFailure) {
+          if (primaryFailure == null) throw evidenceFailure;
+          primaryFailure.addSuppressed(evidenceFailure);
+        } finally {
+          if (interrupted) {
+            Thread.currentThread().interrupt();
+          }
         }
       }
     }
     String output = Files.readString(outputFile, StandardCharsets.UTF_8);
 
-    assertEquals(0, exit, output);
     if ("writer".equals(scenario)) {
       assertTrue(output.contains("QUEUE_BEFORE_DEATH"), output);
       assertTrue(output.contains("fatal_or_uncaught"), output);
