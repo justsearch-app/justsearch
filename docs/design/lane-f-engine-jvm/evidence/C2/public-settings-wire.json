@@ -149,5 +149,6 @@
     "Public POST and frontend producers remain next; checkpoint cannot ship",
     "No new live/model/installed proof",
     "Hosted09f91917e CI34794274393 failed SystemAccessFunnelTest stale allowlist; correction tracked separately; final-head hosted remains owed"
-  ]
+  ],
+  "fullCommand": "./gradlew.bat :modules:app-api:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-observability:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain"
 }

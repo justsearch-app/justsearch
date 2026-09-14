@@ -267,7 +267,10 @@ public final class ServicePhase {
     // §31 Step 1.1: ExcludesService constructed via supplier-aware IndexingService.
     ExcludesService excludes = new ExcludesServiceImpl(in.indexingServiceSupplier());
 
-    SettingsService settings = new SettingsServiceImpl(in.settingsStore(), in.attempts());
+    RuntimeReconciler settingsReconciler = runtimeReconciler;
+    SettingsService settings = new SettingsServiceImpl(in.settingsStore(), in.attempts(), () -> {
+      if (settingsReconciler != null) settingsReconciler.specChanged();
+    });
 
     // §31 Phase 1.B-D: helper impls in app-services.
     AiInstallService aiInstallHelper =

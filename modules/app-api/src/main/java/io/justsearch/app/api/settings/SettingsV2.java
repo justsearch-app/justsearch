@@ -19,7 +19,7 @@ public record SettingsV2(
 ) {
   public SettingsV2 {
     // Do not replace nulls with defaults here.
-    // Null means "absent from request" — mergeV2Into() uses null checks
+    // Null means "absent from request" — partial merging uses null checks
     // to decide what to merge. Use SettingsV2.empty() for a default instance.
     indexPaths = indexPaths != null ? List.copyOf(indexPaths) : null;
     // settingsMode is server-set only (ignored in POST body).

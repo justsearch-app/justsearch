@@ -11,3 +11,9 @@ Raw evidence: active worktree tmp/hosted1437-failure.txt, workflow1437.txt,
 sysaccess1438-red.txt/-counts.json/-xml, sysaccess1439.txt/-counts.json/-xml and
 sysaccess1439.sarif. Retain through lane acceptance plus30 days and export before
 worktree release. No new hosted-success claim; the next push must prove this fix.
+
+Hosted correction proof: [CI34795894101](https://github.com/justsearch-app/justsearch/actions/runs/34795894101)
+and CLA34795892998 succeed at7f665a33d1ab55d8c493d1e322e8f22c31f39c70.
+The earlier wire/cleanup runs were superseded, not successful. This hosted result
+covers the pushed replay/allowlist checkpoint; the subsequent public-producer
+changes still require their own hosted result.

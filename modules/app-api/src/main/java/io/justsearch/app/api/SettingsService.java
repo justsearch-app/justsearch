@@ -17,6 +17,11 @@ public interface SettingsService {
       UiSettings candidate, io.justsearch.app.api.settings.SettingsWitness expected,
       io.justsearch.core.context.EngineContext context);
 
+  /** Public partial mutation; the caller retains one witness and key for every retry. */
+  io.justsearch.app.api.operations.OperationAttemptRunner.Result applyPublic(
+      io.justsearch.app.api.settings.SettingsV2 input, String modeIntentHeader,
+      io.justsearch.core.context.EngineContext context);
+
   /** Freeze the readable witness or absent-history quarantine identity without an effect. */
   OperationPreparation prepareReset(String argumentsJson);
 

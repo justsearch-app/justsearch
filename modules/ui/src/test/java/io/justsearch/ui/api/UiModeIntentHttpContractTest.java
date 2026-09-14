@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -32,12 +33,16 @@ final class UiModeIntentHttpContractTest {
   private static final String ORIGIN = "http://localhost:5173";
   private static final String CLIENT_ID = "ui-mode-http-contract";
 
+  private io.justsearch.app.observability.operations.SqliteOperationStore operations;
+  @AfterEach void closeOperations() throws Exception { if (operations != null) operations.close(); }
+
   @Test
   void staleModeIntentSurvivesCorsRoutingAndRestartWithoutDroppingOtherFields(@TempDir Path tmp)
       throws Exception {
     Path settingsPath = tmp.resolve("settings.json");
     Path indexPath = Files.createDirectories(tmp.resolve("index"));
     HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    operations = new io.justsearch.app.observability.operations.SqliteOperationStore(tmp.resolve("operations.db"));
     LocalApiServer server = start(settingsPath, indexPath);
     try {
       HttpResponse<String> preflight = preflight(client, server);
@@ -67,6 +72,29 @@ final class UiModeIntentHttpContractTest {
               1);
       assertEquals(200, stale.statusCode(), stale.body());
 
+      var invalid = (tools.jackson.databind.node.ObjectNode) JSON.readTree("{\"ui\":{\"theme\":\"light\"}}");
+      invalid.set("witness", JSON.readTree(get(client, server).body()).get("witness"));
+      invalid.put("operationKey", "invalid");
+      var invalidResponse = sendFrozen(client, server, JSON.writeValueAsString(invalid), 3);
+      assertEquals(400, invalidResponse.statusCode());
+      assertEquals("OPERATION_KEY_INVALID", JSON.readTree(invalidResponse.body()).path("errorCode").asText());
+      invalid.remove("operationKey");
+      var missingKey = sendFrozen(client, server, JSON.writeValueAsString(invalid), 3);
+      assertEquals(400, missingKey.statusCode());
+      assertEquals("OPERATION_KEY_INVALID", JSON.readTree(missingKey.body()).path("errorCode").asText());
+
+      String staleKey = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+      invalid.put("operationKey", staleKey);
+      assertEquals(200, post(client, server, "{\"ui\":{\"theme\":\"dark\"}}", 3).statusCode());
+      var conflict = sendFrozen(client, server, JSON.writeValueAsString(invalid), 3);
+      assertEquals(409, conflict.statusCode());
+      var conflictBody = JSON.readTree(conflict.body());
+      assertEquals("VERSION_CONFLICT", conflictBody.path("errorCode").asText());
+      assertEquals(staleKey, conflictBody.path("operationKey").asText());
+      assertTrue(conflictBody.path("operationRecordId").asLong() > 0);
+      assertEquals("FAILED", conflictBody.path("state").asText());
+      org.junit.jupiter.api.Assertions.assertFalse(conflictBody.has("witness"));
+
       assertModeAndTheme(get(client, server), "advanced", "dark");
     } finally {
       server.stop();
@@ -81,9 +109,22 @@ final class UiModeIntentHttpContractTest {
     }
   }
 
-  private static LocalApiServer start(Path settingsPath, Path indexPath) {
-    return LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
-            new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath), indexPath)
+  private LocalApiServer start(Path settingsPath, Path indexPath) {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+    var config = new io.justsearch.configuration.resolved.ConfigStore(
+        io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(settings.inspect().settings()));
+    var owner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(settings, config,
+        () -> { throw new AssertionError("Unexpected settings restart"); }, candidate -> {
+          var projection = io.justsearch.app.services.settings.SettingsV2Projection.toSettingsV2(candidate, settings.mode());
+          return io.justsearch.agent.api.registry.OperationResult.success("Settings committed", java.util.Map.of(
+              "ui", projection.ui(), "llm", projection.llm(), "indexPaths", projection.indexPaths(),
+              "settingsMode", projection.settingsMode()));
+        });
+    var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operations,
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+            io.justsearch.agent.api.registry.OperationKind.RECONFIGURE), owner);
+    return LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settings, indexPath)
+        .settingsService(new io.justsearch.app.services.settings.SettingsServiceImpl(settings, runner))
         .build();
   }
 
@@ -104,6 +145,25 @@ final class UiModeIntentHttpContractTest {
 
   private static HttpResponse<String> post(
       HttpClient client, LocalApiServer server, String body, long sequence) throws Exception {
+    var input = (tools.jackson.databind.node.ObjectNode) JSON.readTree(body);
+    input.set("witness", JSON.readTree(get(client, server).body()).get("witness"));
+    input.put("operationKey", io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC()));
+    String frozen = JSON.writeValueAsString(input);
+    var response = sendFrozen(client, server, frozen, sequence);
+    var retry = sendFrozen(client, server, frozen, sequence);
+    assertEquals(response.statusCode(), retry.statusCode(), retry.body());
+    var strict = JsonMapper.builder().enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+    var first = strict.readValue(response.body(), io.justsearch.app.api.settings.SettingsV2.class);
+    var replay = strict.readValue(retry.body(), io.justsearch.app.api.settings.SettingsV2.class);
+    assertEquals("COMPLETE", first.state());
+    assertEquals(first.witness(), replay.witness());
+    assertEquals(first.operationKey(), replay.operationKey());
+    org.junit.jupiter.api.Assertions.assertNull(replay.ui(), "replay cannot resample current settings");
+    return response;
+  }
+
+  private static HttpResponse<String> sendFrozen(HttpClient client, LocalApiServer server, String body, long sequence)
+      throws Exception {
     return client.send(
         HttpRequest.newBuilder(uri(server))
             .timeout(Duration.ofSeconds(3))

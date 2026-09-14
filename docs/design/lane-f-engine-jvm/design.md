@@ -1,9 +1,9 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED; A/B/C1 complete; C2-6 reset producer integrated and locally reviewed, all-writer/witness/Health/installed proof open; D1-F remain. Draft PR727, merge at F. Hosted checkpoint29d4c8233 passed; later changes require their own final-head proof."
+status: "LOCKED; A/B/C1 complete; C2-6 public producer locally verified; frontend/all-writer/live/installed/final-head proof open; D1-F remain. Draft PR727, merge at F."
 created: 2026-09-06
-updated: 2026-09-13
+updated: 2026-09-14
 lane: F (decision re-examination programme, wave 4)
 model: fable (orchestration)
 category: engine / process-boundary
@@ -26,6 +26,8 @@ document is the lane's contract: the design and the considerations that shaped i
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-14: C2-6 public mode ordering replaces the old blocking whole-write monitor with a nonblocking service admission bit after key-first lookup. The service advances its existing bounded mode LRU only from authoritative COMPLETE before release, including postcommit notification failure. Physical commitment remains solely the settings owner; no persistent state is added. [Trade-off and checks](evidence/C2/C2-6-plan.md#2026-09-14-public-settings-witness-and-retry-cut).
 
 - 2026-09-14: C2-6 public settings wire reuses SettingsWitness as a nested additive field; operationKey identifies the logical mutation and state identifies its outcome. GET projects settings and witness from one inspect snapshot. POST will require the original witness and UUIDv7 key; canonical identity includes normalized patch, witness and mode intent but excludes response-only fields. Matching retries return the recorded receipt without sampling current settings; changed input under the same key returns OPERATION_KEY_REUSED. First completion may include prepared settings, terminal replay is receipt-only, and open replay is202. Split additive wire/read, public producer/controller, then frontend consumers and no-bypass proof into reviewable items. [Owning plan](evidence/C2/C2-6-plan.md#2026-09-14-public-settings-witness-and-retry-cut).
 

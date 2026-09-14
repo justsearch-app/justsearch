@@ -33,7 +33,7 @@ class SettingsWitnessReadTest {
     later.setTheme("light");
     when(store.load()).thenReturn(later);
     var context = context();
-    new SettingsController(store, directory, null, null, null).handleGetSettingsV2(context);
+    new SettingsController(store, directory, null).handleGetSettingsV2(context);
     var response = ArgumentCaptor.forClass(SettingsV2.class);
     verify(context).json(response.capture());
     assertEquals("dark", response.getValue().ui().theme());
@@ -52,7 +52,7 @@ class SettingsWitnessReadTest {
     byte[] before = Files.readAllBytes(file);
     var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
     var context = context();
-    new SettingsController(store, directory, null, null, null).handleGetSettingsV2(context);
+    new SettingsController(store, directory, null).handleGetSettingsV2(context);
     var response = ArgumentCaptor.forClass(Object.class);
     verify(context).status(503);
     verify(context).json(response.capture());
@@ -67,7 +67,7 @@ class SettingsWitnessReadTest {
   void absentWritableSettingsHaveTheActualInitialWitnessWithoutPersistingDefaultPath() {
     var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, directory.resolve("settings.json"));
     var context = context();
-    new SettingsController(store, directory, null, null, null).handleGetSettingsV2(context);
+    new SettingsController(store, directory, null).handleGetSettingsV2(context);
     var response = ArgumentCaptor.forClass(SettingsV2.class);
     verify(context).json(response.capture());
     assertEquals(new SettingsWitness(0, null), response.getValue().witness());

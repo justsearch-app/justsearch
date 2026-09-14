@@ -194,7 +194,7 @@ In the current app:
 * **`justsearch.context.size` no longer has a promotion or a `.source` marker.** The window is derived and contributed at ordinal 150 (`auto_detected` / `hardware_probe`); a user override rides `settings.json` at 300; an operator `-D` / env var still wins at 500 / 400 - by the chain, not by a sysprop write. See `05-ai-architecture.md`, section "The context window".
 * **`justsearch.gpu.layers`, `justsearch.server.exe` and `justsearch.ui.exclude_patterns` no longer have promotions or `.source` markers either** (883 decision 4 slice 2). All three ride `settings.json` at 300. Two consequences worth knowing: the VRAM-tier GPU auto-populate contributes `justsearch.gpu.layers=99` to the ordinal-150 probe map ONLY — mirroring it to a sysprop would put a derived number above the user's own setting — and `justsearch.ui.exclude_patterns` gained a `ResolvedConfig.Ui#excludePatterns` accessor, because it was contributed at 300 but never resolved, which is why its readers had to use the promoted sysprop.
 * **Profile activation:** the named model/projector pair, selected executable, context and GPU layers are submitted in one inference apply. Runtime profile switches do not mutate the bootstrap `justsearch.chat.profile` operator property or persist a resolved model path. The running profile remains available through the realized identity observation.
-* **Runtime propagation:** `SettingsController.handleUpdateSettingsV2()` rebuilds the `ConfigStore` from the saved settings, which is the whole propagation path — the `maybeApply*SysProp` promotions it used to run first are deleted. Note that **inference restart is required** for GPU layer changes to take effect on the running `llama-server` process.
+* **Runtime propagation:** Public settings mutations enter `SettingsService` and the existing accepted settings owner, which replaces the witnessed file and publishes `ConfigStore`. The controller has no raw-save or configuration-rebuild path. Chat intent changes nudge reconciliation after committed completion. **Inference restart is required** for GPU layer changes to affect the running `llama-server` process.
 * **Attribution:** `/api/debug/effective-config` reports the resolver's ordinal chain. Installer paths resolve as settings at300; explicit operator properties remain at500. The external `llama.lib.path` loader property has no settings-copy marker.
 * `InferenceConfig.fromEnvironment(...)` reads from `EnvRegistry` (`LLM_MODEL_PATH`, `GPU_LAYERS`, `CONTEXT_SIZE`, etc).
 * `InferenceLifecycleManager` also reads `llama-server`'s `GET /props` to show the **effective** `model_alias` and `n_ctx` when available (surface via `/api/inference/status`).
@@ -206,6 +206,29 @@ In the current app:
 
 ### UI settings v2 (UX-facing fields)
 The canonical contract for user preferences is `GET/POST /api/settings/v2` with `ui` and `llm` sections.
+
+POST requires the full witness observed with the edited base and one canonical
+UUIDv7 operationKey per logical attempt. The service looks up that key before
+reading settings or checking the index path. Same key and normalized patch,
+witness and mode intent returns the original outcome; changed input under that key
+returns409 OPERATION_KEY_REUSED. A fresh key with an outdated witness returns409
+VERSION_CONFLICT. Null/omitted patch fields preserve values; setters normalize
+supplied fields before canonical identity is recorded.
+
+Completed replies use the SettingsV2 shape with state COMPLETE, operationKey and
+the committed nested witness. The first reply may include its prepared settings;
+replay contains only receipt metadata, never a new settings observation. Open
+replay returns202 without a committed witness. Read-only, malformed-key, conflict
+and recovery failures retain their typed HTTP/error-code distinctions.
+
+The existing64-client mode-intent LRU advances only after the producer's own
+COMPLETE. A nonblocking admission bit serializes fresh public preparations and
+completion bookkeeping without holding a monitor across configuration callbacks.
+Contenders receive retryable RECONFIGURE_IN_PROGRESS; existing-key replay and GET
+remain available. The admission bit grants no physical write authority: internal
+writers and public writes still compare full witnesses through the same owner.
+Missing service composition permits reads and refuses mutations.
+
 
 New UX-facing fields introduced for market-readiness:
 

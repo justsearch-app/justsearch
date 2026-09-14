@@ -1,99 +1,42 @@
-# Lane F handoff: from the design orchestrator to the implementation orchestrator
+# Lane F handoff: implementation orchestrator
 
 ## Current state (2026-09-14)
 
-Public settings additive wire/read is implemented and independently reviewed.
-Full1437 executes4,834 cases/739 suites with four existing skips and no failures;
-focused Java49/frontend16 and typecheck pass. [Proof](evidence/C2/public-settings-wire.md).
-Next: public accepted writer/controller, then frontend frozen attempts and remaining
-C2/D1-F obligations. Hosted09f91917e failed the stale system-access allowlist guard;
-the exact nine stale entries are retired with RED1438/GREEN1439 and config-surface
-proof. [Correction](evidence/C2/hosted-system-access-correction.md). No merge readiness.
+A/B/C1 are complete. C2 remains open; do not merge before stage F.
+The public settings producer/controller is implemented and locally verified:
+final1452 represents4,859 cases, four existing skips and zero failures/errors,
+with PMD/format and UI integration compilation passing.
+[Owning mechanism, review corrections and proof](evidence/C2/public-settings-producer.md).
 
-Installer chat/per-stage ONNX selection and models-pack import now commit through
-the existing accepted settings owner. Redundant ONNX property writes and ORT's
-stale ConfigStore rebuild are retired; status reads the committed config without
-fabricating live sessions. Independent production review is clear. Final1430
-represents4,863 cases/716 suites, four existing skips, zero failures/errors; PMD,
-format, UI integration compilation and register gates pass. [Exact proof and limits](evidence/C2/installer-model-producers.md).
+Next is the frontend attempt helper and every caller: frozen witness/key/body/header,
+explicit COMPLETE versus open202, retained-base Library/adaptation updates, and mode
+queue integration. The old frontend requests lack witness/key, so this checkpoint
+cannot ship independently. Then complete no-bypass retirement and required live/model/
+installed/final-head hosted proof, C2-8/C2-10/C2-11, D1/D2/E/F. No owner decision is pending.
 
-Component-choice693d01314 is committed/pushed, with focused1423 passing28 cases.
-The current installer-model cut includes the old HTTP fixture's owner composition
-correction, verified by focused1429 and full1430. Next is public settings
-update/atomic witness/key wire across all consumers, then raw-writer retirement
-and integrated live/model/installed successor proof. C2-6 remains open; no stage
-completion or merge readiness is claimed. Final-head hosted proof remains owed.
+Pushed prerequisites: installer/import09f91917e, atomic read/wire1e49d18a5,
+system-access residue3d842f496, durable replay witness7f665a33d.
+[Installer proof](evidence/C2/installer-model-producers.md),
+[wire/replay proof](evidence/C2/public-settings-wire.md),
+[activation proof](evidence/C2/activation-settings-producer.md).
+Hosted CI34795894101 and CLA34795892998 pass at7f665a33d; this does not prove the
+subsequent public producer. Prior stale-allowlist failure and exact nine-line
+retirement are [recorded](evidence/C2/hosted-system-access-correction.md).
 
+Active worktree: F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify,
+branch codex/lane-f-pr1, draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
+Merge stays at F. Original lane-F-A is held through2026-09-20 for PR718/evidence/
+foreign helpers; do not build/edit/kill there. Main remains foreign dirty work.
 
-Activation/deactivation/compensation is implemented and independently reviewed.
-Final1420 represents4,851 cases, four existing skips, zero failures/errors, with
-applicable PMD/format/UI integration compilation passing. It removes application
-server-executable property writes, preserves operator precedence, and distinguishes
-automatic GPU selection from explicit CPU in settings envelope4.
-[Evidence, exact sources and limits](evidence/C2/activation-settings-producer.md).
-The internal candidate producer is committed/pushed at `f15b66455`; hosted-gate
-corrections are at `e0cfb76de`. CI34790375481 at36cd600b4 failed due to a missing
-runtime-intent register entry and redundant Java qualifier; both are reproduced
-and corrected locally. No current hosted-success claim follows from that run.
-
-Installer/import migration is now locally verified as recorded above. Public
-settings update/witness wire and live/installed proof remain open; this checkpoint
-cannot ship while the remaining public raw writer refuses recorded revisions.
-
-Earlier runtime-intent proof follows pushed `0ad7e1914` (response observations,
-hosted CI34788273439 and CLA34788272070 successful). Independent review is clear;
-final1405 represents4,235 cases, four existing skips, zero failures/errors, with
-PMD/format/UI integration compilation passing. [Proof and limits](evidence/C2/runtime-intent-producer.md).
-Activation now consumes the accepted settings producer; the remaining installer/import
-and public writers retain their own migration obligations.
-Docs checkpoint `98a27626e` now has successful hosted CI34787367490, including Windows;
-this clears the later hosted checkpoint but does not establish the current dirty head.
-
-Active worktree: `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
-`codex/lane-f-pr1`, draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
-Merge stays at F. Original `worktree-lane-F-A` remains at pushed `8bf81ea2d`, held through
-2026-09-20 for PR718, raw evidence and foreign helper resources. Do not kill those helpers
-or resume implementation in that old checkout. Main remains foreign dirty work.
-
-Checkpoint `29d4c8233` passed all13 hosted CI jobs in run34783675186, including Windows-native
-and Shell crate tests. [Hosted record](evidence/C2/publication-hosted-checkpoint.json).
-Local full1346/build1351/frontend1347/stress1350 and isolated preflight1358 passed at their
-recorded sources. [Preflight record](evidence/C2/publication-preflight-completion.json).
-Later code has its own focused proof; this earlier full/hosted success is not final-head proof.
-
-The response projection (`5c644508c`) and shared fixed-reset validator (`7f4182005`) are
-committed and pushed. The reset producer now directly composes service, runner and fixed
-owner before Engine startup; its controller callback is removed. Independent review is clear.
-Final1376 passes71 focused cases (cached,3 existing skips), PMD/format/UI integration compile;
-adjacent1375 executes3175 cases/505 suites,3 existing skips, no failures/errors.
-[Producer evidence and exact limits](evidence/C2/settings-reset-producer.md).
-
-Reset producer is pushed at `a9509882a`; its hosted CI34785762868 and CLA34785761557 pass. The sticky recovery Health projection passes
-independent review,235 focused cases and full build1379; live1384 proves the initial
-Health SSE error and retained contradictory row/witness. [Health proof/limits](evidence/C2/settings-recovery-health.md).
-Use a revision-local MCP client for live work; the app-attached server still runs main's
-retired two-process tooling. Keep that client alive through capture and owned shutdown.
-
-Health is pushed at `5198da953`. CLA passes; CI34786933226 has a Windows
-PowerShell fixture startup timeout before the Java tests, with the root cause unproven.
-Local1387 supervisor and local1388 all10 dev-runner files pass. Keep current Windows
-hosted proof open; [queue/failure evidence](evidence/C2/hosted-runner-recovery.json). The next producer cuts are grounded in
-[C2-6 next producer plan](evidence/C2/C2-6-plan.md#2026-09-14-next-producer-cuts-after-reset-and-health).
-The response observation prerequisite is reviewed and locally verified:560 tests pass,
-including an allocation-Error regression; the committed receipt always wins collisions.
-[Proof](evidence/C2/settings-response-observations.json).
-Runtime intent now includes recorded handlers, REST and boot seed; typed recovery
-refusal keeps startup alive for Health/reset. Now migrate activation and other writers
-using their captured full witness, expose atomic snapshot/witness GET and
-keyed frontend ingress, then run live public-wire and installed successor-bootstrap proof.
-C2-6/C2-11 and D1/D2/E/F remain open. Do not substitute callback tests for installed proof.
-
-Push each per-item commit with a non-empty item/command/result body; WIP at least hourly.
-One independent review per batch, at most two correction rounds, then root owns the diff.
-Only root runs Gradle; no compiled-source edits during builds. Set the process
-`JUSTSEARCH_AGENT_SESSION_ID` from `CODEX_SESSION_ID` for helper ownership, since the old
-fallback stamp identifies another session. Raw evidence is in the explicitly named old/new
-worktree tmp roots; retain through lane acceptance plus30 days and export before release.
+Root alone runs Gradle; no compiled-source edits during builds. Push every per-item
+commit, with scope and exact proof in its body; WIP at least hourly. Reassess workers
+after two correction rounds and take their diff by three. Continue after checkpoints.
+Use revision-local MCP configuration for live work; attached tooling still references
+main's retired stack. Keep the client alive through start/capture/owned stop.
+Set JUSTSEARCH_AGENT_SESSION_ID from CODEX_SESSION_ID. Raw evidence lives in active
+tmp (older bundles in lane-F-A/tmp); retain through lane acceptance plus30 days and
+export before worktree release. Final acceptance must distinguish local, hosted,
+live/model and installed proof; none substitutes for another.
 
 ## Historical handoff record (preserved)
 

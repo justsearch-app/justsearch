@@ -664,3 +664,31 @@ event-time sequencing, while the witness and key are captured when the queued
 writer starts. Failed/cancelled rows never echo a request witness as committed.
 The runner's durable COMPLETE replay reconstructs the nested committed pair from
 its receipt revision and row key; it never reads current settings.
+
+Public mode serialization decision: replace the old controller's blocking store
+monitor with one nonblocking service admission bit, acquired only after key-first
+lookup and released in finally. Known replay/GET bypass it. Fresh mutations hold
+it through capture, merge, acceptance, synchronous runner return and COMPLETE-only
+LRU advancement, then release before chat nudge. Internal writers still use the
+physical owner's full-witness fence. This closes commit-to-LRU races even when a
+ConfigStore listener throws after commitment: the runner's authoritative COMPLETE
+receipt governs advancement. A body-only post-apply update fails that case; a
+blocking monitor risks callback deadlock. No queue, persistent counter or writer
+is added. Contenders receive RECONFIGURE_IN_PROGRESS and retry their frozen attempt.
+
+Public producer review resolved strict response projection through SettingsV2
+conversion (no operation-only fields on this wire), null/empty nested patch
+normalization, transactionally existing acceptances without repeated bookkeeping,
+and specific invalid-key refusal. The loopback HTTP fixture now composes the real
+SQLite/settings owner, carries the GET witness and a UUIDv7 key, replays identical
+bytes, and strictly parses first/replay DTOs while preserving CORS/restart checks.
+
+Frontend implementation choice: use a transport-injected shared attempt helper
+with explicit retained-base witness versus fresh-observation absolute-intent entry
+points. Prefer GET before each independent absolute attempt over a new global
+witness cache; this avoids another cache/order owner. Freeze patch bytes before
+awaiting the observation, create one UUIDv7 key, then reuse exact bytes and mode
+header for transport retries/open202/retryable admission. Keep the existing mode
+queue and its event-time header, creating its witness/key only when the queued
+writer starts. Derived Library/adaptation writes must provide their observed
+witness; they cannot take the absolute-intent fallback.

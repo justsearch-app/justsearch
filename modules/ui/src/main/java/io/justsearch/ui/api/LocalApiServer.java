@@ -166,22 +166,9 @@ public class LocalApiServer {
         b.telemetry instanceof io.justsearch.telemetry.LocalTelemetry lt0
             ? new HeadApiMetricCatalog(lt0.registry())
             : HeadApiMetricCatalog.noop();
-    // Tempdoc 737 Phase 1: settings writes that change chatEnabled nudge the runtime
-    // reconciler (specChanged) so the persisted intent converges now, not at next boot.
-    // Lazily resolved at fire time — null-safe for test paths without a HeadAssembly.
-    final HeadAssembly haForSpecNudge = b.HeadAssembly;
-    this.settingsController =
-        new SettingsController(
-            b.settingsStore,
-            b.indexBasePath,
-            this.telemetry,
-            ConfigStore.globalOrNull(),
-            () -> {
-              var reconciler = haForSpecNudge != null ? haForSpecNudge.runtimeReconciler() : null;
-              if (reconciler != null) {
-                reconciler.specChanged();
-              }
-            });
+    this.settingsController = new SettingsController(b.settingsStore, b.indexBasePath, this.telemetry,
+        b.settingsService != null ? b.settingsService
+            : b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null ? b.HeadAssembly.serviceOut().settings() : null);
     // Tempdoc 560 §28: the plugin-trust allowlist is persisted as a sibling of settings.json so an
     // operator approval of a URL-loaded plugin survives restarts (otherwise it silently falls back
     // to UNTRUSTED). Mode follows settings (IN_MEMORY for prod/CI isolation; READ_WRITE for use).
@@ -1080,6 +1067,7 @@ public class LocalApiServer {
   public static final class Builder {
     final io.justsearch.core.execution.EngineExecutorRegistry executors;
     final io.justsearch.app.services.settings.UiSettingsStore settingsStore;
+    io.justsearch.app.api.SettingsService settingsService;
     // Tempdoc 583 Stage 2: package-private so ConversationApiAssembly (same package) can read
     // the inputs it needs for the extracted ConversationEngine/agent/chat/MCP wiring.
     final Path indexBasePath;
@@ -1147,6 +1135,11 @@ public class LocalApiServer {
     }
 
     /** Tempdoc 519 §5 endpoint: per-service override for tests + custom wiring. */
+    public Builder settingsService(io.justsearch.app.api.SettingsService service) {
+      this.settingsService = service;
+      return this;
+    }
+
     public Builder documentService(DocumentService documentService) {
       this.documentService = documentService;
       return this;
