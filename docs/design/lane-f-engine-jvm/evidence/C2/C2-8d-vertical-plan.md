@@ -574,3 +574,66 @@ drain; no new child, claim or effect occurs; parent counts/cursor remain unchang
 unprovable queue receipt is acknowledged or pruned. The valid-parent counterpart must still
 catch up and acknowledge its terminal child. Independent source review confirmed the
 counterexample and this bounded failure decision; implementation/proof remains owed in cut3.
+
+
+## Stable coordinator implementation refinements (2026-09-14)
+
+The coordinator is one EngineRoot-owned object. Its application port accepts a prepared
+parent handle and the existing admitted EngineContext; it exposes no queue. EngineRoot
+supplies its indexer-local lifecycle to KnowledgeServer and Head's existing30-second
+operations task invokes maintenance. Production bounded enumeration remains d.3b.
+
+The pump serializes callback/CAS handoffs. It visits REINDEX parents before the INGEST
+parent/child pass, preceded by a verdict-free identity inventory restricted to the runner's
+captured open cohort. Reentrant notifications alone cannot repeat a pass. Winning parent/
+child installation, frozen-root advancement and actual terminal notifications can repeat it;
+these transitions consume the finite plans/cohort. A fixed two-pass draft was refuted by
+nine synchronous roots: it could lose a completion wakeup until the next30-second tick.
+No additional scheduler or persistent progress representation is selected.
+
+RecordedIngestChild owns an identity-only parentKey read for fencing a missing/corrupt
+payload. It validates the existing identity vocabulary and proves no original root membership.
+An unclassifiable captured child denies replay of the captured parent cohort until its
+actual owners drain; since its parent cannot be inferred, those captured parents then fail
+unavailable rather than manufacturing a replacement child. New live accepted work is not
+classified into that older cohort. Strict lookup's CHILD_ACCEPTANCE_REFUSED is contradictory
+binding, while STORAGE_FAILED remains a storage error. Refusal scans must fence/check all
+siblings before any parent terminal decision, including when an earlier child is corrupt.
+
+Actual admitted-work cancellation synchronously marks its parent cancelled, removes exact
+child permission and requests producer cancellation. The queue predicate checks that flag
+without taking coordinator/jobs/operation locks. A later tick is not a cancellation fence.
+Same-process physical replacement rereads parent preparation and context, re-resolves the
+whole frozen plan and exact-finds the child id before restart permission. Cached immutable
+metadata alone is not sufficient after replacement. Missing binding fails after actual
+producer/issued-owner drain and never acknowledges unprovable evidence.
+
+The live child checkpoint cursor is ingest-progress:1:<queue revision>, with only committed
+historical counts. The parent cursor is ingest-parent:1:<completed root count>; its counts
+include confirmed current-child progress while that child runs. Neither cursor acknowledges
+a sealed queue receipt. Terminal child completion still requires the exact ingest-receipt
+cursor. Finishing an already-running third durable attempt spends no fourth attempt;
+recovery repair requires a winning Resume within the total limit3. Terminal parent recovery
+compares aggregate counters before selecting COMPLETE, FAILED or CANCELLED, and repairs a
+stale parent cursor/count checkpoint before terminal publication. Bookkeeping needs no
+admission or producer, including while work admission is frozen.
+
+The process-private fact that a newly accepted child has never entered beginRecordedWalk
+may survive index attachment replacement alongside its pending runner body. That fact permits
+the first queue creation within the same still-running attempt after strict restart authority
+validation. Once beginRecordedWalk succeeds, missing queue progress is unavailable evidence;
+full process restart has no such never-started fact. Fresh authorization never survives a
+physical replacement. This distinguishes pending producer ownership from persisted authority.
+
+These refinements are being implemented and tested in cut3, not completed proof. Required
+regressions include immediate cancellation fencing,9 synchronous roots, real SQLite inherited
+binding corruption, corrupt same-process replacement, never-started same-attempt replacement,
+failed/cancelled parent checkpoint recovery, decreasing aggregate counts, refused sibling
+ordering, bounded deferred admission, actual producer/issued-owner drain and final close retry.
+
+Final close consumes a producer outcome that becomes complete during stop before sealing
+its receipt. It never starts/retries enumeration. Cancellation caused solely by physical
+replacement leaves enumeration open and the same pending parent work replayable; actual
+parent cancellation can settle CANCELLED after drain. The exact old epoch/plan is checked
+before persisting a completed enumeration. The async-stop regression1733 refutes relying
+only on a pre-stop maintenance tick. [Current implementation proof](ingestion-coordinator.md).

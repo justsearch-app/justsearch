@@ -455,7 +455,7 @@ public class HeadlessApp {
         new HeadAssembly(
             engineRoot.operations(), engineRoot.operationAttempts(),
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
-            childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority());
+            childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority(), engineRoot.recordedIngestion());
     LocalApiServer constructedApi = null;
     try {
       log.info("HeadAssembly started (degraded — Worker connecting in background).");

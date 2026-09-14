@@ -96,8 +96,15 @@ public final class EngineRoot implements WorkerHost {
    */
   private static final long CLOSE_COMPLETION_TIMEOUT_MS = 2_000L;
 
-  private final java.util.function.BiFunction<GpuSchedulingGauge,
-      io.justsearch.core.execution.EngineExecutorRegistry, KnowledgeServer> serverFactory;
+  @FunctionalInterface
+  private interface ServerFactory {
+    KnowledgeServer create(GpuSchedulingGauge gauge, io.justsearch.core.execution.EngineExecutorRegistry executors,
+        io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion);
+  }
+  private final ServerFactory serverFactory;
+  private final RecordedIngestionCoordinator recordedIngestion;
+
+  public io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion() { return recordedIngestion; }
   private final long deadlineMs;
   private final int batchSize;
   private final IntConsumer terminalWriterFaultAction;
@@ -182,7 +189,7 @@ public final class EngineRoot implements WorkerHost {
       IntConsumer exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this(operations, attempts,
-        (gauge, executorRegistry) -> {
+        (gauge, executorRegistry, ingestion) -> {
           WorkerConfig workerConfig = WorkerConfig.load();
           // Review S2: the hot-reload trigger is a file under <dataDir>/runtime/, written by the
           // dev MCP tool from another process. Supplying the directory here is what re-arms it;
@@ -191,7 +198,7 @@ public final class EngineRoot implements WorkerHost {
           return new KnowledgeServer(
               executorRegistry, workerConfig,
               new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
-              childRegistry);
+              childRegistry, ingestion);
         },
         deadlineMs,
         batchSize,
@@ -231,13 +238,12 @@ public final class EngineRoot implements WorkerHost {
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory, long deadlineMs, int batchSize,
       IntConsumer terminalWriterFaultAction, Runnable requestedRestartAction,
       io.justsearch.app.services.bootstrap.OperationAuthority authority) {
-    this(operations, attempts, (gauge, ignored) -> serverFactory.apply(gauge), deadlineMs, batchSize,
+    this(operations, attempts, (gauge, ignored, ingestion) -> serverFactory.apply(gauge), deadlineMs, batchSize,
         terminalWriterFaultAction, requestedRestartAction, authority);
   }
 
   private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
-      java.util.function.BiFunction<GpuSchedulingGauge,
-          io.justsearch.core.execution.EngineExecutorRegistry, KnowledgeServer> serverFactory,
+      ServerFactory serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
@@ -245,6 +251,7 @@ public final class EngineRoot implements WorkerHost {
     this.authority = Objects.requireNonNull(authority, "authority");
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
+    this.recordedIngestion = new RecordedIngestionCoordinator(operations, attempts, admission, authority);
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.serverFactory = Objects.requireNonNull(serverFactory, "serverFactory");
     this.deadlineMs = deadlineMs;
@@ -263,7 +270,7 @@ public final class EngineRoot implements WorkerHost {
     if (server != null) {
       throw new IOException("EngineRoot cannot start while its previous server close is incomplete");
     }
-    KnowledgeServer started = serverFactory.apply(gpuScheduling, executors);
+    KnowledgeServer started = serverFactory.create(gpuScheduling, executors, recordedIngestion);
     synchronized (terminalWriterFaultOwnerLock) {
       if (terminalWriterExitAccepted) {
         throw new IOException("EngineRoot cannot restart after accepting a terminal writer fault");
@@ -349,6 +356,10 @@ public final class EngineRoot implements WorkerHost {
       s = server;
     }
     EngineKnowledgeClient c = client;
+    try { recordedIngestion.stopProducers(deadlineMs); }
+    catch (IOException incomplete) {
+      throw new IllegalStateException("Recorded ingestion close incomplete; client and index retained for retry", incomplete);
+    }
     client = null;
     if (c != null) {
       c.close();

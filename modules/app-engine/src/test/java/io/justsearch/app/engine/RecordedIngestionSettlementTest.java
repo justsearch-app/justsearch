@@ -11,6 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationResult;
+import java.util.concurrent.CompletableFuture;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
@@ -97,6 +100,70 @@ final class RecordedIngestionSettlementTest {
       assertEquals(OperationState.COMPLETE, terminal.state());
       assertEquals(attemptsBefore, terminal.attempts());
       assertTrue(settlement.acknowledge(key, PLAN));
+    }
+  }
+
+  @Test
+  void thirdDurableAttemptSettlesWithCurrentHandleWithoutSpendingFourthAttempt() throws Exception {
+    Path operationsPath = temp.resolve("third-attempt-operations.db");
+    Path jobsPath = temp.resolve("third-attempt-jobs.db");
+    try (var operations = new SqliteOperationStore(operationsPath);
+        var queue = new SqliteJobQueue(jobsPath, ignored -> true)) {
+      queue.open();
+      String key = OperationKeys.generate(KEY_CLOCK);
+      JobQueue.SealedWalkReceipt sealed = sealEmptyWalk(queue, key,
+          JobQueue.WalkEnumerationOutcome.COMPLETE);
+      OperationRecord accepted = operations.accept(key, DESCRIPTOR, CONTEXT, null).record();
+      CompletableFuture<OperationResult> pending = new CompletableFuture<>();
+
+      // Each fresh runner represents the next durable recovery attempt after the prior body
+      // remained RUNNING. The first two bodies deliberately retain their private stages.
+      var firstSettlement = new RecordedIngestionSettlement(operations, queue);
+      var firstRunner = newRunner(operations);
+      firstRunner.reconcile(OperationKind.INGEST, row -> {
+        assertEquals(0, row.attempts());
+        assertInstanceOf(OperationAttemptRunner.Reconciliation.Resume.class,
+            firstSettlement.reconcile(row, PLAN, true));
+        return new OperationAttemptRunner.Reconciliation.Resume(handle ->
+            new OperationExecution(OperationResult.success("running"), pending));
+      });
+      assertEquals(1, operations.find(key).orElseThrow().attempts());
+
+      var secondSettlement = new RecordedIngestionSettlement(operations, queue);
+      var secondRunner = newRunner(operations);
+      secondRunner.reconcile(OperationKind.INGEST, row -> {
+        assertEquals(1, row.attempts());
+        assertInstanceOf(OperationAttemptRunner.Reconciliation.Resume.class,
+            secondSettlement.reconcile(row, PLAN, true));
+        return new OperationAttemptRunner.Reconciliation.Resume(handle ->
+            new OperationExecution(OperationResult.success("running"), pending));
+      });
+      assertEquals(2, operations.find(key).orElseThrow().attempts());
+
+      var thirdSettlement = new RecordedIngestionSettlement(operations, queue);
+      var thirdRunner = newRunner(operations);
+      thirdRunner.reconcile(OperationKind.INGEST, row -> {
+        assertEquals(2, row.attempts());
+        return new OperationAttemptRunner.Reconciliation.Resume(handle -> {
+          OperationRecord current = operations.find(key).orElseThrow();
+          assertEquals(3, current.attempts(), "the private body owns the third durable attempt");
+          assertEquals(accepted.id(), handle.id());
+          assertEquals(key, handle.key());
+          // Pass the post-resume row: settleRunning must accept the current attempt at the
+          // ceiling while still refusing a new reconcile-driven repair (tested below).
+          return thirdSettlement.settleRunning(current, PLAN, true, handle).orElseThrow();
+        });
+      });
+
+      OperationRecord terminal = operations.find(key).orElseThrow();
+      assertEquals(3, terminal.attempts());
+      assertEquals(OperationState.COMPLETE, terminal.state());
+      assertEquals(new OperationReceipt("SUCCESS", null), terminal.receipt());
+      assertEquals(RecordedIngestionReceipt.cursor(sealed), terminal.checkpointCursor());
+      assertEquals(sealed.completedUnits(), terminal.unitsCompleted());
+      assertEquals(sealed.failedUnits(), terminal.unitsFailed());
+      assertTrue(thirdSettlement.acknowledge(key, PLAN));
+      assertEquals(sealed.revision(), queue.recordedWalk(key).orElseThrow().acknowledgedRevision());
     }
   }
 

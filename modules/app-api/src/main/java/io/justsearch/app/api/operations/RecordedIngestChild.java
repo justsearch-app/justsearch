@@ -34,9 +34,23 @@ public record RecordedIngestChild(String parentOperationKey, RecordedRootPlan pl
 
   /** Strict private recovery read. A record kind by itself never selects a trusted producer. */
   public static RecordedIngestChild from(OperationDescriptor descriptor, OperationPreparedPayload payload) {
-    Objects.requireNonNull(descriptor, "descriptor");
+    String parentKey = parentKey(descriptor);
     Objects.requireNonNull(payload, "payload");
-    if (descriptor.kind() != OperationKind.INGEST || descriptor.operationRef() != null || payload.sealed()) {
+    if (payload.sealed()) throw new IllegalArgumentException("Invalid ingest child binding");
+    var child = new RecordedIngestChild(parentKey, RecordedRootPlan.fromReplayPayload(payload.value()));
+    if (!child.descriptor().hasSameIdentity(descriptor)) {
+      throw new IllegalArgumentException("Ingest child plan digest mismatch");
+    }
+    return child;
+  }
+
+  /**
+   * Strict identity-only observation for fencing an unavailable payload. This syntactic parent
+   * association proves no root membership, preparation integrity or replay authority.
+   */
+  public static String parentKey(OperationDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    if (descriptor.kind() != OperationKind.INGEST || descriptor.operationRef() != null) {
       throw new IllegalArgumentException("Invalid ingest child binding");
     }
     final Object decoded;
@@ -48,13 +62,13 @@ public record RecordedIngestChild(String parentOperationKey, RecordedRootPlan pl
     if (!(decoded instanceof Map<?, ?> identity) || !identity.keySet().equals(FIELDS)
         || !"ingest-child".equals(identity.get("mode"))
         || !RecordedRootPlan.SCHEMA.equals(identity.get("replaySchema"))
+        || !(identity.get("rootPlanSha256") instanceof String hash)
+        || !hash.matches("[a-f0-9]{64}")
         || !(identity.get("parentOperationKey") instanceof String parentKey)) {
       throw new IllegalArgumentException("Invalid ingest child identity");
     }
-    var child = new RecordedIngestChild(parentKey, RecordedRootPlan.fromReplayPayload(payload.value()));
-    if (!child.descriptor().hasSameIdentity(descriptor)) {
-      throw new IllegalArgumentException("Ingest child plan digest mismatch");
-    }
-    return child;
+    OperationKeys.timestampMillis(parentKey);
+    return parentKey;
   }
+
 }

@@ -900,6 +900,15 @@
       "guard": "test:RecordedIngestionSettlementTest",
       "consumesProjection": "operation-record-type",
       "note": "C2-9b.3b.3 receipt-only recovery selects a runner verdict from the existing queue receipt, checkpoints through the winning runner handle and acknowledges only after rereading the durable matching terminal row. It creates no admission, effect, terminal writer or persistent authority."
+    },
+    {
+      "id": "recorded-ingestion-coordinator",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/RecordedIngestionCoordinator.java",
+      "guard": "test:RecordedIngestionCoordinatorTest",
+      "consumesProjection": "operation-record-type",
+      "note": "C2-9b.3b.3 stable Engine owner coordinates existing runner attempts and queue receipts, retaining admission through actual terminal persistence and fencing claims across cancellation, recovery and physical replacement. It introduces no terminal writer or durable authority."
     }
   ]
 }

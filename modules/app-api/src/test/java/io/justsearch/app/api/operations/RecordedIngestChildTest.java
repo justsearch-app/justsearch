@@ -36,6 +36,44 @@ final class RecordedIngestChildTest {
   }
 
   @Test
+  void parentKeyReadsOnlyStrictIdentityAndLeavesPayloadAuthorityToFrom() {
+    String parentKey = OperationKeys.generate(CLOCK);
+    String identity = "{\"mode\":\"ingest-child\",\"parentOperationKey\":\""
+        + parentKey + "\",\"replaySchema\":\"" + RecordedRootPlan.SCHEMA
+        + "\",\"rootPlanSha256\":\"" + "0".repeat(64) + "\"}";
+    OperationDescriptor descriptor = new OperationDescriptor(OperationKind.INGEST, null, identity);
+
+    // A syntactically valid identity is enough for the fencing read, even with no payload and
+    // with a digest that cannot be the valid plan below.
+    assertEquals(parentKey, RecordedIngestChild.parentKey(descriptor));
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.from(descriptor,
+        new OperationPreparedPayload(false, plan(ROOT_PATH, "docs", false).toReplayPayload())));
+
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.parentKey(
+        new OperationDescriptor(OperationKind.INGEST, null,
+            identity.replace("\"replaySchema\":\"" + RecordedRootPlan.SCHEMA,
+                "\"replaySchema\":\"root-plan.v0"))));
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.parentKey(
+        new OperationDescriptor(OperationKind.INGEST, null,
+            identity.replace("\"rootPlanSha256\":\"" + "0".repeat(64),
+                "\"rootPlanSha256\":\"" + "z".repeat(64)))));
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.parentKey(
+        new OperationDescriptor(OperationKind.INGEST, null,
+            identity.replace(parentKey, UUID.randomUUID().toString()))));
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.parentKey(
+        new OperationDescriptor(OperationKind.REINDEX, null, identity)));
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.parentKey(
+        new OperationDescriptor(OperationKind.INGEST, "core.ingest", identity)));
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.parentKey(
+        new OperationDescriptor(OperationKind.INGEST, null,
+            identity.replace("}", ",\"unexpected\":1}"))));
+    String duplicate = identity.replace("\"mode\":\"ingest-child\"",
+        "\"mode\":\"ingest-child\",\"mode\":\"ingest-child\"");
+    assertThrows(IllegalArgumentException.class, () -> RecordedIngestChild.parentKey(
+        new OperationDescriptor(OperationKind.INGEST, null, duplicate)));
+  }
+
+  @Test
   void requiresOneRootAndCanonicalParentKey() {
     assertThrows(IllegalArgumentException.class,
         () -> new RecordedIngestChild(OperationKeys.generate(CLOCK),

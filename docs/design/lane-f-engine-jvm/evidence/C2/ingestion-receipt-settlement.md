@@ -71,4 +71,8 @@ owner. The guard must remain effective. The next owner wiring is the intended co
 not a baseline exemption. Exact hosted logs are tmp/1719-hosted-failed.txt and metadata
 1719-hosted-ci.json; the downloaded app-ui XML confirms exactly RecordedIngestionReceipt
 and its terminalMatches method, each repeated by three attempts. The other12 CI jobs and
-CLA34868477831 passed. Cut2 hosted verification remains pending commit/push.
+CLA34868477831 passed. Cut2 is pushed23f9221be. CI34870994136 has11 successful jobs and two dead-code failures:
+app-ui flags RecordedIngestionSettlement and its acknowledge/reconcile methods; platform-contracts
+flags the same unreferenced class. CLA34870989825 passes. Exact downloaded XML/logs are
+in tmp/1723-hosted-* under the same retention rule. The current coordinator wiring consumes
+these methods; its required whole-program verification is not yet complete.

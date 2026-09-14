@@ -2,6 +2,13 @@
 
 ## Current state (2026-09-14)
 
+2026-09-14 cut3 stable coordinator is implemented and under verification:1730 focused
+checks report50 cases (28 executed Engine cases,22 reused API/maintenance), no failures.
+Five guard negative controls fail as intended. Second review reproduced an async-stop
+flush gap in1733;1734 now passes all29 Engine cases. Integrated1735 is running. [Owning evidence, corrections
+and remaining acceptance](evidence/C2/ingestion-coordinator.md). Full-suite/hosted proof
+and actual bounded producer/prepared-handler wiring remain. C2 open; merge at F.
+
 C2-9b.3b.3 receipt-only settlement now passes integrated1718:1,069 cases/186 suites,
 zero skips/failures/errors, six PMD tasks and format. Focused15 cases, seven discriminating
 negative controls and independent review are preserved in the

@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-9b.3b.3 connects one stable coordinator through the existing maintenance/lifecycle owners. Cancellation fences claims immediately; replacement rereads persisted bindings; only finite owner transitions repeat a pump; parent recovery checkpoints every terminal outcome. Unclassifiable boot child identity fails the unprovable captured parent cohort after drain. [Mechanisms and regression obligations](evidence/C2/C2-8d-vertical-plan.md#stable-coordinator-implementation-refinements-2026-09-14).
+
 - 2026-09-14: C2-9b.3b.3 scopes normal terminal-child catch-up to a valid parent preparation. A malformed parent can hide a terminal unacknowledged child from the runner's open-row cohort; after open-owner drain it fails with last confirmed progress and does not acknowledge unprovable queue evidence. No broad lookup can recreate that lost binding. [Counterexample, retention consequence and required regression](evidence/C2/C2-8d-vertical-plan.md#malformed-parent-binding-and-unreachable-terminal-children-2026-09-14).
 
 - 2026-09-14: C2-9b.3b.3 is implemented as observation foundations, receipt-only runner settlement, then the stable parent/child owner. The finite producer first reuses the existing bounded root-walk owner and must expose actual exit rather than a deadline response. [Per-item cuts and proof obligations](evidence/C2/C2-8d-vertical-plan.md#coordinator-per-item-cuts-2026-09-14).

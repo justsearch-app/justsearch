@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
 public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.app.api.operations.OperationStore operations;
   private final io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+  private final io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion;
   public io.justsearch.app.api.operations.OperationAttemptRunner operationAttempts() { return attempts; }
 
   /** Borrowed process-lifetime store; this assembly never closes it. */
@@ -355,8 +356,28 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission,
       io.justsearch.app.services.bootstrap.OperationAuthority authority) {
+    this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
+        sharedWorkerCapability, managedChildRegistry, operationLeases, engineAdmission, authority,
+        io.justsearch.app.api.operations.RecordedIngestionService.unavailable());
+  }
+
+  /** Process boot supplies the stable recorded-ingestion owner alongside the shared authority. */
+  public HeadAssembly(
+      io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      Telemetry telemetry,
+      ConfigManagerBootstrap configManager,
+      KnowledgeServerBootstrap knowledgeServer,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
+      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
+      io.justsearch.app.api.OperationLeaseService operationLeases,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion) {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
+    this.recordedIngestion = Objects.requireNonNull(recordedIngestion, "recordedIngestion");
     Objects.requireNonNull(telemetry, "telemetry");
     Objects.requireNonNull(engineAdmission, "engineAdmission");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
@@ -374,7 +395,7 @@ public final class HeadAssembly implements AutoCloseable {
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
-    this.operationsMaintenanceTimer = startOperationsMaintenanceTimer(this.operations, this.executors);
+    this.operationsMaintenanceTimer = startOperationsMaintenanceTimer(this.operations, this.executors, this.recordedIngestion::maintain);
     acquiredOwners.add(this.operationsMaintenanceTimer);
     this.telemetry = telemetry;
     Objects.requireNonNull(managedChildRegistry, "managedChildRegistry");
@@ -991,6 +1012,7 @@ public final class HeadAssembly implements AutoCloseable {
       SearchPort searchPort, Telemetry telemetry, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
+    this.recordedIngestion = io.justsearch.app.api.operations.RecordedIngestionService.unavailable();
     Objects.requireNonNull(searchPort, "searchPort");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
     try {
@@ -1006,7 +1028,7 @@ public final class HeadAssembly implements AutoCloseable {
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
-    this.operationsMaintenanceTimer = startOperationsMaintenanceTimer(this.operations, this.executors);
+    this.operationsMaintenanceTimer = startOperationsMaintenanceTimer(this.operations, this.executors, this.recordedIngestion::maintain);
     acquiredOwners.add(this.operationsMaintenanceTimer);
     this.telemetry = telemetry;
     this.searchPort = searchPort;
@@ -1623,6 +1645,13 @@ public final class HeadAssembly implements AutoCloseable {
   static AutoCloseable startOperationsMaintenanceTimer(
       io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.core.execution.EngineExecutorRegistry executors) {
+    return startOperationsMaintenanceTimer(operations, executors, () -> {});
+  }
+
+  static AutoCloseable startOperationsMaintenanceTimer(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.core.execution.EngineExecutorRegistry executors, Runnable ingestionMaintenance) {
+    Objects.requireNonNull(ingestionMaintenance, "ingestionMaintenance");
     Objects.requireNonNull(operations, "operations");
     Objects.requireNonNull(executors, "executors");
     var limits = executors.limits(
@@ -1639,7 +1668,11 @@ public final class HeadAssembly implements AutoCloseable {
       scheduler = registration.openScheduled(
           Thread.ofPlatform().daemon().name("operations-maintenance-", 0).factory());
       var checkpointTask = scheduler.scheduleAtFixedRate(
-          () -> checkpointDurableOperations(operations), 30, 30, java.util.concurrent.TimeUnit.SECONDS);
+          () -> {
+            try { ingestionMaintenance.run(); }
+            catch (RuntimeException failure) { log.error("Recorded ingestion maintenance failed; retrying next tick", failure); }
+            checkpointDurableOperations(operations);
+          }, 30, 30, java.util.concurrent.TimeUnit.SECONDS);
       var retentionTask = scheduler.scheduleWithFixedDelay(
           () -> pruneOperationsHistory(operations), 1, 1, java.util.concurrent.TimeUnit.HOURS);
       return new OperationsMaintenanceHandle(registration, scheduler, checkpointTask, retentionTask);

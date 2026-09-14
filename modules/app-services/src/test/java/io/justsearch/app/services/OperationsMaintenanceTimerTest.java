@@ -50,6 +50,25 @@ final class OperationsMaintenanceTimerTest {
   @TempDir Path temp;
 
   @Test
+  void existingTickRunsIngestionFirstAndKeepsCheckpointCadenceAfterRefusal() throws Exception {
+    CapturingRegistry executors = new CapturingRegistry();
+    OperationStore operations = mock(OperationStore.class);
+    List<String> order = new ArrayList<>();
+    org.mockito.Mockito.doAnswer(invocation -> { order.add("checkpoint"); return null; })
+        .when(operations).checkpointDurableOperations();
+    var handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors, () -> {
+      order.add("ingestion");
+      throw new IllegalStateException("receipt temporarily unavailable");
+    });
+    try (handle) {
+      var registration = executors.registrations.getFirst();
+      assertEquals(2, registration.tasks.size(), "reuse checkpoint/retention owner without another timer");
+      registration.scheduler.advanceTo(60, TimeUnit.SECONDS);
+      assertEquals(List.of("ingestion", "checkpoint", "ingestion", "checkpoint"), order);
+    }
+  }
+
+  @Test
   void registersCheckpointAndRetentionTasksAndAdvancesThemByDueTime() throws Exception {
     CapturingRegistry executors = new CapturingRegistry();
     OperationStore operations = mock(OperationStore.class);
