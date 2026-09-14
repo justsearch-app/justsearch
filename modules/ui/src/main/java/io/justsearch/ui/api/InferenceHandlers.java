@@ -547,7 +547,7 @@ final class InferenceHandlers {
     var payload = ApiErrorHandler.toResponse(classification, refusal.message(), telemetry, ApiErrorHandler.routeOf(ctx));
     payload.put("errorCode", code);
     payload.put("retryable", refusal.retryable().orElse(false));
-    for (String field : java.util.List.of("operationKey", "operationRecordId")) {
+    for (String field : List.of("operationKey", "operationRecordId")) {
       Object value = refusal.structuredData().get(field);
       if (value != null) payload.put(field, value);
     }

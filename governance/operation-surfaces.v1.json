@@ -839,6 +839,15 @@
       "note": "Lane F C2-6 serializes the settings-file witness and projects recovery verdicts from the existing operation row. It never writes operation state; the runner terminalizes before releasing the fence."
     },
     {
+      "id": "runtime-intent-settings-producer",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeSpecStore.java",
+      "guard": "test:RuntimeIntentProducerTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "C2-6 runtime intent accepts and reuses SETTINGS_APPLY attempts through the shared runner and delegates witnessed settings commitment to its fixed owner. It owns neither terminal state nor settings replacement."
+    },
+    {
       "id": "settings-reset-producer",
       "kind": "consumer",
       "lang": "java",
