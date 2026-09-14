@@ -1,0 +1,151 @@
+{
+  "base": "5739cdb8b358ad97a914f1a95a3c867b64e9147e",
+  "environment": "Windows local; windowsOnly test selection",
+  "runs": {
+    "parser-containment-startup1554": {
+      "revision": "5739cdb8b+dirty",
+      "command": "gradlew worker-services WindowsParserContainmentTest -PwindowsOnly=true,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      "tasks": [
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        }
+      ]
+    },
+    "parser-containment-budget-negative1555": {
+      "revision": "5739cdb8b+controlled-negative",
+      "command": "gradlew worker-services WindowsParserContainmentTest -PwindowsOnly=true with former5s budget",
+      "summary": {
+        "tests": 5,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      "tasks": [
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "FAILED",
+          "tests": 5,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        }
+      ]
+    },
+    "parser-containment-kill-negative1556": {
+      "revision": "5739cdb8b+controlled-negative",
+      "command": "gradlew worker-services WindowsParserContainmentTest -PwindowsOnly=true with containment omitted in fixture bootstrap",
+      "summary": {
+        "tests": 5,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      "tasks": [
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "FAILED",
+          "tests": 5,
+          "failures": 4,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        }
+      ]
+    },
+    "parser-containment-windows-final1557": {
+      "revision": "5739cdb8b+dirty",
+      "command": "gradlew app-util,app-agent,app-services,adapters-lucene,app-inference,worker-services test -PwindowsOnly=true --console=plain; worker-services pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 113,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 9
+      },
+      "tasks": [
+        {
+          "module": "app-util",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 85,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "adapters-lucene",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-inference",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        }
+      ]
+    }
+  },
+  "restoredTestSha256": "f0d5675438bdaab9ec628cac710e5d6df4b4ed7901c17e06825190bf9d512d3e",
+  "hostedProof": "pending on correction",
+  "captureCorrection": "First task announcement preceded the later FAILED announcement in interleaved Gradle output; corrected status from raw log, retaining archived XML counts. Active capture helper now gives FAILED precedence."
+}

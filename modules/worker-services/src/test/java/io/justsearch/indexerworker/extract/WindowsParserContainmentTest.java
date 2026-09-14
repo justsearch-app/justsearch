@@ -26,18 +26,23 @@ final class WindowsParserContainmentTest {
   @TempDir Path tempDir;
 
   @ParameterizedTest
-  @ValueSource(strings = {"recycle", "timeout", "close"})
+  @ValueSource(strings = {"recycle", "timeout", "close", "slow-recycle"})
   void killingParserReapsAlreadyLiveNativeDescendant(String mode) throws Exception {
+    String termination = mode.equals("slow-recycle") ? "recycle" : mode;
     Path request = tempDir.resolve(mode + ".txt");
     Files.writeString(request, "content");
     Path pidFile = Path.of(request + ".pid");
     List<String> command = PersistentExtractionSandboxTest.javaCommand(
-        NativeChild.class, "--enable-native-access=ALL-UNNAMED");
+        mode.equals("slow-recycle") ? SlowNativeChild.class : NativeChild.class,
+        "--enable-native-access=ALL-UNNAMED");
     ProcessHandle nativeChild = null;
     try (PersistentExtractionSandbox sandbox = new PersistentExtractionSandbox(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(), command,
-        TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), Duration.ofSeconds(5),
-        1, mode.equals("recycle") ? 1 : 500, null)) {
+        // This response clock includes cold JVM/native bootstrap, as in the neighboring pool
+        // replacement fixtures. The timeout arm still waits for an actual pool timeout while
+        // the already-observed native child is alive; no production deadline changes.
+        TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), Duration.ofSeconds(10),
+        1, termination.equals("recycle") ? 1 : 500, null)) {
       java.util.concurrent.FutureTask<ExtractionArtifact> pending =
           new java.util.concurrent.FutureTask<>(() -> sandbox.extract(request));
       Thread caller = Thread.ofVirtual().start(pending);
@@ -54,7 +59,7 @@ final class WindowsParserContainmentTest {
       nativeChild = ProcessHandle.of(pid).orElseThrow();
       assertTrue(nativeChild.isAlive(), "capture a LIVE native child before parser termination");
       Files.writeString(Path.of(request + ".release"), "parent observed live child");
-      if (mode.equals("timeout")) {
+      if (termination.equals("timeout")) {
         var failure = assertThrows(java.util.concurrent.ExecutionException.class,
             () -> pending.get(15, TimeUnit.SECONDS));
         assertTrue(failure.getCause() instanceof TimeboxedContentExtractor.ExtractionTimeoutException);
@@ -62,13 +67,13 @@ final class WindowsParserContainmentTest {
         assertEquals("native child was alive", pending.get(15, TimeUnit.SECONDS).result().content());
       }
       caller.join(Duration.ofSeconds(1));
-      if (mode.equals("recycle")) {
+      if (termination.equals("recycle")) {
         // Request-budget recycling happens when the next request acquires this slot.
         Path next = tempDir.resolve("next.txt");
         Files.writeString(next, "next request");
         assertEquals("no native child requested", sandbox.extract(next).result().content());
       }
-      if (mode.equals("close")) {
+      if (termination.equals("close")) {
         assertTrue(nativeChild.isAlive());
         sandbox.close();
       }
@@ -103,6 +108,14 @@ final class WindowsParserContainmentTest {
     } finally {
       child.destroyForcibly();
       assertTrue(child.waitFor(10, TimeUnit.SECONDS));
+    }
+  }
+
+  /** Deterministically exercises cold startup beyond the former five-second fixture budget. */
+  public static final class SlowNativeChild {
+    public static void main(String[] args) throws Exception {
+      Thread.sleep(6_000);
+      NativeChild.main(args);
     }
   }
 

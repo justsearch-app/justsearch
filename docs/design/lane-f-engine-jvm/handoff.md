@@ -47,8 +47,10 @@ whole Spotless pass. Negative1536 discriminates stale preparation and retention 
 independent review's COMPLETE_WITH_GAPS correction is included. [Evidence](evidence/C2/recorded-ingest-binding.md).
 C2-8d.2a adds WIP schema/epoch and actual batch-exit ownership primitives.
 [Proof, failures/corrections and remaining cuts](evidence/C2/walk-claims.md).
-Hosted0123adb1f fixes the missing resolver declaration but has a Windows parser recycle
-containment-test timeout under investigation; no hosted pass is claimed for that revision.
+Hosted0123adb1f fixes the missing resolver declaration but failed a Windows parser recycle
+fixture before its native-child handshake. The test-only startup correction passes the
+exact Windows CI module selection locally (113 cases, no skips/failures), with deterministic
+budget and containment negative controls. [Proof and pending hosted run](evidence/C2/parser-containment-startup.md).
 Actual producer/queue/recovery activation remains open in the [per-item vertical plan](evidence/C2/C2-8d-vertical-plan.md).
 C2-9's [authorization recovery contract](evidence/C2/ingestion-authorization-recovery.md)
 requires a server-built basis, exact grant re-resolution and sole preloaded roots/evaluator.
