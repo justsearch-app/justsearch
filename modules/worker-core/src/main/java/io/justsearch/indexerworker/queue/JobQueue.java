@@ -24,6 +24,60 @@ import io.justsearch.indexerworker.ingest.IngestionOutcome;
 public interface JobQueue extends Closeable {
 
   /**
+   * Batch-exit return of exact issued claims that have no pending commit owner. Implementations
+   * must preserve replacements, terminal rows, retry budgets and forged/unissued identities.
+   * Return only after the ownership release and any matching PROCESSING-to-PENDING write commit.
+   */
+  void returnUnfinishedClaims(java.util.Collection<IndexJob> claims);
+
+  /** Enumeration closure is distinct from terminal unit coverage and operation completion. */
+  enum WalkEnumerationOutcome { COMPLETE, FAILED, CANCELLED }
+
+  /** One durable queue projection. A sealed receipt is immutable until acknowledged and retained. */
+  record WalkProgress(String operationKey, String planHash, long enumerationEpoch,
+      Long enumerationClosedAt, WalkEnumerationOutcome enumerationOutcome,
+      long completedUnits, long failedUnits, long revision, Long sealedAt,
+      String receiptJson, long acknowledgedRevision) {
+    public WalkProgress {
+      java.util.Objects.requireNonNull(operationKey, "operationKey");
+      java.util.Objects.requireNonNull(planHash, "planHash");
+      if (operationKey.isBlank() || operationKey.length() > 256 || !IngestionLedgerTransition.SHA256.matcher(planHash).matches()
+          || enumerationEpoch < 1 || completedUnits < 0 || failedUnits < 0 || revision < 1
+          || acknowledgedRevision < 0 || acknowledgedRevision > revision
+          || (enumerationClosedAt == null) != (enumerationOutcome == null)
+          || (sealedAt == null) != (receiptJson == null)
+          || sealedAt != null && enumerationClosedAt == null) {
+        throw new IllegalArgumentException("Invalid recorded walk projection");
+      }
+    }
+  }
+
+  /**
+   * Enter a finite walk only after outer operation acceptance. Missing progress may be created
+   * only for a fresh attempt, never to infer successful recovery from a rebuilt jobs database.
+   * An interrupted enumeration gets a new epoch; a closed enumeration is never silently reopened.
+   */
+  default WalkProgress beginRecordedWalk(String operationKey, String planHash, boolean createIfMissing) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
+  /** Private owner read; a missing projection is not permission to reconstruct acceptance. */
+  default Optional<WalkProgress> recordedWalk(String operationKey) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
+  /** Record closure of this exact enumeration epoch; unit completion and receipt sealing follow. */
+  default WalkProgress closeRecordedWalkEnumeration(String operationKey, long epoch,
+      WalkEnumerationOutcome outcome) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
+  /** The outer owner acknowledges only after its matching terminal operation receipt is durable. */
+  default boolean acknowledgeRecordedWalk(String operationKey, long revision) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
+  /**
    * An atomically claimed job with its path, collection and admission attribution snapshot.
    *
    * @param path the file path to index

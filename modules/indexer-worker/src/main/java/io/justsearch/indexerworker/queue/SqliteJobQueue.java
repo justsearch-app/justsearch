@@ -85,6 +85,66 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   private static final long MIN_FREE_DISK_BYTES = 50L * 1024 * 1024;
 
+  @Override
+  public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {
+    if (claims == null || claims.isEmpty()) return;
+    lockTimed();
+    try {
+      ensureOpen();
+      List<IndexJob> issued = claims.stream().filter(this::isIssuedClaim).toList();
+      inTransaction(() -> {
+        try (var update = connection.prepareStatement("UPDATE jobs SET state = 'PENDING', last_updated = ? "
+            + "WHERE path = ? AND state = 'PROCESSING' AND scan_id IS ? AND unit_revision IS ?")) {
+          long now = System.currentTimeMillis();
+          for (IndexJob claim : issued) {
+            update.setLong(1, now); update.setString(2, normalizePath(claim.path()));
+            update.setString(3, claim.scanId()); update.setString(4, claim.unitRevision());
+            executeMutation(update::executeUpdate);
+          }
+        }
+        return null;
+      });
+      issued.forEach(this::releaseClaim);
+    } catch (SQLException failure) {
+      throw new OutcomeWriteException("Could not return unfinished processing claims", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  @Override
+  public WalkProgress beginRecordedWalk(String operationKey, String planHash, boolean createIfMissing) {
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.begin(connection, operationKey, planHash, createIfMissing), true);
+  }
+
+  @Override
+  public java.util.Optional<WalkProgress> recordedWalk(String operationKey) {
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.find(connection, operationKey), false);
+  }
+
+  @Override
+  public WalkProgress closeRecordedWalkEnumeration(String operationKey, long epoch, WalkEnumerationOutcome outcome) {
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.closeEnumeration(
+        connection, operationKey, epoch, outcome, System.currentTimeMillis()), true);
+  }
+
+  @Override
+  public boolean acknowledgeRecordedWalk(String operationKey, long revision) {
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.acknowledge(connection, operationKey, revision), true);
+  }
+
+  private <T> T accessRecordedWalk(SqlWork<T> work, boolean mutation) {
+    lockTimed();
+    try {
+      ensureOpen();
+      return mutation ? inTransaction(work) : work.run();
+    } catch (SQLException failure) {
+      throw new IllegalStateException("Recorded walk storage is unavailable", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
   private final Path dbPath;
   private final ReentrantLock lock = new ReentrantLock();
   private final int maxAttempts;
@@ -481,9 +541,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
         return accepted;
       });
-      for (JobQueue.EnqueueEntry entry : entries) {
-        if (entry != null && entry.path() != null) activeClaims.remove(normalizePath(entry.path()));
-      }
 
       meters.recordEnqueued(count);
       log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
@@ -564,7 +621,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // After the commit, like enqueueEntries: a meter incremented inside the transaction would
       // still count a row a rollback threw away.
       if (result.accepted() > 0) {
-        activeClaims.remove(normalizedPath);
         meters.recordEnqueued(result.accepted());
       }
       log.debug(
@@ -580,6 +636,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public List<IndexJob> pollPending(int limit) {
+    if (limit <= 0) return List.of();
     lockTimed();
     try {
       ensureOpen();
@@ -610,15 +667,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     SELECT path, collection, originator, transport, scan_id, unit_revision FROM jobs
                     WHERE state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?)
                     ORDER BY last_updated ASC, path ASC
-                    LIMIT ?
                     """;
 
                 List<ClaimedRow> claimedRows = new ArrayList<>();
                 try (PreparedStatement selectStmt = connection.prepareStatement(selectSql)) {
                   selectStmt.setLong(1, now);
-                  selectStmt.setInt(2, limit);
                   try (ResultSet rs = selectStmt.executeQuery()) {
-                    while (rs.next()) {
+                    // Filter live issued paths before applying the batch limit. A replaced oldest
+                    // row must neither acquire a second owner nor starve unrelated eligible work.
+                    while (claimedRows.size() < limit && rs.next()) {
+                      if (activeClaims.containsKey(rs.getString(1))) continue;
                       String originator = rs.getString(3);
                       String transport = rs.getString(4);
                       claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
@@ -682,9 +740,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  private boolean isIssuedClaim(IndexJob claim) {
+    return claim != null && activeClaims.get(normalizePath(claim.path())) == claim;
+  }
+
   private boolean ownsClaim(IndexJob claim) throws SQLException {
+    if (!isIssuedClaim(claim)) return false;
     String path = normalizePath(claim.path());
-    if (activeClaims.get(path) != claim) return false;
     try (PreparedStatement query = connection.prepareStatement(
         "SELECT state, scan_id, unit_revision FROM jobs WHERE path = ?")) {
       query.setString(1, path);
@@ -867,7 +929,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         if (transition == null) continue;
         if (transition.claim() != null && !seenClaims.add(transition.claim())) continue;
         if (transition.claim() == null || ownsClaim(transition.claim())) eligible.add(transition);
-        else releaseClaim(transition.claim());
       }
       long now = System.currentTimeMillis();
       int[] updates =
@@ -900,8 +961,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 }
                 return result;
               });
-      for (JobQueue.IngestionLedgerTransition transition : eligible) {
-        if (transition.claim() != null) releaseClaim(transition.claim());
+      // Even obsolete issued claims are released only after the whole outcome transaction commits.
+      for (JobQueue.IngestionLedgerTransition transition : transitions) {
+        if (transition != null && transition.claim() != null) releaseClaim(transition.claim());
       }
       logBatchMisses(updates, "markDoneTransitions(outcome)");
       log.debug("Marked {} jobs done with outcome {}", transitions.size(), outcomeClassName(outcome));
@@ -1470,58 +1532,53 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public int recoverStuckJobs() {
-    lock.lock();
-    try {
-      ensureOpen();
-
-      String sql = """
-          UPDATE jobs SET state = 'PENDING', last_updated = ?
-          WHERE state = 'PROCESSING'
-          """;
-
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-        stmt.setLong(1, System.currentTimeMillis());
-        int count = executeMutation(stmt::executeUpdate);
-        if (count > 0) {
-          log.info("Recovered {} stuck jobs", count);
-        }
-        return count;
-      }
-    } catch (SQLException e) {
-      log.error("Failed to recover stuck jobs", e);
-      return 0;
-    } finally {
-      unlockAfterChanges();
-    }
+    return recoverUnownedProcessing(null);
   }
 
-  /**
-   * Age-bounded variant for the periodic liveness reaper (tempdoc 550 Thesis II): re-queue only
-   * PROCESSING rows whose {@code last_updated} is older than {@code olderThanMs}. A generous
-   * threshold spares jobs the loop is actively processing while reclaiming genuinely-orphaned rows
-   * (worker claimed then died mid-process); re-indexing is idempotent so a false reset is harmless.
-   */
+  /** Runtime recovery cannot reclaim an issued claim whose synchronous work has not exited. */
   @Override
   public int recoverStuckJobs(long olderThanMs) {
-    lock.lock();
+    return recoverUnownedProcessing(System.currentTimeMillis() - olderThanMs);
+  }
+
+  private int recoverUnownedProcessing(Long cutoff) {
+    lockTimed();
     try {
       ensureOpen();
-      long now = System.currentTimeMillis();
-      String sql = """
-          UPDATE jobs SET state = 'PENDING', last_updated = ?
-          WHERE state = 'PROCESSING' AND last_updated < ?
-          """;
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-        stmt.setLong(1, now);
-        stmt.setLong(2, now - olderThanMs);
-        int count = executeMutation(stmt::executeUpdate);
-        if (count > 0) {
-          log.info("Reaped {} stale PROCESSING jobs (older than {} ms) → PENDING", count, olderThanMs);
+      int count = inTransaction(() -> {
+        List<String> unowned = new ArrayList<>();
+        try (var query = connection.prepareStatement(
+            "SELECT path FROM jobs WHERE state = 'PROCESSING' AND (? IS NULL OR last_updated < ?)")) {
+          if (cutoff == null) {
+            query.setNull(1, java.sql.Types.BIGINT);
+            query.setNull(2, java.sql.Types.BIGINT);
+          } else {
+            query.setLong(1, cutoff);
+            query.setLong(2, cutoff);
+          }
+          try (var rows = query.executeQuery()) {
+            while (rows.next()) {
+              String path = rows.getString(1);
+              if (!activeClaims.containsKey(path)) unowned.add(path);
+            }
+          }
         }
-        return count;
-      }
-    } catch (SQLException e) {
-      log.error("Failed to reap stale stuck jobs", e);
+        int recovered = 0;
+        try (var update = connection.prepareStatement(
+            "UPDATE jobs SET state = 'PENDING', last_updated = ? WHERE path = ? AND state = 'PROCESSING'")) {
+          long now = System.currentTimeMillis();
+          for (String path : unowned) {
+            update.setLong(1, now);
+            update.setString(2, path);
+            recovered += executeMutation(update::executeUpdate);
+          }
+        }
+        return recovered;
+      });
+      if (count > 0) log.info("Recovered {} unowned processing jobs", count);
+      return count;
+    } catch (SQLException failure) {
+      log.error("Failed to recover unowned processing jobs", failure);
       return 0;
     } finally {
       unlockAfterChanges();
@@ -2028,7 +2085,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String sql = "DELETE FROM jobs WHERE 1";
       try (Statement stmt = connection.createStatement()) {
         int deleted = executeMutation(() -> stmt.executeUpdate(sql));
-        activeClaims.clear();
         if (deleted > 0) {
           log.info("Cleared all {} jobs (profiling reset)", deleted);
           checkAndVacuum();
@@ -2075,7 +2131,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.setString(1, normalized);
         stmt.setString(2, upper);
         int deleted = executeMutation(stmt::executeUpdate);
-        activeClaims.keySet().removeIf(path -> path.compareTo(normalized) >= 0 && path.compareTo(upper) < 0);
         if (deleted > 0) {
           log.info("deleteByPathPrefix: deleted {} jobs for prefix: {}", deleted, normalized);
         } else {
@@ -2179,7 +2234,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setString(1, path);
         int deleted = executeMutation(stmt::executeUpdate);
-        activeClaims.remove(path);
         if (deleted > 0) {
           log.debug("deleteByExactPath: deleted job for path: {}", path);
         }

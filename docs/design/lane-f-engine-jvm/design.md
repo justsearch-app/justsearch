@@ -27,6 +27,9 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-8d.2 retains issued queue object identity until the actual outcome or batch-exit return, independently of a replacement row's admission revision. Poll excludes issued paths before its limit; runtime orphan recovery excludes live owners. Stopped batches return unwritten claims through the existing journal retry owner, while written effects retain commit ownership. Jobs v18 remains a derived projection inside the existing queue connection. Schema/epoch primitives and this prerequisite form the first WIP checkpoint; ledger accounting, seal, acknowledgement retention and producer/recovery activation remain explicit next cuts in the [vertical plan](evidence/C2/C2-8d-vertical-plan.md).
+
+
 - 2026-09-14: C2-8d.1 reintroduces frozen root/child binding against C2-3's separate prepared payload. Resolve the actual producer envelope outside SQLite, compare that exact witness during child insertion, copy original attribution, and retain terminal children while any nonterminal parent (including COMPLETE_WITH_GAPS) may replay. The primitive passes integrated1537 and discriminating negatives; real producer/queue/recovery activation remains the next items in the [vertical plan](evidence/C2/C2-8d-vertical-plan.md). [Proof and limits](evidence/C2/recorded-ingest-binding.md).
 
 - 2026-09-14: C2-9 records a server-built authorization basis at acceptance: re-evaluate structural AUTO through the existing evaluator, resolve the exact durable grant entry, and refuse an ephemeral capsule after restart. The accepted row and caller grant header confer no authority. Reuse one preloaded roots carrier and shared authorization owners before the index fork; check revocation/current frozen scope at each new recorded claim, while already issued units drain. [Verified gap, selected mechanism and required proofs](evidence/C2/ingestion-authorization-recovery.md).

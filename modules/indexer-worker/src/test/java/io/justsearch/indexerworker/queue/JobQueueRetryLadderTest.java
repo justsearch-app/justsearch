@@ -145,8 +145,8 @@ final class JobQueueRetryLadderTest {
     String normalized = PathNormalizer.normalizePath(file.toAbsolutePath().toString());
 
     jobQueue.enqueue(List.of(file));
-    jobQueue.pollPending(1);
-    jobQueue.markFailed(file, ioFailure("share offline"));
+    var firstClaim = jobQueue.pollPending(1).getFirst();
+    assertTrue(jobQueue.markClaimFailed(firstClaim, ioFailure("share offline"), null));
     assertEquals("PENDING", readRow(normalized).state(), "the first failure always retries");
 
     // Age the failure run past the window. Rewriting first_failed_at rather than sleeping is the
@@ -156,8 +156,8 @@ final class JobQueueRetryLadderTest {
         System.currentTimeMillis() - IngestionRetryLadder.MAX_RETRY_WINDOW_MS - 86_400_000L;
     setFirstFailedAtViaJdbc(normalized, eightDaysAgo);
     setStateViaJdbc(normalized, "PENDING");
-    jobQueue.pollPending(1);
-    jobQueue.markFailed(file, ioFailure("share still offline"));
+    var retryClaim = jobQueue.pollPending(1).getFirst();
+    assertTrue(jobQueue.markClaimFailed(retryClaim, ioFailure("share still offline"), null));
 
     JobRow exhausted = readRow(normalized);
     assertEquals(

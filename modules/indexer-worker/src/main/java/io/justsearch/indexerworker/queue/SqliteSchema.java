@@ -26,6 +26,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V15: Added nullable content_hash to jobs for idempotent unit recovery (lane F C2)</li>
  *   <li>V16: Added switch-buffer replacement identity for conditional replay removal (lane F C2)</li>
  *   <li>V17: Added stable queue admission revisions for operation recovery (lane F C2)</li>
+ *   <li>V18: Added finite-walk receipts and ledger terminal coverage (lane F C2)</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -38,7 +39,52 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 17;
+  public static final int TARGET_VERSION = 18;
+
+  public static final String MIGRATE_V17_TO_V18_WALK_EPOCH =
+      "ALTER TABLE jobs ADD COLUMN walk_seen_epoch INTEGER";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_OPERATION =
+      "ALTER TABLE ingestion_ledger ADD COLUMN operation_key TEXT";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_REVISION =
+      "ALTER TABLE ingestion_ledger ADD COLUMN unit_revision TEXT";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_HASH =
+      "ALTER TABLE ingestion_ledger ADD COLUMN content_hash TEXT";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_COVERAGE =
+      "ALTER TABLE ingestion_ledger ADD COLUMN terminal_coverage TEXT "
+          + "CHECK(terminal_coverage IN ('INDEXED', 'FAILED', 'SKIPPED'))";
+
+  /** Derived walk coverage, never operation acceptance, authorization or attempt state. */
+  public static final String CREATE_INGESTION_WALK_PROGRESS = """
+      CREATE TABLE IF NOT EXISTS ingestion_walk_progress (
+        operation_key TEXT PRIMARY KEY,
+        plan_hash TEXT NOT NULL,
+        enumeration_epoch INTEGER NOT NULL CHECK(enumeration_epoch > 0),
+        enumeration_closed_at INTEGER,
+        enumeration_outcome TEXT CHECK(enumeration_outcome IN ('COMPLETE', 'FAILED', 'CANCELLED')),
+        completed_units INTEGER NOT NULL DEFAULT 0 CHECK(completed_units >= 0),
+        failed_units INTEGER NOT NULL DEFAULT 0 CHECK(failed_units >= 0),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK(revision > 0),
+        sealed_at INTEGER,
+        receipt_json TEXT,
+        acknowledged_revision INTEGER NOT NULL DEFAULT 0 CHECK(acknowledged_revision >= 0 AND acknowledged_revision <= revision),
+        CHECK((enumeration_closed_at IS NULL) = (enumeration_outcome IS NULL)),
+        CHECK((sealed_at IS NULL) = (receipt_json IS NULL)),
+        CHECK(sealed_at IS NULL OR enumeration_closed_at IS NOT NULL)
+      )
+      """;
+  public static final String CREATE_JOBS_WALK_EPOCH_INDEX = """
+      CREATE INDEX IF NOT EXISTS idx_jobs_walk_epoch ON jobs(scan_id, walk_seen_epoch)
+      """;
+  public static final String CREATE_LEDGER_WALK_UNIT_INDEX = """
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_walk_unit
+      ON ingestion_ledger(operation_key, path_hash, unit_revision, terminal_coverage)
+      WHERE terminal_coverage IS NOT NULL
+      """;
+  public static final String CREATE_LEDGER_WALK_HASH_INDEX = """
+      CREATE INDEX IF NOT EXISTS idx_ledger_walk_hash
+      ON ingestion_ledger(operation_key, path_hash, content_hash)
+      WHERE terminal_coverage = 'INDEXED'
+      """;
 
   /** An admission identity survives retries; a real replacement receives a new identity. */
   public static final String MIGRATE_V16_TO_V17_UNIT_REVISION =
@@ -158,7 +204,11 @@ public final class SqliteSchema {
         policy_id TEXT,
         parser_id TEXT,
         originator TEXT,
-        transport TEXT
+        transport TEXT,
+        operation_key TEXT,
+        unit_revision TEXT,
+        content_hash TEXT,
+        terminal_coverage TEXT CHECK(terminal_coverage IN ('INDEXED', 'FAILED', 'SKIPPED'))
       )
       """;
 

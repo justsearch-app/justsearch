@@ -169,8 +169,12 @@ public final class JobBatchWriter {
           ex.artifact().result().content() != null ? ex.artifact().result().content().length() : 0);
       log.debug("Indexed successfully: {} in {}ms", ex.filePath(), latencyMs);
 
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | Error e) {
+      if (e instanceof VirtualMachineError fatal) throw fatal;
       log.error("Failed to write: {}", ex.filePath(), e);
+      // An observer failure after handoff cannot turn an already written effect into a retry
+      // or release its live claim before the journal confirms the Lucene commit.
+      if (journal.ownsPendingCommit(ex.claim())) return;
       if (isDrainingWriteRejection(e)) {
         journal.recordOutcomeSafely(
             ex.filePath(),
@@ -248,7 +252,7 @@ public final class JobBatchWriter {
     return e.getClass().getSimpleName() + ": " + message;
   }
 
-  private static boolean isDrainingWriteRejection(RuntimeException e) {
+  private static boolean isDrainingWriteRejection(Throwable e) {
     return e instanceof IndexRuntimeIOException indexRuntimeIOException
         && indexRuntimeIOException.reason() == IndexRuntimeIOException.Reason.DRAINING;
   }

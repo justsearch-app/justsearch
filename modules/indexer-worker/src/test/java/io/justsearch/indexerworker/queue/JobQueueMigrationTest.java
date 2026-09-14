@@ -822,9 +822,7 @@ final class JobQueueMigrationTest {
     String jdbcUrl = "jdbc:sqlite:" + dbPath.toAbsolutePath();
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
-      stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
-      // This version already owns the privacy-safe ledger; V14 alters its existing columns.
-      stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
+      createV10Objects(stmt);
       stmt.execute("PRAGMA user_version = 10");
       stmt.execute(
           "INSERT INTO jobs(path, state, attempts, last_updated)"
@@ -833,6 +831,7 @@ final class JobQueueMigrationTest {
 
     SqliteJobQueue queue = new SqliteJobQueue(dbPath);
     queue.open();
+    assertMatchesFreshSchema(dbPath);
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
@@ -903,10 +902,13 @@ final class JobQueueMigrationTest {
     String pathHash = DocumentIdentityStore.pathHash("/v11/preserved.txt");
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
-      stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
-      // This version already owns the privacy-safe ledger; V14 alters its existing columns.
-      stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
-      stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_TABLE);
+      createV10Objects(stmt);
+      stmt.execute("""
+          CREATE TABLE document_identity (
+            path_hash TEXT PRIMARY KEY, doc_uid TEXT NOT NULL,
+            first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL
+          )
+          """);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_UID_INDEX);
       stmt.execute("PRAGMA user_version = 11");
       stmt.execute(
@@ -921,13 +923,14 @@ final class JobQueueMigrationTest {
 
     SqliteJobQueue queue = new SqliteJobQueue(dbPath);
     queue.open();
+    assertMatchesFreshSchema(dbPath);
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(17, rs.getInt(1));
+        assertEquals(18, rs.getInt(1));
       }
-      assertEquals(17, SqliteSchema.TARGET_VERSION);
+      assertEquals(18, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -1020,10 +1023,13 @@ final class JobQueueMigrationTest {
     String pathHash = DocumentIdentityStore.pathHash("/v12/preserved.txt");
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
-      stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
-      // This version already owns the privacy-safe ledger; V14 alters its existing columns.
-      stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
-      stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_TABLE);
+      createV10Objects(stmt);
+      stmt.execute("""
+          CREATE TABLE document_identity (
+            path_hash TEXT PRIMARY KEY, doc_uid TEXT NOT NULL,
+            first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL
+          )
+          """);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_UID_INDEX);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_IMPORT_TABLE);
       stmt.execute("PRAGMA user_version = 12");
@@ -1036,11 +1042,12 @@ final class JobQueueMigrationTest {
 
     SqliteJobQueue queue = new SqliteJobQueue(dbPath);
     queue.open();
+    assertMatchesFreshSchema(dbPath);
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(17, rs.getInt(1));
+        assertEquals(18, rs.getInt(1));
       }
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity)")) {
@@ -1119,7 +1126,7 @@ final class JobQueueMigrationTest {
         Statement statement = db.createStatement()) {
       try (ResultSet version = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(version.next());
-        assertEquals(17, version.getInt(1));
+        assertEquals(18, version.getInt(1));
       }
       assertTrue(hasColumn(statement, "content_hash"));
       try (ResultSet row = statement.executeQuery(
@@ -1229,6 +1236,58 @@ final class JobQueueMigrationTest {
         ResultSet rows = statement.executeQuery("SELECT job_path FROM ingestion_ledger")) {
       assertFalse(rows.next());
     }
+  }
+
+  /** Historical V10 schema, not the current bootstrap DDL stamped as an older database. */
+  private static void createV10Objects(Statement stmt) throws SQLException {
+    stmt.execute("""
+        CREATE TABLE jobs (
+          path TEXT PRIMARY KEY, state TEXT NOT NULL DEFAULT 'PENDING',
+          attempts INTEGER NOT NULL DEFAULT 0, last_updated INTEGER NOT NULL,
+          error_message TEXT, retry_after INTEGER, first_failed_at INTEGER,
+          collection TEXT DEFAULT NULL, last_outcome_class TEXT, last_reason_code TEXT,
+          last_retry_policy TEXT, last_diagnostic_summary TEXT, last_outcome_at INTEGER,
+          size_bytes INTEGER DEFAULT NULL, scan_id TEXT DEFAULT NULL
+        )
+        """);
+    stmt.execute(SqliteSchema.CREATE_JOBS_STATE_INDEX);
+    stmt.execute(SqliteSchema.CREATE_JOBS_STATE_UPDATED_INDEX);
+    stmt.execute("""
+        CREATE TABLE switch_buffer (
+          key TEXT PRIMARY KEY, op TEXT NOT NULL, payload TEXT NOT NULL,
+          last_updated INTEGER NOT NULL
+        )
+        """);
+    stmt.execute(SqliteSchema.CREATE_SWITCH_BUFFER_INDEX);
+    stmt.execute("""
+        CREATE TABLE ingestion_ledger (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, path_hash TEXT NOT NULL, collection TEXT,
+          outcome_class TEXT NOT NULL, reason_code TEXT NOT NULL, retry_policy TEXT NOT NULL,
+          diagnostic_summary TEXT, observed_at INTEGER NOT NULL, source_size_bytes INTEGER,
+          source_modified_at INTEGER, source_kind TEXT, artifact_status TEXT,
+          policy_id TEXT, parser_id TEXT
+        )
+        """);
+    stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_PATH_TIME_INDEX);
+    stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_OUTCOME_INDEX);
+    for (String sql : SqliteSchema.MIGRATE_V6_TO_V7_ADD_PATH_RESOLUTION) stmt.execute(sql);
+  }
+
+  private void assertMatchesFreshSchema(Path migrated) throws Exception {
+    Path fresh = tempDir.resolve("fresh-" + migrated.getFileName());
+    try (SqliteJobQueue queue = new SqliteJobQueue(fresh)) { queue.open(); }
+    assertEquals(tableColumns(fresh), tableColumns(migrated));
+    assertEquals(indexDefinitions(fresh), indexDefinitions(migrated));
+  }
+
+  private java.util.Set<String> indexDefinitions(Path path) throws Exception {
+    java.util.Set<String> indexes = new java.util.TreeSet<>();
+    try (Connection db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        Statement stmt = db.createStatement();
+        ResultSet rows = stmt.executeQuery("SELECT name, sql FROM sqlite_master WHERE type='index'")) {
+      while (rows.next()) indexes.add(rows.getString(1) + ":" + rows.getString(2));
+    }
+    return indexes;
   }
 
   private void createV14Fixture(Path path) throws Exception {

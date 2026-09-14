@@ -178,6 +178,9 @@ final class JobQueueTest {
         ps.setString(2, "%stale.txt");
         assertEquals(1, ps.executeUpdate(), "exactly one row backdated");
       }
+      // Reopen models loss of the issuing process; aging alone cannot steal a live claim.
+      jobQueue.close();
+      jobQueue.open();
       int reaped = jobQueue.recoverStuckJobs(15 * 60_000L); // 15-min threshold
       assertEquals(1, reaped, "only the stale PROCESSING row is reaped → PENDING");
       assertEquals(1L, countState(raw, "PENDING"), "stale row is now PENDING");
@@ -202,7 +205,9 @@ final class JobQueueTest {
           jobQueue.recoverStuckJobs(15 * 60_000L),
           "a heartbeated PROCESSING row is NOT reaped — the live owner still holds it");
       assertEquals(2L, countState(raw, "PROCESSING"), "both stay PROCESSING after a beat");
-      // Beats stop (loop died); the rows go stale again and the reaper reclaims them as orphans.
+      // Lose the actual owner, then age the rows: they are now genuine orphans.
+      jobQueue.close();
+      jobQueue.open();
       backdateAll(raw, 20 * 60_000L);
       assertEquals(
           2,
@@ -261,11 +266,13 @@ final class JobQueueTest {
   }
 
   @Test
-  void recoverStuckJobsResetsProcesing() {
+  void recoverStuckJobsResetsProcesing() throws Exception {
     Path filePath = Path.of("/path/to/file.txt");
     jobQueue.enqueue(List.of(filePath));
     jobQueue.pollPending(1); // Now in PROCESSING state
 
+    jobQueue.close();
+    jobQueue.open();
     int recovered = jobQueue.recoverStuckJobs();
 
     assertEquals(1, recovered);

@@ -152,6 +152,9 @@ final class WorkerIngestServiceForceReindexWiringTest {
     public void open() {}
 
     @Override
+    public void returnUnfinishedClaims(Collection<IndexJob> claims) {}
+
+    @Override
     public int enqueue(List<Path> paths, String collection) {
       enqueuedPaths.addAll(paths);
       return paths.size();

@@ -694,6 +694,9 @@ class KnowledgeServerTest {
     public void open() throws SQLException, IOException {}
 
     @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {}
+
+    @Override
     public int enqueue(List<Path> paths, String collection) {
       return 0;
     }

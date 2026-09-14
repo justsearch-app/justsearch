@@ -104,7 +104,7 @@ not the current file, representation generation, or completion of a containing o
 
 ### Crash recovery
 
-Each queue admission also has a durable opaque `unit_revision` (jobs schema v17). Enqueue
+Each queue admission also has a durable opaque `unit_revision` (introduced in jobs schema v17). Enqueue
 and deliberate re-enqueue mint a fresh revision; claim, deferral, failure and crash recovery
 preserve it. A claimed job carries its scan id and revision. Completion of a claimed job requires both the
 exact live claim object and the matching durable PROCESSING row, scan id and revision, so a
@@ -112,11 +112,17 @@ superseded admission cannot certify a replacement. This revision is an admission
 path plus source content hash remains the effect identity. It does not yet provide
 operation-scoped boot eligibility or root-walk completion.
 
-On startup, `recoverStuckJobs()` resets all `PROCESSING` jobs back to `PENDING`. This heals incomplete work from a prior crash without burning retry budget (since `attempts` = failures, not claims).
+Issued claims retain their exact object identity through replacement and deletion until the
+worker reports its outcome or returns unfinished claims after batch exit. Polling skips those
+paths before applying the batch limit, so a replacement cannot overtake its live owner or
+starve unrelated jobs. A stopped batch returns unwritten claims without resetting retry
+budget; written claims remain with the commit journal. Failed SQL returns retry before another poll.
 
-The indexing loop is also resilient *in-process*: a per-document `Error` (for example a plugin `LinkageError`, `AssertionError`, or `IOError`) is logged and the loop continues to the next batch. A fatal `VirtualMachineError` or uncaught loop-thread failure publishes `LoopState.FAILED` and clears liveness before logging. Core status reports `indexState=FAILED` and `indexHealthy=false`; the index health port exposes the failed loop state while serving readiness remains independently probed. Ordinary document `ERROR`, deferred startup, and intentional quiescence remain distinct. A new loop start clears the fatal state.
+On startup, `recoverStuckJobs()` resets unowned `PROCESSING` jobs back to `PENDING`. This heals incomplete work from a prior crash without burning retry budget (since `attempts` = failures, not claims).
 
-KnowledgeServer also runs an age-bounded reaper every two minutes. It requeues `PROCESSING` rows whose last update exceeds the five-minute liveness window; actively processed jobs refresh that timestamp through heartbeats. This can recover orphaned rows without a process restart, but does not itself restart a failed indexing loop.
+The indexing loop is also resilient *in-process*: a per-document `Error` (for example a plugin `LinkageError`, `AssertionError`, or `IOError`) is logged and uses the existing per-unit failure/retry path, allowing later batch units to proceed. A recoverable batch-embedding error uses the existing per-document fallback. A fatal `VirtualMachineError` or uncaught loop-thread failure publishes `LoopState.FAILED` and clears liveness before logging. Core status reports `indexState=FAILED` and `indexHealthy=false`; the index health port exposes the failed loop state while serving readiness remains independently probed. Ordinary document `ERROR`, deferred startup, and intentional quiescence remain distinct. A new loop start clears the fatal state.
+
+KnowledgeServer also runs an age-bounded reaper every two minutes. It requeues unowned `PROCESSING` rows whose last update exceeds the five-minute liveness window; a live issued claim remains protected even if its timestamp is old. Actively processed jobs also refresh their timestamps through heartbeats. This can recover orphaned rows without a process restart, but does not itself restart a failed indexing loop.
 
 The reaper owns the registered background scheduler `index.stuck-job-reaper`. Shutdown cancels the periodic task and waits for its actual exit before closing the job queue. Deferred model initialization similarly owns `index.deferred-model-init`; shutdown waits for its executor to terminate before closing published model and runtime resources, even when the initializer's exposed future has been canceled. Both registrations have one thread and one live instance, with queue capacity supplied by the Engine background policy.
 
@@ -128,6 +134,13 @@ The job queue uses `PRAGMA user_version` for linear schema evolution:
 *   **Migration ladder:** On open, the queue applies pending migrations sequentially (V0→V1→V2→...) inside an explicit transaction.
 *   **Fail-fast:** If a migration fails, the transaction rolls back and the queue throws a fatal exception.
 *   **DDL SSOT:** All DDL and migration SQL is centralized in `SqliteSchema`. Migration orchestration (version ladder, transaction management, rollback) lives in `SqliteQueueMigrationOps`.
+
+Version 18 adds `ingestion_walk_progress`, `jobs.walk_seen_epoch`, and nullable ledger
+operation/revision/hash/coverage fields inside the existing queue store. The projection
+primitive persists a plan hash, enumeration epoch and closure outcome, rejects stale closure
+callbacks, and refuses to recreate missing recovery state. This checkpoint does not yet
+connect producers, unit accounting, receipt sealing or operation recovery; it cannot certify
+that a root walk completed. Ledger privacy repair preserves attribution and recorded fields.
 
 ### Pre-migration backups
 

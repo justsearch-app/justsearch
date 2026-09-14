@@ -384,7 +384,10 @@ public final class JobBatchExtractor {
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | Error e) {
+      if (e instanceof VirtualMachineError fatal) throw fatal;
+      // The loop already recovers non-VM Errors. Attribute them to this unit so its bounded
+      // retry policy applies and an early bad document cannot starve the rest of the batch.
       log.error("Failed to process: {}", filePath, e);
       FileEnvelope envelopeForLedger = envelope;
       journal.recordOutcomeSafely(

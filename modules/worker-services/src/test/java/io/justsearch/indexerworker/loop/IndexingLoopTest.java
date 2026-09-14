@@ -1394,6 +1394,122 @@ class IndexingLoopTest {
           .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
     }
 
+    @Test
+    void stoppedBatchReturnsEveryUnvisitedClaim() throws Exception {
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var claims = List.of(new JobQueue.IndexJob(Path.of("one.txt"), null),
+          new JobQueue.IndexJob(Path.of("two.txt"), null));
+      invokeProcessBatch(loop, claims);
+      assertEquals(2, queue.returnedClaims.size());
+      assertTrue(claims.stream().allMatch(claim -> queue.returnedClaims.stream().anyMatch(returned -> returned == claim)));
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+    }
+
+    @Test
+    void stopDuringWriteReturnsRemainderButRetainsWrittenCommitOwner() throws Exception {
+      Path first = Files.writeString(Files.createTempFile("js-stop-first", ".txt"), "one");
+      Path second = Files.writeString(Files.createTempFile("js-stop-second", ".txt"), "two");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      setRunning(loop, true);
+      doAnswer(call -> { setRunning(loop, false); return null; })
+          .when(queue.indexingCoordinator).indexSingle(any());
+      invokeProcessBatch(loop, claims);
+      assertEquals(1, queue.returnedClaims.size());
+      assertSame(claims.get(1), queue.returnedClaims.getFirst());
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertSame(claims.getFirst(), loop.getJournal().pendingTransitionsForTest().getFirst().claim());
+      verify(queue.indexingCoordinator, times(1)).indexSingle(any());
+      assertNull(queue.lastOutcome, "the written effect still needs its commit");
+    }
+
+    @Test
+    void recoverableWriteErrorDoesNotAbandonLaterBatchUnits() throws Exception {
+      Path first = Files.writeString(Files.createTempFile("js-error-first", ".txt"), "one");
+      Path second = Files.writeString(Files.createTempFile("js-error-second", ".txt"), "two");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      setRunning(loop, true);
+      doThrow(new AssertionError("isolated write failure")).doNothing()
+          .when(queue.indexingCoordinator).indexSingle(any());
+      invokeProcessBatch(loop, claims);
+      assertEquals(IngestionOutcomeClass.WRITE_FAILED, queue.lastOutcome.outcomeClass());
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertSame(claims.get(1), loop.getJournal().pendingTransitionsForTest().getFirst().claim());
+      verify(queue.indexingCoordinator, times(2)).indexSingle(any());
+    }
+
+    @Test
+    void fatalWriteErrorPropagatesWithoutClaimingSafeBatchExit() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-fatal", ".txt"), "one");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      setRunning(loop, true);
+      var fatal = new InternalError("fatal fixture");
+      doThrow(fatal).when(queue.indexingCoordinator).indexSingle(any());
+      var thrown = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeProcessBatch(loop, List.of(new JobQueue.IndexJob(file, null))));
+      assertSame(fatal, thrown.getCause());
+      assertTrue(queue.returnedClaims.isEmpty());
+      assertNull(queue.lastOutcome);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void postHandoffObserverFailureKeepsPendingCommitOwner(boolean error) throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-observer-failure", ".txt"), "one");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var metrics = mock(io.justsearch.indexerworker.metrics.OperationalMetrics.class);
+      var field = JobBatchWriter.class.getDeclaredField("metrics");
+      field.setAccessible(true);
+      field.set(loop.getWriter(), metrics);
+      Throwable failure = error ? new AssertionError("observer") : new IllegalStateException("observer");
+      doThrow(failure).when(metrics).recordDocumentIndexed(anyLong());
+      ExtractedJob job = (ExtractedJob) extractedJob(file, "one");
+      loop.getWriter().write(job, null);
+      loop.getJournal().returnBatchClaims(List.of(job.claim()));
+      assertNull(queue.lastOutcome, "observer failure cannot rewrite the written effect as failed");
+      assertTrue(queue.returnedClaims.isEmpty());
+      assertTrue(loop.getJournal().ownsPendingCommit(job.claim()));
+      loop.getJournal().drainPending();
+      assertEquals(IngestionOutcomeClass.SUCCESS_FULL, queue.lastOutcome.outcomeClass());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void batchEmbeddingErrorFallsBackUnlessFatal(boolean fatal) throws Exception {
+      Path first = Files.writeString(Files.createTempFile("js-embed-first", ".txt"), "one");
+      Path second = Files.writeString(Files.createTempFile("js-embed-second", ".txt"), "two");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
+      when(provider.isAvailable()).thenReturn(true);
+      Error failure = fatal ? new InternalError("fatal embedding fixture") : new AssertionError("batch embedding fixture");
+      when(provider.embedDocumentBatch(anyList())).thenThrow(failure);
+      loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
+      var migration = IndexingLoop.class.getDeclaredField("migrationActiveSupplier");
+      migration.setAccessible(true);
+      migration.set(loop, (java.util.function.BooleanSupplier) () -> true);
+      setRunning(loop, true);
+      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      if (fatal) {
+        var thrown = assertThrows(java.lang.reflect.InvocationTargetException.class,
+            () -> invokeProcessBatch(loop, claims));
+        assertSame(failure, thrown.getCause());
+        verify(queue.indexingCoordinator, never()).indexSingle(any());
+        assertTrue(queue.returnedClaims.isEmpty());
+      } else {
+        invokeProcessBatch(loop, claims);
+        verify(queue.indexingCoordinator, times(2)).indexSingle(any());
+        assertEquals(2, loop.getJournal().pendingTransitionsForTest().size());
+        assertTrue(queue.returnedClaims.isEmpty());
+      }
+    }
+
     private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider) {
       DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
@@ -1840,6 +1956,13 @@ class IndexingLoopTest {
 
     @Override
     public void open() {}
+
+    final List<IndexJob> returnedClaims = new java.util.ArrayList<>();
+
+    @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {
+      returnedClaims.addAll(claims);
+    }
 
     @Override
     public int enqueue(List<Path> paths, String collection) {

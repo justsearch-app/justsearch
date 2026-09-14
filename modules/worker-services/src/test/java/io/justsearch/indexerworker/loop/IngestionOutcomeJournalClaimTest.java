@@ -22,6 +22,60 @@ final class IngestionOutcomeJournalClaimTest {
   private static final String CONTENT_HASH = "a".repeat(64);
 
   @Test
+  void profilingResetRetainsFailedReturnsAndReturnsDiscardedWrittenClaims() {
+    JobQueue queue = mock();
+    var journal = new IngestionOutcomeJournal(queue, mock(), mock(), () -> false);
+    var written = new JobQueue.IndexJob(Path.of("written.txt"), null);
+    var unvisited = new JobQueue.IndexJob(Path.of("unvisited.txt"), null);
+    journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(written, null, CONTENT_HASH));
+    List<List<JobQueue.IndexJob>> attempts = new ArrayList<>();
+    doAnswer(call -> {
+      Collection<JobQueue.IndexJob> claims = call.getArgument(0);
+      attempts.add(List.copyOf(claims));
+      if (attempts.size() <= 2) throw new OutcomeWriteException("return unavailable through exit", null);
+      return null;
+    }).when(queue).returnUnfinishedClaims(anyCollection());
+    journal.returnBatchClaims(List.of(written, unvisited));
+    org.junit.jupiter.api.Assertions.assertFalse(journal.retryBatchReturns());
+    // resetForProfiling calls this only after actual exit and external index/queue cleanup.
+    journal.clearPending();
+    assertTrue(journal.pendingTransitionsForTest().isEmpty());
+    assertTrue(journal.retryBatchReturns());
+    assertEquals(3, attempts.size());
+    assertEquals(2, attempts.get(2).size());
+    assertTrue(attempts.get(2).stream().anyMatch(claim -> claim == written));
+    assertTrue(attempts.get(2).stream().anyMatch(claim -> claim == unvisited));
+    assertTrue(journal.retryBatchReturns());
+    assertEquals(3, attempts.size());
+  }
+
+  @Test
+  void failedBatchReturnRetriesExactOwnersAndNeverReturnsPendingCommit() {
+    JobQueue queue = mock();
+    var journal = new IngestionOutcomeJournal(queue, mock(), mock(), () -> false);
+    var written = new JobQueue.IndexJob(Path.of("same.txt"), null);
+    var unvisited = new JobQueue.IndexJob(Path.of("same.txt"), null);
+    journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(written, null, CONTENT_HASH));
+    List<List<JobQueue.IndexJob>> attempts = new ArrayList<>();
+    doAnswer(call -> {
+      Collection<JobQueue.IndexJob> claims = call.getArgument(0);
+      attempts.add(List.copyOf(claims));
+      if (attempts.size() == 1) throw new OutcomeWriteException("return rollback", null);
+      return null;
+    }).when(queue).returnUnfinishedClaims(anyCollection());
+    journal.returnBatchClaims(List.of(written, unvisited));
+    assertEquals(1, attempts.size());
+    assertEquals(1, attempts.getFirst().size());
+    assertSame(unvisited, attempts.getFirst().getFirst());
+    assertTrue(journal.retryBatchReturns());
+    assertEquals(2, attempts.size());
+    assertSame(unvisited, attempts.get(1).getFirst());
+    assertTrue(journal.retryBatchReturns());
+    assertEquals(2, attempts.size(), "successful return clears the pending retry");
+    assertTrue(journal.ownsPendingCommit(written));
+  }
+
+  @Test
   void discardedEqualValuedClaimCannotRemoveAFailedCurrentTransition() {
     JobQueue queue = mock();
     var journal = new IngestionOutcomeJournal(queue, mock(), mock(), () -> false);

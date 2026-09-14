@@ -55,6 +55,9 @@ final class CommittedContentHashTest {
       queue.enqueue(List.of(file));
       var old = queue.pollPending(1).getFirst();
       queue.enqueue(List.of(file));
+      assertTrue(queue.pollPending(1).isEmpty());
+      queue.markDoneTransitions(List.of(transition(old, HASH)), success());
+      assertEquals(new Stored("PENDING", null), stored(db));
       var current = queue.pollPending(1).getFirst();
       var forged = new JobQueue.IndexJob(
           current.path(), current.collection(), current.provenance(), current.scanId(),

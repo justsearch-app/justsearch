@@ -45,10 +45,14 @@ C2-8d.1 frozen roots and child acceptance are implemented as a WIP primitive: in
 executes5,013 cases/774 suites, four existing skips, zero failures/errors; ten PMD and
 whole Spotless pass. Negative1536 discriminates stale preparation and retention defects;
 independent review's COMPLETE_WITH_GAPS correction is included. [Evidence](evidence/C2/recorded-ingest-binding.md).
+C2-8d.2a adds WIP schema/epoch and actual batch-exit ownership primitives.
+[Proof, failures/corrections and remaining cuts](evidence/C2/walk-claims.md).
+Hosted0123adb1f fixes the missing resolver declaration but has a Windows parser recycle
+containment-test timeout under investigation; no hosted pass is claimed for that revision.
 Actual producer/queue/recovery activation remains open in the [per-item vertical plan](evidence/C2/C2-8d-vertical-plan.md).
 C2-9's [authorization recovery contract](evidence/C2/ingestion-authorization-recovery.md)
 requires a server-built basis, exact grant re-resolution and sole preloaded roots/evaluator.
-PR727 managed review record is verified through07813a14a and design a5f1a0fa8.
+PR727 managed review record is verified through84f70806c (hosted proof was pending).
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is
 C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then

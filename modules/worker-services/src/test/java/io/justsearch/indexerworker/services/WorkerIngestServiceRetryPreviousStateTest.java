@@ -126,6 +126,9 @@ final class WorkerIngestServiceRetryPreviousStateTest {
     public void open() {}
 
     @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {}
+
+    @Override
     public int enqueue(List<Path> paths, String collection) {
       throw new AssertionError(
           "the retry path must go through reenqueue — a plain enqueue cannot report the state it"

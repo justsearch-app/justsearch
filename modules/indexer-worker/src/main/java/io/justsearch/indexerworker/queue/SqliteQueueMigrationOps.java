@@ -285,6 +285,24 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V16 to V17: Identified durable queue admissions");
       }
+      case 18 -> {
+        addColumnIfMissing(conn, "walk_seen_epoch", SqliteSchema.MIGRATE_V17_TO_V18_WALK_EPOCH);
+        try (Statement stmt = conn.createStatement()) {
+          String[][] columns = {
+              {"operation_key", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_OPERATION},
+              {"unit_revision", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_REVISION},
+              {"content_hash", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_HASH},
+              {"terminal_coverage", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_COVERAGE}};
+          for (String[] column : columns) {
+            if (!columnExists(conn, "ingestion_ledger", column[0])) stmt.execute(column[1]);
+          }
+          stmt.execute(SqliteSchema.CREATE_INGESTION_WALK_PROGRESS);
+          stmt.execute(SqliteSchema.CREATE_JOBS_WALK_EPOCH_INDEX);
+          stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_UNIT_INDEX);
+          stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_HASH_INDEX);
+        }
+        log.info("V17 to V18: Recorded finite-walk coverage and terminal receipts");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }
@@ -301,17 +319,21 @@ final class SqliteQueueMigrationOps {
           INSERT INTO ingestion_ledger (
             id, path_hash, collection, outcome_class, reason_code, retry_policy,
             diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
-            source_kind, artifact_status, policy_id, parser_id
+            source_kind, artifact_status, policy_id, parser_id, originator, transport,
+            operation_key, unit_revision, content_hash, terminal_coverage
           )
           SELECT id, COALESCE(path_hash, 'UNKNOWN'), collection, outcome_class, reason_code, retry_policy,
                  diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
                  COALESCE(source_kind, 'UNKNOWN'), COALESCE(artifact_status, 'NOT_CREATED'),
-                 COALESCE(policy_id, 'UNKNOWN'), COALESCE(parser_id, 'UNKNOWN')
+                 COALESCE(policy_id, 'UNKNOWN'), COALESCE(parser_id, 'UNKNOWN'), originator, transport,
+                 operation_key, unit_revision, content_hash, terminal_coverage
           FROM ingestion_ledger_with_paths
           """);
       stmt.execute("DROP TABLE ingestion_ledger_with_paths");
       stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_PATH_TIME_INDEX);
       stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_OUTCOME_INDEX);
+      stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_UNIT_INDEX);
+      stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_HASH_INDEX);
       log.info("Removed raw job paths from ingestion ledger schema");
     }
   }

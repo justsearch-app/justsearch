@@ -26,16 +26,17 @@ final class OperationQueueOwnershipTest {
       queue.open();
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null, "scan-A");
       var firstClaim = queue.pollPending(1).getFirst();
-      // A later batch can be claimed before the previous batch's Lucene commit drains its
-      // pending ledger transitions. Both claims name the same path but represent different work.
+      // A replacement is pending while the prior issued effect awaits its commit. It must not
+      // acquire another owner or be completed by the old effect.
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null, "scan-B");
-      var secondClaim = queue.pollPending(1).getFirst();
+      assertTrue(queue.pollPending(1).isEmpty());
       queue.markDoneTransitions(
           List.of(new JobQueue.IngestionLedgerTransition(firstClaim, null)),
           IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
               IngestionRetryPolicy.NONE));
       assertEquals(1, queue.queueDepth(),
           "the replacement claim must remain open until its own effect commits");
+      var secondClaim = queue.pollPending(1).getFirst();
       assertTrue(queue.markClaimDone(secondClaim, success(), null));
       assertEquals(0, queue.queueDepth());
     }

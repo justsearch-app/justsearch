@@ -41,7 +41,7 @@ final class AdmissionRevisionTest {
     Map<String, Admission> migrated;
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
-      assertEquals(17, schemaVersion(db));
+      assertEquals(18, schemaVersion(db));
       migrated = readAdmissions(db);
     }
 
@@ -81,6 +81,7 @@ final class AdmissionRevisionTest {
       queue.enqueueEntries(
           List.of(new JobQueue.EnqueueEntry(file, JobQueue.UNKNOWN_SIZE_BYTES, provenance)),
           "docs", "scan-A");
+      queue.returnUnfinishedClaims(List.of(first));
       JobQueue.IndexJob replacement = queue.pollPending(1).getFirst();
       assertNotEquals(first.unitRevision(), replacement.unitRevision());
       assertEquals("scan-A", replacement.scanId());
@@ -103,6 +104,7 @@ final class AdmissionRevisionTest {
           1,
           queue.reenqueue(
               new JobQueue.EnqueueEntry(file, JobQueue.UNKNOWN_SIZE_BYTES, override)).accepted());
+      queue.returnUnfinishedClaims(List.of(retried));
       JobQueue.IndexJob overridden = queue.pollPending(1).getFirst();
       assertNotEquals(retried.unitRevision(), overridden.unitRevision());
       assertEquals("docs", overridden.collection());
@@ -144,6 +146,9 @@ final class AdmissionRevisionTest {
       JobQueue.IndexJob afterDefer = queue.pollPending(1).getFirst();
       assertEquals(revision, afterDefer.unitRevision());
 
+      // Simulate actual owner loss, not a runtime reaper stealing a live polled claim.
+      queue.close();
+      queue.open();
       assertEquals(1, queue.recoverStuckJobs());
       assertEquals(revision, durableRevision(db));
       JobQueue.IndexJob afterRecovery = queue.pollPending(1).getFirst();
@@ -160,6 +165,8 @@ final class AdmissionRevisionTest {
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null, "scan-1");
       JobQueue.IndexJob stale = queue.pollPending(1).getFirst();
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null, "scan-2");
+      assertTrue(queue.pollPending(1).isEmpty(), "replacement waits for the old issued owner");
+      assertFalse(queue.markClaimDone(stale, success(), null));
       JobQueue.IndexJob current = queue.pollPending(1).getFirst();
       JobQueue.IndexJob forged =
           new JobQueue.IndexJob(

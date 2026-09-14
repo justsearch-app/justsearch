@@ -641,6 +641,11 @@ public class IndexingLoop implements Closeable {
         // Must unload embedding model when Main claims GPU, reload when released
         embeddingLifecycle.handleGpuStateTransition();
 
+        if (!journal.retryBatchReturns()) {
+          if (!sleepBrieflyAfterError()) break;
+          continue;
+        }
+
         // Poll for pending jobs
         List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pacing().pollBatchSize());
 
@@ -874,18 +879,27 @@ public class IndexingLoop implements Closeable {
   }
 
   private void processBatch(List<JobQueue.IndexJob> jobs) {
-    Span batchSpan = maybeSpan("indexing.batch");
-    batchSpan.setAttribute("batch.polled", (long) jobs.size());
-    // Tempdoc 400 LR2-d.2: attach commit.* identity attrs best-effort.
+    Span batchSpan = Span.getInvalid();
+    boolean fatal = false;
     try {
-      io.justsearch.indexerworker.services.CommitMetadataSpanAttrs.applyTo(
-          batchSpan, commitMetadataSupplier.get());
-    } catch (RuntimeException e) {
-      log.debug("commit metadata supplier failed (best-effort)", e);
-    }
-    try (Scope ignored = batchSpan.makeCurrent()) {
-      processBatchInner(jobs, batchSpan);
+      batchSpan = maybeSpan("indexing.batch");
+      batchSpan.setAttribute("batch.polled", (long) jobs.size());
+      try {
+        io.justsearch.indexerworker.services.CommitMetadataSpanAttrs.applyTo(
+            batchSpan, commitMetadataSupplier.get());
+      } catch (RuntimeException e) {
+        log.debug("commit metadata supplier failed (best-effort)", e);
+      }
+      try (Scope ignored = batchSpan.makeCurrent()) {
+        processBatchInner(jobs, batchSpan);
+      }
+    } catch (VirtualMachineError failure) {
+      fatal = true;
+      throw failure;
     } finally {
+      // A stopped/failed batch may not visit every polled claim. Written claims retain their
+      // existing commit owner; the remainder return only after synchronous batch execution exits.
+      if (!fatal) journal.returnBatchClaims(jobs);
       batchSpan.end();
     }
   }
@@ -935,8 +949,9 @@ public class IndexingLoop implements Closeable {
         } else {
           embedSpan.setAttribute("embed.success", false);
         }
-      } catch (RuntimeException e) {
-        log.debug("Batch embedding failed, falling back to per-doc: {}", e.getMessage());
+      } catch (RuntimeException | Error e) {
+        if (e instanceof VirtualMachineError fatal) throw fatal;
+        log.warn("Batch embedding failed, falling back to per-doc", e);
         embedSpan.setAttribute("embed.success", false);
         embedSpan.setAttribute("embed.error", e.getMessage());
       } finally {

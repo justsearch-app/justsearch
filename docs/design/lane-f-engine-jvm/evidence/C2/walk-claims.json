@@ -1,0 +1,294 @@
+{
+  "base": "0123adb1f6e5e5e0478d5b74a7b21e9535095848",
+  "status": "WIP C2-8d.2a; real producer, accounting, seal and recovery remain open",
+  "environment": "Windows, local worktree lane-f-pr1-verify",
+  "evidenceRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp",
+  "runs": {
+    "walk-projection-focused1542": {
+      "revision": "84f70806c-dirty",
+      "command": "./gradlew.bat :modules:worker-core:spotlessApply :modules:indexer-worker:test --tests *RecordedWalkProjectionTest",
+      "summary": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "walk-claims-focused1543": {
+      "revision": "84f70806c+dirty",
+      "command": "gradlew worker-core/indexer-worker/worker-services spotlessApply; indexer-worker tests RecordedWalkProjectionTest,BatchClaimExitTest,AdmissionRevisionTest; worker-services tests IngestionOutcomeJournalClaimTest,IndexingLoopTest",
+      "summary": {
+        "tests": 93,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 17
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 71,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        }
+      ]
+    },
+    "walk-claims-integrated1544": {
+      "revision": "0123adb1f+dirty",
+      "command": "gradlew worker-core/indexer-worker/worker-services spotlessApply,test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 2204,
+        "failures": 9,
+        "errors": 0,
+        "skipped": 20,
+        "suites": 426
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 503,
+          "failures": 9,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 86
+        },
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1359,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        }
+      ]
+    },
+    "walk-claims-corrections1545": {
+      "revision": "0123adb1f+dirty",
+      "command": "gradlew indexer-worker/worker-services spotlessApply; indexer-worker tests JobQueueMigrationTest,JobQueueRetryLadderTest,JobQueueTest,CommittedContentHashTest,OperationQueueOwnershipTest; worker-services pmdTest",
+      "summary": {
+        "tests": 100,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 6
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 100,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        }
+      ]
+    },
+    "walk-claims-negative1546": {
+      "revision": "0123adb1f+controlled-negative",
+      "command": "gradlew indexer-worker BatchClaimExitTest; worker-services two IndexingLoopTest batch-exit cases",
+      "summary": {
+        "tests": 14,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      },
+      "tasks": [
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 12,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "walk-claims-integrated1547": {
+      "revision": "0123adb1f+dirty",
+      "command": "gradlew worker-core/indexer-worker/worker-services test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 2204,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 20,
+        "suites": 426
+      },
+      "tasks": [
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "FROM-CACHE",
+          "tests": 1359,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 503,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 86
+        }
+      ]
+    },
+    "walk-claims-reset1548": {
+      "revision": "0123adb1f+dirty",
+      "command": "gradlew indexer-worker BatchClaimExitTest; worker-services IngestionOutcomeJournalClaimTest,IndexingLoopTest; affected PMD and whole Spotless",
+      "summary": {
+        "tests": 89,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 15
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 76,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        }
+      ]
+    },
+    "walk-claims-final1549": {
+      "revision": "0123adb1f+dirty",
+      "command": "gradlew worker-core/indexer-worker/worker-services test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 2206,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 20,
+        "suites": 426
+      },
+      "tasks": [
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 504,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 86
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1360,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        }
+      ]
+    }
+  },
+  "negativeRestoration": [
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java",
+      "backup": "tmp\\claim-negative1546-0.java",
+      "sha256": "7e2faa2cd17941335c90aaa7e77373a846252d0aca03d13fc72e78f7e9c796e5"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java",
+      "backup": "tmp\\claim-negative1546-1.java",
+      "sha256": "fafacf64c130e9dee1261f7c9ddce29df9d03a7e17d046ac6baf5c863c1cb68a"
+    }
+  ]
+}

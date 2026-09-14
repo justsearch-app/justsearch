@@ -303,8 +303,10 @@ implemented in app-observability, and the same instance is injected into the app
 composition before asynchronous startup. It closes after the index half drains. The schema starts
 at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 bytes
 for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
-history fence; `jobs.db` independently uses version 16, retaining nullable `jobs.content_hash`
-for legacy rows and adding an opaque revision to each accepted switch-buffer replacement.
+history fence; `jobs.db` independently uses version 18. Versions 15–17 retain nullable
+`jobs.content_hash` for legacy rows and add opaque revisions to switch-buffer replacements
+and queue admissions. Version 18 adds the finite-walk projection schema and epoch primitives;
+producer integration and terminal walk receipts remain under implementation.
 Replay removes only the versions it applied and committed, preserving admissions that arrive
 during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
 roll back both.
