@@ -864,6 +864,15 @@
       "guard": "test:SettingsResetPreparationTest",
       "consumesProjection": "operation-record-type",
       "note": "Fixed C2-6 reset metadata decoder binds the existing accepted row and private prepared envelope; no settings or operation state write authority."
+    },
+    {
+      "id": "recorded-ingest-plan-resolver",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/RecordedIngestPlanResolver.java",
+      "guard": "test:RecordedIngestPlanResolverTest",
+      "consumesProjection": "operation-record-type",
+      "note": "C2-8d.1 verifies the existing accepted operation row and prepared invocation to derive its frozen root plan. It owns neither acceptance nor lifecycle state, and does not grant recovery authority."
     }
   ]
 }

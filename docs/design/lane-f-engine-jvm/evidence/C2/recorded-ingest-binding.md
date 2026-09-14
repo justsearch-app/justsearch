@@ -74,3 +74,9 @@ same-named .txt logs. Retain through2026-10-14 or acceptance plus30 days, whiche
 later. These are accessible local evidence, not hosted/platform proof. Hosted CI and
 CLA for the preceding admission-revision commit128a0c945 both passed (CI34809851127,
 CLA34809849392); they do not verify this dirty binding change.
+
+### Hosted declaration correction (2026-09-14)
+
+Revision 84f70806c hosted CI [34812687837](https://github.com/justsearch-app/justsearch/actions/runs/34812687837) failed the operation-surface register gate: RecordedIngestPlanResolver referenced the accepted operation record without declaring its consumer relationship. CLA run 34812685916 passed. This is a real missing declaration, not runner congestion. Local reproduction returned exactly operation-surface/undeclared-surface for that resolver. The correction registers it as an operation-record-type consumer with RecordedIngestPlanResolverTest as its guard; it introduces no independent record authority. Raw hosted output is in tmp/binding-hosted1543.json and tmp/binding-hosted-failed1543.txt under this worktree, with the same retention limit as the preceding proof.
+
+After the declaration, the same three gates passed locally with zero findings. Required hosted proof on the correction remains pending.
