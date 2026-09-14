@@ -56,6 +56,19 @@ final class ExcludeMatcher {
     }
   }
 
+  /** Recorded writes cannot silently replace an unreadable policy with an empty one. */
+  static ExcludeMatcher fromRawJsonStrict(String rawJson, boolean windows) {
+    if (rawJson == null || rawJson.isBlank()) return empty();
+    var value = EXCLUDE_JSON.readTree(rawJson);
+    if (!value.isArray()) throw new IllegalArgumentException("Exclude policy must be a string array");
+    List<String> globs = new ArrayList<>();
+    for (var entry : value) {
+      if (!entry.isString()) throw new IllegalArgumentException("Exclude policy must be a string array");
+      globs.add(entry.asString());
+    }
+    return fromPatterns(globs, windows);
+  }
+
   static ExcludeMatcher fromPatterns(List<String> globs, boolean windows) {
     if (globs == null || globs.isEmpty()) {
       return empty();

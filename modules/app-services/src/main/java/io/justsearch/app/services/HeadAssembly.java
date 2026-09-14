@@ -519,7 +519,7 @@ public final class HeadAssembly implements AutoCloseable {
                             attempts,
                             this.lateBindings,
                             () -> this.knowledgeClient,
-                            this::currentKnowledgeServer, operationLeases)))
+                            this::currentKnowledgeServer, operationLeases, recordedIngestion, authority.roots())))
             .orThrow();
     long t_service_1 = System.currentTimeMillis();
     this.serviceOut = serviceOut;
@@ -658,7 +658,7 @@ public final class HeadAssembly implements AutoCloseable {
                     // the allowlisted entrypoint, parsed downstream (app-services may not read env).
                     io.justsearch.app.services.mcphost.McpHostConfig.fromPath(
                         io.justsearch.configuration.EnvRegistry.MCP_HOST_CONFIG.getPath()),
-                    new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager), authority))
+                    new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager), authority, recordedIngestion))
             .orThrow();
 
 
@@ -937,7 +937,8 @@ public final class HeadAssembly implements AutoCloseable {
                   this.memoryStore,
                   this.scanProgressRegistry,
                   scanRollupLedgerOrNull(),
-                  this.services.worker().documents());
+                  this.services.worker().documents(), recordedIngestion, authority.roots(),
+                  () -> this.knowledgeClient);
             });
     bootTraceBuilder.record(
         io.justsearch.app.services.bootstrap.PhaseRecord.lazyPending(

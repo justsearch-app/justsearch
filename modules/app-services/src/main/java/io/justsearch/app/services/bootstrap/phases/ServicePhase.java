@@ -97,7 +97,8 @@ public final class ServicePhase {
       // abort an in-progress VDU batch if the user becomes active mid-run) — same live-reference
       // rationale as knowledgeClientSupplier above.
       Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier,
-      OperationLeaseService operationLeases) {}
+      OperationLeaseService operationLeases,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots) {}
 
   /**
    * Inference-manager teardown handles (tempdoc 737 Phase 1). Bundles the GPU-broadcast listener
@@ -262,7 +263,7 @@ public final class ServicePhase {
             in.indexingService(),
             onlineAiService,
             in.lambdaMartReranker(),
-            in.documentService());
+            in.documentService(), in.recordedIngestion(), in.recordedRoots(), in.indexingServiceSupplier());
 
     // §31 Step 1.1: ExcludesService constructed via supplier-aware IndexingService.
     ExcludesService excludes = new ExcludesServiceImpl(in.indexingServiceSupplier());

@@ -177,3 +177,8 @@ runs: that case passes, with no exemption; the task executes36 cases/16 suites i
 the mandatory architecture guards. This establishes the binding clears that
 local source-reachability check; the new commit still requires hosted CI. The prior full1826
 XML was copied before this focused run. Final1832 canonical/skills/link checks also pass.
+
+Hosted0431bbe74: all13 jobs in CI34900811163 pass, including the formerly failing app-ui
+unreferenced-code guard; CLA34900809246 also passes. Exact head/status/job inventory is retained
+in tmp/1835-hosted.json and1836-hosted.json. This closes this commit's hosted check, not the
+remaining C2 public-handler/live/model/installed acceptance.

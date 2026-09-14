@@ -98,7 +98,8 @@ public final class SubstratePhase {
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
       List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher,
-      io.justsearch.app.services.bootstrap.OperationAuthority authority) {
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion) {
     try {
       return new io.justsearch.app.services.bootstrap.PhaseOutcome.Ready<>(
           runInternal(
@@ -120,7 +121,7 @@ public final class SubstratePhase {
               agentTools,
               capabilityResolver,
               operationLeaseService,
-              mcpServers, preparationCipher, authority));
+              mcpServers, preparationCipher, authority, recordedIngestion));
     } catch (RuntimeException e) {
       return io.justsearch.app.services.bootstrap.PhaseOutcome.Failed.of(e);
     }
@@ -153,7 +154,8 @@ public final class SubstratePhase {
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
       List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher,
-      io.justsearch.app.services.bootstrap.OperationAuthority authority) {
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion) {
     // Operation registry inputs (consumed by OperationSubstrateInit).
     HandlerRegistry operationHandlers = new HandlerRegistry();
     OperationHandlerRegistrations.registerWorker(
@@ -170,7 +172,7 @@ public final class SubstratePhase {
         policyServiceSupplier,
         runtimeSpecStoreSupplier,
         runtimeReconcilerSupplier,
-        operationLeaseService);
+        operationLeaseService, recordedIngestion, authority.roots());
     AgentToolHandlers.registerEager(operationHandlers, agentTools);
     // Tempdoc 560 WS4 — the operation-catalog collapse + two-phase composition. Core + agent-tools +
     // the MCP-host's contributions compose into the ONE ContributionRegistry, and capability-derived

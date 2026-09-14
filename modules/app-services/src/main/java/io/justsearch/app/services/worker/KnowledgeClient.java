@@ -891,6 +891,13 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return raw == null ? "" : raw;
     }
 
+    /** Freeze the resolved effective policy for a recorded write; unavailable authority refuses. */
+    public static List<String> captureRecordedExcludePatterns() {
+        var store = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+        if (store == null) throw new IllegalStateException("Recorded exclusion policy is unavailable");
+        return ExcludeMatcher.fromRawJsonStrict(store.get().ui().excludePatterns(), PlatformPaths.isWindows()).patterns();
+    }
+
     private ExcludeMatcher getExcludeMatcher() {
         boolean windows = PlatformPaths.isWindows();
         // String-equality cache on the raw JSON, unchanged: a resolved value is the same kind of

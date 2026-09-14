@@ -14,6 +14,9 @@ import io.justsearch.app.api.knowledge.FolderFilesResponse;
 import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponseBuilder;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
+import io.justsearch.app.api.operations.RecordedIngestionService;
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -174,32 +177,18 @@ final class AgentToolPathRoundTripTest {
     Files.createDirectories(realFile.getParent());
     Files.writeString(realFile, "the file the model named");
 
-    var accepted = new java.util.ArrayList<Path>();
-    IngestTool.IngestCallback ingest =
-        (files, collection, context) -> {
-          accepted.addAll(files);
-          return new io.justsearch.app.api.knowledge.KnowledgeIngestResponse(files.size(), null);
-        };
-    IngestTool tool =
-        new IngestTool(
-            ingest,
-            (rootPath, collection, excludeGlobs, context) ->
-                new io.justsearch.app.api.knowledge.KnowledgeIngestResponse(0, "no scan expected"),
-            context ->
-                List.of(
-                    new BrowseTool.RootInfo(emptyDocsRoot.toString(), "docs"),
-                    new BrowseTool.RootInfo(otherRoot.toString(), "B")));
+    var bindings = List.of(
+        new IngestCollectionPolicy.RootBinding(emptyDocsRoot, null),
+        new IngestCollectionPolicy.RootBinding(otherRoot, null));
+    IngestTool tool = new IngestTool(RecordedIngestionService.unavailable(),
+        ignored -> bindings, ignored -> "generation-1", List::of);
 
-    OperationResult result = tool.execute("{\"paths\":[\"docs/x.md\"]}", EngineContextTestFixtures.AGENT_LOOP);
+    var prepared = tool.prepare("{\"paths\":[\"docs/x.md\"]}",
+        io.justsearch.agent.api.registry.InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+        EngineContextTestFixtures.AGENT_LOOP);
+    var plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
 
-    assertTrue(result.success(), result.message());
-    assertFalse(
-        result.message().contains("skipped"),
-        "the named file exists under an indexed root; skipping it is the name-collision bug: "
-            + result.message());
-    assertEquals(
-        List.of(realFile.normalize()),
-        accepted,
+    assertEquals(realFile.toAbsolutePath().normalize(), plan.roots().get(0).path(),
         "resolution must fall through a name match that does not exist, to the path that does");
   }
 }

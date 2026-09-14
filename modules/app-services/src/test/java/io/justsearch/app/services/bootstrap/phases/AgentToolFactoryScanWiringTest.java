@@ -134,7 +134,10 @@ final class AgentToolFactoryScanWiringTest {
               null,
               registry,
               ledger,
-              mock(DocumentService.class));
+              mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
 
       assertTrue(registered, "registration ran (prerequisites met)");
       assertSame(registry, boundField(adapter, "scanProgressRegistry"));
@@ -172,7 +175,10 @@ final class AgentToolFactoryScanWiringTest {
             client,
             OnlineAiService.unavailable(),
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     AgentToolHandlers.registerEager(eager, eagerTools);
 
     HandlerRegistry lateBound = new HandlerRegistry();
@@ -192,7 +198,10 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             null,
-            mock(DocumentService.class)),
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class)),
         "late-bound registration ran (prerequisites met)");
 
     assertEquals(
@@ -235,7 +244,10 @@ final class AgentToolFactoryScanWiringTest {
             client,
             OnlineAiService.unavailable(),
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     AgentToolHandlers.registerEager(registry, eagerTools);
     assertTrue(
         registry.resolve(AgentToolsOperationCatalog.SEARCH_INDEX).isPresent(),
@@ -261,7 +273,10 @@ final class AgentToolFactoryScanWiringTest {
             MemoryStore.noop(),
             null,
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertTrue(lateBoundRan, "late-bound registration must run: all prerequisites are satisfied");
 
     assertEquals(
@@ -296,7 +311,10 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertSame(existing, reused.agentSearchAdapter(), "a supplied adapter is reused, not replaced");
 
     AgentToolFactory.Output fresh =
@@ -312,7 +330,10 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertNotNull(fresh.agentSearchAdapter(), "a fresh adapter is built when none is supplied");
     assertNotSame(existing, fresh.agentSearchAdapter());
   }
@@ -336,7 +357,10 @@ final class AgentToolFactoryScanWiringTest {
               null,
               registry,
               ledger,
-              mock(DocumentService.class));
+              mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
 
       assertSame(registry, boundField(out.agentSearchAdapter(), "scanProgressRegistry"));
       assertSame(ledger, boundField(out.agentSearchAdapter(), "scanRollupLedger"));
@@ -356,7 +380,10 @@ final class AgentToolFactoryScanWiringTest {
             client,
             OnlineAiService.unavailable(),
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertNotNull(out.agentSearchAdapter());
     assertNotNull(out.fileOperationLog());
     assertNotNull(out.fileOperationsTool());
@@ -395,7 +422,10 @@ final class AgentToolFactoryScanWiringTest {
             mock(KnowledgeClient.class),
             OnlineAiService.unavailable(),
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertNull(out.agentSearchAdapter());
     assertNull(out.fileOperationsTool());
     assertNull(out.searchTool());
@@ -449,7 +479,10 @@ final class AgentToolFactoryScanWiringTest {
             existing,
             null,
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertSame(existing, reused.fileOperationLog(), "a supplied journal is reused, not replaced");
 
     AgentToolFactory.Output fresh =
@@ -465,7 +498,10 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertNotNull(fresh.fileOperationLog(), "a fresh journal is built when none is supplied");
     assertNotSame(existing, fresh.fileOperationLog());
   }

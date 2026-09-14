@@ -1,31 +1,32 @@
 # Lane F handoff: implementation orchestrator
 
-## Current state (2026-09-14)
+## Current state (2026-09-15)
 
-Current d.3b.2b [bounded recorded Engine producer](evidence/C2/recorded-engine-producer.md)
-is implemented against pushed1a75eb891 plus its per-item diff. EngineRoot binds after physical
-queue attachment; the producer reuses bounded admission and waits for actual walk and delivery
-cleanup. Failed bind/close retains unready ownership. Real SQLite/queue/Java scan integration
-covers frozen identity, force, exact provenance, receipts and replacement preserving the parent.
-Final1826 executes3,240 cases/490 suites with three existing skips and no failures/errors;
-four PMD tasks and format pass. Fault injections discriminate early completion, unready startup,
-cleanup release, rejection and deadline handling. Independent source review is clear; final
-evidence reconciliation is also clear. No dev stack or UI helper remains owned/running.
+**Paused at the user's request for low usage.** The .3a WIP checkpoint is committed/pushed
+at closeout; resume from this branch head. [Exact pause state, proof and ordered remaining work](evidence/C2/session-2026-09-15-closeout.md).
+Production/test compilation and91 focused cases pass. Independent implementation review,
+negative controls, full suites, PMD, canonical follow-through and later C2 work remain.
 
-Next .3 connects prepared ingest/reindex handlers and REST ingestion to this durable producer.
-Root is resolving preparation ownership from current code before freezing that implementation.
-Read-only discovery is tmp/recorded-handler-discovery.md; the authoritative requirements remain
-[evidence/C2/C2-8d-vertical-plan.md](evidence/C2/C2-8d-vertical-plan.md) and
-[recorded-ingest-binding.md](evidence/C2/recorded-ingest-binding.md). The older
-recorded-root-preparation.md mechanism is explicitly superseded. C2 stays open, merge remains
-at F, and root owns lifecycle, SQL, source installation, shared builds and publication.
+Pushed0431bbe74 completes the bounded Engine producer item: full1826 executes3,240 cases/490
+suites with three existing skips and zero failures/errors; independent source/evidence review,
+PMD/format and docs/governance pass. Focused1831 clears the unreferenced-method check. All13
+hosted CI34900811163 jobs and CLA34900809246 pass. [Producer proof](evidence/C2/recorded-engine-producer.md).
 
-Prerequisite recovery routing is pushed1a75eb891: final1809 passes6,589 frontend cases,
-1808 typecheck/focused checks pass, and1810 represents62 Java cases (17 new,45 cached).
-Independent source/evidence review and fixture UI checks pass; live rebuilding is not claimed.
-[Recovery proof](evidence/C2/recovery-routing.md). Hosted CI34896562458 passes12/13 jobs,
-failing the unreferenced-code guard; CLA34896560028 passes. The new producer binding still
-requires its own hosted proof. Earlier40a9a14b9/d23f1136e force/legacy prerequisites retain
+Current dirty item .3a connects prepared ingest/reindex handlers and their eager/late/replacement
+composition. The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a
+handlers, .3b REST dispatcher/consumer retirement, then .3c real vertical integration/proof.
+Root/policy snapshots and root-owned wiring are installed; isolated handler/test work is in
+progress. 1841 passes91 focused cases with no failures/errors/skips; this is not full verification. Root owns shared lifecycle,
+source integration, builds and publication. The user requested a pause; no agents or builds remain running after closeout.
+C2 remains open; merge stays at F. No dev stack or fixture UI helper remains running.
+
+The active root/child contract is [C2-8d-vertical-plan.md](evidence/C2/C2-8d-vertical-plan.md)
+and [recorded-ingest-binding.md](evidence/C2/recorded-ingest-binding.md). Historical
+recorded-root-preparation.md is superseded where it conflicts. Prerequisite recovery routing
+is pushed1a75eb891 with final6,589 frontend cases, typecheck/focused checks and62 represented
+Java cases (17 new,45 cached); source/evidence review and fixture UI checks pass.
+[Recovery proof](evidence/C2/recovery-routing.md). Its earlier hosted guard failure is resolved
+by0431bbe74. Earlier40a9a14b9/d23f1136e force/legacy prerequisites retain
 [their evidence](evidence/C2/recorded-force-compatibility.md).
 
 Recorded scan admission is pushed17d56daf0 with52 final1769 cases and independent negative proofs.

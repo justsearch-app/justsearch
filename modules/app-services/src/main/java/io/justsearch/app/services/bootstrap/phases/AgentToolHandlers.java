@@ -159,7 +159,9 @@ public final class AgentToolHandlers {
       io.justsearch.agent.api.memory.MemoryStore memoryStore,
       io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry,
       io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
-      DocumentService documentService) {
+      DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      java.util.function.Supplier<IndexingService> liveIndexing) {
     if (knowledgeClient == null || !workerCapability.available()) {
       log.warn("registerAgentToolHandlers skipped: knowledgeClient or worker capability unavailable");
       return false;
@@ -199,7 +201,7 @@ public final class AgentToolHandlers {
             existingFileOperationLog,
             scanProgressRegistry,
             scanRollupLedger,
-            documentService);
+            documentService, recordedIngestion, recordedRoots, liveIndexing);
     // Tempdoc 877 §2.10: the log line is DERIVED from what this method actually registered. It
     // used to hand-list the names, which is a second authority that drifts the moment a
     // conditional registration is skipped (READ_DOCUMENT and REMEMBER both are, below).

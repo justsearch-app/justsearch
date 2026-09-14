@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -249,5 +250,91 @@ final class WatchedRootsStateTest {
     Path injected = dataDirectory.resolve("injected").toAbsolutePath().normalize();
     roots.put(injected, Instant.parse("2026-09-14T09:00:00Z"));
     assertTrue(state.watchedPaths().contains(injected));
+  }
+
+  @Test
+  @DisplayName("snapshotBindings captures membership and nullable labels atomically and deterministically")
+  void snapshotBindingsCapturesMembershipAndLabels(@TempDir Path dataDirectory) {
+    WatchedRootsState state = WatchedRootsState.inMemory();
+    Path later = dataDirectory.resolve("z-root").toAbsolutePath().normalize();
+    Path earlier = dataDirectory.resolve("a-root").toAbsolutePath().normalize();
+
+    // Neither path exists: preparing a recorded plan must not probe filesystem availability.
+    state.register(later, "documents", true);
+    state.register(earlier, null, true);
+
+    List<IngestCollectionPolicy.RootBinding> bindings = state.snapshotBindings();
+    assertEquals(2, bindings.size());
+    assertEquals(new IngestCollectionPolicy.RootBinding(earlier, null), bindings.get(0));
+    assertEquals(new IngestCollectionPolicy.RootBinding(later, "documents"), bindings.get(1));
+  }
+
+  @Test
+  @DisplayName("snapshotBindings is detached and immutable, including null labels")
+  void snapshotBindingsIsDetachedAndImmutable(@TempDir Path dataDirectory) {
+    WatchedRootsState state = WatchedRootsState.inMemory();
+    Path root = dataDirectory.resolve("missing-root").toAbsolutePath().normalize();
+    state.register(root, null, true);
+
+    List<IngestCollectionPolicy.RootBinding> snapshot = state.snapshotBindings();
+    assertThrows(UnsupportedOperationException.class, snapshot::clear);
+    state.removeRootAndNested(root);
+
+    assertEquals(1, snapshot.size(), "later state changes must not rewrite the accepted snapshot");
+    assertEquals(new IngestCollectionPolicy.RootBinding(root, null), snapshot.getFirst());
+    assertTrue(state.snapshotBindings().isEmpty());
+  }
+
+  @Test
+  @org.junit.jupiter.api.Timeout(10)
+  void snapshotCannotObserveRegistrationBeforeItsCollectionIsPublished() throws Exception {
+    Path root = tempDir.resolve("registered").toAbsolutePath().normalize();
+    var membershipWritten = new java.util.concurrent.CountDownLatch(1);
+    var releaseRegistration = new java.util.concurrent.CountDownLatch(1);
+    var readerStarted = new java.util.concurrent.CountDownLatch(1);
+    var readerThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
+    Map<Path, Instant> map = new ConcurrentHashMap<>() {
+      private static final long serialVersionUID = 1L;
+      @Override public Instant put(Path key, Instant value) {
+        Instant old = super.put(key, value);
+        membershipWritten.countDown();
+        try {
+          if (!releaseRegistration.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            throw new AssertionError("registration was not released");
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(interrupted);
+        }
+        return old;
+      }
+    };
+    var state = new WatchedRootsState(map, new WatchedRootsStore(null, null));
+    try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var registration = executor.submit(() -> state.register(root, "documents", true));
+      try {
+        assertTrue(membershipWritten.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        var snapshot = executor.submit(() -> {
+          readerThread.set(Thread.currentThread());
+          readerStarted.countDown();
+          return state.snapshotBindings();
+        });
+        assertTrue(readerStarted.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (!snapshot.isDone() && readerThread.get().getState() != Thread.State.BLOCKED
+            && System.nanoTime() < deadline) {
+          Thread.sleep(1);
+        }
+        assertTrue(snapshot.isDone() || readerThread.get().getState() == Thread.State.BLOCKED,
+            "reader must reach either the snapshot or its writer monitor");
+        assertFalse(snapshot.isDone(), "membership without its collection must never escape preparation");
+        releaseRegistration.countDown();
+        assertTrue(registration.get(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(List.of(new IngestCollectionPolicy.RootBinding(root, "documents")),
+            snapshot.get(5, java.util.concurrent.TimeUnit.SECONDS));
+      } finally {
+        releaseRegistration.countDown();
+      }
+    }
   }
 }

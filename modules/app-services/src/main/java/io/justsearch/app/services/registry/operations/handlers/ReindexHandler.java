@@ -1,83 +1,107 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
-import io.justsearch.core.context.EngineContext;
-
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationApprovalPreview;
+import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
-import io.justsearch.app.api.IndexingService;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
+import io.justsearch.app.api.operations.RecordedIngestionService;
+import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.core.context.EngineContext;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tools.jackson.databind.JsonNode;
 
-/**
- * Handler for {@code core.reindex}.
- *
- * <p>Lightweight incremental reindex of all watched roots. Distinct from
- * {@code core.bulk-reindex} (blue/green migration). Maps to
- * {@link IndexingService#reindexWatchedRoots(boolean)}; the {@code force} arg
- * bypasses the file-mtime unchanged-detection optimization.
- *
- * <p>Slice 3a-1-2 closure: real handler for HealthView's "Reindex Now" button.
- * Pattern mirrors {@link ClearFailedJobsHandler} + {@link BulkReindexHandler}
- * (lazy {@code Supplier<IndexingService>} for the HeadAssembly init-order
- * gap).
- *
- * <p>Args shape: {@code {"force": boolean}} (optional; defaults false).
- */
+/** Freezes watched-root incremental reindex before acceptance; the recorded owner runs effects. */
 public final class ReindexHandler implements OperationHandler {
+  private final RecordedIngestionService ingestion;
+  private final Function<EngineContext, List<RootBinding>> roots;
+  private final Function<EngineContext, String> generation;
+  private final Supplier<List<String>> exclusions;
 
-  private static final Logger log = LoggerFactory.getLogger(ReindexHandler.class);
-
-  private final Supplier<IndexingService> indexingSupplier;
-
-  public ReindexHandler(Supplier<IndexingService> indexingSupplier) {
-    this.indexingSupplier = Objects.requireNonNull(indexingSupplier, "indexingSupplier");
+  public ReindexHandler(RecordedIngestionService ingestion,
+      Function<EngineContext, List<RootBinding>> roots,
+      Function<EngineContext, String> generation, Supplier<List<String>> exclusions) {
+    this.ingestion = Objects.requireNonNull(ingestion, "ingestion");
+    this.roots = Objects.requireNonNull(roots, "roots");
+    this.generation = Objects.requireNonNull(generation, "generation");
+    this.exclusions = Objects.requireNonNull(exclusions, "exclusions");
   }
 
-  @Override
-  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
-    boolean force = parseForce(argumentsJson);
-    IndexingService indexing;
-    try {
-      indexing = indexingSupplier.get();
-    } catch (RuntimeException e) {
-      log.warn("ReindexHandler: indexing service supplier threw", e);
-      return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
-    }
-    if (indexing == null) {
-      return OperationResult.failure("Indexing service unavailable");
-    }
-    try {
-      indexing.reindexWatchedRoots(force, engineContext);
-      indexing.flush(engineContext);
-      // Tempdoc 821 §3-C3 — this sentence became TRUE here. The scan now goes out as
-      // SCAN_MODE_FORCE_REINDEX, the Worker marks the admitted paths forced, and JobBatchExtractor
-      // skips its unchanged-check for them. Until then the force flag never left the Head and the
-      // message was a claim the pipeline did not honour.
-      return OperationResult.success(
-          force ? "Reindex started (force=true; bypasses mtime unchanged-check)" : "Reindex started");
-    } catch (RuntimeException e) {
-      log.error("ReindexHandler: reindexWatchedRoots threw", e);
-      return OperationResult.failure("Reindex failed: " + e.getMessage());
-    }
+  @Override public OperationResult execute(String argumentsJson, EngineContext context) {
+    throw new IllegalStateException("Reindex requires an accepted prepared invocation");
   }
 
-  /** Parse {@code force} from args JSON. Lenient: missing / wrong shape → false. */
-  private static boolean parseForce(String argumentsJson) {
-    if (argumentsJson == null || argumentsJson.isBlank()) {
-      return false;
+  @Override public OperationPreparation prepare(String argumentsJson, InvocationProvenance provenance,
+      EngineContext context) {
+    boolean force = forceOf(argumentsJson);
+    List<RootBinding> bindings = List.copyOf(roots.apply(context));
+    List<String> patterns = List.copyOf(exclusions.get());
+    String target = generation.apply(context);
+    var planned = bindings.stream().map(root -> new RecordedRootPlan.Root(
+        root.path(), root.collection(), force, false, patterns, List.of())).toList();
+    var plan = RecordedRootPlan.partition(target, planned);
+    return new OperationPreparation(argumentsJson, RecordedRootPlan.SCHEMA, plan.toReplayPayload());
+  }
+
+  @Override public void validatePreparation(OperationPreparation prepared) {
+    frozenPlan(prepared);
+  }
+
+  @Override public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+    var plan = frozenPlan(prepared);
+    String targets = plan.roots().stream().limit(6).map(root -> root.path().toString())
+        .map(path -> path.length() > 256 ? path.substring(0, 253) + "..." : path)
+        .collect(java.util.stream.Collectors.joining("\n"));
+    return new OperationApprovalPreview("Reindex " + plan.roots().size() + " watched locations"
+        + (forceOf(prepared.argumentsJson()) ? ", including unchanged files" : "")
+        + ":\n" + targets + (plan.roots().size() > 6 ? "\nAdditional locations: " + (plan.roots().size() - 6) : ""));
+  }
+
+  @Override public OperationExecution executePrepared(OperationPreparation prepared,
+      InvocationProvenance provenance, EngineContext context, OperationRecordHandle record) {
+    validatePreparation(prepared);
+    Objects.requireNonNull(record, "Accepted reindex record");
+    return ingestion.execute(record, context);
+  }
+
+  private static RecordedRootPlan frozenPlan(OperationPreparation prepared) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.content() != OperationPreparation.Content.METADATA
+        || !RecordedRootPlan.SCHEMA.equals(prepared.replaySchema())) {
+      throw new IllegalArgumentException("Reindex requires a metadata root plan");
     }
+    boolean force = forceOf(prepared.argumentsJson());
+    var plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
+    if (plan.roots().stream().anyMatch(root -> root.singleFile() || root.force() != force)) {
+      throw new IllegalArgumentException("Reindex root policy differs from its prepared invocation");
+    }
+    return plan;
+  }
+
+  private static boolean forceOf(String argumentsJson) {
+    final tools.jackson.databind.JsonNode args;
     try {
-      JsonNode root = HandlerJson.MAPPER.readTree(argumentsJson);
-      JsonNode forceNode = root.get("force");
-      return forceNode != null && forceNode.isBoolean() && forceNode.asBoolean();
-    } catch (Exception e) {
-      // Treat parse failure as force=false rather than fail the dispatch — matches
-      // existing handler-pattern leniency (PingBackendHandler ignores args entirely).
-      return false;
+      args = HandlerJson.MAPPER.readTree(argumentsJson);
+    } catch (RuntimeException invalid) {
+      throw badArguments();
     }
+    if (args == null || !args.isObject()) throw badArguments();
+    var force = args.get("force");
+    if (force != null && !force.isBoolean()) throw badArguments();
+    return force != null && force.asBoolean();
+  }
+
+  private static OperationPreparationRefused badArguments() {
+    return new OperationPreparationRefused(OperationResult.failure(
+        "Reindex arguments must be an object with an optional boolean force",
+        "BAD_REQUEST", Map.of(), false));
   }
 }

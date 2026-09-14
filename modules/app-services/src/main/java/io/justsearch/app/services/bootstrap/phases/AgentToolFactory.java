@@ -14,7 +14,6 @@ import io.justsearch.agent.tools.SearchTool;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.api.OnlineAiService;
-import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
@@ -75,7 +74,9 @@ public final class AgentToolFactory {
       IndexingService indexingService,
       OnlineAiService onlineAiService,
       LambdaMartReranker lambdaMartReranker,
-      DocumentService documentService) {
+      DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      Supplier<IndexingService> liveIndexing) {
     if (knowledgeClient == null || indexingService == null) {
       return new Output(null, fileOperationLog(dataDir), null, null, null, null, null);
     }
@@ -91,7 +92,7 @@ public final class AgentToolFactory {
         null,
         null,
         null,
-        documentService);
+        documentService, recordedIngestion, recordedRoots, liveIndexing);
   }
 
   /**
@@ -141,7 +142,9 @@ public final class AgentToolFactory {
       FileOperationLog existingFileOperationLog,
       io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry,
       io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
-      DocumentService documentService) {
+      DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      Supplier<IndexingService> liveIndexing) {
     KnowledgeHttpApiAdapter agentSearchAdapter =
         existingAdapter != null
             ? existingAdapter
@@ -182,10 +185,11 @@ public final class AgentToolFactory {
             agentSearchAdapter::listFolders, agentSearchAdapter::listFolderFiles, rootsView);
     IngestTool ingestTool =
         new IngestTool(
-            agentSearchAdapter::ingest,
-            agentSearchAdapter::scanRoot,
-            rootsView,
-            engineContext -> rootBindings(indexingService, engineContext));
+            recordedIngestion,
+            context -> recordedRoots.snapshotBindings(),
+            context -> java.util.Objects.requireNonNull(liveIndexing.get(), "Indexing service unavailable")
+                .captureServingGeneration(context),
+            KnowledgeClient::captureRecordedExcludePatterns);
     // Tempdoc 868 §B.2: the read tool rides the SAME roots view as search, so `path` validation
     // and `path_prefix` validation share one authority and one degrade-open rule. The fetch is the
     // Worker's FetchDocumentSlice via DocumentService — the Head still never reads document bytes.
@@ -226,20 +230,4 @@ public final class AgentToolFactory {
     if (scanRollupLedger != null) agentSearchAdapter.setScanRollupLedger(scanRollupLedger);
   }
 
-  /**
-   * Tempdoc 811 (C-2a) — projects the watched-root registry into the ingest-tagging authority so an
-   * agent/MCP ingest of an in-root path inherits that root's collection instead of writing an
-   * unlabeled document. Best-effort: a Worker-unavailable lookup yields an empty list, which makes
-   * every path resolve out-of-root (`mcp-ingest`).
-   */
-  static List<IngestCollectionPolicy.RootBinding> rootBindings(IndexingService indexingService, EngineContext engineContext) {
-    try {
-      return indexingService.getWatchedRoots(engineContext).stream()
-          .filter(r -> r != null && r.path() != null)
-          .map(r -> new IngestCollectionPolicy.RootBinding(r.path(), r.collection()))
-          .toList();
-    } catch (RuntimeException e) {
-      return List.of();
-    }
-  }
 }

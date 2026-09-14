@@ -3,6 +3,7 @@ package io.justsearch.agent.tools;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.registry.OperationResult;
@@ -10,7 +11,7 @@ import io.justsearch.agent.EngineContextTestFixtures;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.knowledge.FolderBrowseResponse;
-import io.justsearch.app.api.knowledge.KnowledgeIngestResponse;
+import io.justsearch.app.api.operations.RecordedIngestionService;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponseBuilder;
 import java.io.IOException;
@@ -21,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -124,27 +124,16 @@ final class AgentToolRootsDegradeTest {
   }
 
   @Test
-  @DisplayName("ingest: unusable roots never throw and never block an absolute path")
-  void ingestDegradesOpen() throws IOException {
-    Path file = tempDir.resolve("note.md");
-    Files.writeString(file, "content");
-    List<Function<EngineContext, List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
-    for (int i = 0; i < suppliers.size(); i++) {
-      var accepted = new ArrayList<Path>();
-      IngestTool.IngestCallback ingest =
-          (files, collection, context) -> {
-            accepted.addAll(files);
-            return new KnowledgeIngestResponse(files.size(), null);
-          };
-      IngestTool tool = new IngestTool(ingest, localScan(ingest), suppliers.get(i));
+  @DisplayName("ingest: unavailable roots refuse preparation")
+  void ingestRefusesWhenRootsAreUnavailable() {
+    IngestTool tool = new IngestTool(RecordedIngestionService.unavailable(),
+        ignored -> { throw new IllegalStateException("roots unavailable"); },
+        ignored -> "generation-1", List::of);
 
-      OperationResult result =
-          tool.execute(
-              "{\"paths\":[\"" + file.toString().replace("\\", "\\\\") + "\"]}", EngineContextTestFixtures.AGENT_LOOP);
-
-      assertTrue(result.success(), label(i) + " must not block an absolute path: " + result.message());
-      assertTrue(accepted.contains(file.normalize()), label(i) + " must ingest the named file");
-    }
+    assertThrows(IllegalStateException.class,
+        () -> tool.prepare("{\"paths\":[\"/tmp/note.md\"]}",
+            io.justsearch.agent.api.registry.InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+            EngineContextTestFixtures.AGENT_LOOP));
   }
 
   @Test
@@ -172,16 +161,4 @@ final class AgentToolRootsDegradeTest {
     }
   }
 
-  /** Mirrors {@code IngestToolTest}'s local-walk stand-in for the Worker-side scan RPC. */
-  private static IngestTool.ScanRootCallback localScan(IngestTool.IngestCallback ingest) {
-    return (rootPath, collection, excludeGlobs, engineContext) -> {
-      List<Path> expanded = new ArrayList<>();
-      try (Stream<Path> stream = Files.walk(Path.of(rootPath))) {
-        stream.filter(Files::isRegularFile).limit(1000).forEach(expanded::add);
-      } catch (IOException e) {
-        return new KnowledgeIngestResponse(0, e.getMessage());
-      }
-      return ingest.ingest(expanded, collection, engineContext);
-    };
-  }
 }

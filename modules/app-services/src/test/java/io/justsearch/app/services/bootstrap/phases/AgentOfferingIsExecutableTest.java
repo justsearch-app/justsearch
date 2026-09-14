@@ -95,7 +95,10 @@ final class AgentOfferingIsExecutableTest {
             client,
             OnlineAiService.unavailable(),
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     AgentToolHandlers.registerEager(operationHandlers, eagerTools);
 
     boolean lateBoundRan =
@@ -114,7 +117,10 @@ final class AgentOfferingIsExecutableTest {
             MemoryStore.noop(),
             null,
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertTrue(lateBoundRan, "late-bound registration must run with all prerequisites satisfied");
 
     // core.navigate-to-surface: registered by OperationSubstrateInit (a side effect of building

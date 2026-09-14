@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2 d.3b.3 connects prepared ingest/reindex through the existing finite owner. Snapshot membership/labels under WatchedRootsState's monitor, freeze resolved exclusions and strict generation, retain initial path classification in root-plan.v1, and retire explicit unrecorded handler/REST effects. Keyed retries and recovery consume persisted preparation. [Owning mechanism and per-item plan](evidence/C2/recorded-handler-connection.md).
+
 - 2026-09-14: C2 d.3b.2b reuses the bounded root-walk executor and existing owned delivery completion, composes their actual exits, and binds only after physical queue attachment. A failed bind/close retains unready ownership; test factories retain the same lifecycle input. [Frozen mechanism and verification](evidence/C2/recorded-engine-producer.md).
 
 - 2026-09-14: C2 d.3b.2a.3 preserves each condition's recovery arguments through the existing inverse-index projection and uses the catalog operation control for confirmation. Embedding/brake causes select full rebuild; schema causes retain incremental forced reindex. Serve the already-advertised schema from its packaged copy; connection-scoped SSE precedence prevents a late REST response from reverting the remedy. [Owning mechanism and acceptance plan](evidence/C2/recovery-routing.md).

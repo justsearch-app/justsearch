@@ -3,6 +3,7 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.ExcludesService;
@@ -69,6 +70,13 @@ final class ExcludePatternsResolutionTest {
     ConfigStore.setGlobal(new ConfigStore(builder.build()));
   }
 
+  private static void publishRawResolvedExcludePatterns(String raw) {
+    ResolvedConfigBuilder builder = ResolvedConfig.builder();
+    builder.put("justsearch.ui.exclude_patterns", ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON,
+        "settings.json", null, raw);
+    ConfigStore.setGlobal(new ConfigStore(builder.build()));
+  }
+
   @Test
   @DisplayName("ResolvedConfig.Ui exposes the settings list at ordinal 300")
   void resolvedConfigExposesTheList() {
@@ -95,6 +103,42 @@ final class ExcludePatternsResolutionTest {
     TestResolvedConfigHelper.restoreGlobal(null);
 
     assertEquals("", KnowledgeClient.resolvedExcludePatterns());
+  }
+
+  @Test
+  @DisplayName("Recorded capture refuses an unavailable exclusion policy")
+  void recordedCaptureRefusesMissingConfigStore() {
+    TestResolvedConfigHelper.restoreGlobal(null);
+
+    IllegalStateException failure = assertThrows(IllegalStateException.class,
+        KnowledgeClient::captureRecordedExcludePatterns);
+    assertEquals("Recorded exclusion policy is unavailable", failure.getMessage());
+  }
+
+  @Test
+  @DisplayName("Recorded capture refuses malformed, object, and non-string exclusion JSON")
+  void recordedCaptureRefusesMalformedShapes() {
+    publishRawResolvedExcludePatterns("{}");
+    assertThrows(IllegalArgumentException.class, KnowledgeClient::captureRecordedExcludePatterns,
+        "an object is not a recorded string-array policy");
+
+    publishRawResolvedExcludePatterns("[\"*.tmp\", 7]");
+    assertThrows(IllegalArgumentException.class, KnowledgeClient::captureRecordedExcludePatterns,
+        "a non-string array member is not a recorded string-array policy");
+
+    publishRawResolvedExcludePatterns("[broken");
+    assertThrows(RuntimeException.class, KnowledgeClient::captureRecordedExcludePatterns,
+        "malformed JSON must refuse instead of becoming an empty policy");
+  }
+
+  @Test
+  @DisplayName("Recorded capture uses resolved settings and preserves strict normalization")
+  void recordedCaptureUsesResolvedSettingsAndNormalization() {
+    publishRawResolvedExcludePatterns("[\"  **\\\\cache\\\\** \",\"*.LOG\",\"*.LOG\"]");
+
+    assertEquals(List.of("**/cache/**", "**/*.LOG"),
+        KnowledgeClient.captureRecordedExcludePatterns());
+    assertNull(System.getProperty(KEY), "recorded capture must not consult a promoted sysprop");
   }
 
   @Test

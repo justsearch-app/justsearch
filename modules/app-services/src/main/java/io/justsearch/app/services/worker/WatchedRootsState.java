@@ -36,6 +36,13 @@ public final class WatchedRootsState {
     return java.util.List.copyOf(watchedRoots.keySet());
   }
 
+  /** Atomic membership/label projection for pure recorded preparation; no availability probe. */
+  public synchronized java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> snapshotBindings() {
+    return watchedRoots.keySet().stream().sorted()
+        .map(path -> new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(path, collections.get(path)))
+        .toList();
+  }
+
   Map<Path, Instant> rootsMap() { return watchedRoots; }
 
   private final Map<Path, Instant> watchedRoots;

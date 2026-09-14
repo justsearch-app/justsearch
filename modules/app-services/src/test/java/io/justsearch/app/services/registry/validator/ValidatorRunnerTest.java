@@ -82,7 +82,8 @@ final class ValidatorRunnerTest {
     handlers.register(
         CoreOperationCatalog.REINDEX,
         new io.justsearch.app.services.registry.operations.handlers.ReindexHandler(
-            io.justsearch.app.api.IndexingService::unavailable));
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            context -> java.util.List.of(), context -> "generation-test", java.util.List::of));
     // Tempdoc 626 §Recency added core.reconcile-root to CoreOperationCatalog; register its handler so
     // ExecutorBindingValidator resolves the binding (the validator does not invoke handlers). Mirrors
     // the production wiring in OperationHandlerRegistrations.
