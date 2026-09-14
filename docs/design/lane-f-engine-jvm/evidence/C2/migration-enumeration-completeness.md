@@ -78,3 +78,21 @@ It identifies direct pause-metadata assertions as unperformed; the unchanged man
 those fields, while executed regression proves paused failure persistence and Blue retention.
 This final change affects failure consumption, not the normal installed-success path exercised
 by1605; final-head failure-path proof is recorded separately from that installed run.
+
+
+## Hosted reconciliation after reboot (2026-09-14)
+
+[CI34830819900](https://github.com/justsearch-app/justsearch/actions/runs/34830819900)
+tested pushed revision `13207a960993e11fe5dad1c15e446adbf8c1e2dd`: all13 jobs
+succeeded, including the advisory integration job. The downloaded
+`unit-test-attribution-search-worker` artifact identifies Ubuntu24. Its
+MigrationEnumerationCompletenessTest XML has23 executed cases, zero skips/failures/errors,
+including the POSIX unreadable-root case and both root/nested symbolic-link cases.
+CutoverRestartEvidenceTest has6 executed cases, zero skips/failures/errors. This closes
+the three Windows filesystem proof limits for the committed migration correction.
+
+Accessible XML and attribution are retained in
+`F:/justsearch-public/tmp/resume1611-hosted-artifact/`, under the artifact's
+`modules/indexer-worker/build/test-results/test/` and `build/ci/` paths. Run metadata is
+`F:/justsearch-public/tmp/resume1611-hosted-run.json`. Retain through final lane reconciliation
+plus30 days, at least2026-10-14. Subsequent dirty closure/sealing changes are not covered.
