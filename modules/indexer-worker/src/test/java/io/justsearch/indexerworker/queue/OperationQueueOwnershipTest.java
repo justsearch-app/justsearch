@@ -47,7 +47,8 @@ final class OperationQueueOwnershipTest {
       queue.open();
       queue.enqueue(List.of(temp.resolve("document.txt")));
       var claim = queue.pollPending(1).getFirst();
-      var forged = new JobQueue.IndexJob(claim.path(), claim.collection(), claim.provenance());
+      var forged = new JobQueue.IndexJob(
+          claim.path(), claim.collection(), claim.provenance(), claim.scanId(), claim.unitRevision());
       assertEquals(claim, forged, "record value equality is deliberately insufficient");
       assertFalse(queue.markClaimDone(forged, success(), null));
       var transition = new JobQueue.IngestionLedgerTransition(claim, null);

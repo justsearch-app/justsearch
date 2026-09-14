@@ -29,8 +29,15 @@ public interface JobQueue extends Closeable {
    * @param path the file path to index
    * @param collection collection tag for the indexed document, or null for default
    * @param provenance admission attribution, or null for an unknown legacy origin
+   * @param scanId durable admitting scan, or null for rowless maintenance
+   * @param unitRevision opaque durable admission identity; unchanged by retry or recovery
    */
-  record IndexJob(Path path, String collection, EnqueueProvenance provenance) {
+  record IndexJob(Path path, String collection, EnqueueProvenance provenance,
+      String scanId, String unitRevision) {
+    /** Legacy/internal fixture without a durable admission witness. */
+    public IndexJob(Path path, String collection, EnqueueProvenance provenance) {
+      this(path, collection, provenance, null, null);
+    }
     /** Legacy/internal fixture with unknown admission attribution. */
     public IndexJob(Path path, String collection) {
       this(path, collection, null);

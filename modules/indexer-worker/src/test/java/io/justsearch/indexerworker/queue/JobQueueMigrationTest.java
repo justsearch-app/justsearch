@@ -925,9 +925,9 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(16, rs.getInt(1));
+        assertEquals(17, rs.getInt(1));
       }
-      assertEquals(16, SqliteSchema.TARGET_VERSION);
+      assertEquals(17, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -1040,7 +1040,7 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(16, rs.getInt(1));
+        assertEquals(17, rs.getInt(1));
       }
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity)")) {
@@ -1119,7 +1119,7 @@ final class JobQueueMigrationTest {
         Statement statement = db.createStatement()) {
       try (ResultSet version = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(version.next());
-        assertEquals(16, version.getInt(1));
+        assertEquals(17, version.getInt(1));
       }
       assertTrue(hasColumn(statement, "content_hash"));
       try (ResultSet row = statement.executeQuery(

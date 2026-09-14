@@ -104,6 +104,14 @@ not the current file, representation generation, or completion of a containing o
 
 ### Crash recovery
 
+Each queue admission also has a durable opaque `unit_revision` (jobs schema v17). Enqueue
+and deliberate re-enqueue mint a fresh revision; claim, deferral, failure and crash recovery
+preserve it. A claimed job carries its scan id and revision. Completion of a claimed job requires both the
+exact live claim object and the matching durable PROCESSING row, scan id and revision, so a
+superseded admission cannot certify a replacement. This revision is an admission witness;
+path plus source content hash remains the effect identity. It does not yet provide
+operation-scoped boot eligibility or root-walk completion.
+
 On startup, `recoverStuckJobs()` resets all `PROCESSING` jobs back to `PENDING`. This heals incomplete work from a prior crash without burning retry budget (since `attempts` = failures, not claims).
 
 The indexing loop is also resilient *in-process*: a per-document `Error` (for example a plugin `LinkageError`, `AssertionError`, or `IOError`) is logged and the loop continues to the next batch. A fatal `VirtualMachineError` or uncaught loop-thread failure publishes `LoopState.FAILED` and clears liveness before logging. Core status reports `indexState=FAILED` and `indexHealthy=false`; the index health port exposes the failed loop state while serving readiness remains independently probed. Ordinary document `ERROR`, deferred startup, and intentional quiescence remain distinct. A new loop start clears the fatal state.

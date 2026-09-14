@@ -25,6 +25,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V14: Added nullable admission originator/transport to jobs and ingestion_ledger (lane F C1)</li>
  *   <li>V15: Added nullable content_hash to jobs for idempotent unit recovery (lane F C2)</li>
  *   <li>V16: Added switch-buffer replacement identity for conditional replay removal (lane F C2)</li>
+ *   <li>V17: Added stable queue admission revisions for operation recovery (lane F C2)</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -37,7 +38,13 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 16;
+  public static final int TARGET_VERSION = 17;
+
+  /** An admission identity survives retries; a real replacement receives a new identity. */
+  public static final String MIGRATE_V16_TO_V17_UNIT_REVISION =
+      "ALTER TABLE jobs ADD COLUMN unit_revision TEXT NOT NULL DEFAULT ''";
+  public static final String BACKFILL_UNIT_REVISIONS =
+      "UPDATE jobs SET unit_revision = lower(hex(randomblob(16))) WHERE unit_revision = ''";
 
   /** An opaque identity for each accepted buffer replacement, independent of wall-clock time. */
   public static final String MIGRATE_V15_TO_V16_SWITCH_REVISION =
@@ -85,7 +92,8 @@ public final class SqliteSchema {
         first_failed_at INTEGER,
         originator TEXT,
         transport TEXT,
-        content_hash TEXT
+        content_hash TEXT,
+        unit_revision TEXT NOT NULL DEFAULT ''
       )
       """;
 

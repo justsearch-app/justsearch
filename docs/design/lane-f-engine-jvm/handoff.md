@@ -36,9 +36,14 @@ integrated1525 executes2,179 cases/423 suites, 20 existing skips, zero failures/
 PMD/format pass. Combined and isolated shutdown negatives are preserved; final1527
 restores the exact production source and passes65 cases. [Proof and limits](evidence/C2/committed-content-hash.md).
 Hosted CI34807238861 (all13 jobs) and CLA34807236808 pass at07813a14a.
+C2-8c admission revisions and reenqueue ownership preservation are locally verified:
+final1533 represents2,186 cases/424 suites,20 existing skips, zero failures/errors;
+PMD/format pass. Focused1530, discriminating negative1531 and the corrected version-pin
+failure1532 are preserved. [Proof and limitations](evidence/C2/admission-revision.md).
+PR727 managed review record is verified through07813a14a and design a5f1a0fa8.
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is
-C2-8c durable admission revisions, C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then
+C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then
 required integrated/live/model/installed/final-head proofs and D1/D2/E/F. Root makes
 remaining mechanism/merge decisions; no owner reply is pending.
 

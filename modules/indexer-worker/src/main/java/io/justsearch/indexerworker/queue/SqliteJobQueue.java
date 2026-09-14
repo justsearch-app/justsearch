@@ -17,6 +17,7 @@ import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.HashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
@@ -432,14 +433,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // there, the re-enqueue re-stats the file, so its silence really does mean unknown.
       String sql = """
           INSERT OR REPLACE INTO jobs
-            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport)
+            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision)
           VALUES (
             ?, 'PENDING', 0, ?,
             COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
             ?,
             COALESCE(?, (SELECT prior.scan_id FROM jobs prior WHERE prior.path = ?)),
             COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
-            COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)))
+            COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
+            lower(hex(randomblob(16))))
           """;
 
       long now = System.currentTimeMillis();
@@ -526,23 +528,35 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 }
               }
             }
-            // Same statement and same column list as enqueueEntries — the unlisted columns are the
-            // reset that revives a RETRY_EXHAUSTED row with a fresh retry window.
+            // A deliberate retry is a new admission with a fresh retry window and revision.
+            // Same-admission failure/recovery updates preserve the existing revision.
             String sql =
                 """
                 INSERT OR REPLACE INTO jobs
-                  (path, state, attempts, last_updated, collection, size_bytes, scan_id)
-                VALUES (?, 'PENDING', 0, ?, NULL, ?, NULL)
+                  (path, state, attempts, last_updated, collection, size_bytes, scan_id,
+                   originator, transport, unit_revision)
+                VALUES (?, 'PENDING', 0, ?,
+                  (SELECT prior.collection FROM jobs prior WHERE prior.path = ?), ?,
+                  (SELECT prior.scan_id FROM jobs prior WHERE prior.path = ?),
+                  COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
+                  COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
+                  lower(hex(randomblob(16))))
                 """;
             int accepted;
             try (PreparedStatement write = connection.prepareStatement(sql)) {
               write.setString(1, normalizedPath);
               write.setLong(2, System.currentTimeMillis());
+              write.setString(3, normalizedPath);
               if (entry.sizeBytes() >= 0) {
-                write.setLong(3, entry.sizeBytes());
+                write.setLong(4, entry.sizeBytes());
               } else {
-                write.setNull(3, java.sql.Types.INTEGER);
+                write.setNull(4, java.sql.Types.INTEGER);
               }
+              write.setString(5, normalizedPath);
+              write.setString(6, entry.provenance() == null ? null : entry.provenance().originator());
+              write.setString(7, normalizedPath);
+              write.setString(8, entry.provenance() == null ? null : entry.provenance().transport());
+              write.setString(9, normalizedPath);
               accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
             return new JobQueue.ReenqueueResult(accepted, previousState);
@@ -573,7 +587,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       long now = System.currentTimeMillis();
 
       // Local carrier for a candidate row selected before any mutation happens.
-      record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance) {}
+      record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance,
+        String scanId, String unitRevision) {}
 
       // Claim is atomic via an explicit transaction (BEGIN/COMMIT through the existing
       // inTransaction() helper), not a single UPDATE...RETURNING statement: SQLite's RETURNING
@@ -592,7 +607,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           inTransaction(
               () -> {
                 String selectSql = """
-                    SELECT path, collection, originator, transport FROM jobs
+                    SELECT path, collection, originator, transport, scan_id, unit_revision FROM jobs
                     WHERE state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?)
                     ORDER BY last_updated ASC, path ASC
                     LIMIT ?
@@ -608,7 +623,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                       String transport = rs.getString(4);
                       claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
                           originator == null && transport == null ? null
-                              : new JobQueue.EnqueueProvenance(originator, transport)));
+                              : new JobQueue.EnqueueProvenance(originator, transport),
+                          rs.getString(5), rs.getString(6)));
                     }
                   }
                 }
@@ -645,7 +661,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
                 List<IndexJob> claimed = new ArrayList<>(claimedRows.size());
                 for (ClaimedRow row : claimedRows) {
-                  claimed.add(new IndexJob(Path.of(row.path()), row.collection(), row.provenance()));
+                  claimed.add(new IndexJob(Path.of(row.path()), row.collection(), row.provenance(),
+                      row.scanId(), row.unitRevision()));
                 }
                 return claimed;
               });
@@ -669,10 +686,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     String path = normalizePath(claim.path());
     if (activeClaims.get(path) != claim) return false;
     try (PreparedStatement query = connection.prepareStatement(
-        "SELECT state FROM jobs WHERE path = ?")) {
+        "SELECT state, scan_id, unit_revision FROM jobs WHERE path = ?")) {
       query.setString(1, path);
       try (ResultSet result = query.executeQuery()) {
-        return result.next() && STATE_PROCESSING.equals(result.getString(1));
+        return result.next() && STATE_PROCESSING.equals(result.getString(1))
+            && Objects.equals(claim.scanId(), result.getString(2))
+            && Objects.equals(claim.unitRevision(), result.getString(3));
       }
     }
   }

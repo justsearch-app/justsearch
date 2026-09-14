@@ -278,6 +278,13 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V15 to V16: Identified durable switch-buffer replacements");
       }
+      case 17 -> {
+        addColumnIfMissing(conn, "unit_revision", SqliteSchema.MIGRATE_V16_TO_V17_UNIT_REVISION);
+        try (Statement stmt = conn.createStatement()) {
+          stmt.execute(SqliteSchema.BACKFILL_UNIT_REVISIONS);
+        }
+        log.info("V16 to V17: Identified durable queue admissions");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }
