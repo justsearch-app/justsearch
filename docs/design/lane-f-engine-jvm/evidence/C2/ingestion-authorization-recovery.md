@@ -180,3 +180,51 @@ Independent refute review (`/root/walk_closure_refute`) reread the restored prod
 source and1631/1633 evidence and found no further C2-9a.1 blocker. Its grant-write
 failure finding remains explicitly owned by the next C2-9a.2 cut. Hosted7777 proves
 only the predecessor queue work, not this diff.
+
+
+### C2-9a.2 publication decision (2026-09-14)
+
+Use one volatile immutable set of the existing `DurableGrant` keys, replacing the
+two mutable per-kind key sets. One mutation lock serializes candidate construction
+and strict forced atomic file replacement; only successful replacement publishes
+the new set. Readers capture one committed snapshot; lifecycle callbacks run after
+publication and outside the lock. This removes the two private key projections
+rather than adding a journal, transaction manager or another authority. A failed
+mutation throws and leaves the prior committed state; callers must not report a
+successful revoke. Strict replacement refuses unsupported atomic rename instead
+of falling back to a partial overwrite. This does not claim physical power-loss
+parent-directory durability beyond AtomicFileWrites' documented contract.
+
+
+Review checked the existing audit fan-in (`OperationSubstrateInit` binds only
+`ActionLedgerChangeRegistry.broadcastActionEvent`). No Grant event consumer
+reconstructs current authorization from callback delivery order. The immutable
+committed set/file remains the sole authority; callbacks may interleave after
+concurrent commits. A new event-sequencing queue is therefore not part of this fix.
+
+
+### C2-9a.2 local verification (2026-09-14)
+
+Implemented at base `43fa7b3ace2f32a8a23715dd073c55f93c477a39` plus this
+publication diff, Windows x64, root-owned Gradle. The previously open live-before-disk
+defect is corrected; C2-9b integration remains open.
+
+- 1634 executed145 focused cases/7 suites, no failures/errors/skips, PMD and format
+pass. Real TempDir filesystem failures preserve committed memory and saved/reopened
+file for issuance and operation/family/non-user revocation, emit no success event,
+and permit successful restore/retry. Concurrent mixed writers retain all grants
+on reopen. Invalid loaded/issued keys fail closed.
+- 1635 deliberately published before persistence:8 executed cases, exactly two
+expected failures in failed-grant and failed-revoke state assertions.
+- 1636 restored the production file byte-for-byte to1634 and executed the full
+app-services suite:2,901 cases/430 suites, three existing skips, no failures/errors;
+PMD/format passed. Root independently verified byte equality after the run.
+- Canonical regeneration/link/config checks and store-recoverability pass in
+`tmp/1636-docs.txt` and `tmp/1636-store-gate.txt`.
+
+Independent reviewer reread production, failure/reopen tests and1634/1635 evidence:
+no remaining blocker in this correction. A proposed audit sequencing concern was
+refuted against actual consumers and did not justify another queue. No hosted
+proof for this dirty cut is claimed. Logs/counts/XML remain accessible under
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/1634*` through `tmp/1636*`,
+retained through final lane reconciliation plus30 days, at least2026-10-14.

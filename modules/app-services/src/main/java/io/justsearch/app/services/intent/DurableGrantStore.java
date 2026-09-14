@@ -16,11 +16,11 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.JsonNode;
@@ -55,27 +55,18 @@ import tools.jackson.databind.json.JsonMapper;
  * so an allow-always survives a restart (previously process-lifetime only — a restart silently dropped
  * the grant, re-prompting the user). Persistence is mode-aware ({@link PersistenceMode}): READ_WRITE for
  * real use, IN_MEMORY for prod/CI isolation and tests (the no-arg constructors). Mirrors
- * {@code UiSettingsStore} / {@code FileConversationStore}; best-effort writes (a failure is logged,
- * never alters grant semantics).
+ * {@code UiSettingsStore} / {@code FileConversationStore}. Mutations persist a candidate snapshot
+ * before publishing it to readers. A failed write throws and preserves the last committed view;
+ * lifecycle events are emitted only after successful publication.
  */
 public final class DurableGrantStore {
 
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   static final int CURRENT_SCHEMA_VERSION = 1;
 
-  /**
-   * An operation grant: allow-always for one operation from a source tier. The key is
-   * args-independent because this store answers only "was a grant issued?"; whether the grant
-   * reaches THESE arguments is {@link DurableGrantScope}'s question, asked by the executor
-   * (tempdoc 875 C.3).
-   */
-  private record OperationKey(String operationId, SourceTier sourceTier) {}
-
-  /** A family grant: allow-always for every operation in a capability family from a source tier. */
-  private record FamilyKey(String family, SourceTier sourceTier) {}
-
-  private final java.util.Set<OperationKey> grantedOps = ConcurrentHashMap.newKeySet();
-  private final java.util.Set<FamilyKey> grantedFamilies = ConcurrentHashMap.newKeySet();
+  private final Object mutationLock = new Object();
+  // The persisted read-model key is also the sole live key; no parallel per-kind indexes.
+  private volatile Set<DurableGrant> committedGrants = Set.of();
   private final Clock clock;
   /** Persistence target; {@code null} ⇒ in-memory only (tests / prod isolation). */
   private final Path persistenceFile;
@@ -120,16 +111,14 @@ public final class DurableGrantStore {
   public void grantAllowAlways(String operationId, SourceTier sourceTier) {
     Objects.requireNonNull(operationId, "operationId");
     Objects.requireNonNull(sourceTier, "sourceTier");
-    if (grantedOps.add(new OperationKey(operationId, sourceTier))) {
-      persist();
+    if (updateGrant(new DurableGrant(GrantKind.OPERATION, operationId, sourceTier), true)) {
       emit("durable:" + sourceTier + ":" + operationId, operationId, "GRANTED_ALWAYS");
     }
   }
 
   /** Revoke a single operation allow-always grant. */
   public void revoke(String operationId, SourceTier sourceTier) {
-    if (grantedOps.remove(new OperationKey(operationId, sourceTier))) {
-      persist();
+    if (updateGrant(new DurableGrant(GrantKind.OPERATION, operationId, sourceTier), false)) {
       emit("durable:" + sourceTier + ":" + operationId, operationId, "REVOKED");
     }
   }
@@ -140,16 +129,14 @@ public final class DurableGrantStore {
   public void grantFamilyAllowAlways(String family, SourceTier sourceTier) {
     Objects.requireNonNull(family, "family");
     Objects.requireNonNull(sourceTier, "sourceTier");
-    if (grantedFamilies.add(new FamilyKey(family, sourceTier))) {
-      persist();
+    if (updateGrant(new DurableGrant(GrantKind.FAMILY, family, sourceTier), true)) {
       emit("durable-family:" + sourceTier + ":" + family, family, "GRANTED_ALWAYS");
     }
   }
 
   /** Revoke a family allow-always grant. */
   public void revokeFamily(String family, SourceTier sourceTier) {
-    if (grantedFamilies.remove(new FamilyKey(family, sourceTier))) {
-      persist();
+    if (updateGrant(new DurableGrant(GrantKind.FAMILY, family, sourceTier), false)) {
       emit("durable-family:" + sourceTier + ":" + family, family, "REVOKED");
     }
   }
@@ -204,11 +191,12 @@ public final class DurableGrantStore {
     if (risk == RiskTier.HIGH) {
       return Optional.empty();
     }
-    if (grantedOps.contains(new OperationKey(operationId, sourceTier))) {
+    Set<DurableGrant> current = committedGrants;
+    if (current.contains(new DurableGrant(GrantKind.OPERATION, operationId, sourceTier))) {
       return Optional.of(new DurableGrant(GrantKind.OPERATION, operationId, sourceTier));
     }
     return capabilityFamily
-        .filter(family -> grantedFamilies.contains(new FamilyKey(family, sourceTier)))
+        .filter(family -> current.contains(new DurableGrant(GrantKind.FAMILY, family, sourceTier)))
         .map(family -> new DurableGrant(GrantKind.FAMILY, family, sourceTier));
   }
 
@@ -232,9 +220,9 @@ public final class DurableGrantStore {
     }
     return switch (selected.kind()) {
       case OPERATION -> selected.target().equals(operationId)
-          && grantedOps.contains(new OperationKey(selected.target(), selected.sourceTier()));
+          && committedGrants.contains(selected);
       case FAMILY -> capabilityFamily.filter(selected.target()::equals)
-          .map(family -> grantedFamilies.contains(new FamilyKey(family, selected.sourceTier())))
+          .map(family -> committedGrants.contains(selected))
           .orElse(false);
     };
   }
@@ -244,27 +232,17 @@ public final class DurableGrantStore {
    * Global Hard Stop drives, matching the gate's hard-stop scope.
    */
   public void revokeNonUser() {
-    boolean changed = false;
-    for (OperationKey key : List.copyOf(grantedOps)) {
-      if (key.sourceTier() == SourceTier.UNTRUSTED && grantedOps.remove(key)) {
-        changed = true;
-        emit(
-            "durable:" + key.sourceTier() + ":" + key.operationId(),
-            key.operationId(),
-            "REVOKED");
-      }
+    List<DurableGrant> revoked;
+    synchronized (mutationLock) {
+      revoked = committedGrants.stream().filter(grant -> grant.sourceTier() == SourceTier.UNTRUSTED).toList();
+      if (revoked.isEmpty()) return;
+      var candidate = new HashSet<>(committedGrants);
+      candidate.removeAll(revoked);
+      publish(candidate);
     }
-    for (FamilyKey key : List.copyOf(grantedFamilies)) {
-      if (key.sourceTier() == SourceTier.UNTRUSTED && grantedFamilies.remove(key)) {
-        changed = true;
-        emit(
-            "durable-family:" + key.sourceTier() + ":" + key.family(),
-            key.family(),
-            "REVOKED");
-      }
-    }
-    if (changed) {
-      persist();
+    for (DurableGrant grant : revoked) {
+      String prefix = grant.kind() == GrantKind.OPERATION ? "durable:" : "durable-family:";
+      emit(prefix + grant.sourceTier() + ":" + grant.target(), grant.target(), "REVOKED");
     }
   }
 
@@ -281,14 +259,7 @@ public final class DurableGrantStore {
 
   /** A snapshot of all current durable grants (operation + family) — for a management view. */
   public List<DurableGrant> snapshot() {
-    List<DurableGrant> out = new ArrayList<>(grantedOps.size() + grantedFamilies.size());
-    for (OperationKey k : grantedOps) {
-      out.add(new DurableGrant(GrantKind.OPERATION, k.operationId(), k.sourceTier()));
-    }
-    for (FamilyKey k : grantedFamilies) {
-      out.add(new DurableGrant(GrantKind.FAMILY, k.family(), k.sourceTier()));
-    }
-    return List.copyOf(out);
+    return List.copyOf(committedGrants);
   }
 
   // ── Persistence ─────────────────────────────────────────────────────────────────────────────────
@@ -323,13 +294,12 @@ public final class DurableGrantStore {
       if (grants == null) {
         throw new CorruptDurableStoreException("durable-grants", "grants payload is missing");
       }
-      for (DurableGrant g : grants) {
-        if (g.kind() == GrantKind.OPERATION) {
-          grantedOps.add(new OperationKey(g.target(), g.sourceTier()));
-        } else {
-          grantedFamilies.add(new FamilyKey(g.target(), g.sourceTier()));
+      for (DurableGrant grant : grants) {
+        if (!validKey(grant)) {
+          throw new CorruptDurableStoreException("durable-grants", "invalid grant key");
         }
       }
+      committedGrants = Set.copyOf(grants);
     } catch (CorruptDurableStoreException
         | io.justsearch.configuration.persistence.UnsupportedStoreVersionException e) {
       throw e;
@@ -339,14 +309,36 @@ public final class DurableGrantStore {
     }
   }
 
-  private void persist() {
+  private static boolean validKey(DurableGrant grant) {
+    return grant != null && grant.kind() != null && grant.target() != null && grant.sourceTier() != null
+        && !grant.target().isBlank() && grant.target().chars().noneMatch(Character::isISOControl);
+  }
+
+  private boolean updateGrant(DurableGrant grant, boolean add) {
+    if (!validKey(grant)) throw new IllegalArgumentException("Invalid durable grant key");
+    synchronized (mutationLock) {
+      var candidate = new HashSet<>(committedGrants);
+      boolean changed = add ? candidate.add(grant) : candidate.remove(grant);
+      if (changed) publish(candidate);
+      return changed;
+    }
+  }
+
+  /** Called only by the serialized mutation owner; no observer sees provisional authority. */
+  private void publish(Set<DurableGrant> candidate) {
+    Set<DurableGrant> next = Set.copyOf(candidate);
+    persist(next);
+    committedGrants = next;
+  }
+
+  private void persist(Set<DurableGrant> next) {
     if (persistenceFile == null) {
       return;
     }
     try {
-      AtomicFileWrites.replace(
+      AtomicFileWrites.replaceStrict(
           persistenceFile,
-          MAPPER.writeValueAsBytes(new PersistedState(CURRENT_SCHEMA_VERSION, snapshot())));
+          MAPPER.writeValueAsBytes(new PersistedState(CURRENT_SCHEMA_VERSION, List.copyOf(next))));
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to persist durable grants to " + persistenceFile, e);
     }

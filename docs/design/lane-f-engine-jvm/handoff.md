@@ -18,9 +18,10 @@ remains historical. Existing autonomous authorization and merge-at-F placement r
 C2-9a.1 authorization basis/selection/binding is now locally verified: full1631
 app-api/services has3,122 cases, three existing skips and no failures; negative1632
 and restored1633 pin the new guards. [Owning evidence](evidence/C2/ingestion-authorization-recovery.md).
-Next is C2-9a.2 grant persistence-before-publication, then C2-9b shared pre-poll
-authority and C2-8d.3 actual producer. Independent review found the inherited
-live-before-disk grant update defect; its fix is required before recovery activation.
+C2-9a.1 is pushed as43fa7b3ac. The C2-9a.2 grant persistence-before-publication
+correction now passes full1636 (2,901 services cases, three existing skips,
+zero failures), negative1635 and independent review. Next is C2-9b shared pre-poll
+authority and C2-8d.3 actual producer. Recovery activation remains unimplemented.
 Notification checkpoint7777be3fd passed all13 hosted jobs in CI34835832804.
 
 A/B/C1 are complete. C2 remains open; do not merge before stage F.

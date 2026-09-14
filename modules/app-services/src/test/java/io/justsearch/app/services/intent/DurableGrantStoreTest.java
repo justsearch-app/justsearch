@@ -2,6 +2,7 @@ package io.justsearch.app.services.intent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,15 +11,26 @@ import io.justsearch.agent.api.registry.SourceTier;
 import io.justsearch.app.observability.ledger.ActionEvent;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /** Tempdoc 550 thesis IV — the durable "allow-always" grant (the second Grant-model member). */
 @DisplayName("DurableGrantStore")
@@ -277,5 +289,186 @@ class DurableGrantStoreTest {
         CorruptDurableStoreException.class,
         () -> new DurableGrantStore(Clock.systemUTC(), file));
     assertEquals(malformed, Files.readString(file));
+  }
+
+  @Test
+  @DisplayName("failed grant persistence publishes neither state nor audit, then retry persists")
+  void failedGrantDoesNotPublishOrEmit(@TempDir Path dir) throws Exception {
+    Path parent = dir.resolve("ui");
+    Path file = parent.resolve("durable-grants.json");
+    DurableGrantStore store = new DurableGrantStore(Clock.systemUTC(), file);
+    store.grantAllowAlways("core.committed", SourceTier.UNTRUSTED);
+    Set<DurableGrantStore.DurableGrant> committed = snapshotOf(store);
+    List<ActionEvent> events = new ArrayList<>();
+    store.setGrantEventSink(events::add);
+
+    Path savedParent = blockParent(dir, parent);
+    try {
+      UncheckedIOException failure = assertThrows(
+          UncheckedIOException.class,
+          () -> store.grantAllowAlways("core.failed", SourceTier.UNTRUSTED));
+      assertInstanceOf(IOException.class, failure.getCause());
+      assertEquals(committed, snapshotOf(store), "failed grant is not visible in memory");
+      assertTrue(events.isEmpty(), "failed grant emits no audit event");
+      assertEquals(committed,
+          snapshotOf(new DurableGrantStore(Clock.systemUTC(), savedParent.resolve(file.getFileName()))),
+          "failed grant is absent after reopen");
+    } finally {
+      restoreParent(parent, savedParent);
+    }
+
+    store.grantAllowAlways("core.failed", SourceTier.UNTRUSTED);
+    assertTrue(store.isAllowed("core.failed", RiskTier.MEDIUM,
+        io.justsearch.app.services.TestEngineContexts.agent()));
+    assertEquals(snapshotOf(store), snapshotOf(new DurableGrantStore(Clock.systemUTC(), file)));
+    assertEquals(1, events.size(), "only the successful retry emits");
+  }
+
+  @Test
+  @DisplayName("failed operation, family, and hard-stop revokes preserve the last committed state")
+  void failedRevokesPreserveCommittedState(@TempDir Path dir) throws Exception {
+    Path parent = dir.resolve("ui");
+    Path file = parent.resolve("durable-grants.json");
+    DurableGrantStore store = new DurableGrantStore(Clock.systemUTC(), file);
+    store.grantAllowAlways("core.revoke", SourceTier.UNTRUSTED);
+    store.grantAllowAlways("core.hard-stop", SourceTier.UNTRUSTED);
+    store.grantFamilyAllowAlways("family.revoke", SourceTier.UNTRUSTED);
+    store.grantAllowAlways("core.trusted", SourceTier.TRUSTED);
+    Set<DurableGrantStore.DurableGrant> committed = snapshotOf(store);
+    List<ActionEvent> events = new ArrayList<>();
+    store.setGrantEventSink(events::add);
+
+    Path savedParent = blockParent(dir, parent);
+    try {
+      UncheckedIOException operationFailure = assertThrows(
+          UncheckedIOException.class,
+          () -> store.revoke("core.revoke", SourceTier.UNTRUSTED));
+      assertInstanceOf(IOException.class, operationFailure.getCause());
+      UncheckedIOException familyFailure = assertThrows(
+          UncheckedIOException.class,
+          () -> store.revokeFamily("family.revoke", SourceTier.UNTRUSTED));
+      assertInstanceOf(IOException.class, familyFailure.getCause());
+      UncheckedIOException hardStopFailure = assertThrows(
+          UncheckedIOException.class, store::revokeNonUser);
+      assertInstanceOf(IOException.class, hardStopFailure.getCause());
+
+      assertEquals(committed, snapshotOf(store), "failed revokes leave memory unchanged");
+      assertTrue(events.isEmpty(), "failed revokes emit no audit events");
+      assertEquals(committed,
+          snapshotOf(new DurableGrantStore(Clock.systemUTC(), savedParent.resolve(file.getFileName()))),
+          "failed revokes leave the saved file unchanged");
+    } finally {
+      restoreParent(parent, savedParent);
+    }
+
+    store.revoke("core.revoke", SourceTier.UNTRUSTED);
+    store.revokeFamily("family.revoke", SourceTier.UNTRUSTED);
+    store.revokeNonUser();
+    assertTrue(store.isAllowed("core.trusted", RiskTier.MEDIUM,
+        io.justsearch.app.services.TestEngineContexts.ui()));
+    assertEquals(1, store.snapshot().size(), "retry removes all non-user entries");
+    assertEquals(snapshotOf(store), snapshotOf(new DurableGrantStore(Clock.systemUTC(), file)));
+  }
+
+  @Test
+  @DisplayName("concurrent writers retain every committed grant after reopen")
+  void concurrentWritersDoNotLoseGrants(@TempDir Path dir) throws Exception {
+    Path file = dir.resolve("ui").resolve("durable-grants.json");
+    DurableGrantStore store = new DurableGrantStore(Clock.systemUTC(), file);
+    int writers = 12;
+    CountDownLatch ready = new CountDownLatch(writers);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService pool = Executors.newFixedThreadPool(writers);
+    List<Future<?>> futures = new ArrayList<>();
+    try {
+      for (int i = 0; i < writers; i++) {
+        int writer = i;
+        futures.add(pool.submit(() -> {
+          ready.countDown();
+          assertTrue(start.await(5, TimeUnit.SECONDS));
+          if (writer % 2 == 0) {
+            store.grantAllowAlways("core.concurrent." + writer, SourceTier.UNTRUSTED);
+          } else {
+            store.grantFamilyAllowAlways("family.concurrent." + writer, SourceTier.UNTRUSTED);
+          }
+          return null;
+        }));
+      }
+      assertTrue(ready.await(5, TimeUnit.SECONDS), "all writers reached the barrier");
+      start.countDown();
+      for (Future<?> future : futures) {
+        future.get(10, TimeUnit.SECONDS);
+      }
+    } finally {
+      pool.shutdownNow();
+      assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS), "writer pool terminated");
+    }
+
+    Set<DurableGrantStore.DurableGrant> live = snapshotOf(store);
+    assertEquals(writers, live.size());
+    assertEquals(live, snapshotOf(new DurableGrantStore(Clock.systemUTC(), file)),
+        "reopen matches the complete committed live snapshot");
+  }
+
+  @ParameterizedTest(name = "invalid persisted grant row: {0}")
+  @MethodSource("invalidPersistedGrantRows")
+  void invalidPersistedGrantRowsAreRefusedWithoutOverwrite(String grantRow, @TempDir Path dir)
+      throws Exception {
+    Path file = dir.resolve("durable-grants.json");
+    String state = "{\"schemaVersion\":1,\"grants\":[" + grantRow + "]}";
+    Files.writeString(file, state);
+
+    assertThrows(
+        CorruptDurableStoreException.class,
+        () -> new DurableGrantStore(Clock.systemUTC(), file));
+    assertEquals(state, Files.readString(file));
+  }
+
+  static List<String> invalidPersistedGrantRows() {
+    return List.of(
+        "null",
+        "{\"kind\":null,\"target\":\"core.x\",\"sourceTier\":\"UNTRUSTED\"}",
+        "{\"kind\":\"UNKNOWN\",\"target\":\"core.x\",\"sourceTier\":\"UNTRUSTED\"}",
+        "{\"kind\":\"OPERATION\",\"target\":null,\"sourceTier\":\"UNTRUSTED\"}",
+        "{\"kind\":\"OPERATION\",\"target\":\"\",\"sourceTier\":\"UNTRUSTED\"}",
+        "{\"kind\":\"OPERATION\",\"target\":\"core\\u0001x\",\"sourceTier\":\"UNTRUSTED\"}",
+        "{\"kind\":\"OPERATION\",\"target\":\"core.x\",\"sourceTier\":null}",
+        "{\"kind\":\"OPERATION\",\"target\":\"core.x\",\"sourceTier\":\"UNKNOWN\"}");
+  }
+
+  @Test
+  void invalidIssuanceLeavesCommittedFileAndViewUnchanged(@TempDir Path dir) throws Exception {
+    Path file = dir.resolve("ui").resolve("durable-grants.json");
+    DurableGrantStore store = new DurableGrantStore(Clock.systemUTC(), file);
+    store.grantAllowAlways("core.committed", SourceTier.UNTRUSTED);
+    Set<DurableGrantStore.DurableGrant> committed = snapshotOf(store);
+    String saved = Files.readString(file);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> store.grantAllowAlways("", SourceTier.UNTRUSTED));
+    assertThrows(IllegalArgumentException.class,
+        () -> store.grantAllowAlways("core" + Character.toString((char) 1) + "x",
+            SourceTier.UNTRUSTED));
+    assertThrows(IllegalArgumentException.class,
+        () -> store.grantFamilyAllowAlways("", SourceTier.UNTRUSTED));
+
+    assertEquals(committed, snapshotOf(store));
+    assertEquals(saved, Files.readString(file));
+  }
+
+  private static Set<DurableGrantStore.DurableGrant> snapshotOf(DurableGrantStore store) {
+    return Set.copyOf(store.snapshot());
+  }
+
+  private static Path blockParent(Path tempDir, Path parent) throws IOException {
+    Path savedParent = tempDir.resolve("ui-saved");
+    Files.move(parent, savedParent, StandardCopyOption.REPLACE_EXISTING);
+    Files.writeString(parent, "blocked");
+    return savedParent;
+  }
+
+  private static void restoreParent(Path parent, Path savedParent) throws IOException {
+    Files.delete(parent);
+    Files.move(savedParent, parent, StandardCopyOption.REPLACE_EXISTING);
   }
 }
