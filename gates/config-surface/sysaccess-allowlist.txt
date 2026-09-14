@@ -41,7 +41,7 @@
 # (javac's `lambda$foo$3` is normalised to `foo`), because the index shifts on unrelated edits and a
 # ratchet that cries wolf gets deleted.
 #
-# ---- entries (95 as of 2026-09-08) ----
+# ---- entries (85 as of 2026-09-14) ----
 io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard#allowMismatch
 io.justsearch.aibackend.local.DeterminismProfile#from
 io.justsearch.app.inference.BrainSupervisionPolicy#defaults
@@ -57,7 +57,6 @@ io.justsearch.app.inference.LlamaServerOps#resolveLlamaServerLogFile
 io.justsearch.app.inference.OnlineAiServiceImpl#resolveModelsDir
 io.justsearch.app.inference.OnlineAiServiceImpl#resolveOptionalPath
 io.justsearch.app.services.HeadAssembly#getJustSearchHome
-io.justsearch.app.services.ai.install.AiInstallService#applyCudaServerExe
 io.justsearch.app.services.ai.install.AiInstallService#resolveHomeDir
 io.justsearch.app.services.ai.install.DownloadExecutor#isWindows
 io.justsearch.app.services.ai.install.DownloadExecutor#shouldInjectTransportFault
@@ -66,17 +65,10 @@ io.justsearch.app.services.ai.pack.AiPackImportService#resolveAiHome
 io.justsearch.app.services.ai.pack.AiPackValidator#isWindows
 io.justsearch.app.services.ai.pack.PackStagingOps#isWindows
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#<clinit>
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#applyServerExeSysProp
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#forceServerExeSysProp
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#getStatus
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#isWindows
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveBundledRuntimeBinDirBestEffort
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveEnvOrProp
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveModelsDir
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#restoreChatProfileProp
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#rollback
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#runActivate
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#runDeactivate
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#getJustSearchHome
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#initialRuntimeContext
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#resolveOccurrenceBufferSize
@@ -132,7 +124,6 @@ io.justsearch.telemetry.TracingBootstrap#<init>
 io.justsearch.ui.HeadlessApp#buildApi
 io.justsearch.ui.HeadlessApp#harmonizeDataDirProperties
 io.justsearch.ui.HeadlessApp#hasCudaRuntime
-io.justsearch.ui.HeadlessApp#maybeAutoSelectCuda12Variant
 io.justsearch.ui.api.DebugConditionController#handleClear
 io.justsearch.ui.api.DebugConditionController#handleTrip
 io.justsearch.ui.api.LocalApiServer#handleResetIndex

@@ -7,7 +7,8 @@ Full1437 executes4,834 cases/739 suites with four existing skips and no failures
 focused Java49/frontend16 and typecheck pass. [Proof](evidence/C2/public-settings-wire.md).
 Next: public accepted writer/controller, then frontend frozen attempts and remaining
 C2/D1-F obligations. Hosted09f91917e failed the stale system-access allowlist guard;
-root is reproducing and retiring the exact residue separately. No merge readiness.
+the exact nine stale entries are retired with RED1438/GREEN1439 and config-surface
+proof. [Correction](evidence/C2/hosted-system-access-correction.md). No merge readiness.
 
 Installer chat/per-stage ONNX selection and models-pack import now commit through
 the existing accepted settings owner. Redundant ONNX property writes and ORT's
