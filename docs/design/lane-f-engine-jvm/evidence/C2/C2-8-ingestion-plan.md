@@ -141,9 +141,14 @@ its receipt. A new watcher path may remain rowless maintenance: it is processed 
 is not silently adopted into the finite walk. Only explicit enumerator admission adds members.
 Recorded overlapping roots refuse a different active request before it can admit units.
 Deletion preserves active membership as a terminal source-removal skip and invalidates its
-claim; it does not assert that Lucene deletion committed. Durable delete acknowledgement and
-index convergence at activation remain D2/D1 obligations. Explicit root removal cancels the
-walk and prevents remaining claims from being certified under that operation.
+current-row completion while retaining the actual issued object until callback/return. An
+already committed effect remains truthful historical coverage; it cannot rewrite the skipped
+current member. No skip asserts that Lucene deletion committed. Durable delete acknowledgement
+and index convergence at activation remain D2/D1 obligations. Explicit root removal cancels the
+walk and stops new claims; already issued effects drain and remain visible without converting
+the cancelled operation to success. Before a maintenance replacement, the queue seals that
+one walk if closed, terminal and without issued work, so maintenance cannot reopen an already
+finished finite walk. See the [closure transaction decisions](C2-8d-vertical-plan.md).
 
 For boot eligibility, the queue starts with no recorded walk authorized to poll or recover.
 A runtime set installed by the sole validated recovery owner permits only resumed keys. The

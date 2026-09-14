@@ -195,3 +195,76 @@ terminalize a recorded member. Superseded exact claims retain terminal SKIPPED/F
 history without mutating their replacement. A superseded retryable failure is diagnostic
 only: the replacement owns its new retry window, so the old callback neither spends its
 attempts nor invents an exhausted old unit from the replacement's state.
+
+
+## C2-8d.2b.2 closure transaction detail (2026-09-14)
+
+Use the existing DONE state with typed SKIPPED_POLICY or STALE_SOURCE plus SKIPPED ledger
+coverage for administrative completion. Do not add another jobs state. Generic untyped
+completion remains refused for recorded members. Root cancellation must state a skip rather
+than the existing misleading SUCCESS_PARTIAL outcome. Source deletion preserves the member
+and clears its current hash; an already issued old effect may still append historical INDEXED
+coverage. Clear-failed and profiling clear use an administrative skip reason rather than
+claiming index absence. Retention cleanup never silently turns a live walk into a skip.
+
+Sealing is an explicit queue-owner transaction invoked by the producer/progress projection
+and its existing reconciliation cadence. This is simpler than attempting to seal every walk
+inside every jobs mutation and passing temporary claim-release sets through all writers.
+It observes committed enumeration closure, no unfinished current members and no still-issued
+claim for that key. It validates current terminal coverage against the existing ledger,
+then freezes the versioned JSON receipt and advances its projection revision. A callback
+whose outcome committed but whose actual claim has not yet been released cannot seal it.
+Before maintenance replaces an existing member, it attempts the same seal for that one
+walk under the queue lock. If the closed walk is already terminal and has no issued claims,
+it seals first and the new maintenance admission is outside it. This preserves the governing
+closed-plus-terminal boundary without scanning every walk on every jobs transaction.
+Duplicate sealing returns the stored receipt.
+
+The receipt carries version1, revision, final completedUnits/failedUnits, currentFailedUnits,
+currentSkippedUnits, enumerationOutcome and at most100 failed path hashes with a truncation
+flag. Counters describe history; current failures and enumeration outcome decide success.
+No raw path or copied scope enters the receipt. A missing terminal coverage row is a gap,
+not proof of a successful zero-unit walk. Completed re-enumeration retires unseen members
+as source-removal skips; failed/inaccessible enumeration does not label them deleted.
+Failed/cancelled closure stops new polling and drains issued owners before sealing.
+
+Administrative deletion preserves unsealed members as terminal skips and retains sealed
+unacknowledged rows. Jobs and ledger age cleanup requires either unrecorded membership or
+an existing sealed progress row acknowledged at its exact final revision; missing progress
+never satisfies that predicate. The next d.2c cut connects notifications after lock release
+and acknowledgement only after the matching outer operations transaction.
+
+### Refute review decisions (2026-09-14)
+
+- FAILED/CANCELLED closure atomically skips unissued PENDING and unowned PROCESSING members
+with typed administrative coverage. Poll excludes both outcomes. Issued objects stay owned;
+a later unfinished return or orphan recovery of a closed failed/cancelled member writes a
+terminal skip instead of returning it to PENDING. COMPLETE retains normal claim recovery.
+- COMPLETE closure retires unseen members in that same transaction after the final admission
+batch. It cannot wait until seal: later maintenance may have legitimately observed the file
+again. FAILED/CANCELLED never infer source deletion. An issued unseen row becomes currently
+DONE/SKIPPED, with null current hash, while its actual object remains in activeClaims.
+- Administrative skip invalidates current-row completion, not the actual issued object.
+A late committed effect can append historical INDEXED/FAILED coverage without changing the
+current skip. Root cancellation makes the operation cancelled and forbids new claims; it
+cannot erase an effect already committed. Rollback retains actual ownership and blocks seal.
+- trySealRecordedWalk returns the existing WalkProgress: sealedAt absent means NOT_READY
+only for open enumeration, unfinished members or still-issued work; present means immutable
+SEALED. Missing progress and terminal coverage mismatch throw a dedicated receipt-gap error,
+which the outer owner maps to storage/projection loss rather than retrying as ordinary work.
+Current outcome controls compatible coverage; a historical row for another revision or
+hash cannot repair the current receipt. The failure list is current FAILED path hashes,
+sorted lexically, first100, with truncation iff the full count exceeds100.
+- Maintenance preflight seals only its affected eligible walk before replacement. This is
+simpler than a global seal scan and prevents a ready walk being kept open merely because
+maintenance wins the lock before its projection callback. A still-running walk may continue
+to absorb updates to its members, as the governing live-input rule requires.
+- This cut does not prune progress rows. The next retention cut may remove a progress row
+only atomically after exact final acknowledgement and removal of all keyed member/ledger
+evidence. Missing progress never grants cleanup permission.
+
+Required regressions add FAILED/CANCELLED poll/return/recovery, source removal with a live
+stale writer and rollback, unseen retirement before later maintenance, maintenance preflight
+sealing, legitimate zero-unit closure versus missing terminal evidence, mismatched coverage,
+duplicate immutable seal, and more than100 current failure hashes. These decisions supersede
+the earlier delayed-seal sentence; no implementation or proof is claimed by this design edit.

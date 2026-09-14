@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-8d closure review resolves cancellation/return/recovery, atomic unseen retirement, retained actual claim identity, explicit seal/gap outcomes, deterministic failure hashes and progress retention. Maintenance first seals its one affected walk if already closed/terminal/unowned, preserving the finite boundary without a global scan. [Owning transaction decisions](evidence/C2/C2-8d-vertical-plan.md). Implementation remains next.
+
 - 2026-09-14: A resumed corruption-recovery Green re-derives the existing stamp waiver only from exact persisted recovery source, matching opened building generation, and an authoritative empty document count. Source alone cannot attest a nonempty generation after a model change. [Restart-state and discriminating proof](evidence/C2/corruption-resume-attestation.md).
 
 - 2026-09-14: The migration cutover barrier reconciles the existing embedding success evidence and requires the current fingerprint before its COMPLETE commit, including a fresh Green already in COMPATIBLE state. A drained pending count alone cannot certify it; metadata verification still guards promotion. No new attestation or waiver is introduced. [Repair and proof](evidence/C2/migration-cutover-attestation.md).
