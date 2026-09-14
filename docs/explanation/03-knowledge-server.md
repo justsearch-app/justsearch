@@ -87,6 +87,21 @@ The ingest port surface (`IngestServiceCalls`) enforces caps before the queue ev
 *   `submitBatch` rejects batches larger than **10,000** paths (`MAX_BATCH_SIZE`).
 *   `submitBatch` rejects submissions when `queueDepth >= 100,000` (`MAX_QUEUE_DEPTH`) with `RESOURCE_EXHAUSTED`. Callers should retry later.
 
+### Committed content identity
+
+Successful extraction carries its source SHA-256 through the exact processing claim to
+`IngestionOutcomeJournal`. After the Lucene commit succeeds, `markDoneTransitions` commits
+`DONE`, `jobs.content_hash` and the ingestion-ledger outcome together. A stale claim cannot
+complete a replacement job. If SQLite rolls back, the same transition remains retryable;
+the journal's per-unit fallback retains the hash as well as the claim. Later idle cycles and
+shutdown retry already committed outcomes even when no new documents require a commit.
+A failed index commit never advances those outcomes.
+
+A null hash means no committed content identity was established by that completion.
+Administrative completions and timestamp-based `UNCHANGED` skips do not invent a digest;
+re-enqueue clears the previous digest. The hash describes the committed source bytes,
+not the current file, representation generation, or completion of a containing operation.
+
 ### Crash recovery
 
 On startup, `recoverStuckJobs()` resets all `PROCESSING` jobs back to `PENDING`. This heals incomplete work from a prior crash without burning retry budget (since `attempts` = failures, not claims).

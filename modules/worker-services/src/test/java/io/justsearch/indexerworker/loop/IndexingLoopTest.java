@@ -864,6 +864,95 @@ class IndexingLoopTest {
       assertNotNull(queue.lastEntry);
       assertEquals("SUCCESS_FULL", queue.lastEntry.artifactStatus());
       assertEquals("test-structured", queue.lastEntry.parserId());
+      assertNotNull(queue.lastTransition);
+      assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
+    }
+
+    @Test
+    void idleCommitRetriesCommittedOutcomeWithoutAnotherWriteOrCommit() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-idle-outcome-retry", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      CommitOps commitOps = mock(CommitOps.class);
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      replaceCommitOps(loop, commitOps);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+      assertNull(queue.lastOutcome);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      doThrow(new RuntimeException("first idle commit failure"))
+          .doNothing()
+          .when(commitOps)
+          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_IDLE);
+      invokeFinishIdleCommit(loop);
+      assertEquals(0, queue.markDoneTransitionCalls, "a failed index commit must skip outcome drain");
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      queue.transientOutcomeWriteFailures = 2;
+      invokeFinishIdleCommit(loop);
+      assertEquals(2, queue.markDoneTransitionCalls, "batch and singleton outcome writes should retry");
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertEquals(
+          SourceContentHash.sha256(file),
+          loop.getJournal().pendingTransitionsForTest().getFirst().committedContentHash());
+
+      invokeFinishIdleCommit(loop);
+      assertEquals(3, queue.markDoneTransitionCalls);
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+      assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
+      verify(commitOps, times(2))
+          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_IDLE);
+    }
+
+    @Test
+    void shutdownRetriesCommittedOutcomeWithoutAnotherWrite() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-shutdown-outcome-retry", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      CommitOps commitOps = mock(CommitOps.class);
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      replaceCommitOps(loop, commitOps);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+      queue.transientOutcomeWriteFailures = 2;
+      invokeFinishIdleCommit(loop);
+      assertEquals(0L, indexedSinceCommit(loop));
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertEquals(2, queue.markDoneTransitionCalls);
+
+      invokeFinalizeShutdownCommit(loop);
+
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+      assertEquals(3, queue.markDoneTransitionCalls);
+      assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
+      verify(commitOps)
+          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_IDLE);
+      verify(commitOps, never())
+          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
+    }
+
+    @Test
+    void failedShutdownCommitDoesNotDrainCommittedOutcome() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-shutdown-commit-fail", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      CommitOps commitOps = mock(CommitOps.class);
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      replaceCommitOps(loop, commitOps);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+      doThrow(new RuntimeException("shutdown commit failure"))
+          .when(commitOps)
+          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
+
+      invokeFinalizeShutdownCommit(loop);
+
+      assertEquals(0, queue.markDoneTransitionCalls, "a failed shutdown commit must skip outcome drain");
+      assertNull(queue.lastOutcome);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertEquals(
+          SourceContentHash.sha256(file),
+          loop.getJournal().pendingTransitionsForTest().getFirst().committedContentHash());
+      verify(commitOps)
+          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
     }
 
     @Test
@@ -1357,6 +1446,30 @@ class IndexingLoopTest {
       loop.getWriter().write((ExtractedJob) extractedJob, null);
     }
 
+    private void invokeFinishIdleCommit(IndexingLoop loop) throws Exception {
+      Method finishIdleCommit = IndexingLoop.class.getDeclaredMethod("finishIdleCommit");
+      finishIdleCommit.setAccessible(true);
+      finishIdleCommit.invoke(loop);
+    }
+
+    private void invokeFinalizeShutdownCommit(IndexingLoop loop) throws Exception {
+      Method finalizeShutdown = IndexingLoop.class.getDeclaredMethod("finalizeShutdownCommit");
+      finalizeShutdown.setAccessible(true);
+      finalizeShutdown.invoke(loop);
+    }
+
+    private void replaceCommitOps(IndexingLoop loop, CommitOps commitOps) throws Exception {
+      var commitOpsField = IndexingLoop.class.getDeclaredField("commitOps");
+      commitOpsField.setAccessible(true);
+      commitOpsField.set(loop, commitOps);
+    }
+
+    private long indexedSinceCommit(IndexingLoop loop) throws Exception {
+      var indexedField = IndexingLoop.class.getDeclaredField("indexedSinceCommit");
+      indexedField.setAccessible(true);
+      return indexedField.getLong(loop);
+    }
+
     private void invokeProcessBatch(IndexingLoop loop, List<JobQueue.IndexJob> jobs) throws Exception {
       Method method = IndexingLoop.class.getDeclaredMethod("processBatch", List.class);
       method.setAccessible(true);
@@ -1396,6 +1509,7 @@ class IndexingLoopTest {
           artifact,
           System.currentTimeMillis(),
           envelope,
+          SourceContentHash.sha256(file),
           "00000000-0000-4000-8000-000000000001");
     }
 
@@ -1691,6 +1805,7 @@ class IndexingLoopTest {
   private static final class RecordingQueue implements JobQueue {
     IngestionOutcome lastOutcome;
     IngestionLedgerEntry lastEntry;
+    IngestionLedgerTransition lastTransition;
     /**
      * Slice G.1 — every outcome-bearing markDone* call is appended here so tests can assert on
      * the full sequence (the prior single-{@code lastOutcome} field collapsed multiple calls
@@ -1703,6 +1818,8 @@ class IndexingLoopTest {
     boolean deferred;
     boolean failOutcomeWrites;
     boolean failOutcomeWritesAsIllegalArgument;
+    int transientOutcomeWriteFailures;
+    int markDoneTransitionCalls;
     IndexingCoordinator indexingCoordinator;
 
     private void maybeFail(String op) {
@@ -1713,6 +1830,11 @@ class IndexingLoopTest {
       if (failOutcomeWrites) {
         throw new io.justsearch.indexerworker.queue.OutcomeWriteException(
             "simulated rollback during " + op, null);
+      }
+      if (transientOutcomeWriteFailures > 0) {
+        transientOutcomeWriteFailures--;
+        throw new io.justsearch.indexerworker.queue.OutcomeWriteException(
+            "simulated transient rollback during " + op, null);
       }
     }
 
@@ -1759,12 +1881,17 @@ class IndexingLoopTest {
     @Override
     public void markDoneTransitions(
         java.util.Collection<IngestionLedgerTransition> transitions, IngestionOutcome outcome) {
+      markDoneTransitionCalls++;
       maybeFail("markDoneTransitions");
       record(outcome);
       lastEntry =
           transitions == null || transitions.isEmpty()
               ? null
               : transitions.iterator().next().entry();
+      lastTransition =
+          transitions == null || transitions.isEmpty()
+              ? null
+              : transitions.iterator().next();
       done = true;
     }
 

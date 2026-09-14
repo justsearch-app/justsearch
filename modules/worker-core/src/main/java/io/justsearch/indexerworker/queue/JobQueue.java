@@ -583,21 +583,38 @@ public interface JobQueue extends Closeable {
    */
   int LEDGER_ENTRY_MAX_FIELD_CHARS = 256;
 
-  /** Path plus privacy-safe metadata for an outcome transition. */
-  record IngestionLedgerTransition(Path path, IngestionLedgerEntry entry, IndexJob claim) {
-    /** Administrative/fixture transition without a processing claim. */
+  /** Exact claimed write and privacy-safe metadata retained until the Lucene commit succeeds. */
+  record IngestionLedgerTransition(
+      Path path, IngestionLedgerEntry entry, IndexJob claim, String committedContentHash) {
+    private static final java.util.regex.Pattern SHA256 =
+        java.util.regex.Pattern.compile("[0-9a-f]{64}");
+
+    /** Administrative/fixture transition without a processing claim or known content hash. */
     public IngestionLedgerTransition(Path path, IngestionLedgerEntry entry) {
-      this(path, entry, null);
+      this(path, entry, null, null);
+    }
+
+    public IngestionLedgerTransition(Path path, IngestionLedgerEntry entry, IndexJob claim) {
+      this(path, entry, claim, null);
     }
 
     /** Retain the actual claimed object through the Lucene commit boundary. */
     public IngestionLedgerTransition(IndexJob claim, IngestionLedgerEntry entry) {
-      this(claim.path(), entry, claim);
+      this(claim.path(), entry, claim, null);
+    }
+
+    public IngestionLedgerTransition(
+        IndexJob claim, IngestionLedgerEntry entry, String committedContentHash) {
+      this(claim.path(), entry, claim, committedContentHash);
     }
 
     public IngestionLedgerTransition {
       if (claim != null && !claim.path().equals(path)) {
         throw new IllegalArgumentException("Transition path differs from its claim");
+      }
+      if (committedContentHash != null
+          && (claim == null || !SHA256.matcher(committedContentHash).matches())) {
+        throw new IllegalArgumentException("A committed SHA-256 requires its processing claim");
       }
     }
   }

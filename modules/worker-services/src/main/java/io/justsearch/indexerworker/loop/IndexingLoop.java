@@ -653,23 +653,7 @@ public class IndexingLoop implements Closeable {
             batchStats.reset();
           }
 
-          // IMPORTANT: Commit when we transition to idle with uncommitted changes.
-          //
-          // The time-based commit strategy below runs only after processing jobs. If the queue becomes empty
-          // and we go idle, we would otherwise never reach the commit check again, leaving the index
-          // uncommitted (no segments_*), which makes the main process report indexAvailable=false.
-          if (indexedSinceCommit > 0) {
-            try {
-              commitOps.commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
-              metrics.recordCommit();
-              log.debug("Committed index: {} docs, reason=batch idle", indexedSinceCommit);
-              indexedSinceCommit = 0;
-              lastCommitTime = System.currentTimeMillis();
-              journal.drainPending();
-            } catch (RuntimeException e) {
-              log.error("Failed to commit index on idle", e);
-            }
-          }
+          finishIdleCommit();
 
           // Tempdoc 516 Slice 4d (W6): BackfillScheduler owns the per-cycle backfill
           // orchestration (combined enrichment tight loop + per-stage fallback + disambiguation
@@ -788,6 +772,24 @@ public class IndexingLoop implements Closeable {
     log.info("Indexing loop stopped");
   }
 
+  /** Commit buffered effects before outcomes; retry already committed outcomes on every idle cycle. */
+  private void finishIdleCommit() {
+    try {
+      if (indexedSinceCommit > 0) {
+        commitOps.commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+        metrics.recordCommit();
+        log.debug("Committed index: {} docs, reason=batch idle", indexedSinceCommit);
+        indexedSinceCommit = 0;
+        lastCommitTime = System.currentTimeMillis();
+      }
+      // A failed SQL outcome write can outlive its successful index commit. With no new index
+      // work there is nothing to commit, but the exact committed transition still needs retry.
+      journal.drainPending();
+    } catch (RuntimeException e) {
+      log.error("Failed to commit index or record outcomes on idle", e);
+    }
+  }
+
   /**
    * Tempdoc 730 review item 2 (the "no subsequent commit" ratchet hole): a rebuild-completion or
    * fresh-compatible fingerprint stamp that becomes due right as the loop is stopping previously
@@ -821,8 +823,9 @@ public class IndexingLoop implements Closeable {
         metrics.recordCommit();
         log.info("Final commit: {} documents", indexedSinceCommit);
         recordStageMs("post_commit", System.currentTimeMillis() - commitStart, "shutdown");
-        journal.drainPending();
+        indexedSinceCommit = 0;
       }
+      journal.drainPending();
     } catch (RuntimeException e) {
       log.error("Failed final commit", e);
     }

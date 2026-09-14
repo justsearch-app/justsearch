@@ -722,7 +722,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       ensureOpen();
 
       String sql = """
-          UPDATE jobs SET state = 'DONE', last_updated = ?
+          UPDATE jobs SET state = 'DONE', content_hash = NULL, last_updated = ?
           WHERE path = ?
           """;
 
@@ -756,7 +756,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               () -> {
                 String sql = """
                     UPDATE jobs
-                    SET state = 'DONE', last_updated = ?,
+                    SET state = 'DONE', content_hash = NULL, last_updated = ?,
                         last_outcome_class = ?, last_reason_code = ?, last_retry_policy = ?,
                         last_diagnostic_summary = ?, last_outcome_at = ?
                     WHERE path = ?
@@ -799,7 +799,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         int end = Math.min(offset + chunkSize, pathList.size());
         var chunk = pathList.subList(offset, end);
 
-        StringBuilder sb = new StringBuilder("UPDATE jobs SET state = 'DONE', last_updated = ? WHERE path IN (");
+        StringBuilder sb = new StringBuilder("UPDATE jobs SET state = 'DONE', content_hash = NULL, last_updated = ? WHERE path IN (");
         for (int i = 0; i < chunk.size(); i++) {
           if (i > 0) sb.append(',');
           sb.append('?');
@@ -856,7 +856,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               () -> {
                 String sql = """
                     UPDATE jobs
-                    SET state = 'DONE', last_updated = ?,
+                    SET state = 'DONE', content_hash = ?, last_updated = ?,
                         last_outcome_class = ?, last_reason_code = ?, last_retry_policy = ?,
                         last_diagnostic_summary = ?, last_outcome_at = ?
                     WHERE path = ?
@@ -866,7 +866,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   for (JobQueue.IngestionLedgerTransition transition : eligible) {
                     if (transition == null) continue;
                     String normalizedPath = normalizePath(transition.path());
-                    bindOutcomeUpdate(stmt, 1, now, outcome, normalizedPath);
+                    stmt.setString(1, transition.committedContentHash());
+                    bindOutcomeUpdate(stmt, 2, now, outcome, normalizedPath);
                     int rows = executeMutation(stmt::executeUpdate);
                     rowCounts.add(rows);
                     if (rows > 0) {

@@ -130,8 +130,8 @@ public final class IngestionOutcomeJournal {
 
   /**
    * Drains one outcome-grouped batch. Try a batched {@code markDoneTransitions}; on
-   * {@link OutcomeWriteException} fall back to per-path so a single bad row doesn't block the
-   * rest. Paths that fail per-path stay in {@code pendingMarkDone} (via the caller's
+   * {@link OutcomeWriteException} fall back to per-transition writes so a single bad row doesn't
+   * block the rest. Transitions that fail individually stay in {@code pendingMarkDone} (via the caller's
    * identity removal of the surviving in-list) so the next drain or
    * {@code recoverStuckJobs} on Worker restart can retry.
    */
@@ -143,7 +143,7 @@ public final class IngestionOutcomeJournal {
       return;
     } catch (OutcomeWriteException e) {
       log.warn(
-          "Batch markDone for outcome {} rolled back, falling back to per-path: {}",
+          "Batch markDone for outcome {} rolled back, falling back to per-transition: {}",
           outcome.outcomeClass(),
           e.getMessage());
     }
@@ -151,7 +151,7 @@ public final class IngestionOutcomeJournal {
     while (it.hasNext()) {
       JobQueue.IngestionLedgerTransition transition = it.next();
       try {
-        jobQueue.markClaimDone(transition.claim(), outcome, transition.entry());
+        jobQueue.markDoneTransitions(List.of(transition), outcome);
       } catch (OutcomeWriteException ex) {
         log.warn(
             "Per-path markDone after commit rolled back; will retry on next drain: {}",

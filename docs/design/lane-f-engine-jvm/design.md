@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-8b supplies Q5's existing jobs.content_hash only through the exact claimed transition after Lucene commit, atomically with DONE and the ingestion ledger. Preserve that transition in per-unit fallback; unknown completions clear the digest. The existing idle/shutdown owner retries retained outcomes even with no new index writes, always after any required index commit. No new store or recovery owner is introduced. This foundation does not make mtime skips or mutable queue rows operation recovery evidence. [Mechanism and proof plan](evidence/C2/C2-8-content-hash-plan.md).
+
 - 2026-09-14: C2-8a carries the optional public operationKey into background scheduling and returns the accepted identity/outcome. Matching attempts bypass timer scheduling even after scheduler close; changed public request/delay under the same key refuses. UI keys reuse one extracted UUIDv7 helper with settings. Interactive survival and nested-tool authority do not change. [Owning cut](evidence/C2/C2-8-scheduled-key-plan.md).
 
 - 2026-09-14: C2-7 adds atomic logical checkpoints of current durable-row progress at a30-second fixed-rate schedule and the named pre-index shutdown step, retaining immediate per-unit commits. The existing row is the only progress authority; no stale snapshot or second cursor. An unfinished unit retains the prior resumable position: cadence is not a promise of unit completion within30 seconds. Reuse the retention owner for maintenance; preserve Q6 NORMAL/process-crash scope and best-effort WAL close after index drain. [Mechanism, trade-off and acceptance](evidence/C2/C2-7-plan.md).

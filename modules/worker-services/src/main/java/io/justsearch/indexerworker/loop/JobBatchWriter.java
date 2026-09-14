@@ -160,7 +160,8 @@ public final class JobBatchWriter {
           new JobQueue.IngestionLedgerTransition(
               ex.claim(),
               LedgerEntryFactory.forEnvelope(
-                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance())));
+                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance()),
+              ex.sourceSha256()));
 
       long latencyMs = System.currentTimeMillis() - ex.startTime();
       metrics.recordDocumentIndexed(latencyMs);

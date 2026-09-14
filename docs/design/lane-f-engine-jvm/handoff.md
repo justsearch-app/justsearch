@@ -28,7 +28,13 @@ CI34802770723(all13 jobs)/CLA34802769444 pass at browser347187073. PR727's manag
 review record is verified through those checkpoints. C2-7 CI34804384959 and CLA34804383862
 pass at5a4d1dde3. C2-8a scheduled key delivery is locally verified: 1,936 Java cases
 (one existing skip), 6,577 frontend cases, PMD/format/typecheck/lint and negative controls.
-[Scope and evidence](evidence/C2/scheduled-key.md); this batch still needs its hosted result.
+[Scope and evidence](evidence/C2/scheduled-key.md); CI34805930681(all13 jobs) and
+CLA34805928429 pass at2ab49abc4. PR727 review record is verified through the scheduled
+key checkpoint (its CI was still running when the record was updated).
+C2-8b committed content hash and idle/shutdown outcome retry are locally verified:
+integrated1525 executes2,179 cases/423 suites, 20 existing skips, zero failures/errors;
+PMD/format pass. Combined and isolated shutdown negatives are preserved; final1527
+restores the exact production source and passes65 cases. [Proof and limits](evidence/C2/committed-content-hash.md).
 Next is C2-8/C2-9 ingestion, C2-10 reindex, then
 required integrated/live/model/installed/final-head proofs and D1/D2/E/F. Root makes
 remaining mechanism/merge decisions; no owner reply is pending.

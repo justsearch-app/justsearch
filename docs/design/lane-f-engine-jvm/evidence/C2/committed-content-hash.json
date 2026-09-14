@@ -1,0 +1,314 @@
+{
+  "date": "2026-09-14",
+  "base": "2ab49abc4b457f195dd693b65f226152ce40801b",
+  "workspace": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "sources": [
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java",
+      "sha256": "45da111ffe9aba99f72375b24484102d56fe4c5476b06c74affcc72120a419a2"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java",
+      "sha256": "756de876f9e5e9ce0e3c4a1e701c64e471f7603f12116404b72ef800685eb612"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/CommittedContentHashTest.java",
+      "sha256": "e4b1568401e90c8ea24ba268d7a86613b0a91de7924be888cd05900fd7650f6e"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java",
+      "sha256": "0c613d4a364ac62b9d9aa01c9888a2ee09754b09f3212ac51fad05cdb1f766b9"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournal.java",
+      "sha256": "54338c69534eb144cce822e9cf436c12b16bebb8ccd8920a897717d79fcaa0c5"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java",
+      "sha256": "dd7e6c14ec596824de591416136ea051df6d85ed53de96043036971e2af8ee9b"
+    },
+    {
+      "path": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java",
+      "sha256": "1fe7aee24cd12b257f27c64af407a491e36163d6cd9f6c1d6c4e7da980bd0b54"
+    },
+    {
+      "path": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournalClaimTest.java",
+      "sha256": "8b28ed373db81f5d6f4bd1bbe348a83bce9bf617bbbceafcbf878dae9e1a6164"
+    }
+  ],
+  "restoredSources": {
+    "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java": "byte-identical to production backup used by integrated1525",
+    "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java": "byte-identical to production backup used by integrated1525",
+    "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java": "byte-identical to production backup used by integrated1525"
+  },
+  "runs": {
+    "content-hash-focused1523": {
+      "log": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-focused1523.txt",
+      "sha256": "8d9e9694b5ba782faa1b8bc1fdd3a939e949b5519bd0b3bd84cccad4a9128768",
+      "inventory": {
+        "revision": "2ab49abc4-dirty",
+        "command": "./gradlew.bat :modules:indexer-worker:test --tests '*CommittedContentHashTest' --tests '*OperationQueueOwnershipTest' :modules:worker-services:test --tests '*IndexingLoopTest' --tests '*IngestionOutcomeJournalClaimTest'",
+        "summary": {
+          "tests": 83,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 16
+        },
+        "tasks": [
+          {
+            "module": "indexer-worker",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 17,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 3
+          },
+          {
+            "module": "worker-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 66,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 13
+          }
+        ]
+      },
+      "xml": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-focused1523-xml"
+    },
+    "content-hash-negative1524": {
+      "log": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-negative1524.txt",
+      "sha256": "2e103e9a7bb2c92d40c8beaf7ad8c56e83f48af44c9ab2d1aae596598b32d5dc",
+      "inventory": {
+        "revision": "2ab49abc4-negative",
+        "command": "./gradlew.bat :modules:indexer-worker:test --tests '*CommittedContentHashTest' :modules:worker-services:test --tests '*IndexingLoopTest' --tests '*IngestionOutcomeJournalClaimTest' --continue",
+        "summary": {
+          "tests": 77,
+          "failures": 7,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        },
+        "tasks": [
+          {
+            "module": "worker-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 66,
+            "failures": 4,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 13
+          },
+          {
+            "module": "indexer-worker",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 11,
+            "failures": 3,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 2
+          }
+        ]
+      },
+      "xml": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-negative1524-xml"
+    },
+    "content-hash-integrated1525": {
+      "log": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-integrated1525.txt",
+      "sha256": "d9d8718124c333f5b8c72a7bb6d6203a25b6e9042b10c79faa0e6721054e123a",
+      "inventory": {
+        "revision": "2ab49abc4-dirty",
+        "command": "./gradlew.bat :modules:worker-core:test :modules:indexer-worker:test :modules:worker-services:test :modules:worker-core:pmdMain :modules:worker-core:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:worker-services:pmdMain :modules:worker-services:pmdTest spotlessCheck",
+        "summary": {
+          "tests": 2179,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 20,
+          "suites": 423
+        },
+        "tasks": [
+          {
+            "module": "worker-core",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 342,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 6,
+            "suites": 84
+          },
+          {
+            "module": "worker-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 1350,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 2,
+            "suites": 256
+          },
+          {
+            "module": "indexer-worker",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 487,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 12,
+            "suites": 83
+          }
+        ]
+      },
+      "xml": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-integrated1525-xml"
+    },
+    "content-hash-shutdown-negative1526": {
+      "log": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-shutdown-negative1526.txt",
+      "sha256": "0454bb71ec866a98864608d5cbbe74e485c9aeb9c5f946dc5e9eee1e3460c08f",
+      "inventory": {
+        "revision": "2ab49abc4-negative-shutdown",
+        "command": "./gradlew.bat :modules:worker-services:test --tests '*IndexingLoopTest'",
+        "summary": {
+          "tests": 65,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 12
+        },
+        "tasks": [
+          {
+            "module": "worker-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 65,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 12
+          }
+        ]
+      },
+      "xml": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-shutdown-negative1526-xml"
+    },
+    "content-hash-final1527": {
+      "log": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-final1527.txt",
+      "sha256": "98ffea73726874b3d336b438335364b905dcd8e1a7e584b98952b76b1779b25f",
+      "inventory": {
+        "revision": "2ab49abc4-dirty",
+        "command": "./gradlew.bat :modules:worker-services:test --tests '*IndexingLoopTest' :modules:worker-services:pmdMain :modules:worker-services:pmdTest spotlessCheck",
+        "summary": {
+          "tests": 65,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 12
+        },
+        "tasks": [
+          {
+            "module": "worker-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 65,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 12
+          }
+        ]
+      },
+      "xml": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/content-hash-final1527-xml"
+    }
+  },
+  "existingSkips": [
+    {
+      "class": "io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest",
+      "test": "symlink loop is classified without stack overflow (POSIX)"
+    },
+    {
+      "class": "io.justsearch.indexerworker.splade.SpladeIndexContentCrashHarnessTest",
+      "test": "batch-encode every parent and reconstructed chunk text from the crashed index"
+    },
+    {
+      "class": "io.justsearch.indexerworker.bgem3.BgeM3VocabLoadTest",
+      "test": "loadRealVocabulary()"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "doc vector from embedWithSpans is bit-identical to embed()"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "embed() sanity: produces a unit-length vector"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "single span covering the whole doc matches an isolated embed() within epsilon"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "multi-span: each chunk vector is unit-length and chunks differ"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "long doc (> maxSeqLen tokens) returns null"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "long text in batch is chunked, not truncated"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "single-item batch delegates correctly"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "empty batch returns empty list"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "short texts in batch match single-embed results"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "mixed short and long texts in batch all produce correct results"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "different texts produce different embeddings"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "similar texts produce similar embeddings"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "empty text produces valid embedding"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "embedding is deterministic"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "embedding is L2-normalized (unit length)"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "produces 768-dimensional embedding"
+    },
+    {
+      "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "short text produces single chunk"
+    }
+  ],
+  "proofLimits": [
+    "Negative1524 directly proves writer hash, SQL hash and idle retry. Its coupled failures do not independently prove shutdown or failed-commit ordering.",
+    "Shutdown-only negative1526 proves the shutdown retry; final1527 restores production and passes.",
+    "No operation membership, generation/grant recovery, live model or installed forced-kill proof is claimed."
+  ],
+  "retention": "Keep logs/copied XML through 2026-10-14; source/evidence summaries remain in Git."
+}
