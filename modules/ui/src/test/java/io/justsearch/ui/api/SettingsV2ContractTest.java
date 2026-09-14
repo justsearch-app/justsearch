@@ -42,7 +42,7 @@ final class SettingsV2ContractTest {
             true, "advanced", true, List.of("*.tmp", "node_modules/**"), true),
         new LlmSettingsV2("llama-server.exe", 8192, 2048, 35, "C:/models/chat.gguf", null),
         List.of("C:/docs", "D:/papers"),
-        "read_write");
+        "read_write", new io.justsearch.app.api.settings.SettingsWitness(0, null), null, null);
 
     // Serialize
     // tempdoc 696: force LF so Windows System.lineSeparator() doesn't churn committed files
@@ -85,6 +85,7 @@ final class SettingsV2ContractTest {
 
     // Verify settingsMode
     assertEquals(original.settingsMode(), roundTripped.settingsMode());
+    assertEquals(original.witness(), roundTripped.witness());
 
     // Verify fixture JSON has expected keys
     JsonNode tree = MAPPER.readTree(json);

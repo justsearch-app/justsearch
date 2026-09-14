@@ -20,7 +20,9 @@ export interface SettingsV2 {
     modelPath?: string | null;
     serverExecutable?: string | null;
   } | null;
+  operationKey?: string | null;
   settingsMode?: string | null;
+  state?: string | null;
   ui?: {
     chatEnabled?: boolean | null;
     defaultAction?: string | null;
@@ -34,6 +36,10 @@ export interface SettingsV2 {
     theme?: string | null;
     vimMode?: boolean | null;
   } | null;
+  witness?: {
+    acceptedRevision: number;
+    lastCommittedOperationKey: string | null;
+  } | null;
 }
 export const settingsV2Schema = z.strictObject({
   "indexPaths": z.array(z.string()).nullable().optional(),
@@ -45,7 +51,9 @@ export const settingsV2Schema = z.strictObject({
     "modelPath": z.string().nullable().optional(),
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
+  "operationKey": z.string().nullable().optional(),
   "settingsMode": z.string().nullable().optional(),
+  "state": z.string().nullable().optional(),
   "ui": z.strictObject({
     "chatEnabled": z.boolean().nullable().optional(),
     "defaultAction": z.string().nullable().optional(),
@@ -58,5 +66,9 @@ export const settingsV2Schema = z.strictObject({
     "pauseIndexingDuringAi": z.boolean().nullable().optional(),
     "theme": z.string().nullable().optional(),
     "vimMode": z.boolean().nullable().optional(),
+  }).nullable().optional(),
+  "witness": z.strictObject({
+    "acceptedRevision": z.number().int(),
+    "lastCommittedOperationKey": z.string().nullable(),
   }).nullable().optional(),
 });

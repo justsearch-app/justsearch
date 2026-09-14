@@ -87,12 +87,24 @@ public class SettingsController {
    * GET /api/settings/v2 - Returns the canonical {@link SettingsV2} shape.
    */
   public void handleGetSettingsV2(Context ctx) {
-    UiSettings settings = settingsStore.load();
-    if ((settings.getIndexBasePath() == null || settings.getIndexBasePath().isBlank())
-        && defaultIndexBasePath != null) {
-      settings.setIndexBasePath(defaultIndexBasePath.toString());
+    try {
+      var snapshot = settingsStore.inspect();
+      UiSettings settings = snapshot.settings();
+      if ((settings.getIndexBasePath() == null || settings.getIndexBasePath().isBlank())
+          && defaultIndexBasePath != null) {
+        settings.setIndexBasePath(defaultIndexBasePath.toString());
+      }
+      ctx.json(io.justsearch.app.services.settings.SettingsV2Projection.toSettingsV2(
+          settings, settingsStore.mode(), snapshot.witness()));
+    } catch (io.justsearch.configuration.persistence.CorruptDurableStoreException
+        | io.justsearch.configuration.persistence.UnsupportedStoreVersionException
+        | java.io.UncheckedIOException failure) {
+      var payload = ApiErrorHandler.toResponse(ApiErrorCode.SETTINGS_UNAVAILABLE,
+          "Settings recovery is required before a revision can be read", telemetry, ApiErrorHandler.routeOf(ctx));
+      payload.put("errorCode", "SETTINGS_RECOVERY_REQUIRED");
+      payload.put("retryable", false);
+      ctx.status(503).json(payload);
     }
-    ctx.json(toSettingsV2(settings));
   }
 
   /**

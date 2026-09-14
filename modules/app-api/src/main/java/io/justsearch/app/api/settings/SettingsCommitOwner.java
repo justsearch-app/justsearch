@@ -36,6 +36,7 @@ public interface SettingsCommitOwner {
           || (data.containsKey("acceptedRevision") && !Long.valueOf(acceptedRevision).equals(data.get("acceptedRevision")))) {
         throw new IllegalArgumentException("Settings result contradicts its commitment witness");
       }
+      data.put("witness", new SettingsWitness(acceptedRevision, operationKey));
       data.put("operationKey", operationKey);
       data.put("acceptedRevision", acceptedRevision);
       response = new OperationResult(true, response.message(), response.executionId(), data,

@@ -600,3 +600,67 @@ newer intent or invoke runtime; unresolved producer cannot report success; impor
 refusal/runtime failure never records an installed pack; updated status sees
 persisted paths without claiming live sessions. Run affected suites, PMD/format,
 independent review and final integrated/live/installed proofs.
+
+## 2026-09-14 public settings witness and retry cut
+
+The installer/import cut is pushed at09f91917e. Public settings updates remain the
+next raw writer. Reuse the existing SettingsWitness record in an additive nested
+SettingsV2.witness field; operationKey is the new logical attempt identity, state
+is response-only. This avoids another independently validated revision/key pair.
+Keep the original four-argument Java construction for projections without witness.
+GET obtains one inspect() snapshot, including the witness, before response-only
+index-path defaulting. Unreadable/unsupported witnesses return typed recovery
+failure, never a fabricated zero witness. The fixed committed Receipt may project
+its existing authoritative pair into the nested witness before the commit boundary;
+retain its old top-level key/revision for existing operation consumers.
+
+Public POST will require a valid full witness and UUIDv7 operationKey. SettingsService
+owns the existing partial merge, index-path validation and bounded64-entry mode LRU.
+Canonical identity is normalized ui/llm/indexPaths patch plus witness and normalized
+mode intent; null and omitted patch fields both mean preserve. Exclude operationKey
+itself and server-only state/settingsMode. Look up the key before settings inspect,
+merge, path validation or LRU access. Unknown keys capture one candidate and commit
+against the client's original witness; no metadata refresh. Update the existing mode
+LRU and nudge chat reconciliation only after commitment. Retain existing capacity,
+sequence and trust behavior; no new counter, transaction owner or replay store.
+
+Same key/same identity returns its receipt; different identity refuses with
+OPERATION_KEY_REUSED before inspecting current settings. A new key/stale witness
+returns VERSION_CONFLICT. First COMPLETE may return the already-prepared full
+settings projection; terminal replay is witness/key/state only, never today's
+settings. Open replay returns202 without a committed witness. A client must not
+treat receipt-only replay as a complete settings document or relabel a later GET
+as the attempted mutation's result. Preserve accepted failure identity and typed
+400/409/503/500 distinctions rather than calling every failure malformed JSON.
+
+Per-item implementation:
+1. Additive wire/read and prepared receipt projection: DTO/schema/generated types,
+   one-snapshot GET, corrupt-witness refusal and receipt round-trip proof.
+2. Public producer/controller: relocate current behavior to SettingsService, inject
+   the existing runner-backed service, refuse uncomposed writes, remove raw save and
+   config publication. Prove key-first lookup, changed input, full-witness conflict,
+   mode sequence/LRU, postcommit-only nudge, A-to-B/B-to-C/retry-A-to-B receipt.
+3. Frontend helper and all producers: one frozen key/witness/body/mode header per
+   logical attempt; retries never refresh any of them. Base-relative editors retain
+   the witness observed with their loaded data (especially Library exclusions).
+   An implicit global cached witness must not be attached to an older edited value.
+   Independent absolute field intents without a loaded base may obtain a GET before
+   creating the logical attempt. Preserve the shared UI-mode queue and event-time
+   sequence. Conflict requires refreshed observation and a new logical attempt,
+   never a silent witness/key replacement on the old request. Cover every direct
+   POST found in SettingsSurface, BrainSurface, LibrarySurface, Shell,
+   adaptationProfile and the public settings domain client.
+4. Retire every remaining public raw-save/rebuild bypass, enforce the executable
+   guard and run required integrated/frontend/live/model/installed/hosted proofs.
+
+The intermediate wire item keeps old writers only until the next planned items;
+it does not make this checkpoint independently shippable or close C2-6.
+
+Frontend review corrections: Library exclusions retain the witness only after a
+successful load; failed loads do not enable editing/saving an empty list. Preview
+and Apply run only after terminal COMPLETE. HTTP202/open is not success: replay
+the exact frozen attempt and keep the mode queue unsettled. Mode headers retain
+event-time sequencing, while the witness and key are captured when the queued
+writer starts. Failed/cancelled rows never echo a request witness as committed.
+The runner's durable COMPLETE replay reconstructs the nested committed pair from
+its receipt revision and row key; it never reads current settings.

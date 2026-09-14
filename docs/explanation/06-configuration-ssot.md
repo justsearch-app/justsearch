@@ -89,6 +89,13 @@ Path llmModel = Path.of(EnvRegistry.LLM_MODEL_PATH.getString("Qwen_Qwen3.5-9B-Q4
 versions before v3 cannot carry revision fields. A witness is either revision zero with no
 key or a positive revision with a canonical UUIDv7 key. Future versions are refused.
 
+GET /api/settings/v2 projects settings and their full nested witness from one
+store inspection. Both witness members are required when present, including an
+explicit null last key for revision zero. Response-only index-path defaults do not
+write the file. Unreadable state returns503 SETTINGS_RECOVERY_REQUIRED rather than
+a fabricated initial witness. Operation receipts carry their committed witness;
+receipt-only replay need not contain a full current settings document.
+
 The GPU override is one nullable field: null means automatic selection, zero explicitly
 selects CPU, and a positive value selects GPU offload. Reading an older envelope migrates
 zero to null because the previous resolver treated it as automatic; positive values and

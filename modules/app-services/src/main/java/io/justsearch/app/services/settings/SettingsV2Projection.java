@@ -13,6 +13,11 @@ public final class SettingsV2Projection {
   private SettingsV2Projection() {}
 
   public static SettingsV2 toSettingsV2(UiSettings settings, UiSettingsStore.PersistenceMode persistenceMode) {
+    return toSettingsV2(settings, persistenceMode, null);
+  }
+
+  public static SettingsV2 toSettingsV2(UiSettings settings, UiSettingsStore.PersistenceMode persistenceMode,
+      io.justsearch.app.api.settings.SettingsWitness witness) {
     var ui = new UiSettingsV2(
         settings.getTheme(), settings.isHighContrast(), settings.getDensity(),
         settings.isVimMode(), settings.getDefaultAction(),
@@ -25,7 +30,8 @@ public final class SettingsV2Projection {
         blankToNull(settings.getLlmModelPath()), blankToNull(settings.getLlamaLibPath()));
     String basePath = settings.getIndexBasePath();
     List<String> indexPaths = basePath == null || basePath.isBlank() ? List.of() : List.of(basePath);
-    return new SettingsV2(ui, llm, indexPaths, persistenceMode.name().toLowerCase(Locale.ROOT));
+    return new SettingsV2(ui, llm, indexPaths, persistenceMode.name().toLowerCase(Locale.ROOT),
+        witness, null, null);
   }
 
   private static String blankToNull(String value) {

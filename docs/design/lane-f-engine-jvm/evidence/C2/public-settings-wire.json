@@ -1,0 +1,153 @@
+{
+  "base": "09f91917e",
+  "testedSources": [
+    {
+      "path": "SSOT/schemas/settings-v2.v1.json",
+      "sha256": "b273be90dfc9e6f280ba784df47868053f15112d6c1ab8158fa4e94ed92aeb30"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsCommitOwner.java",
+      "sha256": "a2fcbf9a136934be1e6c7fa828dad7a5478b4a521cbec856f61b54d9fa1395a5"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsV2.java",
+      "sha256": "58bc30c904b2d907798a670b0f8cf22d9d2b77aa4212b1880c99b743f96835c4"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsWitness.java",
+      "sha256": "f81a97e0d89ddd6666633422c02cd22a3f9d6f68e94cf4759d98329b67a70be0"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsV2Projection.java",
+      "sha256": "f18a82e56b465cadb3e471ac30ca9c1f0d44682aeba051f2364f3336d73ada09"
+    },
+    {
+      "path": "modules/ui-web/src/api/__fixtures__/settings-v2-live.json",
+      "sha256": "5cf63b7c517b0b9120e44cf08739211a135426c30c1e1e82f53ddfa67b01a221"
+    },
+    {
+      "path": "modules/ui-web/src/api/generated/schema-types/settings-v2.test.ts",
+      "sha256": "cef2433d77090bc1a47e6b2e353e4d8901e133d4c587149a183dcfbd019d40e6"
+    },
+    {
+      "path": "modules/ui-web/src/api/generated/schema-types/settings-v2.ts",
+      "sha256": "538b235229701320f27d192d5d6fb7f40878a7c4fc060e7c97d2bdffc2807fa5"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SettingsController.java",
+      "sha256": "401e4194293890ae0a04f1aa9e51ca44e48c8d723a7fef69554389fbaea07447"
+    },
+    {
+      "path": "modules/ui/src/main/resources/SSOT/schemas/settings-v2.v1.json",
+      "sha256": "b273be90dfc9e6f280ba784df47868053f15112d6c1ab8158fa4e94ed92aeb30"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsV2ContractTest.java",
+      "sha256": "73d062d51ef61031ed03e5783f6d05f805fbcf44de4bcd5f9c0d30f9c3ed6ac1"
+    },
+    {
+      "path": "modules/app-api/src/test/java/io/justsearch/app/api/settings/SettingsWitnessWireTest.java",
+      "sha256": "69a9933c322ce62e92319bf2b6eb3b00d723f6504b1095ac06575d37e6d768c3"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsWitnessReadTest.java",
+      "sha256": "d9a32f677d3dc0e361b266afaee66a12f5a786d802ff3c8b8dde5cee6c5cd5d4"
+    }
+  ],
+  "verification": {
+    "revision": "09f91917e-plus-wire-correction",
+    "command": "full app-api app-services app-observability ui suites; applicable PMD/Spotless; ui integration compilation",
+    "summary": {
+      "tests": 4834,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "suites": 739
+    },
+    "tasks": [
+      {
+        "module": "app-api",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 207,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 43
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 2845,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "suites": 427
+      },
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 1222,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 186
+      },
+      {
+        "module": "app-observability",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 560,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 83
+      }
+    ]
+  },
+  "focusedJava": {
+    "tests": 49,
+    "failures": 0,
+    "evidence": "settings-wire1436-counts.json"
+  },
+  "frontend": {
+    "tests": 16,
+    "failures": 0,
+    "typecheck": "PASS"
+  },
+  "review": "Independent correction reread CLEAR; reviewer inspected RED1434 and GREEN1436 artifacts",
+  "rawRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp",
+  "artifacts": [
+    "settings-wire1431-generate.txt",
+    "settings-wire1432-counts.json",
+    "settings-wire1432-xml",
+    "settings-wire1432.txt",
+    "settings-wire1433-codegen.txt",
+    "settings-wire1433-frontend.txt",
+    "settings-wire1433-register-gates.txt",
+    "settings-wire1433-register.sarif",
+    "settings-wire1433-typecheck.txt",
+    "settings-wire1434-red-frontend.txt",
+    "settings-wire1434-red-java-counts.json",
+    "settings-wire1434-red-java-xml",
+    "settings-wire1434-red-java.txt",
+    "settings-wire1435-codegen.txt",
+    "settings-wire1435-generate.txt",
+    "settings-wire1436-counts.json",
+    "settings-wire1436-frontend.txt",
+    "settings-wire1436-typecheck.txt",
+    "settings-wire1436-xml",
+    "settings-wire1436.txt",
+    "settings-wire1437-counts.json",
+    "settings-wire1437-xml",
+    "settings-wire1437.txt"
+  ],
+  "retention": "Through lane acceptance plus30 days; export before worktree release",
+  "limits": [
+    "Public POST and frontend producers remain next; checkpoint cannot ship",
+    "No new live/model/installed proof",
+    "Hosted09f91917e CI34794274393 failed SystemAccessFunnelTest stale allowlist; correction tracked separately; final-head hosted remains owed"
+  ]
+}
