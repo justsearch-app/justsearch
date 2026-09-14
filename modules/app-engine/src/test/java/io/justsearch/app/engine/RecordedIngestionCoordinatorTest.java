@@ -558,6 +558,148 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  @Test
+  void cancellationBeforeFirstEnumerationPersistsAnEmptyCancelledReceipt() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
+        assertTrue(f.queue.recordedWalk(child.key()).isEmpty());
+        work.cancel("cancel before any producer exists");
+        assertFalse(f.coordinator.mayClaimRecorded(child.key()));
+        f.coordinator.maintain();
+        assertEquals(OperationState.CANCELLED, result.completion().toCompletableFuture()
+            .get(2, java.util.concurrent.TimeUnit.SECONDS).state());
+        var terminal = f.operations.find(child.key()).orElseThrow();
+        assertEquals(OperationState.CANCELLED, terminal.state());
+        assertEquals(0, terminal.unitsCompleted());
+        assertEquals(0, terminal.unitsFailed());
+        var receipt = f.queue.recordedWalk(child.key()).orElseThrow();
+        assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+        assertTrue(f.queue.pollPending(1).isEmpty());
+        AtomicInteger starts = new AtomicInteger();
+        f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+          starts.incrementAndGet(); return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+        });
+        assertEquals(0, starts.get(), "later producer binding cannot resurrect cancelled work");
+      }
+      assertEquals(0, f.admission.activeWorkCount());
+    }
+  }
+
+  @Test
+  void cancellationBetweenAuthorizationAndTokenPublicationCannotStartTheProducer() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      f.attachment.close();
+      JobQueue bridge = org.mockito.Mockito.mock(JobQueue.class,
+          org.mockito.AdditionalAnswers.delegatesTo(f.queue));
+      f.attachment = f.coordinator.attach(bridge, () -> Optional.of(GENERATION), () -> true);
+      var request = f.request();
+      var accepted = f.accept(request);
+      AtomicInteger starts = new AtomicInteger();
+      CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
+      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        starts.incrementAndGet();
+        cancellation.onCancel(() -> exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
+        return exit;
+      });
+      try (var work = f.admission.admit(request.context(), false)) {
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var cancelled = new java.util.concurrent.CountDownLatch(1);
+        CompletableFuture<Void> cancellationResult = new CompletableFuture<>();
+        Thread canceller = Thread.ofPlatform().start(() -> {
+          try {
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            work.cancel("cancel before producer token publication");
+            cancellationResult.complete(null);
+          } catch (Throwable failure) { cancellationResult.completeExceptionally(failure); }
+          finally { cancelled.countDown(); }
+        });
+        org.mockito.Mockito.doAnswer(invocation -> {
+          var progress = f.queue.beginRecordedWalk(invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
+          entered.countDown();
+          assertTrue(cancelled.await(2, java.util.concurrent.TimeUnit.SECONDS), "cancellation must not wait for coordinator lock");
+          cancellationResult.join();
+          return progress;
+        }).when(bridge).beginRecordedWalk(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyBoolean());
+        try {
+          var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+          assertEquals(0, starts.get(), "cancelled context cannot start a producer after token publication");
+          f.coordinator.maintain();
+          assertEquals(OperationState.CANCELLED, result.completion().toCompletableFuture()
+              .get(2, java.util.concurrent.TimeUnit.SECONDS).state());
+          var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
+          assertFalse(f.coordinator.mayClaimRecorded(child.key()));
+          var receipt = f.queue.recordedWalk(child.key()).orElseThrow();
+          assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+        } finally {
+          exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED);
+          entered.countDown();
+          canceller.join(3000);
+          assertFalse(canceller.isAlive());
+        }
+      }
+      assertEquals(0, f.admission.activeWorkCount());
+    }
+  }
+
+  @Test
+  void synchronousProducerRejectionSettlesChildBeforeParentFailure() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        throw new java.util.concurrent.RejectedExecutionException("bounded producer queue full");
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        assertEquals(OperationState.FAILED, result.completion().toCompletableFuture()
+            .get(2, java.util.concurrent.TimeUnit.SECONDS).state());
+        var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
+        assertEquals(OperationState.FAILED, child.state(), "producer rejection must not orphan the accepted child");
+        assertEquals("INGEST_ENUMERATION_FAILED", child.receipt().code());
+        var receipt = f.queue.recordedWalk(child.key()).orElseThrow();
+        assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+        assertEquals("INGEST_ENUMERATION_FAILED", f.operations.find(request.key()).orElseThrow().receipt().code());
+        assertFalse(f.coordinator.mayClaimRecorded(child.key()));
+      }
+      assertEquals(0, f.admission.activeWorkCount());
+    }
+  }
+
+  @Test
+  void cancellationCannotRecreateProgressAfterAnEnumerationHasStarted() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
+      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        cancellation.onCancel(() -> exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
+        return exit;
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
+        assertTrue(f.queue.recordedWalk(child.key()).isPresent());
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+            var delete = connection.prepareStatement("DELETE FROM ingestion_walk_progress WHERE operation_key = ?")) {
+          delete.setString(1, child.key());
+          assertEquals(1, delete.executeUpdate());
+        }
+        work.cancel("cancel after recorded progress was lost");
+        f.coordinator.maintain();
+        assertEquals(OperationState.FAILED, result.completion().toCompletableFuture()
+            .get(2, java.util.concurrent.TimeUnit.SECONDS).state());
+        assertEquals(RecordedIngestionSettlement.UNAVAILABLE, f.operations.find(request.key()).orElseThrow().receipt().code());
+        assertEquals(RecordedIngestionSettlement.UNAVAILABLE, f.operations.find(child.key()).orElseThrow().receipt().code());
+        assertTrue(f.queue.recordedWalk(child.key()).isEmpty(), "lost evidence cannot be rebuilt as an empty cancellation");
+      }
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore operations;
     final SqliteJobQueue queue;

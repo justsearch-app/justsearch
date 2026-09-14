@@ -73,7 +73,7 @@ final class OperationsMaintenanceTimerTest {
     CapturingRegistry executors = new CapturingRegistry();
     OperationStore operations = mock(OperationStore.class);
 
-    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors);
+    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors, () -> {});
     try {
       CapturingRegistration registration = executors.registrations.getFirst();
       assertEquals("head.operations-maintenance", registration.spec.name());
@@ -156,7 +156,7 @@ final class OperationsMaintenanceTimerTest {
       setUpdatedAt(path, accepted.id(), 1);
 
       CapturingRegistry executors = new CapturingRegistry();
-      AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors);
+      AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors, () -> {});
       try {
         var scheduler = executors.registrations.getFirst().scheduler;
         scheduler.advanceTo(29, TimeUnit.SECONDS);
@@ -193,7 +193,7 @@ final class OperationsMaintenanceTimerTest {
     ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();
     logger.addAppender(appender);
-    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors);
+    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors, () -> {});
     try {
       CapturingRegistration registration = executors.registrations.getFirst();
       registration.scheduler.advanceTo(30, TimeUnit.SECONDS);
@@ -227,7 +227,7 @@ final class OperationsMaintenanceTimerTest {
     appender.start();
     logger.addAppender(appender);
     CapturingRegistry executors = new CapturingRegistry();
-    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors);
+    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors, () -> {});
     try {
       CapturingRegistration registration = executors.registrations.getFirst();
       registration.scheduler.advanceTo(3600, TimeUnit.SECONDS);
@@ -255,7 +255,7 @@ final class OperationsMaintenanceTimerTest {
     AssertionError fatal = new AssertionError("fatal checkpoint failure");
     doThrow(fatal).when(operations).checkpointDurableOperations();
     CapturingRegistry executors = new CapturingRegistry();
-    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors);
+    AutoCloseable handle = HeadAssembly.startOperationsMaintenanceTimer(operations, executors, () -> {});
     try {
       CapturingRegistration registration = executors.registrations.getFirst();
       assertSame(
@@ -273,7 +273,7 @@ final class OperationsMaintenanceTimerTest {
     CapturingRegistry timeoutRegistry = new CapturingRegistry();
     timeoutRegistry.timeoutFirst = true;
     AutoCloseable timeoutHandle =
-        HeadAssembly.startOperationsMaintenanceTimer(mock(OperationStore.class), timeoutRegistry);
+        HeadAssembly.startOperationsMaintenanceTimer(mock(OperationStore.class), timeoutRegistry, () -> {});
     CapturingRegistration timeoutRegistration = timeoutRegistry.registrations.getFirst();
     assertTrue(
         assertThrows(IllegalStateException.class, timeoutHandle::close)
@@ -290,7 +290,7 @@ final class OperationsMaintenanceTimerTest {
     interruptionRegistry.interruptFirst = true;
     AutoCloseable interruptionHandle =
         HeadAssembly.startOperationsMaintenanceTimer(
-            mock(OperationStore.class), interruptionRegistry);
+            mock(OperationStore.class), interruptionRegistry, () -> {});
     CapturingRegistration interruptionRegistration =
         interruptionRegistry.registrations.getFirst();
     assertTrue(

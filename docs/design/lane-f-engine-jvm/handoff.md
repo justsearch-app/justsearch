@@ -2,12 +2,14 @@
 
 ## Current state (2026-09-14)
 
-2026-09-14 cut3 stable coordinator is implemented and under verification:1730 focused
-checks report50 cases (28 executed Engine cases,22 reused API/maintenance), no failures.
-Five guard negative controls fail as intended. Second review reproduced an async-stop
-flush gap in1733;1734 now passes all29 Engine cases. Integrated1735 is running. [Owning evidence, corrections
-and remaining acceptance](evidence/C2/ingestion-coordinator.md). Full-suite/hosted proof
-and actual bounded producer/prepared-handler wiring remain. C2 open; merge at F.
+2026-09-14 stable coordinator checkpointfa66bb1cb passes full Engine/API/store/services
+(4,031 cases, three existing skips) in1735. Hosted CI passes12/13; remaining app-ui guard
+finds the unbound producer and a superseded maintenance overload. Root corrected two
+cancellation edges, synchronous producer rejection and removed that overload.1744 passes45
+focused cases;1745/1746 prove lost progress cannot be reconstructed as empty cancellation.
+1747 passes the whole-program audit and reuses46 unchanged focused cases. [Owning evidence and remaining work](evidence/C2/ingestion-coordinator.md).
+Next is recorded force-at-claim semantics, then actual bounded producer and prepared handler
+wiring. C2 remains open; merge remains at F.
 
 C2-9b.3b.3 receipt-only settlement now passes integrated1718:1,069 cases/186 suites,
 zero skips/failures/errors, six PMD tasks and format. Focused15 cases, seven discriminating

@@ -46,6 +46,7 @@ import java.util.function.BooleanSupplier;
 
 /** Stable Engine owner of finite parent/child attempts; physical queue attachments are replaceable. */
 final class RecordedIngestionCoordinator implements RecordedIngestionService, RecordedIngestionLifecycle {
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RecordedIngestionCoordinator.class);
   /** Completion is actual producer exit, including cancellation/deadline cleanup, not caller release. */
   @FunctionalInterface
   interface Producer {
@@ -176,6 +177,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           child.fresh = false;
           if (child.cancellation != null) child.cancellation.cancel("index attachment stopping");
           if (child.exit != null) pending.add(child.exit.handle((ignored, failure) -> null));
+          if (child.notification != null) pending.add(child.notification);
         }
       }
       exits = pending.toArray(CompletableFuture<?>[]::new);
@@ -530,7 +532,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
       return;
     }
-    boolean allowed = parent.refusal == null && parent.work != null
+    boolean allowed = !parent.cancelled && parent.refusal == null && parent.work != null
         && !(parentDecision instanceof RecordedIngestRecoveryDecision.Wait)
         && physical.generationValue().filter(child.plan.generation()::equals).isPresent()
         && physical.online.getAsBoolean()
@@ -561,6 +563,13 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
       if (parent.refusal != null) {
         permissions.remove(row.key());
+        if (observed.isEmpty() && child.createIfMissing) {
+          // Same-attempt proof of no producer activity permits an empty refused receipt.
+          var empty = physical.queue.beginRecordedWalk(row.key(), planHash(child.plan), true);
+          child.createIfMissing = false;
+          child.epoch = empty.enumerationEpoch();
+          observed = Optional.of(empty);
+        }
         if (observed.isEmpty()) throw new JobQueue.RecordedWalkGapException("Refused child has no recorded progress");
         var progress = observed.orElseThrow();
         if (progress.enumerationClosedAt() == null) physical.queue.closeRecordedWalkEnumeration(row.key(),
@@ -581,9 +590,25 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
             child.createIfMissing = false;
             child.epoch = progress.enumerationEpoch();
             child.cancellation = new CancelToken();
-            child.exit = physical.producer.enumerate(child.plan.roots().getFirst(), row.key(), child.epoch,
-                parent.work.context(), child.cancellation).toCompletableFuture();
-            child.exit.whenComplete((ignored, failure) -> maintain());
+            if (parent.cancelled) {
+              child.cancellation.cancel("parent cancelled before producer publication");
+              child.exit = CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
+            } else {
+              try {
+                child.exit = physical.producer.enumerate(child.plan.roots().getFirst(), row.key(), child.epoch,
+                    parent.work.context(), child.cancellation).toCompletableFuture();
+              } catch (RuntimeException rejected) {
+                // A synchronous rejection owns no producer; settle through the same receipt barrier.
+                child.exit = CompletableFuture.failedFuture(rejected);
+              }
+            }
+            child.notification = child.exit.handle((ignored, failure) -> {
+              try { maintain(); }
+              catch (RuntimeException retryable) {
+                log.error("Recorded ingestion completion notification failed; maintenance will retry", retryable);
+              }
+              return null;
+            });
             if (!child.exit.isDone()) return;
           }
           JobQueue.WalkEnumerationOutcome outcome;
@@ -747,6 +772,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     long epoch;
     volatile CancelToken cancellation;
     CompletableFuture<JobQueue.WalkEnumerationOutcome> exit;
+    CompletableFuture<Void> notification;
     Child(OperationRecord row, OperationRecordHandle handle, RecordedRootPlan plan, boolean fresh, boolean createIfMissing) {
       this.row = row; this.handle = handle; this.plan = plan; this.fresh = fresh; this.createIfMissing = createIfMissing;
     }

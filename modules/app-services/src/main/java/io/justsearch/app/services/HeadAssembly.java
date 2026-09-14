@@ -1644,12 +1644,6 @@ public final class HeadAssembly implements AutoCloseable {
 
   static AutoCloseable startOperationsMaintenanceTimer(
       io.justsearch.app.api.operations.OperationStore operations,
-      io.justsearch.core.execution.EngineExecutorRegistry executors) {
-    return startOperationsMaintenanceTimer(operations, executors, () -> {});
-  }
-
-  static AutoCloseable startOperationsMaintenanceTimer(
-      io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.core.execution.EngineExecutorRegistry executors, Runnable ingestionMaintenance) {
     Objects.requireNonNull(ingestionMaintenance, "ingestionMaintenance");
     Objects.requireNonNull(operations, "operations");

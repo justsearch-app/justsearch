@@ -637,3 +637,27 @@ replacement leaves enumeration open and the same pending parent work replayable;
 parent cancellation can settle CANCELLED after drain. The exact old epoch/plan is checked
 before persisting a completed enumeration. The async-stop regression1733 refutes relying
 only on a pre-stop maintenance tick. [Current implementation proof](ingestion-coordinator.md).
+
+## Cancellation before producer publication (2026-09-14)
+
+Second cut3 review found two edges before the first producer starts. Cancellation after
+child acceptance but before beginRecordedWalk has no missing effect evidence: the existing
+private createIfMissing fact proves that this attempt never entered queue creation. Only
+that same-attempt fact permits creation, immediate refused closure (CANCELLED for cancellation,
+FAILED for another known refusal) and sealing of an empty exact-plan walk, followed by the
+normal runner terminal/ack barrier. Missing progress after
+queue creation or full restart still fails unavailable. No producer or claim is permitted.
+
+The cancellation callback remains lock-free. Publish the child token, then recheck the
+volatile parent cancellation flag before invoking the producer. A cancellation before token
+publication is seen by this recheck; one after publication cancels the published token.
+Also include cancellation in the preliminary allowed decision. A latch regression pauses
+inside the real queue begin, after authorization and before token publication, and cancels
+from another thread. It must prove zero producer invocations and durable CANCELLED receipts.
+These are corrections within the decided cancellation/fencing rule, not new authority.
+
+A synchronous bounded producer rejection must be represented as an exited failed producer
+and flow through child enumeration failure, sealing, runner terminal and acknowledgement
+before parent failure. Once a producer owns an active task it must return that task's actual
+exit stage, even on cancellation/error; throwing after starting an unreported task is forbidden.
+Root regression1743 reproduced an orphan/escaping rejection and1744 proves the correction.
