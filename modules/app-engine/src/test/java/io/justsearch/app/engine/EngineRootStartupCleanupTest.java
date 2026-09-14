@@ -20,7 +20,6 @@ import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /** Startup cleanup proof for EngineRoot's retained KnowledgeServer owner. */
@@ -36,7 +35,11 @@ final class EngineRootStartupCleanupTest {
 
     KnowledgeServer replacement = mockServer();
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root(gauge -> factoryCalls.getAndIncrement() == 0 ? failed : replacement);
+    EngineRoot root = root((gauge, executors, ingestion) -> {
+      if (factoryCalls.getAndIncrement() == 0) return failed;
+      EngineRootRecordedLifecycleTestSupport.bindOffline(replacement, ingestion);
+      return replacement;
+    });
     try {
       IOException observed = assertThrows(IOException.class,
           () -> root.start(new GpuSchedulingGauge(), IpcTelemetry.noop()));
@@ -66,7 +69,11 @@ final class EngineRootStartupCleanupTest {
 
     KnowledgeServer replacement = mockServer();
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root(gauge -> factoryCalls.getAndIncrement() == 0 ? failed : replacement);
+    EngineRoot root = root((gauge, executors, ingestion) -> {
+      if (factoryCalls.getAndIncrement() == 0) return failed;
+      EngineRootRecordedLifecycleTestSupport.bindOffline(replacement, ingestion);
+      return replacement;
+    });
     try {
       assertSame(startFailure, assertThrows(IOException.class,
           () -> root.start(new GpuSchedulingGauge(), IpcTelemetry.noop())));
@@ -86,7 +93,7 @@ final class EngineRootStartupCleanupTest {
     when(failed.awaitClosed(anyLong())).thenReturn(false, true);
 
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root(gauge -> {
+    EngineRoot root = root((gauge, executors, ingestion) -> {
       factoryCalls.incrementAndGet();
       return failed;
     });
@@ -114,7 +121,7 @@ final class EngineRootStartupCleanupTest {
         .thenReturn(true);
 
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root(gauge -> {
+    EngineRoot root = root((gauge, executors, ingestion) -> {
       factoryCalls.incrementAndGet();
       return failed;
     });
@@ -145,7 +152,7 @@ final class EngineRootStartupCleanupTest {
     return server;
   }
 
-  private static EngineRoot root(Function<GpuSchedulingGauge, KnowledgeServer> factory) {
+  private static EngineRoot root(EngineRoot.ServerFactory factory) {
     return new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class), factory,
         1_000, 100, ignored -> {}, () -> {}, OperationAuthority.inMemory());
   }

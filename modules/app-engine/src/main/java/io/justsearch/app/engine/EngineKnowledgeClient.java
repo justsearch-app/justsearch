@@ -19,6 +19,12 @@ import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.ScanRootProgress;
+import io.justsearch.ipc.ScanMode;
+import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import io.justsearch.ipc.ScanRootRequest;
 import io.justsearch.ipc.SubscribeIndexingJobsRequest;
 import java.util.Objects;
@@ -436,8 +442,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private static final int CANCELLED = 3;
 
     private final AtomicInteger state = new AtomicInteger(QUEUED);
-    private final java.util.concurrent.CompletableFuture<Void> completion =
-        new java.util.concurrent.CompletableFuture<>();
+    private final CompletableFuture<Void> completion =
+        new CompletableFuture<>();
     private final Budget budget;
     private final io.justsearch.app.api.EngineWorkHandle work;
     private final Runnable body;
@@ -579,7 +585,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
       Function<Budget, T> body) {
     var work = admission.attach(engineContext);
-    var pending = new java.util.concurrent.CompletableFuture<T>();
+    var pending = new CompletableFuture<T>();
     Budget budget;
     try {
       budget = new Budget(budgetMs, work, pending::completeExceptionally);
@@ -660,7 +666,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
   }
 
-  private static <T> T decidedResult(String operation, java.util.concurrent.CompletableFuture<T> pending) {
+  private static <T> T decidedResult(String operation, CompletableFuture<T> pending) {
     try {
       return pending.join();
     } catch (java.util.concurrent.CancellationException cancelled) {
@@ -774,6 +780,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   protected void executeRootWalk(ExecutorService executor, Consumer<EngineContext> body,
       EngineContext engineContext) {
+    scheduleRootWalk(executor, body, engineContext, null);
+  }
+
+  private CompletionStage<Void> scheduleRootWalk(ExecutorService executor, Consumer<EngineContext> body,
+      EngineContext engineContext, CancelToken cancellation) {
     var owner = admission.attach(engineContext);
     var trace = io.opentelemetry.context.Context.current();
     String requestId = currentRequestId();
@@ -790,15 +801,17 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }, false);
     try {
       task.armCancellation();
+      if (cancellation != null) cancellation.onCancel(() -> task.cancel(false));
       task.executeOn(executor);
     } catch (RuntimeException | Error failure) {
-      task.cancel(false);
+      task.cancelAfterSchedulingFailure(failure);
       if (failure instanceof java.util.concurrent.RejectedExecutionException) throw engineLimit();
       throw failure;
     }
+    return task.completion.minimalCompletionStage();
   }
 
-  private void executeOwnedStream(io.justsearch.app.api.EngineWorkHandle work, Runnable body,
+  private CompletionStage<Void> executeOwnedStream(io.justsearch.app.api.EngineWorkHandle work, Runnable body,
       boolean countForeground) {
     var owner = work.retain();
     var task = new OwnedStreamTask(work, owner, body, countForeground);
@@ -807,9 +820,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       task.armCancellation();
       task.executeOn(executor);
     } catch (RuntimeException | Error failure) {
-      task.cancel(false);
+      task.cancelAfterSchedulingFailure(failure);
       throw failure;
     }
+    return task.completion.minimalCompletionStage();
   }
 
   /** A queued stream or root walk releases its retained work if it never starts. */
@@ -820,8 +834,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private static final int CANCELLED = 3;
 
     private final AtomicInteger state = new AtomicInteger(QUEUED);
-    private final java.util.concurrent.CompletableFuture<Void> completion =
-        new java.util.concurrent.CompletableFuture<>();
+    private final CompletableFuture<Void> completion =
+        new CompletableFuture<>();
     private final io.justsearch.app.api.EngineWorkHandle work;
     private final io.justsearch.app.api.EngineWorkHandle owner;
     private final Runnable body;
@@ -863,7 +877,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         failure = cause;
       } finally {
         state.set(FINISHED);
-        cleanup();
+        failure = cleanup(failure);
       }
       if (failure == null) {
         completion.complete(null);
@@ -875,24 +889,50 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       }
     }
 
-    private void cleanup() {
+    private Throwable cleanup(Throwable failure) {
       var registration = cancellation.getAndSet(null);
-      if (registration != null) registration.close();
-      owner.close();
+      try {
+        if (registration != null) registration.close();
+      } catch (Throwable cause) {
+        if (failure == null) failure = cause;
+        else if (failure != cause) failure.addSuppressed(cause);
+      }
+      try {
+        owner.close();
+      } catch (Throwable cause) {
+        if (failure == null) failure = cause;
+        else if (failure != cause) failure.addSuppressed(cause);
+      }
+      return failure;
     }
 
     @Override
     public synchronized boolean cancel(boolean mayInterruptIfRunning) {
       if (!state.compareAndSet(QUEUED, CANCELLED)) return false;
+      Throwable failure = null;
       try {
-        if (queueOwner instanceof java.util.concurrent.ThreadPoolExecutor pool) {
-          pool.remove(this);
-        }
-        cleanup();
-      } finally {
-        completion.cancel(false);
+        if (queueOwner instanceof java.util.concurrent.ThreadPoolExecutor pool) pool.remove(this);
+      } catch (Throwable cause) {
+        failure = cause;
       }
+      failure = cleanup(failure);
+      if (failure == null) completion.cancel(false);
+      else completion.completeExceptionally(failure);
       return true;
+    }
+
+    void cancelAfterSchedulingFailure(Throwable schedulingFailure) {
+      cancel(false);
+      if (!completion.isCompletedExceptionally() || completion.isCancelled()) return;
+      try {
+        completion.join();
+      } catch (java.util.concurrent.CompletionException stopped) {
+        Throwable cleanupFailure = stopped.getCause();
+        if (cleanupFailure != schedulingFailure) cleanupFailure.addSuppressed(schedulingFailure);
+        if (cleanupFailure instanceof RuntimeException runtime) throw runtime;
+        if (cleanupFailure instanceof Error error) throw error;
+        throw new IllegalStateException(cleanupFailure);
+      }
     }
 
     @Override
@@ -919,6 +959,45 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
   }
 
+  /** One accepted child on the existing bounded walker; completion means both owned tasks exited. */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
+      String childKey, long epoch, EngineContext context, CancelToken cancellation) {
+    Objects.requireNonNull(plan, "plan");
+    Objects.requireNonNull(cancellation, "cancellation");
+    if (plan.roots().size() != 1) throw new IllegalArgumentException("Recorded producer requires one root");
+    var root = plan.roots().getFirst();
+    var builder = ScanRootRequest.newBuilder().setRootPath(root.path().toString())
+        .setMode(root.force() ? ScanMode.SCAN_MODE_FORCE_REINDEX : ScanMode.SCAN_MODE_INITIAL)
+        .addAllExcludeGlobs(root.excludePatterns());
+    if (root.collection() != null) builder.setCollection(root.collection());
+    var request = builder.build();
+    var recorded = new WorkerIngestService.RecordedRootScan(request, childKey, epoch,
+        plan.generation(), root.singleFile(), root.excludedSubtrees());
+    var delivery = new AtomicReference<CompletionStage<Void>>(CompletableFuture.completedFuture(null));
+    var outcome = new AtomicReference<>(JobQueue.WalkEnumerationOutcome.FAILED);
+    var walk = scheduleRootWalk(rootWalkExecutor(), ownedContext -> {
+      try (var work = admission.attach(ownedContext)) {
+        var terminal = foregroundLoad.call(work, () ->
+            scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
+        outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
+            ? JobQueue.WalkEnumerationOutcome.CANCELLED
+            : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
+                ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+      }
+    }, context, cancellation);
+    // handle + thenCompose waits for delivery even when the walk failed; allOf with a separately
+    // captured default would miss a delivery task scheduled after the producer returned.
+    return walk.handle((ignored, failure) -> failure).thenCompose(walkFailure ->
+        delivery.get().handle((ignored, deliveryFailure) -> {
+          if (walkFailure != null) {
+            if (deliveryFailure != null && walkFailure != deliveryFailure) walkFailure.addSuppressed(deliveryFailure);
+            throw new java.util.concurrent.CompletionException(walkFailure);
+          }
+          if (deliveryFailure != null) throw new java.util.concurrent.CompletionException(deliveryFailure);
+          return outcome.get();
+        }));
+  }
+
   @Override
   protected ScanRootProgress executeScanRoot(
       ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progressConsumer,
@@ -930,6 +1009,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private ScanRootProgress scanRootWork(ScanRootRequest request, CancelToken cancelToken,
       Consumer<ScanRootProgress> progressConsumer, io.justsearch.app.api.EngineWorkHandle work) {
+    return scanRootWork(request, cancelToken, progressConsumer, work, null, null);
+  }
+
+  private ScanRootProgress scanRootWork(ScanRootRequest request, CancelToken cancelToken,
+      Consumer<ScanRootProgress> progressConsumer, io.justsearch.app.api.EngineWorkHandle work,
+      WorkerIngestService.RecordedRootScan recorded,
+      AtomicReference<CompletionStage<Void>> deliveryExit) {
     String traceId = currentTraceId();
     String requestId = currentRequestId();
     // Item A8: the same bounded hand-off item A7 built, between the WALKER thread and the SSE
@@ -948,7 +1034,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                       progressConsumer.accept(event);
                     },
                     deliveryFailure::set,
-                    body -> executeOwnedStream(work, body, false),
+                    body -> {
+                      var exit = executeOwnedStream(work, body, false);
+                      if (deliveryExit != null) deliveryExit.set(exit);
+                    },
                     // BLOCK: the producer is the walker thread, which holds a directory iterator
                     // and nothing else. Pausing it pauses this scan and nothing else — the
                     // backpressure the wire used to apply. Compare subscribeIndexingJobs, whose
@@ -959,6 +1048,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // and per directory, so a cancel lands within a file — well inside the 100-file progress tick
     // the item asks for.
     FlowCancelSignal cancel = new FlowCancelSignal();
+    var deadlineExpired = new java.util.concurrent.atomic.AtomicBoolean();
     try (flow) {
       flow.onClose(cancel::cancel);
       try (var _ = work.onCancel(reason -> cancel.cancel())) {
@@ -973,18 +1063,19 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         // has to STOP, and the terminal event the walker then emits is the honest answer. This is the
         // same LONG_RUNNING category the wire applied.
         ScheduledFuture<?> alarm =
-            scheduleDeadline(cancel::cancel, deadline(RpcDeadlineCategory.LONG_RUNNING));
+            scheduleDeadline(() -> {
+              deadlineExpired.set(true);
+              cancel.cancel();
+            }, deadline(RpcDeadlineCategory.LONG_RUNNING));
         try {
-          requireService(WorkerAppServices::ingestService)
-              .scanRoot(
-                  request,
-                  event -> {
-                    if (!flow.publish(event)) {
-                      // The consumer stopped draining, or the caller closed the flow: stop walking.
-                      cancel.cancel();
-                    }
-                  },
-                  new CallContext(traceId, requestId, cancel, work.context(), enqueueProvenance(work.context()), () -> work.retain()::close));
+          Consumer<ScanRootProgress> sink = event -> {
+            if (!flow.publish(event)) cancel.cancel();
+          };
+          var call = new CallContext(traceId, requestId, cancel, work.context(),
+              enqueueProvenance(work.context()), () -> work.retain()::close);
+          var service = requireService(WorkerAppServices::ingestService);
+          if (recorded == null) service.scanRoot(request, sink, call);
+          else service.scanRecordedRoot(recorded, sink, call);
         } finally {
           alarm.cancel(false);
           // The walk has ended; let the frames it already handed over reach the consumer before the
@@ -1013,6 +1104,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       io.justsearch.core.execution.EngineFutures.rethrowCancellation(failed);
       throw WorkerServiceException.internal("scanRoot progress delivery failed: " + failed);
     }
+    // Recorded completion cannot turn a late clean frame into success after its deadline fired.
+    if (recorded != null && deadlineExpired.get()) return scanCancelledEvent();
     ScanRootProgress terminal = last.get();
     if (terminal != null) {
       // The worker already stamps CLIENT_CANCELLED on its own terminal event when it observes the
@@ -1140,9 +1233,9 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     };
   }
 
-  private static io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance enqueueProvenance(
+  private static JobQueue.EnqueueProvenance enqueueProvenance(
       EngineContext context) {
-    return new io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance(
+    return new JobQueue.EnqueueProvenance(
         io.justsearch.app.services.intent.EngineProvenance.originator(context), context.transport());
   }
 

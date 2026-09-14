@@ -2,27 +2,31 @@
 
 ## Current state (2026-09-14)
 
-Current d.3b.2a.3 [recovery routing](evidence/C2/recovery-routing.md) is implemented
-against d23f1136e plus its per-item diff. Embedding/brake conditions select full rebuild; schema
-conditions retain force-reindex. Per-condition arguments survive REST/SSE into catalog controls,
-including inline confirmation and error display. Connection-scoped SSE precedence prevents stale
-REST overwrites and rejects old connection responses. Final1809 passes6,589 frontend cases/490
-files;1808 typecheck/37 focused cases pass;1810 represents62 Java cases with no failures (17 newly
-executed,45 cached), plus unchanged schema proof from1791/1799. Seven injected assertion failures
-and the two pre-fix regressions discriminate the corrections. Independent source review is clear;
-independent final evidence review is also clear. The per-item commit follows. Fixture UI1802 has zero accessibility,
-console or overflow findings; live/installed/final hosted proof remains outstanding.
+Current d.3b.2b [bounded recorded Engine producer](evidence/C2/recorded-engine-producer.md)
+is implemented against pushed1a75eb891 plus its per-item diff. EngineRoot binds after physical
+queue attachment; the producer reuses bounded admission and waits for actual walk and delivery
+cleanup. Failed bind/close retains unready ownership. Real SQLite/queue/Java scan integration
+covers frozen identity, force, exact provenance, receipts and replacement preserving the parent.
+Final1826 executes3,240 cases/490 suites with three existing skips and no failures/errors;
+four PMD tasks and format pass. Fault injections discriminate early completion, unready startup,
+cleanup release, rejection and deadline handling. Independent source review is clear; final
+evidence reconciliation is also clear. No dev stack or UI helper remains owned/running.
 
-Prerequisites are pushed:40a9a14b9 selected-force/provenance and d23f1136e legacy recovery
-visibility/coverage/strict counts. Their [evidence](evidence/C2/recorded-force-compatibility.md)
-remains applicable. d23f1136e hosted CI34893182564 passes12/13; only the unbound producer method
-fails on all three attempts. CLA34893179972 passes. No exemption is authorized or needed.
+Next .3 connects prepared ingest/reindex handlers and REST ingestion to this durable producer.
+Root is resolving preparation ownership from current code before freezing that implementation.
+Read-only discovery is tmp/recorded-handler-discovery.md; the authoritative requirements remain
+[evidence/C2/C2-8d-vertical-plan.md](evidence/C2/C2-8d-vertical-plan.md) and
+[recorded-ingest-binding.md](evidence/C2/recorded-ingest-binding.md). The older
+recorded-root-preparation.md mechanism is explicitly superseded. C2 stays open, merge remains
+at F, and root owns lifecycle, SQL, source installation, shared builds and publication.
 
-Next .2b binds the bounded Engine producer and proves actual producer/delivery exit, followed by
-.3 prepared handlers and all final C2 integrated/live/installed/hosted reconciliation. No producer
-is bound yet. C2 remains open, merge stays at F, and root owns lifecycle, SQL, builds and source
-installation. The investigated draft is tmp/recorded-producer-exit-design.md; freeze it in the
-owning design after the prerequisite commit, before implementation.
+Prerequisite recovery routing is pushed1a75eb891: final1809 passes6,589 frontend cases,
+1808 typecheck/focused checks pass, and1810 represents62 Java cases (17 new,45 cached).
+Independent source/evidence review and fixture UI checks pass; live rebuilding is not claimed.
+[Recovery proof](evidence/C2/recovery-routing.md). Hosted CI34896562458 passes12/13 jobs,
+failing the unreferenced-code guard; CLA34896560028 passes. The new producer binding still
+requires its own hosted proof. Earlier40a9a14b9/d23f1136e force/legacy prerequisites retain
+[their evidence](evidence/C2/recorded-force-compatibility.md).
 
 Recorded scan admission is pushed17d56daf0 with52 final1769 cases and independent negative proofs.
 Its hosted CI34887604012 passes12/13 jobs; app-ui fails only the still-unbound producer method on three attempts, while

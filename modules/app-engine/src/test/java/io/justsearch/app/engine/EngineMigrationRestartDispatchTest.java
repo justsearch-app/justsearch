@@ -26,7 +26,7 @@ final class EngineMigrationRestartDispatchTest {
     EngineTestHarness.publishConfig(dataDir, dataDir.resolve("index"), Map.of());
     var restarts = new AtomicInteger();
     try (var root = new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
-        gauge -> new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(gauge)),
+        (gauge, executors, ingestion) -> new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(gauge), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion),
         30_000L, 5_000, code -> { throw new AssertionError("unexpected fatal exit " + code); },
         restarts::incrementAndGet)) {
       var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());

@@ -186,10 +186,10 @@ final class EngineRootTerminalWriterFailureTest {
     KnowledgeServer[] server = new KnowledgeServer[1];
     EngineRoot root =
         new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
-            gauge -> {
+            (gauge, executors, ingestion) -> {
               server[0] =
-                  new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
-                      WorkerConfig.load(), new InProcessWorkerSignalBus(gauge));
+                  new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(gauge),
+                      io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion);
               return server[0];
             },
             30_000L,

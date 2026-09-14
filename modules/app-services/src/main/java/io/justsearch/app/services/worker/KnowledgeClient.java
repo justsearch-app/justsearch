@@ -299,6 +299,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         }
     }
 
+    /** Borrow the existing bounded walk executor; its registration remains owned by this client. */
+    protected final ExecutorService rootWalkExecutor() { return walkExecutor; }
+
     /** Retain exact work before a root walk enters its bounded executor queue. */
     protected abstract void executeRootWalk(
         ExecutorService executor, java.util.function.Consumer<EngineContext> body,

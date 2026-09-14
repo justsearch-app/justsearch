@@ -253,7 +253,18 @@ issued owners return. Recorded progress notifications capture actual changes on 
 connection, promote keys only after commit and deliver after the outermost lock release.
 Subscribers read the latest durable receipt; runtime observer failure does not undo the
 queue commit. The display change stream retains its separate under-lock ordering.
-These queue primitives do not yet activate recorded producers or the operations retry cadence.
+EngineRoot binds the recorded producer only after the physical lifecycle attaches. It uses the
+existing single-thread bounded root-walk executor and passes the accepted one-root plan's key,
+epoch, generation, root shape and frozen policy directly to WorkerIngestService. Service lookup
+occurs at execution, so replacement does not leave a cached service behind. Queue receipts remain
+the durable progress authority; a finished walk alone cannot complete its parent operation.
+
+Producer completion waits for both the filesystem walk and the progress-delivery task to release
+their owners, including on cancellation or deadline expiry. Queued cancellation removes the exact
+task; replacing the index cancels the producer without cancelling the durable parent. Cleanup
+attempts every owned release and reports failures. Failed activation or incomplete close retains
+an unready client/server and prevents a new start from returning that client. Dispatcher entry
+still requires the accepted, prepared operation row; binding grants no independent authorization.
 
 **Invariant:** any operator-visible export of ledger or queue data carries a `path_hash` (SHA-256 over the normalized absolute path), never the raw path, and never any path-derived field that could reverse-map to the user's filesystem.
 

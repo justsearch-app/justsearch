@@ -50,7 +50,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   /** Completion is actual producer exit, including cancellation/deadline cleanup, not caller release. */
   @FunctionalInterface
   interface Producer {
-    CompletionStage<JobQueue.WalkEnumerationOutcome> enumerate(RecordedRootPlan.Root root,
+    CompletionStage<JobQueue.WalkEnumerationOutcome> enumerate(RecordedRootPlan plan,
         String childKey, long epoch, EngineContext context, CancelToken cancellation);
   }
 
@@ -598,7 +598,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
               child.exit = CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
             } else {
               try {
-                child.exit = physical.producer.enumerate(child.plan.roots().getFirst(), row.key(), child.epoch,
+                child.exit = physical.producer.enumerate(child.plan, row.key(), child.epoch,
                     parent.work.context(), child.cancellation).toCompletableFuture();
               } catch (RuntimeException rejected) {
                 // A synchronous rejection owns no producer; settle through the same receipt barrier.

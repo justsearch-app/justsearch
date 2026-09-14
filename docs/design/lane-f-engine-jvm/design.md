@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2 d.3b.2b reuses the bounded root-walk executor and existing owned delivery completion, composes their actual exits, and binds only after physical queue attachment. A failed bind/close retains unready ownership; test factories retain the same lifecycle input. [Frozen mechanism and verification](evidence/C2/recorded-engine-producer.md).
+
 - 2026-09-14: C2 d.3b.2a.3 preserves each condition's recovery arguments through the existing inverse-index projection and uses the catalog operation control for confirmation. Embedding/brake causes select full rebuild; schema causes retain incremental forced reindex. Serve the already-advertised schema from its packaged copy; connection-scoped SSE precedence prevents a late REST response from reverting the remedy. [Owning mechanism and acceptance plan](evidence/C2/recovery-routing.md).
 
 - 2026-09-14: C2 d.3b.2a.2 requires durable, reader-visible and exactly covered legacy re-marking before compatibility transition; normal/shutdown certification refuses unreadable pending counts and resets consecutive-zero evidence. Reuse existing recovery/commit/count owners, with no new marker or global queue gate. [Mechanism and proof](evidence/C2/recorded-force-compatibility.md#2a2-implementation-details-2026-09-14).

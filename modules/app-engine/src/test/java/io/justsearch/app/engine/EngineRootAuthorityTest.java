@@ -34,7 +34,10 @@ final class EngineRootAuthorityTest {
     when(server.foregroundLoad()).thenReturn(new ForegroundLoad());
     when(server.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
     var root = new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class),
-        ignored -> server, 1_000, 100, ignored -> {}, () -> {}, authority);
+        (ignored, executors, ingestion) -> {
+          EngineRootRecordedLifecycleTestSupport.bindOffline(server, ingestion);
+          return server;
+        }, 1_000, 100, ignored -> {}, () -> {}, authority);
     try {
       assertSame(authority, root.authority());
       var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());

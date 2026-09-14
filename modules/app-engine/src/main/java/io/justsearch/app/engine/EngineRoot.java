@@ -10,7 +10,6 @@ import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import java.io.IOException;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.function.IntConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,11 +96,12 @@ public final class EngineRoot implements WorkerHost {
   private static final long CLOSE_COMPLETION_TIMEOUT_MS = 2_000L;
 
   @FunctionalInterface
-  private interface ServerFactory {
+  interface ServerFactory {
     KnowledgeServer create(GpuSchedulingGauge gauge, io.justsearch.core.execution.EngineExecutorRegistry executors,
         io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion);
   }
   private final ServerFactory serverFactory;
+  private boolean clientReady;
   private final RecordedIngestionCoordinator recordedIngestion;
 
   public io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion() { return recordedIngestion; }
@@ -208,13 +208,13 @@ public final class EngineRoot implements WorkerHost {
 
   /** Test seam: supply the index half rather than building it from the global config. */
   EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
-      Function<GpuSchedulingGauge, KnowledgeServer> serverFactory, long deadlineMs, int batchSize) {
+      ServerFactory serverFactory, long deadlineMs, int batchSize) {
     this(operations, attempts, serverFactory, deadlineMs, batchSize, EngineRoot::missingExitAction);
   }
 
   /** Test seam: supply both the index half and the process exit action. */
   EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
-      Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
+      ServerFactory serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction) {
@@ -223,7 +223,7 @@ public final class EngineRoot implements WorkerHost {
   }
 
   EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
-      Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
+      ServerFactory serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
@@ -235,19 +235,9 @@ public final class EngineRoot implements WorkerHost {
   /** Test seam preserving the same supplied authority as the process factory. */
   EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.app.api.operations.OperationAttemptRunner attempts,
-      Function<GpuSchedulingGauge, KnowledgeServer> serverFactory, long deadlineMs, int batchSize,
+      ServerFactory serverFactory, long deadlineMs, int batchSize,
       IntConsumer terminalWriterFaultAction, Runnable requestedRestartAction,
       io.justsearch.app.services.bootstrap.OperationAuthority authority) {
-    this(operations, attempts, (gauge, ignored, ingestion) -> serverFactory.apply(gauge), deadlineMs, batchSize,
-        terminalWriterFaultAction, requestedRestartAction, authority);
-  }
-
-  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
-      ServerFactory serverFactory,
-      long deadlineMs,
-      int batchSize,
-      IntConsumer terminalWriterFaultAction,
-      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this.authority = Objects.requireNonNull(authority, "authority");
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
@@ -265,6 +255,7 @@ public final class EngineRoot implements WorkerHost {
       throws IOException {
     Objects.requireNonNull(gpuScheduling, "gpuScheduling");
     if (client != null) {
+      if (!clientReady) throw new IOException("EngineRoot retains an unready client after incomplete startup or close");
       return client;
     }
     if (server != null) {
@@ -308,6 +299,14 @@ public final class EngineRoot implements WorkerHost {
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
             () -> requestRestart(started), admission, authority.roots());
     this.client = built;
+    try {
+      recordedIngestion.bindProducer(built::enumerateRecordedRoot);
+      clientReady = true;
+    } catch (RuntimeException | Error failure) {
+      try { close(); }
+      catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
+      throw failure;
+    }
     log.info("Engine composed the index half in-process (no worker process, no channel)");
     return built;
   }
@@ -351,6 +350,7 @@ public final class EngineRoot implements WorkerHost {
 
   @Override
   public synchronized void close() {
+    clientReady = false;
     KnowledgeServer s;
     synchronized (terminalWriterFaultOwnerLock) {
       s = server;
@@ -360,9 +360,9 @@ public final class EngineRoot implements WorkerHost {
     catch (IOException incomplete) {
       throw new IllegalStateException("Recorded ingestion close incomplete; client and index retained for retry", incomplete);
     }
-    client = null;
     if (c != null) {
       c.close();
+      client = null;
     }
     if (s != null) {
       try {

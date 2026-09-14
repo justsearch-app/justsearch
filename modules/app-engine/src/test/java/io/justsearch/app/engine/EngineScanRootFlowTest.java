@@ -89,7 +89,7 @@ final class EngineScanRootFlowTest {
 
     root =
         new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
-            g -> new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g)),
+            (g, executors, ingestion) -> new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(g), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion),
             300_000L,
             5_000);
     KnowledgeClient client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());

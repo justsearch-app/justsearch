@@ -388,8 +388,8 @@ final class RecordedIngestionCoordinatorTest {
       f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
         children.add(key);
         f.queue.enqueueRecordedEntries(key, epoch, List.of(
-            JobQueue.EnqueueEntry.ofUnknownSize(root.path().resolve("first.txt")),
-            JobQueue.EnqueueEntry.ofUnknownSize(root.path().resolve("second.txt"))), null);
+            JobQueue.EnqueueEntry.ofUnknownSize(root.roots().getFirst().path().resolve("first.txt")),
+            JobQueue.EnqueueEntry.ofUnknownSize(root.roots().getFirst().path().resolve("second.txt"))), null);
         return exit;
       });
       var request = f.request();
@@ -527,7 +527,7 @@ final class RecordedIngestionCoordinatorTest {
       f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
         children.add(key);
         f.queue.enqueueRecordedEntries(key, epoch,
-            List.of(JobQueue.EnqueueEntry.ofUnknownSize(root.path().resolve("last.txt"))), null);
+            List.of(JobQueue.EnqueueEntry.ofUnknownSize(root.roots().getFirst().path().resolve("last.txt"))), null);
         CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
         if (exitsDuringStop) cancellation.onCancel(() -> exit.complete(JobQueue.WalkEnumerationOutcome.COMPLETE));
         else exit.complete(JobQueue.WalkEnumerationOutcome.COMPLETE);
@@ -724,7 +724,7 @@ final class RecordedIngestionCoordinatorTest {
         try (var attachment = recovered.attach(reopened, () -> Optional.of(GENERATION), () -> true)) {
           org.junit.jupiter.api.Assertions.assertNotNull(attachment);
           recovered.bindProducer((root, key, epoch, context, cancellation) -> {
-            assertEquals(force, root.force(), "producer receives the persisted plan, not a new public flag");
+            assertEquals(force, root.roots().getFirst().force(), "producer receives the persisted plan, not a new public flag");
             reopened.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
             return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
           });
@@ -746,6 +746,125 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void actualEngineProducerJournalsAndAcknowledgesARealFilesystemRoot(boolean singleFile) throws Exception {
+    var generations = new io.justsearch.indexerworker.index.IndexGenerationManager(temp.resolve("index"));
+    var layout = generations.initializeOrLoad();
+    String generation = layout.activeGenerationPath().getFileName().toString();
+    try (Fixture f = new Fixture(temp.resolve("fixture"), 1, true, generation, singleFile);
+        var executors = new DefaultEngineExecutorRegistry()) {
+      var runtime = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+      var service = new io.justsearch.indexerworker.services.WorkerIngestService(f.queue, null, null,
+          io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled(), layout.basePath(),
+          layout.activeGenerationPath(), runtime, runtime, null, 0L);
+      var services = org.mockito.Mockito.mock(io.justsearch.indexerworker.server.WorkerAppServices.class);
+      org.mockito.Mockito.when(services.ingestService()).thenReturn(service);
+      Path file = singleFile ? f.plan.roots().getFirst().path()
+          : Files.writeString(f.plan.roots().getFirst().path().resolve("probe.txt"), "recorded producer probe");
+      var enumerated = new java.util.concurrent.CountDownLatch(1);
+      try (var client = new EngineKnowledgeClient(executors, () -> services,
+          new ForegroundLoadGate(new io.justsearch.indexerworker.loop.pacing.ForegroundLoad()),
+          5_000, 100, io.justsearch.app.services.worker.IpcTelemetry.noop(), () -> {}, f.admission, f.authority.roots());
+          var _ = f.queue.subscribeRecordedWalks(key -> {
+            if (f.queue.recordedWalk(key).orElseThrow().enumerationClosedAt() != null) enumerated.countDown();
+          })) {
+        f.coordinator.bindProducer(client::enumerateRecordedRoot);
+        var request = f.request();
+        var accepted = f.accept(request);
+        try (var work = f.admission.admit(request.context(), false)) {
+          var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+          assertTrue(enumerated.await(5, java.util.concurrent.TimeUnit.SECONDS), "real walk must reach enumeration closure");
+          var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
+          var progress = f.queue.recordedWalk(child.key()).orElseThrow();
+          assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE, progress.enumerationOutcome());
+          assertFalse(result.completion().toCompletableFuture().isDone(), "enumeration is not index completion");
+          var jobs = f.queue.pollPending(10);
+          assertEquals(1, jobs.size(), "only the frozen file was admitted");
+          var issued = jobs.getFirst();
+          assertEquals(file, issued.path());
+          assertEquals(child.key(), issued.scanId());
+          assertEquals(progress.enumerationEpoch(), issued.walkEpoch());
+          assertTrue(issued.recordedForce(), "force is supplied by recorded claim authority");
+          assertEquals(new JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL"), issued.provenance());
+          f.queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(issued, null, "e".repeat(64))),
+              io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                  io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                  io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+          var completed = result.completion().toCompletableFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
+          assertEquals(OperationState.COMPLETE, completed.state());
+          assertEquals(1, completed.unitsCompleted());
+          var sealed = f.queue.recordedWalk(child.key()).orElseThrow();
+          assertEquals(sealed.revision(), sealed.acknowledgedRevision());
+        }
+        f.coordinator.stopProducers(1_000);
+        assertEquals(0, f.admission.activeWorkCount());
+      }
+    }
+  }
+
+  @Test
+  void actualProducerReplacementWaitsForExitWithoutCancellingDurableParent() throws Exception {
+    var entered = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    try (Fixture f = new Fixture(temp, 1); var executors = new DefaultEngineExecutorRegistry()) {
+      var firstService = org.mockito.Mockito.mock(io.justsearch.indexerworker.services.WorkerIngestService.class);
+      var seen = new java.util.concurrent.atomic.AtomicReference<io.justsearch.indexerworker.services.CallContext>();
+      org.mockito.Mockito.doAnswer(call -> {
+        seen.set(call.getArgument(2));
+        entered.countDown();
+        assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        call.<java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress>>getArgument(1).accept(
+            io.justsearch.ipc.ScanRootProgress.newBuilder().setComplete(true).setTerminalReasonCode("CLIENT_CANCELLED").build());
+        return null;
+      }).when(firstService).scanRecordedRoot(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      var services = org.mockito.Mockito.mock(io.justsearch.indexerworker.server.WorkerAppServices.class);
+      org.mockito.Mockito.when(services.ingestService()).thenReturn(firstService);
+      var current = new java.util.concurrent.atomic.AtomicReference<>(services);
+      var firstExit = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletionStage<JobQueue.WalkEnumerationOutcome>>();
+      try (var client = new EngineKnowledgeClient(executors, current::get,
+          new ForegroundLoadGate(new io.justsearch.indexerworker.loop.pacing.ForegroundLoad()), 5_000, 100,
+          io.justsearch.app.services.worker.IpcTelemetry.noop(), () -> {}, f.admission, f.authority.roots())) {
+        f.coordinator.bindProducer((plan, key, epoch, context, token) -> {
+          var exit = client.enumerateRecordedRoot(plan, key, epoch, context, token);
+          firstExit.set(exit);
+          return exit;
+        });
+        var request = f.request();
+        var accepted = f.accept(request);
+        try (var work = f.admission.admit(request.context(), false)) {
+          var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+          assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS));
+          org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, () -> f.coordinator.stopProducers(10));
+          assertTrue(seen.get().cancelled());
+          assertTrue(work.cancellationReason().isEmpty(), "physical replacement must retain durable parent authority");
+          assertFalse(result.completion().toCompletableFuture().isDone());
+          org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, f.attachment::close);
+          release.countDown();
+          assertEquals(JobQueue.WalkEnumerationOutcome.CANCELLED,
+              firstExit.get().toCompletableFuture().get(3, java.util.concurrent.TimeUnit.SECONDS));
+          f.coordinator.stopProducers(1_000);
+          f.attachment.close();
+          assertFalse(result.completion().toCompletableFuture().isDone(), "same parent remains pending across replacement");
+          var replacement = org.mockito.Mockito.mock(io.justsearch.indexerworker.services.WorkerIngestService.class);
+          org.mockito.Mockito.doAnswer(call -> {
+            call.<java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress>>getArgument(1).accept(
+                io.justsearch.ipc.ScanRootProgress.newBuilder().setComplete(true).build());
+            return null;
+          }).when(replacement).scanRecordedRoot(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+          var replacementServices = org.mockito.Mockito.mock(io.justsearch.indexerworker.server.WorkerAppServices.class);
+          org.mockito.Mockito.when(replacementServices.ingestService()).thenReturn(replacement);
+          current.set(replacementServices);
+          f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true);
+          f.coordinator.bindProducer(client::enumerateRecordedRoot);
+          assertEquals(OperationState.COMPLETE, result.completion().toCompletableFuture().get(3, java.util.concurrent.TimeUnit.SECONDS).state());
+          assertEquals(1, f.operations.find(request.key()).orElseThrow().attempts());
+          org.mockito.Mockito.verify(replacement).scanRecordedRoot(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        }
+      }
+    } finally { release.countDown(); }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore operations;
     final SqliteJobQueue queue;
@@ -758,11 +877,16 @@ final class RecordedIngestionCoordinatorTest {
     io.justsearch.indexerworker.server.RecordedIngestionLifecycle.Attachment attachment;
     Fixture(Path directory, int roots) throws Exception { this(directory, roots, false); }
     Fixture(Path directory, int roots, boolean force) throws Exception {
+      this(directory, roots, force, GENERATION, false);
+    }
+    Fixture(Path directory, int roots, boolean force, String generation, boolean singleFile) throws Exception {
       Files.createDirectories(directory);
       List<RecordedRootPlan.Root> plans = new ArrayList<>();
       for (int index = 0; index < roots; index++) plans.add(new RecordedRootPlan.Root(
-          Files.createDirectory(directory.resolve("root-" + index)), null, force, false, List.of(), List.of()));
-      plan = new RecordedRootPlan(GENERATION, plans);
+          singleFile ? Files.writeString(directory.resolve("root-" + index + ".txt"), "recorded producer probe")
+              : Files.createDirectory(directory.resolve("root-" + index)),
+          null, force, singleFile, List.of(), List.of()));
+      plan = new RecordedRootPlan(generation, plans);
       Path authorityDirectory = directory.resolve("authority");
       Files.createDirectories(authorityDirectory);
       Files.writeString(authorityDirectory.resolve("watched_roots.json"),
@@ -775,7 +899,7 @@ final class RecordedIngestionCoordinatorTest {
       coordinator = new RecordedIngestionCoordinator(operations, runner, admission, authority);
       queue = new SqliteJobQueue(directory.resolve("jobs.db"), key -> fixtureClaimOwner.get() ? JobQueue.RecordedClaimDecision.ALLOW : coordinator.recordedClaimDecision(key));
       queue.open();
-      attachment = coordinator.attach(queue, () -> Optional.of(GENERATION), () -> true);
+      attachment = coordinator.attach(queue, () -> Optional.of(generation), () -> true);
     }
     OperationAttemptRunner.Request request() { return request(new OperationAuthorizationBasis.StructuralAuto()); }
     OperationAttemptRunner.Request request(OperationAuthorizationBasis basis) {
