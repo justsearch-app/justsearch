@@ -2,12 +2,11 @@
 package io.justsearch.app.services.worker;
 
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
-import io.justsearch.configuration.persistence.StoreFormatVersions;
+import io.justsearch.configuration.persistence.WatchedRootsFormat;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -27,7 +26,6 @@ import org.slf4j.Logger;
  * transport/retry behavior.
  */
 final class WatchedRootsStore {
-  private static final int CURRENT_SCHEMA_VERSION = 1;
   private static final ObjectMapper JSON = new ObjectMapper();
   /**
    * Sentinel value used when a root is tracked but has never completed an indexing submission.
@@ -123,7 +121,7 @@ final class WatchedRootsStore {
       String content = Files.readString(rootsFile);
       if (content.trim().startsWith("{")) {
         var node = JSON.readTree(content);
-        requireReadableObject(node);
+        WatchedRootsFormat.requireReadableObject(node);
         var rootsArray = node.get("roots");
         if (rootsArray != null && rootsArray.isArray()) {
           for (var entry : rootsArray) {
@@ -196,7 +194,7 @@ final class WatchedRootsStore {
       // Try new format first: {"roots": [{"path": "...", "lastIndexed": "..."}]}
       if (content.trim().startsWith("{")) {
         var node = JSON.readTree(content);
-        requireReadableObject(node);
+        WatchedRootsFormat.requireReadableObject(node);
         var rootsArray = node.get("roots");
         if (rootsArray != null && rootsArray.isArray()) {
           for (var entry : rootsArray) {
@@ -292,7 +290,7 @@ final class WatchedRootsStore {
         rootEntries.add(rootEntry);
       }
       Map<String, Object> data = new LinkedHashMap<>();
-      data.put("schemaVersion", CURRENT_SCHEMA_VERSION);
+      data.put("schemaVersion", WatchedRootsFormat.CURRENT_SCHEMA_VERSION);
       data.put("roots", rootEntries);
       AtomicFileWrites.replace(
           rootsFile, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
@@ -304,18 +302,4 @@ final class WatchedRootsStore {
     }
   }
 
-  private static void requireReadableObject(JsonNode root) {
-    if (root == null || !root.isObject()) {
-      throw new CorruptDurableStoreException(
-          "watched-roots", "expected a legacy array or versioned object");
-    }
-    JsonNode versionNode = root.get("schemaVersion");
-    if (versionNode != null && !versionNode.isInt()) {
-      throw new CorruptDurableStoreException(
-          "watched-roots", "schemaVersion must be an integer");
-    }
-    Integer observedVersion = versionNode == null ? null : versionNode.asInt();
-    StoreFormatVersions.requireReadable(
-        "watched-roots", observedVersion, CURRENT_SCHEMA_VERSION, 0, 0);
-  }
 }

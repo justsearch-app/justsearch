@@ -462,6 +462,15 @@ During blue-green migration, the migration enumerator (which walks the filesyste
 
 Without this gate, the enumerator starts immediately and the `IndexingLoop` processes jobs before the embedding provider is ready — resulting in most documents getting `PENDING` status instead of inline vectors (tempdoc 312: 35% coverage without latch → 99.7% with latch).
 
+Migration enumeration requires complete declared coverage. An absent or valid empty root registry
+with no configured roots completes with zero files; directory and single-file roots are supported.
+The registry header/version uses the same format authority as the watched-roots store. Invalid
+or future formats, missing/inaccessible declared roots, file-walk failures, interrupted/stopped
+work and short queue admission refuse completion. Previously admitted files remain durable,
+but a partial scan cannot promote Green. The cutover monitor records FAILED before best-effort state classification,
+pause or completion; a failed state write is retried with the enumeration failure retained and
+Blue still active. This adds no exception to the embedding attestation rules below.
+
 The latch has a 120-second timeout; if the embedding provider isn't ready by then, enumeration proceeds without inline embedding. When a model fingerprint is resolvable, pending embedding backfill must drain before cutover certification and the final commit. An unreadable pending count defers certification under the existing switching deadline; it never counts as zero pending work. A fresh Green can already be `COMPATIBLE` while backfill success has not yet reached the idle-loop stamp reconciliation. The cutover barrier reconciles that existing evidence and requires the current fingerprint to be available to the final commit. Zero pending work alone does not earn a stamp; absent or unreadable success evidence defers cutover. Reconciliation stays outside the IO-free commit overlay. The commit's schema and embedding metadata still have to pass verification before promotion.
 
 The corruption-recovery empty-index exception survives restart only when the opened Green

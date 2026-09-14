@@ -581,7 +581,7 @@
       "readableLegacyVersions": [
         0
       ],
-      "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsStore.java",
+      "versionAuthority": "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WatchedRootsFormat.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootsStoreTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -589,6 +589,8 @@
       "reconciliation": "MIGRATE_LEGACY_LOCATION_READ_V0_AND_WRITE_V1",
       "status": "READY",
       "implementationSources": [
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WatchedRootsFormat.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsStore.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
         "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"

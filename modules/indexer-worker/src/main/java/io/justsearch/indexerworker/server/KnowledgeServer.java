@@ -137,6 +137,7 @@ public final class KnowledgeServer implements Closeable {
   private final ReentrantLock runtimeSwapLock = new ReentrantLock();
   private volatile boolean closeStarted;
   private volatile boolean migrationEnumeratorDone;
+  private volatile Throwable migrationEnumeratorFailure;
 
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
   WorkerSignalBus signalBus;
@@ -647,6 +648,7 @@ public final class KnowledgeServer implements Closeable {
       IndexGenerationManager.State state = layout.state();
       this.buildingIndexPath = null;
       this.migrationEnumeratorDone = false;
+      this.migrationEnumeratorFailure = null;
 
       logConfiguration();
 
@@ -2599,6 +2601,7 @@ public final class KnowledgeServer implements Closeable {
                         jobQueue,
                         () -> running,
                         () -> migrationEnumeratorDone,
+                        () -> migrationEnumeratorFailure,
                         MIGRATION_SWITCHING_QUEUE_DEPTH_THRESHOLD,
                         MIGRATION_SWITCHING_MAX_DURATION_MS,
                         migrationCutoverMaxFailedJobs,
@@ -2745,11 +2748,7 @@ public final class KnowledgeServer implements Closeable {
                       "Migration enumerator: models not ready after 120s, "
                           + "proceeding without inline embedding/SPLADE");
                 }
-                List<Path> roots = loadWatchedRootsBestEffort(rc);
-                if (roots.isEmpty()) {
-                  log.warn("Migration enumerator: no watched roots found; Green index will remain empty");
-                  return;
-                }
+                List<Path> roots = loadMigrationRoots(rc);
                 migrationEnumeratorRootsTotal.set(roots.size());
                 int totalEnqueued = enqueueAllFilesUnderRoots(roots);
                 log.info(
@@ -2758,7 +2757,9 @@ public final class KnowledgeServer implements Closeable {
                     totalEnqueued);
                 migrationEnumeratorDone = true;
               } catch (Exception e) {
-                log.warn("Migration enumerator failed (continuing)", e);
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                migrationEnumeratorFailure = e;
+                log.warn("Migration enumeration incomplete; cutover will preserve Blue", e);
               } finally {
                 migrationEnumeratorRunning.set(false);
                 migrationEnumeratorFinishedAtMs.set(System.currentTimeMillis());
@@ -2775,9 +2776,9 @@ public final class KnowledgeServer implements Closeable {
     migrationEnumeratorThread.start();
   }
 
-  private List<Path> loadWatchedRootsBestEffort(ResolvedConfig rc) {
-    return KnowledgeServerMigrationOps.loadWatchedRootsBestEffort(
-        dataDir, rc.collections().items(), JSON, log);
+  private List<Path> loadMigrationRoots(ResolvedConfig rc) throws IOException {
+    return KnowledgeServerMigrationOps.loadMigrationRoots(
+        dataDir, rc.collections().items(), JSON);
   }
 
   private int enqueueAllFilesUnderRoots(List<Path> roots) throws IOException {

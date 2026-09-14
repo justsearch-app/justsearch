@@ -427,14 +427,14 @@ class KnowledgeServerTest {
   // connections and WAL files which are difficult to test in isolation.
 
   @Nested
-  @DisplayName("loadWatchedRootsBestEffort()")
+  @DisplayName("loadMigrationRoots()")
   class LoadWatchedRootsTests {
 
     @Test
     @DisplayName("returns empty list when no roots file and no config")
     void noRootsFile_noConfig_returnsEmpty(@TempDir Path tempDir) throws Exception {
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      List<Path> roots = invokeLoadMigrationRoots(server, null);
       assertTrue(roots.isEmpty());
     }
 
@@ -452,7 +452,7 @@ class KnowledgeServerTest {
       Files.writeString(rootsFile, json);
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      List<Path> roots = invokeLoadMigrationRoots(server, null);
 
       assertEquals(2, roots.size());
       assertTrue(roots.contains(root1.toAbsolutePath().normalize()));
@@ -476,15 +476,15 @@ class KnowledgeServerTest {
       Files.writeString(rootsFile, json);
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      List<Path> roots = invokeLoadMigrationRoots(server, null);
 
       assertEquals(1, roots.size());
       assertEquals(root1.toAbsolutePath().normalize(), roots.get(0));
     }
 
     @Test
-    @DisplayName("skips non-existent directories")
-    void nonExistentDirs_areSkipped(@TempDir Path tempDir) throws Exception {
+    @DisplayName("refuses incomplete declared root coverage")
+    void nonExistentDirs_areRefused(@TempDir Path tempDir) throws Exception {
       Path rootsFile = tempDir.resolve("watched_roots.json");
       Path existingRoot = tempDir.resolve("exists");
       Files.createDirectories(existingRoot);
@@ -495,23 +495,61 @@ class KnowledgeServerTest {
       Files.writeString(rootsFile, json);
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
-
-      assertEquals(1, roots.size());
-      assertEquals(existingRoot.toAbsolutePath().normalize(), roots.get(0));
+      var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeLoadMigrationRoots(server, null));
+      assertInstanceOf(IOException.class, failure.getCause());
+      assertTrue(Files.exists(rootsFile));
     }
 
     @Test
-    @DisplayName("handles malformed JSON gracefully")
-    void malformedJson_returnsEmpty(@TempDir Path tempDir) throws Exception {
+    @DisplayName("malformed JSON cannot certify an empty migration")
+    void malformedJson_isRefused(@TempDir Path tempDir) throws Exception {
       Path rootsFile = tempDir.resolve("watched_roots.json");
       Files.writeString(rootsFile, "{ invalid json }}}");
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeLoadMigrationRoots(server, null));
+      assertEquals("{ invalid json }}}", Files.readString(rootsFile));
+    }
+  }
 
-      // Should return empty (or fallback to config roots)
-      assertTrue(roots.isEmpty());
+  @Nested
+  @DisplayName("migration enumeration terminal coverage")
+  class MigrationEnumerationTerminalTests {
+    @Test
+    void genuineEmptyRootsCompleteButMalformedRootsLatchFailure(@TempDir Path tempDir) throws Exception {
+      for (boolean malformed : new boolean[] {false, true}) {
+        Path data = Files.createDirectory(tempDir.resolve(Boolean.toString(malformed)));
+        if (malformed) Files.writeString(data.resolve("watched_roots.json"), "{broken");
+        KnowledgeServer server = createServerWithDataDir(data);
+        setField(server, "jobQueue", org.mockito.Mockito.mock(JobQueue.class));
+        setField(server, "running", true);
+        setField(server, "modelReadyLatch", new java.util.concurrent.CountDownLatch(0));
+        Method start = KnowledgeServer.class.getDeclaredMethod("startMigrationEnumeratorBestEffort",
+            io.justsearch.configuration.resolved.ResolvedConfig.class);
+        start.setAccessible(true);
+        start.invoke(server, io.justsearch.configuration.resolved.ResolvedConfig.builder().build());
+        Field threadField = findField(KnowledgeServer.class, "migrationEnumeratorThread");
+        threadField.setAccessible(true);
+        Thread thread = (Thread) threadField.get(server);
+        thread.join(5_000);
+        try {
+          assertFalse(thread.isAlive(), "enumeration must terminate for empty and malformed roots");
+          MigrationProgressSnapshot snapshot = invokeMigrationProgressSnapshot(server);
+          assertEquals(!malformed, snapshot.enumeratorDone());
+          assertFalse(snapshot.enumeratorRunning());
+          assertEquals(0, snapshot.filesEnqueued());
+          Field failure = findField(KnowledgeServer.class, "migrationEnumeratorFailure");
+          failure.setAccessible(true);
+          assertEquals(malformed, failure.get(server) != null);
+        } finally {
+          if (thread.isAlive()) {
+            thread.interrupt();
+            thread.join(5_000);
+          }
+        }
+      }
     }
   }
 
@@ -598,7 +636,7 @@ class KnowledgeServerTest {
       Path dbPath = tempDir.resolve("jobs.db");
       try (SqliteJobQueue queue = new SqliteJobQueue(dbPath)) {
         queue.open();
-        KnowledgeServer server = createServerWithJobQueue(queue);
+        KnowledgeServer server = createServerWithJobQueueAndRunning(queue, true);
 
         int count = invokeEnqueueAllFilesUnderRoots(server, List.of());
         assertEquals(0, count);
@@ -606,11 +644,12 @@ class KnowledgeServerTest {
     }
 
     @Test
-    @DisplayName("returns 0 when jobQueue is null")
-    void nullQueue_returnsZero() throws Exception {
-      KnowledgeServer server = createServerWithJobQueue(null);
-      int count = invokeEnqueueAllFilesUnderRoots(server, List.of(Path.of("/some/path")));
-      assertEquals(0, count);
+    @DisplayName("missing queue cannot certify coverage")
+    void nullQueue_isRefused() throws Exception {
+      KnowledgeServer server = createServerWithJobQueueAndRunning(null, true);
+      var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeEnqueueAllFilesUnderRoots(server, List.of(Path.of("/some/path"))));
+      assertInstanceOf(IOException.class, failure.getCause());
     }
 
     @Test
@@ -637,8 +676,8 @@ class KnowledgeServerTest {
     }
 
     @Test
-    @DisplayName("skips non-directory roots")
-    void nonDirectoryRoots_areSkipped(@TempDir Path tempDir) throws Exception {
+    @DisplayName("single-file roots are admitted")
+    void singleFileRoots_areAdmitted(@TempDir Path tempDir) throws Exception {
       Path dbPath = tempDir.resolve("jobs.db");
       Path file = tempDir.resolve("not_a_dir.txt");
       Files.writeString(file, "content");
@@ -648,7 +687,8 @@ class KnowledgeServerTest {
         KnowledgeServer server = createServerWithJobQueueAndRunning(queue, true);
 
         int count = invokeEnqueueAllFilesUnderRoots(server, List.of(file));
-        assertEquals(0, count);
+        assertEquals(1, count);
+        assertEquals(1L, queue.queueDepth());
       }
     }
   }
@@ -698,10 +738,10 @@ class KnowledgeServerTest {
   }
 
   @SuppressWarnings("unchecked")
-  private static List<Path> invokeLoadWatchedRootsBestEffort(
+  private static List<Path> invokeLoadMigrationRoots(
       KnowledgeServer server, Object ignored) throws Exception {
     Method method = KnowledgeServer.class.getDeclaredMethod(
-        "loadWatchedRootsBestEffort",
+        "loadMigrationRoots",
         io.justsearch.configuration.resolved.ResolvedConfig.class);
     method.setAccessible(true);
     // Build a minimal ResolvedConfig with empty collections

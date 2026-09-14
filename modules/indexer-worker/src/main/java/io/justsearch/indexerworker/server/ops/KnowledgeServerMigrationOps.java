@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server.ops;
 
-import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.core.JacksonException;
+import io.justsearch.configuration.persistence.WatchedRootsFormat;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
@@ -29,6 +31,8 @@ import io.justsearch.ipc.SyncDirectoryResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -54,6 +58,7 @@ public final class KnowledgeServerMigrationOps {
       JobQueue jobQueue,
       BooleanSupplier runningSupplier,
       BooleanSupplier migrationEnumeratorDoneSupplier,
+      Supplier<Throwable> migrationEnumeratorFailureSupplier,
       long migrationSwitchingQueueDepthThreshold,
       long migrationSwitchingMaxDurationMs,
       int migrationCutoverMaxFailedJobs,
@@ -122,16 +127,24 @@ public final class KnowledgeServerMigrationOps {
     }
     while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
       try {
+        Throwable enumerationFailure = context.migrationEnumeratorFailureSupplier().get();
+        if (enumerationFailure != null) {
+          context.log().warn("Migration enumeration incomplete; keeping Blue active", enumerationFailure);
+          context.indexGenerationManager().updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+          context.drainSwitchBufferAction().run();
+          return;
+        }
         IndexGenerationManager.State state = context.indexGenerationManager().readStateBestEffort();
         IndexGenerationManager.MigrationState ms =
             parseMigrationState(state == null ? null : state.migration_state());
-        if (state != null && Boolean.TRUE.equals(state.migration_paused())) {
-          Thread.sleep(1_000);
-          continue;
-        }
         if (ms == IndexGenerationManager.MigrationState.IDLE
             || ms == IndexGenerationManager.MigrationState.FAILED) {
           return;
+        }
+
+        if (state != null && Boolean.TRUE.equals(state.migration_paused())) {
+          Thread.sleep(1_000);
+          continue;
         }
 
         if (!context.migrationEnumeratorDoneSupplier().getAsBoolean()) {
@@ -796,56 +809,78 @@ public final class KnowledgeServerMigrationOps {
     return kind != null && kind.trim().toUpperCase(Locale.ROOT).startsWith("VDU_");
   }
 
-  /** Loads watched roots from persisted file + config collections. */
-  public static List<Path> loadWatchedRootsBestEffort(
-      Path dataDir, List<ResolvedConfig.CollectionCfg> collections, ObjectMapper json, Logger log) {
+  /** Loads complete declared coverage; an unreadable source cannot certify an empty migration. */
+  public static List<Path> loadMigrationRoots(
+      Path dataDir, List<ResolvedConfig.CollectionCfg> collections, ObjectMapper json) throws IOException {
     Set<Path> roots = new LinkedHashSet<>();
     Path rootsFile = dataDir.resolve("watched_roots.json");
+    String content;
     try {
-      if (Files.exists(rootsFile)) {
-        String content = Files.readString(rootsFile);
-        if (content.trim().startsWith("{")) {
-          var node = json.readTree(content);
-          var rootsArray = node.get("roots");
-          if (rootsArray != null && rootsArray.isArray()) {
-            for (var entry : rootsArray) {
-              String p = entry.has("path") ? entry.get("path").asText() : null;
-              if (p != null && !p.isBlank()) {
-                roots.add(Path.of(p).toAbsolutePath().normalize());
-              }
-            }
-          }
-        } else {
-          List<String> paths = json.readValue(content, new TypeReference<List<String>>() {});
-          for (String p : paths) {
-            if (p != null && !p.isBlank()) {
-              roots.add(Path.of(p).toAbsolutePath().normalize());
-            }
-          }
+      content = Files.readString(rootsFile);
+    } catch (NoSuchFileException absent) {
+      // A missing registry is valid only when the path itself is absent, not a dangling link.
+      if (!Files.notExists(rootsFile, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw absent;
+      content = null;
+    }
+    if (content != null) {
+      JsonNode document;
+      try {
+        document = json.readTree(content);
+      } catch (JacksonException malformed) {
+        throw new IOException("Invalid watched-roots JSON", malformed);
+      }
+      boolean object = document != null && document.isObject();
+      if (object) WatchedRootsFormat.requireReadableObject(document);
+      JsonNode entries = object ? document.get("roots") : document;
+      if (entries == null || !entries.isArray()) throw new IOException("Invalid watched-roots array");
+      for (JsonNode entry : entries) {
+        JsonNode path = object ? entry.get("path") : entry;
+        if (path == null || !path.isString() || path.asText().isBlank()) {
+          throw new IOException("Invalid watched-roots path");
+        }
+        roots.add(Path.of(path.asText()).toAbsolutePath().normalize());
+      }
+    }
+    if (collections != null) {
+      for (ResolvedConfig.CollectionCfg collection : collections) {
+        for (Path root : collection.roots()) {
+          if (root == null) throw new IOException("Null configured migration root");
+          roots.add(root.toAbsolutePath().normalize());
         }
       }
-    } catch (Exception e) {
-      log.warn("Failed to read watched_roots.json (falling back to config roots): {}", e.getMessage());
     }
-    try {
-      if (collections != null) {
-        for (ResolvedConfig.CollectionCfg c : collections) {
-          for (Path r : c.roots()) {
-            if (r != null) {
-              roots.add(r.toAbsolutePath().normalize());
-            }
-          }
-        }
-      }
-    } catch (Exception e) {
-      log.warn("Failed to enumerate config roots", e);
+    for (Path root : roots) requireMigrationRoot(root);
+    return List.copyOf(roots);
+  }
+
+  private static void requireMigrationRoot(Path root) throws IOException {
+    if (root == null) throw new IOException("Null migration root");
+    BasicFileAttributes attributes = Files.readAttributes(root, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    if ((!attributes.isDirectory() && !attributes.isRegularFile()) || !Files.isReadable(root)) {
+      throw new IOException("Unreadable migration root: " + root);
     }
-    return roots.stream().filter(Files::isDirectory).toList();
+  }
+
+  private static void requireEnumerationRunning(EnqueueContext context) throws IOException {
+    if (Thread.currentThread().isInterrupted() || !context.runningSupplier().getAsBoolean()) {
+      throw new IOException("Migration enumeration stopped before complete coverage");
+    }
+  }
+
+  private static int acceptMigrationBatch(EnqueueContext context, List<JobQueue.EnqueueEntry> batch)
+      throws IOException {
+    requireEnumerationRunning(context);
+    int accepted = context.jobQueue().enqueueEntries(batch);
+    context.migrationEnumeratorFilesEnqueued().addAndGet(accepted);
+    if (accepted != batch.size()) throw new IOException("Incomplete migration batch admission");
+    batch.clear();
+    return accepted;
   }
 
   public static int enqueueAllFilesUnderRoots(EnqueueContext context) throws IOException {
-    if (context.jobQueue() == null || context.roots() == null || context.roots().isEmpty()) {
-      return 0;
+    requireEnumerationRunning(context);
+    if (context.jobQueue() == null || context.roots() == null) {
+      throw new IOException("Missing migration queue or roots");
     }
     int total = 0;
     int batchSize = 2_000;
@@ -853,9 +888,7 @@ public final class KnowledgeServerMigrationOps {
     long lastPersistMs = 0L;
 
     for (Path root : context.roots()) {
-      if (Thread.currentThread().isInterrupted()) {
-        break;
-      }
+      requireEnumerationRunning(context);
       while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
         IndexGenerationManager manager = context.indexGenerationManagerSupplier().get();
         IndexGenerationManager.State state = manager == null ? null : manager.readStateBestEffort();
@@ -869,16 +902,18 @@ public final class KnowledgeServerMigrationOps {
           break;
         }
       }
-      if (root == null || !Files.isDirectory(root)) {
-        continue;
-      }
+      requireEnumerationRunning(context);
+      requireMigrationRoot(root);
       context.log().info("Migration enumerator scanning root: {}", root);
       try (Stream<Path> walk = Files.walk(root)) {
-        var iterator = walk.filter(Files::isRegularFile).filter(Files::isReadable).iterator();
+        var iterator = walk.iterator();
         while (iterator.hasNext()) {
           Path path = iterator.next();
-          if (Thread.currentThread().isInterrupted()) {
-            break;
+          requireEnumerationRunning(context);
+          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+          if (attributes.isDirectory()) continue;
+          if (!attributes.isRegularFile() || !Files.isReadable(path)) {
+            throw new IOException("Unreadable migration file: " + path);
           }
           context.migrationEnumeratorFilesSeen().incrementAndGet();
           try {
@@ -911,25 +946,15 @@ public final class KnowledgeServerMigrationOps {
             }
           }
 
-          // 813 Slice B: this walk is a Stream, not a visitor, so no BasicFileAttributes are in
-          // hand — stat for the size (unknown on failure).
-          batch.add(JobQueue.EnqueueEntry.stat(path));
+          requireEnumerationRunning(context);
+          batch.add(new JobQueue.EnqueueEntry(path, attributes.size()));
           if (batch.size() >= batchSize) {
-            int enqueued = context.jobQueue().enqueueEntries(batch);
-            total += enqueued;
-            context.migrationEnumeratorFilesEnqueued().addAndGet(enqueued);
-            batch.clear();
+            total += acceptMigrationBatch(context, batch);
           }
         }
-      } catch (Exception e) {
-        context.log().warn("Migration enumerator failed walking {}: {}", root, e.getMessage());
       }
-      if (!batch.isEmpty()) {
-        int enqueued = context.jobQueue().enqueueEntries(batch);
-        total += enqueued;
-        context.migrationEnumeratorFilesEnqueued().addAndGet(enqueued);
-        batch.clear();
-      }
+      if (!batch.isEmpty()) total += acceptMigrationBatch(context, batch);
+      requireEnumerationRunning(context);
       context.migrationEnumeratorRootsDone().incrementAndGet();
 
       MigrationProgressStore store = context.migrationProgressStoreSupplier().get();
@@ -946,6 +971,7 @@ public final class KnowledgeServerMigrationOps {
     if (store != null) {
       persistMigrationProgressSnapshot(context, store);
     }
+    requireEnumerationRunning(context);
     return total;
   }
 

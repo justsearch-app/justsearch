@@ -50,7 +50,7 @@ final class CutoverRestartEvidenceTest {
     var drainChecks = new java.util.concurrent.atomic.AtomicInteger();
     var runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
     var context = new KnowledgeServerMigrationOps.CutoverContext(
-        manager, mock(JobQueue.class), () -> true, () -> true, 0, 60_000, -1,
+        manager, mock(JobQueue.class), () -> true, () -> true, () -> null, 0, 60_000, -1,
         () -> runtime, () -> drainChecks.incrementAndGet() > 1, () -> {
           assertTrue(drainChecks.get() > 1, "unfinished embeddings cannot reach final verification");
           return verified;
@@ -111,6 +111,48 @@ final class CutoverRestartEvidenceTest {
         "and the marker still lands: the two facts are independent");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void enumerationFailurePersistsDespitePauseAndTransientWriteFailure(
+      boolean unreadableFirstState, @TempDir Path data) throws Exception {
+    var manager = org.mockito.Mockito.spy(new IndexGenerationManager(data.resolve("index")));
+    String blue = manager.initializeOrLoad().state().active_generation();
+    manager.startMigration("manual");
+    manager.setMigrationPaused(true, "test");
+    org.mockito.Mockito.doThrow(new java.io.IOException("transient state write failure"))
+        .doCallRealMethod().when(manager).updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+    if (unreadableFirstState) {
+      org.mockito.Mockito.doReturn(null).doCallRealMethod().when(manager).readStateBestEffort();
+    }
+    var active = new AtomicBoolean(true);
+    var drained = new AtomicBoolean();
+    var runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
+    var context = new KnowledgeServerMigrationOps.CutoverContext(
+        manager, mock(JobQueue.class), active::get, () -> false,
+        () -> new java.io.IOException("incomplete coverage"), 0, 60_000, -1,
+        () -> runtime, () -> { throw new AssertionError("failed scan cannot certify embeddings"); },
+        () -> { throw new AssertionError("failed scan cannot verify Green"); },
+        () -> drained.set(true), () -> {},
+        () -> { throw new AssertionError("failed scan cannot restart/promote"); },
+        data, LoggerFactory.getLogger(CutoverRestartEvidenceTest.class));
+    Thread monitor = new Thread(() -> KnowledgeServerMigrationOps.runMigrationCutoverLoop(context));
+    monitor.start();
+    try {
+      monitor.join(8_000);
+      assertFalse(monitor.isAlive(), "failed persistence must retry even while migration is paused");
+      assertEquals(IndexGenerationManager.MigrationState.FAILED.name(), manager.readStateBestEffort().migration_state());
+      assertEquals(blue, manager.readStateBestEffort().active_generation());
+      assertTrue(drained.get());
+      org.mockito.Mockito.verify(manager, org.mockito.Mockito.times(2))
+          .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+      org.mockito.Mockito.verifyNoInteractions(runtime);
+    } finally {
+      active.set(false);
+      monitor.interrupt();
+      monitor.join(5_000);
+    }
+  }
+
   private static KnowledgeServerMigrationOps.CutoverContext context(
       IndexGenerationManager genManager, Path dataDir, Runnable flush) {
     return new KnowledgeServerMigrationOps.CutoverContext(
@@ -118,6 +160,7 @@ final class CutoverRestartEvidenceTest {
         null,
         () -> true,
         () -> true,
+        () -> null,
         0L,
         0L,
         0,

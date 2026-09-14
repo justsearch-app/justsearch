@@ -62,3 +62,11 @@ the same classifier/rollback owner used by pruneHistory. Hosted proof for this r
 F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/operations-startup*.
 Retain through final lane reconciliation plus30 days, at least2026-10-14.
 This completes the startup retry item locally; stage C2 and lane acceptance remain open.
+
+## Hosted reconciliation
+
+2026-09-14: final startup checkpoint518f13d62 CI34827632310 passes all13 jobs,
+including integration, Windows-native, Linux unit suites and license/notices.
+CLA34827630282 passes. The preceding30acebfd9 failed-job rerun was cancelled by the newer
+push; it is not a successful retry. These results close hosted proof for the startup repair,
+not for subsequent enumeration changes. Job metadata is retained in tmp/enumeration-hosted1604.json.

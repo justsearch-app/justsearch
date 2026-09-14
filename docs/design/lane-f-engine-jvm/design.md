@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: Migration enumeration distinguishes genuine empty coverage from malformed/inaccessible/partial scans. Only complete admission sets done; the existing cutover monitor persists FAILED from a latched failure before promotion, retrying failed persistence. The authored watched-roots format check becomes shared validation, with no new root authority or stamp waiver. [Mechanism and required proof](evidence/C2/migration-enumeration-completeness.md).
+
 - 2026-09-14: Operations-store initialization retries proven SQLite BUSY only after confirmed connection close, under a monotonic bounded window. Compatibility/corruption preservation runs once outside that loop; the first-incarnation host policy stays unchanged. [Selected ownership, negative controls and proof limits](evidence/C2/operations-startup-busy.md).
 
 - 2026-09-14: C2-8d closure review resolves cancellation/return/recovery, atomic unseen retirement, retained actual claim identity, explicit seal/gap outcomes, deterministic failure hashes and progress retention. Maintenance first seals its one affected walk if already closed/terminal/unowned, preserving the finite boundary without a global scan. [Owning transaction decisions](evidence/C2/C2-8d-vertical-plan.md). Implementation remains next.

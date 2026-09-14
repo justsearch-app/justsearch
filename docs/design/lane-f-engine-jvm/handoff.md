@@ -80,9 +80,19 @@ passes five of six; targeted1591 proves WAL setup returns SQLITE_BUSY despite it
 The BUSY-only initializer retry passes integrated1596 (3,453 cases, three existing skips)
 and all six installed recovery cases1598, plus independent review, PMD/format and governance.
 [Startup retry proof](evidence/C2/operations-startup-busy.md). Quick1599 confirms clean fixture
-shutdown. Hosted30acebfd9 passes twelve jobs including integration and Windows-native; license
-report download fails with Maven HTTP403 and its failed-job rerun is requested. Zero-root and
-partial migration enumeration remain the next repair before sealing resumes. The [recovery record](evidence/C2/hosted-recovery-correction.md) retains exact evidence. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
+shutdown. Startup checkpoint518f13d62 CI34827632310 passes all13 jobs and CLA34827630282
+passes. The preceding Maven HTTP403 rerun was cancelled by this newer push, not passed.
+Zero-root and partial migration enumeration are now corrected: only complete declared coverage
+sets done, failures block promotion and the existing monitor retries FAILED persistence, with
+one shared watched-roots format authority. Integrated1604 executes4,050 cases/638 suites,
+24 skips (21 existing plus three Windows filesystem limitations), zero failures/errors;
+PMD/format and all six installed recovery cases1605 pass. [Mechanism and proof](evidence/C2/migration-enumeration-completeness.md).
+Final review also closes a transient-null-state early exit: failure consumption now precedes
+state classification. Negative1607 fails exactly that branch; final1608 executes561 indexer
+cases with15 skips/no failures, PMD/format pass. Combined with unchanged1604 modules,4,051
+cases/638 suites are represented with24 skips; installed1605 covers the unchanged normal
+success path before this final failure-order correction. Linux permission/symlink tests
+remain required hosted proof. Quick1606 confirms fixture cleanup. Next implementation is the settled queue-owned administrative closure/seal cut. The [recovery record](evidence/C2/hosted-recovery-correction.md) retains exact evidence. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is
 C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then
