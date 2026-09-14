@@ -224,7 +224,11 @@ become typed skips. Administrative source removal records a skip without claimin
 index deletion. Sealing verifies current terminal evidence and waits for every issued owner,
 then freezes a receipt with bounded sorted failure path hashes. Maintenance seals its affected
 ready walk before admitting a replacement outside it; stopped walks refuse replacement until
-issued owners return. These queue primitives do not yet activate recorded producers.
+issued owners return. Recorded progress notifications capture actual changes on the queue
+connection, promote keys only after commit and deliver after the outermost lock release.
+Subscribers read the latest durable receipt; runtime observer failure does not undo the
+queue commit. The display change stream retains its separate under-lock ordering.
+These queue primitives do not yet activate recorded producers or the operations retry cadence.
 
 **Invariant:** any operator-visible export of ledger or queue data carries a `path_hash` (SHA-256 over the normalized absolute path), never the raw path, and never any path-derived field that could reverse-map to the user's filesystem.
 

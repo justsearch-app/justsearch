@@ -279,3 +279,33 @@ the stopped receipt and admits maintenance outside it. This uses existing admiss
 not a new pending buffer or fabricated successful skip. Producers must respect refusal.
 Deferred/retryable callbacks after unsuccessful closure finish as typed skips inside their
 existing outcome transaction. No nested inTransaction is introduced: it would commit early.
+
+
+## C2-8d.2c notification and retention attachment (2026-09-14)
+
+Use a package-private same-connection walk notification helper. Native update hooks capture
+only affected progress row ids, with no SQL or callbacks. The queue's existing transaction
+owner discards provisional rows on rollback and materializes keys after confirmed JDBC
+commit. The outermost unlock drains a detached key batch only after releasing the lock.
+The existing display stream retains its under-lock ordering. Observer runtime failures are
+logged without changing committed queue results; fatal errors propagate. Consumers read
+the latest receipt and retry missed projection through the existing maintenance/shutdown
+owner when the producer is connected. No timer, executor, persistent notification queue or
+whole-table revision scan is introduced. Automatic actual-row capture is smaller and safer
+than maintaining explicit key marks at every admission/terminal/admin/seal writer.
+
+Duplicate exact acknowledgement returns success without another UPDATE, avoiding a
+notification loop when a consumer repeats its durable receipt check. Existing jobs/ledger
+age cleanup also prunes old sealed exactly acknowledged progress with no remaining keyed
+jobs or ledger references, in the same transaction as its existing cleanup. Deletes never
+notify a now-missing receipt. Subscriptions are scoped to the opened queue and close with it.
+
+The queue-only d.2c commit supplies notifications and retention; d.3 connects the actual
+recorded owner, matching terminal receipt acknowledgement, and missed-projection cadence
+before claiming the overall d.2c acceptance. The distinction is an implementation cut, not
+a deferral of external acknowledgement or shutdown proof.
+
+Actual claim release also schedules its key after the successful outcome/return transaction:
+an administrative skip may already be committed, so release can make the walk sealable
+without another SQL change. Forged, rolled-back or still-owned claims never schedule that
+release hint. It shares the same outermost-unlock delivery and durable reread contract.

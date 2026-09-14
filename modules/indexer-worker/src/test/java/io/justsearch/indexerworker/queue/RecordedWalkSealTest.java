@@ -286,7 +286,7 @@ final class RecordedWalkSealTest {
       assertTrue(queue.acknowledgeRecordedWalk(key, sealed.revision()));
       assertEquals(1, queue.cleanupOldJobs(7));
       assertEquals(1, queue.cleanupOldLedgerEvents(7));
-      assertTrue(queue.recordedWalk(key).isPresent(), "progress pruning belongs to the next cut");
+      assertTrue(queue.recordedWalk(key).isPresent(), "recent progress survives old evidence cleanup");
     }
   }
 

@@ -8,7 +8,10 @@ preflight1611 reports no stack/foreign run/inference orphan. The preserved seali
 implemented and C2-8d.2b.2 closure/seal is locally verified:1613 full affected suites report
 915 cases/21 skips/no failures;1614 corrected focused tests and1615 guard negative controls
 establish the reviewed claims. [Evidence](evidence/C2/walk-closure-sealing.md). Next is
-C2-8d.2c notifications/outer acknowledgement/progress retention, then producer activation.
+C2-8d.3 producer activation and outer receipt/cadence integration. The queue-only C2-8d.2c
+notification/retention attachment now passes integrated1624 (929 cases/21 skips/no failures),
+with failure-path and discriminating negative proofs. [Evidence](evidence/C2/walk-notifications-retention.md).
+The overall .2c acceptance still requires the actual outer owner and cadence/shutdown wiring.
 Root owns SQL/lifecycle changes; independent test and read-only review work are bounded. The prior [pause summary](evidence/C2/session-2026-09-14-closeout.md)
 remains historical. Existing autonomous authorization and merge-at-F placement remain in force.
 

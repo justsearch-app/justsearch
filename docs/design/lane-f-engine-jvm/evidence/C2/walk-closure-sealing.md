@@ -69,3 +69,9 @@ this lane merges only at F. There is no shipped production state requiring migra
 that temporary primitive. The current closure is atomic; supported restart recovery handles
 its retained issued PROCESSING members. No old-fixture reconciliation mechanism is added.
 Legacy nonrecorded queue rows retain their existing compatibility behavior.
+
+
+[Hosted CI34833934557](https://github.com/justsearch-app/justsearch/actions/runs/34833934557)
+completed all13 jobs successfully at `64af16c20104cdbfe88d65795e42be270f522c38`;
+CLA34833932626 also passed. Metadata is retained at `tmp/1626-hosted.json`. This proves
+the closure checkpoint, not the subsequent notification/retention diff.

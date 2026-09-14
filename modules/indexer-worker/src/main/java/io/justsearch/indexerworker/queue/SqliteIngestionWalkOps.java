@@ -209,6 +209,7 @@ final class SqliteIngestionWalkOps {
   static boolean acknowledge(Connection connection, String key, long revision) throws SQLException {
     var existing = find(connection, key);
     if (existing.isEmpty() || existing.get().sealedAt() == null || existing.get().revision() != revision) return false;
+    if (existing.get().acknowledgedRevision() == revision) return true;
     try (var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET acknowledged_revision = ? "
         + "WHERE operation_key = ? AND sealed_at IS NOT NULL AND revision = ?")) {
       update.setLong(1, revision); update.setString(2, key); update.setLong(3, revision);

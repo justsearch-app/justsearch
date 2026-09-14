@@ -319,7 +319,9 @@ Enumeration closure and administrative skips commit with their ledger coverage. 
 requires closed enumeration, terminal current members, exact matching ledger coverage and
 no issued claims; the immutable versioned receipt distinguishes historical effects from
 current failures and skips. Cleanup retains recorded evidence until exact final acknowledgement.
-Notification delivery, outer operation acknowledgement and producer/recovery integration
+Queue notifications deliver committed keys outside the lock. Existing age cleanup prunes old
+sealed exactly acknowledged progress only after all keyed jobs and ledger references are gone.
+Outer operation acknowledgement, notification retry cadence and producer/recovery integration
 remain under implementation.
 Replay removes only the versions it applied and committed, preserving admissions that arrive
 during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures

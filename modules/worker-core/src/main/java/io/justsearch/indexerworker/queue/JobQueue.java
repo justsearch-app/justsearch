@@ -92,6 +92,19 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
   }
 
+  /** Subscription lifetime is bound to this opened queue. */
+  interface WalkSubscription extends AutoCloseable {
+    @Override void close();
+  }
+
+  /**
+   * Best-effort committed keys delivered outside the queue lock. Calls may overlap or reorder;
+   * subscribers must be thread-safe and re-read the latest durable receipt rather than apply deltas.
+   */
+  default WalkSubscription subscribeRecordedWalks(java.util.function.Consumer<String> subscriber) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
   /** The outer owner acknowledges only after its matching terminal operation receipt is durable. */
   default boolean acknowledgeRecordedWalk(String operationKey, long revision) {
     throw new UnsupportedOperationException("Recorded walks are unavailable");

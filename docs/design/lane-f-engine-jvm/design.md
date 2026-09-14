@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-8d.2c captures actual progress-row changes on the queue connection, promotes keys only after JDBC commit and delivers after outermost unlock. Reuse existing cleanup for old exact-ack unreferenced progress and make duplicate acknowledgement update-free. This avoids explicit marks at every writer and any global scan/new timer. Queue-only attachment precedes actual producer, terminal matching and cadence integration, which remain required. [Owning detail](evidence/C2/C2-8d-vertical-plan.md#c2-8d2c-notification-and-retention-attachment-2026-09-14).
+
 - 2026-09-14: Stopped recorded walks refuse maintenance replacement while issued owners prevent sealing. Retrying after those owners return seals the receipt and admits maintenance outside it; deferred/retryable returns become typed skips in their existing outcome transaction. This avoids unpollable pending membership without another buffer or transaction owner. [C2-8d closure detail](evidence/C2/C2-8d-vertical-plan.md#implementation-detail-stopped-maintenance-admission-2026-09-14).
 
 - 2026-09-14: Migration enumeration distinguishes genuine empty coverage from malformed/inaccessible/partial scans. Only complete admission sets done; the existing cutover monitor persists FAILED from a latched failure before promotion, retrying failed persistence. The authored watched-roots format check becomes shared validation, with no new root authority or stamp waiver. [Mechanism and required proof](evidence/C2/migration-enumeration-completeness.md).
