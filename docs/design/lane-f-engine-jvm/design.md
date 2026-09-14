@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: The migration cutover barrier reconciles the existing embedding success evidence and requires the current fingerprint before its COMPLETE commit, including a fresh Green already in COMPATIBLE state. A drained pending count alone cannot certify it; metadata verification still guards promotion. No new attestation or waiver is introduced. [Repair and proof](evidence/C2/migration-cutover-attestation.md).
+
 - 2026-09-14: Queue mutation transactions acquire their SQLite write reservation before preservation reads. A zero-row write avoids deferred read-to-write BUSY upgrade without adding retries or changing Xerial's post-commit transaction mode. The two-connection negative/positive and no-phantom-delta proofs accompany the [correction](evidence/C2/queue-write-reservation.md); installed contention proof remains open.
 
 - 2026-09-14: C2-8d.2b.1 records explicit membership and historical terminal coverage in the existing queue transaction. Epoch distinguishes recorded membership from a legacy matching scan key; missing projections refuse adoption. Exact superseded claims retain truthful effects without mutating replacement jobs. Coverage/outcome mismatch and untyped recorded completion refuse. Administrative closure/seal/retention and actual activation remain next cuts. [Proof](evidence/C2/walk-terminal-accounting.md).

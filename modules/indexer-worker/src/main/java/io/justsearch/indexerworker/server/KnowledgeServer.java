@@ -2610,11 +2610,13 @@ public final class KnowledgeServer implements Closeable {
    * embedding fingerprint — instead of racing the indexing-loop thread that would otherwise call
    * {@code checkRebuildCompletion}. Pending work or an unreadable pending count defers the cutover
    * under its existing switching deadline. Metadata verification still guards promotion after
-   * certification and the final commit.
+   * certification and the final commit. A fresh green may already be COMPATIBLE before backfill
+   * earns its first stamp; reconcile that evidence here too, without waiting for an idle-loop tick.
    */
   private boolean finalizeEmbeddingRebuildBeforeCutover() {
     var ecc = embeddingCompatController;
-    if (ecc == null || ecc.currentFingerprint() == null || ecc.currentFingerprint().isBlank()) {
+    String expectedFingerprint = ecc == null ? null : ecc.currentFingerprint();
+    if (expectedFingerprint == null || expectedFingerprint.isBlank()) {
       return true; // No resolvable embedding model: a legitimate keyword-only rebuild.
     }
     if (ingestLifecycle == null) return false;
@@ -2626,7 +2628,8 @@ public final class KnowledgeServer implements Closeable {
               .countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
       if (pendingEmbeddings > 0) return false;
       ecc.checkRebuildCompletion(queueDepth, pendingEmbeddings);
-      return true;
+      return ecc.reconcileStampEvidence()
+          && ecc.fingerprintToStamp().filter(expectedFingerprint::equals).isPresent();
     } catch (IOException | RuntimeException e) {
       log.warn("Cannot establish embedding completion before cutover: {}", e.getMessage());
       return false;

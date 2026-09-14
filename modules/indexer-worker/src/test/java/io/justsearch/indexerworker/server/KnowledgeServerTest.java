@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
+import io.justsearch.indexerworker.embed.EmbeddingFingerprint;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
@@ -14,9 +15,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -49,6 +55,8 @@ class KnowledgeServerTest {
         org.mockito.Mockito.RETURNS_DEEP_STUBS);
     var controller = org.mockito.Mockito.mock(EmbeddingCompatibilityController.class);
     org.mockito.Mockito.when(controller.currentFingerprint()).thenReturn("current-model");
+    org.mockito.Mockito.when(controller.reconcileStampEvidence()).thenReturn(true);
+    org.mockito.Mockito.when(controller.fingerprintToStamp()).thenReturn(Optional.of("current-model"));
     setField(server, "ingestLifecycle", runtime);
     setField(server, "embeddingCompatController", controller);
     var counts = runtime.indexCountOps();
@@ -63,8 +71,109 @@ class KnowledgeServerTest {
     assertEquals(false, method.invoke(server), "unreadable is not drained");
     org.mockito.Mockito.verify(controller, org.mockito.Mockito.never())
         .checkRebuildCompletion(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt());
-    assertEquals(true, method.invoke(server), "a subsequent successful zero read permits certification");
+    assertEquals(true, method.invoke(server), "a subsequent zero read with earned fingerprint permits certification");
     org.mockito.Mockito.verify(controller).checkRebuildCompletion(0L, 0);
+  }
+
+  @Nested
+  class CutoverAttestationTests {
+    private final AtomicLong documents = new AtomicLong();
+    private final AtomicInteger completed = new AtomicInteger();
+    private final AtomicBoolean readable = new AtomicBoolean(true);
+    private EmbeddingCompatibilityController controller;
+    private KnowledgeServer server;
+    private io.justsearch.adapters.lucene.runtime.RunningRuntime runtime;
+    private Method finalizeCutover;
+
+    @BeforeEach
+    void setUp() throws Exception {
+      EmbeddingFingerprint.setForTesting("cutover-current-model");
+      controller = new EmbeddingCompatibilityController(Map::of, documents::get, () -> {
+        if (!readable.get()) throw new IllegalStateException("completed reader unavailable");
+        return completed.get();
+      });
+      controller.refresh();
+      server = createServerWithJobQueue(new StubJobQueue());
+      runtime = org.mockito.Mockito.mock(
+          io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+          org.mockito.Mockito.RETURNS_DEEP_STUBS);
+      setField(server, "ingestLifecycle", runtime);
+      setField(server, "embeddingCompatController", controller);
+      finalizeCutover = KnowledgeServer.class.getDeclaredMethod("finalizeEmbeddingRebuildBeforeCutover");
+      finalizeCutover.setAccessible(true);
+    }
+
+    @AfterEach
+    void clearFingerprint() {
+      EmbeddingFingerprint.invalidate();
+    }
+
+    @Test
+    void freshGreenBackfillEarnsStampBeforeFinalCommitWithoutAnIdleTick() throws Exception {
+      assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, controller.state());
+      documents.set(1);
+      completed.set(1);
+      assertTrue(controller.fingerprintToStamp().isEmpty(), "backfill has not signalled the idle loop");
+
+      assertEquals(true, finalizeCutover.invoke(server));
+      assertEquals(Optional.of("cutover-current-model"), controller.fingerprintToStamp(),
+          "the COMPLETE commit must already be able to stamp the fingerprint");
+      assertEquals(true, finalizeCutover.invoke(server), "already certified remains eligible");
+    }
+
+    @Test
+    void zeroOrUnreadableSuccessEvidenceDefersFreshGreenAndCanRecover() throws Exception {
+      documents.set(1);
+      assertEquals(false, finalizeCutover.invoke(server), "zero pending is not proof of success");
+      readable.set(false);
+      completed.set(1);
+      assertEquals(false, finalizeCutover.invoke(server), "unreadable completed count is not evidence");
+      assertTrue(controller.fingerprintToStamp().isEmpty());
+      readable.set(true);
+      assertEquals(true, finalizeCutover.invoke(server));
+      assertEquals(Optional.of("cutover-current-model"), controller.fingerprintToStamp());
+    }
+
+    @Test
+    void pendingEmbeddingsDeferEvenWithAnEarnedStamp() throws Exception {
+      controller.noteSuccessfulEmbeddingObserved();
+      org.mockito.Mockito.when(runtime.indexCountOps().countByFieldOrThrow(
+          io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS,
+          io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(1);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void rebuildingGreenWithCompletedVectorsCanCutOver() throws Exception {
+      documents.set(2);
+      controller.refresh();
+      controller.onForcedReindexRequested();
+      completed.set(2);
+      assertEquals(true, finalizeCutover.invoke(server));
+      assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, controller.state());
+      assertEquals(Optional.of("cutover-current-model"), controller.fingerprintToStamp());
+    }
+
+    @Test
+    void currentModelMustMatchTheOfferedStamp() throws Exception {
+      var mismatched = org.mockito.Mockito.mock(EmbeddingCompatibilityController.class);
+      org.mockito.Mockito.when(mismatched.currentFingerprint()).thenReturn("current-model");
+      org.mockito.Mockito.when(mismatched.reconcileStampEvidence()).thenReturn(true);
+      org.mockito.Mockito.when(mismatched.fingerprintToStamp()).thenReturn(Optional.of("another-model"));
+      setField(server, "embeddingCompatController", mismatched);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void failedRebuildCannotCutOverWithoutVectors() throws Exception {
+      documents.set(2);
+      controller.refresh();
+      controller.onForcedReindexRequested();
+      assertEquals(EmbeddingCompatibilityController.State.REBUILDING, controller.state());
+      assertEquals(false, finalizeCutover.invoke(server));
+      assertTrue(controller.fingerprintToStamp().isEmpty());
+      assertEquals(EmbeddingCompatibilityController.State.REBUILDING, controller.state());
+    }
   }
 
   // ==================== Phase 1: Safe Gauge Methods ====================
@@ -606,7 +715,7 @@ class KnowledgeServerTest {
 
   /** Creates a minimal EmbeddingCompatibilityController for testing. */
   private static EmbeddingCompatibilityController createEmbeddingCompatController() {
-    return new EmbeddingCompatibilityController(java.util.Map::of, () -> 0L);
+    return new EmbeddingCompatibilityController(Map::of, () -> 0L);
   }
 
   /** Initializes final fields that require non-null values. */
@@ -622,8 +731,8 @@ class KnowledgeServerTest {
     setField(
         server,
         "embeddingFingerprintSupplier",
-        new AtomicReference<java.util.function.Supplier<java.util.Optional<String>>>(
-            java.util.Optional::empty));
+        new AtomicReference<java.util.function.Supplier<Optional<String>>>(
+            Optional::empty));
   }
 
   private static Field findField(Class<?> clazz, String name) throws NoSuchFieldException {

@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-14",
+  "base": "043b05bc02d41e2b445365ab2eddf43a4fdfffc8",
+  "testedState": "base plus barrier/tests; installed1578 also lock-evidence fixture changes",
+  "proof": "migration-cutover-attestation.md",
+  "negative": "tmp/migration-attestation-negative1573-counts.json",
+  "integrated": "tmp/migration-attestation1575-counts.json",
+  "finalChecks": "tmp/migration-attestation1576.txt",
+  "finalTests": "tmp/migration-attestation1579-counts.json",
+  "installed": "tmp/installed-recovery1578-counts.json",
+  "installedResult": {
+    "executed": 6,
+    "passed": 5,
+    "failed": 1,
+    "skipped": 0,
+    "failure": "lock-boot initial discovery"
+  },
+  "remaining": [
+    "initial-discovery fault",
+    "resumed empty corruption-recovery waiver",
+    "later C2 and lane stages"
+  ],
+  "retention": "through final lane reconciliation plus30 days; at least2026-10-14"
+}
