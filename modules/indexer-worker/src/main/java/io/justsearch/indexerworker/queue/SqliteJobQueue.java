@@ -132,6 +132,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public boolean hasIssuedRecordedClaims(String operationKey) {
+    lock.lock();
+    try {
+      ensureOpen();
+      return hasIssuedRecordedClaimsLocked(operationKey);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  private boolean hasIssuedRecordedClaimsLocked(String operationKey) {
+    Objects.requireNonNull(operationKey, "operationKey");
+    return activeClaims.values().stream()
+        .anyMatch(claim -> claim.walkEpoch() != null && operationKey.equals(claim.scanId()));
+  }
+
+  @Override
   public java.util.Optional<WalkProgress> recordedWalk(String operationKey) {
     return accessRecordedWalk(() -> SqliteIngestionWalkOps.find(connection, operationKey), false);
   }
@@ -177,8 +194,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private WalkProgress sealRecordedWalk(String operationKey) throws SQLException {
-    boolean issued = activeClaims.values().stream()
-        .anyMatch(claim -> claim.walkEpoch() != null && operationKey.equals(claim.scanId()));
+    boolean issued = hasIssuedRecordedClaimsLocked(operationKey);
     return SqliteIngestionWalkOps.seal(connection, operationKey, issued, SqliteJobQueue::sha256, System.currentTimeMillis());
   }
 

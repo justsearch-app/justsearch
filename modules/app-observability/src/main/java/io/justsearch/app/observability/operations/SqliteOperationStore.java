@@ -509,20 +509,11 @@ public final class SqliteOperationStore implements OperationStore {
       if (!acceptedPreparationRow(parent.id()).filter(expectedParentPreparation::equals).isPresent()) {
         throw childRefused();
       }
-      try (var query = connection.prepareStatement(
-          "SELECT * FROM operations WHERE kind = 'ingest' AND operation_ref IS NULL AND identity_json = ?")) {
-        query.setString(1, identity);
-        try (var rows = query.executeQuery()) {
-          if (rows.next()) {
-            var existing = readRecord(rows);
-            if (rows.next() || !sameChildAttribution(parent, existing)
-                || existing.historyMode() != OperationHistoryMode.NONE
-                || !acceptedPreparationRow(existing.id()).map(Preparation::payload).filter(child.payload()::equals).isPresent()) {
-              throw childRefused();
-            }
-            return new Acceptance(existing, false);
-          }
-        }
+      var existing = findIngestChildRow(parent, child, identity);
+      if (existing.isPresent()) {
+        var row = existing.orElseThrow();
+        if (!row.state().terminal() && parent.state() != OperationState.RUNNING) throw childRefused();
+        return new Acceptance(row, false);
       }
       if (parent.state() != OperationState.RUNNING) throw childRefused();
       // Enforce the same capacity and missing-key fence as ordinary acceptance.
@@ -550,6 +541,35 @@ public final class SqliteOperationStore implements OperationStore {
       }
       return new Acceptance(findRow(childKey).orElseThrow(() -> new SQLException("Accepted child is missing")), true);
     }));
+  }
+
+  @Override
+  public java.util.Optional<OperationRecord> findIngestChild(String parentKey, RecordedRootPlan oneRootPlan) {
+    var child = new RecordedIngestChild(parentKey, oneRootPlan);
+    String identity = canonicalIdentity(child.descriptor().identityJson());
+    return locked(() -> {
+      var parent = findRow(parentKey).orElseThrow(SqliteOperationStore::childRefused);
+      return findIngestChildRow(parent, child, identity);
+    });
+  }
+
+  /** Shared exact lookup; callers separately decide whether an open parent authorizes acceptance. */
+  private java.util.Optional<OperationRecord> findIngestChildRow(OperationRecord parent,
+      RecordedIngestChild child, String identity) throws SQLException {
+    try (var query = connection.prepareStatement(
+        "SELECT * FROM operations WHERE kind = 'ingest' AND operation_ref IS NULL AND identity_json = ?")) {
+      query.setString(1, identity);
+      try (var rows = query.executeQuery()) {
+        if (!rows.next()) return java.util.Optional.empty();
+        var existing = readRecord(rows);
+        if (rows.next() || !sameChildAttribution(parent, existing)
+            || existing.historyMode() != OperationHistoryMode.NONE
+            || !acceptedPreparationRow(existing.id()).map(Preparation::payload).filter(child.payload()::equals).isPresent()) {
+          throw childRefused();
+        }
+        return java.util.Optional.of(existing);
+      }
+    }
   }
 
   private static boolean sameChildAttribution(OperationRecord parent, OperationRecord child) {

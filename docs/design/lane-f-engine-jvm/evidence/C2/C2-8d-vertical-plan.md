@@ -442,3 +442,100 @@ runner's FAILED transition. Same-process replacement proof must show nonterminal
 ownership, fresh-permission revocation, restart-only revalidation, one workId and later
 root acceptance after async acknowledgement. These are selected mechanisms, not executed
 proof or permission to bypass the bounded EngineKnowledgeClient effect path.
+
+
+## Coordinator child observation and refusal ordering (2026-09-14)
+
+The existing acceptIngestChild lookup may create a child and requires a private live
+runner handle. Add a read-only findIngestChild(parentKey, oneRootPlan) to the same
+operations store, reusing its exact canonical child query, attribution, history-mode
+and prepared-payload validation. It creates no row, attempt, admission or authority.
+Missing parent or contradictory binding refuses; a valid parent with no child returns
+empty. Terminal children remain observable across reopen. This is smaller than a
+new child registry or a whole-history scan and lets refusal bookkeeping avoid creating
+unknown children. Existing acceptance of an open child additionally requires a RUNNING
+parent; terminal child observation remains permitted. A read itself never authorizes replay.
+
+Parent refusal must fence permissions, settle each existing child and acknowledge its
+matching terminal receipt before completing the parent. It must not immediately return
+Reconciliation.Failed while a child remains open. A winning Resume may own bookkeeping
+without admission or effects; unavailable/corrupt projection remains a gap rather than
+fabricating successful zero work. COMPLETE_WITH_GAPS remains D1-owned and never grants
+permission. The parent-before-child ordering and open-parent receipt anchor remain as
+decided. A correctly terminal parent already passed all child acknowledgements; no new
+scan of terminal history is needed to repair the designed completion ordering.
+
+The Engine's compact cursor is ingest-receipt:<version>:<revision>:<exact UTF-8 SHA256>.
+All fields are validated by the queue's typed view; compare the exact cursor and historical
+counts, expected terminal state, receipt code and null executionId before acknowledgement.
+No JSON reserialization, digest in executionId, or independent receipt parser is introduced.
+Cancellation uses the existing runner receipt code cancelled; enumeration failure uses
+INGEST_ENUMERATION_FAILED, current member failures INGEST_UNITS_FAILED, otherwise SUCCESS.
+Historical failed units alone do not decide the current outcome.
+
+Required proof adds read-only absent-child lookup, terminal child lookup after parent
+completion/reopen, malformed inherited binding refusal, open-child acceptance refusal
+under a non-running parent, and parent refusal with no new child/effect/admission.
+These mechanisms belong to9b.3b.3; no coordinator completion is claimed by this design.
+
+
+## Unavailable receipt evidence and issued-owner drain (2026-09-14)
+
+The earlier derived-store-loss rule at Enumeration and failure details remains in force.
+The normal exact checkpoint/terminal/ack barrier applies to valid sealed COMPLETE, FAILED
+and CANCELLED receipts. It cannot override that earlier rule by waiting forever on evidence
+that is missing/corrupt or on an exhausted repair attempt. A valid sealed queue receipt with
+a stale/missing operation checkpoint remains repairable through a winning Resume. Check the
+existing total durable-operation attempts field against the decided limit3 before another
+Resume; no separate repair counter and no generic unbounded runner retry are selected.
+
+For unavailable/contradictory final receipt evidence or exhausted repair, revoke permission,
+settle the enumeration producer, and prove issued queue owners have drained. Then fail the
+child and subsequently its parent with INGEST_UNIT_STATE_UNAVAILABLE (or
+INGEST_RECOVERY_ATTEMPTS_EXHAUSTED for exhaustion), null executionId, and the last confirmed
+operations checkpoint/counts. Do not fabricate a new successful checkpoint or acknowledge
+invalid queue evidence. Retention remains refused for that unacknowledged evidence. This
+is FAILED partial-effect reporting under7.5, never COMPLETE_WITH_GAPS acceptance or D1
+candidate activation. Independent source review confirmed this resolves an overbroad later
+wording without changing the already-decided derived-store loss behavior.
+
+Add only hasIssuedRecordedClaims(operationKey) to the private index-side queue port. It
+reads the existing activeClaims map under the same queue lock using the exact existing
+seal predicate (non-null walkEpoch and matching scanId). Reuse that predicate inside sealing;
+no second activity counter or registry. Read false only after permission revocation: poll
+checks permission and publishes each actual claim before releasing that same lock, so the
+ordered revoke/read forms the drain proof. Durable PROCESSING state alone proves neither
+ownership nor work exit. A closed/unavailable queue must not return a fabricated false.
+Enumeration producer exit is a separate required barrier; this read only covers queue claims.
+Required proof includes fence/read race, pending outcome persistence, exact returned claim,
+and a reopened unowned PROCESSING row. None is claimed by this design entry.
+
+
+## Coordinator per-item cuts (2026-09-14)
+
+Keep9b.3b.3 reviewable through three commits, pushing each. These refine implementation
+placement within the decided stable coordinator; none independently completes that item.
+
+1. Observation foundations: exact child lookup/acceptance guard, pure compact receipt
+ projection, and locked issued-claim observation. No activation or producer binding.
+ [Evidence](ingestion-coordinator-foundations.md).
+2. Receipt-only recovery settlement: after the outer owner revoked permission and actual
+ enumeration/issued owners exited, select a runner reconciliation verdict. Exact checkpoint
+ finishes without another attempt; stale/missing checkpoint uses a winning Resume within
+ the existing durable-operation budget3; decreasing confirmed counters is unavailable
+ evidence. Revalidate the sealed receipt inside the winning body, checkpoint before its
+ outcome, then independently reread the durable terminal row before exact acknowledgement.
+ No admission, effect, direct terminal write, new timer, or persistent authority is added.
+ Test the actual runner with both SQLite owners, including failed terminal persistence.
+3. Stable parent/child coordinator: compose those mechanisms with bounded parent admission,
+ fresh/restart permission, strict parent preparation, refusal ordering, actual producer
+ completion, existing maintenance, final drain and same-process replacement. Keep the
+ captured runner cohort as recovery authority; no whole-history scan or runner rearm API.
+
+The existing knowledge-client-root-walk executor is the first reuse candidate for d.3b's
+async producer. Its queued/running OwnedStreamTask already distinguishes cancellation
+before start from actual completion after exit. Preserve that distinction in the recorded
+adapter and reuse its bounded queue; do not introduce a notification executor. A unary
+caller's deadline response is not proof its effect owner exited. Verify the actual exit
+signal before choosing the single-file adapter. This is an integration requirement, not
+an assertion that the present adapter already carries child key/epoch or completes the row.

@@ -882,6 +882,15 @@
       "guard": "test:RecordedIngestRecoveryDecisionTest",
       "consumesProjection": "operation-record-type",
       "note": "C2-9b.2b pure recovery decision revalidates the existing row and frozen invocation against the sole current roots, source, gate and exact grant authorities. It writes no operation state, installs no queue permit and starts no effect."
+    },
+    {
+      "id": "recorded-ingestion-receipt",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/RecordedIngestionReceipt.java",
+      "guard": "test:RecordedIngestionReceiptTest",
+      "consumesProjection": "operation-record-type",
+      "note": "C2-9b.3b.3 derives compact checkpoint/outcome expectations from the existing sealed queue receipt and compares them with the sole operations row. It owns no acceptance, persistence, authority, or independent lifecycle state."
     }
   ]
 }

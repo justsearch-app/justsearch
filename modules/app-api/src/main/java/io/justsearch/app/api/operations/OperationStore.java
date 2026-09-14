@@ -85,6 +85,15 @@ public interface OperationStore extends AutoCloseable {
     throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
   }
 
+  /**
+   * Exact derived-child observation for receipt repair, including terminal children after restart.
+   * Never creates acceptance or authorizes replay. Missing parent or inconsistent stored binding
+   * refuses; an existing parent with no matching child returns empty.
+   */
+  default java.util.Optional<OperationRecord> findIngestChild(String parentKey, RecordedRootPlan oneRootPlan) {
+    throw new UnsupportedOperationException("Recorded ingestion child lookup is unavailable");
+  }
+
   record Acceptance(OperationRecord record, boolean created) {}
 
   /**

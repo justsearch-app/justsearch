@@ -27,6 +27,12 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-9b.3b.3 is implemented as observation foundations, receipt-only runner settlement, then the stable parent/child owner. The finite producer first reuses the existing bounded root-walk owner and must expose actual exit rather than a deadline response. [Per-item cuts and proof obligations](evidence/C2/C2-8d-vertical-plan.md#coordinator-per-item-cuts-2026-09-14).
+
+- 2026-09-14: C2-9b.3b.3 preserves the decided derived-store-loss failure path: revoke permissions and prove producer/issued-claim drain before FAILED with last confirmed counts, without acknowledging invalid receipt evidence. Valid receipts retain the exact normal barrier and repair uses the existing three-attempt budget. [Owning clarification](evidence/C2/C2-8d-vertical-plan.md#unavailable-receipt-evidence-and-issued-owner-drain-2026-09-14).
+
+- 2026-09-14: C2-9b.3b.3 uses exact read-only child lookup in the existing operations store for receipt repair and refusal bookkeeping. Parent completion remains behind child fencing and acknowledgement; the compact cursor carries version/revision/exact stored-byte digest. [Owning mechanism](evidence/C2/C2-8d-vertical-plan.md#coordinator-child-observation-and-refusal-ordering-2026-09-14).
+
 - 2026-09-14: C2-8d.3a validates sealed receipt JSON in the queue and exposes only a typed non-durable projection with an exact stored-byte digest; it precedes the stable coordinator and d.3b effect wiring. The coordinator retains pending operation completions across same-process index replacement while revoking fresh permissions; no runner rearm API is needed. [Owning receipt and continuation mechanisms](evidence/C2/C2-8d-vertical-plan.md#remaining-producer-cuts-and-strict-receipt-boundary-2026-09-14).
 
 - 2026-09-14: C2-9b.3b.2 attachment creation is failure-atomic; the server retains its returned handle through drain and successful close. Failed startup retains the physical server unless its close latch confirms completion, including fatal errors. Generation eligibility requires the writable serving runtime and a strict current state read. [Owning lifecycle sequence](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b2-startup-and-close-attachment-2026-09-14).

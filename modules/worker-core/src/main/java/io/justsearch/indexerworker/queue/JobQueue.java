@@ -67,6 +67,14 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
   }
 
+  /**
+   * Actual process-local issued owners, including superseded claims. False is a drain proof only
+   * after the outer owner revoked permission for this key; durable PROCESSING rows are not owners.
+   */
+  default boolean hasIssuedRecordedClaims(String operationKey) {
+    throw new UnsupportedOperationException("Recorded claim ownership is unavailable");
+  }
+
   /** Private owner read; a missing projection is not permission to reconstruct acceptance. */
   default Optional<WalkProgress> recordedWalk(String operationKey) {
     throw new UnsupportedOperationException("Recorded walks are unavailable");

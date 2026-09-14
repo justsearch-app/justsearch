@@ -45,7 +45,8 @@ v1 rows remain compatible. No corruption repair is inferred from a successful ca
 Root independently checked XML counts and the reviewer findings. Final independent
 read-only review found no surviving correctness finding after numeric-read and rollback
 corrections. Operation/execution/register-resolution gates and store recoverability pass
-in1692 without baseline changes. Hosted proof for this new code remains pending its push.
+in1692 without baseline changes. Hosted proof now passes at759775f6f84cb386e930d7e31bf04e5007d8ef87: all13 jobs in CI34863470535 and CLA34863468188. Saved metadata: tmp/1705-hosted-ci.json.
+[Hosted CI](https://github.com/justsearch-app/justsearch/actions/runs/34863470535).
 
 Exact commands/revisions/task counts are in tmp/1689-counts.json through
 1698-counts.json; raw logs use the same numeric .txt prefix and copied XML the -xml/

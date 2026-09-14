@@ -2,6 +2,14 @@
 
 ## Current state (2026-09-14)
 
+C2-9b.3b.3 observation foundations now pass integrated1709:1,218 cases/234 suites,
+21 existing skips and no failures, plus PMD/format. API/store1703 separately passed814
+cases. Exact child lookup, compact receipt matching and locked issued-owner observation
+are implemented; independent review and lock/acceptance negative controls pass.
+[Proof and limits](evidence/C2/ingestion-coordinator-foundations.md). Next is receipt-only
+runner settlement, then the stable parent/child coordinator and actual producer binding.
+No live recorded producer is bound yet. C2 remains open; merge at F.
+
 C2-9b.3b.2 startup/drain attachment is committed1ced178d9 and locally/hosted
 verified through ae486f3e4 (separate pacing observation correction). Integrated1688
 passes1,190 cases/231 suites,21 existing skips, zero failures/errors, plus PMD/format.
@@ -13,7 +21,8 @@ failures and their corrections remain preserved in the owning evidence.
 C2-8d.3a strict sealed receipt projection is implemented and locally verified:
 final indexer1698 passes625 cases/15 existing skips; unchanged Worker-core1692 passes
 342/six skips. Independent review and corruption/retention/rollback negative controls
-pass. [Receipt proof](evidence/C2/sealed-receipt-validation.md). Hosted proof awaits push.
+pass. All13 CI34863470535 jobs and CLA34863468188 pass at759775f6f.
+[Receipt proof](evidence/C2/sealed-receipt-validation.md).
 Next: stable activation/admission coordinator .3b.3, then actual bounded producer
 adapters d.3b. No live recorded producer is bound yet; constructor defaults to denial.
 Root owns lifecycle/SQL/builds; C2 remains open.
