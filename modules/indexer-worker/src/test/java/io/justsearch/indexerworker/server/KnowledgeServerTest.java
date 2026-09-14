@@ -143,6 +143,61 @@ class KnowledgeServerTest {
       assertEquals(false, finalizeCutover.invoke(server));
     }
 
+    private void restoreCorruptionGreen(Path base, String source, long documentCount,
+        boolean readableCount, boolean matchingPath) throws Exception {
+      var original = new io.justsearch.indexerworker.index.IndexGenerationManager(base);
+      var state = original.startMigration(source);
+      var reopened = new io.justsearch.indexerworker.index.IndexGenerationManager(base);
+      reopened.initializeOrLoad();
+      setField(server, "indexGenerationManager", reopened);
+      setField(server, "buildingIndexPath", matchingPath
+          ? reopened.resolveGenerationPathStrict(state.building_generation()) : base.resolve("another-generation"));
+      setField(server, "appServices", org.mockito.Mockito.mock(WorkerAppServices.class));
+      if (readableCount) {
+        org.mockito.Mockito.when(runtime.indexCountOps().docCountOrThrow()).thenReturn(documentCount);
+      } else {
+        org.mockito.Mockito.when(runtime.indexCountOps().docCountOrThrow())
+            .thenThrow(new IOException("green reader unavailable"));
+      }
+      var initialize = KnowledgeServer.class.getDeclaredMethod("initEmbeddingCompatibilityController");
+      initialize.setAccessible(true);
+      initialize.invoke(server);
+      var controllerField = KnowledgeServer.class.getDeclaredField("embeddingCompatController");
+      controllerField.setAccessible(true);
+      controller = (EmbeddingCompatibilityController) controllerField.get(server);
+      controller.onForcedReindexRequested();
+    }
+
+    @Test
+    void resumedEmptyCorruptionGreenRetainsItsStructuralAttestation(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 0, true, true);
+      assertEquals(true, finalizeCutover.invoke(server), "reopened empty recovery has no old-model vectors");
+    }
+
+    @Test
+    void normalEmptyMigrationCannotBorrowCorruptionWaiver(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "schema_mismatch", 0, true, true);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void nonemptyResumedCorruptionGreenCannotBorrowOldModelAuthority(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 1, true, true);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void unreadableResumedGreenDoesNotCountAsEmpty(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 0, false, true);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void waiverRequiresTheActuallyOpenedBuildingGeneration(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 0, true, false);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
     @Test
     void rebuildingGreenWithCompletedVectorsCanCutOver() throws Exception {
       documents.set(2);

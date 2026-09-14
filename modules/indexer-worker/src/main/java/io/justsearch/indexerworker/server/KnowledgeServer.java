@@ -1795,7 +1795,7 @@ public final class KnowledgeServer implements Closeable {
             this::trustworthyCompletedEmbeddingCountOrThrow);
     ecc.refresh();
     embeddingCompatController = ecc;
-    if (corruptionRecoveryRebuildStarted) {
+    if (corruptionRecoveryRebuildStarted || isResumedEmptyCorruptionRecovery()) {
       ecc.permitStampWithoutEmbeddingEvidence("corrupt_index_rebuild");
     }
     // Tempdoc 730 A1 REVERTED (post-review): the unconditional EmbeddingFingerprint::get
@@ -1823,6 +1823,28 @@ public final class KnowledgeServer implements Closeable {
     // early refresh just certified COMPATIBLE would still persist unstamped.
     embeddingFingerprintSupplier.set(ecc::fingerprintToStamp);
     appServices.wireEmbeddingCompatController(ecc);
+  }
+
+  /** Re-derive only the empty-Green corruption waiver; source alone cannot attest old vectors. */
+  private boolean isResumedEmptyCorruptionRecovery() {
+    if (indexGenerationManager == null || buildingIndexPath == null) return false;
+    try {
+      var state = indexGenerationManager.readStateBestEffort();
+      if (state == null || state.building_generation() == null
+          || !("MIGRATING".equals(state.migration_state()) || "SWITCHING".equals(state.migration_state()))) {
+        return false;
+      }
+      String generation = state.building_generation();
+      if (!indexGenerationManager.resolveGenerationPathStrict(generation).equals(buildingIndexPath)
+          || !MigrationSource.CORRUPT_INDEX_REBUILD.wire().equals(
+              indexGenerationManager.readGenerationSourceBestEffort(generation))) {
+        return false;
+      }
+      return trustworthyDocCountOrThrow() == 0;
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("Cannot establish empty corruption-recovery Green: {}", unavailable.getMessage());
+      return false;
+    }
   }
 
   /**

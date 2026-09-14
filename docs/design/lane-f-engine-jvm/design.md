@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: A resumed corruption-recovery Green re-derives the existing stamp waiver only from exact persisted recovery source, matching opened building generation, and an authoritative empty document count. Source alone cannot attest a nonempty generation after a model change. [Restart-state and discriminating proof](evidence/C2/corruption-resume-attestation.md).
+
 - 2026-09-14: The migration cutover barrier reconciles the existing embedding success evidence and requires the current fingerprint before its COMPLETE commit, including a fresh Green already in COMPATIBLE state. A drained pending count alone cannot certify it; metadata verification still guards promotion. No new attestation or waiver is introduced. [Repair and proof](evidence/C2/migration-cutover-attestation.md).
 
 - 2026-09-14: Queue mutation transactions acquire their SQLite write reservation before preservation reads. A zero-row write avoids deferred read-to-write BUSY upgrade without adding retries or changing Xerial's post-commit transaction mode. The two-connection negative/positive and no-phantom-delta proofs accompany the [correction](evidence/C2/queue-write-reservation.md); installed contention proof remains open.

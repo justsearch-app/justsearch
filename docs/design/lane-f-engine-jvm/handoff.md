@@ -72,9 +72,11 @@ stamp before the final commit, including fresh COMPATIBLE Green. Its old-code ne
 fails in all three intended cases; final1576 represents870 cases/174 suites with18 existing
 skips and no test failures/errors, PMD/Spotless pass. Final review1579 adds exact-model binding and successful REBUILDING coverage (40 executed
 cases, no failures/skips). Installed1578 passes five of six, including real-model migration
-and lock-ingest; lock-boot reproduces initial Engine exit before discovery. The inherited
-resumed-empty corruption-recovery waiver also needs its next bounded correction before
-sealing resumes. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
+and lock-ingest; lock-boot reproduces initial Engine exit before discovery. The inherited resumed-empty corruption-recovery waiver is now corrected with exact
+persisted provenance, opened-generation binding and a trustworthy zero count; full1583
+indexer/core and PMD/Spotless pass. [Proof](evidence/C2/corruption-resume-attestation.md).
+Zero-root enumeration and initial lock-boot diagnostics/recovery remain active repairs
+before sealing resumes. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is
 C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then

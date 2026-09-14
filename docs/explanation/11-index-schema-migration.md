@@ -464,6 +464,12 @@ Without this gate, the enumerator starts immediately and the `IndexingLoop` proc
 
 The latch has a 120-second timeout; if the embedding provider isn't ready by then, enumeration proceeds without inline embedding. When a model fingerprint is resolvable, pending embedding backfill must drain before cutover certification and the final commit. An unreadable pending count defers certification under the existing switching deadline; it never counts as zero pending work. A fresh Green can already be `COMPATIBLE` while backfill success has not yet reached the idle-loop stamp reconciliation. The cutover barrier reconciles that existing evidence and requires the current fingerprint to be available to the final commit. Zero pending work alone does not earn a stamp; absent or unreadable success evidence defers cutover. Reconciliation stays outside the IO-free commit overlay. The commit's schema and embedding metadata still have to pass verification before promotion.
 
+The corruption-recovery empty-index exception survives restart only when the opened Green
+matches the current building generation, its persisted source is `corrupt_index_rebuild`,
+and an authoritative document count proves it empty. Unreadable or nonempty Green does
+not inherit that exception from its source label: surviving vectors could belong to a model
+from before restart. An already matching committed fingerprint supplies its own evidence.
+
 ## Inline embedding during migration
 
 During blue-green migration, `IndexingLoop.canBatchEmbed` is conditionally enabled (via `migrationActiveSupplier`) so batch GPU/CPU embedding runs inline. This differs from normal primary indexing (where embedding is deferred to backfill). The rationale: during migration, Blue serves search and Green is not yet serving — "fast BM25" has no benefit. Green should optimize for total time including vectors (~8.6 docs/sec inline > 7 docs/sec RMW backfill total time).
