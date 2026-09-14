@@ -59,6 +59,7 @@ public final class SchemaController {
   private static final List<String> SCHEMA_NAMES =
       List.of(
           "health-event.v1.json",
+          "condition-recovery-index.v1.json",
           "indexing-job-view.v1.json",
           "operation-history-entry.v1.json",
           "operation-outcome-view.v1.json",

@@ -12,7 +12,7 @@
  * future refactors. This test fills that gap.
  */
 
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import './HealthSurface.js';
 import type { HealthSurface } from './HealthSurface.js';
 import {
@@ -39,8 +39,9 @@ describe('HealthSurface — recommendedActions panel', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     __resetAiStateForTest();
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async () => new Response('{}', { headers: { 'Content-Type': 'application/json' } })));
   });
-  afterEach(() => __resetAiStateForTest());
+  afterEach(() => { __resetAiStateForTest(); vi.unstubAllGlobals(); });
 
   // 595: a ready readiness composite fed to the ONE store → the verdict is
   // `operational`, which both header and footer consume.
@@ -193,12 +194,12 @@ describe('HealthSurface — recommendedActions panel', () => {
     }
   });
 
-  it('renders one button per entry when recommendedActions is populated', async () => {
+  it('renders one catalog action per entry when recommendedActions is populated', async () => {
     const el = await mount();
     try {
       el.recommendedActions = new Map([
-        ['schema.reindex-required|worker.schema', 'core.reindex'],
-        ['index.unavailable|worker', 'core.rebuild-index'],
+        ['schema.reindex-required|worker.schema', { target: 'core.reindex', args: {} }],
+        ['index.unavailable|worker', { target: 'core.rebuild-index', args: {} }],
       ]);
       await el.updateComplete;
 
@@ -206,7 +207,7 @@ describe('HealthSurface — recommendedActions panel', () => {
       expect(section).not.toBeNull();
 
       const buttons = el.shadowRoot?.querySelectorAll(
-        '.card.section.recommended jf-button',
+        '.card.section.recommended .recommended-action',
       );
       expect(buttons?.length).toBe(2);
 
@@ -229,13 +230,13 @@ describe('HealthSurface — recommendedActions panel', () => {
     try {
       // Insertion order is reverse-alphabetical; the render should sort by key.
       el.recommendedActions = new Map([
-        ['z.condition|sub', 'core.z-op'],
-        ['a.condition|sub', 'core.a-op'],
+        ['z.condition|sub', { target: 'core.z-op', args: {} }],
+        ['a.condition|sub', { target: 'core.a-op', args: {} }],
       ]);
       await el.updateComplete;
 
       const buttons = el.shadowRoot?.querySelectorAll(
-        '.card.section.recommended jf-button',
+        '.card.section.recommended .recommended-action',
       );
       const texts = Array.from(buttons ?? []).map((b) =>
         b.textContent?.trim() ?? '',
@@ -271,16 +272,16 @@ describe('HealthSurface — recommendedActions panel', () => {
     }
   });
 
-  it('button title includes the conditionId and subject for accessibility', async () => {
+  it('recommendation title includes the conditionId and subject for accessibility', async () => {
     const el = await mount();
     try {
       el.recommendedActions = new Map([
-        ['schema.reindex-required|worker.schema', 'core.reindex'],
+        ['schema.reindex-required|worker.schema', { target: 'core.reindex', args: {} }],
       ]);
       await el.updateComplete;
 
       const button = el.shadowRoot?.querySelector(
-        '.card.section.recommended jf-button',
+        '.card.section.recommended .recommended-action',
       ) as HTMLButtonElement | null;
       expect(button).not.toBeNull();
       expect(button?.title).toContain('schema.reindex-required');
@@ -464,8 +465,9 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     __resetAiStateForTest();
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async () => new Response('{}', { headers: { 'Content-Type': 'application/json' } })));
   });
-  afterEach(() => __resetAiStateForTest());
+  afterEach(() => { __resetAiStateForTest(); vi.unstubAllGlobals(); });
 
   function feed(core: Record<string, unknown>): void {
     __feedForTest({

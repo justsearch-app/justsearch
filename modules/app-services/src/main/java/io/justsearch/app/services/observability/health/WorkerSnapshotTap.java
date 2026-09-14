@@ -157,7 +157,7 @@ public final class WorkerSnapshotTap {
 
   // ----- Mapping constants (boolean fields) -----
 
-  // Per 442 §B.9 row 547 + 447-impl-B: schema.reindex-required's recovery is
+  // Per 442 §B.9 row 547 + 447-impl-B: schema.reindex-required's default recovery is
   // core.reindex with force=true. Path-A's Optional<OperationRef> couldn't carry the
   // force=true default; OperationInvocation.defaultArgsJson now does.
   private static final ConditionMapping REINDEX_MAPPING =
@@ -169,6 +169,19 @@ public final class WorkerSnapshotTap {
               new io.justsearch.agent.api.registry.OperationInvocation(
                   new io.justsearch.agent.api.registry.OperationRef("core.reindex"),
                   "{\"force\":true}")));
+
+  // Embedding compatibility failures and an exhausted rebuild brake require the whole-index
+  // recovery owner. Keep the condition identity/subject/severity stable while changing only the
+  // operation projection and its empty defaults.
+  private static final ConditionMapping REBUILD_INDEX_MAPPING =
+      new ConditionMapping(
+          "schema.reindex-required",
+          "worker.schema",
+          Severity.WARNING,
+          Optional.of(
+              new io.justsearch.agent.api.registry.OperationInvocation(
+                  new io.justsearch.agent.api.registry.OperationRef("core.rebuild-index"),
+                  "{}")));
   // ----- Enrichment completeness (tempdoc 821 §3-C3 follow-on) -----
 
   /**
@@ -425,16 +438,22 @@ public final class WorkerSnapshotTap {
   private void reconcileReindex(CompatibilityStatusView compat) {
     boolean required = compat.reindexRequired();
     if (required) {
-      Optional<String> message =
-          compat.reindexRequiredReason().isEmpty()
-              ? Optional.empty()
-              : Optional.of(compat.reindexRequiredReason());
-      upsertCondition(REINDEX_MAPPING, "ReindexRequired", message);
+      String reason = compat.reindexRequiredReason();
+      Optional<String> message = reason.isEmpty() ? Optional.empty() : Optional.of(reason);
+      upsertCondition(resolveReindexMapping(reason), "ReindexRequired", message);
     } else if (priorReindexRequired) {
       // Was required, now isn't → clear the prior condition.
       clearCondition(REINDEX_MAPPING.conditionId(), REINDEX_MAPPING.subject());
     }
     priorReindexRequired = required;
+  }
+
+  private static ConditionMapping resolveReindexMapping(String reason) {
+    return switch (reason) {
+      case "embedding_mismatch", "embedding_legacy", "rebuild_brake_exhausted" ->
+          REBUILD_INDEX_MAPPING;
+      default -> REINDEX_MAPPING;
+    };
   }
 
   private void reconcileQueueDbHealthy(QueueDbStatusView queueDb) {

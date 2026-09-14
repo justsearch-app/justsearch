@@ -836,6 +836,67 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                       "comfortable": "Comfortable", "rich": "Spacious"}
     _MODE_LABEL = {"simple": "Simple", "advanced": "Detailed"}
 
+    async def setup_health_recovery(page):
+        # Exercise the actual REST projection and catalog confirmation through transport fixtures.
+        catalog = json.loads(ui_fixtures.fixture_body("http://localhost/api/registry/operations"))
+        template = catalog["entries"][0]
+        catalog["entries"] = []
+        for operation_id, high in (("core.reindex", False), ("core.rebuild-index", True)):
+            entry = json.loads(json.dumps(template))
+            entry["id"] = operation_id
+            entry["presentation"]["labelKey"] = f"ops.{operation_id.removeprefix('core.')}.label"
+            entry["policy"]["risk"] = "HIGH" if high else "LOW"
+            entry["policy"]["confirm"] = {"kind": "INLINE" if high else "NONE"}
+            entry["intf"]["inputs"] = {"type": "object"}
+            entry["intf"]["result"] = {"type": "object"}
+            catalog["entries"].append(entry)
+        recovery = {"catalogVersion": 1, "entries": [
+            {"target": "core.reindex", "conditions": [{
+                "conditionId": "schema.reindex-required", "subject": "worker.schema",
+                "severity": "WARNING", "since": "2026-09-14T00:00:00Z",
+                "defaultArgsJson": '{"force":true}',
+            }]},
+            {"target": "core.rebuild-index", "conditions": [{
+                "conditionId": "embedding.blocked", "subject": "worker.embedding",
+                "severity": "WARNING", "since": "2026-09-14T00:00:00Z",
+                "defaultArgsJson": '{}',
+            }]},
+        ]}
+        invoked = []
+
+        async def operations(route):
+            await route.fulfill(status=200, content_type="application/json", body=json.dumps(catalog))
+
+        async def recommendations(route):
+            await route.fulfill(status=200, content_type="application/json", body=json.dumps(recovery))
+
+        async def empty_stream(route):
+            await route.fulfill(status=200, content_type="text/event-stream", body=": ready\n\n")
+
+        async def invoke(route):
+            invoked.append(route.request.url)
+            await route.fulfill(status=200, content_type="application/json",
+                                body=json.dumps({"success": True, "message": "Completed"}))
+
+        await page.route("**/api/registry/operations", operations)
+        await page.route("**/api/condition-recovery-index", recommendations)
+        await page.route("**/api/condition-recovery-index/stream", empty_stream)
+        await page.route("**/api/operations/*/invoke", invoke)
+        # Catalog bootstrap must consume the overridden transport, not a cached earlier catalog.
+        await page.reload()
+        await _goto_surface(page, S.RAIL_SURFACE_HEALTH)
+        panel = page.locator("jf-health-surface .recommended")
+        low = panel.locator('jf-operation[operation-id="core.reindex"]')
+        await low.wait_for(state="visible", timeout=15_000)
+        async with page.expect_request("**/api/operations/*/invoke") as request:
+            await low.locator("jf-action-button button.invoke").click()
+        assert (await request.value).post_data_json["args"] == {"force": True}
+        high = panel.locator('jf-operation[operation-id="core.rebuild-index"]')
+        await high.locator("jf-action-button button.invoke").click()
+        await high.locator(".confirm-row").wait_for(state="visible")
+        assert len(invoked) == 1, "Rebuild must wait for catalog inline confirmation"
+        await panel.scroll_into_view_if_needed()
+
     async def setup_health_completion(page):
         # Exercise the real Health SSE consumer and Lit projection with a finite
         # transport fixture. No private component state is patched.
@@ -2091,6 +2152,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         Step("engine-recovery", setup=setup_engine_recovery, isolated=True),
         Step("engine-admission-wait", setup=setup_engine_admission_wait, isolated=True),
         Step("health-completion", setup=setup_health_completion, isolated=True),
+        Step("health-recovery", setup=setup_health_recovery, isolated=True),
         Step("search-failure", setup=setup_search_failure, isolated=True),
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),
         # --- Shared-browser chain (demo flow) ---

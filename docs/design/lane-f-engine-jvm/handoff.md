@@ -2,20 +2,27 @@
 
 ## Current state (2026-09-14)
 
-Current d.3b.2a.2 [legacy recovery correction](evidence/C2/recorded-force-compatibility.md)
-is implemented against40a9a14b9 plus its per-item diff. Recovery requires exact re-mark coverage,
-commit and reader refresh before compatibility transition; normal/shutdown certification refuses
-unreadable pending counts. Final1787 passes131 new cases/21 suites plus19 unchanged core cases
-reused, no failures/errors/skips;16 fault-injection failures discriminate all safeguards, sources
-restored. Independent review and final evidence reread, PMD, format and governance pass.
-Selected-force/provenance correction is already pushed40a9a14b9 with100 focused1775 cases and12
-restored1779 cases; no selected force can certify untouched vectors or strip known old provenance.
+Current d.3b.2a.3 [recovery routing](evidence/C2/recovery-routing.md) is implemented
+against d23f1136e plus its per-item diff. Embedding/brake conditions select full rebuild; schema
+conditions retain force-reindex. Per-condition arguments survive REST/SSE into catalog controls,
+including inline confirmation and error display. Connection-scoped SSE precedence prevents stale
+REST overwrites and rejects old connection responses. Final1809 passes6,589 frontend cases/490
+files;1808 typecheck/37 focused cases pass;1810 represents62 Java cases with no failures (17 newly
+executed,45 cached), plus unchanged schema proof from1791/1799. Seven injected assertion failures
+and the two pre-fix regressions discriminate the corrections. Independent source review is clear;
+independent final evidence review is also clear. The per-item commit follows. Fixture UI1802 has zero accessibility,
+console or overflow findings; live/installed/final hosted proof remains outstanding.
 
-Next .2a.3 routes embedding/brake recovery to full rebuild and preserves per-condition invocation
-arguments through the recovery index into the actual UI path. Then .2b binds the bounded Engine
-producer and proves actual producer/delivery exit, followed by .3 prepared handlers and all final
-C2 integrated/live/installed/hosted reconciliation. No producer is bound yet. C2 remains open,
-merge stays at F, and root owns lifecycle, SQL, builds and installed source/test changes.
+Prerequisites are pushed:40a9a14b9 selected-force/provenance and d23f1136e legacy recovery
+visibility/coverage/strict counts. Their [evidence](evidence/C2/recorded-force-compatibility.md)
+remains applicable. d23f1136e hosted CI34893182564 passes12/13; only the unbound producer method
+fails on all three attempts. CLA34893179972 passes. No exemption is authorized or needed.
+
+Next .2b binds the bounded Engine producer and proves actual producer/delivery exit, followed by
+.3 prepared handlers and all final C2 integrated/live/installed/hosted reconciliation. No producer
+is bound yet. C2 remains open, merge stays at F, and root owns lifecycle, SQL, builds and source
+installation. The investigated draft is tmp/recorded-producer-exit-design.md; freeze it in the
+owning design after the prerequisite commit, before implementation.
 
 Recorded scan admission is pushed17d56daf0 with52 final1769 cases and independent negative proofs.
 Its hosted CI34887604012 passes12/13 jobs; app-ui fails only the still-unbound producer method on three attempts, while

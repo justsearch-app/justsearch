@@ -20,6 +20,7 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
 import '../components/OpButton.js';
+import type { OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/StatusBadge.js';
 import '../components/Button.js';
 import '../components/ErrorAlert.js';
@@ -39,6 +40,7 @@ import type { HealthEvent } from '../../api/generated/index.js';
 import { healthEventSchema } from '../../api/domains/health.js';
 import { parseWireContract } from '../../api/schemas.js';
 import '../aggregate-substrate/components/JfHealthEvent.js';
+import '../aggregate-substrate/components/JfOperation.js';
 // B1/B7: the observed state (status, inference, phase, readiness) comes from the
 // one aiStateStore — Health no longer runs a SECOND /api/status poll. The raw
 // snapshot types are the generated/poll shapes, re-exported by the store.
@@ -76,6 +78,41 @@ import '../components/DeclaredSurface.js';
 import './SystemSelfView.js';
 
 // QueueDbStatus interface elided — derived inline from status response.
+
+interface RecoveryAction {
+  target: string;
+  args: Record<string, unknown>;
+}
+
+interface RecoveryIndexWire {
+  entries?: Array<{
+    target?: string;
+    conditions?: Array<{ conditionId?: string; subject?: string; defaultArgsJson?: string }>;
+  }>;
+}
+
+/** The inverse index is a projection of the condition's complete invocation, shared by REST/SSE. */
+function recoveryActions(index: RecoveryIndexWire): Map<string, RecoveryAction> {
+  const next = new Map<string, RecoveryAction>();
+  for (const entry of index.entries ?? []) {
+    if (typeof entry.target !== 'string' || !entry.target) continue;
+    for (const condition of entry.conditions ?? []) {
+      if (!condition.conditionId || typeof condition.defaultArgsJson !== 'string') continue;
+      let args: unknown;
+      try {
+        args = JSON.parse(condition.defaultArgsJson);
+      } catch {
+        // A malformed invocation is unavailable; never silently replace its arguments with {}.
+        continue;
+      }
+      if (args === null || typeof args !== 'object' || Array.isArray(args)) continue;
+      next.set(`${condition.conditionId}|${condition.subject ?? ''}`, {
+        target: entry.target, args: args as Record<string, unknown>,
+      });
+    }
+  }
+  return next;
+}
 
 interface FailedJob {
   path?: string;
@@ -141,7 +178,6 @@ export class HealthSurface extends JfElement {
     autoRefresh: { state: true },
     loading: { state: true },
     initialPollComplete: { state: true },
-    busy: { state: true },
     error: { state: true },
     recommendedActions: { state: true },
   };
@@ -173,7 +209,6 @@ export class HealthSurface extends JfElement {
    * pre-first-poll window. (observations.md `#270` fix.)
    */
   declare initialPollComplete: boolean;
-  declare busy: Record<string, boolean>;
   declare error: string | null;
   /**
    * Slice 447 §X.11.5 Phase 4: condition → recommended Operation lookup. Populated
@@ -183,7 +218,7 @@ export class HealthSurface extends JfElement {
    * invokes the suggested Operation directly, which closes the §X.3.4 named-consumer
    * loop end-to-end (this surface is the rail-mounted production Health view).
    */
-  declare recommendedActions: Map<string, string>;
+  declare recommendedActions: Map<string, RecoveryAction>;
 
   private pollStatus: number | null = null;
   private unsubAi: (() => void) | null = null;
@@ -215,7 +250,6 @@ export class HealthSurface extends JfElement {
     this.autoRefresh = true;
     this.loading = false;
     this.initialPollComplete = false;
-    this.busy = {};
     this.error = null;
     this.recommendedActions = new Map();
   }
@@ -225,26 +259,30 @@ export class HealthSurface extends JfElement {
    * populate {@link #recommendedActions}. Plugin overlays (Phase 6) take precedence
    * via {@link getOverlayRecovery} at render time.
    */
-  private async fetchRecoveryIndex(): Promise<void> {
+  private startRecoveryIndex(): void {
+    this.recoveryIndexStreamAbort?.abort();
+    const controller = new AbortController();
+    this.recoveryIndexStreamAbort = controller;
+    this.recommendedActions = new Map();
+    // The initial REST request is a fallback until this connection receives SSE.
+    // Backend versions reset on restart, so precedence belongs to the connection.
+    let receivedStream = false;
+    const accept = (index: RecoveryIndexWire, fromStream: boolean): void => {
+      if (controller.signal.aborted || this.recoveryIndexStreamAbort !== controller) return;
+      if (!fromStream && receivedStream) return;
+      const actions = recoveryActions(index);
+      if (fromStream) receivedStream = true;
+      this.recommendedActions = actions;
+    };
+    void this.fetchRecoveryIndex(controller.signal, index => accept(index, false));
+    void this.startRecoveryIndexStream(controller.signal, index => accept(index, true));
+  }
+
+  private async fetchRecoveryIndex(signal: AbortSignal, accept: (index: RecoveryIndexWire) => void): Promise<void> {
     try {
-      const r = await this.doFetch('/api/condition-recovery-index');
+      const r = await this.doFetch('/api/condition-recovery-index', { signal });
       if (!r.ok) return;
-      const index = (await r.json()) as {
-        entries?: Array<{
-          target?: string;
-          conditions?: Array<{ conditionId?: string; subject?: string }>;
-        }>;
-      };
-      const next = new Map<string, string>();
-      for (const entry of index.entries ?? []) {
-        const target = entry.target ?? '';
-        for (const c of entry.conditions ?? []) {
-          const cid = c.conditionId ?? '';
-          const subj = c.subject ?? '';
-          if (cid && target) next.set(`${cid}|${subj}`, target);
-        }
-      }
-      this.recommendedActions = next;
+      accept((await r.json()) as RecoveryIndexWire);
     } catch {
       // Silent failure — Quick Actions section still renders without the
       // Recommended sub-section.
@@ -436,6 +474,13 @@ export class HealthSurface extends JfElement {
       flex-wrap: wrap;
       gap: 0.5rem;
     }
+    .recommended .actions { align-items: flex-start; gap: 1rem; }
+    .recommended-action {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.375rem;
+    }
     /* Audience-gated <jf-operation> hosts render no content for viewers the
        operation is not visible to (tempdoc 689); without this, the empty
        light-DOM hosts stay zero-width flex children and each reserves a
@@ -536,19 +581,17 @@ export class HealthSurface extends JfElement {
     void this.refresh();
     this.startPolling();
     this.startEventStream();
-    void this.fetchRecoveryIndex();
-    this.startRecoveryIndexStream();
+    this.startRecoveryIndex();
     // 569 §15 — re-render when the active presentation changes (the declared status/stats regions
     // appear when CORE_DECLARED is applied, revert when cleared/quarantined — degrade-never-fail).
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
   }
 
-  /** Tempdoc 609 — settle transient state on hide (initial-load flag, per-op busy locks, op error) so a
+  /** Tempdoc 609 — settle transient state on hide (initial-load flag, operation error) so a
    *  return doesn't show a stale spinner or locked action. Subscribed statuses + autoRefresh are
    *  recoverable and untouched (a fresh poll re-populates on reconnect). */
   protected override settleTransients(): void {
     this.loading = false;
-    this.busy = {};
     this.error = null;
   }
 
@@ -662,14 +705,12 @@ export class HealthSurface extends JfElement {
    *
    * Both rebuild {@link recommendedActions} from `index.entries`.
    */
-  private async startRecoveryIndexStream(): Promise<void> {
-    this.recoveryIndexStreamAbort?.abort();
-    this.recoveryIndexStreamAbort = new AbortController();
+  private async startRecoveryIndexStream(signal: AbortSignal, accept: (index: RecoveryIndexWire) => void): Promise<void> {
     try {
       // Tempdoc 511-followup-D: see startEventStream for the Accept-
       // header rationale. Same negotiation behavior on this endpoint.
       const res = await this.doFetch('/api/condition-recovery-index/stream', {
-        signal: this.recoveryIndexStreamAbort.signal,
+        signal,
         headers: { Accept: 'text/event-stream' },
       });
       if (!res.ok || !res.body) return;
@@ -687,23 +728,14 @@ export class HealthSurface extends JfElement {
             const payload = env.payload as Record<string, unknown> | undefined;
             // LIFECYCLE snapshot: index is nested under payload.index.
             // UPDATE: payload IS the index (per ConditionRecoveryIndexChangeRegistry.broadcast).
-            let index: { entries?: Array<{ target?: string; conditions?: Array<{ conditionId?: string; subject?: string }> }> } | undefined;
+            let index: RecoveryIndexWire | undefined;
             if (env.frameKind === 'LIFECYCLE' && payload?.kind === 'snapshot') {
               index = payload.index as typeof index;
             } else if (env.frameKind === 'UPDATE') {
               index = payload as typeof index;
             }
             if (!index) return;
-            const next = new Map<string, string>();
-            for (const entry of index.entries ?? []) {
-              const target = entry.target ?? '';
-              for (const c of entry.conditions ?? []) {
-                const cid = c.conditionId ?? '';
-                const subj = c.subject ?? '';
-                if (cid && target) next.set(`${cid}|${subj}`, target);
-              }
-            }
-            this.recommendedActions = next;
+            accept(index);
           } catch {
             // ignore parse errors
           }
@@ -711,8 +743,7 @@ export class HealthSurface extends JfElement {
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        // Stream interrupted; the REST snapshot fetched at connectedCallback
-        // remains the last-known state until the next reconnect.
+        // Stream interrupted; the last accepted snapshot remains until reconnect.
       }
     }
   }
@@ -744,19 +775,6 @@ export class HealthSurface extends JfElement {
     }
   }
 
-  private async invokeOp(operationId: string, key: string): Promise<void> {
-    if (this.busy[key]) return;
-    this.busy = { ...this.busy, [key]: true };
-    this.error = null;
-    try {
-      await this.host_.data.invokeOperation(operationId);
-      await this.refresh();
-    } catch (err) {
-      this.error = err instanceof Error ? err.message : String(err);
-    } finally {
-      this.busy = { ...this.busy, [key]: false };
-    }
-  }
 
   private renderHeader(): TemplateResult {
     // Slice 456 §gap-fix: overall-health badge intentionally EXCLUDES the
@@ -1349,7 +1367,7 @@ export class HealthSurface extends JfElement {
    * sub-section above Quick Actions when {@link #recommendedActions} is non-empty.
    * Each entry maps a (conditionId, subject) pair to an Operation that the backend
    * (or a TRUSTED plugin overlay) declared as the recovery; clicking the button
-   * dispatches the Operation through the existing invokeOp pathway.
+   * uses the catalog control, including its argument and confirmation policy.
    */
   /** The footer body sentence per verdict kind (595 §10.5 — single-sourced wording). */
   private renderRecommendedActions(): TemplateResult {
@@ -1383,31 +1401,29 @@ export class HealthSurface extends JfElement {
       <div class="card section recommended">
         <h3>⚡ Fixable now (${entries.length})</h3>
         <div class="actions">
-          ${entries.map(([key, opRef]) => {
+          ${entries.map(([key, invocation]) => {
             const [conditionId, subject] = key.split('|');
             const overlay = getOverlayRecovery(conditionId ?? '', subject ?? '');
-            const target = overlay ?? opRef;
-            const busyKey = target.replace(/^core\./, '');
-            const isBusy = !!this.busy[busyKey];
-            // §2.A: the VISIBLE label is humanized via the display projector — never
-            // the raw condition id. The title= keeps the raw id + subject for
-            // precise a11y/debugging.
+            // A plugin overlay replaces the invocation. Its target-only contract supplies no
+            // arguments; never attach the overridden core operation's arguments to another action.
+            const target = overlay ?? invocation.target;
+            const args = overlay ? {} : invocation.args;
             const conditionLabel = present({ kind: 'condition', id: conditionId ?? '' }).label;
             return html`
-              <jf-button
-                size="sm"
-                label="Fix: ${conditionLabel}"
-                ?disabled=${isBusy}
-                .onActivate=${() => void this.invokeOp(target, busyKey)}
-                title="Fix: ${conditionId} on ${subject}"
-              >
-                ${isBusy
-                  ? html`⏳ Running…`
-                  : html`${icon({ name: 'refresh-cw', size: 12 })} Fix: ${conditionLabel}`}
+              <div class="recommended-action" role="group" aria-label="Fix: ${conditionLabel}" title="Fix: ${conditionId} on ${subject}">
+                <span>Fix: ${conditionLabel}</span>
+                <jf-operation
+                  operation-id=${target}
+                  context="button"
+                  api-base=${this.apiBase}
+                  .args=${args}
+                  @op-success=${() => { this.error = null; void this.refresh(); }}
+                  @op-error=${(event: CustomEvent<OpErrorEventDetail>) => { this.error = event.detail.message; }}
+                ></jf-operation>
                 ${overlay
                   ? html`<span class="overlay-tag" title="Plugin overlay">·plugin</span>`
                   : nothing}
-              </jf-button>
+              </div>
             `;
           })}
         </div>
