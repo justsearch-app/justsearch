@@ -135,16 +135,23 @@ public final class BackgroundRunService {
    */
   public String runInBackground(AgentRequest request, EngineContext engineContext) {
     EngineContext child = freshChild(engineContext);
-    var prepared = accept(request, Duration.ZERO, child);
+    var prepared = accept(null, request, Duration.ZERO, child);
     return runAccepted(request, child, prepared).executionId().orElse(null);
   }
 
-  private OperationAttemptRunner.PreparedAttempt accept(AgentRequest request, Duration delay, EngineContext child) {
+  private OperationAttemptRunner.PreparedAttempt accept(
+      String operationKey, AgentRequest request, Duration delay, EngineContext child) {
     Objects.requireNonNull(request, "request");
-    String arguments = MAPPER.writeValueAsString(Map.of("request", request, "delayMillis", Math.max(0, delay.toMillis())));
-    return attempts.accept(new OperationAttemptRunner.Request(null,
-        OperationDescriptor.invocation(OperationKind.SCHEDULED_RUN, null, arguments, false), child,
-        InvocationProvenance.fromEngineContext(child, ExecutorTag.AGENT, Clock.systemUTC().instant(), Optional.empty())));
+    String arguments =
+        MAPPER.writeValueAsString(
+            Map.of("request", request, "delayMillis", Math.max(0, delay.toMillis())));
+    return attempts.accept(
+        new OperationAttemptRunner.Request(
+            operationKey,
+            OperationDescriptor.invocation(OperationKind.SCHEDULED_RUN, null, arguments, false),
+            child,
+            InvocationProvenance.fromEngineContext(
+                child, ExecutorTag.AGENT, Clock.systemUTC().instant(), Optional.empty())));
   }
 
   private static EngineContext freshChild(EngineContext context) {
@@ -199,16 +206,27 @@ public final class BackgroundRunService {
   }
 
   /** Acceptance is durable before the timer exists; the returned handle observes actual completion. */
-  public OperationAttemptRunner.PreparedAttempt schedule(AgentRequest request, Duration delay, EngineContext engineContext) {
+  public OperationAttemptRunner.PreparedAttempt schedule(
+      AgentRequest request, Duration delay, EngineContext engineContext) {
+    return schedule(null, request, delay, engineContext);
+  }
+
+  /** Schedule with a caller-owned operation key so transport retries reuse one acceptance. */
+  public OperationAttemptRunner.PreparedAttempt schedule(
+      String operationKey, AgentRequest request, Duration delay, EngineContext engineContext) {
     Objects.requireNonNull(delay, "delay");
     EngineContext child = freshChild(engineContext);
-    var prepared = accept(request, delay, child);
+    var prepared = accept(operationKey, request, delay, child);
+    if (prepared.existing()) return prepared;
     try {
       synchronized (timerLock) {
         if (closed.get()) throw new RejectedExecutionException("Background scheduler is closed");
         pending.add(prepared);
-        var unused = scheduler.schedule(() -> fire(request, child, prepared), Math.max(0, delay.toMillis()),
-            java.util.concurrent.TimeUnit.MILLISECONDS);
+        var unused =
+            scheduler.schedule(
+                () -> fire(request, child, prepared),
+                Math.max(0, delay.toMillis()),
+                java.util.concurrent.TimeUnit.MILLISECONDS);
       }
     } catch (RuntimeException failure) {
       synchronized (timerLock) { pending.remove(prepared); }

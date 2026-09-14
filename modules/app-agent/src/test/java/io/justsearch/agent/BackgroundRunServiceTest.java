@@ -1,9 +1,7 @@
 package io.justsearch.agent;
 
-import io.justsearch.core.context.EngineContext;
-import io.justsearch.core.execution.TestEngineExecutors;
-import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,15 +11,30 @@ import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.api.lifecycle.AgentLifecycle;
 import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSnapshot;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
@@ -37,12 +50,12 @@ final class BackgroundRunServiceTest {
 
   @TempDir Path operationDirectory;
   private io.justsearch.app.observability.operations.SqliteOperationStore operationStore;
-  private io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+  private OperationAttemptRunner attempts;
   @org.junit.jupiter.api.BeforeEach
   void openOperationRunner() throws Exception {
     operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(operationDirectory.resolve("operations.db"));
     attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operationStore,
-        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
+        Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
   }
   @org.junit.jupiter.api.AfterEach
   void closeOperationRunner() throws Exception {
@@ -125,6 +138,89 @@ final class BackgroundRunServiceTest {
     }
   }
 
+  private static final class CountingRegistry implements EngineExecutorRegistry {
+    private final CountingRegistration registration = new CountingRegistration();
+
+    @Override
+    public Registration register(EngineExecutorSpec spec) {
+      registration.spec = spec;
+      return registration;
+    }
+
+    @Override
+    public Limits limits(EngineExecutorSpec.Kind kind) {
+      return new Limits(4, 64);
+    }
+
+    @Override
+    public int maxConcurrentWork() {
+      return 64;
+    }
+
+    @Override
+    public int retryAfterSeconds() {
+      return 1;
+    }
+
+    @Override
+    public EngineExecutorSnapshot snapshot() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void close() {
+      registration.close();
+    }
+  }
+
+  private static final class CountingRegistration implements EngineExecutorRegistry.Registration {
+    private final AtomicInteger scheduledCount = new AtomicInteger();
+    private EngineExecutorSpec spec;
+    private CountingScheduler scheduler;
+
+    @Override
+    public EngineExecutorSpec spec() {
+      return spec;
+    }
+
+    @Override
+    public ExecutorService open(ThreadFactory factory) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ScheduledExecutorService openScheduled(ThreadFactory factory) {
+      scheduler = new CountingScheduler(factory, scheduledCount);
+      return scheduler;
+    }
+
+    @Override
+    public ExecutorService openVirtual() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void close() {
+      if (scheduler != null) scheduler.shutdownNow();
+    }
+  }
+
+  private static final class CountingScheduler extends ScheduledThreadPoolExecutor {
+    private final AtomicInteger scheduledCount;
+
+    private CountingScheduler(ThreadFactory factory, AtomicInteger scheduledCount) {
+      super(1, factory);
+      this.scheduledCount = scheduledCount;
+      setRemoveOnCancelPolicy(true);
+    }
+
+    @Override
+    public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+      scheduledCount.incrementAndGet();
+      return super.schedule(command, delay, unit);
+    }
+  }
+
   @Test
   @DisplayName("a background run persists stamped background=true and presenceSince surfaces it")
   void backgroundRunIsProducedAndSurfacedOnReturn(@TempDir Path tmp) {
@@ -161,6 +257,155 @@ final class BackgroundRunServiceTest {
       background.shutdown();
       registry.close();
     }
+  }
+
+  @Test
+  @DisplayName("a supplied key deduplicates pending and terminal schedules")
+  void suppliedKeyDeduplicatesPendingAndTerminalAttempts() throws Exception {
+    var runStore = new AgentRunStore(operationDirectory.resolve("agent-runs"));
+    var loop = new FakeLoop(runStore);
+    AgentRequest request = request("one scheduled run");
+    String pendingKey = OperationKeys.generate(Clock.systemUTC());
+    try (var registry = new TestEngineExecutors()) {
+      var pendingService = new BackgroundRunService(attempts, loop, registry);
+      try {
+        var first = pendingService.schedule(
+            pendingKey, request, java.time.Duration.ofDays(1),
+            EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+        var duplicate = pendingService.schedule(
+            pendingKey, request, java.time.Duration.ofDays(1),
+            EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+        assertFalse(first.existing());
+        assertEquals(pendingKey, first.accepted().key());
+        assertTrue(duplicate.existing());
+        assertEquals(first.accepted().id(), duplicate.accepted().id());
+        assertEquals(0, loop.bodyCalls(), "a pending duplicate must not enter the agent body");
+      } finally {
+        pendingService.shutdown();
+      }
+
+      AgentRequest terminalRequest = request("one terminal scheduled run");
+      String terminalKey = OperationKeys.generate(Clock.systemUTC());
+      var terminalService = new BackgroundRunService(attempts, loop, registry);
+      try {
+        var first = terminalService.schedule(
+            terminalKey, terminalRequest, java.time.Duration.ZERO,
+            EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+        assertEquals(terminalKey, first.accepted().key());
+        first.completion().toCompletableFuture().join();
+        assertEquals(1, loop.bodyCalls());
+
+        var replay = terminalService.schedule(
+            terminalKey, terminalRequest, java.time.Duration.ZERO,
+            EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+        assertTrue(replay.existing());
+        replay.completion().toCompletableFuture().join();
+        assertEquals(1, loop.bodyCalls(), "a terminal replay must not enter the agent body again");
+      } finally {
+        terminalService.shutdown();
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("a supplied key binds the request and normalized delay")
+  void changedRequestOrDelayUnderSameKeyIsRejected() throws Exception {
+    var runStore = new AgentRunStore(operationDirectory.resolve("agent-runs"));
+    var loop = new FakeLoop(runStore);
+    String key = OperationKeys.generate(Clock.systemUTC());
+    AgentRequest original = request("original prompt");
+    try (var registry = new TestEngineExecutors()) {
+      var background = new BackgroundRunService(attempts, loop, registry);
+      try {
+        background.schedule(
+            key, original, java.time.Duration.ofHours(1),
+            EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+        var promptConflict = assertThrows(OperationStoreException.class,
+            () -> background.schedule(
+                key, request("changed prompt"), java.time.Duration.ofHours(1),
+                EngineContextTestFixtures.AGENT_LOOP_BACKGROUND));
+        assertEquals(OperationStoreException.Code.OPERATION_KEY_REUSED, promptConflict.code());
+
+        var delayConflict = assertThrows(OperationStoreException.class,
+            () -> background.schedule(
+                key, original, java.time.Duration.ofHours(2),
+                EngineContextTestFixtures.AGENT_LOOP_BACKGROUND));
+        assertEquals(OperationStoreException.Code.OPERATION_KEY_REUSED, delayConflict.code());
+        assertEquals(OperationState.ACCEPTED, operationStore.find(key).orElseThrow().state());
+      } finally {
+        background.shutdown();
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("concurrent duplicate schedules install one timer")
+  void concurrentDuplicateSchedulesCreateOneFreshTimer() throws Exception {
+    var runStore = new AgentRunStore(operationDirectory.resolve("agent-runs"));
+    var loop = new FakeLoop(runStore);
+    AgentRequest request = request("concurrent prompt");
+    String key = OperationKeys.generate(Clock.systemUTC());
+    var registry = new CountingRegistry();
+    try (var callers = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+      var background = new BackgroundRunService(attempts, loop, registry);
+      try {
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var futures = new ArrayList<java.util.concurrent.Future<OperationAttemptRunner.PreparedAttempt>>();
+        for (int i = 0; i < 16; i++) {
+          futures.add(callers.submit(() -> {
+            assertTrue(start.await(5, TimeUnit.SECONDS));
+            return background.schedule(
+                key, request, java.time.Duration.ofDays(1),
+                EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+          }));
+        }
+        start.countDown();
+        int fresh = 0;
+        long acceptedId = -1;
+        for (var future : futures) {
+          var prepared = future.get(5, TimeUnit.SECONDS);
+          if (!prepared.existing()) fresh++;
+          if (acceptedId < 0) acceptedId = prepared.accepted().id();
+          assertEquals(acceptedId, prepared.accepted().id());
+        }
+        assertEquals(1, fresh);
+        assertEquals(1, registry.registration.scheduledCount.get());
+        assertEquals(0, loop.bodyCalls());
+      } finally {
+        background.shutdown();
+      }
+    } finally {
+      registry.close();
+    }
+  }
+
+  @Test
+  @DisplayName("a closed scheduler replays a recorded terminal result")
+  void closedSchedulerAnswersMatchingRecordedAttempt() throws Exception {
+    var runStore = new AgentRunStore(operationDirectory.resolve("agent-runs"));
+    var loop = new FakeLoop(runStore);
+    AgentRequest request = request("recorded before close");
+    String key = OperationKeys.generate(Clock.systemUTC());
+    try (var registry = new TestEngineExecutors()) {
+      var background = new BackgroundRunService(attempts, loop, registry);
+      var first = background.schedule(
+          key, request, java.time.Duration.ZERO,
+          EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+      first.completion().toCompletableFuture().join();
+      background.shutdown();
+
+      var replay = background.schedule(
+          key, request, java.time.Duration.ZERO,
+          EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+      assertTrue(replay.existing());
+      assertEquals(first.accepted().id(), replay.accepted().id());
+      assertEquals(OperationState.COMPLETE, replay.completion().toCompletableFuture().join().state());
+      assertEquals(1, loop.bodyCalls());
+    }
+  }
+
+  private static AgentRequest request(String prompt) {
+    return AgentRequest.singleTurn(List.of(Map.of("role", "user", "content", prompt)));
   }
 
   @Test

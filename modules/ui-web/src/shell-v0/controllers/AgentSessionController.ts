@@ -18,6 +18,7 @@ import {
   type RunNotFoundDetail,
 } from '../../api/streams.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { createOperationKey } from '../../api/operationKey.js';
 import { LivenessWatchdog } from '../streaming/LivenessWatchdog.js';
 import { STREAM_WATCHDOG_STALE_MS } from '../../api/generated/stream-liveness-constants.js';
 import { friendlyStreamError } from '../utils/streamError.js';
@@ -2481,18 +2482,27 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const trimmed = prompt.trim();
     if (!trimmed) return;
     try {
-      await authorizedFetch(`${this.apiBase}/api/presence/run`, {
+      // Capture once before authorizedFetch can wait or retry admission/token delivery.
+      const operationKey = createOperationKey();
+      const body = JSON.stringify({
+        prompt: trimmed,
+        ...(this.conversationId ? { conversationId: this.conversationId } : {}),
+        operationKey,
+      });
+      const response = await authorizedFetch(`${this.apiBase}/api/presence/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: trimmed,
-          ...(this.conversationId ? { conversationId: this.conversationId } : {}),
-        }),
+        body,
       });
-      // Tempdoc 585 §D Phase 1 (D1): poll until the run completes so the completion toast fires.
+      if (!response.ok) throw new Error('Background scheduling refused');
+      const receipt = await response.json() as { ok?: boolean; operationKey?: string };
+      if (receipt.ok !== true || receipt.operationKey !== operationKey) {
+        throw new Error('Background scheduling was not confirmed');
+      }
+      // Poll only after the accepted operation identity has been acknowledged.
       this.pollPresenceUntilIdle();
     } catch {
-      // ignore
+      emitEphemeralToast({ message: 'Background task could not be confirmed.', severity: 'error' });
     }
   }
 

@@ -25,7 +25,10 @@ C2-7 checkpoint cadence/shutdown is implemented and locally verified: final1514 
 compilation pass. Negative1512 proves both callbacks matter. [Checkpoint evidence](evidence/C2/checkpoint-cadence.md).
 Hosted CI34801903519/CLA34801900544 pass at writer-retirement dc06b4be4;
 CI34802770723(all13 jobs)/CLA34802769444 pass at browser347187073. PR727's managed
-review record is verified through those checkpoints. C2-7 needs its own pushed hosted result.
+review record is verified through those checkpoints. C2-7 CI34804384959 and CLA34804383862
+pass at5a4d1dde3. C2-8a scheduled key delivery is locally verified: 1,936 Java cases
+(one existing skip), 6,577 frontend cases, PMD/format/typecheck/lint and negative controls.
+[Scope and evidence](evidence/C2/scheduled-key.md); this batch still needs its hosted result.
 Next is C2-8/C2-9 ingestion, C2-10 reindex, then
 required integrated/live/model/installed/final-head proofs and D1/D2/E/F. Root makes
 remaining mechanism/merge decisions; no owner reply is pending.

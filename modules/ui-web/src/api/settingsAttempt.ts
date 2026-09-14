@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createOperationKey } from './operationKey.js';
 import { settingsV2Schema, type SettingsV2 } from './generated/schema-types/settings-v2.js';
 
 export type SettingsWitness = NonNullable<SettingsV2['witness']>;
@@ -51,23 +52,6 @@ export function requireSettingsWitness(value: SettingsV2['witness']): SettingsWi
   return { acceptedRevision: value.acceptedRevision, lastCommittedOperationKey: value.lastCommittedOperationKey };
 }
 
-/** Timestamp plus cryptographic randomness, matching the server's canonical UUIDv7 keys. */
-function operationKey(): string {
-  let timestamp = Date.now();
-  if (!Number.isSafeInteger(timestamp) || timestamp < 0 || timestamp > 0xffffffffffff) {
-    throw new Error('Cannot create a settings operation key with this clock');
-  }
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  for (let i = 5; i >= 0; i--) {
-    bytes[i] = timestamp % 256;
-    timestamp = Math.floor(timestamp / 256);
-  }
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x70;
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 /** Capture at event time when a queued writer will run later. */
 export function captureSettingsPatch(patch: SettingsPatch): SettingsPatch {
   return patchSchema.parse(patch);
@@ -78,7 +62,7 @@ export function createSettingsAttempt(
   patch: SettingsPatch, witness: SettingsWitness, headers?: HeadersInit,
 ): SettingsAttempt {
   const capturedWitness = Object.freeze(requireSettingsWitness(witness));
-  const key = operationKey();
+  const key = createOperationKey();
   const capturedHeaders = new Headers(headers);
   capturedHeaders.set('Content-Type', 'application/json');
   return Object.freeze({

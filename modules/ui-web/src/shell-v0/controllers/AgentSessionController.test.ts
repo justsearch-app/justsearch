@@ -2025,3 +2025,44 @@ describe('the reasoning-region boundary rule (859 §A)', () => {
     expect(ctrl.reasoning.isThinking).toBe(true);
   });
 });
+
+
+describe('keyed background scheduling', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.mocked(emitEphemeralToast).mockClear(); });
+  afterEach(() => { ctrl.destroy(); vi.useRealTimers(); });
+
+  it('captures one key and conversation across a token retry; a new action has a new key', async () => {
+    const bodies: string[] = [];
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(String(init?.body));
+      if (bodies.length === 1) {
+        return new Response(JSON.stringify({ errorCode: 'UI_TOKEN_REQUIRED' }), { status: 401 });
+      }
+      return new Response(JSON.stringify({ ok: true, operationKey: JSON.parse(String(init?.body)).operationKey }));
+    }) as typeof fetch;
+    ctrl.conversationId = 'original';
+    const pending = ctrl.runBackgroundTask('  find invoices  ');
+    ctrl.conversationId = 'later';
+    await pending;
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toBe(bodies[0]);
+    const first = JSON.parse(bodies[0]!);
+    expect(first).toEqual({ prompt: 'find invoices', conversationId: 'original', operationKey: expect.any(String) });
+    expect(first.operationKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(vi.getTimerCount()).toBe(1);
+    await ctrl.runBackgroundTask('find invoices');
+    expect(JSON.parse(bodies[2]!).operationKey).not.toBe(first.operationKey);
+    expect(emitEphemeralToast).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [409, { errorCode: 'OPERATION_KEY_REUSED' }],
+    [200, { ok: false, operationKey: 'wrong' }],
+    [200, { ok: true, operationKey: 'wrong' }],
+  ])('reports unconfirmed scheduling without starting presence polling (%s)', async (status, body) => {
+    globalThis.fetch = mockFetchJson(body, status);
+    await ctrl.runBackgroundTask('find invoices');
+    expect(emitEphemeralToast).toHaveBeenCalledWith({ message: 'Background task could not be confirmed.', severity: 'error' });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
