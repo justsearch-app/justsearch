@@ -861,3 +861,10 @@ tmp with the prior suffixes and retention. Thread captures1685-29980-threads.txt
 1685-28596-threads.txt show active CPU inference and real Engine workload, not completion.
 The per-item implementation is a WIP checkpoint until the remaining integrated failures
 are resolved. .3b.3/.3c remain required; no coordinator activation is claimed.
+
+
+Lifecycle WIP1ced178d9 is pushed. Focused1687 separately corrects the inherited pacing
+fixture's early observation exit and passes its unchanged assertion set; see
+[pacing evidence](pacing-observation-exit.md). Full sequential integrated verification,
+including the prior concurrent-read drain and multi-group embedding failures, remains
+required. No new deadline or input reduction was selected.

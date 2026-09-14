@@ -163,7 +163,7 @@ final class EngineForegroundPacingTest {
               + " ingest or health operation carried foreground urgency");
       docsAfterPolling = client.getStatus(TestEngineContexts.BACKGROUND).getCore().getDocCount();
       pollSamples++;
-      if (docsAfterPolling > 0 && System.currentTimeMillis() >= pollMinimumUntil) {
+      if (pollSamples > 10 && docsAfterPolling > 0 && System.currentTimeMillis() >= pollMinimumUntil) {
         break;
       }
       Thread.sleep(100);
