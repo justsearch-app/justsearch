@@ -692,3 +692,16 @@ header for transport retries/open202/retryable admission. Keep the existing mode
 queue and its event-time header, creating its witness/key only when the queued
 writer starts. Derived Library/adaptation writes must provide their observed
 witness; they cannot take the absolute-intent fallback.
+
+Frontend per-item commits (2026-09-14): (3a) transport-injected attempt helper and
+fault regressions; (3b) absolute field writers/domain API plus mode queue callers;
+(3c) retained-base Library/adaptation writers and conflict/chain regressions.
+Each commit is pushed with exact checks before the next item expands. None alone
+closes C2-6. Helper bounds observation/replay waits, retains uncertain attempt
+identity, uses canonical UUIDv7 and validates COMPLETE receipt identity/revision.
+
+Mode deadline correction: enqueueUiModeSettings is the sole settings mode entry.
+The shared queue bounds intent allocation, then the helper owns its bounded write
+deadline. Competing timers lose the original attempt identity, demonstrated by
+negative1460; generic queue writers retain their existing timeout. All three mode
+callers migrate to this wrapper in item3b.
