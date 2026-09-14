@@ -75,8 +75,10 @@ cases, no failures/skips). Installed1578 passes five of six, including real-mode
 and lock-ingest; lock-boot reproduces initial Engine exit before discovery. The inherited resumed-empty corruption-recovery waiver is now corrected with exact
 persisted provenance, opened-generation binding and a trustworthy zero count; full1583
 indexer/core and PMD/Spotless pass. [Proof](evidence/C2/corruption-resume-attestation.md).
-Zero-root enumeration and initial lock-boot diagnostics/recovery remain active repairs
-before sealing resumes. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
+Initial-discovery diagnostics now preserve the actual exit and causal stderr. Installed1589
+passes five of six; targeted1591 proves WAL setup returns SQLITE_BUSY despite its busy timeout.
+The BUSY-only initializer retry and zero-root enumeration remain active repairs before sealing
+resumes. The [recovery record](evidence/C2/hosted-recovery-correction.md) retains exact evidence. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is
 C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then

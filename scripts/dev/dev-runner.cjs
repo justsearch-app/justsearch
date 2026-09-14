@@ -2225,7 +2225,7 @@ async function cmdStart(opts) {
    * the manifest must name the current child PID, so a retained predecessor ownership record can
    * never be mistaken for this incarnation's discovery state.
    */
-  const awaitEngineIncarnation = async ({ portTimeoutMs, readyTimeoutMs }) => {
+  const awaitEngineIncarnation = async ({ portTimeoutMs, readyTimeoutMs, initialDiscovery = false }) => {
     let discovered = 0;
     const awaitedChild = backend;
     const predecessor = manifestInstanceId;
@@ -2233,7 +2233,13 @@ async function cmdStart(opts) {
     while (discovered <= 0 && Date.now() < waitForPortDeadline) {
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 100));
-      if (backend !== awaitedChild || awaitedChild.exitCode !== null) throw new Error("Engine exited during discovery");
+      if (backend !== awaitedChild || awaitedChild.exitCode !== null || awaitedChild.signalCode !== null) {
+        const error = new Error('Engine exited during discovery');
+        error.code = 'ENGINE_EXITED_DURING_DISCOVERY';
+        error.details = { runId, pid: awaitedChild.pid, exitCode: awaitedChild.exitCode,
+          signalCode: awaitedChild.signalCode, childReplaced: backend !== awaitedChild, initialDiscovery };
+        throw error;
+      }
       discovered = tryReadManifest(awaitedChild.pid, predecessor);
     }
     if (!Number.isFinite(discovered) || discovered <= 0) {
@@ -2252,6 +2258,7 @@ async function cmdStart(opts) {
   };
 
   const firstIncarnation = await awaitEngineIncarnation({
+    initialDiscovery: true,
     portTimeoutMs: portEmitTimeoutMs,
     readyTimeoutMs: backendReadyTimeoutMs,
   });

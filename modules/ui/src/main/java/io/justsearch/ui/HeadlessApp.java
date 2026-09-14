@@ -1310,6 +1310,10 @@ public class HeadlessApp {
     } catch (Exception e) {
       terminalWriterShutdown.completeExceptionally(e);
       log.error("Fatal error in HeadlessApp", e);
+      // The data-directory logger may itself be inaccessible during bootstrap contention.
+      // The host owns stderr independently, so preserve the refusal before cleanup and exit.
+      System.err.println("JUSTSEARCH_ENGINE_STARTUP_FAILURE");
+      e.printStackTrace(System.err);
       fatalStartup = true;
     } finally {
       try {

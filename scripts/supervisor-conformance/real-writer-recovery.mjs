@@ -156,7 +156,7 @@ function resolveOwnedRunId() {
   const runs = path.join(state, 'runs');
   if (!fs.existsSync(runs)) return null;
   const ids = fs.readdirSync(runs, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(runs, entry.name, 'run.json')))
     .map((entry) => entry.name);
   return ids.length === 1 ? ids[0] : null;
 }
@@ -165,6 +165,9 @@ let fixtureFailure;
 try {
   const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
   const initial = await waitFor('first running incarnation with matching manifest', 90000, async () => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(`startup runner exited before initial discovery: exit=${child.exitCode} signal=${child.signalCode}; ${output}`);
+    }
     const s = readJson(supervisorFile);
     const m = readJson(path.join(data, 'runtime', 'manifest.json'));
     return s?.state === 'running' && m?.pid === s.pid && m?.instanceId === s.instanceId
@@ -297,7 +300,16 @@ try {
       () => fs.existsSync(path.join(work, 'intruder-stopped')));
   }
   const cleanupRunId = resolveOwnedRunId();
-  requireThat(cleanupRunId, `could not resolve owned run identity under ${state}`);
+  if (!cleanupRunId) {
+    const observedExit = output.split(/\r?\n/).filter(line => line.startsWith('{'))
+      .map(line => { try { return JSON.parse(line); } catch { return null; } })
+      .find(value => value?.error?.code === 'ENGINE_EXITED_DURING_DISCOVERY')?.error?.details;
+    requireThat(fixtureFailure && child.exitCode === 1 && observedExit?.initialDiscovery === true
+      && observedExit.childReplaced === false
+      && (Number.isInteger(observedExit.exitCode) || typeof observedExit.signalCode === 'string'),
+    `could not resolve registered run or prove initial Engine exit under ${state}`);
+    console.log('INITIAL_ENGINE_EXIT_OBSERVED', JSON.stringify(observedExit));
+  } else {
   const stopArgs = [runner, 'stop', '--json', '--session-id', 'writer-recovery-live',
     '--run', cleanupRunId];
   const stopped = spawnSync(process.execPath, stopArgs, {
@@ -306,6 +318,7 @@ try {
   console.log('STOP', stopped.status, stopped.stdout, stopped.stderr);
   if (stopped.status !== 0 || !stopped.stdout.includes('"portsClosed":true')) {
     throw new Error(`identity-checked dev-runner cleanup failed: ${stopped.stdout} ${stopped.stderr}`);
+  }
   }
 } catch (cleanupFailure) {
   if (fixtureFailure) {

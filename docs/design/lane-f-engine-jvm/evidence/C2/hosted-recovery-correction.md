@@ -73,3 +73,39 @@ empty corruption-recovery Green loses its boot-local waiver, and a zero-root enu
 returns before marking done. Reapplying the waiver needs exact recovery provenance and a
 trustworthy empty opened Green. Normal empty migration gains no new waiver. Root-loading
 failures must not become successful empty enumeration when repairing the done transition.
+
+## Initial-discovery diagnostics and exact lock cause (2026-09-14)
+
+The dev-runner now classifies an observed initial exit with run ID, actual child PID/code/
+signal and replacement/initial-discovery facts. Its real-child test exits23 before emitting
+any manifest and proves no run registration or frontend spawn. Early fixture drafts1584
+and1585 fail argument validation (UI port0, then data outside the repository); those are not
+regression proofs. Corrected old-code1586 fails at missing classification after actual child
+exit. Positive1587 and the auto-discovered dev-runner suite1588 pass all11 test files.
+Focused ESLint and all three surface/register gates pass.
+
+The Engine preserves caught bootstrap failure and causal stack on host-owned stderr as
+well as the normal logger. The recovery fixture stops waiting when the startup runner exits,
+recognizes only run.json directories as registered runs, and skips registered-run stop only
+when the dev-runner proves the initial Engine exited before registration. It reports
+INITIAL_ENGINE_EXIT_OBSERVED, never fabricated portsClosed. Unproven missing identity still
+fails. The JUnit owner keeps the primary failure; lock-boot is now separately selectable
+with the exact same runScenario workload and assertions.
+
+Java1588 executes six startup-error cases, no skips/failures; UI PMD, integration compilation/
+PMD and Spotless pass. Installed1589 again executes six cases:five pass, lock-boot fails,
+no skips. It captures OperationStoreException STORAGE_FAILED and code1 with no secondary
+Run not found. quick1590 reports ABSENT/no foreign runs/inference orphan.
+
+With full causal stderr, targeted1591 executes the same lock-boot scenario and fails at
+SqliteOperationStore constructor line111:PRAGMA journal_mode=WAL returns SQLITE_BUSY even
+with busy_timeout5000 already set. Fixture writer-junit-81522bc1-a4cb-4a44-bf20-7c12b3f5e367
+retains the complete stack. This supplies the previously missing exact cause. PMD-integration
+and Spotless still pass; the failed installed test is not counted as recovery proof.
+
+Raw evidence is in tmp/initial-exit*, tmp/initial-diagnostics*, tmp/dev-runner1588.txt,
+tmp/installed-recovery1589*, tmp/lock-boot-cause1591* and their fixture directories under the
+active worktree. The original retention rule applies. Next is a bounded BUSY-only retry of
+operations-store initialization after confirmed connection close, outside the one-time
+compatibility/corruption preservation phase. It is not implemented/proved by this diagnostic
+commit, and the zero-root enumeration/remaining C2 and D1–F obligations stay open.

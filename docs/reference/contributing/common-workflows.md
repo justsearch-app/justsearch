@@ -221,6 +221,15 @@ FINALIZING. In phase 1 (`executeOnSchedule: false`) it prints obligations and re
 `world-state.mjs` shows the same facts in its Worktrees table (OWNER, LIFECYCLE) and, under
 `--lifecycle`, the coverage, latency and preservation metrics (952 A8).
 
+**Engine exit before discovery.** The dev-runner reports `ENGINE_EXITED_DURING_DISCOVERY`
+with the actual run ID, PID, exit code or signal, whether the child was replaced, and whether
+this was initial discovery. A directory containing startup logs alone is not a registered
+run: identity-checked stop requires `run.json`. The first incarnation still fails synchronously
+before the supervisor is installed. For a caught bootstrap failure, the Engine also writes
+`JUSTSEARCH_ENGINE_STARTUP_FAILURE` and its causal stack to host-owned stderr, which remains
+available when the data-directory log is locked. This is failure evidence, not readiness or
+proof that an otherwise unknown process was stopped.
+
 **Shared models / runtime resolution.** The dev-runner resolves `JUSTSEARCH_MODELS_DIR` from the
 **main** checkout automatically (tempdoc 618 §2). Runtime resolution is **GPU-only by design as
 of tempdoc 656** (supersedes 618 §3's CPU-baseline auto-stage): the dev-runner resolves a

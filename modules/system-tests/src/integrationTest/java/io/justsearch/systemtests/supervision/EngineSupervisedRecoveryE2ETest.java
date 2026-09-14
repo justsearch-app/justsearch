@@ -15,15 +15,21 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Test;
 
 /** Installed Engine proofs for durable recovery, migration and hostile filesystem survival. */
 @Timeout(7 * 60)
 final class EngineSupervisedRecoveryE2ETest {
 
   @ParameterizedTest
-  @ValueSource(strings = {"writer", "migration", "lock-boot", "lock-ingest", "processing"})
+  @ValueSource(strings = {"writer", "migration", "lock-ingest", "processing"})
   void supervisedRecoveryUsesTheCorrectExitAndReopensDurableState(String scenario) throws Exception {
     runScenario(scenario);
+  }
+
+  @Test
+  void initialBootstrapSurvivesHostileLocks() throws Exception {
+    runScenario("lock-boot");
   }
 
   static void runScenario(String scenario) throws Exception {
@@ -167,6 +173,7 @@ final class EngineSupervisedRecoveryE2ETest {
       runIds =
           entries
               .filter(Files::isDirectory)
+              .filter(candidate -> Files.isRegularFile(candidate.resolve("run.json")))
               .map(Path::getFileName)
               .map(Path::toString)
               .toList();
