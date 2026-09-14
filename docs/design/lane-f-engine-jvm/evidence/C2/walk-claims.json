@@ -277,6 +277,98 @@
           "suites": 256
         }
       ]
+    },
+    "queue-open-cleanup1550": {
+      "revision": "bda750489+dirty",
+      "command": "gradlew indexer-worker JobQueueMigrationTest,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 29,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 29,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "queue-open-cleanup1551": {
+      "revision": "bda750489+dirty",
+      "command": "gradlew indexer-worker JobQueueMigrationTest,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 29,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "queue-open-negative1552": {
+      "revision": "bda750489+controlled-negative",
+      "command": "gradlew indexer-worker failedOpenClosesItsConnectionAndCanRetryWithoutExplicitClose",
+      "summary": {
+        "tests": 7,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "queue-open-final1553": {
+      "revision": "bda750489+dirty",
+      "command": "gradlew indexer-worker test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 505,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 12,
+        "suites": 86
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 505,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 86
+        }
+      ]
     }
   },
   "negativeRestoration": [
@@ -290,5 +382,6 @@
       "backup": "tmp\\claim-negative1546-1.java",
       "sha256": "fafacf64c130e9dee1261f7c9ddce29df9d03a7e17d046ac6baf5c863c1cb68a"
     }
-  ]
+  ],
+  "openCleanupRestoredSha256": "eef2d4b6fd02345c115c82c3265a20434a7dacd3b40258e016d4583ccd8be865"
 }

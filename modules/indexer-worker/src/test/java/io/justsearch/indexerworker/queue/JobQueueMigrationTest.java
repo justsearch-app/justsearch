@@ -1238,6 +1238,38 @@ final class JobQueueMigrationTest {
     }
   }
 
+  @Test
+  void failedOpenClosesItsConnectionAndCanRetryWithoutExplicitClose() throws Exception {
+    Path path = tempDir.resolve("failed-open-cleanup.db");
+    var queueRef = new java.util.concurrent.atomic.AtomicReference<SqliteJobQueue>();
+    var acquired = new java.util.concurrent.atomic.AtomicReference<Connection>();
+    var failOnce = new java.util.concurrent.atomic.AtomicBoolean(true);
+    try (var queue = new SqliteJobQueue(path, 3, null, version -> {
+      if (version == SqliteSchema.TARGET_VERSION && failOnce.compareAndSet(true, false)) {
+        try {
+          var field = SqliteJobQueue.class.getDeclaredField("connection");
+          field.setAccessible(true);
+          acquired.set((Connection) field.get(queueRef.get()));
+        } catch (ReflectiveOperationException failure) {
+          throw new SQLException("fixture cannot inspect acquired connection", failure);
+        }
+        throw new SQLException("injected migration failure");
+      }
+    })) {
+      queueRef.set(queue);
+      SQLException failure = assertThrows(SQLException.class, queue::open);
+      assertEquals("injected migration failure", failure.getMessage());
+      assertNotNull(acquired.get());
+      assertTrue(acquired.get().isClosed(), "failed open must release its own JDBC connection");
+      assertTrue(queue.indexingJobChangeFeed().isEmpty());
+      queue.open();
+      assertEquals(1, queue.enqueue(List.of(tempDir.resolve("retry.txt"))));
+      assertEquals(1, queue.pollPending(1).size());
+      assertThrows(SQLException.class, queue::open, "double open cannot abandon the current owner");
+      assertEquals(1, queue.jobStateCounts().processingCount());
+    }
+  }
+
   /** Historical V10 schema, not the current bootstrap DDL stamped as an older database. */
   private static void createV10Objects(Statement stmt) throws SQLException {
     stmt.execute("""

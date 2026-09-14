@@ -300,9 +300,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public void open() throws SQLException, IOException {
     lock.lock();
+    boolean acquiredConnection = false;
     try {
       if (connectionFailure != null) throw new SQLException(
           "Queue connection cleanup requires successful close before open", connectionFailure);
+      if (connection != null) throw new SQLException("Queue is already open; close before reopening");
       Files.createDirectories(dbPath.getParent());
 
       // Capture whether DB existed BEFORE opening (JDBC will create empty file if missing)
@@ -313,6 +315,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       String jdbcUrl = "jdbc:sqlite:" + dbPath.toAbsolutePath();
       connection = DriverManager.getConnection(jdbcUrl);
+      acquiredConnection = true;
 
       // Configure SQLite for better concurrency
       try (Statement stmt = connection.createStatement()) {
@@ -334,6 +337,19 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       changeStream = new IndexingJobsChangeStream(connection, lock, this::ensureOpen);
 
       log.info("SqliteJobQueue opened: {}", dbPath);
+    } catch (SQLException | IOException | RuntimeException | Error failure) {
+      if (acquiredConnection) {
+        try {
+          // An incomplete open owns no usable queue. Close directly without checkpointing or
+          // restoring auto-commit: failed migration rollback may have left a partial transaction.
+          connection.close();
+          connection = null;
+        } catch (SQLException | RuntimeException | Error cleanupFailure) {
+          if (cleanupFailure != failure) failure.addSuppressed(cleanupFailure);
+          connectionFailure = cleanupFailure;
+        }
+      }
+      throw failure;
     } finally {
       unlockAfterChanges();
     }

@@ -86,8 +86,8 @@ notifications, operation-completion acknowledgement and retention. Source-remova
 stale issued committed coverage, cancellation, rollback/seal and receipt-loss proofs remain
 owed in those cuts. d.3 real producer and C2-9 authorization/pre-poll recovery are still open.
 Installed shutdown/kill proof must establish actual exit; queue close does not certify seal.
-Review also noted failed queue open retains its connection until explicit close; establish
-and fix that lifecycle behavior in the next root-owned queue cut with a regression.
+The review's failed-open connection leak is fixed in the immediate queue-owner follow-up
+below; it does not change the next unit-accounting/seal cut.
 
 Logs, archived XML generations and *-counts.json files use the labels above in
 F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/. Negative backups and hashes
@@ -96,3 +96,22 @@ are in tmp/claim-negative1546-backups.json. Hosted output is in
  tmp/resolver-register-hosted1547.json and tmp/resolver-register-hosted-failed1549.txt.
 Retain these accessible artifacts until2026-10-14 or30 days after lane acceptance,
 whichever is later. The committed JSON records counts/statuses; hashes alone are not access.
+
+## Failed-open resource correction (2026-09-14)
+
+Queue open now closes its newly acquired connection on setup failure without checkpointing
+or restoring auto-commit. A double open refuses before acquiring another connection. Failed
+cleanup retains the existing connectionFailure guard and original setup failure. No usable
+queue or walk completion is published from a failed open.
+
+Initial1550 failed because its test hook targeted V2, which fresh bootstrap detection skips;
+no cleanup fault was injected. Corrected1551 injects at the final migration step and passes
+29 cases/2 suites. The test verifies the actual acquired connection is closed, no change feed
+is published, the same instance can retry, and double-open refusal preserves its live claim.
+Negative1552 removes failed-open close:7 cases/2 suites include exactly one failure at the
+actual connection-isClosed assertion. Production was restored byte-for-byte (hash in
+ tmp/open-negative1552-sha.txt) before final1553:505 cases/86 suites,12 existing skips,
+zero failures/errors, test task EXECUTED; both PMD and whole Spotless pass. Independent
+review found no further defect. Close-failure suppression ordering on this new branch is
+code-reviewed, not fault-injected by this test; shared failed-normal-close behavior already
+has separate regression coverage. Raw labels and retention follow this document's policy.
