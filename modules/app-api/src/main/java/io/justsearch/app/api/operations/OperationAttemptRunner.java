@@ -14,6 +14,9 @@ import java.util.function.Function;
 
 /** Shared acceptance/effect/completion owner for dispatch, ingestion, settings and scheduled work. */
 public interface OperationAttemptRunner {
+  /** Maximum total attempts for durable-operation recovery; distinct from per-file retries. */
+  int MAX_DURABLE_ATTEMPTS = 3;
+
   /** Bounded metadata for the first failed durable transition in this process. */
   record PersistenceFailure(String operationKey, OperationState intendedState) {}
 

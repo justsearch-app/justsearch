@@ -59,7 +59,12 @@ Artifacts use tmp/1701-counts.json through1709-counts.json, numeric .txt logs an
 directories in F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/. Negative originals
 are tmp/1702-store-original.bin and tmp/1708-queue-original.bin. Gate outputs are
 1704-gates.txt and1704-store.txt. Retain through final lane reconciliation plus30 days,
-at least2026-10-14. Hosted proof for this foundation diff remains pending its commit/push.
+at least2026-10-14. Foundation13dd53189 hosted CI34868482004 has12 successful jobs
+and one app-ui failure: app-launcher's unreferenced-code guard reports the unconnected
+RecordedIngestionReceipt class and terminalMatches method (three repeated attempts).
+CLA34868477831 passes. Exact metadata/logs/downloaded app-ui XML are tmp/1719-hosted-*
+under the same retention rule. Production coordinator wiring remains owed; no exemption.
+Receipt-only settlement is now locally verified in [its own proof](ingestion-receipt-settlement.md).
 
 ## Remaining
 

@@ -539,3 +539,38 @@ adapter and reuse its bounded queue; do not introduce a notification executor. A
 caller's deadline response is not proof its effect owner exited. Verify the actual exit
 signal before choosing the single-file adapter. This is an integration requirement, not
 an assertion that the present adapter already carries child key/epoch or completes the row.
+
+
+## Malformed parent binding and unreachable terminal children (2026-09-14)
+
+A source refutation corrected the earlier catch-up wording. The runner captures only
+openRecords at process construction. A child that became terminal before a crash but was
+not yet acknowledged is retained by its open parent, yet absent from that cohort. A valid
+parent can reconstruct its frozen roots and observe each child through findIngestChild.
+A missing/malformed accepted parent preparation cannot do so. Therefore the normal exact
+child-acknowledgement barrier requires a valid decodable parent binding.
+
+Treat missing/malformed accepted parent preparation as unavailable binding evidence.
+Revoke parent and known child permissions, settle known producers, and drain actual issued
+claims for every identifiable open child. The first parent reconciliation waits; a later
+pass may fail the parent only after those open children settle. Persist FAILED with
+INGEST_UNIT_STATE_UNAVAILABLE, null executionId and unchanged last confirmed checkpoint
+and counts. Do not create children, claim zero work, or acknowledge terminal evidence whose
+membership in the lost parent plan cannot be proved. Unclassifiable child binding cannot
+be guessed into a parent; the coordinator's denied-cohort handling must establish no
+outstanding unknown issued owner before releasing the affected parent.
+
+A parent-key query would find syntactic candidates, not reconstruct the missing complete
+root set or prove their original membership. No broad child/history lookup is selected.
+This is the existing failed-partial-effects/unavailable-evidence path, not an exception for
+successful completion or normal valid-parent recovery. After parent failure, terminal child
+operation rows become eligible for ordinary operations retention. Their unacknowledged
+queue receipt/jobs/ledger remain retention-protected; automatic reconstruction is not claimed.
+
+Required regression: terminal sealed child plus open parent, crash before acknowledgement,
+corrupt parent preparation, restart, and an open sibling with a live producer/issued claim.
+Prove the terminal child is absent from the runner cohort; parent failure waits sibling
+drain; no new child, claim or effect occurs; parent counts/cursor remain unchanged and no
+unprovable queue receipt is acknowledged or pruned. The valid-parent counterpart must still
+catch up and acknowledge its terminal child. Independent source review confirmed the
+counterexample and this bounded failure decision; implementation/proof remains owed in cut3.

@@ -891,6 +891,15 @@
       "guard": "test:RecordedIngestionReceiptTest",
       "consumesProjection": "operation-record-type",
       "note": "C2-9b.3b.3 derives compact checkpoint/outcome expectations from the existing sealed queue receipt and compares them with the sole operations row. It owns no acceptance, persistence, authority, or independent lifecycle state."
+    },
+    {
+      "id": "recorded-ingestion-settlement",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/RecordedIngestionSettlement.java",
+      "guard": "test:RecordedIngestionSettlementTest",
+      "consumesProjection": "operation-record-type",
+      "note": "C2-9b.3b.3 receipt-only recovery selects a runner verdict from the existing queue receipt, checkpoints through the winning runner handle and acknowledges only after rereading the durable matching terminal row. It creates no admission, effect, terminal writer or persistent authority."
     }
   ]
 }

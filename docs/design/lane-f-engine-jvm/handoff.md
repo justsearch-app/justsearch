@@ -2,6 +2,15 @@
 
 ## Current state (2026-09-14)
 
+C2-9b.3b.3 receipt-only settlement now passes integrated1718:1,069 cases/186 suites,
+zero skips/failures/errors, six PMD tasks and format. Focused15 cases, seven discriminating
+negative controls and independent review are preserved in the
+[settlement proof](evidence/C2/ingestion-receipt-settlement.md). Next is the stable
+parent/child coordinator and actual bounded producer binding. Foundation13dd53189 hosted
+CI34868482004 has12 passing jobs and one app-ui failure: the unreferenced-code guard
+correctly detects the still-unconnected projection. Complete production wiring; do not
+exempt the code. C2 remains open and merge remains at F.
+
 C2-9b.3b.3 observation foundations now pass integrated1709:1,218 cases/234 suites,
 21 existing skips and no failures, plus PMD/format. API/store1703 separately passed814
 cases. Exact child lookup, compact receipt matching and locked issued-owner observation
