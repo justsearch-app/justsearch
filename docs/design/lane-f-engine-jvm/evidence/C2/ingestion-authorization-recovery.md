@@ -868,3 +868,23 @@ fixture's early observation exit and passes its unchanged assertion set; see
 [pacing evidence](pacing-observation-exit.md). Full sequential integrated verification,
 including the prior concurrent-read drain and multi-group embedding failures, remains
 required. No new deadline or input reduction was selected.
+
+
+Integrated verification1688 at ae486f3e4e519d8fef3b40969a87786188ad93c0 passes:
+1,190 cases/231 suites,21 existing skips, zero failures/errors. All three suites
+executed: Worker-core342/6 skips, indexer608/15 skips, Engine240/no skips.
+All six main/test PMD tasks and Spotless pass. The command uses the repository's
+-PtestParallelism=1 test-JVM gate and -PincludeStress=true; it completes in15 minutes.
+The unchanged concurrent-read drain and multi-group embedding cases pass; the latter
+takes253.367 seconds versus627.920 in1685. This supports resource contention as an
+explanation for the prior timeout, without claiming universal timing or deadlock proof.
+Pacing's separate ae486f3e4 correction retains every assertion, corpus and deadline.
+
+Exact command, task counts and copied XML are in tmp/1688-counts.json,
+tmp/1688.txt and tmp/1688-xml/ in the active worktree. Retain through final lane
+reconciliation plus30 days, at least2026-10-14. The original failed1685 evidence remains.
+Hosted CI34859997847 passes all13 jobs at the same revision, and CLA34859994378
+passes. Metadata is retained in tmp/1688-hosted-ci.json. The intermediate1ced178d9
+CI was cancelled by this successor, not independently passed. This closes local and
+hosted proof for the startup/drain attachment; stable coordinator .3b.3 and actual
+producer/receipt integration remain open, and C2 is not complete.

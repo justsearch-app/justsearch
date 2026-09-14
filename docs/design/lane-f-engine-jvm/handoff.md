@@ -2,24 +2,18 @@
 
 ## Current state (2026-09-14)
 
-C2-9b.3b.2 startup/drain attachment is implemented in the current worktree and has
-focused proof1683 (19 cases, zero skips/failures/errors), independent review and
-three discriminating negative controls. It preserves failed-start and failed-close
-owners, fences invalid/unpublished/non-serving generation state, and defaults to
-no recorded permission. Full1685 ended with five failures: two
-exception-contract regressions now corrected at the lifecycle boundary, two existing
-Engine behavior failures (pacing sample count and concurrent-read drain), and an
-unchanged CPU embedding timeout. Focused1686 passes with real corruption-reopen proof.
-The three integrated failures are unresolved verification, not a completion or platform
-deferral. Next: finish their separate verification after this per-item WIP checkpoint. Stable coordinator .3b.3 and actual producer
-.3c follow. [Owning evidence](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b2-startup-and-close-attachment-2026-09-14).
+C2-9b.3b.2 startup/drain attachment is committed1ced178d9 and locally/hosted
+verified through ae486f3e4 (separate pacing observation correction). Integrated1688
+passes1,190 cases/231 suites,21 existing skips, zero failures/errors, plus PMD/format.
+All13 hosted CI34859997847 jobs and CLA34859994378 pass at ae486f3e4.
+Focused1686 also proves actual SQLite corruption/restore fencing. Earlier1685
+failures and their corrections remain preserved in the owning evidence.
+[Current proof and limits](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b2-startup-and-close-attachment-2026-09-14).
 
-Latest pushed cut is C2-9b.3b.1 pure fresh policy: full1673 services2,942 cases,
-three existing skips, no failures; focused28 cases and two negative controls plus
-independent production/test reviews. The policy creates no permission and cannot
-prove fresh origin. [Owning evidence and selected cuts](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b1-fresh-policy-implementation-and-proof-2026-09-14).
-The current .3b.2 cut precedes .3b.3 stable activation/admission and
-.3c producer/receipt barrier. Root owns lifecycle work; C2 remains open.
+Next: strict sealed receipt projection, then stable activation/admission coordinator
+.3b.3 and actual producer/receipt barrier .3c. No live recorded producer is bound yet.
+The constructor defaults to denial. Root owns lifecycle/SQL/builds; C2 remains open.
+Pure fresh policy2bfd30b08 also passed all13 CI34853428167 jobs and CLA34853425540.
 
 C2-9b.3a queue fencing now passes the full indexer suite:598 cases,15 existing skips,
 no failures, plus focused and discriminating negative controls. Constructor default
