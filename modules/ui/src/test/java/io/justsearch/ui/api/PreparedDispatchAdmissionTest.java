@@ -80,7 +80,8 @@ class PreparedDispatchAdmissionTest {
         String token = capsules.mintPrepared(id.value(), "{}", EngineProvenance.sourceTier(caller), key, pending.preparationNonce());
         assertTrue(executor.dispatch(op, "{}", currentProvenance, Optional.of(token), request.context(), key, pending.preparationNonce()).success());
         assertEquals(sameCaller ? 1 : 2, admission.activeWorkCount());
-        assertEquals(origin.withWorkId(seenContext.get().workId().orElseThrow()), seenContext.get());
+        assertEquals(origin.withGrantReference(Optional.of("jsa1:capsule"))
+            .withWorkId(seenContext.get().workId().orElseThrow()), seenContext.get());
         assertEquals(originProvenance, seenProvenance.get());
         assertEquals(sameCaller, request.context().workId().equals(seenContext.get().workId()));
         assertEquals(OperationState.RUNNING, store.find(key).orElseThrow().state());
