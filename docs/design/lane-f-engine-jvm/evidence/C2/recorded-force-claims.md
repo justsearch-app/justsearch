@@ -89,18 +89,27 @@ six guardrails pass. Root reread each XML assertion and restored every mutated s
 byte-for-byte. An initial1754 invocation failed before Gradle because Python passed a Unix
 relative batch path to Windows; using gradlew.bat corrected the invocation before proof.
 
-Full affected Engine/indexer/Worker-services/Worker-core suites, eight PMD tasks and format
-are running as1757 on the restored reviewed source, with testParallelism=1/includeStress=true.
-They are not yet passing evidence. Exact commands/revisions/counts are in numeric -counts.json,
+Full affected1757 passes on0aa0575b4's restored reviewed source:2,626 cases/493 suites,
+zero failures/errors and23 existing skips (Engine279/zero; indexer642/15; Worker-services1363/two;
+Worker-core342/six). All four test tasks execute; eight PMD tasks and format pass, with
+testParallelism=1/includeStress=true. Worker-services skips are AdversarialCorpusIngestionTest
+and SpladeIndexContentCrashHarnessTest, preserved with the other skip identities in XML.
+Exact commands/revisions/counts are in numeric -counts.json,
 XML in matching -xml directories and logs in numeric .txt under
 F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/. Original negative-control source
 bytes are1754-*.original.bin and1756-*.original.bin. Retain through final lane reconciliation
-plus30 days, at least2026-10-14. No hosted result exists for this uncommitted force cut.
+plus30 days, at least2026-10-14.
 
 1758 passes operation-surface, execution-surface and register-guard-resolution gates, with no
 findings. Canonical link, runtime config and store recoverability checks pass; documentation
-and skill regeneration produce no additional diff. This cut is checkpointed while1757 runs,
-so integrated and hosted verification remain open after the commit.
+and skill regeneration produce no additional diff. Checkpoint0aa0575b4 was committed/pushed
+at20:38/20:38:58 local while1757 ran; its source remained unchanged through completion.
+
+Hosted CI34882097481 passes12/13 jobs; CLA34882092528 passes. Exact downloaded XML under
+1761-hosted-xml identifies the sole app-ui unused-method finding as the still-unbound producer,
+on three attempts.1761-hosted-ci.json,1761-hosted-failed.txt and1761-artifacts.txt preserve
+metadata/logs. PR727's managed review was updated and exactly read back in1759-review-applied.json.
+The local force cut is verified; the stage's producer wiring and final hosted green remain open.
 
 Actual bounded producer, prepared handlers and live proof remain d.3b; C2 remains open,
 with merge at stage F. Checkpoint064adc779 hosted CI34878848566 passes12/13 jobs, failing only

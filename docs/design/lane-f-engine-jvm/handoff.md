@@ -8,11 +8,14 @@ is the still-unbound producer. CLA34878843824 passes. The obsolete maintenance h
 [Coordinator proof](evidence/C2/ingestion-coordinator.md) preserves full1735 and corrective
 focused/negative-control evidence without treating the partial hosted run as green.
 
-The next per-item force-at-claim cut is implemented and independently reviewed.1752 executes74
-focused cases; review coverage corrections pass1755.1754/1756 produce all seven expected
-negative-control failures and sources are restored byte-for-byte. Full affected1757 is running,
-not yet passing proof. [Owning implementation, evidence and limits](evidence/C2/recorded-force-claims.md).
-Commit/push this cut before actual bounded producer DTO/adapter and prepared-handler wiring.
+Force-at-claim checkpoint0aa0575b4 is pushed and locally verified: full1757 executes2,626
+cases/493 suites,23 existing skips and no failures/errors, plus eight PMD tasks and format.
+Independent review and all seven negative controls pass. Hosted CI34882097481 passes12/13,
+failing only the unbound producer method; CLA34882092528 passes.
+[Owning implementation, evidence and limits](evidence/C2/recorded-force-claims.md).
+Next is actual Java-only recorded admission/adapter and prepared-handler wiring. indexing.proto
+stays unchanged under C2-2. Frozen subtree pruning, cancellation after backpressure and force
+compatibility ordering must be proven before producer activation.
 C2 remains open; merge remains at F.
 
 C2-9b.3b.3 receipt-only settlement now passes integrated1718:1,069 cases/186 suites,
