@@ -10,6 +10,7 @@ import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.StoreFormatVersions;
+import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -157,7 +158,7 @@ public final class DurableGrantStore {
 
   /** True if an operation grant covers {@code operationId} at {@code risk} from {@code sourceTier}. */
   public boolean isAllowed(String operationId, RiskTier risk,
-      io.justsearch.core.context.EngineContext engineContext) {
+      EngineContext engineContext) {
     return isAllowed(operationId, Optional.empty(), risk, engineContext);
   }
 
@@ -184,18 +185,58 @@ public final class DurableGrantStore {
    */
   public boolean isAllowed(
       String operationId, Optional<String> capabilityFamily, RiskTier risk,
-      io.justsearch.core.context.EngineContext engineContext) {
-    SourceTier sourceTier = EngineProvenance.sourceTier(engineContext);
+      EngineContext engineContext) {
+    return findAllowed(operationId, capabilityFamily, risk, engineContext).isPresent();
+  }
+
+  /**
+   * Resolve the exact current durable entry that covers an operation. Operation grants have
+   * precedence over family grants when both are present; the returned value is the entry the
+   * caller must retain for later exact revalidation.
+   */
+  public Optional<DurableGrant> findAllowed(
+      String operationId, Optional<String> capabilityFamily, RiskTier risk,
+      EngineContext engineContext) {
+    Objects.requireNonNull(operationId, "operationId");
+    Objects.requireNonNull(capabilityFamily, "capabilityFamily");
     Objects.requireNonNull(risk, "risk");
+    SourceTier sourceTier = EngineProvenance.sourceTier(engineContext);
     if (risk == RiskTier.HIGH) {
-      return false;
+      return Optional.empty();
     }
     if (grantedOps.contains(new OperationKey(operationId, sourceTier))) {
-      return true;
+      return Optional.of(new DurableGrant(GrantKind.OPERATION, operationId, sourceTier));
     }
     return capabilityFamily
-        .map(family -> grantedFamilies.contains(new FamilyKey(family, sourceTier)))
-        .orElse(false);
+        .filter(family -> grantedFamilies.contains(new FamilyKey(family, sourceTier)))
+        .map(family -> new DurableGrant(GrantKind.FAMILY, family, sourceTier));
+  }
+
+  /**
+   * Revalidate the exact entry selected at authorization time. A revoked selected entry is not
+   * replaced by another operation or family grant that happens to match the same invocation.
+   */
+  public boolean isAllowed(
+      DurableGrant selected, String operationId, Optional<String> capabilityFamily, RiskTier risk,
+      EngineContext engineContext) {
+    if (selected == null || selected.kind() == null || selected.target() == null
+        || selected.sourceTier() == null) {
+      return false;
+    }
+    Objects.requireNonNull(operationId, "operationId");
+    Objects.requireNonNull(capabilityFamily, "capabilityFamily");
+    Objects.requireNonNull(risk, "risk");
+    if (risk == RiskTier.HIGH
+        || EngineProvenance.sourceTier(engineContext) != selected.sourceTier()) {
+      return false;
+    }
+    return switch (selected.kind()) {
+      case OPERATION -> selected.target().equals(operationId)
+          && grantedOps.contains(new OperationKey(selected.target(), selected.sourceTier()));
+      case FAMILY -> capabilityFamily.filter(selected.target()::equals)
+          .map(family -> grantedFamilies.contains(new FamilyKey(family, selected.sourceTier())))
+          .orElse(false);
+    };
   }
 
   /**

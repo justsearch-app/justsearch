@@ -95,6 +95,92 @@ class DurableGrantStoreTest {
     assertFalse(store.isAllowed("core.ingest", family, RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()));
   }
 
+  @Test
+  @DisplayName("findAllowed returns the operation entry before a matching family entry")
+  void findsOperationBeforeFamily() {
+    DurableGrantStore store = new DurableGrantStore();
+    Optional<String> family = Optional.of("file-operations");
+    store.grantFamilyAllowAlways("file-operations", SourceTier.UNTRUSTED);
+    store.grantAllowAlways("core.ingest", SourceTier.UNTRUSTED);
+
+    assertEquals(
+        Optional.of(new DurableGrantStore.DurableGrant(
+            DurableGrantStore.GrantKind.OPERATION, "core.ingest", SourceTier.UNTRUSTED)),
+        store.findAllowed("core.ingest", family, RiskTier.MEDIUM,
+            io.justsearch.app.services.TestEngineContexts.agent()));
+
+    store.revoke("core.ingest", SourceTier.UNTRUSTED);
+    assertEquals(
+        Optional.of(new DurableGrantStore.DurableGrant(
+            DurableGrantStore.GrantKind.FAMILY, "file-operations", SourceTier.UNTRUSTED)),
+        store.findAllowed("core.ingest", family, RiskTier.MEDIUM,
+            io.justsearch.app.services.TestEngineContexts.agent()));
+  }
+
+  @Test
+  @DisplayName("exact revalidation keeps the selected family and refuses a revoked selected entry")
+  void exactRevalidationDoesNotSubstituteAnotherGrant() {
+    DurableGrantStore store = new DurableGrantStore();
+    Optional<String> family = Optional.of("file-operations");
+    var agent = io.justsearch.app.services.TestEngineContexts.agent();
+    store.grantFamilyAllowAlways("file-operations", SourceTier.UNTRUSTED);
+    DurableGrantStore.DurableGrant selectedFamily =
+        store.findAllowed("core.ingest", family, RiskTier.MEDIUM, agent).orElseThrow();
+
+    // A later, more-specific grant does not invalidate the family entry that was selected earlier.
+    store.grantAllowAlways("core.ingest", SourceTier.UNTRUSTED);
+    assertTrue(store.isAllowed(selectedFamily, "core.ingest", family, RiskTier.MEDIUM, agent));
+
+    // Revoking that selected family entry fails exact recovery, even though the operation grant matches.
+    store.revokeFamily("file-operations", SourceTier.UNTRUSTED);
+    assertFalse(store.isAllowed(selectedFamily, "core.ingest", family, RiskTier.MEDIUM, agent));
+    assertTrue(store.isAllowed("core.ingest", family, RiskTier.MEDIUM, agent),
+        "ordinary selection may use the currently available operation grant");
+
+    // The same no-substitution rule applies when the operation entry was selected first.
+    store.grantFamilyAllowAlways("file-operations", SourceTier.UNTRUSTED);
+    DurableGrantStore.DurableGrant selectedOperation =
+        store.findAllowed("core.ingest", family, RiskTier.MEDIUM, agent).orElseThrow();
+    store.revoke("core.ingest", SourceTier.UNTRUSTED);
+    assertFalse(store.isAllowed(selectedOperation, "core.ingest", family, RiskTier.MEDIUM, agent));
+    assertTrue(store.isAllowed("core.ingest", family, RiskTier.MEDIUM, agent),
+        "ordinary selection may use the currently available family grant");
+  }
+
+  @Test
+  @DisplayName("exact revalidation requires matching target, tier, declared scope, and non-HIGH risk")
+  void exactRevalidationRejectsMismatches() {
+    DurableGrantStore store = new DurableGrantStore();
+    Optional<String> family = Optional.of("file-operations");
+    var agent = io.justsearch.app.services.TestEngineContexts.agent();
+    var ui = io.justsearch.app.services.TestEngineContexts.ui();
+    store.grantFamilyAllowAlways("file-operations", SourceTier.UNTRUSTED);
+    DurableGrantStore.DurableGrant selected =
+        store.findAllowed("core.ingest", family, RiskTier.MEDIUM, agent).orElseThrow();
+    assertTrue(
+        store.isAllowed(selected, "core.other-in-family", family, RiskTier.MEDIUM, agent),
+        "a selected family grant covers another operation declaring that family");
+    store.grantAllowAlways("core.ingest", SourceTier.UNTRUSTED);
+    DurableGrantStore.DurableGrant selectedOperation =
+        store.findAllowed("core.ingest", family, RiskTier.MEDIUM, agent).orElseThrow();
+
+    assertFalse(store.isAllowed(selectedOperation, "core.other", family, RiskTier.MEDIUM, agent));
+    assertFalse(
+        store.isAllowed(selected, "core.ingest", Optional.of("other"), RiskTier.MEDIUM, agent));
+    assertFalse(
+        store.isAllowed(selected, "core.ingest", Optional.empty(), RiskTier.MEDIUM, agent));
+    assertFalse(store.isAllowed(selected, "core.ingest", family, RiskTier.HIGH, agent));
+    assertFalse(store.isAllowed(selected, "core.ingest", family, RiskTier.MEDIUM, ui));
+    assertFalse(store.isAllowed(
+        new DurableGrantStore.DurableGrant(
+            DurableGrantStore.GrantKind.FAMILY, "file-operations", SourceTier.TRUSTED),
+        "core.ingest", family, RiskTier.MEDIUM, agent));
+    assertFalse(store.isAllowed(
+        new DurableGrantStore.DurableGrant(
+            DurableGrantStore.GrantKind.OPERATION, "core.ungranted", SourceTier.UNTRUSTED),
+        "core.ungranted", Optional.empty(), RiskTier.MEDIUM, agent));
+  }
+
   /**
    * Tempdoc 875 C.2 — the risk ceiling. A FAMILY grant for "file-operations" must still authorize the
    * MEDIUM member (560 §28's axis is preserved) and must NOT authorize the HIGH member. Both halves

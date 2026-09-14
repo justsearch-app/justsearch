@@ -15,6 +15,14 @@ The overall .2c acceptance still requires the actual outer owner and cadence/shu
 Root owns SQL/lifecycle changes; independent test and read-only review work are bounded. The prior [pause summary](evidence/C2/session-2026-09-14-closeout.md)
 remains historical. Existing autonomous authorization and merge-at-F placement remain in force.
 
+C2-9a.1 authorization basis/selection/binding is now locally verified: full1631
+app-api/services has3,122 cases, three existing skips and no failures; negative1632
+and restored1633 pin the new guards. [Owning evidence](evidence/C2/ingestion-authorization-recovery.md).
+Next is C2-9a.2 grant persistence-before-publication, then C2-9b shared pre-poll
+authority and C2-8d.3 actual producer. Independent review found the inherited
+live-before-disk grant update defect; its fix is required before recovery activation.
+Notification checkpoint7777be3fd passed all13 hosted jobs in CI34835832804.
+
 A/B/C1 are complete. C2 remains open; do not merge before stage F.
 The public settings producer/controller is implemented and locally verified:
 final1452 represents4,859 cases, four existing skips and zero failures/errors,

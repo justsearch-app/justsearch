@@ -163,6 +163,17 @@ final class RecordedIngestPlanResolverTest {
     return Stream.of("key", "nonce");
   }
 
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.NullSource
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"caller-header", "jsa2:auto", "jsa1:op:UNTRUSTED:bad="})
+  void refusesMissingOrMalformedServerBasis(String reference) {
+    var fixture = fixture(OperationKind.INGEST, "core.ingest-files", false,
+        RecordedRootPlan.SCHEMA, OperationPreparation.Content.METADATA);
+    assertThrows(IllegalArgumentException.class, () -> new RecordedIngestPlanResolver().resolve(
+        withContext(fixture.parent(), fixture.parent().context().withGrantReference(Optional.ofNullable(reference))),
+        fixture.preparation()));
+  }
+
   private static Fixture fixture(OperationKind kind, String operationRef, boolean undo,
       String replaySchema, OperationPreparation.Content content) {
     String key = OperationKeys.generate(KEY_CLOCK);
@@ -181,7 +192,7 @@ final class RecordedIngestPlanResolverTest {
         EngineProvenance.invocation(context, ExecutorTag.UI, OCCURRED_AT, Optional.empty()));
     OperationPreparedPayload payload = codec.encode(envelope);
     OperationStore.Preparation stored = new OperationStore.Preparation(nonce, payload);
-    return new Fixture(key, nonce, plan, row(key, descriptor, context, "UI", "root-owner",
+    return new Fixture(key, nonce, plan, row(key, descriptor, context.withGrantReference(Optional.of("jsa1:auto")), "UI", "root-owner",
         "session-id", OCCURRED_AT), stored);
   }
 

@@ -5,6 +5,7 @@ import io.justsearch.agent.api.encryption.StoreCipher;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.OperationPreparation;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.OperationAuthorizationBasis;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.RecordedRootPlan;
@@ -22,19 +23,23 @@ public final class RecordedIngestPlanResolver implements OperationAttemptRunner.
     }
     var envelope = new PreparedInvocationCodec(StoreCipher.disabled()).decode(
         stored.payload(), parent.key(), stored.nonce(), descriptor);
+    // The server replaces only the untrusted grant header at acceptance. Validate the
+    // typed replacement, then compare every remaining frozen attribution/work axis.
+    var acceptedContext = envelope.context().withGrantReference(parent.context().grantReference());
     var preparation = envelope.preparation();
     var provenance = envelope.provenance();
     if (preparation.content() != OperationPreparation.Content.METADATA
         || !RecordedRootPlan.SCHEMA.equals(preparation.replaySchema())
         || !descriptor.hasSameIdentity(io.justsearch.app.api.operations.OperationDescriptor.invocation(
             descriptor.kind(), descriptor.operationRef(), preparation.argumentsJson(), false))
-        || !envelope.context().equals(parent.context())
+        || !acceptedContext.equals(parent.context())
         || !envelope.executor().name().equals(parent.executor())
         || !Objects.equals(provenance.initiator().orElse(null), parent.initiator())
         || !Objects.equals(provenance.correlationId().orElse(null), parent.correlationId())
         || !envelope.occurredAt().equals(parent.provenanceOccurredAt())) {
       throw new IllegalArgumentException("Recorded ingestion preparation binding mismatch");
     }
+    OperationAuthorizationBasis.decode(parent.context().grantReference().orElse(null));
     return RecordedRootPlan.fromReplayPayload(preparation.replayPayloadJson());
   }
 }

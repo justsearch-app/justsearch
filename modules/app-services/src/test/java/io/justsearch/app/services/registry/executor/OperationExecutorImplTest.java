@@ -133,6 +133,61 @@ final class OperationExecutorImplTest {
     completion.complete(OperationResult.success("finished"));
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"auto", "capsule", "operation", "family"})
+  void acceptanceReplacesForgedHeaderWithTheExactServerSelectedBasis(String branch) {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.authorization-basis");
+    var observed = new java.util.concurrent.atomic.AtomicReference<EngineContext>();
+    handlers.register(id, (args, ctx) -> { observed.set(ctx); return OperationResult.success("done"); });
+    var capsules = new ConsentCapsuleService();
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, null, Map.of(), Clock.systemUTC(),
+        new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog(), null, capsules);
+    var grants = new io.justsearch.app.services.intent.DurableGrantStore();
+    if (branch.equals("operation")) grants.grantAllowAlways(id.value(), io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
+    if (branch.equals("family")) grants.grantFamilyAllowAlways(FAMILY, io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
+    executor.setDurableGrantStore(grants, (op, args, ctx) -> true);
+    var context = io.justsearch.app.services.TestEngineContexts.agent()
+        .withGrantReference(Optional.of("jsa1:auto"));
+    var provenance = io.justsearch.app.services.intent.EngineProvenance.invocation(context, ExecutorTag.AGENT, Instant.now(), Optional.empty());
+    var op = makeFamilyOp(id, branch.equals("auto") ? RiskTier.LOW : RiskTier.MEDIUM);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    var token = branch.equals("capsule") ? Optional.of(capsules.mint(id.value(), "{}")) : Optional.<String>empty();
+    if (branch.equals("capsule")) {
+      assertThrows(ConfirmationRequiredException.class,
+          () -> executor.dispatch(op, "{}", provenance, Optional.empty(), context, key));
+      assertTrue(operationStore.find(key).isEmpty(), "A forged AUTO header cannot produce acceptance");
+    }
+    assertTrue(executor.dispatch(op, "{}", provenance, token, context, key).success());
+    io.justsearch.app.api.operations.OperationAuthorizationBasis expected = switch (branch) {
+      case "auto" -> new io.justsearch.app.api.operations.OperationAuthorizationBasis.StructuralAuto();
+      case "capsule" -> new io.justsearch.app.api.operations.OperationAuthorizationBasis.EphemeralCapsule();
+      case "operation" -> new io.justsearch.app.api.operations.OperationAuthorizationBasis.OperationGrant(
+          id.value(), io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
+      case "family" -> new io.justsearch.app.api.operations.OperationAuthorizationBasis.FamilyGrant(
+          FAMILY, io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
+      default -> throw new AssertionError(branch);
+    };
+    assertEquals(context.withGrantReference(Optional.of(expected.encode())), operationStore.find(key).orElseThrow().context());
+    assertEquals(Optional.of(expected.encode()), observed.get().grantReference());
+  }
+
+  @Test
+  void ungatedWiringCannotPersistAForgedServerBasis() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.ungated-basis");
+    handlers.register(id, (args, ctx) -> {
+      assertTrue(ctx.grantReference().isEmpty());
+      return OperationResult.success("done");
+    });
+    var context = io.justsearch.app.services.TestEngineContexts.internal()
+        .withGrantReference(Optional.of("jsa1:auto"));
+    var result = new OperationExecutorImpl(attempts, admission, handlers)
+        .dispatch(makeOp(id, TrustTier.CORE, false), "{}", context);
+    String key = (String) result.structuredData().get("operationKey");
+    assertTrue(operationStore.find(key).orElseThrow().context().grantReference().isEmpty());
+  }
+
   @Test
   void keyedReceiptDoesNotConsumeApprovalAgainButFreshMutationStillRequiresIt() {
     var handlers = new HandlerRegistry();

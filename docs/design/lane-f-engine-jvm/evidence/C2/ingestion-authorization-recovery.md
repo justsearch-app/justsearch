@@ -91,4 +91,92 @@ The implementation is not ready until focused tests establish all of the followi
 
 ## Missing proof
 
-The shared authority record, typed gate result, exact durable-grant resolver, strict recorded-root preparation scope, preloaded roots carrier, per-claim invalidation, generation-ready callback, and after-lock notification are not implemented by this note. Every regression above remains unexecuted for this mechanism. This evidence therefore supports the C2-9 implementation contract only; it is not a readiness or stage-completion claim.
+The shared pre-fork authority, strict recorded-root scope, roots carrier, per-claim invalidation and generation-ready recovery callback remain unimplemented. After-lock queue notification is implemented and verified separately in [walk-notifications-retention.md](walk-notifications-retention.md). The C2-9a.1 basis/selection/binding cut is locally verified below; it does not establish live recovery, reboot permission or stage completion.
+
+
+## C2-9a acceptance prerequisite (2026-09-14)
+
+Implement the already-selected typed basis and exact grant lookup before activating the real
+C2-8d.3 producer. This is a prerequisite ordering within C2, with no stage/merge movement.
+Keep `operations.grant_ref` as the durable slot and preserve all other prepared context axes.
+
+The pure app-api basis encoding is `jsa1:auto`, `jsa1:capsule`, or
+`jsa1:op:<SOURCE_TIER>:<base64url-UTF8-target>` /
+`jsa1:family:<SOURCE_TIER>:<base64url-UTF8-target>`. Reuse SourceTier; do not create a trust
+vocabulary. Encoding is unpadded, canonical, strict UTF-8, bounded to 256 characters, and
+rejects unknown variants/versions, blank/control-bearing targets and noncanonical forms.
+This is a projection of the exact existing grant key, not another authority or grant store.
+Operation and family references are distinct and never substitute for each other on replay.
+Oversized keys refuse acceptance; truncation or hashing away the exact target is forbidden.
+
+C2-9a supplies the codec, exact existing-entry selection/revalidation and gate-to-acceptance
+stamp, with prepared-context one-field validation. Pre-fork shared authorities, roots carrier,
+per-claim permits, generation-ready callback and live recovery remain C2-9b and must be
+connected before the overall C2-8/9 acceptance is claimed.
+
+The stamping cut applies to every dispatcher acceptance that passes the shared
+lattice, including AUTO and capsules, so `grant_ref` has one meaning across its
+server-gated rows. Ungated legacy/test constructors clear caller grant references and do not invent a basis; their
+rows cannot pass the recorded-ingestion recovery binding validator. A prepared
+retry evaluates the frozen context and provenance, while the existing public
+argument digest check still precedes the gate. Only the grant reference changes;
+all other envelope axes remain exact. This adds no operations column.
+
+### Per-item cut and review correction
+
+C2-9a.1 supplies the typed evidence/selection/binding prerequisite only. Independent
+review found an inherited durability defect: grant/revoke currently changes live
+sets before the file replacement succeeds. C2-9a.2 must serialize one candidate
+snapshot, persist it before publication, and emit success events only after that
+commit. The existing grant keys and file remain the sole authority. This is smaller
+than a new journal/store or a permanent recovery marker. On a failed write the
+mutation throws and the previously committed view remains both in memory and on
+disk; no successful revoke is reported. Recovery activation remains blocked until
+this correction and failure/reopen regressions pass.
+
+The earlier cross-client prepared-dispatch fixture treated the fresh trusted
+retry as sufficient to run a frozen untrusted invocation. That expectation is
+superseded by this design's explicit frozen-context gate rule: the retry must
+supply bound approval, while attribution and work-handle isolation remain pinned.
+
+
+### C2-9a.1 local verification (2026-09-14)
+
+Base `7777be3fd135b9119a60ab89f059b0990eb0c2f7` plus the basis/selection/binding
+commit diff, Windows x64, root-owned Gradle with no simultaneous source edits.
+The codec is strict/canonical; selection preserves the exact operation/family key;
+the dispatcher clears every caller reference and stamps successful shared-gate
+results at acceptance. Prepared retries use frozen context/provenance. Resolver
+validation permits only the stamped field difference. The original preparation
+remains byte-equivalent on injected SQLite acceptance failure and no row/effect
+appears. No capsule secret is included in the stamp.
+
+| Run | Result |
+| --- | --- |
+|1627|Compile rejected two redundant record-constructor assignments; corrected without suppressions. Tests did not execute.|
+|1628|158 cases, no skips/failures; PMD rejected one redundant qualified test annotation.|
+|1629|157 cases, no skips/failures; app-services executed, app-api reused up-to-date; PMD/format passed. Removed the empty-context construction case because it tested the wrong rejection boundary.|
+|1630|23 cases, no skips/failures; acceptance-failure regression and prepared dispatch suite executed; PMD/format passed.|
+|1631|Full app-api and app-services suites both executed:3,122 cases/476 suites, three existing skips, no failures/errors; PMD/format passed.|
+|1632|Negative control removed stamps, exact selected-entry checks, frozen gate context and resolver checks:20 cases,11 expected failures, no skips/errors.|
+|1633|All three production files restored byte-for-byte to1631;20 targeted cases executed, no skips/failures/errors; PMD/format passed.|
+
+The negative proves failure for the operation/family/capsule stamps, ungated forged
+reference, cross-client trust upgrade, revoked selected-entry substitution, row
+context mismatch and missing/malformed evidence. AUTO retains the forged AUTO
+value in that mutation and is not claimed as a discriminating negative by itself.
+The existing unaffected provenance/executor checks continue to pass.
+
+`tmp/1633-gates.txt` records operation-surface, execution-surface,
+register-guard-resolution and store-recoverability passes. Canonical documentation
+regeneration/link/config checks pass in `tmp/1633-docs.txt`.
+All logs, counts and preserved XML are accessible under
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/1627*` through `tmp/1633*`;
+retain through final lane reconciliation plus30 days, at least2026-10-14.
+Full final-lane/platform/live proof remains required. C2-9a.2 persistence correction
+and C2-9b integration remain open; this per-item commit does not activate recovery.
+
+Independent refute review (`/root/walk_closure_refute`) reread the restored production
+source and1631/1633 evidence and found no further C2-9a.1 blocker. Its grant-write
+failure finding remains explicitly owned by the next C2-9a.2 cut. Hosted7777 proves
+only the predecessor queue work, not this diff.

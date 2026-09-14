@@ -59,4 +59,11 @@ The tests run on Windows11 x64 build26100, Temurin OpenJDK25.0.2+10 and SQLite J
 Governance's operation/execution/register gates, store recoverability and canonical docs checks pass. Logs, counts, XML and snapshots use
 `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/1619*` through `tmp/1626*`.
 Retain through final lane reconciliation plus30 days, at least2026-10-14. Hosted proof for
-these changes remains unperformed; predecessor64af16c20 CI34833934557 completed all13 jobs successfully.
+this queue attachment passed as recorded below; outer producer integration remains unimplemented.
+
+
+Hosted reconciliation: commit `7777be3fd135b9119a60ab89f059b0990eb0c2f7`
+passed all 13 jobs in [CI34835832804](https://github.com/justsearch-app/justsearch/actions/runs/34835832804),
+and CLA34835830589 passed. Root independently checked the exact head and every job
+in `tmp/1631-hosted.json` in the active worktree. This verifies the pushed queue
+attachment, not the still-unimplemented outer producer/shutdown integration.

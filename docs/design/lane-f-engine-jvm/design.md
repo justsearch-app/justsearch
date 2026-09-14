@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: Implement C2-9a's selected server-built authorization stamp before real ingest producer activation. Reuse grant_ref with a canonical bounded jsa1 basis, exact operation/family key and shared SourceTier; preserve every other prepared context axis. This is a prerequisite ordering within C2, not a stage change. [Encoding and owning contract](evidence/C2/ingestion-authorization-recovery.md#c2-9a-acceptance-prerequisite-2026-09-14).
+
 - 2026-09-14: C2-8d.2c captures actual progress-row changes on the queue connection, promotes keys only after JDBC commit and delivers after outermost unlock. Reuse existing cleanup for old exact-ack unreferenced progress and make duplicate acknowledgement update-free. This avoids explicit marks at every writer and any global scan/new timer. Queue-only attachment precedes actual producer, terminal matching and cadence integration, which remain required. [Owning detail](evidence/C2/C2-8d-vertical-plan.md#c2-8d2c-notification-and-retention-attachment-2026-09-14).
 
 - 2026-09-14: Stopped recorded walks refuse maintenance replacement while issued owners prevent sealing. Retrying after those owners return seals the receipt and admits maintenance outside it; deferred/retryable returns become typed skips in their existing outcome transaction. This avoids unpollable pending membership without another buffer or transaction owner. [C2-8d closure detail](evidence/C2/C2-8d-vertical-plan.md#implementation-detail-stopped-maintenance-admission-2026-09-14).

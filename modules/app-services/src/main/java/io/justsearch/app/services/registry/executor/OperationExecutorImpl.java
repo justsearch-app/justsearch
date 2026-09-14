@@ -8,6 +8,7 @@ import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationPreparation;
 import io.justsearch.agent.api.registry.OperationPreparationRefused;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.OperationAuthorizationBasis;
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.operations.OperationDescriptor;
@@ -387,10 +388,18 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     existing = existingInvocation(op, argumentsJson, provenance, context, plan.request().key(), undoId != null);
     if (existing.isPresent()) return existing.get();
     if (plan.existing()) throw preparationUnavailable();
+    var request = plan.request();
+    Optional<String> acceptedBasis = Optional.empty();
     if (intentGateEvaluator != null) {
-      enforceTrustLattice(op, argumentsJson, provenance, confirmationToken, context,
-          plan.invocation().value(), plan.request().key(), plan.pending() == null ? null : plan.pending().nonce());
+      var basis = enforceTrustLattice(op, argumentsJson, request.provenance(),
+          confirmationToken, request.context(), plan.invocation().value(), request.key(),
+          plan.pending() == null ? null : plan.pending().nonce());
+      acceptedBasis = Optional.of(basis.encode());
     }
+    // A caller header is never server evidence, including in ungated legacy/test wiring.
+    var acceptedContext = request.context().withGrantReference(acceptedBasis);
+    plan = new InvocationPlan(new OperationAttemptRunner.Request(request.key(), request.descriptor(),
+        acceptedContext, request.provenance(), request.historyMode()), plan.invocation(), plan.pending(), false);
     return executeAttempt(op, plan, undoId);
   }
 
@@ -844,7 +853,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * {@code UNTRUSTED} so the gate behavior errs on the side of caution. The
    * BackendIntentRouter logs the unregistered-ingress condition separately.
    */
-  private void enforceTrustLattice(
+  private OperationAuthorizationBasis enforceTrustLattice(
       Operation op,
       String argumentsJson,
       InvocationProvenance provenance,
@@ -861,7 +870,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     GateBehavior gate = verdict.gateBehavior();
     switch (gate) {
       case AUTO -> {
-        // proceed
+        return new OperationAuthorizationBasis.StructuralAuto();
       }
       case INLINE_CONFIRM, TYPED_CONFIRM -> {
         // Tempdoc 550 thesis IV + 560 §28 (4d): a durable "allow-always" grant satisfies the gate
@@ -875,14 +884,19 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         // so the user gets the ordinary confirm dialog, which names the arguments.
         var durable = this.durableGrantStore;
         var scope = this.durableGrantScope;
-        if (durable != null
-            && durable.isAllowed(
-                op.id().value(), op.policy().capabilityFamily(), op.policy().risk(), engineContext)
+        var selected = durable == null
+            ? Optional.<io.justsearch.app.services.intent.DurableGrantStore.DurableGrant>empty()
+            : durable.findAllowed(op.id().value(), op.policy().capabilityFamily(), op.policy().risk(), engineContext);
+        if (selected.isPresent()
             && (preparationNonce == null ? scope.coversArguments(op, argumentsJson, engineContext)
                 : scope.coversPreparation(op, prepared, engineContext))) {
           emitGateOutcome(op, provenance, sourceTier, gate,
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
-          return; // durable-grant-satisfied
+          var grant = selected.orElseThrow();
+          return switch (grant.kind()) {
+            case OPERATION -> new OperationAuthorizationBasis.OperationGrant(grant.target(), grant.sourceTier());
+            case FAMILY -> new OperationAuthorizationBasis.FamilyGrant(grant.target(), grant.sourceTier());
+          };
         }
         String token = confirmationToken.orElse("");
         // Tempdoc 550 A1 + C2 (steps 3+4 complete): the ONLY thing that satisfies a
@@ -902,7 +916,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
           // Tempdoc 550 Outcome face: record the gate firing as APPROVED, then proceed.
           emitGateOutcome(op, provenance, sourceTier, gate,
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
-          return; // capsule-satisfied
+          return new OperationAuthorizationBasis.EphemeralCapsule();
         }
         var preview = preparationNonce == null ? null
             : Objects.requireNonNull(resolveHandler(op).approvalPreview(prepared), "approvalPreview");
@@ -917,6 +931,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         throw new TrustGateDeniedException(op.id(), sourceTier);
       }
     }
+    throw new IllegalStateException("Unhandled trust gate");
   }
 
   /**

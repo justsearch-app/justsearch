@@ -156,7 +156,11 @@ class PreparedOperationDispatchTest {
       assertEquals(key, retry.structuredData().get("operationKey"));
       var row = store.find(key).orElseThrow();
       assertEquals(OperationState.COMPLETE, row.state());
-      assertTrue(store.acceptedPreparation(row.id()).isPresent());
+      var storedPreparation = store.acceptedPreparation(row.id()).orElseThrow();
+      var envelope = new PreparedInvocationCodec(io.justsearch.agent.api.encryption.StoreCipher.disabled())
+          .decode(storedPreparation.payload(), key, storedPreparation.nonce(), row.descriptor());
+      assertEquals(ORIGIN, envelope.context(), "Acceptance preserves the original preparation");
+      assertEquals(Optional.of("jsa1:capsule"), row.context().grantReference());
       assertEquals(undo ? OperationHistoryMode.UNDO : OperationHistoryMode.UNDOABLE, row.historyMode());
       assertEquals(PROVENANCE.occurredAt(), row.provenanceOccurredAt());
     }
@@ -382,6 +386,30 @@ class PreparedOperationDispatchTest {
   }
 
   @Test
+  void failedAcceptanceRetainsUnstampedPreparationAndCreatesNoAuthorizedRow() throws Exception {
+    var fixture = new Fixture(); var capsules = new ConsentCapsuleService();
+    Path database = directory.resolve("operations.db");
+    try (var store = new SqliteOperationStore(database)) {
+      var executor = executor(store, fixture.registry(), capsules);
+      String key = OperationKeys.generate(CLOCK);
+      var gated = assertThrows(ConfirmationRequiredException.class,
+          () -> invoke(executor, false, key, null, Optional.empty()));
+      var descriptor = OperationDescriptor.invocation(OperationKind.NOTE, ID.value(), "{}", false);
+      var pending = store.pendingPreparation(key, descriptor).orElseThrow();
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+          var statement = connection.createStatement()) {
+        statement.execute("CREATE TRIGGER refuse_accept BEFORE INSERT ON operations BEGIN SELECT RAISE(ABORT, 'injected acceptance failure'); END");
+      }
+      String token = capsules.mintPrepared(ID.value(), "{}", SourceTier.UNTRUSTED, key, gated.preparationNonce());
+      assertThrows(OperationStoreException.class,
+          () -> invoke(executor, false, key, gated.preparationNonce(), Optional.of(token)));
+      assertTrue(store.find(key).isEmpty());
+      assertEquals(pending, store.pendingPreparation(key, descriptor).orElseThrow());
+      assertEquals(0, fixture.effects.get());
+    }
+  }
+
+  @Test
   void crossClientRetryPreservesFrozenOriginWithoutBorrowingItsWorkId() throws Exception {
     var fixture = new Fixture(); var capsules = new ConsentCapsuleService(); var admission = admission();
     try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
@@ -390,16 +418,21 @@ class PreparedOperationDispatchTest {
       String key = OperationKeys.generate(CLOCK);
       var gated = assertThrows(ConfirmationRequiredException.class,
           () -> invoke(executor, false, key, null, Optional.empty()));
-      // The current caller is authorized by its own current trust lattice, while frozen
-      // original attribution selects a fresh child rather than relabelling this work handle.
+      // A trusted retry cannot upgrade the frozen untrusted origin's authority.
+      // After bound approval, original attribution still selects a fresh child.
       var current = TestEngineContexts.ui().withWorkId(UUID.randomUUID());
       var currentProvenance = EngineProvenance.invocation(current, ExecutorTag.UI, CLOCK.instant(), Optional.empty());
-      assertTrue(executor.dispatch(operation(), "{}", currentProvenance, Optional.empty(), current, key, gated.preparationNonce()).success());
-      verify(admission).attach(ORIGIN);
+      assertThrows(ConfirmationRequiredException.class, () -> executor.dispatch(operation(), "{}",
+          currentProvenance, Optional.empty(), current, key, gated.preparationNonce()));
+      assertEquals(0, fixture.effects.get());
+      String token = capsules.mintPrepared(ID.value(), "{}", SourceTier.UNTRUSTED, key, gated.preparationNonce());
+      assertTrue(executor.dispatch(operation(), "{}", currentProvenance, Optional.of(token), current, key, gated.preparationNonce()).success());
+      var accepted = ORIGIN.withGrantReference(Optional.of("jsa1:capsule"));
+      verify(admission).attach(accepted);
       assertEquals(ORIGIN.clientId(), fixture.usedContext.get().clientId());
       assertNotEquals(current.workId(), fixture.usedContext.get().workId());
       assertEquals(PROVENANCE, fixture.usedProvenance.get());
-      assertEquals(ORIGIN, store.find(key).orElseThrow().context());
+      assertEquals(accepted, store.find(key).orElseThrow().context());
     }
   }
 

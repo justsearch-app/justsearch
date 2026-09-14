@@ -58,6 +58,12 @@ public record EngineContext(
         survival, urgency, Optional.of(id));
   }
 
+  /** Replace grant attribution after server-side authorization; this value grants no authority. */
+  public EngineContext withGrantReference(Optional<String> reference) {
+    return new EngineContext(clientKind, clientId, sessionId, reference, sourceTier, transport,
+        survival, urgency, workId);
+  }
+
   /** Explicit work-owner transition; survival and attribution remain independent. */
   public EngineContext withUrgency(Urgency next) {
     return new EngineContext(clientKind, clientId, sessionId, grantReference, sourceTier, transport,
