@@ -228,6 +228,6 @@ describe('BrainSurface shared detail level', () => {
 
     expect((el as unknown as { busy: { mode: boolean } }).busy.mode).toBe(false);
     expect(getUiMode()).toBe('simple');
-    expect(el.shadowRoot?.textContent).toContain('Settings completion timed out; the original attempt may still complete.');
+    expect(el.shadowRoot?.textContent).toContain('Settings request timed out.');
   });
 });

@@ -8,15 +8,17 @@ final1452 represents4,859 cases, four existing skips and zero failures/errors,
 with PMD/format and UI integration compilation passing.
 [Owning mechanism, review corrections and proof](evidence/C2/public-settings-producer.md).
 
-The frontend helper531128d11 and absolute callers are implemented; full1468 passes
-6,557 tests and typecheck/lint pass. [Owning proof and failed UI capture](evidence/C2/frontend-settings-absolute.md).
-Next is retained-base Library/adaptation migration, then the UI capture repair,
-no-bypass retirement and required live/model/installed/final-head hosted proof,
-C2-8/C2-10/C2-11, D1/D2/E/F. UI capture1466 is partial proof: Settings mounted with zero axe/console errors,
+All eight frontend callers now use the shared witnessed attempt helper. Final1485
+passes6,573 tests across489 suites; typecheck/lint and independent reviews pass.
+[Retained-base proof and negative controls](evidence/C2/frontend-settings-derived.md).
+Next is UI harness repair/reproof, raw settings writer retirement/guard, then required
+integrated governance/live/model/installed/final-head proof and C2-8/C2-10/C2-11,
+D1/D2/E/F. UI capture1466 is partial: Settings mounted with zero axe/console errors,
 but five downstream density/search selectors timed out despite CLI exit0. Root
 corrected its initial topbar-heading misread and owns harness repair/reproof.
 Same-session ui-shot Vite pid48580/port5185 is registered; use the repository sweep
-when finished, not direct kill. No Gradle/dev stack is running.
+when finished, not direct kill. No Gradle/dev stack is running. Root makes remaining
+mechanism/merge decisions; no owner reply is pending.
 
 Pushed prerequisites: installer/import09f91917e, atomic read/wire1e49d18a5,
 system-access residue3d842f496, durable replay witness7f665a33d.

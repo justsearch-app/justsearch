@@ -16,6 +16,7 @@
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
 import '../components/Button.js';
@@ -145,6 +146,7 @@ export class LibrarySurface extends JfElement {
     error: { state: true },
     excludesText: { state: true },
     excludesLoaded: { state: true },
+    excludesBusy: { state: true },
     pendingPath: { state: true },
     pendingCollection: { state: true },
     pendingPreview: { state: true },
@@ -166,6 +168,10 @@ export class LibrarySurface extends JfElement {
   declare error: string | null;
   declare excludesText: string;
   declare excludesLoaded: boolean;
+  declare excludesBusy: boolean;
+  private excludesWitness: SettingsWitness | null = null;
+  private excludesAttempt: SettingsAttempt | null = null;
+  private excludesLoadStarted = false;
   declare pendingPath: string;
   /**
    * Tempdoc 914 D4 — the optional collection the new watched root's documents are tagged with.
@@ -243,6 +249,7 @@ export class LibrarySurface extends JfElement {
     this.error = null;
     this.excludesText = '';
     this.excludesLoaded = false;
+    this.excludesBusy = false;
     this.pendingPath = '';
     this.pendingCollection = '';
     this.pendingPreview = null;
@@ -520,7 +527,7 @@ export class LibrarySurface extends JfElement {
       this.isTauri = this.host_.platform.capabilities.has('folder-picker');
     }
     void this.refresh();
-    void this.loadExcludes();
+    if (!this.excludesLoadStarted) void this.loadExcludes();
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
     // 595 §4.3 — observe the one Stability axis so an empty roots list during a
     // transition renders as "Rebuilding…", not "No watched folders".
@@ -778,36 +785,54 @@ export class LibrarySurface extends JfElement {
       method: init?.method,
       headers: init?.headers as Record<string, string> | undefined,
       body: init?.body as string | undefined,
+      signal: init?.signal ?? undefined,
     });
   }
 
   private async loadExcludes(): Promise<void> {
+    if (this.excludesBusy || this.excludesAttempt) return;
+    this.excludesLoadStarted = true;
+    this.excludesBusy = true;
     try {
-      const res = await this.doFetch('/api/settings/v2');
-      if (!res.ok) return;
-      const body = await res.json();
-      const patterns: string[] = body?.ui?.excludePatterns ?? [];
-      this.excludesText = patterns.join('\n');
+      const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
+      this.excludesText = (body.ui?.excludePatterns ?? []).join('\n');
+      this.excludesWitness = body.witness;
       this.excludesLoaded = true;
-    } catch {
-      // Silent: excludes section still works, just starts empty.
-      this.excludesLoaded = true;
+      this.error = null;
+    } catch (err) {
+      this.excludesLoaded = false;
+      this.excludesWitness = null;
+      this.error = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.excludesBusy = false;
     }
   }
 
-  private async persistExcludes(): Promise<void> {
-    const patterns = this.excludesText
-      .split('\n')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+  private async persistExcludes(): Promise<boolean> {
+    if (!this.excludesLoaded || !this.excludesWitness) return false;
     try {
-      await this.doFetch('/api/settings/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ui: { excludePatterns: patterns } }),
-      });
+      if (!this.excludesAttempt) {
+        const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
+        this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: patterns } }, this.excludesWitness);
+      }
+      const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), this.excludesAttempt);
+      this.excludesWitness = result.witness;
+      this.excludesAttempt = null;
+      return true;
     } catch (err) {
+      // An uncertain save remains the same attempt on the next Preview/Apply click.
+      // Do not let an edited draft acquire a newer witness while that row is unresolved.
+      const state = err instanceof SettingsAttemptError ? err.response?.['state'] : undefined;
+      const terminal = state === 'FAILED' || state === 'CANCELLED'
+        || (err instanceof SettingsAttemptError && ['VERSION_CONFLICT', 'SETTINGS_READ_ONLY', 'INVALID_REQUEST', 'INVALID_PATH',
+          'OPERATION_KEY_INVALID', 'OPERATION_KEY_REUSED', 'OPERATION_KEY_EXPIRED'].includes(err.code));
+      if (terminal) {
+        this.excludesAttempt = null;
+        this.excludesLoaded = false;
+        this.excludesWitness = null;
+      }
       this.error = err instanceof Error ? err.message : String(err);
+      return false;
     }
   }
 
@@ -969,13 +994,21 @@ export class LibrarySurface extends JfElement {
   }
 
   private async handlePreviewExcludes(): Promise<void> {
-    await this.persistExcludes();
-    await this.invoke(OP_PREVIEW, {});
+    await this.saveAndInvokeExcludes(OP_PREVIEW);
   }
 
   private async handleApplyExcludes(): Promise<void> {
-    await this.persistExcludes();
-    await this.invoke(OP_APPLY, {});
+    await this.saveAndInvokeExcludes(OP_APPLY);
+  }
+
+  private async saveAndInvokeExcludes(operation: string): Promise<void> {
+    if (this.excludesBusy || !this.excludesLoaded) return;
+    this.excludesBusy = true;
+    try {
+      if (await this.persistExcludes()) await this.invoke(operation, {});
+    } finally {
+      this.excludesBusy = false;
+    }
   }
 
   private renderStatusIcon(status: string): TemplateResult {
@@ -1338,15 +1371,23 @@ export class LibrarySurface extends JfElement {
             </p>
           </div>
           <div class="actions">
-            <jf-button label="Preview" .onActivate=${() => void this.handlePreviewExcludes()}
+            <jf-button label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
+              .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
+            <jf-button label="Preview" .disabled=${!this.excludesLoaded || this.excludesBusy}
+              .onActivate=${() => void this.handlePreviewExcludes()}
               >Preview</jf-button
             >
-            <jf-button label="Apply" .onActivate=${() => void this.handleApplyExcludes()}
+            <jf-button label="Apply" .disabled=${!this.excludesLoaded || this.excludesBusy}
+              .onActivate=${() => void this.handleApplyExcludes()}
               >Apply</jf-button
             >
           </div>
         </div>
+        ${this.excludesAttempt && !this.excludesBusy
+          ? html`<p>Save completion is unknown. Retry Preview or Apply to check the same save.</p>` : nothing}
         <textarea
+          aria-label="Exclude patterns"
+          ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
           .value=${this.excludesText}
           @input=${(e: Event) =>
             (this.excludesText = (e.target as HTMLTextAreaElement).value)}

@@ -1,0 +1,64 @@
+{
+  "kind": "lane-f-frontend-settings-derived.v1",
+  "baseRevision": "c9896be8cf58ea03305a6dd98ffef9dc6df61135",
+  "testedSources": [
+    {
+      "path": "modules/ui-web/src/api/settingsAttempt.test.ts",
+      "sha256": "955a80631ed49efb0b45b26fa9ce6e9cf2bcdff1b7fec22320caf710d086bd24"
+    },
+    {
+      "path": "modules/ui-web/src/api/settingsAttempt.ts",
+      "sha256": "522307bec9d1e59e6447972ae27d438d94c98b5a02d96cd724d24f4451681a19"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/adaptationProfile.test.ts",
+      "sha256": "6ad2ed8fe1ea047747bbe9e27f7a81d28003e8ba91a1c7a41ac11090689022f6"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/adaptationProfile.ts",
+      "sha256": "bfcdb4de626ac2bc7a9305e70c9a8e4305c53b3d1b10272c70c15b728cd0e141"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts",
+      "sha256": "5ec8bb762edcdece002e018477c163d5b0d593fa2de92a7a446bd6d25c068432"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "sha256": "f55f617c99f3ceb4cbc2adcc8d6ed1477f5eaf38c1a2bb5f7d8a1e291bacb291"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/LibrarySurface.ts",
+      "sha256": "9a82fe3afe7b7969b3b7ede9d1c44e67012014ba60590cac8fd75ed52ed71668"
+    }
+  ],
+  "environment": "Windows; Node/Vitest4.1.9; happy-dom",
+  "commands": [
+    "npm run typecheck",
+    "npm run test:unit:run",
+    "npx eslint src/api/settingsAttempt.test.ts src/api/settingsAttempt.ts src/shell-v0/state/adaptationProfile.test.ts src/shell-v0/state/adaptationProfile.ts src/shell-v0/views/BrainSurface.ui-mode.test.ts src/shell-v0/views/LibrarySurface.settings-attempt.test.ts src/shell-v0/views/LibrarySurface.ts"
+  ],
+  "result": {
+    "suites": 489,
+    "tests": 6573,
+    "failures": 0,
+    "skips": 0
+  },
+  "raw": [
+    "tmp/frontend-derived-full1485.txt",
+    "tmp/frontend-derived-typecheck1485.txt",
+    "tmp/frontend-derived-lint1485.txt",
+    "tmp/frontend-derived-focused1484.txt",
+    "tmp/frontend-derived-negative1476.txt",
+    "tmp/frontend-derived-value-negative1481.txt",
+    "tmp/agent-evidence/adaptationProfile-item3c1470.txt"
+  ],
+  "negativeControls": [
+    "Unconditional Apply after failed settings row invokes forbidden effect",
+    "Removing same-profile value guard permits stale POST and DOM projection"
+  ],
+  "limits": [
+    "UI harness repair/reproof owed",
+    "No-bypass retirement and integrated governance remain",
+    "No live/model/installed/final-head hosted claim"
+  ]
+}

@@ -89,6 +89,19 @@ export function createSettingsAttempt(
   });
 }
 
+/** One bounded, validated observation; a late transport result cannot publish a new base. */
+export function readSettingsObservation(
+  send: SettingsTransport, options: SettingsAttemptOptions = {},
+): Promise<SettingsV2 & { witness: SettingsWitness }> {
+  return withinDeadline(options, async (signal) => {
+    const response = await send(ENDPOINT, { signal });
+    if (!response.ok) throw refusal(await readObject(response), undefined, response.status);
+    const settings = settingsV2Schema.parse(await response.json());
+    signal.throwIfAborted();
+    return { ...settings, witness: requireSettingsWitness(settings.witness) };
+  });
+}
+
 /** Fresh observation is permitted only for independent absolute field intents. */
 export async function saveAbsoluteSettings(
   send: SettingsTransport, patch: SettingsPatch, options: SettingsAttemptOptions = {},
@@ -99,9 +112,7 @@ export async function saveAbsoluteSettings(
   let attempt: SettingsAttempt | undefined;
   try {
     return await withinDeadline(options, async (signal) => {
-      const response = await send(ENDPOINT, { signal });
-      if (!response.ok) throw refusal(await readObject(response), undefined, response.status);
-      const settings = settingsV2Schema.parse(await response.json());
+      const settings = await readSettingsObservation(send, { ...options, signal });
       signal.throwIfAborted();
       attempt = createSettingsAttempt(captured, requireSettingsWitness(settings.witness), headers);
       return executeSettingsAttempt(send, attempt, { ...options, signal });
@@ -192,7 +203,7 @@ async function withinDeadline<T>(options: SettingsAttemptOptions, action: (signa
   const abort = () => controller.abort(options.signal?.reason);
   options.signal?.addEventListener('abort', abort, { once: true });
   if (options.signal?.aborted) abort();
-  const timer = setTimeout(() => controller.abort(new Error('Settings completion timed out; the original attempt may still complete.')), timeout);
+  const timer = setTimeout(() => controller.abort(new Error('Settings request timed out.')), timeout);
   let rejectAbort: () => void = () => {};
   const cancelled = new Promise<never>((_, reject) => {
     rejectAbort = () => reject(controller.signal.reason);

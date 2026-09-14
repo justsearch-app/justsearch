@@ -182,7 +182,7 @@ describe('absolute intents and shared mode ordering', () => {
     const patch = { ui: { excludePatterns: ['event-time'] } };
     const result = saveAbsoluteSettings(send, patch);
     patch.ui.excludePatterns.push('later');
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
     observe(json({ witness: { acceptedRevision: 8, lastCommittedOperationKey: priorKey } }));
     expect((await result).witness.acceptedRevision).toBe(9);
     expect(JSON.parse(String(send.mock.calls[1]?.[1]?.body)).ui.excludePatterns).toEqual(['event-time']);

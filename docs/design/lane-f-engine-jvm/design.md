@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED; A/B/C1 complete; C2-6 backend and absolute frontend locally verified; derived frontend/capture repair/all-writer/live/installed/final-head proof open; D1-F remain. Draft PR727, merge at F."
+status: "LOCKED; A/B/C1 complete; C2-6 backend and all frontend callers locally verified; capture repair/all-writer/live/installed/final-head proof open; D1-F remain. Draft PR727, merge at F."
 created: 2026-09-06
 updated: 2026-09-14
 lane: F (decision re-examination programme, wave 4)

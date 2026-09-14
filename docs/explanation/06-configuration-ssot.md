@@ -229,6 +229,16 @@ remain available. The admission bit grants no physical write authority: internal
 writers and public writes still compare full witnesses through the same owner.
 Missing service composition permits reads and refuses mutations.
 
+Frontend writes share one frozen settings attempt: key, witness, serialized patch
+and mode header survive retry. Reads and open-row replay have bounded deadlines;
+202 never signals completion. Mode changes retain event-time sequence and acquire
+their witness only when the shared queue starts their writer. Library exclusions
+and legacy contrast migration keep the witness observed with their loaded base.
+A Library conflict preserves the draft for explicit reload; an uncertain save keeps
+its original attempt for a later check. Preview/Apply wait for COMPLETE. Migration
+clears a legacy contrast value only after completion or an equal canonical read,
+and only while its captured profile and value still match.
+
 
 New UX-facing fields introduced for market-readiness:
 
