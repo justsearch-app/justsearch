@@ -2,11 +2,23 @@
 
 ## Current state (2026-09-14)
 
-Latest implemented cut is C2-9b.3b.1 pure fresh policy: full1673 services2,942 cases,
+C2-9b.3b.2 startup/drain attachment is implemented in the current worktree and has
+focused proof1683 (19 cases, zero skips/failures/errors), independent review and
+three discriminating negative controls. It preserves failed-start and failed-close
+owners, fences invalid/unpublished/non-serving generation state, and defaults to
+no recorded permission. Full1685 ended with five failures: two
+exception-contract regressions now corrected at the lifecycle boundary, two existing
+Engine behavior failures (pacing sample count and concurrent-read drain), and an
+unchanged CPU embedding timeout. Focused1686 passes with real corruption-reopen proof.
+The three integrated failures are unresolved verification, not a completion or platform
+deferral. Next: finish their separate verification after this per-item WIP checkpoint. Stable coordinator .3b.3 and actual producer
+.3c follow. [Owning evidence](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b2-startup-and-close-attachment-2026-09-14).
+
+Latest pushed cut is C2-9b.3b.1 pure fresh policy: full1673 services2,942 cases,
 three existing skips, no failures; focused28 cases and two negative controls plus
 independent production/test reviews. The policy creates no permission and cannot
 prove fresh origin. [Owning evidence and selected cuts](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b1-fresh-policy-implementation-and-proof-2026-09-14).
-Next is .3b.2 startup/drain attachment, then .3b.3 stable activation/admission and
+The current .3b.2 cut precedes .3b.3 stable activation/admission and
 .3c producer/receipt barrier. Root owns lifecycle work; C2 remains open.
 
 C2-9b.3a queue fencing now passes the full indexer suite:598 cases,15 existing skips,

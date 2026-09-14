@@ -737,3 +737,127 @@ through final lane reconciliation plus30 days, at least2026-10-14. .3b.2 startup
 actual recovery, live-model or process-restart claim follows from these pure tests.
 
 All three governance gates, store recovery and canonical links pass1673.
+
+
+### C2-9b.3b.2 startup and close attachment (2026-09-14)
+
+Root source investigation and independent read-only review at2bfd30b08 select an
+indexer-local RecordedIngestionLifecycle with constructor-bound mayClaimRecorded
+and synchronous attach(queue, checkedServingGeneration, workerOnline). It returns
+a closeable server-scoped attachment. The Worker readiness input is a BooleanSupplier;
+EngineRoot maps its own RequiredCapability vocabulary rather than teaching the indexer
+about agent policy. InferenceOnline is not embedding readiness and remains unavailable
+through this index-only seam. No current finite-ingest operation requires it.
+
+The checked generation source dynamically reads the authoritative state for captured
+activeIndexPath, then requires the same RunningRuntime for ingest/search and no
+exhausted rebuild brake. This matches the actual typed WorkerIngestService constructor;
+a DeferredRuntime is readable but not yet a recorded write target. Invalid/unreadable
+state aborts startup, while a valid empty observation keeps recorded work fenced.
+No deep health request is called inside a queue predicate: that request itself reads
+SQLite/Lucene. Per-claim generation failures deny; no cached active-generation fallback.
+
+Attach must clean provisional state itself on any failure before returning, including
+Error. The server publishes the returned handle immediately; subsequent startup failures
+clean it through normal ordered close, preserving the original failure and any cleanup
+failure. EngineRoot previously lost a failed-start owner unconditionally; this cut fixes
+that structural defect by clearing it only after awaitClosed(0) proves completion.
+Otherwise later start refuses and close retries the same physical owner. Fatal errors
+remain fatal and are rethrown unchanged after cleanup is attempted.
+
+The handle closes only after app-services/index-loop drain and final receipt flush,
+then revokes permissions before jobs close. A failed close retains it and the queue;
+a successful close clears it immediately. No public permit installer, queue export
+through app-api, or new timer/state table. The two-minute Worker orphan reaper stays
+aged recovery only. The existing Head 30-second operations maintenance owner remains
+the .3b.3/.3c home for later reconciliation and immediate unconditional queue recovery.
+
+The constructor's no-owner overloads explicitly deny. Actual stable coordinator binding
+remains .3b.3. Required tests exercise real boot ordering, callback failure/fatal cleanup,
+close retry, restart exclusion, same-queue corruption reopen, strict current generation
+versus migration/brake/deferred state, and no callback into jobs from readiness.
+
+
+.3b.2 implementation now supplies that constructor-bound lifecycle and ordered
+attachment/close seam. Independent production review found no surviving defect
+after root added volatile runtime publication and a single snapshot after the
+appServices acquire read. The checked observation validates state even when the
+runtime is currently fenced. This does not add a generation lease.
+
+Initial1675 compiled indexer/Engine main code and passed both main PMD tasks.
+Focused1676 executed9 Engine cases/3 suites, zero skips/failures/errors, plus Engine
+test PMD and formatting. Those tests cover failed-start retained ownership, close
+retry, confirmed-clean retry, fatal identity, interruption and existing terminal-writer
+ownership. The later runtime-visibility refinement still requires fresh compilation
+and real indexer boot proof. Worker authored the root test as an isolated draft;
+root corrected its missing checked-exception declaration before installation.
+The initial startup/generation/close draft was still pending at1676; later proof is
+recorded below.
+Three governance gates, store recovery and generated canonical docs checks pass1676.
+Logs are tmp/1675.txt and tmp/1676.txt; counts/copied XML are tmp/1676-counts.json and
+tmp/1676-xml. Same final-reconciliation-plus30-day retention, at least2026-10-14.
+
+
+Fresh-policy checkpoint2bfd30b08 passes all13 CI34853428167 jobs and
+CLA34853425540; metadata tmp/1677-hosted-run.json. This hosted result excludes the
+later dirty .3b.2 startup seam. Root negative1677 restored unconditional failed-start
+owner discard and executed4 cases with exactly3 expected failures; the confirmed-clean
+retry control still passes. Root restored EngineRoot byte-for-byte from
+ tmp/1677-root-original.bin before proceeding. Final startup proof remains pending.
+
+
+Root corrected the installed draft after1678 exposed unchecked Jackson parse failure
+through the declared checked generation source, and a redundant test assignment.
+The initial correction wrapped JacksonException in the strict IndexGenerationManager
+read;1685 showed that this changed its existing exception contract. The final correction
+below moves translation to the new checked lifecycle boundary instead.1679 then exposed the draft's invalid
+sealed LuceneRuntime mock; root replaced it with the existing concrete RunningRuntime
+fixture. Both failed logs/XML are retained.1680 executes14 cases without skips or
+failures, plus test PMD and formatting. No failed assertion was weakened.
+
+Independent review identified missing publication/identity and startup-preflight proof.
+Root added valid-IDLE/no-services and distinct writable runtime fences, their positive
+control, and real boot corruption immediately before attach. That boot must refuse
+before invoking the collaborator, preserve malformed state, and finish cleanup.
+Readiness explicitly verifies zero JobQueue interactions.1683 executes19 cases/3 suites
+(9 real/helper indexer cases,6 automatic guardrails,4 Engine ownership cases), zero
+skips/failures/errors. Both test PMD tasks and formatting pass. Actual boot cases suppress
+only deferred model initialization; real SQLite, Lucene, services and drain execute.
+This is no substitute for the later live producer/model/restart proof.
+
+Negative controls:1681 moves recovery before attachment (7 cases, exactly1 expected
+ordering failure);1682 discards the attachment before its close returns (8 cases,
+exactly2 expected retry failures);1684 removes startup preflight and the publication/
+runtime-identity guards together (8 cases, exactly2 expected failures).1684 is one
+grouped mutation, not independent proof of each removed condition. All controls retain
+6 automatic guardrails. Root restored KnowledgeServer byte-for-byte from
+ tmp/1681-ks-original.bin after each control and before full1685.1677 independently
+covers EngineRoot's failed-start ownership discard (4 cases,3 expected failures).
+
+Logs/counts/copied XML for1678-1684 remain under tmp in the active worktree with
+.txt, -counts.json and -xml suffixes. Same retention through final lane reconciliation
+plus30 days, at least2026-10-14. Full1685 and final review remain pending at this entry.
+
+
+Full1685 executes1,189 cases/231 suites with21 skips and5 failures: indexer607/15
+skips/zero failures; Engine240/no skips/two failures; Worker-core342/six skips/three
+failures. Engine pacing ended its observation at exactly10 samples before requiring
+more than10; concurrent-read indexing missed its180-second drain deadline. The unchanged
+multi-group CPU embedding test took627.920 seconds against its10-minute limit. These
+three failures remain open for separate verification; parallel module load is a hypothesis,
+not an established cause. Two generation-reader failures directly refuted root's overly
+broad exception translation: its existing tests explicitly require JacksonException.
+Root restored IndexGenerationManager byte-for-byte from HEAD and translated only at
+KnowledgeServer's new checked lifecycle source, preserving both contracts and all tests.
+
+1686 executes27 cases/4 suites, zero skips/failures/errors:16 indexer (10 lifecycle
+plus6 guardrails),7 existing VDU generation eligibility and4 Engine startup ownership
+cases. Indexer main/test PMD and formatting pass. It also adds real
+boot corruption of SQLite page1's schema b-tree with a valid backup: boot must actually
+quarantine/restore, attach before recovery, consult the original constructor callback,
+and leave the restored recorded PROCESSING member fenced. No corruption-test seam or
+error-classifier bypass is used. Raw logs/XML/counts for1685 and1686 are retained under
+tmp with the prior suffixes and retention. Thread captures1685-29980-threads.txt and
+1685-28596-threads.txt show active CPU inference and real Engine workload, not completion.
+The per-item implementation is a WIP checkpoint until the remaining integrated failures
+are resolved. .3b.3/.3c remain required; no coordinator activation is claimed.

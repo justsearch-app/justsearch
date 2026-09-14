@@ -124,8 +124,21 @@ On startup, `recoverStuckJobs()` resets eligible unowned `PROCESSING` jobs back 
 new claim. The same check governs the aged reaper. No-owner constructors deny
 recorded work; a legacy null-epoch row retains its existing behavior even when it
 has a scan id. False or a runtime failure in the authority denies the unit; fatal
-errors propagate. The actual generation-ready authority/producer attachment is
-still required before recorded work can run.
+errors propagate. KnowledgeServer supplies the predicate at queue construction and
+attaches its recorded-ingestion lifecycle after generation/runtime/services and
+embedding compatibility initialization, before unconditional recovery, reaper or
+indexing loop startup. The checked generation source rereads authoritative state
+for the captured serving path and requires the same writable ingest/search runtime;
+migration, deferred writes and the exhausted rebuild brake remain fenced. Default
+constructors still deny: the actual Engine coordinator and producer are required
+before recorded work can run.
+
+The returned lifecycle attachment is retained through index drain. Close invokes it
+before the jobs connection closes, giving its owner the final receipt-flush and
+permission-revocation boundary. A failed
+close retains that owner and prevents replacement startup until cleanup succeeds.
+Fatal startup errors receive cleanup and are rethrown unchanged; EngineRoot clears
+a failed server only after its shutdown-completion latch confirms closure.
 
 A failed/cancelled walk's unowned orphan instead receives administrative SKIPPED
 coverage without execution permission. That lets a stopped walk seal after a crash

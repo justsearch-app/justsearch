@@ -275,13 +275,22 @@ public final class EngineRoot implements WorkerHost {
     started.onMigrationRestart(() -> requestRestart(started));
     try {
       started.start();
-    } catch (IOException | RuntimeException e) {
-      synchronized (terminalWriterFaultOwnerLock) {
-        if (this.server == started) {
-          this.server = null;
+    } catch (IOException | RuntimeException | Error failure) {
+      // A failed start may also have failed cleanup. Retain that physical owner until its
+      // close latch confirms completion, so retry cannot overlap a live queue or activation.
+      boolean closed = false;
+      try {
+        closed = started.awaitClosed(0);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        failure.addSuppressed(interrupted);
+      }
+      if (closed) {
+        synchronized (terminalWriterFaultOwnerLock) {
+          if (this.server == started) this.server = null;
         }
       }
-      throw e;
+      throw failure;
     }
 
     // THE gauge the indexing loop paces off, read from the field that owns it rather than from

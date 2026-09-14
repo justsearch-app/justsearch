@@ -158,8 +158,8 @@ public final class KnowledgeServer implements Closeable {
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
   private io.justsearch.indexerworker.queue.SqlitePathResolutionStore pathResolutionStore;
   private io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore documentIdentityStore;
-  private LuceneRuntime searchLifecycle;
-  private LuceneRuntime ingestLifecycle;
+  private volatile LuceneRuntime searchLifecycle;
+  private volatile LuceneRuntime ingestLifecycle;
   EmbeddingService embeddingService;
   EmbeddingCompatibilityController embeddingCompatController;
   volatile WorkerAppServices appServices;
@@ -333,6 +333,8 @@ public final class KnowledgeServer implements Closeable {
 
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final WorkerExecutorRegistrations workerExecutors;
+  private final RecordedIngestionLifecycle recordedIngestionLifecycle;
+  private RecordedIngestionLifecycle.Attachment recordedIngestionAttachment;
   private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
 
   public KnowledgeServer(
@@ -340,6 +342,17 @@ public final class KnowledgeServer implements Closeable {
       WorkerConfig config,
       WorkerSignalBus signalBus,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this(executors, config, signalBus, childRegistry, RecordedIngestionLifecycle.denied());
+  }
+
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle) {
+    this.recordedIngestionLifecycle = Objects.requireNonNull(recordedIngestionLifecycle,
+        "recordedIngestionLifecycle");
     this.executors = Objects.requireNonNull(executors, "executors");
     this.config = config;
     this.dataDir = config.dataDir();
@@ -581,7 +594,8 @@ public final class KnowledgeServer implements Closeable {
       // Tempdoc 885 item 21d: the cap lives in ONE place. This was a bare literal `3` that agreed
       // with SqliteJobQueue.DEFAULT_MAX_ATTEMPTS only by coincidence.
       SqliteJobQueue sqliteQueue =
-          new SqliteJobQueue(dbPath, SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure);
+          new SqliteJobQueue(dbPath, recordedIngestionLifecycle::mayClaimRecorded,
+              SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure);
       // Tempdoc 885 item 21e: per-outcome counters. Late-bound like the write-failure callback
       // above — the catalog does not exist until registerTelemetryGauges runs.
       sqliteQueue.setOutcomeObserver(
@@ -609,14 +623,6 @@ public final class KnowledgeServer implements Closeable {
           throw e;
         }
       }
-      jobQueue.recoverStuckJobs();
-
-      // Tempdoc 550 Thesis II: periodic liveness reaper. recoverStuckJobs() above heals on
-      // startup; this re-queues PROCESSING rows orphaned WITHOUT a restart (worker claimed a job
-      // then died mid-process while the Head/UI keep running), so the rail never shows a dead job
-      // as perpetually "running". Age-bounded → never touches actively-draining jobs.
-      startStuckJobReaper(jobQueue);
-
       tPhase = System.nanoTime();
       long jobQueueMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
@@ -1020,6 +1026,12 @@ public final class KnowledgeServer implements Closeable {
       // late: it needs a RunningRuntime for the re-mark and the runtime may still be deferred here.
       initEmbeddingCompatibilityController();
 
+      // Recorded recovery cannot run until the actual serving generation and owner are attached.
+      attachRecordedIngestion();
+      jobQueue.recoverStuckJobs();
+      startStuckJobReaper(jobQueue);
+
+
       // Dev hot-reload manager (Phase 2, tempdoc 305)
       if (ConfigStore.global().get().ai().devHotReload()) {
         devReloadManager = new DevReloadManager(this);
@@ -1073,7 +1085,7 @@ public final class KnowledgeServer implements Closeable {
       // ingest queues jobs normally. Models become available via volatile setters.
       startDeferredModelInitialization(this::initDeferredModels);
 
-    } catch (Exception e) {
+    } catch (Exception | Error e) {
       log.error("Failed to start KnowledgeServer", e);
       // tempdoc 628 Stage D-part2: if startup failed because the index is corrupt and could not be
       // auto-recovered (FAIL_CLOSED / recovery-failed), stamp a fatal-reason marker so the Head can
@@ -1092,9 +1104,49 @@ public final class KnowledgeServer implements Closeable {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(
             dataDir, io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
       }
-      closeQuietly();
+      try {
+        close();
+      } catch (Exception | Error cleanupFailure) {
+        if (cleanupFailure != e) e.addSuppressed(cleanupFailure);
+        log.warn("Failed startup cleanup remains incomplete", cleanupFailure);
+      }
+      if (e instanceof Error fatal) throw fatal;
       throw new IOException("Failed to start KnowledgeServer", e);
     }
+  }
+
+  /** Publish ownership before any operation that can fail after attachment returns. */
+  void attachRecordedIngestion() throws IOException {
+    // Validate state even when an intentionally denying attachment does not read its source.
+    currentRecordedServingGeneration();
+    recordedIngestionAttachment = Objects.requireNonNull(recordedIngestionLifecycle.attach(
+        jobQueue, this::currentRecordedServingGeneration, this::recordedWorkerOnline),
+        "recorded ingestion attachment");
+  }
+
+  java.util.Optional<String> currentRecordedServingGeneration() throws IOException {
+    if (indexGenerationManager == null || activeIndexPath == null) {
+      throw new IOException("Recorded serving generation has not been initialized");
+    }
+    WorkerAppServices initializedServices = appServices;
+    LuceneRuntime ingest = ingestLifecycle;
+    LuceneRuntime search = searchLifecycle;
+    java.util.Optional<String> generation;
+    try {
+      generation = indexGenerationManager.idleActiveGeneration(activeIndexPath);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Malformed authoritative index state", malformed);
+    }
+    if (initializedServices == null || !(ingest instanceof RunningRuntime) || ingest != search
+        || rebuildBrakeExhausted) {
+      return java.util.Optional.empty();
+    }
+    return generation;
+  }
+
+  /** Index runtime presence only; no queue query, model call or Head-side readiness dependency. */
+  boolean recordedWorkerOnline() {
+    return appServices != null && searchLifecycle != null && ingestLifecycle != null;
   }
 
   /** Opens the server-owned periodic queue producer on its registered background scheduler. */
@@ -2493,6 +2545,12 @@ public final class KnowledgeServer implements Closeable {
           }
         }
 
+        // Final recorded receipts observe drained indexing. Keep both owners on failure.
+        if (recordedIngestionAttachment != null) {
+          recordedIngestionAttachment.close();
+          recordedIngestionAttachment = null;
+        }
+
         // Retain the queue and index exclusion if native connection cleanup needs retry.
         // EngineRoot must not observe completed shutdown while this mutable owner remains live.
         if (jobQueue != null) {
@@ -2554,14 +2612,6 @@ public final class KnowledgeServer implements Closeable {
   // Tempdoc 417 Phase 3c: registerOtelObservableCallbacks() removed — its 25 metrics now flow
   // through WorkerOpsMetricCatalog (constructed in registerTelemetryGauges). Telemetry.meter()
   // retired with this change.
-
-  private void closeQuietly() {
-    try {
-      close();
-    } catch (Exception e) {
-      log.warn("Error during cleanup", e);
-    }
-  }
 
   // Package-private accessors for testing
   JobQueue jobQueueForTests() {
