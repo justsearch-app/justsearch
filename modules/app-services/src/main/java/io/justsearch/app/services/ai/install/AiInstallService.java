@@ -894,8 +894,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           ApiErrorCode.SETTINGS_UNAVAILABLE,
           "Settings are unavailable, so the choice cannot be remembered.");
     }
-    // UiSettingsStore.save() is a silent no-op in IN_MEMORY mode, so without this the endpoint would
-    // answer 200 and forget the choice on the next read — the same class of lie as a fabricated 0.
+    // Refuse before accepting a mutation that cannot be persisted in this session.
     if (!settingsStore.mode().isWritable()) {
       throw new AiInstallException(
           409,
@@ -903,14 +902,25 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           "Settings are read-only in this session, so the choice cannot be remembered.");
     }
     try {
-      UiSettings settings = settingsStore.load();
+      var snapshot = settingsStore.inspect();
+      UiSettings settings = snapshot.settings();
       List<String> next = new ArrayList<>(settings.getDeclinedAiPackages());
       boolean changed = declined ? (!next.contains(id) && next.add(id)) : next.remove(id);
       if (!changed) {
         return; // already in the requested state — writing settings again would be pure churn.
       }
       settings.setDeclinedAiPackages(next);
-      settingsStore.save(settings);
+      if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+      var result = settingsService.applyInternal(settings, snapshot.witness(),
+          io.justsearch.app.services.intent.EngineProvenance.internal("ai-component-choice",
+              io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+              io.justsearch.core.context.EngineContext.Urgency.FOREGROUND));
+      if (!result.response().success()) {
+        throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
+      }
+      if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
+        throw new IllegalStateException("Settings commitment is unresolved");
+      }
       log.info("AI component '{}' {} by the user", id, declined ? "declined" : "re-enabled");
     } catch (Exception e) {
       // Unlike the read path (best-effort, defaults to "decline nothing"), a WRITE that silently

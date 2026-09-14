@@ -541,3 +541,19 @@ The regression1394 reproduced missing restart retention; the correction moves pr
 inside the existing body guard. Final1395 executes560 cases/83 suites with zero skips,
 failures or errors; PMD/format/UI integration compilation pass. No new fault callback
 was needed: a mocked response supplies the synthetic allocation-path Error.
+
+## 2026-09-14 installer component choice cut
+
+The first installer item migrates decline/re-enable independently of model selection.
+Capture settings and full witness once, after registry and persistence guards; base
+both the unchanged-choice decision and changed candidate on that snapshot. Use the
+already-composed SettingsService internal producer, with interactive foreground
+context. Require a successful COMPLETE before answering success. Existing
+AiInstallException projects refusal/uncertainty as AI_INSTALL_ERROR; no new public
+error vocabulary or second row owner. Missing legacy composition fails closed on
+mutation. Preserve the existing unchanged-choice success without accepting a row.
+
+Required proof: real owner advances the witness, repeated choice preserves it,
+concurrent chat intent survives a stale choice, and missing owner writes nothing.
+Follow with chat/ONNX/import producer migration and the separate native-path
+publication investigation; all remain required within C2-6.

@@ -2,6 +2,13 @@
 
 ## Current state (2026-09-14)
 
+The installer component-choice producer is migrated; focused1423 executes28
+passing cases with PMD/format clear. Repeated no-op allocates no row and a stale
+choice cannot erase concurrent chat intent. [Evidence](evidence/C2/component-choice-producer.md).
+Next is installer chat/ONNX and pack import, then public witness/update flows.
+The e0cfb76de hosted-gate correction now has successful CI34791639369; activation
+8c4f34a02 CI34792718785 is still running as of this record.
+
 Activation/deactivation/compensation is implemented and independently reviewed.
 Final1420 represents4,851 cases, four existing skips, zero failures/errors, with
 applicable PMD/format/UI integration compilation passing. It removes application
