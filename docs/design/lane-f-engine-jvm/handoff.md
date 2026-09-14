@@ -2,6 +2,13 @@
 
 ## Current state (2026-09-14)
 
+**Paused at the user's request, 2026-09-14.** Last production checkpoint2cc21e10a is pushed.
+The just-started sealing implementation and seven tests are preserved outside compiled sources
+in a checked patch; they are incomplete and unverified. [Session summary, exact proof limits,
+draft recovery and next steps](evidence/C2/session-2026-09-14-closeout.md). No owned build or
+stack is running; no subagent should continue. Resume with the closure/seal cut and final-head
+hosted reconciliation, retaining existing autonomous authorization and merge-at-F placement.
+
 A/B/C1 are complete. C2 remains open; do not merge before stage F.
 The public settings producer/controller is implemented and locally verified:
 final1452 represents4,859 cases, four existing skips and zero failures/errors,
