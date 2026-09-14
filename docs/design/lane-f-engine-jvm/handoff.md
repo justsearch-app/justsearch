@@ -2,12 +2,15 @@
 
 ## Current state (2026-09-14)
 
-**Paused at the user's request, 2026-09-14.** Last production checkpoint2cc21e10a is pushed.
-The just-started sealing implementation and seven tests are preserved outside compiled sources
-in a checked patch; they are incomplete and unverified. [Session summary, exact proof limits,
-draft recovery and next steps](evidence/C2/session-2026-09-14-closeout.md). No owned build or
-stack is running; no subagent should continue. Resume with the closure/seal cut and final-head
-hosted reconciliation, retaining existing autonomous authorization and merge-at-F placement.
+**Resumed after the user's reboot.** Checkpoint13207a960 passed all13 hosted CI34830819900 jobs; exact Linux filesystem XML
+confirms all three Windows-skipped cases executed successfully. Evidence commit a822dff0f is pushed. Resource
+preflight1611 reports no stack/foreign run/inference orphan. The preserved sealing draft is
+implemented and C2-8d.2b.2 closure/seal is locally verified:1613 full affected suites report
+915 cases/21 skips/no failures;1614 corrected focused tests and1615 guard negative controls
+establish the reviewed claims. [Evidence](evidence/C2/walk-closure-sealing.md). Next is
+C2-8d.2c notifications/outer acknowledgement/progress retention, then producer activation.
+Root owns SQL/lifecycle changes; independent test and read-only review work are bounded. The prior [pause summary](evidence/C2/session-2026-09-14-closeout.md)
+remains historical. Existing autonomous authorization and merge-at-F placement remain in force.
 
 A/B/C1 are complete. C2 remains open; do not merge before stage F.
 The public settings producer/controller is implemented and locally verified:

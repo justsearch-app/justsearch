@@ -27,11 +27,13 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: Stopped recorded walks refuse maintenance replacement while issued owners prevent sealing. Retrying after those owners return seals the receipt and admits maintenance outside it; deferred/retryable returns become typed skips in their existing outcome transaction. This avoids unpollable pending membership without another buffer or transaction owner. [C2-8d closure detail](evidence/C2/C2-8d-vertical-plan.md#implementation-detail-stopped-maintenance-admission-2026-09-14).
+
 - 2026-09-14: Migration enumeration distinguishes genuine empty coverage from malformed/inaccessible/partial scans. Only complete admission sets done; the existing cutover monitor persists FAILED from a latched failure before promotion, retrying failed persistence. The authored watched-roots format check becomes shared validation, with no new root authority or stamp waiver. [Mechanism and required proof](evidence/C2/migration-enumeration-completeness.md).
 
 - 2026-09-14: Operations-store initialization retries proven SQLite BUSY only after confirmed connection close, under a monotonic bounded window. Compatibility/corruption preservation runs once outside that loop; the first-incarnation host policy stays unchanged. [Selected ownership, negative controls and proof limits](evidence/C2/operations-startup-busy.md).
 
-- 2026-09-14: C2-8d closure review resolves cancellation/return/recovery, atomic unseen retirement, retained actual claim identity, explicit seal/gap outcomes, deterministic failure hashes and progress retention. Maintenance first seals its one affected walk if already closed/terminal/unowned, preserving the finite boundary without a global scan. [Owning transaction decisions](evidence/C2/C2-8d-vertical-plan.md). Implementation remains next.
+- 2026-09-14: C2-8d closure review resolves cancellation/return/recovery, atomic unseen retirement, retained actual claim identity, explicit seal/gap outcomes, deterministic failure hashes and progress retention. Maintenance first seals its one affected walk if already closed/terminal/unowned, preserving the finite boundary without a global scan. [Owning transaction decisions](evidence/C2/C2-8d-vertical-plan.md), [implemented closure/seal proof](evidence/C2/walk-closure-sealing.md). Notifications and producer integration remain next.
 
 - 2026-09-14: A resumed corruption-recovery Green re-derives the existing stamp waiver only from exact persisted recovery source, matching opened building generation, and an authoritative empty document count. Source alone cannot attest a nonempty generation after a model change. [Restart-state and discriminating proof](evidence/C2/corruption-resume-attestation.md).
 

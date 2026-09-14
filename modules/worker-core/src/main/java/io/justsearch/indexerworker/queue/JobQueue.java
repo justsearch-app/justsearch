@@ -78,6 +78,20 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
   }
 
+  /** Missing or contradictory terminal evidence must never be interpreted as an empty receipt. */
+  final class RecordedWalkGapException extends IllegalStateException {
+    public RecordedWalkGapException(String message) { super(message); }
+    public RecordedWalkGapException(String message, Throwable cause) { super(message, cause); }
+  }
+
+  /**
+   * Seal complete current coverage under the queue owner. An unsealed result means enumeration,
+   * current units or issued callbacks are unfinished; a sealed result is immutable and idempotent.
+   */
+  default WalkProgress trySealRecordedWalk(String operationKey) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
   /** The outer owner acknowledges only after its matching terminal operation receipt is durable. */
   default boolean acknowledgeRecordedWalk(String operationKey, long revision) {
     throw new UnsupportedOperationException("Recorded walks are unavailable");

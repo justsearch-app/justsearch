@@ -11,6 +11,8 @@ import java.util.Optional;
 
 /** SQL projection helpers borrowing the queue's connection, lock and transaction; no independent owner. */
 final class SqliteIngestionWalkOps {
+  private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
+
   private SqliteIngestionWalkOps() {}
 
   static Optional<JobQueue.WalkProgress> find(Connection connection, String key) throws SQLException {
@@ -142,6 +144,68 @@ final class SqliteIngestionWalkOps {
     return find(connection, key).orElseThrow(() -> new SQLException("Walk projection disappeared"));
   }
 
+  static JobQueue.WalkProgress seal(Connection connection, String key, boolean issued,
+      java.util.function.Function<String, String> pathHash, long now) throws SQLException {
+    var progress = find(connection, key)
+        .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded walk state is unavailable"));
+    if (progress.sealedAt() != null || progress.enumerationClosedAt() == null || issued) return progress;
+    long skipped = 0;
+    java.util.List<String> failed = new java.util.ArrayList<>();
+    try (var query = connection.prepareStatement("SELECT path, state, unit_revision, content_hash, "
+        + "last_outcome_class, last_retry_policy FROM jobs WHERE scan_id = ? AND walk_seen_epoch IS NOT NULL")) {
+      query.setString(1, key);
+      try (var rows = query.executeQuery()) {
+        while (rows.next()) {
+          String state = rows.getString("state");
+          if ("PENDING".equals(state) || "PROCESSING".equals(state)) return progress;
+          String hash = pathHash.apply(rows.getString("path"));
+          String contentHash = rows.getString("content_hash");
+          Coverage coverage;
+          if ("DONE".equals(state)) coverage = contentHash == null ? Coverage.SKIPPED : Coverage.INDEXED;
+          else if ("FAILED".equals(state) || "RETRY_EXHAUSTED".equals(state)) coverage = Coverage.FAILED;
+          else throw new JobQueue.RecordedWalkGapException("Recorded unit state is invalid");
+          try {
+            var outcome = IngestionOutcome.of(
+                io.justsearch.indexerworker.ingest.IngestionOutcomeClass.valueOf(rows.getString("last_outcome_class")),
+                null, IngestionRetryPolicy.valueOf(rows.getString("last_retry_policy")));
+            validateReceipt(new UnitReceipt(key, rows.getString("unit_revision"), coverage, contentHash), outcome);
+          } catch (IllegalArgumentException | NullPointerException | SQLException invalid) {
+            throw new JobQueue.RecordedWalkGapException("Recorded terminal outcome is incompatible", invalid);
+          }
+          try (var evidence = connection.prepareStatement("SELECT 1 FROM ingestion_ledger WHERE "
+              + "operation_key = ? AND path_hash = ? AND unit_revision = ? AND terminal_coverage = ? "
+              + "AND content_hash IS ? LIMIT 1")) {
+            evidence.setString(1, key); evidence.setString(2, hash);
+            evidence.setString(3, rows.getString("unit_revision")); evidence.setString(4, coverage.name());
+            evidence.setString(5, contentHash);
+            try (var receipt = evidence.executeQuery()) {
+              if (!receipt.next()) throw new JobQueue.RecordedWalkGapException("Recorded terminal coverage is unavailable");
+            }
+          }
+          if (coverage == Coverage.SKIPPED) skipped++;
+          if (coverage == Coverage.FAILED) failed.add(hash);
+        }
+      }
+    }
+    requireAdvance(progress);
+    long revision = progress.revision() + 1;
+    failed.sort(String::compareTo);
+    var receipt = new java.util.LinkedHashMap<String, Object>();
+    receipt.put("version", 1); receipt.put("revision", revision);
+    receipt.put("completedUnits", progress.completedUnits()); receipt.put("failedUnits", progress.failedUnits());
+    receipt.put("currentFailedUnits", failed.size()); receipt.put("currentSkippedUnits", skipped);
+    receipt.put("enumerationOutcome", progress.enumerationOutcome().name());
+    receipt.put("failedPathHashes", java.util.List.copyOf(failed.subList(0, Math.min(100, failed.size()))));
+    receipt.put("failedPathHashesTruncated", failed.size() > 100);
+    try (var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET "
+        + "sealed_at = ?, receipt_json = ?, revision = ? WHERE operation_key = ? AND sealed_at IS NULL")) {
+      update.setLong(1, now); update.setString(2, JSON.writeValueAsString(receipt));
+      update.setLong(3, revision); update.setString(4, key);
+      if (update.executeUpdate() != 1) throw new SQLException("Recorded walk disappeared before sealing");
+    }
+    return find(connection, key).orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded walk disappeared"));
+  }
+
   static boolean acknowledge(Connection connection, String key, long revision) throws SQLException {
     var existing = find(connection, key);
     if (existing.isEmpty() || existing.get().sealedAt() == null || existing.get().revision() != revision) return false;
@@ -171,7 +235,13 @@ final class SqliteIngestionWalkOps {
     if (epoch != null) {
       var progress = find(connection, priorKey)
           .orElseThrow(() -> new SQLException("Recorded unit state is unavailable"));
-      if (progress.sealedAt() == null) return new Membership(priorKey, epoch);
+      if (progress.sealedAt() == null) {
+        if (progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.FAILED
+            || progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.CANCELLED) {
+          throw new SQLException("Stopped recorded walk awaits issued owners before maintenance admission");
+        }
+        return new Membership(priorKey, epoch);
+      }
       // Post-seal maintenance is outside that immutable finite walk.
       if (Objects.equals(requestedKey, priorKey)) requestedKey = null;
       priorKey = null;

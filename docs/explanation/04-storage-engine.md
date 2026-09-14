@@ -315,7 +315,12 @@ enumeration preserves same-walk retry state; maintenance preserves active member
 assigning a fresh admission revision. Recorded terminal ledger coverage and monotonic counters
 commit with the job outcome on the same connection. Successful counters deduplicate by
 walk, path hash and committed content hash; failed counters count each terminal admission once.
-Administrative sealing, receipt acknowledgement and producer/recovery integration remain under implementation.
+Enumeration closure and administrative skips commit with their ledger coverage. Sealing
+requires closed enumeration, terminal current members, exact matching ledger coverage and
+no issued claims; the immutable versioned receipt distinguishes historical effects from
+current failures and skips. Cleanup retains recorded evidence until exact final acknowledgement.
+Notification delivery, outer operation acknowledgement and producer/recovery integration
+remain under implementation.
 Replay removes only the versions it applied and committed, preserving admissions that arrive
 during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
 roll back both.

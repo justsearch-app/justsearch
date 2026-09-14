@@ -139,7 +139,7 @@ Version 18 adds `ingestion_walk_progress`, `jobs.walk_seen_epoch`, and nullable 
 operation/revision/hash/coverage fields inside the existing queue store. The projection
 primitive persists a plan hash, enumeration epoch and closure outcome, rejects stale closure
 callbacks, and refuses to recreate missing recovery state. This checkpoint does not yet
-connect producers, unit accounting, receipt sealing or operation recovery; it cannot certify
+connect producers or operation recovery; by itself it cannot certify
 that a root walk completed. Ledger privacy repair preserves attribution and recorded fields.
 
 ### Pre-migration backups
@@ -219,6 +219,12 @@ outside the export view. Indexed coverage requires an exact issued claim and the
 the committed source; a diagnostic ledger append cannot advance a recorded walk. Counters
 and ledger insertion roll back with the job transition. A late committed claim can record
 its historical effect after maintenance replacement while leaving the replacement pending.
+Closed failed/cancelled walks stop new polling; issued owners drain and unfinished returns
+become typed skips. Administrative source removal records a skip without claiming durable
+index deletion. Sealing verifies current terminal evidence and waits for every issued owner,
+then freezes a receipt with bounded sorted failure path hashes. Maintenance seals its affected
+ready walk before admitting a replacement outside it; stopped walks refuse replacement until
+issued owners return. These queue primitives do not yet activate recorded producers.
 
 **Invariant:** any operator-visible export of ledger or queue data carries a `path_hash` (SHA-256 over the normalized absolute path), never the raw path, and never any path-derived field that could reverse-map to the user's filesystem.
 

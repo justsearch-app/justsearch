@@ -268,3 +268,14 @@ stale writer and rollback, unseen retirement before later maintenance, maintenan
 sealing, legitimate zero-unit closure versus missing terminal evidence, mismatched coverage,
 duplicate immutable seal, and more than100 current failure hashes. These decisions supersede
 the earlier delayed-seal sentence; no implementation or proof is claimed by this design edit.
+
+### Implementation detail: stopped maintenance admission (2026-09-14)
+
+A failed/cancelled walk with an issued owner cannot seal yet. Maintenance must not recreate
+PENDING membership in that stopped walk: polling forbids it and would strand the new admission.
+Affected-walk preflight seals when ready; while issued work prevents that, the existing queue
+admission refuses the replacement and reports no acceptance. Once owners return, a retry seals
+the stopped receipt and admits maintenance outside it. This uses existing admission refusal,
+not a new pending buffer or fabricated successful skip. Producers must respect refusal.
+Deferred/retryable callbacks after unsuccessful closure finish as typed skips inside their
+existing outcome transaction. No nested inTransaction is introduced: it would commit early.
