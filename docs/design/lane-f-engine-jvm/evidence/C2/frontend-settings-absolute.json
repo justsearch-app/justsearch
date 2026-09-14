@@ -71,7 +71,7 @@
       "tmp/ui-settings1466/settings.measure.json",
       "tmp/ui-settings1466/settings-light.measure.json"
     ],
-    "result": "Wrong surface in created images; five timeout failures; CLI zero exit is not success."
+    "result": "Partial capture: Settings h2 mounted in both PNGs, zero axe/console errors. Five density/search selector timeouts remain; CLI zero exit is not batch success. Initial wrong-surface claim corrected after full measurement reread."
   },
   "limits": [
     "Library/adaptation next item",

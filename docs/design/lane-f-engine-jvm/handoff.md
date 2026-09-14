@@ -12,8 +12,9 @@ The frontend helper531128d11 and absolute callers are implemented; full1468 pass
 6,557 tests and typecheck/lint pass. [Owning proof and failed UI capture](evidence/C2/frontend-settings-absolute.md).
 Next is retained-base Library/adaptation migration, then the UI capture repair,
 no-bypass retirement and required live/model/installed/final-head hosted proof,
-C2-8/C2-10/C2-11, D1/D2/E/F. UI capture1466 is failed proof (wrong surface and five
-timeouts despite CLI exit0). Root is investigating; no owner decision is pending.
+C2-8/C2-10/C2-11, D1/D2/E/F. UI capture1466 is partial proof: Settings mounted with zero axe/console errors,
+but five downstream density/search selectors timed out despite CLI exit0. Root
+corrected its initial topbar-heading misread and owns harness repair/reproof.
 Same-session ui-shot Vite pid48580/port5185 is registered; use the repository sweep
 when finished, not direct kill. No Gradle/dev stack is running.
 

@@ -26,13 +26,18 @@ ESLint1469 pass. Root corrected four worker fixture typing errors exposed by1467
 the production1462 notification-option typo was corrected before1463. No validation
 or test intent was weakened.
 
-UI capture1466 is **failed proof**: settings/light PNGs were written but measurements
-show the Search heading, and five dependent density/search selectors timed out.
-The CLI exited zero despite those FAIL lines; exit code is not acceptance. Root is
-investigating navigation/fixture ownership and will repair and rerun the captures
-in the remaining frontend verification item. Source changes are not yet accepted
-as visually or live verified. The command's first invocation1465 also used multiple
-positional paths unsupported by --affected;1466 used one valid path.
+UI capture1466 is **partial proof**: settings/light mounted Settings (h2), with26
+axe passes, zero violations and zero console errors each. Root initially misread
+the persistent Search topbar h1 as the captured surface; independent diagnosis and
+root's complete measurement reread corrected that claim. Read all relevant landmarks
+before interpreting a heading. Five dependent density/search selectors still timed
+out, so the affected-step batch is not accepted. The CLI exited zero despite FAIL
+lines; exit code is not acceptance. The current density control is a discrete slider,
+while ui_check.py:911-928 waits for retired option buttons. Search-input selectors
+are also documented stale in ui_selectors.py. Mode setup readiness still needs live
+DOM proof. Root owns harness repair/reproof in the remaining frontend verification
+item. The first invocation1465 used unsupported multiple positional paths;1466 used
+one valid path. These fixtures do not prove live settings mutations.
 
 Exact source hashes, commands and raw report paths are in the adjacent manifest.
 Raw evidence is in active lane-f-pr1-verify/tmp, retained through lane acceptance
