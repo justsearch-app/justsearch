@@ -16,6 +16,7 @@ import io.justsearch.app.services.worker.WatchedRootsState;
 import java.nio.file.Path;
 import io.justsearch.agent.api.registry.GateBehavior;
 import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.RequiredCapability;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.operations.OperationAuthorizationBasis;
@@ -97,25 +98,17 @@ public final class OperationAuthority {
       Function<RequiredCapability, Boolean> capabilities) {
     Objects.requireNonNull(servingGeneration, "servingGeneration");
     Objects.requireNonNull(capabilities, "capabilities");
-    final Operation operation;
+    final IngestPolicyBinding binding;
     final RecordedRootPlan plan;
-    final TransportTag transport;
-    final OperationAuthorizationBasis basis;
     try {
-      String operationRef = row.descriptor().operationRef();
-      operation = coreOperations.findByIdValue(operationRef)
-          .or(() -> agentOperations.findByIdValue(operationRef)).orElseThrow(
-              () -> new IllegalArgumentException("Unknown recorded operation"));
+      binding = ingestPolicyBinding(row);
       plan = new RecordedIngestPlanResolver().resolve(row, stored);
-      transport = TransportTag.valueOf(row.context().transport());
-      if (sources.findByTransport(transport).isEmpty()) {
-        return refused("RECOVERY_BINDING_INVALID");
-      }
-      EngineProvenance.sourceTier(row.context());
-      basis = OperationAuthorizationBasis.decode(row.context().grantReference().orElse(null));
     } catch (IllegalArgumentException | NullPointerException invalidBinding) {
       return refused("RECOVERY_BINDING_INVALID");
     }
+    Operation operation = binding.operation();
+    TransportTag transport = binding.transport();
+    OperationAuthorizationBasis basis = binding.basis();
     if (!scope.coversPlan(operation, plan, row.context())) {
       return refused("RECOVERY_SCOPE_REFUSED");
     }
@@ -156,6 +149,71 @@ public final class OperationAuthority {
     }
     return new RecordedIngestRecoveryDecision.Authorized(plan);
   }
+
+  /**
+   * Current continuation policy for one already-bound child effect. This boolean does not prove
+   * fresh origin or grant permission: only the private winning child body may combine it with its
+   * live server/generation activation and admitted parent. Never use it for restart reconciliation.
+   * The caller validates the immutable parent envelope and exact child membership outside the jobs
+   * lock; the accepted row snapshot need not already say RUNNING. No capsule is consumed here.
+   */
+  public boolean allowsFreshRecordedIngest(OperationRecord parent, RecordedRootPlan boundPlan) {
+    if (boundPlan == null || boundPlan.roots().size() != 1) {
+      return false;
+    }
+    final IngestPolicyBinding binding;
+    try {
+      binding = ingestPolicyBinding(parent);
+    } catch (IllegalArgumentException | NullPointerException invalidBinding) {
+      return false;
+    }
+    Operation operation = binding.operation();
+    var verdict = evaluator.evaluate(operation.policy().risk(), binding.transport());
+    if (verdict.gateBehavior() == GateBehavior.DENY) {
+      return false;
+    }
+    return switch (binding.basis()) {
+      case OperationAuthorizationBasis.StructuralAuto ignored ->
+          verdict.gateBehavior() == GateBehavior.AUTO;
+      case OperationAuthorizationBasis.EphemeralCapsule ignored -> true;
+      case OperationAuthorizationBasis.OperationGrant grant ->
+          scope.coversPlan(operation, boundPlan, parent.context()) && grants.isAllowed(
+              new DurableGrantStore.DurableGrant(DurableGrantStore.GrantKind.OPERATION,
+                  grant.target(), grant.sourceTier()), operation.id().value(),
+              operation.policy().capabilityFamily(), operation.policy().risk(), parent.context());
+      case OperationAuthorizationBasis.FamilyGrant grant ->
+          scope.coversPlan(operation, boundPlan, parent.context()) && grants.isAllowed(
+              new DurableGrantStore.DurableGrant(DurableGrantStore.GrantKind.FAMILY,
+                  grant.target(), grant.sourceTier()), operation.id().value(),
+              operation.policy().capabilityFamily(), operation.policy().risk(), parent.context());
+    };
+  }
+
+  private IngestPolicyBinding ingestPolicyBinding(OperationRecord parent) {
+    String operationRef = parent.descriptor().operationRef();
+    boolean ingest = parent.descriptor().kind() == OperationKind.INGEST
+        && AgentToolsOperationCatalog.INGEST_FILES.value().equals(operationRef);
+    boolean reindex = parent.descriptor().kind() == OperationKind.REINDEX
+        && CoreOperationCatalog.REINDEX.value().equals(operationRef);
+    if (!ingest && !reindex) {
+      throw new IllegalArgumentException("Unsupported recorded ingestion producer");
+    }
+    Operation operation = coreOperations.findByIdValue(operationRef)
+        .or(() -> agentOperations.findByIdValue(operationRef)).orElseThrow(
+            () -> new IllegalArgumentException("Unknown recorded operation"));
+    TransportTag transport = TransportTag.valueOf(parent.context().transport());
+    if (sources.findByTransport(transport).isEmpty()) {
+      throw new IllegalArgumentException("Unregistered recorded transport");
+    }
+    EngineProvenance.sourceTier(parent.context());
+    OperationAuthorizationBasis basis =
+        OperationAuthorizationBasis.decode(parent.context().grantReference().orElse(null));
+    return new IngestPolicyBinding(operation, transport, basis);
+  }
+
+  /** Short-lived projection of existing catalog and row fields, never an execution capability. */
+  private record IngestPolicyBinding(
+      Operation operation, TransportTag transport, OperationAuthorizationBasis basis) {}
 
   private static RecordedIngestRecoveryDecision.Refused refused(String code) {
     return new RecordedIngestRecoveryDecision.Refused(new OperationReceipt(code, null));

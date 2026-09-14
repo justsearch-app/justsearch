@@ -99,6 +99,8 @@ final class RecordedIngestRecoveryDecisionTest {
         "core.reindex", TransportTag.SYSTEM_INTERNAL,
         new OperationAuthorizationBasis.EphemeralCapsule());
 
+    assertTrue(fixture.authority().allowsFreshRecordedIngest(fixture.row(), fixture.plan()),
+        "the same bound plan may continue fresh but must not gain restart permission");
     assertRefused("RECOVERY_AUTHORIZATION_REFUSED", fixture.authority().evaluateRecordedIngest(
         fixture.row(), fixture.preparation(), Optional.of(GENERATION), ignored -> true));
   }
@@ -228,6 +230,8 @@ final class RecordedIngestRecoveryDecisionTest {
         "core.ingest-files", TransportTag.SYSTEM_INTERNAL,
         new OperationAuthorizationBasis.StructuralAuto());
 
+    assertTrue(fixture.authority().allowsFreshRecordedIngest(fixture.row(), fixture.plan()),
+        "the same bound plan may continue fresh but must not gain restart permission");
     assertRefused("RECOVERY_SCOPE_REFUSED", fixture.authority().evaluateRecordedIngest(
         fixture.row(), fixture.preparation(), Optional.of(GENERATION), ignored -> true));
   }

@@ -596,6 +596,25 @@ a denied/throwing authority, and prove the resulting receipt seals.
 
 ### Fresh continuation, restart admission and child binding (2026-09-14)
 
+Implementation cuts within .3b are .3b.1 the pure fresh-continuation policy,
+.3b.2 the indexer-local startup/drain attachment, and .3b.3 the stable activation,
+admission and reconciliation coordinator. Each is committed/pushed separately;
+none alone completes activation. .3c remains the actual producer/receipt barrier.
+
+The .3b.1 signature is allowsFreshRecordedIngest(parent, boundPlan). It reads the
+accepted parent row's stamped basis and canonical supported operation policy, while
+boundPlan is the exact already-validated child effect. Envelope validation and exact
+parent-child membership remain with the resolver/runner, outside the jobs lock.
+A private short-lived binding projection may share decoding with restart evaluation;
+it is not an authority token, durable record or public validated wrapper. This avoids
+duplicating the finite operation/provenance/basis checks without moving store access
+under the queue lock. Null/malformed binding or plan denies. An ACCEPTED snapshot
+is not rejected solely by its state: the private runner body proves actual start.
+Fresh durable scope applies to that active child plan; removing another future root
+does not cancel this child, but prevents that future child when selected. Restart
+continues to validate the entire frozen parent plan. The boolean itself proves only
+current policy, never fresh origin, generation, admission or permission.
+
 Keep evaluateRecordedIngest restart-only. The stable coordinator retains only
 process-local permission keyed by the exact child operation key and server/generation
 activation, with fresh-start versus restart origin. Fresh origin cannot be inferred
@@ -668,3 +687,53 @@ blocking, bounded scheduling, shutdown without false terminal failure and exact
 parent acknowledgement ordering. These are selected mechanisms and required checks,
 not completed .3b/.3c implementation. Root verified the child/admission source paths;
 independent read-only reviews were performed at449f56a06 without runtime tests.
+
+
+### C2-9b.3b.1 fresh policy implementation and proof (2026-09-14)
+
+Base1927164b6, Windows x64/Temurin25.0.2+10. OperationAuthority now owns
+allowsFreshRecordedIngest(parent, boundPlan) with exactly one bound root. A private
+short-lived IngestPolicyBinding shares the existing canonical operation, registered
+transport, provenance and basis decoding with restart evaluation. The fresh policy
+performs no store/runner/permission/generation action; restart semantics remain
+whole-plan scope, permanent refusal before readiness, and capsule refusal.
+Independent production refute found no surviving defect in this cut.
+
+Root reviewed the worker's isolated test draft before installing it. Its original
+current-AUTO claim actually used medium-risk ingest; a separate low-risk reindex
+case now proves that revoked selected authority cannot fall back to current AUTO.
+Root removal now changes the same authority's roots supplier. Hard-stop durable
+cases reissue the grant after stop so the denial assertion tests DENY rather than
+incidentally passing from grant revocation. Two existing restart tests now prove
+fresh policy success and restart refusal for the exact same row/frozen invocation.
+This is policy evidence only; private winning-child activation remains .3b.3/.3c.
+
+- 1669 main compilation and PMD pass. Three unchanged HeadAssembly advisories remain:
+  ignored indexing-bridge Future, locale-less health lowercase, and unnecessary
+  capability-resolver lambda. This cut introduces none of those warnings.
+- 1670 executes28 cases/6 suites with zero skips/failures/errors; test PMD and whole
+  formatting pass, including the unchanged restart decision suite.
+- 1671 bypasses only fresh basis eligibility after current DENY;14 cases produce
+  exactly five expected failures (current AUTO, both exact keys, alternate grant and
+  root containment checks). This is a grouped guard mutation, not five separate runs.
+- 1672 separately bypasses the single-root guard;14 cases produce exactly one expected
+  failure. Root restored production byte-for-byte to1670 from
+  tmp/1671-authority-original.bin before full services1673.
+- Full services1673 executes2,942 cases/434 suites, three existing skips, zero
+  failures/errors. Main PMD reuses its restored positive cache; test PMD and Spotless
+  are up-to-date from1670. Hosted proof is pending after commit.
+
+Independent test review found no material wrong-reason pass. Root independently
+re-read XML and corrected its evidence summary:1670 is8 fresh cases +14 recovery
+cases +6 automatic guardrails, not14 fresh cases. The1671 five failures are structural
+AUTO, selected family, selected operation, revoked grant/current AUTO, and scope;
+DENY is retained in that mutation and its hard-stop test passes. The independent
+review is source/evidence review, not an additional executed run.
+
+Logs/counts/copied XML are tmp/1670 through tmp/1673 with .txt, -counts.json and
+-xml suffixes in F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify. Retain
+through final lane reconciliation plus30 days, at least2026-10-14. .3b.2 startup,
+.3b.3 activation/admission and .3c producer barrier remain required; no call-site,
+actual recovery, live-model or process-restart claim follows from these pure tests.
+
+All three governance gates, store recovery and canonical links pass1673.

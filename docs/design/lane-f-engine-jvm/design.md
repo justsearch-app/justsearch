@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-9b.3b is cut into pure fresh policy, startup/drain attachment, and stable activation/reconciliation. Fresh policy uses the validated active child plan; restart retains whole-parent scope. No policy boolean proves live origin. [Owning split and signature](evidence/C2/ingestion-authorization-recovery.md#fresh-continuation-restart-admission-and-child-binding-2026-09-14).
+
 - 2026-09-14: C2-9b.3b/c distinguishes live fresh consent from restart revalidation, preserves one admitted parent work identity, and bounds pending activation by the running admission limit. Child recovery validates the real parent's whole frozen plan and inherited identity; roots proceed through exact acknowledgements sequentially. No public fresh-permit installer, new durable flag or separate quota authority. [Owning mechanism and proof obligations](evidence/C2/ingestion-authorization-recovery.md#fresh-continuation-restart-admission-and-child-binding-2026-09-14).
 
 - 2026-09-14: C2-9b.3a applies permission before PROCESSING-to-PENDING replay, while an unowned FAILED/CANCELLED member receives administrative SKIPPED coverage without execution permission. This repairs crash-after-stop without stranding a terminal walk; issued owners remain excluded. [Review correction](evidence/C2/ingestion-authorization-recovery.md#c2-9b3-queue-fence-and-startup-sequence-2026-09-14).

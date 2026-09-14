@@ -63,7 +63,7 @@ Worker-core suite executed342 cases/84 suites with six skips and one inherited
 long-document CPU test timeout; it is not an integrated green claim. The isolated
 reproduction and separate method-budget correction are recorded in
 [long-doc-test-budget.md](long-doc-test-budget.md). Full corrected Worker-core1668
-is running at this queue checkpoint. Queue production is byte-identical to1661;
+subsequently executed342 cases/84 suites, six existing skips, zero failures/errors. Queue production is byte-identical to1661;
 the original bytes are retained as tmp/1662-queue-original.bin.
 
 C2-9b.3a queue behavior is implemented and locally verified. Startup activation,
@@ -71,3 +71,9 @@ per-generation ownership and the actual producer remain .3b/.3c. No recorded wal
 can execute through the default constructor before those owners are attached.
 Current logs/counts and copied XML are tmp/1661 through tmp/1665 with .txt,
 -counts.json and -xml suffixes. Hosted proof remains required after push.
+
+
+Hosted checkpoint1927164b62bb780977f7793369c7f9ffbb0e796d passes all13 jobs in
+CI34851406477 and CLA34851402072. This includes the separate a14b931d6 test correction;
+model-free hosted checks do not replace the real-model local1667/1668 proof.
+Metadata is tmp/1673-hosted-run.json. No stage-C2 completion follows from this cut.

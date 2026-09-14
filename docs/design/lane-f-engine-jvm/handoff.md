@@ -2,12 +2,19 @@
 
 ## Current state (2026-09-14)
 
+Latest implemented cut is C2-9b.3b.1 pure fresh policy: full1673 services2,942 cases,
+three existing skips, no failures; focused28 cases and two negative controls plus
+independent production/test reviews. The policy creates no permission and cannot
+prove fresh origin. [Owning evidence and selected cuts](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b1-fresh-policy-implementation-and-proof-2026-09-14).
+Next is .3b.2 startup/drain attachment, then .3b.3 stable activation/admission and
+.3c producer/receipt barrier. Root owns lifecycle work; C2 remains open.
+
 C2-9b.3a queue fencing now passes the full indexer suite:598 cases,15 existing skips,
 no failures, plus focused and discriminating negative controls. Constructor default
 denies recorded execution; stopped-orphan administrative closure remains possible.
 [Queue proof and remaining attachment](evidence/C2/recorded-queue-authority.md).
 A separate inherited real-model test-budget failure was reproduced and corrected;
-focused1667 passes, full Worker-core1668 is running at this checkpoint. The source
+focused1667 and full Worker-core1668 pass (342 cases, six existing skips, no failures). The source
 and failed proof are preserved in [the correction record](evidence/C2/long-doc-test-budget.md).
 Next is C2-9b.3b startup/reconciliation/lifecycle, then .3c actual producer. The
 selected fresh/restart/admission design is pushed9dfaf9ee4; pure decision449f56a06

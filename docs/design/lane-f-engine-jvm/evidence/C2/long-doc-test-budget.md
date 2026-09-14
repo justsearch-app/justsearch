@@ -31,11 +31,20 @@ budget changes are justified by this failure.
 - 1667: scoped correction executed both real-model cases, zero skips/failures/errors;
   Worker-core test PMD and whole Spotless passed. The input remains5,141 tokens and
   both long cosine comparisons remain1.000000.
-- Full Worker-core1668 is pending at this checkpoint. A narrow rerun does not replace
-  the failed integrated run; the production queue has not changed since1665.
+- Full Worker-core1668 executed342 cases/84 suites, six existing skips and zero
+  failures/errors. The long method took57.096s with5,141 tokens and both cosines1.0.
+  Main PMD executed and passed; test PMD/Spotless reused unchanged1667 inputs.
+  This is the full correction proof, separate from the failed1665/1666 runs.
+  All three governance gates and store recoverability passed1668 as well.
 
-Commands are in tmp/1665-counts.json through tmp/1667-counts.json and their complete
-logs tmp/1665.txt through tmp/1667.txt. Copied JUnit XML is in the matching
+Commands are in tmp/1665-counts.json through tmp/1668-counts.json and their complete
+logs tmp/1665.txt through tmp/1668.txt. Copied JUnit XML is in the matching
 *-xml directories in F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp.
 Retain logs, counts and XML through final lane reconciliation plus30 days, at least
 2026-10-14. Hosted proof for this correction remains required.
+
+
+Hosted checkpoint1927164b62bb780977f7793369c7f9ffbb0e796d passes all13 jobs in
+CI34851406477 and CLA34851402072. This includes the separate a14b931d6 test correction;
+model-free hosted checks do not replace the real-model local1667/1668 proof.
+Metadata is tmp/1673-hosted-run.json. No stage-C2 completion follows from this cut.
