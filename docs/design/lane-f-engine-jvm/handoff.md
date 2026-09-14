@@ -16,14 +16,13 @@ consumer-registration correction ([evidence](evidence/C2/hosted-frontend-contrac
 The raw save API is retired and the physical/config caller guard passes integrated1500:
 4,187 represented cases, four existing skips, zero failures/errors, PMD/format and
 UI integration compilation ([evidence](evidence/C2/settings-writer-retirement.md)).
-Next is completion of UI harness repair/reproof, then required
-integrated governance/live/model/installed/final-head proof and C2-8/C2-10/C2-11,
-D1/D2/E/F. UI capture1466 is partial: Settings mounted with zero axe/console errors,
-but five downstream density/search selectors timed out despite CLI exit0. Root
-corrected its initial topbar-heading misread and owns harness repair/reproof.
-Same-session ui-shot Vite pid48580/port5185 is registered; use the repository sweep
-when finished, not direct kill. No Gradle/dev stack is running. Root makes remaining
-mechanism/merge decisions; no owner reply is pending.
+The repaired harness now proves20 mapped Settings/Library/Brain captures with zero
+axe/console/overflow findings; Python UI/CLI1508 passes218 tests. [Browser proof](evidence/C2/frontend-settings-browser.md)
+records earlier failures and fixture limitations. Both owned Vite helpers5185/5186
+were identity-verified and closed by sweep1509. No Gradle/dev stack is running.
+Next is C2-7 checkpoint cadence/shutdown, C2-8/C2-9 ingestion, C2-10 reindex, then
+required integrated/live/model/installed/final-head proofs and D1/D2/E/F. Root makes
+remaining mechanism/merge decisions; no owner reply is pending.
 
 Pushed prerequisites: installer/import09f91917e, atomic read/wire1e49d18a5,
 system-access residue3d842f496, durable replay witness7f665a33d.

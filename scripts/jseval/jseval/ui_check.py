@@ -272,22 +272,51 @@ def _demo_url(ui_url: str, **extra: str) -> str:
 
 
 async def _type_and_search(page, query: str = "justsearch") -> None:
-    # tempdoc 615 §6.1b: the live Lit shell lands on the chat surface, so navigate to the search
-    # surface first (rail click, hash-route fallback) before reaching for the search input.
+    # Search v3 owns retrieval. Its composer does not use the retired `search-input` testid and a
+    # draft is not a search until the command palette's explicit "Search this text" action runs.
     await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
-    try:
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-    except Exception:
-        # Search Thread S5b — the standalone `core.search-surface` rail surface is retired; the
-        # retrieve tier folded into the one window (matches S.RAIL_SURFACE_SEARCH above).
-        await page.evaluate("() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }")
-    # tempdoc 615 §11 HARDEN: resolve the search input by accessible role+name first
-    # (stable across testid churn), falling back to the testid.
-    inp = await S.SEARCH_INPUT.locate(page)
+    await page.evaluate("() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }")
+    window = page.locator(S.CSS_SV3_WINDOW)
+    await window.first.wait_for(state="visible", timeout=15_000)
+    inp = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
     await inp.wait_for(state="visible", timeout=10_000)
-    await inp.click()
-    await inp.type(query, delay=30)
-    await page.locator(S.CSS_SEARCH_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
+    await inp.fill(query)
+    await window.get_by_role("button", name="Open command palette", exact=True).click()
+    async with page.expect_response("**/api/knowledge/search", timeout=30_000):
+        await page.locator(S.CSS_SV3_PALETTE).get_by_role(
+            "option", name="Search this text", exact=True
+        ).click()
+    await page.locator(S.CSS_SV3_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
+
+
+async def _set_density_in_settings(page, label: str) -> None:
+    """Select one FE-local Density stop and prove the control projected it."""
+    slider = page.locator(S.CSS_DENSITY_SLIDER).first
+    await slider.wait_for(state="visible", timeout=10_000)
+    await slider.fill(str({"Compact": 0, "Comfortable": 1, "Spacious": 2}[label]))
+    if await slider.get_attribute("aria-valuetext") != label:
+        raise AssertionError(f"Density slider did not select {label}")
+
+
+async def _set_detail_level_in_settings(page, label: str) -> None:
+    """Select the header's backend-persisted detail level and await its witnessed receipt."""
+    # The reachable authority is Shell's persistent header toggle: a named group of pressed
+    # buttons. Settings also projects the value, but this header control is always reachable.
+    group = page.get_by_role("group", name="Detail level").first
+    btn = group.get_by_role("button", name=label, exact=True)
+    await btn.wait_for(state="visible", timeout=10_000)
+    if await btn.get_attribute("aria-pressed") == "true":
+        return
+    async with page.expect_response(
+        lambda response: "/api/settings/v2" in response.url
+        and response.request.method == "POST",
+        timeout=15_000,
+    ) as response_info:
+        await btn.click()
+    response = await response_info.value
+    receipt = await response.json()
+    if response.status != 200 or receipt.get("state") != "COMPLETE":
+        raise AssertionError(f"Detail-level settings write did not complete: {receipt!r}")
 
 
 async def _navigate_and_search(page, url: str, query: str = "justsearch", *, timeout_ms: int = 60_000) -> None:
@@ -770,25 +799,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 if cooldown_ms > 0:
                     await asyncio.sleep(cooldown_ms / 1000)
             if view_name == "ai-brain-advanced":
-                # Tempdoc 923 — Brain now projects the shared app-wide detail level through its
-                # accessible header control. The retired Simple-panel "Switch to Advanced" hook
-                # no longer exists; select the current user-facing Detailed choice instead.
-                detail_level = page.get_by_role("group", name="Detail level").first
-                b = detail_level.get_by_role("button", name="Detailed", exact=True)
-                await b.wait_for(state="visible", timeout=10_000)
-                await b.click(timeout=5_000)
-                if cooldown_ms > 0:
-                    await asyncio.sleep(cooldown_ms / 1000)
-            # tempdoc 840 Phase 5 — the per-component install list: what each piece of the ~7 GB is,
-            # what it costs, and what you lose by declining it. Scroll it into the capture.
-            #
-            # KNOWN LIMITATION: on a profile that has not dismissed it, the first-run walkthrough
-            # floats over the lower ~200px and occludes the last rows. Its dismissal lives in
-            # UserStateDocument (not a storage key an init_script can set), and a click-through
-            # attempt did not reach the button inside the card's shadow root. The required and
-            # improves-results groups — what these steps exist to verify — are above the overlay and
-            # capture cleanly; axe still reports 0 violations. Left as a limitation rather than a
-            # swallowed exception that would look handled.
+                await _set_detail_level_in_settings(page, "Detailed")
+            if view_name in ("ai-brain-components", "ai-brain-consent"):
+                # These controls live in the Simple panel; the captured settings fixture starts
+                # Detailed. Select the panel through the shared witnessed header control first.
+                await _set_detail_level_in_settings(page, "Simple")
             if view_name == "ai-brain-components":
                 lst = page.get_by_test_id(S.TID_INSTALL_COMPONENT_LIST)
                 await lst.wait_for(state="visible", timeout=10_000)
@@ -910,17 +925,14 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     def _density_setup(density: str):
         async def setup(page):
-            # tempdoc 615 §6.1b: density is a LIVE Settings control (the Accessibility section's
-            # `button.option-btn` Compact/Comfortable/Spacious -> applyAdaptationProfile, persisted
-            # server-side), not the retired `__JUSTSEARCH_STORES__` global. Set it in Settings, then search.
+            # Density is the Accessibility discrete slider and persists in the FE-local profile.
             await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
             await _goto_surface(page, S.RAIL_SURFACE_SETTINGS)
-            # Density lives in the Accessibility section as an `option-btn` (Compact/Comfortable/Spacious);
-            # the cards carry sub-labels, so match by leading text on the button class, not the full name.
+            await page.locator(S.CSS_SETTINGS_WINDOW_CONTENT).first.wait_for(
+                state="attached", timeout=10_000
+            )
             label = _DENSITY_LABEL.get(density, "Comfortable")
-            btn = page.locator("button.option-btn", has_text=label)
-            await btn.first.wait_for(state="visible", timeout=10_000)
-            await btn.first.click(timeout=10_000)
+            await _set_density_in_settings(page, label)
             if cooldown_ms > 0:
                 await asyncio.sleep(cooldown_ms / 1000)
             await _goto_surface(page, S.RAIL_SURFACE_SEARCH)
@@ -929,15 +941,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     def _mode_setup(mode: str):
         async def setup(page):
-            # tempdoc 923: UI mode is the live Settings Simple/Detailed `option-btn` (the compatible
-            # wire value remains `advanced`; the control persists via
-            # `/api/settings/v2` `ui.mode`), not the retired store + filter toggle. Set it, then search.
+            # UI mode is the persistent header's "Detail level" pressed-button group. Its async
+            # patch is complete only
+            # after the witnessed settings POST returns a COMPLETE receipt.
             await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
-            await _goto_surface(page, S.RAIL_SURFACE_SETTINGS)
-            # The Simple/Detailed cards are `option-btn`s with sub-labels; match by leading text.
-            btn = page.locator("button.option-btn", has_text=_MODE_LABEL.get(mode, "Simple"))
-            await btn.first.wait_for(state="visible", timeout=10_000)
-            await btn.first.click()
+            await _set_detail_level_in_settings(page, _MODE_LABEL.get(mode, "Simple"))
             if cooldown_ms > 0:
                 await asyncio.sleep(cooldown_ms / 1000)
             await _goto_surface(page, S.RAIL_SURFACE_SEARCH)
@@ -2101,8 +2109,12 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # -filtered steps are retired rather than repointed.
 
         # --- Isolated: main views (dark + light) ---
-        *[Step(f"{v}", setup=_view_setup(v), isolated=True) for v in views],
-        *[Step(f"{v}-light", setup=_view_setup(v, "light"), isolated=True, color_scheme="light") for v in views],
+        *[Step(f"{v}", setup=_view_setup(v), isolated=True,
+               fixtures_variant="install-preview" if v in ("ai-brain-components", "ai-brain-consent") else "default")
+          for v in views],
+        *[Step(f"{v}-light", setup=_view_setup(v, "light"), isolated=True, color_scheme="light",
+               fixtures_variant="install-preview" if v in ("ai-brain-components", "ai-brain-consent") else "default")
+          for v in views],
         Step("help-narrow", setup=setup_help_narrow, isolated=True),
 
         # --- Isolated: density/mode variants ---
