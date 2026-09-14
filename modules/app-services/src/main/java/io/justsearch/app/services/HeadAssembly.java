@@ -96,7 +96,7 @@ public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration backgroundDocumentOwner;
   private final java.util.concurrent.ExecutorService foregroundDocuments;
   private final java.util.concurrent.ExecutorService backgroundDocuments;
-  private final AutoCloseable operationsRetentionTimer;
+  private final AutoCloseable operationsMaintenanceTimer;
   private final AutoCloseable operationsHistoryProjector;
 
 
@@ -356,8 +356,8 @@ public final class HeadAssembly implements AutoCloseable {
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
-    this.operationsRetentionTimer = startOperationsRetentionTimer(this.operations, this.executors);
-    acquiredOwners.add(this.operationsRetentionTimer);
+    this.operationsMaintenanceTimer = startOperationsMaintenanceTimer(this.operations, this.executors);
+    acquiredOwners.add(this.operationsMaintenanceTimer);
     this.telemetry = telemetry;
     Objects.requireNonNull(managedChildRegistry, "managedChildRegistry");
     Objects.requireNonNull(configManager, "configManager");
@@ -784,7 +784,7 @@ public final class HeadAssembly implements AutoCloseable {
             .orThrow();
     this.services = orchestrationOut.initialServices();
     this.orchestration =
-        orchestrationOut.orchestrationHandles().withOperationsRetention(this.operationsRetentionTimer);
+        orchestrationOut.orchestrationHandles().withOperationsMaintenance(this.operationsMaintenanceTimer);
     this.gplJobCoordinator = orchestrationOut.gplJobCoordinator();
     this.gplAutoTrigger = orchestrationOut.gplAutoTrigger();
     this.gplSnapshotFile = orchestrationOut.gplSnapshotFile();
@@ -1010,8 +1010,8 @@ public final class HeadAssembly implements AutoCloseable {
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
-    this.operationsRetentionTimer = startOperationsRetentionTimer(this.operations, this.executors);
-    acquiredOwners.add(this.operationsRetentionTimer);
+    this.operationsMaintenanceTimer = startOperationsMaintenanceTimer(this.operations, this.executors);
+    acquiredOwners.add(this.operationsMaintenanceTimer);
     this.telemetry = telemetry;
     this.searchPort = searchPort;
     this.knowledgeClient = null;
@@ -1093,7 +1093,7 @@ public final class HeadAssembly implements AutoCloseable {
         io.justsearch.app.services.bootstrap.Memoized.of(() -> Boolean.FALSE);
     this.orchestration =
         io.justsearch.app.services.bootstrap.OrchestrationHandles.empty()
-            .withOperationsRetention(this.operationsRetentionTimer);
+            .withOperationsMaintenance(this.operationsMaintenanceTimer);
     // Last acquisition: no later bootstrap phase can strand a retryable live projector.
     this.operationsHistoryProjector =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
@@ -1433,7 +1433,7 @@ public final class HeadAssembly implements AutoCloseable {
         this.substrateOut.indexingJobsBridge() == null ? null : (AutoCloseable) this.substrateOut.indexingJobsBridge()::stop;
     this.orchestration =
         buildOrchestrationHandles(bridgeHandle, null)
-            .withOperationsRetention(this.operationsRetentionTimer);
+            .withOperationsMaintenance(this.operationsMaintenanceTimer);
     io.justsearch.app.api.SearchService newSearch =
         new io.justsearch.app.services.search.SearchServiceImpl(() -> this.searchPort);
     this.services =
@@ -1541,10 +1541,10 @@ public final class HeadAssembly implements AutoCloseable {
       catch (Exception failure) { throw new IllegalStateException("Operations history did not drain", failure); }
     }
     io.justsearch.app.services.bootstrap.OrchestrationHandles handles = this.orchestration;
-    if (!closed.get() && handles != null && handles.operationsRetention() != null) {
-      try { handles.operationsRetention().close(); }
+    if (!closed.get() && handles != null && handles.operationsMaintenance() != null) {
+      try { handles.operationsMaintenance().close(); }
       catch (RuntimeException failure) { throw failure; }
-      catch (Exception failure) { throw new IllegalStateException("Operations retention did not drain", failure); }
+      catch (Exception failure) { throw new IllegalStateException("Operations maintenance did not drain", failure); }
     }
     if (!closed.compareAndSet(false, true)) return;
     if (serviceOut != null) {
@@ -1581,7 +1581,7 @@ public final class HeadAssembly implements AutoCloseable {
           else failure.addSuppressed(closeFailure);
         }
       }
-      try { if (handles != null) handles.withOperationsRetention(null).close(); }
+      try { if (handles != null) handles.withOperationsMaintenance(null).close(); }
       catch (RuntimeException closeFailure) {
         if (failure == null) failure = closeFailure;
         else failure.addSuppressed(closeFailure);
@@ -1624,7 +1624,7 @@ public final class HeadAssembly implements AutoCloseable {
         limits.maxThreads(), limits.maxQueue(), 1));
   }
 
-  static AutoCloseable startOperationsRetentionTimer(
+  static AutoCloseable startOperationsMaintenanceTimer(
       io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.core.execution.EngineExecutorRegistry executors) {
     Objects.requireNonNull(operations, "operations");
@@ -1632,7 +1632,7 @@ public final class HeadAssembly implements AutoCloseable {
     var limits = executors.limits(
         io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
     var registration = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
-        "head.operations-retention",
+        "head.operations-maintenance",
         io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
         io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED,
         1,
@@ -1641,10 +1641,12 @@ public final class HeadAssembly implements AutoCloseable {
     java.util.concurrent.ScheduledExecutorService scheduler;
     try {
       scheduler = registration.openScheduled(
-          Thread.ofPlatform().daemon().name("operations-retention-", 0).factory());
-      var task = scheduler.scheduleWithFixedDelay(
+          Thread.ofPlatform().daemon().name("operations-maintenance-", 0).factory());
+      var checkpointTask = scheduler.scheduleAtFixedRate(
+          () -> checkpointDurableOperations(operations), 30, 30, java.util.concurrent.TimeUnit.SECONDS);
+      var retentionTask = scheduler.scheduleWithFixedDelay(
           () -> pruneOperationsHistory(operations), 1, 1, java.util.concurrent.TimeUnit.HOURS);
-      return new OperationsRetentionHandle(registration, scheduler, task);
+      return new OperationsMaintenanceHandle(registration, scheduler, checkpointTask, retentionTask);
     } catch (RuntimeException | Error failure) {
       try {
         registration.close();
@@ -1652,6 +1654,14 @@ public final class HeadAssembly implements AutoCloseable {
         failure.addSuppressed(cleanupFailure);
       }
       throw failure;
+    }
+  }
+
+  static void checkpointDurableOperations(io.justsearch.app.api.operations.OperationStore operations) {
+    try {
+      operations.checkpointDurableOperations();
+    } catch (RuntimeException failure) {
+      log.error("Operations checkpoint failed; will retry on the next 30s tick", failure);
     }
   }
 
@@ -1663,19 +1673,22 @@ public final class HeadAssembly implements AutoCloseable {
     }
   }
 
-  private static final class OperationsRetentionHandle implements AutoCloseable {
+  private static final class OperationsMaintenanceHandle implements AutoCloseable {
     private final io.justsearch.core.execution.EngineExecutorRegistry.Registration registration;
     private final java.util.concurrent.ScheduledExecutorService scheduler;
-    private final java.util.concurrent.ScheduledFuture<?> task;
+    private final java.util.concurrent.ScheduledFuture<?> checkpointTask;
+    private final java.util.concurrent.ScheduledFuture<?> retentionTask;
     private boolean closed;
 
-    private OperationsRetentionHandle(
+    private OperationsMaintenanceHandle(
         io.justsearch.core.execution.EngineExecutorRegistry.Registration registration,
         java.util.concurrent.ScheduledExecutorService scheduler,
-        java.util.concurrent.ScheduledFuture<?> task) {
+        java.util.concurrent.ScheduledFuture<?> checkpointTask,
+        java.util.concurrent.ScheduledFuture<?> retentionTask) {
       this.registration = registration;
       this.scheduler = scheduler;
-      this.task = task;
+      this.checkpointTask = checkpointTask;
+      this.retentionTask = retentionTask;
     }
 
     @Override
@@ -1684,16 +1697,17 @@ public final class HeadAssembly implements AutoCloseable {
         return;
       }
       try {
-        task.cancel(true);
+        checkpointTask.cancel(true);
+        retentionTask.cancel(true);
         scheduler.shutdownNow();
         if (!scheduler.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
           throw new IllegalStateException(
-              "Operations retention scheduler did not terminate within 5s");
+              "Operations maintenance scheduler did not terminate within 5s");
         }
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
         throw new IllegalStateException(
-            "Interrupted while waiting for operations retention scheduler termination",
+            "Interrupted while waiting for operations maintenance scheduler termination",
             interrupted);
       }
       // Keep the registration live after a failed termination wait so a later close can finish

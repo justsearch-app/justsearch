@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED; A/B/C1 complete; C2-6 backend, frontend callers and physical writer retirement locally verified; browser structural proof complete; live/installed/final-head proof and later C2 items open; D1-F remain. Draft PR727, merge at F."
+status: "LOCKED; A/B/C1 complete; C2-6 backend, frontend callers and physical writer retirement locally verified; browser structural proof and C2-7 checkpoint mechanism locally verified; live/installed/final-head proof and C2-8 onward open; D1-F remain. Draft PR727, merge at F."
 created: 2026-09-06
 updated: 2026-09-14
 lane: F (decision re-examination programme, wave 4)
@@ -26,6 +26,8 @@ document is the lane's contract: the design and the considerations that shaped i
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-14: C2-7 adds atomic logical checkpoints of current durable-row progress at a30-second fixed-rate schedule and the named pre-index shutdown step, retaining immediate per-unit commits. The existing row is the only progress authority; no stale snapshot or second cursor. An unfinished unit retains the prior resumable position: cadence is not a promise of unit completion within30 seconds. Reuse the retention owner for maintenance; preserve Q6 NORMAL/process-crash scope and best-effort WAL close after index drain. [Mechanism, trade-off and acceptance](evidence/C2/C2-7-plan.md).
 
 - 2026-09-14: C2-6 retires UiSettingsStore.save now every production producer uses accepted ownership. Guard physical prepare/replace and config swap/notification, including method references. Preserve only ConfigStoreRebuilder.rebuild from HeadlessApp.rebuildAfterPostBuildWrites, itself called by resolveConfig: CUDA ordinal150/native-path discovery must reach ORT before initialization and writes no settings file. Generic ConfigStore primitives retain their implementation self-calls, not runtime-producer permission. Fixture seeding uses explicit prepared replacements; raw-save refusal assertions become API-absence plus corrupt-witness/accepted-owner proof. No new writer, token, registry or boot operation row. [Owning cut](evidence/C2/C2-6-plan.md#2026-09-14-item4-physical-writer-retirement).
 
@@ -1438,7 +1440,11 @@ operation key it answers to (7.6), kind, survival and urgency (3.4), state, chec
 cursor, attempts, timestamps), registered in `store-recoverability.v1.json`; the per-file
 `jobs` rows remain ingestion's unit-level substrate beneath it. A durable operation
 **checkpoints on a bounded cadence**, per completed unit (a file batch, an extraction page) and
-at most every 30 s; shutdown step 3 is one more checkpoint, not the only one. Resume is the
+at most every 30 s; shutdown step 3 is one more checkpoint, not the only one. *(clarified2026-09-14, C2-7)* Each unit commits its position immediately; the timed and
+shutdown transactions re-checkpoint the row's current position atomically. When no further unit
+has committed, the position stays the same and updated_at records that checkpoint. This field
+includes these periodic same-position checkpoints; it does not imply a completed unit, reduced
+replay work or stronger durability. The30-second bound is cadence, not a unit-duration bound. Resume is the
 stronger promise, chosen deliberately: a batch extraction merely "not lost" is a feature nobody
 ships. A checkpoint says where to continue, not whether continuing is still the same task, so
 **resume has four conditions**, each a column of the row: *identity* (the operation's declared

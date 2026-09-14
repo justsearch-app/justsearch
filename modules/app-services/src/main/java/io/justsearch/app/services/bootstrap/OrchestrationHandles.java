@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
  */
 public record OrchestrationHandles(
     AutoCloseable gplAutoTrigger,
-    AutoCloseable operationsRetention,
+    AutoCloseable operationsMaintenance,
     AutoCloseable lambdaMartReranker,
     AutoCloseable jobQueueDepthProducer,
     AutoCloseable documentsIndexedRateProducer,
@@ -65,8 +65,8 @@ public record OrchestrationHandles(
     ordered.add(agentToolHandlers);
     // GPL can still call inference and the Worker; stop its producer before either dependency.
     ordered.add(gplAutoTrigger);
-    // Retention calls the borrowed operations store; stop it before any dependency teardown.
-    ordered.add(operationsRetention);
+    // Maintenance calls the borrowed operations store; stop it before any dependency teardown.
+    ordered.add(operationsMaintenance);
     Collections.reverse(ordered);
     IllegalStateException failure = null;
     for (AutoCloseable handle : ordered) {
@@ -90,11 +90,11 @@ public record OrchestrationHandles(
         null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
   }
 
-  /** Returns this teardown bundle with the Head-owned operations retention timer installed. */
-  public OrchestrationHandles withOperationsRetention(AutoCloseable retention) {
+  /** Returns this teardown bundle with the Head-owned operations maintenance timer installed. */
+  public OrchestrationHandles withOperationsMaintenance(AutoCloseable maintenance) {
     return new OrchestrationHandles(
         gplAutoTrigger,
-        retention,
+        maintenance,
         lambdaMartReranker,
         jobQueueDepthProducer,
         documentsIndexedRateProducer,

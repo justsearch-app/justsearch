@@ -245,6 +245,7 @@ class OperationStoreArchitectureTest {
     }
     @Override public long historySinceMillis() { return 0; }
     @Override public void pruneHistory() {}
+    @Override public void checkpointDurableOperations() {}
     @Override public java.util.Optional<Recovery> recovery() { return java.util.Optional.empty(); }
     @Override public void close() {}
   }

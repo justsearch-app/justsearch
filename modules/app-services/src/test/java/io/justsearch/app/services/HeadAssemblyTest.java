@@ -92,13 +92,13 @@ class HeadAssemblyTest {
     try (HeadAssembly bootstrap = HeadAssembly.bootForSearchPortOnly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), searchPort, telemetry, org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       // Tempdoc 519 Â§5 / Step 4: bootstrap is itself the AppFacade (no separate accessor).
       assertNotNull(bootstrap);
-      var timerField = HeadAssembly.class.getDeclaredField("operationsRetentionTimer");
+      var timerField = HeadAssembly.class.getDeclaredField("operationsMaintenanceTimer");
       timerField.setAccessible(true);
       var orchestrationField = HeadAssembly.class.getDeclaredField("orchestration");
       orchestrationField.setAccessible(true);
       var handles = (io.justsearch.app.services.bootstrap.OrchestrationHandles)
           orchestrationField.get(bootstrap);
-      assertSame(timerField.get(bootstrap), handles.operationsRetention());
+      assertSame(timerField.get(bootstrap), handles.operationsMaintenance());
     }
   }
 

@@ -925,6 +925,24 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
+  public void checkpointDurableOperations() {
+    locked(() -> {
+      // The row itself is the only progress authority. Re-checkpoint it atomically: no stale
+      // read/modify/write cursor and no assertion that an unfinished unit has committed.
+      try (var statement = connection.prepareStatement("""
+          UPDATE operations SET checkpoint_cursor=checkpoint_cursor,
+            units_completed=units_completed, units_failed=units_failed,
+            updated_at=MAX(updated_at, ?)
+          WHERE survival='DURABLE' AND state IN ('RUNNING', 'COMPLETE_WITH_GAPS')
+          """)) {
+        statement.setLong(1, clock.millis());
+        statement.executeUpdate();
+      }
+      return null;
+    });
+  }
+
+  @Override
   public void close() throws IOException {
     lock.lock();
     try {

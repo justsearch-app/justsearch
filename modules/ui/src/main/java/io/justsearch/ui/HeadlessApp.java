@@ -1513,6 +1513,12 @@ public class HeadlessApp {
               headClosed.set(true);
               return null;
             }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "durable-operations-checkpoint",
+            reason -> {
+              operations.checkpointDurableOperations();
+              return null;
+            }),
         // The one step whose outcome the receipt reports. Named INDEX_HALF_STEP in the sequence so
         // re-ordering cannot silently change which step the updater reads.
         new io.justsearch.app.engine.EngineShutdownSequence.Step(

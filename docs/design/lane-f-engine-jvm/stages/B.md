@@ -479,9 +479,9 @@ that are not yet buildable are named rather than faked:
 - 7.3 step 1 (close mutating admission) has no admission front until C1 — B implements it as the
   upgrade barrier's existing admission freeze (`UpgradeController.java:101-106` reads
   `snapshot.admissionFrozen()`), generalised to every reason.
-- 7.3 step 3 (checkpoint durable operations) has no operations table until C2 — **this is 17.8's
-  fifth bullet firing**; see §11. B implements the buildable half: stop taking new work and
-  checkpoint what the job queue already has (B5).
+- 7.3 step3 originally covered only the job queue (B5). C2-7 now adds the named durable
+  operations checkpoint before index close; [local mechanism proof](../evidence/C2/checkpoint-cadence.md)
+  replaces that buildability limit. The producer forced-kill tier remains C2-11.
 
 **Acceptance:** idempotency preserved (a test calls the sequence twice and asserts one run);
 both triggers reach it; the receipt is still written nonce-bound on the upgrade path
@@ -813,8 +813,9 @@ not make any other row unmeasurable.
   cooldown plus warm start); `restarting` is visible in `supervisor.v1.json`; no orphaned child
   after a restart; a healthy llama-server adopted rather than reloaded on the crash and `restart`
   paths, and stopped on `quit` and `upgrade`. The durable-operation half of the row ("resumes
-  from its last checkpoint") is **C2's** and stays unmeasurable until then — say so in the
-  evidence record rather than reporting the row as passed.
+  from its last checkpoint") is **C2's**. C2-7 now proves row checkpoint/reopen/resume;
+  actual ingest/reindex producer and installed-kill proof remain C2-8/9/10/11, so the full
+  row is not yet passed. See section10 row2.
 - **hang, graceful** — a wedge that leaves the watcher thread runnable is recovered through the
   request channel. B3's watcher on its own executor is the mechanism; the *parameters* are E's
   placeholders, so B must show the path fires, not that it fires within a tuned budget.
@@ -1011,10 +1012,11 @@ room, and B is additive, so the list is short.
    assert the hang path *fires*; no test may assert it fires within a production-tuned budget, and
    the harness's hang cases use an explicit test-only interval. **This is not licence for a red
    test** — a placeholder that reds is a defect.
-2. **Shutdown step 3 checkpoints the job queue, not an operations table.** C2 owns the operations
-   table (7.5). B's step 3 is "stop taking new work and checkpoint what exists". The 16
-   `recovery, process` row's durable-operation clause is therefore **unmeasurable, not failing**;
-   the evidence record must say unmeasurable, not passed. See §11.
+2. **Closed by C2-7,2026-09-14: shutdown step3 checkpoints durable operations.** The named
+   pre-index action, per-unit writes and30-second logical checkpoints are implemented and
+   locally verified, including real-row reopen/resume after an earlier shutdown failure.
+   [Evidence and limits](../evidence/C2/checkpoint-cadence.md). Actual ingest/reindex eligibility,
+   unit effects and installed forced-kill proofs remain C2-8/9/10/11; this does not close them.
 3. **Signed dead-Engine installer/user-store proof is assigned to stage E.** The owner's
    2026-09-08 deferral is recorded in design section 0 and registered as
    `upgrade-dead-engine-recovery`. B requires the host-level handoff/reconciliation proofs;

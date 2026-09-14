@@ -97,7 +97,9 @@ final class HeadlessAppShutdownWiringTest {
     assertEquals(1, exitCode.get());
     assertTrue(result.errors().stream().anyMatch(error -> error.contains("head-assembly")));
     assertTrue(result.errors().stream().anyMatch(error -> error.contains("operations-store")));
-    org.mockito.Mockito.verifyNoInteractions(index, operations, tracing, telemetry, instanceLock);
+    org.mockito.Mockito.verify(operations).checkpointDurableOperations();
+    org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
+    org.mockito.Mockito.verifyNoInteractions(index, tracing, telemetry, instanceLock);
   }
 
   @Test
@@ -177,6 +179,7 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(health).close();
     order.verify(assembly).setStopGenerativeBackendOnClose(false);
     order.verify(assembly).close();
+    order.verify(operations).checkpointDurableOperations();
     order.verify(knowledge).closeForUpgrade();
     order.verify(operations).close();
     order.verify(tracing).close();

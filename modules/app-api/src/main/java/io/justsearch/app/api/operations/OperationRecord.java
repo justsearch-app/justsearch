@@ -3,7 +3,11 @@ package io.justsearch.app.api.operations;
 
 import io.justsearch.core.context.EngineContext;
 
-/** Immutable internal projection of the one operations row; HTTP exposes the narrower outcome. */
+/**
+ * Immutable internal projection of the one operations row; HTTP exposes the narrower outcome.
+ * updatedAt includes periodic same-position checkpoints. It does not imply another completed unit,
+ * less replay work, or a stronger durability guarantee.
+ */
 public record OperationRecord(
     long id, String key, OperationDescriptor descriptor, EngineContext context,
     String executor, String initiator, String correlationId, OperationState state, String phase,

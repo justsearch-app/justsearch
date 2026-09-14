@@ -20,7 +20,13 @@ The repaired harness now proves20 mapped Settings/Library/Brain captures with ze
 axe/console/overflow findings; Python UI/CLI1508 passes218 tests. [Browser proof](evidence/C2/frontend-settings-browser.md)
 records earlier failures and fixture limitations. Both owned Vite helpers5185/5186
 were identity-verified and closed by sweep1509. No Gradle/dev stack is running.
-Next is C2-7 checkpoint cadence/shutdown, C2-8/C2-9 ingestion, C2-10 reindex, then
+C2-7 checkpoint cadence/shutdown is implemented and locally verified: final1514 represents
+4,964 cases/769 suites, four existing skips, no failures/errors; PMD/format/UI integration
+compilation pass. Negative1512 proves both callbacks matter. [Checkpoint evidence](evidence/C2/checkpoint-cadence.md).
+Hosted CI34801903519/CLA34801900544 pass at writer-retirement dc06b4be4;
+CI34802770723(all13 jobs)/CLA34802769444 pass at browser347187073. PR727's managed
+review record is verified through those checkpoints. C2-7 needs its own pushed hosted result.
+Next is C2-8/C2-9 ingestion, C2-10 reindex, then
 required integrated/live/model/installed/final-head proofs and D1/D2/E/F. Root makes
 remaining mechanism/merge decisions; no owner reply is pending.
 

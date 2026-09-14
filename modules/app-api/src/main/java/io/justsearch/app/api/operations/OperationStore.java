@@ -113,6 +113,13 @@ public interface OperationStore extends AutoCloseable {
   /** A checkpoint describes already committed effects; counts cannot go backwards. */
   boolean checkpoint(long id, String cursor, long unitsCompleted, long unitsFailed);
 
+  /**
+   * Re-checkpoint each running durable row's current committed cursor and counts atomically.
+   * The store clock stamps the checkpoint; no snapshot can overwrite newer unit progress.
+   * An unfinished unit cannot advance this position. Terminal and interactive rows are untouched.
+   */
+  void checkpointDurableOperations();
+
   /** Terminal rows are immutable. Returns the committed row snapshot, or empty when the update was refused. */
   java.util.Optional<OperationRecord> finish(long id, OperationState terminalState, OperationReceipt receipt);
 
