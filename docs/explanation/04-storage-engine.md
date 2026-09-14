@@ -305,8 +305,12 @@ at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 byt
 for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
 history fence; `jobs.db` independently uses version 18. Versions 15–17 retain nullable
 `jobs.content_hash` for legacy rows and add opaque revisions to switch-buffer replacements
-and queue admissions. Version 18 adds the finite-walk projection schema and epoch primitives;
-producer integration and terminal walk receipts remain under implementation.
+and queue admissions. Version 18 adds the finite-walk projection schema and epoch primitives. Explicit recorded
+enumeration preserves same-walk retry state; maintenance preserves active membership while
+assigning a fresh admission revision. Recorded terminal ledger coverage and monotonic counters
+commit with the job outcome on the same connection. Successful counters deduplicate by
+walk, path hash and committed content hash; failed counters count each terminal admission once.
+Administrative sealing, receipt acknowledgement and producer/recovery integration remain under implementation.
 Replay removes only the versions it applied and committed, preserving admissions that arrive
 during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
 roll back both.

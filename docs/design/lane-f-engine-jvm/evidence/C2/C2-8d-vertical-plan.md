@@ -18,7 +18,8 @@ Root owns migrations, shared-state changes, composition and all Gradle runs.
    does not activate root ingestion. Root writes schema/transaction changes and their tests.
    Commit d.2a (WIP schema/epochs and actual batch-exit claim return) before d.2b
    (membership, ledger coverage/counters and seal) and d.2c (notification/acknowledgement
-   retention). These are reviewable cuts within the same d.2 acceptance item.
+   retention). Within d.2b, commit admission/terminal accounting as d.2b.1 before
+   d.2b.2 administrative closure and immutable sealing. These are reviewable cuts within the same d.2 acceptance item.
 3. **C2-8d.3, actual producer.** The existing IngestTool becomes prepared/record-aware; REST
    dispatches through the same catalog operation and MCP retains its existing keyed dispatch.
    Frozen single files and directories each use one child. Carry the accepted key through the
@@ -171,3 +172,26 @@ its existing fallback, while VM errors propagate without claiming safe exit.
 Prove quiesce after poll, quiesce during write, recoverable failure at the first/middle
 unit, oldest issued path with poll limit1, stale committed callback, rollback/retry and
 runtime reaper with a blocked live owner. These are part of C2-8d.2, not a new owner gate.
+
+## C2-8d.2b identity and admission detail (2026-09-14)
+
+Explicit recorded enqueue validates the current open epoch, marks rediscovered members
+seen without resetting state, and refuses to steal another unsealed walk's member. The
+root owner still refuses overlapping roots before admission; this queue check is defensive.
+A nullable membership epoch also rides the issued IndexJob alongside its existing scan key
+and admission revision. This is a projection of the existing v18 column, not a new marker
+store: an issued recorded callback must remain identifiable if its current jobs row is
+replaced or missing. Missing progress cannot silently turn it into an unrecorded completion.
+Claimless diagnostic ledger appends never create terminal coverage; indexed coverage needs
+an actual issued claim and committed source hash. Administrative path completion/deletion
+can establish only explicit skip coverage, never an indexed effect or D2 delete acknowledgement.
+
+
+The d.2b.1 review requires a non-null membership epoch before treating matching scan_id
+as recorded re-enumeration. Legacy collisions get a fresh admission revision; a recorded
+member whose projection disappeared refuses adoption by another walk. Coverage and typed
+outcomes must agree inside the outcome transaction. Raw untyped completion/failure cannot
+terminalize a recorded member. Superseded exact claims retain terminal SKIPPED/FAILED
+history without mutating their replacement. A superseded retryable failure is diagnostic
+only: the replacement owns its new retry window, so the old callback neither spends its
+attempts nor invents an exhausted old unit from the replacement's state.

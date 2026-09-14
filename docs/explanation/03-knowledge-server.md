@@ -207,6 +207,13 @@ explicit admission replaces it. Legacy rows remain null. Watcher events identify
 producer, and cloud-placeholder observations carry the observing scan's attribution. These
 database columns do not widen the export view described below.
 
+The internal v18 recorded-walk projection attaches operation key, admission revision,
+committed content hash and terminal coverage to the same ledger row. Those fields remain
+outside the export view. Indexed coverage requires an exact issued claim and the hash of
+the committed source; a diagnostic ledger append cannot advance a recorded walk. Counters
+and ledger insertion roll back with the job transition. A late committed claim can record
+its historical effect after maintenance replacement while leaving the replacement pending.
+
 **Invariant:** any operator-visible export of ledger or queue data carries a `path_hash` (SHA-256 over the normalized absolute path), never the raw path, and never any path-derived field that could reverse-map to the user's filesystem.
 
 #### Path normalisation spec

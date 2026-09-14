@@ -61,6 +61,12 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
   }
 
+  /** Admit or mark seen within this exact open enumeration, preserving same-walk retry state. */
+  default int enqueueRecordedEntries(String operationKey, long epoch,
+      List<EnqueueEntry> entries, String collection) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
   /** Private owner read; a missing projection is not permission to reconstruct acceptance. */
   default Optional<WalkProgress> recordedWalk(String operationKey) {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
@@ -84,10 +90,16 @@ public interface JobQueue extends Closeable {
    * @param collection collection tag for the indexed document, or null for default
    * @param provenance admission attribution, or null for an unknown legacy origin
    * @param scanId durable admitting scan, or null for rowless maintenance
+   * @param walkEpoch explicit recorded membership at claim time, or null for legacy work
    * @param unitRevision opaque durable admission identity; unchanged by retry or recovery
    */
   record IndexJob(Path path, String collection, EnqueueProvenance provenance,
-      String scanId, String unitRevision) {
+      String scanId, String unitRevision, Long walkEpoch) {
+    /** Legacy/internal admission without recorded walk membership. */
+    public IndexJob(Path path, String collection, EnqueueProvenance provenance,
+        String scanId, String unitRevision) {
+      this(path, collection, provenance, scanId, unitRevision, null);
+    }
     /** Legacy/internal fixture without a durable admission witness. */
     public IndexJob(Path path, String collection, EnqueueProvenance provenance) {
       this(path, collection, provenance, null, null);

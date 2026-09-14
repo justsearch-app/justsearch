@@ -146,6 +146,21 @@
     }
   },
   "restoredTestSha256": "f0d5675438bdaab9ec628cac710e5d6df4b4ed7901c17e06825190bf9d512d3e",
-  "hostedProof": "pending on correction",
+  "hostedProof": {
+    "revision": "d892321c64084715be06fd59843fc57877398916",
+    "ciRun": 34818093845,
+    "overallConclusion": "success",
+    "windowsNative": "success",
+    "passedJobs": 12,
+    "failedJob": "Integration tests (system-tests tier)",
+    "reportedAttempts": 101,
+    "reportedFailures": 7,
+    "reportedSkips": 42,
+    "claRun": 34818091906,
+    "claConclusion": "success",
+    "requiredLaneRecoveryProof": "open; overall green does not satisfy failed integration job",
+    "metadata": "tmp/parser-hosted1561.json",
+    "failedLog": "tmp/parser-hosted-failed1561.txt"
+  },
   "captureCorrection": "First task announcement preceded the later FAILED announcement in interleaved Gradle output; corrected status from raw log, retaining archived XML counts. Active capture helper now gives FAILED precedence."
 }

@@ -118,6 +118,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public int enqueueRecordedEntries(String operationKey, long epoch,
+      List<EnqueueEntry> entries, String collection) {
+    if (!hasSufficientDiskSpace()) throw new IllegalStateException("Recorded queue admission is unavailable");
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.enqueueRecorded(
+        connection, operationKey, epoch, entries, collection, System.currentTimeMillis()), true);
+  }
+
+  @Override
   public java.util.Optional<WalkProgress> recordedWalk(String operationKey) {
     return accessRecordedWalk(() -> SqliteIngestionWalkOps.find(connection, operationKey), false);
   }
@@ -509,15 +517,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // there, the re-enqueue re-stats the file, so its silence really does mean unknown.
       String sql = """
           INSERT OR REPLACE INTO jobs
-            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision)
+            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch)
           VALUES (
             ?, 'PENDING', 0, ?,
             COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
             ?,
-            COALESCE(?, (SELECT prior.scan_id FROM jobs prior WHERE prior.path = ?)),
+            ?,
             COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
             COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-            lower(hex(randomblob(16))))
+            lower(hex(randomblob(16))), ?)
           """;
 
       long now = System.currentTimeMillis();
@@ -535,6 +543,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
             String normalizedPath =
                 PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
+            var membership = SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scan);
             stmt.setString(1, normalizedPath);
             stmt.setLong(2, now);
             stmt.setString(3, col);
@@ -544,16 +553,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             } else {
               stmt.setNull(5, java.sql.Types.INTEGER);
             }
-            stmt.setString(6, scan);
-            stmt.setString(7, normalizedPath); // carry-forward lookup for scan_id
-            stmt.setString(8, entry.provenance() == null ? null : entry.provenance().originator());
-            stmt.setString(9, normalizedPath);
-            stmt.setString(10, entry.provenance() == null ? null : entry.provenance().transport());
-            stmt.setString(11, normalizedPath);
-            stmt.addBatch();
+            stmt.setString(6, membership.key());
+            stmt.setString(7, entry.provenance() == null ? null : entry.provenance().originator());
+            stmt.setString(8, normalizedPath);
+            stmt.setString(9, entry.provenance() == null ? null : entry.provenance().transport());
+            stmt.setString(10, normalizedPath);
+            if (membership.epoch() == null) stmt.setNull(11, java.sql.Types.BIGINT);
+            else stmt.setLong(11, membership.epoch());
+            stmt.executeUpdate();
+            if (membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
             accepted++;
           }
-          stmt.executeBatch();
         }
         return accepted;
       });
@@ -601,19 +611,20 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 }
               }
             }
+            var membership = SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, null);
             // A deliberate retry is a new admission with a fresh retry window and revision.
             // Same-admission failure/recovery updates preserve the existing revision.
             String sql =
                 """
                 INSERT OR REPLACE INTO jobs
                   (path, state, attempts, last_updated, collection, size_bytes, scan_id,
-                   originator, transport, unit_revision)
+                   originator, transport, unit_revision, walk_seen_epoch)
                 VALUES (?, 'PENDING', 0, ?,
                   (SELECT prior.collection FROM jobs prior WHERE prior.path = ?), ?,
-                  (SELECT prior.scan_id FROM jobs prior WHERE prior.path = ?),
+                  ?,
                   COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
                   COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-                  lower(hex(randomblob(16))))
+                  lower(hex(randomblob(16))), ?)
                 """;
             int accepted;
             try (PreparedStatement write = connection.prepareStatement(sql)) {
@@ -625,13 +636,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               } else {
                 write.setNull(4, java.sql.Types.INTEGER);
               }
-              write.setString(5, normalizedPath);
+              write.setString(5, membership.key());
               write.setString(6, entry.provenance() == null ? null : entry.provenance().originator());
               write.setString(7, normalizedPath);
               write.setString(8, entry.provenance() == null ? null : entry.provenance().transport());
               write.setString(9, normalizedPath);
+              setNullableLong(write, 10, membership.epoch());
               accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
+            if (accepted > 0 && membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
             return new JobQueue.ReenqueueResult(accepted, previousState);
           });
       // After the commit, like enqueueEntries: a meter incremented inside the transaction would
@@ -661,7 +674,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // Local carrier for a candidate row selected before any mutation happens.
       record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance,
-        String scanId, String unitRevision) {}
+        String scanId, String unitRevision, Long walkEpoch) {}
 
       // Claim is atomic via an explicit transaction (BEGIN/COMMIT through the existing
       // inTransaction() helper), not a single UPDATE...RETURNING statement: SQLite's RETURNING
@@ -680,7 +693,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           inTransaction(
               () -> {
                 String selectSql = """
-                    SELECT path, collection, originator, transport, scan_id, unit_revision FROM jobs
+                    SELECT path, collection, originator, transport, scan_id, unit_revision, walk_seen_epoch FROM jobs
                     WHERE state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?)
                     ORDER BY last_updated ASC, path ASC
                     """;
@@ -693,12 +706,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     // row must neither acquire a second owner nor starve unrelated eligible work.
                     while (claimedRows.size() < limit && rs.next()) {
                       if (activeClaims.containsKey(rs.getString(1))) continue;
+                      long epochValue = rs.getLong(7);
+                      Long walkEpoch = rs.wasNull() ? null : epochValue;
                       String originator = rs.getString(3);
                       String transport = rs.getString(4);
                       claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
                           originator == null && transport == null ? null
                               : new JobQueue.EnqueueProvenance(originator, transport),
-                          rs.getString(5), rs.getString(6)));
+                          rs.getString(5), rs.getString(6), walkEpoch));
                     }
                   }
                 }
@@ -736,7 +751,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 List<IndexJob> claimed = new ArrayList<>(claimedRows.size());
                 for (ClaimedRow row : claimedRows) {
                   claimed.add(new IndexJob(Path.of(row.path()), row.collection(), row.provenance(),
-                      row.scanId(), row.unitRevision()));
+                      row.scanId(), row.unitRevision(), row.walkEpoch()));
                 }
                 return claimed;
               });
@@ -779,11 +794,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (activeClaims.get(path) == claim) activeClaims.remove(path);
   }
 
-  private boolean finishClaim(IndexJob claim, Runnable update) {
+  private boolean finishClaim(IndexJob claim, Runnable update, SqlWork<Void> superseded) {
     lock.lock();
     try {
       ensureOpen();
+      if (!isIssuedClaim(claim)) return false;
       if (!ownsClaim(claim)) {
+        if (claim.walkEpoch() != null) inTransaction(superseded);
         releaseClaim(claim);
         return false;
       }
@@ -799,17 +816,33 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public boolean markClaimDone(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
-    return finishClaim(claim, () -> markDone(claim.path(), outcome, entry));
+    return finishClaim(claim, () -> markDoneWithOutcome(claim.path(), outcome, entry, claim),
+        () -> recordSupersededOutcome(claim, outcome, entry, SqliteIngestionWalkOps.Coverage.SKIPPED));
   }
 
   @Override
   public boolean markClaimFailed(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
-    return finishClaim(claim, () -> markFailed(claim.path(), outcome, entry));
+    return finishClaim(claim, () -> markFailedWithOutcome(claim.path(), outcome, entry, claim), () -> {
+      SqliteIngestionWalkOps.requireFailureOutcome(outcome);
+      // The replacement owns its new retry window. A superseded retryable attempt is only diagnostic.
+      return recordSupersededOutcome(claim, outcome, entry,
+          outcome.retryPolicy() == io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE
+              ? SqliteIngestionWalkOps.Coverage.FAILED : null);
+    });
   }
 
   @Override
   public boolean deferClaim(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
-    return finishClaim(claim, () -> defer(claim.path(), outcome, entry));
+    return finishClaim(claim, () -> deferWithOutcome(claim.path(), outcome, entry, claim),
+        () -> recordSupersededOutcome(claim, outcome, entry, null));
+  }
+
+  private Void recordSupersededOutcome(IndexJob claim, IngestionOutcome outcome,
+      JobQueue.IngestionLedgerEntry entry, SqliteIngestionWalkOps.Coverage coverage) throws SQLException {
+    String path = normalizePath(claim.path());
+    insertLedgerEvent(path, outcome, ledgerEntryForClaim(path, entry, claim),
+        SqliteIngestionWalkOps.claimReceipt(connection, claim, coverage, null));
+    return null;
   }
 
   @Override
@@ -817,6 +850,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     lock.lock();
     try {
       ensureOpen();
+      if (SqliteIngestionWalkOps.currentReceipt(connection, normalizePath(path), null) != null) {
+        throw new IllegalStateException("Recorded completion requires a typed outcome");
+      }
 
       String sql = """
           UPDATE jobs SET state = 'DONE', content_hash = NULL, last_updated = ?
@@ -844,6 +880,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public void markDone(Path path, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
+    markDoneWithOutcome(path, outcome, entry, null);
+  }
+
+  private void markDoneWithOutcome(Path path, IngestionOutcome outcome,
+      JobQueue.IngestionLedgerEntry entry, IndexJob claim) {
     lock.lock();
     try {
       ensureOpen();
@@ -851,6 +892,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       int updated =
           inTransaction(
               () -> {
+                var receipt = claim == null
+                    ? SqliteIngestionWalkOps.currentReceipt(connection, normalizedPath, SqliteIngestionWalkOps.Coverage.SKIPPED)
+                    : SqliteIngestionWalkOps.claimReceipt(connection, claim, SqliteIngestionWalkOps.Coverage.SKIPPED, null);
                 String sql = """
                     UPDATE jobs
                     SET state = 'DONE', content_hash = NULL, last_updated = ?,
@@ -863,7 +907,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   bindOutcomeUpdate(stmt, 1, now, outcome, normalizedPath);
                   int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
-                    insertLedgerEvent(normalizedPath, outcome, entry);
+                    insertLedgerEvent(normalizedPath, outcome, ledgerEntryForClaim(normalizedPath, entry, claim), receipt);
                   }
                   return rows;
                 }
@@ -884,6 +928,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     lock.lock();
     try {
       ensureOpen();
+      for (Path path : paths) {
+        if (SqliteIngestionWalkOps.currentReceipt(connection, normalizePath(path), null) != null) {
+          throw new IllegalStateException("Recorded completion requires a typed outcome");
+        }
+      }
 
       long now = System.currentTimeMillis();
       // SQLite has a default SQLITE_MAX_VARIABLE_NUMBER of 999.
@@ -944,7 +993,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       for (JobQueue.IngestionLedgerTransition transition : transitions) {
         if (transition == null) continue;
         if (transition.claim() != null && !seenClaims.add(transition.claim())) continue;
-        if (transition.claim() == null || ownsClaim(transition.claim())) eligible.add(transition);
+        if (transition.claim() == null || isIssuedClaim(transition.claim())) eligible.add(transition);
       }
       long now = System.currentTimeMillis();
       int[] updates =
@@ -962,12 +1011,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   for (JobQueue.IngestionLedgerTransition transition : eligible) {
                     if (transition == null) continue;
                     String normalizedPath = normalizePath(transition.path());
-                    stmt.setString(1, transition.committedContentHash());
-                    bindOutcomeUpdate(stmt, 2, now, outcome, normalizedPath);
-                    int rows = executeMutation(stmt::executeUpdate);
+                    if (transition.claim() == null && SqliteIngestionWalkOps.currentReceipt(
+                        connection, normalizedPath, SqliteIngestionWalkOps.Coverage.INDEXED) != null) {
+                      throw new SQLException("Recorded index completion requires an issued claim");
+                    }
+                    var receipt = SqliteIngestionWalkOps.claimReceipt(connection, transition.claim(),
+                        SqliteIngestionWalkOps.Coverage.INDEXED, transition.committedContentHash());
+                    int rows = 0;
+                    if (transition.claim() == null || ownsClaim(transition.claim())) {
+                      stmt.setString(1, transition.committedContentHash());
+                      bindOutcomeUpdate(stmt, 2, now, outcome, normalizedPath);
+                      rows = executeMutation(stmt::executeUpdate);
+                    }
                     rowCounts.add(rows);
-                    if (rows > 0) {
-                      insertLedgerEvent(normalizedPath, outcome, transition.entry());
+                    if (rows > 0 || receipt != null) {
+                      insertLedgerEvent(normalizedPath, outcome,
+                          ledgerEntryForClaim(normalizedPath, transition.entry(), transition.claim()), receipt);
                     }
                   }
                 }
@@ -1005,6 +1064,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       int currentAttempts = 0;
 
       String normalizedPath = PathNormalizer.normalizePath(path.toAbsolutePath().toString());
+      if (SqliteIngestionWalkOps.currentReceipt(connection, normalizedPath, null) != null) {
+        throw new IllegalStateException("Recorded failure requires an issued claim and typed outcome");
+      }
       try (PreparedStatement stmt = connection.prepareStatement(checkSql)) {
         stmt.setString(1, normalizedPath);
         try (ResultSet rs = stmt.executeQuery()) {
@@ -1111,6 +1173,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public void defer(Path path, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
+    deferWithOutcome(path, outcome, entry, null);
+  }
+
+  private void deferWithOutcome(Path path, IngestionOutcome outcome,
+      JobQueue.IngestionLedgerEntry entry, IndexJob claim) {
     lock.lock();
     try {
       ensureOpen();
@@ -1119,6 +1186,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       int updated =
           inTransaction(
               () -> {
+                if (claim == null && SqliteIngestionWalkOps.currentReceipt(connection, normalizedPath, null) != null) {
+                  throw new SQLException("Recorded deferral requires an issued claim");
+                }
                 String sql = """
                     UPDATE jobs
                     SET state = 'PENDING', last_updated = ?, retry_after = ?,
@@ -1132,7 +1202,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   bindOutcomeOnly(stmt, 3, outcome, normalizedPath);
                   int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
-                    insertLedgerEvent(normalizedPath, outcome, entry);
+                    insertLedgerEvent(normalizedPath, outcome, ledgerEntryForClaim(normalizedPath, entry, claim),
+                        SqliteIngestionWalkOps.claimReceipt(connection, claim, null, null));
                   }
                   return rows;
                 }
@@ -1169,6 +1240,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   private void markFailedWithOutcome(
       Path path, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
+    markFailedWithOutcome(path, outcome, entry, null);
+  }
+
+  private void markFailedWithOutcome(Path path, IngestionOutcome outcome,
+      JobQueue.IngestionLedgerEntry entry, IndexJob claim) {
     if (outcome != null
         && outcome.retryPolicy()
             == io.justsearch.indexerworker.ingest.IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT) {
@@ -1189,6 +1265,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       FailedTransitionResult result =
           inTransaction(
               () -> {
+                if (claim == null && SqliteIngestionWalkOps.currentReceipt(
+                    connection, normalizedPath, SqliteIngestionWalkOps.Coverage.FAILED) != null) {
+                  throw new SQLException("Recorded failure requires an issued claim");
+                }
+                if (claim != null && claim.walkEpoch() != null) {
+                  SqliteIngestionWalkOps.claimReceipt(connection, claim, null, null);
+                  SqliteIngestionWalkOps.requireFailureOutcome(outcome);
+                }
                 FailureRunState run = readFailureRun(normalizedPath);
                 int newAttempts = run.attempts() + 1;
                 long now = System.currentTimeMillis();
@@ -1247,7 +1331,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   bindOutcomeOnly(stmt, 7, outcome, normalizedPath);
                   int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
-                    insertLedgerEvent(normalizedPath, outcome, entry);
+                    insertLedgerEvent(normalizedPath, outcome, ledgerEntryForClaim(normalizedPath, entry, claim),
+                        SqliteIngestionWalkOps.claimReceipt(connection, claim,
+                            STATE_FAILED.equals(newState) || STATE_RETRY_EXHAUSTED.equals(newState)
+                                ? SqliteIngestionWalkOps.Coverage.FAILED : null, null));
                   }
                   return new FailedTransitionResult(rows, newAttempts, newState, retryAfter);
                 }
@@ -1419,15 +1506,31 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private void insertLedgerEvent(
       String normalizedPath, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry)
       throws SQLException {
-    if (outcome == null) return;
+    insertLedgerEvent(normalizedPath, outcome, entry, null);
+  }
+
+  private void insertLedgerEvent(String normalizedPath, IngestionOutcome outcome,
+      JobQueue.IngestionLedgerEntry entry, SqliteIngestionWalkOps.UnitReceipt receipt)
+      throws SQLException {
+    if (outcome == null) {
+      if (receipt != null) throw new SQLException("Recorded terminal outcome is required");
+      return;
+    }
+    String pathHash = sha256(normalizedPath);
+    if (receipt != null && entry != null && entry.pathHash() != null && !pathHash.equals(entry.pathHash())) {
+      throw new SQLException("Recorded outcome path identity does not match its claim");
+    }
+    SqliteIngestionWalkOps.validateReceipt(receipt, outcome);
+    if (!SqliteIngestionWalkOps.advanceReceipt(connection, receipt, pathHash)) return;
     String sql = """
         INSERT INTO ingestion_ledger (
           path_hash, collection, outcome_class, reason_code, retry_policy,
           diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
-          source_kind, artifact_status, policy_id, parser_id, originator, transport
+          source_kind, artifact_status, policy_id, parser_id, originator, transport,
+          operation_key, unit_revision, content_hash, terminal_coverage
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           CASE WHEN ? THEN ? ELSE (SELECT originator FROM jobs WHERE path = ?) END,
-          CASE WHEN ? THEN ? ELSE (SELECT transport FROM jobs WHERE path = ?) END)
+          CASE WHEN ? THEN ? ELSE (SELECT transport FROM jobs WHERE path = ?) END, ?, ?, ?, ?)
         """;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       JobQueue.IngestionLedgerEntry normalizedEntry = normalizeLedgerEntry(normalizedPath, entry);
@@ -1453,8 +1556,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       stmt.setBoolean(17, entry != null);
       stmt.setString(18, normalizedEntry.transport());
       stmt.setString(19, normalizedPath);
+      stmt.setString(20, receipt == null ? null : receipt.operationKey());
+      stmt.setString(21, receipt == null ? null : receipt.unitRevision());
+      stmt.setString(22, receipt == null ? null : receipt.contentHash());
+      stmt.setString(23, receipt == null || receipt.coverage() == null ? null : receipt.coverage().name());
       executeMutation(stmt::executeUpdate);
     }
+  }
+
+  private static JobQueue.IngestionLedgerEntry ledgerEntryForClaim(String path,
+      JobQueue.IngestionLedgerEntry entry, IndexJob claim) {
+    if (claim == null) return entry;
+    var normalized = normalizeLedgerEntry(path, entry);
+    var provenance = claim.provenance();
+    return new JobQueue.IngestionLedgerEntry(normalized.pathHash(), claim.collection(),
+        normalized.sourceSizeBytes(), normalized.sourceModifiedAtMs(), normalized.sourceKind(),
+        normalized.artifactStatus(), normalized.policyId(), normalized.parserId(),
+        provenance == null ? null : provenance.originator(), provenance == null ? null : provenance.transport());
   }
 
   private static JobQueue.IngestionLedgerEntry normalizeLedgerEntry(

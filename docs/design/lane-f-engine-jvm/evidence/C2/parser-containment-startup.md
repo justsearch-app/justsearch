@@ -50,3 +50,16 @@ Independent review found no fixture defect and corrected one evidence metadata e
 kill-negative1556's later FAILED announcement must supersede the earlier task-start line.
 The archived four failures were already correct; only status metadata changed. The active
 capture helper now preserves a later FAILED status instead of retaining its first announcement.
+
+
+## Hosted result at d892321c6 (2026-09-14)
+
+[CI34818093845](https://github.com/justsearch-app/justsearch/actions/runs/34818093845)
+completed with overall success and Windows-native tests success. Twelve jobs passed;
+Integration tests (system-tests tier) failed:101 reported attempts including retries,
+seven failures and42 skips. Failures include EngineSupervisedRecoveryE2ETest's lock-boot
+and processing arms and OperationResumeE2ETest. The overall run conclusion is not an
+integration pass. These recovery failures remain required lane work, being diagnosed from
+hosted artifacts. CLA34818091906 passes. The intermediate5739cdb8b and bda750489 CI runs
+were cancelled by later pushes, not verified passes. Local downloaded job metadata and
+failed log:tmp/parser-hosted1561.json and tmp/parser-hosted-failed1561.txt.

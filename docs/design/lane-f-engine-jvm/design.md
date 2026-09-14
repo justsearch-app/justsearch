@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-8d.2b.1 records explicit membership and historical terminal coverage in the existing queue transaction. Epoch distinguishes recorded membership from a legacy matching scan key; missing projections refuse adoption. Exact superseded claims retain truthful effects without mutating replacement jobs. Coverage/outcome mismatch and untyped recorded completion refuse. Administrative closure/seal/retention and actual activation remain next cuts. [Proof](evidence/C2/walk-terminal-accounting.md).
+
 - 2026-09-14: C2-8d.2 retains issued queue object identity until the actual outcome or batch-exit return, independently of a replacement row's admission revision. Poll excludes issued paths before its limit; runtime orphan recovery excludes live owners. Stopped batches return unwritten claims through the existing journal retry owner, while written effects retain commit ownership. Jobs v18 remains a derived projection inside the existing queue connection. Schema/epoch primitives and this prerequisite form the first WIP checkpoint; ledger accounting, seal, acknowledgement retention and producer/recovery activation remain explicit next cuts in the [vertical plan](evidence/C2/C2-8d-vertical-plan.md).
 
 
