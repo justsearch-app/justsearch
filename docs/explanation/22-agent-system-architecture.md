@@ -295,8 +295,12 @@ it is never authority supplied by a request header. Ungated test wiring clears t
 reference. Prepared retries retain their frozen context and provenance for the gate;
 acceptance changes only the grant reference in that context. The exact-grant query
 refuses substitution when the selected entry was revoked, even if another grant
-could cover a fresh invocation. Recorded ingestion recovery still requires its
-pre-poll authority integration before activation.
+could cover a fresh invocation. The shared authority also supplies a pure recorded
+ingestion decision using its canonical operation catalogs: invalid binding, current
+scope or exact-basis authority refuses before generation/capability readiness can
+wait. A capsule never authorizes restart. This decision writes nothing and grants
+no queue permission; recorded ingestion still requires its pre-poll authority
+integration before activation.
 
 Durable grant writes serialize a candidate snapshot and force its atomic file
 replacement before publishing the new immutable set to authorization readers.

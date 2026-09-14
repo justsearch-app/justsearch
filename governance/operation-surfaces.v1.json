@@ -873,6 +873,15 @@
       "guard": "test:RecordedIngestPlanResolverTest",
       "consumesProjection": "operation-record-type",
       "note": "C2-8d.1 verifies the existing accepted operation row and prepared invocation to derive its frozen root plan. It owns neither acceptance nor lifecycle state, and does not grant recovery authority."
+    },
+    {
+      "id": "recorded-ingest-recovery-authority",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/OperationAuthority.java",
+      "guard": "test:RecordedIngestRecoveryDecisionTest",
+      "consumesProjection": "operation-record-type",
+      "note": "C2-9b.2b pure recovery decision revalidates the existing row and frozen invocation against the sole current roots, source, gate and exact grant authorities. It writes no operation state, installs no queue permit and starts no effect."
     }
   ]
 }

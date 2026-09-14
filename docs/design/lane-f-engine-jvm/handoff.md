@@ -25,8 +25,7 @@ C2-9b.1 now preloads one shared OperationAuthority and the existing WatchedRoots
 before the async fork, with identical state used by the client and Head. Full1642
 services/Engine:3,145 cases, three existing skips, zero failures;143 focused cases,
 three discriminating negative controls, UI compilation/PMD/format and independent
-call-path review also pass. Next is C2-9b.2 strict frozen-root scope/recovery decision,
-then C2-9b.3 fencing and C2-8d.3 actual producer. Recovery activation remains open.
+call-path review also pass. C2-9b.2 scope/decision is verified below; next is C2-9b.3 fencing and C2-8d.3 actual producer. Recovery activation remains open.
 Hosted27246acd6 exposed the old UI assertion that omitted the server-selected basis;
 [the correction record](evidence/C2/hosted-authorization-context.md) preserves the
 exact failure. This is separate from the shared-authority implementation.
@@ -34,11 +33,13 @@ Notification checkpoint7777be3fd passed all13 hosted jobs in CI34835832804.
 
 C2-9b.1 is pushed as9a3aa8bb0 and passed all13 CI34842534126 jobs plus CLA,
 including the separately committed288113a2b UI context assertion correction.
-C2-9b.2a strict frozen-root scope now passes full1650 services (2,919 cases,
-three existing skips, no failures), PMD/format and discriminating raw-fallback /
-missing-path controls. C2-9b.2b pure typed authorization decision and .3 actual
-fencing/producer integration are next; the catalog-reuse draft is not yet verified
-as a recovery owner. [Owning scope/decision plan and evidence](evidence/C2/ingestion-authorization-recovery.md).
+C2-9b.2a strict frozen-root scope is pushed48b38b4ea and passed all13 hosted
+CI34844688686 jobs plus CLA. C2-9b.2b pure typed decision now passes full1657
+services:2,934 cases, three existing skips, no failures; focused Engine/UI and
+negative controls pass. [Owning decision and proof](evidence/C2/ingestion-authorization-recovery.md).
+Next is C2-9b.3 startup/per-claim fencing and C2-8d.3 actual producer, including
+immediate stuck-job recovery after later Wait-to-Authorized reconciliation.
+No queue permission or real recovery activation is claimed by the pure decision.
 
 A/B/C1 are complete. C2 remains open; do not merge before stage F.
 The public settings producer/controller is implemented and locally verified:

@@ -176,8 +176,8 @@ public final class SubstratePhase {
     // the MCP-host's contributions compose into the ONE ContributionRegistry, and capability-derived
     // availability is applied ONCE over the full merged set (tempdoc 550 E3), closing the pre-WS4 gap
     // where MCP (or any post-merge) ops bypassed the gate because derivation ran before the merge.
-    CoreOperationCatalog coreBase = new CoreOperationCatalog();
-    AgentToolsOperationCatalog agentToolsBase = new AgentToolsOperationCatalog();
+    CoreOperationCatalog coreBase = authority.coreOperations();
+    AgentToolsOperationCatalog agentToolsBase = authority.agentOperations();
 
     // MCP-host first consumer (tempdoc 560 §6): connect to any configured external MCP servers and
     // project their tools onto EXECUTABLE Operation declarations — Path B, through the executor +

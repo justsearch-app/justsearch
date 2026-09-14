@@ -6,7 +6,7 @@ This note records the minimum authorization and composition contract for recover
 
 The source review was performed at revision `128a0c945e60fe1ba3d1afb4d30869d8242ea6d9` in the Windows/PowerShell worktree `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`. The tree also contained unrelated in-progress app-api value changes. No build or test was run for this docs-only review.
 
-## Verified current behavior and gaps
+## Historical investigation at128a0c945 (superseded by the implementation records below)
 
 `RequestEngineContext` copies `X-JustSearch-Grant-Reference` from the request into `EngineContext` (`modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineContext.java:37-39`). `EngineContext` explicitly defines `clientKind` and `grantReference` as attribution rather than authorization and requires a resumed operation to resolve authority again (`modules/core/src/main/java/io/justsearch/core/context/EngineContext.java:14-17`). Source identity is separately checked against the registered transport through `EngineProvenance` (`modules/app-services/src/main/java/io/justsearch/app/services/intent/EngineProvenance.java:61-69`). A caller-provided grant reference therefore cannot authorize admission or recovery.
 
@@ -91,7 +91,7 @@ The implementation is not ready until focused tests establish all of the followi
 
 ## Missing proof
 
-Shared pre-fork authority and the sole roots carrier are locally verified in C2-9b.1 below. Strict recorded-root scope, per-claim invalidation and the generation-ready recovery callback remain unimplemented. After-lock queue notification is implemented and verified separately in [walk-notifications-retention.md](walk-notifications-retention.md). The C2-9a.1 basis/selection/binding cut is locally verified below; it does not establish live recovery, reboot permission or stage completion.
+Shared pre-fork authority and the sole roots carrier are locally verified in C2-9b.1 below. Strict recorded-root scope is locally and hosted verified in C2-9b.2a. The pure typed decision is implemented in C2-9b.2b; its current verification is recorded below. Per-claim fencing and the generation-ready recovery callback remain unimplemented. After-lock queue notification is implemented and verified separately in [walk-notifications-retention.md](walk-notifications-retention.md). The C2-9a.1 basis/selection/binding cut is locally verified below; it does not establish live recovery, reboot permission or stage completion.
 
 
 ## C2-9a acceptance prerequisite (2026-09-14)
@@ -453,3 +453,52 @@ mixed-root test. Three governance gates, store recovery and canonical docs check
 pass in tmp/1650-gates.txt and tmp/1652-docs.txt. Retain1651/1652 with the same
 artifacts/retention described above. C2-9b.2a is locally verified; typed authority
 revalidation, producer activation and live restart proof remain required.
+
+
+### C2-9b.2b verification (2026-09-14)
+
+Base48b38b4ead9b6f97ae5f1de21c9d6ac0c08fb02b, Windows x64. The pure decision and
+canonical base-catalog reuse implement the selected contract above. No lifecycle
+command, runtime permit, queue mutation or effect is introduced by this cut.
+
+- 1653 main-only services/UI compilation and services PMD passed while the test
+  worker completed its separate test file; that run neither compiled nor ran tests.
+- Root reviewed the test diff and corrected the public paths field, the reindex
+  input, and two potential wrong-reason passes. The unregistered source case uses
+  LOW reindex with AUTO so registration is decisive; the refusal/readiness case
+  uses a capsule with required WorkerOnline so reordering is observable.
+- 1654 executed32 focused cases/11 suites across services, Engine and UI, with no
+  failures/errors/skips. Services PMD and formatting passed.
+- 1655 disabled registration, scope, DENY, capsule prohibition, exact grant identity,
+  no-AUTO-substitution and generation guards. It executed20 cases with nine expected
+  failures, including both alternate-grant directions and a grant issued after the
+  hard stop. This is a grouped control, not separate execution of each mutation.
+- 1656 restored those guards and moved readiness before permanent checks. It
+  executed20 cases with exactly one expected failure in refusal-before-readiness.
+  Root restored OperationAuthority byte-for-byte from the positive1654 version
+  before the final integrated run.
+
+Logs, counts and copied XML are tmp/1653* through tmp/1657* in the active worktree;
+retention is through final lane reconciliation plus30 days, at least2026-10-14.
+
+The scope checkpoint48b38b4ea passed CI34844688686 and CLA34844684700; exact CI
+metadata is tmp/1656-hosted-run.json. This is hosted proof for .2a, not the later
+pure decision. The actual queue fence, producer and live restart proof remain .3.
+
+Final1657 executed the full services suite:2,934 cases/433 suites, three existing
+skips, no failures/errors. Engine(1 case) and UI(5 cases) were UP-TO-DATE from1654;
+the combined represented result is2,940 cases/437 suites, not2,940 new executions.
+PMD/format passed, and root independently verified restored authority bytes.
+The first governance pass correctly rejected the undeclared authority reader;
+it is now explicitly a consumer of operation-record-type, guarded by the real
+recovery decision tests. No alternate lifecycle representation was registered.
+
+Final governance1658 passes all three gates with zero findings; store recovery and
+canonical documentation checks passed in1657. The declared reader and its guard
+resolve without a baseline exception or suppressed finding.
+
+Independent read-only refute by /root/seal_test_completion found no material pure
+verdict defect or wrong-reason pass after reading the restored source, tests and
+1654-1657 evidence. It explicitly does not establish .3 lifecycle/claim/startup
+behavior. The separate production review by /root/walk_closure_refute was clear
+before final test execution; root retained implementation and Gradle ownership.
