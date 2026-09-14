@@ -59,6 +59,10 @@ Keep the newly found corrections in separate commits, all required before produc
   existing full-generation rebuild action (legacy can recover automatically; an explicit retry
   must still be a whole-index action), preserve schema-specific behavior, and assert exact
   operation/default arguments by reason. Correct remaining canonical UI remedy descriptions.
+  Read-only tracing also found the recovery inverse index and HealthSurface discard default
+  arguments: preserve the existing invocation through that projection rather than duplicating
+  mappings in the UI. Route rebuild_brake_exhausted to full rebuild, matching the existing
+  readiness notice and status remedy; preserve other schema mappings. No owner input is needed.
 
 The checks below apply to the relevant subcut; .2a as a whole stays open until all three pass.
 
@@ -116,3 +120,55 @@ failure diagnosis still to reconcile. This cut has no hosted/live claim yet.
 .2a.1 local acceptance is satisfied. .2a.2 visibility/coverage/strict-count corrections and
 .2a.3 actual recovery routing remain mandatory next, followed by .2b producer binding and
 .3 prepared handlers. C2 remains open and merge stays at F.
+
+## .2a.2 implementation details (2026-09-14)
+
+Use the existing recovery entry point and commit/refresh operations; no new persistent marker,
+writer or transition lock. Count parents strictly, re-mark exact batches, commit with the
+existing VDU_RECOVERY attribution, refresh, then strictly require zero COMPLETED and FAILED
+parents before enabling REBUILDING. A count, write, commit or refresh failure leaves the
+controller blocked and logs the existing best-effort refusal. Enumeration at its bounded cap
+refuses instead of treating a partial list as complete. Finalization uses the existing strict
+count operation; any read failure resets the consecutive-zero streak, including shutdown.
+
+Strengthen the real-index production-rescue regression by stopping background refresh,
+disabling foreground refresh and removing its test-side post-rescue barrier. Probe both
+normal and shutdown finalization. Mocked coverage/IO regressions complement, not substitute
+for, that real visibility proof. The local proof below covers this subcut; final lane live/installed/hosted reconciliation remains owed.
+
+## .2a.2 verification (2026-09-14)
+
+Against40a9a14b9 plus this subcut, Windows/Temurin25.0.2. Independent first review found no
+material defect in the safety chain or the strengthened tests. Final independent evidence reread passed, including exact source-byte restoration and reused-test attribution.
+1780 did not compile because a new fixture returned long to IntSupplier; corrected the fixture,
+without changing the acceptance assertions. That failed command is retained, not counted as proof.
+
+| Proof | Result |
+|---|---|
+|1781 focused|36 cases/five suites executed, zero failures/errors/skips; PMD/format pass.|
+|1783 barrier removal|14 cases/three suites, five expected failures: commit/refresh unit arms and both real-index finalization variants. The real reader still sees old COMPLETED parents, so strict coverage refuses; its XML includes that exact cause. Nine positive controls pass.|
+|1784 coverage removal|11 cases, seven expected failures: four inexact batch results, unsafe cap acceptance, omitted COMPLETED coverage and residual FAILED coverage. Four positive controls pass. Cap mutant returns an empty truncated list rather than allocating millions of duplicate ids.|
+|1785 swallowing count|13 cases, exactly three strict-finalizer regressions fail by incorrectly certifying; ten other lifecycle cases pass.|
+|1786 missing streak reset|One case, expected failure: the first zero after a reader fault incorrectly certifies.|
+|1787 final restored|131 cases/21 suites newly executed across indexer-worker and worker-services, zero failures/errors/skips.19 unchanged worker-core cases/one suite are UP-TO-DATE reuse:150 represented, not150 new. Six PMD tasks and format pass.|
+
+Every fault-injection driver restores and verifies source bytes in finally; root reread the
+captured assertion messages and the real-index cause.1783-initial stopped at the worker failure;
+1783 repeated with --continue to run BOTH module selections, retaining initial evidence separately.
+Existing IndexingLoopTest stubs now explicitly supply strict counts instead of passing through a
+mock's default zero. Live embeddings are simulated in the persistence regression, as before.
+
+1787 command:
+
+```powershell
+gradlew.bat -PtestParallelism=1 :modules:worker-services:test --tests *EmbeddingRecoveryOpsTest --tests *EmbeddingProviderLifecycleTest --tests *IndexingLoopTest :modules:worker-core:test --tests *EmbeddingCompatibilityControllerTest :modules:indexer-worker:test --tests *InPlaceEmbeddingRebuildRecoveryTest --tests *EmbeddingFingerprintLegacyUnattestedVectorsMigrationTest --tests *EmbeddingFingerprintProductionWiringDurabilityTest --tests *EmbeddingCompatibilityBootOrderingTest --tests *WorkerSelectedForceCompatibilityTest --tests *GreenCutoverEmbeddingFpVerifyTest :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:worker-core:pmdMain :modules:worker-core:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest spotlessCheck
+```
+
+Fault-injection commands are in `tmp/recovery-negative.py`; each label1783–1786 selects its
+specified regression. Logs, copied XML and counts manifests are `tmp/<label>.txt`,
+`tmp/<label>-xml/` and `tmp/<label>-counts.json`; original bytes are adjacent. Retention is the
+same as .2a.1.1788 records documentation links/index, three governance gates and store checks.
+Full-stage/live/installed/final hosted proof remains required; .2a.3 reachable remedy routing
+is next, before producer activation. Hosted scan17d56daf0 failure is now diagnosed from downloaded
+XML: only RecordedIngestionCoordinator.bindProducer is unreferenced, on all three attempts
+(`tmp/1781-prior-hosted-xml`). No exemption or early merge is authorized by this result.

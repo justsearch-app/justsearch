@@ -1,9 +1,11 @@
 package io.justsearch.indexerworker.loop;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -16,6 +18,9 @@ import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.embed.EmbeddingFingerprint;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexing.SchemaFields;
+import java.io.IOException;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -283,4 +288,118 @@ class EmbeddingProviderLifecycleTest {
     assertFalse(lifecycle.tryFinalizeFreshCompatibleStamp());
     verifyNoInteractions(commitOps);
   }
+
+  @Test
+  void normalFinalizeRefusesWhenStrictPendingCountCannotBeRead() throws IOException {
+    CommitOps commitOps = mock(CommitOps.class);
+    IndexCountOps indexCountOps = mock(IndexCountOps.class);
+    JobQueue jobQueue = mock(JobQueue.class);
+    when(jobQueue.queueDepth()).thenReturn(0L);
+
+    // Keep the swallowing API independently "safe-looking": a restored implementation that calls
+    // countByField() would observe zero and incorrectly certify on its second attempt.
+    when(indexCountOps.countByField(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenReturn(0);
+    when(indexCountOps.countByFieldOrThrow(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenThrow(new IOException("simulated reader failure"));
+
+    EmbeddingCompatibilityController ecc = rebuildingWithPriorSuccessfulWriteEvidence();
+    EmbeddingProviderLifecycle lifecycle = newLifecycle(jobQueue, indexCountOps, commitOps);
+    lifecycle.setEmbeddingCompatController(ecc);
+
+    assertFalse(lifecycle.tryFinalizeRebuild(), "first strict read failure must refuse");
+    assertFalse(lifecycle.tryFinalizeRebuild(), "second strict read failure must refuse");
+    assertEquals(EmbeddingCompatibilityController.State.REBUILDING, ecc.state());
+    verify(indexCountOps, times(2))
+        .countByFieldOrThrow(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+    verify(indexCountOps, never())
+        .countByField(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+    verifyNoInteractions(commitOps);
+  }
+
+  @Test
+  void shutdownFinalizeRefusesWhenStrictPendingCountCannotBeRead() throws IOException {
+    CommitOps commitOps = mock(CommitOps.class);
+    IndexCountOps indexCountOps = mock(IndexCountOps.class);
+    JobQueue jobQueue = mock(JobQueue.class);
+    when(jobQueue.queueDepth()).thenReturn(0L);
+
+    // A one-shot shutdown finalize has no second-read opportunity; an unreadable count is still
+    // refusal, even when the legacy swallowing method is stubbed to return zero.
+    when(indexCountOps.countByField(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenReturn(0);
+    when(indexCountOps.countByFieldOrThrow(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenThrow(new IOException("simulated shutdown reader failure"));
+
+    EmbeddingCompatibilityController ecc = rebuildingWithPriorSuccessfulWriteEvidence();
+    EmbeddingProviderLifecycle lifecycle = newLifecycle(jobQueue, indexCountOps, commitOps);
+    lifecycle.setEmbeddingCompatController(ecc);
+
+    assertFalse(
+        lifecycle.tryFinalizeRebuildAtShutdown(),
+        "shutdown must refuse when the strict pending count is unreadable");
+    assertEquals(EmbeddingCompatibilityController.State.REBUILDING, ecc.state());
+    verify(indexCountOps)
+        .countByFieldOrThrow(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+    verify(indexCountOps, never())
+        .countByField(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+    verifyNoInteractions(commitOps);
+  }
+
+  @Test
+  void transientPendingCountReadFailureResetsTwoReadCertificationStreak() throws IOException {
+    CommitOps commitOps = mock(CommitOps.class);
+    IndexCountOps indexCountOps = mock(IndexCountOps.class);
+    JobQueue jobQueue = mock(JobQueue.class);
+    when(jobQueue.queueDepth()).thenReturn(0L);
+
+    // This sequence must be false,false,false,true: the fault between the first and second zero
+    // clears the prior zero, so certification needs two fresh successful zero reads.
+    when(indexCountOps.countByField(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenReturn(0);
+    when(indexCountOps.countByFieldOrThrow(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenReturn(0)
+        .thenThrow(new IOException("simulated transient reader failure"))
+        .thenReturn(0)
+        .thenReturn(0);
+
+    EmbeddingCompatibilityController ecc = rebuildingWithPriorSuccessfulWriteEvidence();
+    EmbeddingProviderLifecycle lifecycle = newLifecycle(jobQueue, indexCountOps, commitOps);
+    lifecycle.setEmbeddingCompatController(ecc);
+
+    assertFalse(lifecycle.tryFinalizeRebuild(), "first zero only arms the guard");
+    assertFalse(lifecycle.tryFinalizeRebuild(), "read failure must refuse and reset the guard");
+    assertFalse(lifecycle.tryFinalizeRebuild(), "first zero after the fault only re-arms it");
+    assertTrue(lifecycle.tryFinalizeRebuild(), "second fresh zero certifies the evidenced rebuild");
+    assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, ecc.state());
+    verify(indexCountOps, times(4))
+        .countByFieldOrThrow(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+    verify(indexCountOps, never())
+        .countByField(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+    verify(commitOps).commitAndTrack(CommitReason.INDEXING_LOOP_REBUILD_STAMP);
+  }
+
+  private static EmbeddingCompatibilityController rebuildingWithPriorSuccessfulWriteEvidence() {
+    EmbeddingCompatibilityController ecc =
+        new EmbeddingCompatibilityController(Map::of, () -> 2L, () -> 2);
+    ecc.refresh();
+    assertEquals(EmbeddingCompatibilityController.State.BLOCKED_LEGACY, ecc.state());
+    ecc.onForcedReindexRequested();
+    ecc.noteSuccessfulEmbeddingObserved();
+    assertEquals(EmbeddingCompatibilityController.State.REBUILDING, ecc.state());
+    return ecc;
+  }
+
 }

@@ -1265,7 +1265,7 @@ class IndexingLoopTest {
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
       WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
       queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      when(indexCountOps.countByField(any(), any())).thenReturn(0);
+      when(indexCountOps.countByFieldOrThrow(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
           new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
@@ -1306,7 +1306,7 @@ class IndexingLoopTest {
       // Tempdoc 516 Slice 4c: maybeFinalize is now a wrapper that delegates to the
       // lifecycle's tryFinalizeRebuild() and resets the commit-driver counters on true.
       // Tempdoc 726 F1: the lifecycle debounces certification with a two-consecutive-reads guard
-      // (pendingEmbeddings==0 twice — indexCountOps is a mock defaulting countByField()→0), so the
+      // (pendingEmbeddings==0 twice — indexCountOps explicitly supplies strict zero counts), so the
       // first invocation confirms and the second certifies + commits.
       Method finalize =
           IndexingLoop.class.getDeclaredMethod("tryFinalizeEmbeddingRebuild");
@@ -1341,7 +1341,7 @@ class IndexingLoopTest {
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
       WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
       queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      when(indexCountOps.countByField(any(), any())).thenReturn(0);
+      when(indexCountOps.countByFieldOrThrow(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
           new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),

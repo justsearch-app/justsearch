@@ -2,21 +2,23 @@
 
 ## Current state (2026-09-14)
 
-Current d.3b.2a.1 [selected-force/provenance correction](evidence/C2/recorded-force-compatibility.md)
-is implemented and locally verified against17d56daf0 plus this per-item diff. Selected recorded
-and ordinary force cannot transition whole-index compatibility; blocked mismatch commits preserve
-the known old fingerprint. Integrated1775 passes100 cases/12 suites, final restored1779 passes12,
-and all ten expected fault-injection failures discriminate the unsafe behavior. Independent review,
-PMD, format and documentation/governance checks pass. Live/model/hosted proof is not claimed.
+Current d.3b.2a.2 [legacy recovery correction](evidence/C2/recorded-force-compatibility.md)
+is implemented against40a9a14b9 plus its per-item diff. Recovery requires exact re-mark coverage,
+commit and reader refresh before compatibility transition; normal/shutdown certification refuses
+unreadable pending counts. Final1787 passes131 new cases/21 suites plus19 unchanged core cases
+reused, no failures/errors/skips;16 fault-injection failures discriminate all safeguards, sources
+restored. Independent review and final evidence reread, PMD, format and governance pass.
+Selected-force/provenance correction is already pushed40a9a14b9 with100 focused1775 cases and12
+restored1779 cases; no selected force can certify untouched vectors or strip known old provenance.
 
-Next, in separate commits: .2a.2 fixes legacy recovery commit/refresh visibility, exact coverage and
-strict certification reads; .2a.3 routes compatibility remedies to the actual full rebuild. Both
-are mandatory before .2b bounded Engine producer binding/actual-exit proof, then .3 prepared
-handlers and integrated/live/installed/hosted reconciliation. No producer is bound yet. C2 stays
-open and merge stays at F; root owns lifecycle, SQL, builds and installation of source/test changes.
+Next .2a.3 routes embedding/brake recovery to full rebuild and preserves per-condition invocation
+arguments through the recovery index into the actual UI path. Then .2b binds the bounded Engine
+producer and proves actual producer/delivery exit, followed by .3 prepared handlers and all final
+C2 integrated/live/installed/hosted reconciliation. No producer is bound yet. C2 remains open,
+merge stays at F, and root owns lifecycle, SQL, builds and installed source/test changes.
 
 Recorded scan admission is pushed17d56daf0 with52 final1769 cases and independent negative proofs.
-Its hosted CI34887604012 passes12/13 jobs; app-ui failure diagnosis remains to reconcile, while
+Its hosted CI34887604012 passes12/13 jobs; app-ui fails only the still-unbound producer method on three attempts, while
 CLA34887601017 passes. [Scan evidence](evidence/C2/recorded-scan-admission.md).
 
 Prior pushed checkpoint064adc779 fixes coordinator startup cancellation and

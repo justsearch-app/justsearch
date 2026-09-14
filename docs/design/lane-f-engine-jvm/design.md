@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2 d.3b.2a.2 requires durable, reader-visible and exactly covered legacy re-marking before compatibility transition; normal/shutdown certification refuses unreadable pending counts and resets consecutive-zero evidence. Reuse existing recovery/commit/count owners, with no new marker or global queue gate. [Mechanism and proof](evidence/C2/recorded-force-compatibility.md#2a2-implementation-details-2026-09-14).
+
 - 2026-09-14: C2 d.3b.2a keeps selected force as extraction-only intent; whole-index legacy recovery and blue/green migration own embedding compatibility. Remove the unsafe batch-trigger shortcut and its architecture exemption rather than certifying untouched vectors from selected receipts. [Decision, superseded candidate and proof plan](evidence/C2/recorded-force-compatibility.md).
 
 - 2026-09-14: C2 d.3b.1 carries recorded child key/epoch, frozen generation and subtree policy beside the existing Java scan request, preserving indexing.proto. Revalidate generation before every batch, bound single-file traversal to the start node with consistent non-following link policy, prune nested ownership, reject malformed/partial traversal and recheck cancellation before enqueue. The recorded Worker admission seam precedes bounded Engine binding; force compatibility must use proven index work before activation. [Owning mechanism and acceptance](evidence/C2/recorded-scan-admission.md).

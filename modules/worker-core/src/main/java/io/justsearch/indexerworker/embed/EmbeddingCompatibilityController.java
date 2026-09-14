@@ -289,7 +289,7 @@ public final class EmbeddingCompatibilityController {
    *
    * <p>Vectors on documents already marked {@code COMPLETED} but committed WITHOUT a fingerprint have
    * unknowable provenance (they may have been written by a different embedding model), so the caller
-   * is responsible for re-marking such documents PENDING before/around this call so the backfill
+   * is responsible for re-marking such documents PENDING, committing and refreshing before this call so the backfill
    * re-embeds them under the current model.
    *
    * <p><b>The on-disk signature this rescues (tempdoc 730 A4 §THEORIZE A).</b> A commit finalized
@@ -302,7 +302,7 @@ public final class EmbeddingCompatibilityController {
    * cannot prove came from the current model (the mixed-provenance risk the tempdoc 730 A1 revert
    * identified), so the only safe rescue in BOTH cases is a real re-embed, owned by the whole-index
    * legacy recovery caller in EmbeddingRecoveryOps. Safety comes from the caller having
-   * re-marked first — not from inspecting the completed/pending split, which is why this takes no
+   * verified complete, visible re-marking first; this method does not itself read the index or take
    * distribution counts.
    *
    * @param docCount total (parent) docs in the index

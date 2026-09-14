@@ -24,6 +24,8 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -185,13 +187,14 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
   @DisplayName(
       "the production rescue seam re-marks COMPLETED docs PENDING before entering REBUILDING —"
           + " a rescue that transitioned without re-marking (PR #185's"
           + " maybeAutoStartRebuildForLegacyUnattestedVectors shape) would find pending==0 already"
           + " true, certify instantly, and stamp a fingerprint over never-re-embedded vectors")
-  void rescueSeamReMarksPendingBeforeCertifying_neverFabricatesProvenance() throws Exception {
+  void rescueSeamReMarksPendingBeforeCertifying_neverFabricatesProvenance(boolean shutdown) throws Exception {
     EmbeddingFingerprint.setForTesting(FP);
     Path dir = Files.createTempDirectory("in-place-recovery-fabrication");
     int docCount = 3;
@@ -223,6 +226,8 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
     try (var r2 = openRuntime(dir, stamping);
         SqliteJobQueue jobQueue = new SqliteJobQueue(dir.resolve("jobs.db"))) {
       jobQueue.open();
+      // No background reopen or foreground query refresh may hide a missing production barrier.
+      r2.commitOps().suspendNrtRefresh();
 
       var ecc =
           new EmbeddingCompatibilityController(
@@ -252,10 +257,7 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
       assertEquals(docCount, outcome.reMarkedPending(), "the rescue re-marks every COMPLETED doc");
       assertTrue(outcome.rebuildStarted(), "the rescue transitions to REBUILDING");
       assertEquals(EmbeddingCompatibilityController.State.REBUILDING, ecc.state());
-      // Commit so the re-marked state is durably visible to count/query reads (the real backfill
-      // commits periodically).
-      r2.commitOps().commitAndTrack();
-      r2.commitOps().maybeRefreshBlocking();
+      // No test-side commit/refresh: the production rescue must establish reader visibility.
 
       // Observable effect #1: the documents are actually re-queued for real re-embedding, not just
       // a bare state flip.
@@ -280,11 +282,11 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
       // the debounce alone even for a rescue that re-marked nothing — i.e. pass for the wrong
       // reason. Two consecutive reads defeat the debounce and leave only the invariant.
       assertFalse(
-          lifecycle.tryFinalizeRebuild(),
+          shutdown ? lifecycle.tryFinalizeRebuildAtShutdown() : lifecycle.tryFinalizeRebuild(),
           "must not certify while re-embed work is still pending — certifying would stamp a"
               + " fingerprint over vectors nobody has re-embedded under the current model");
       assertFalse(
-          lifecycle.tryFinalizeRebuild(),
+          shutdown ? lifecycle.tryFinalizeRebuildAtShutdown() : lifecycle.tryFinalizeRebuild(),
           "must still not certify on a second consecutive read — with docs genuinely PENDING no"
               + " read count may certify; if this passes only via the debounce, the rescue never"
               + " re-marked and provenance is about to be fabricated");
@@ -322,6 +324,7 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
     return io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
             FieldCatalogDef.forTesting(768), commitMetadata, PERMISSIVE)
         .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
+        .withForegroundActive(() -> false)
         .open();
   }
 
