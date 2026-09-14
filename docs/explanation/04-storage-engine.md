@@ -300,7 +300,12 @@ LauncherEnvironment. A second launcher in the same JVM must acquire its own lock
 is refused while the first remains active. Shutdown retains the lock until the operations
 store closes; failed setup releases it after safe store cleanup. The port is
 implemented in app-observability, and the same instance is injected into the application and index
-composition before asynchronous startup. It closes after the index half drains. The schema starts
+composition before asynchronous startup. Startup retries SQLite BUSY (including extended BUSY
+codes) during WAL/schema/pruning setup only after the attempted connection closes successfully.
+Compatibility inspection and corruption preservation run once before these attempts; contention
+never triggers quarantine. A monotonic five-second window bounds retry admission, while each
+admitted native call retains its five-second busy timeout. Other failures, uncertain close and
+interruption fail startup. It closes after the index half drains. The schema starts
 at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 bytes
 for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
 history fence; `jobs.db` independently uses version 18. Versions 15–17 retain nullable

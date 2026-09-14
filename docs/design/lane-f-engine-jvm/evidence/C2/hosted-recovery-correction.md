@@ -109,3 +109,14 @@ active worktree. The original retention rule applies. Next is a bounded BUSY-onl
 operations-store initialization after confirmed connection close, outside the one-time
 compatibility/corruption preservation phase. It is not implemented/proved by this diagnostic
 commit, and the zero-root enumeration/remaining C2 and D1–F obligations stay open.
+
+## Startup repair reconciliation (2026-09-14)
+
+The BUSY-only operations initializer now passes installed1597's targeted lock-boot and
+installed1598's complete six-case recovery group (six executed, no skips/failures).
+[Mechanism, integrated tests, negative controls and independent review](operations-startup-busy.md).
+Quick1599 confirms ABSENT/no foreign runs/no inference orphan. This closes the locally observed
+initial-discovery failure without changing first-incarnation supervision or narrowing the locks.
+Hosted30acebfd9 CI34825957735 passes integration and Windows-native plus ten other jobs;
+license-report dependency download receives Maven HTTP403, and the failed job is retried.
+The newer startup repair still requires its own hosted proof; C2-11 acceptance is not asserted.

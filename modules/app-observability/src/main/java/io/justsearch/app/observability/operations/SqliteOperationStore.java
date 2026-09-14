@@ -105,15 +105,7 @@ public final class SqliteOperationStore implements OperationStore {
       }
       Recovery latestRecovery = latestRecovery();
       long recoveryFloor = latestRecovery == null ? 0 : latestRecovery.historySinceMillis();
-      connection = DriverManager.getConnection("jdbc:sqlite:" + this.path);
-      try (Statement statement = connection.createStatement()) {
-        statement.execute("PRAGMA busy_timeout = 5000");
-        statement.execute("PRAGMA journal_mode = WAL");
-        statement.execute("PRAGMA synchronous = NORMAL");
-      }
-      boolean recovered = initializeSchema(recoveryFloor);
-      if (recovered) recovery = latestRecovery;
-      pruneHistory();
+      initializeWithContentionRetry(recoveryFloor, latestRecovery);
     } catch (IOException | SQLException | RuntimeException | Error failure) {
       if (connection != null) {
         try { connection.close(); } catch (SQLException closeFailure) {
@@ -123,6 +115,60 @@ public final class SqliteOperationStore implements OperationStore {
       }
       throw failure;
     }
+  }
+
+  /** Retry only startup BUSY after closing the attempted connection; preservation runs once. */
+  private void initializeWithContentionRetry(long recoveryFloor, Recovery latestRecovery)
+      throws SQLException, IOException {
+    long retryStarted = System.nanoTime();
+    long retryWindowNanos = Duration.ofSeconds(5).toNanos();
+    for (;;) {
+      try {
+        connection = DriverManager.getConnection("jdbc:sqlite:" + path);
+        try (Statement statement = connection.createStatement()) {
+          statement.execute("PRAGMA busy_timeout = 5000");
+          hook.afterStep("before-journal-mode");
+          statement.execute("PRAGMA journal_mode = WAL");
+          statement.execute("PRAGMA synchronous = NORMAL");
+        }
+        boolean recovered = initializeSchema(recoveryFloor);
+        if (recovered) recovery = latestRecovery;
+        pruneHistory();
+        return;
+      } catch (SQLException | IOException | RuntimeException | Error failure) {
+        if (connection != null) {
+          try {
+            connection.close();
+          } catch (SQLException closeFailure) {
+            failure.addSuppressed(closeFailure);
+            throw failure;
+          } finally {
+            connection = null;
+          }
+        }
+        if (!isStartupBusy(failure) || System.nanoTime() - retryStarted >= retryWindowNanos) throw failure;
+        hook.afterStep("startup-contention-closed");
+        long remaining = retryWindowNanos - (System.nanoTime() - retryStarted);
+        if (remaining <= 0) throw failure;
+        try {
+          java.util.concurrent.TimeUnit.NANOSECONDS.sleep(Math.min(Duration.ofMillis(50).toNanos(), remaining));
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          var stopped = new IOException("Interrupted while opening operations store", interrupted);
+          stopped.addSuppressed(failure);
+          throw stopped;
+        }
+        if (System.nanoTime() - retryStarted >= retryWindowNanos) throw failure;
+      }
+    }
+  }
+
+  private static boolean isStartupBusy(Throwable failure) {
+    SQLException sql = failure instanceof SQLException direct ? direct
+        : failure instanceof OperationStoreException store
+            && store.code() == OperationStoreException.Code.STORAGE_FAILED
+            && store.getCause() instanceof SQLException cause ? cause : null;
+    return sql != null && (sql.getErrorCode() & 0xff) == 5;
   }
 
   private void inspectExisting() throws SQLException, IOException {

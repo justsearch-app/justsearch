@@ -77,8 +77,12 @@ persisted provenance, opened-generation binding and a trustworthy zero count; fu
 indexer/core and PMD/Spotless pass. [Proof](evidence/C2/corruption-resume-attestation.md).
 Initial-discovery diagnostics now preserve the actual exit and causal stderr. Installed1589
 passes five of six; targeted1591 proves WAL setup returns SQLITE_BUSY despite its busy timeout.
-The BUSY-only initializer retry and zero-root enumeration remain active repairs before sealing
-resumes. The [recovery record](evidence/C2/hosted-recovery-correction.md) retains exact evidence. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
+The BUSY-only initializer retry passes integrated1596 (3,453 cases, three existing skips)
+and all six installed recovery cases1598, plus independent review, PMD/format and governance.
+[Startup retry proof](evidence/C2/operations-startup-busy.md). Quick1599 confirms clean fixture
+shutdown. Hosted30acebfd9 passes twelve jobs including integration and Windows-native; license
+report download fails with Maven HTTP403 and its failed-job rerun is requested. Zero-root and
+partial migration enumeration remain the next repair before sealing resumes. The [recovery record](evidence/C2/hosted-recovery-correction.md) retains exact evidence. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is
 C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then
