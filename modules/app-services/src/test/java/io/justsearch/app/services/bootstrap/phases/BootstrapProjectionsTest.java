@@ -12,6 +12,7 @@ import io.justsearch.app.api.ModeChangeListener;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
@@ -33,12 +34,12 @@ final class BootstrapProjectionsTest {
 
   @TempDir Path tmp;
 
-  private RuntimeSpecStore specStore(boolean chatEnabled) {
+  private RuntimeSpecStore specStore(boolean chatEnabled) throws Exception {
     UiSettingsStore store =
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
     UiSettings initial = new UiSettings();
     initial.setChatEnabled(chatEnabled);
-    store.save(initial);
+    store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
     return new RuntimeSpecStore(store);
   }
 

@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED; A/B/C1 complete; C2-6 backend and all frontend callers locally verified; capture repair/all-writer/live/installed/final-head proof open; D1-F remain. Draft PR727, merge at F."
+status: "LOCKED; A/B/C1 complete; C2-6 backend, frontend callers and physical writer retirement locally verified; capture repair/live/installed/final-head proof open; D1-F remain. Draft PR727, merge at F."
 created: 2026-09-06
 updated: 2026-09-14
 lane: F (decision re-examination programme, wave 4)
@@ -26,6 +26,8 @@ document is the lane's contract: the design and the considerations that shaped i
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-14: C2-6 retires UiSettingsStore.save now every production producer uses accepted ownership. Guard physical prepare/replace and config swap/notification, including method references. Preserve only ConfigStoreRebuilder.rebuild from HeadlessApp.rebuildAfterPostBuildWrites, itself called by resolveConfig: CUDA ordinal150/native-path discovery must reach ORT before initialization and writes no settings file. Generic ConfigStore primitives retain their implementation self-calls, not runtime-producer permission. Fixture seeding uses explicit prepared replacements; raw-save refusal assertions become API-absence plus corrupt-witness/accepted-owner proof. No new writer, token, registry or boot operation row. [Owning cut](evidence/C2/C2-6-plan.md#2026-09-14-item4-physical-writer-retirement).
 
 - 2026-09-14: C2-6 public mode ordering replaces the old blocking whole-write monitor with a nonblocking service admission bit after key-first lookup. The service advances its existing bounded mode LRU only from authoritative COMPLETE before release, including postcommit notification failure. Physical commitment remains solely the settings owner; no persistent state is added. [Trade-off and checks](evidence/C2/C2-6-plan.md#2026-09-14-public-settings-witness-and-retry-cut).
 

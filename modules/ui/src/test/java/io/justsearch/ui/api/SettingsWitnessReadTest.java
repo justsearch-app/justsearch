@@ -22,7 +22,7 @@ class SettingsWitnessReadTest {
   @TempDir Path directory;
 
   @Test
-  void getProjectsSettingsAndWitnessFromOneInspection() {
+  void getProjectsSettingsAndWitnessFromOneInspection() throws Exception {
     var settings = new UiSettings();
     settings.setTheme("dark");
     var witness = new SettingsWitness(7, OperationKeys.generate(Clock.systemUTC()));
@@ -41,7 +41,9 @@ class SettingsWitnessReadTest {
     assertEquals(java.util.List.of(directory.toString()), response.getValue().indexPaths());
     verify(store, times(1)).inspect();
     verify(store, never()).load();
-    verify(store, never()).save(any());
+    verify(store, never()).prepare(any(), any());
+    verify(store, never()).replacePrepared(any());
+    verify(store, never()).notifyRecoveryCleared();
     assertNull(response.getValue().operationKey(), "a read cannot mint an attempt identity");
   }
 

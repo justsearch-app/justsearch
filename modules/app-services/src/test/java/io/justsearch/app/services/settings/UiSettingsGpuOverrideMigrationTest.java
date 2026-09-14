@@ -4,6 +4,7 @@ package io.justsearch.app.services.settings;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Files;
@@ -44,18 +45,18 @@ class UiSettingsGpuOverrideMigrationTest {
         var snapshot = store.inspect();
         assertEquals(layers == 0 ? null : Integer.valueOf(layers), snapshot.settings().configuredGpuLayers());
         assertEquals(0, snapshot.witness().acceptedRevision());
-        store.save(snapshot.settings());
+        store.replacePrepared(store.prepare(snapshot.settings(), snapshot.witness()));
         assertEquals(snapshot.settings().configuredGpuLayers(), store.inspect().settings().configuredGpuLayers());
       }
     }
   }
 
   @Test
-  void schemaFourKeepsExplicitCpuAcrossReloadAndResetRestoresAutomatic() {
+  void schemaFourKeepsExplicitCpuAcrossReloadAndResetRestoresAutomatic() throws Exception {
     var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, directory.resolve("settings.json"));
     UiSettings settings = new UiSettings();
     settings.setGpuLayers(0);
-    store.save(settings);
+    store.replacePrepared(store.prepare(settings, new SettingsWitness(0, null)));
     var loaded = store.load();
     assertEquals(0, loaded.configuredGpuLayers());
     SettingsResetDefaults.applyTo(loaded);

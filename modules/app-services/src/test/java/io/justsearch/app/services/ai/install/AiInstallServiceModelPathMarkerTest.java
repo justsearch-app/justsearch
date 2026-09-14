@@ -14,6 +14,7 @@ import static org.mockito.Mockito.mock;
 import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.settings.SettingsServiceImpl;
@@ -209,7 +210,7 @@ final class AiInstallServiceModelPathMarkerTest {
     UiSettings settings = store.load();
     settings.setContextLength(8192);
     settings.setGpuLayers(23);
-    store.save(settings);
+    store.replacePrepared(store.prepare(settings, new SettingsWitness(0, null)));
     OnlineAiService onlineAi =
         mock(
             OnlineAiService.class,
@@ -220,7 +221,7 @@ final class AiInstallServiceModelPathMarkerTest {
     AtomicReference<Integer> appliedContext = new AtomicReference<>();
     AtomicReference<Integer> appliedGpu = new AtomicReference<>();
     AtomicReference<ResolvedConfig> observedConfig = new AtomicReference<>();
-    AtomicReference<io.justsearch.app.api.settings.SettingsWitness> observedWitness =
+    AtomicReference<SettingsWitness> observedWitness =
         new AtomicReference<>();
     AiInstallService svc = newService(store, onlineAi);
     var before = store.inspect().witness();

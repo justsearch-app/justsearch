@@ -110,15 +110,18 @@ it never falls back to an ordinary move. This is not a guarantee against physica
 loss. Recovery notification is a separate call after replacement. `inspect` reads the
 actual witness without substituting defaults for corrupt, inaccessible, or quarantined
 state; a preserved corrupt sibling prevents an absent file from masquerading as a fresh
-store after restart. The transitional raw `save` refuses recorded revisions and ambiguous
-recovery state. The application owner must establish recovery authority before explicitly
-replacing a quarantined document.
+store after restart. There is no unrecorded `save` API. The application owner must establish
+recovery authority before explicitly replacing a quarantined document. An executable caller
+guard confines preparation, replacement and recovery-clear notification to that owner.
 
 `ConfigStoreRebuilder.prepare` builds an immutable resolved snapshot without publishing it
 and propagates preparation failures. `ConfigStore.swap` replaces the snapshot and returns
 a change event; `notifyListeners` is separate so an owner can release its publication lock
-before arbitrary callbacks run. The convenience `update` and `rebuild` APIs retain their
-swap-then-notify behavior.
+before arbitrary callbacks run. The convenience `update` retains its swap-then-notify
+behavior, with runtime producers excluded by the caller guard. `rebuild` is called only by
+HeadlessApp's post-discovery boot refresh: it publishes remembered CUDA selection and the
+ORT native path before inference initialization, without writing settings.json. The guard
+also restricts entry to that refresh to configuration assembly.
 
 ## Platform Paths
 To ensure seamless operation across operating systems, we use `PlatformPaths` to resolve data directories.

@@ -314,13 +314,14 @@ class UiSettingsStorePersistenceModeTest {
     }
 
     @Test
-    @DisplayName("READ_WRITE save emits the current-version envelope and reloads it")
-    void readWrite_saveWritesVersionedEnvelope() throws Exception {
+    @DisplayName("READ_WRITE prepared replacement emits the current-version envelope and reloads it")
+    void readWrite_preparedReplacementWritesVersionedEnvelope() throws Exception {
       Path settingsFile = tempDir.resolve("settings.json");
       UiSettings settings = new UiSettings();
       settings.setMaxTokens(777);
 
-      new UiSettingsStore(READ_WRITE, settingsFile).save(settings);
+      var store = new UiSettingsStore(READ_WRITE, settingsFile);
+      store.replacePrepared(store.prepare(settings, new SettingsWitness(0, null)));
 
       String persisted = Files.readString(settingsFile);
       // Bumped to 2 by tempdoc 883 (contextLength 4096 -> 0 = auto migration).

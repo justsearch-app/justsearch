@@ -13,17 +13,11 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Rebuilds the {@link ResolvedConfig} in a {@link ConfigStore} after runtime sysprop changes.
+ * Assembles configuration for the accepted settings owner and the pre-inference boot refresh.
  *
- * <p>Extracted from {@code SettingsController.rebuildConfigStore()} so that other services
- * (RuntimeActivationService, AiInstallService, AiPackImportService) can trigger a rebuild after
- * writing system properties that affect configuration values.
- *
- * <p>Tempdoc 519 §9 Block B3.0.e: moved from {@code io.justsearch.ui.config} to {@code app-services}
- * together with the {@code contributeUiSettings} helper formerly on {@code HeadlessApp}. The
- * helper had no {@code ui} dependencies (it operated on {@code UiSettings} from {@code app-api}
- * and {@code ResolvedConfigBuilder} from {@code configuration}), so relocation broke the soft
- * cycle without introducing a new SPI.
+ * <p>Runtime producers submit candidates through SettingsService. The commit coordinator uses
+ * {@link #prepare} before physical replacement, then publishes the prepared snapshot. Only
+ * HeadlessApp's post-discovery boot step calls {@link #rebuild}; it writes no settings file.
  */
 public final class ConfigStoreRebuilder {
 
@@ -33,14 +27,14 @@ public final class ConfigStoreRebuilder {
    * The boot-time hardware probe, so a rebuild does not silently drop ordinal 150.
    *
    * <p>{@link #rebuild} re-derives the config from scratch, but ordinal-150 values do not come from
-   * any source it can re-read: the probe runs once, at startup, in the Head. Before tempdoc 883 the
+   * any source it can re-read: the probe runs once, at startup, in the Engine. Before tempdoc 883 the
    * only ordinal-150 values were GPU flags, and they survived a rebuild by ALSO being written as
    * system properties — which is the promotion pattern 883 deletes, and which resolves at ordinal
    * 500 and so reports as {@code jvm_arg}. The derived context window must not acquire the same
    * lie, so the probe result is remembered here and re-contributed at its own ordinal instead.
    *
    * <p>Process-wide static for the same reason {@code ConfigStore.setGlobal} is: there is one
-   * hardware probe per process, and the four services that call {@link #rebuild} have no path to it.
+   * hardware probe per process, and later accepted settings preparation must retain it.
    */
   private static volatile Map<String, String> autoDetected = Map.of();
 
@@ -89,11 +83,12 @@ public final class ConfigStoreRebuilder {
   }
 
   /**
-   * Prepares and publishes a new snapshot, preserving the historical null-store no-op behavior.
+   * Publishes the boot refresh after hardware/native-path discovery and before inference starts.
    *
    * <p>The snapshot swap and listener notification are separate so callers that need stronger
    * ownership can perform the notification outside their publication lock. This convenience
-   * method has no such lock and therefore performs both operations directly.
+   * method runs only during boot and therefore performs both operations directly. The executable
+   * settings-publication guard excludes runtime producers from this entry.
    *
    * @param store the ConfigStore to update (if null, this is a no-op)
    * @param settings current UI settings (if null, UI settings contribution is skipped)

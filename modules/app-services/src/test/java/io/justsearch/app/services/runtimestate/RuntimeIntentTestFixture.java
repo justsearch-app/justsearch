@@ -14,6 +14,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
@@ -52,7 +53,7 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
     UiSettings initial = new UiSettings();
     if (initialChatEnabled != null) {
       initial.setChatEnabled(initialChatEnabled);
-      created.save(initial);
+      created.replacePrepared(created.prepare(initial, new SettingsWitness(0, null)));
     }
     this.settings = created;
     operations = new SqliteOperationStore(directory.resolve("operations.db"));

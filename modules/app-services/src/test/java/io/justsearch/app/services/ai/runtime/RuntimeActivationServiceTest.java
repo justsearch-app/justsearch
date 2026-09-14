@@ -20,6 +20,7 @@ import io.justsearch.app.api.InstallPlanPreview;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
@@ -628,7 +629,7 @@ class RuntimeActivationServiceTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsFile);
     UiSettings s = store.load();
     s.setLlmModelPath(chosen.toAbsolutePath().toString());
-    store.save(s);
+    store.replacePrepared(store.prepare(s, new SettingsWitness(0, null)));
 
     RuntimeActivationService svc =
         new RuntimeActivationService(processExecutors,
@@ -684,7 +685,7 @@ class RuntimeActivationServiceTest {
     UiSettings initial = settings.load();
     initial.setServerExecutablePath(cuda.toAbsolutePath().toString());
     initial.setGpuLayers(99);
-    settings.save(initial);
+    settings.replacePrepared(settings.prepare(initial, new SettingsWitness(0, null)));
 
     ConfigStoreRebuilder.rememberAutoDetected(Map.of("justsearch.gpu.layers", "99",
         "justsearch.server.exe", cuda.toAbsolutePath().toString(), "justsearch.context.size", "32768"));

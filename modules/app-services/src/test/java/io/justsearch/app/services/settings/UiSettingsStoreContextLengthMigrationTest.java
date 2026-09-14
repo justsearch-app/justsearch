@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -88,7 +89,7 @@ final class UiSettingsStoreContextLengthMigrationTest {
   }
 
   @Test
-  @DisplayName("migration is idempotent across repeated loads before the next save")
+  @DisplayName("migration is idempotent across repeated loads before the next accepted replacement")
   void migrationIsIdempotent() throws Exception {
     Path file = tempDir.resolve("settings.json");
     Files.writeString(file, "{\"schemaVersion\":1,\"settings\":{\"contextLength\":4096}}");
@@ -99,13 +100,13 @@ final class UiSettingsStoreContextLengthMigrationTest {
   }
 
   @Test
-  @DisplayName("a save after migration rewrites the file at the current version")
-  void saveRewritesAtCurrentVersion() throws Exception {
+  @DisplayName("a prepared replacement after migration rewrites the file at the current version")
+  void preparedReplacementRewritesAtCurrentVersion() throws Exception {
     Path file = tempDir.resolve("settings.json");
     Files.writeString(file, "{\"schemaVersion\":1,\"settings\":{\"contextLength\":4096}}");
 
     UiSettingsStore store = new UiSettingsStore(READ_WRITE, file);
-    store.save(store.load());
+    store.replacePrepared(store.prepare(store.load(), new SettingsWitness(0, null)));
 
     String persisted = Files.readString(file);
     assertTrue(persisted.contains("\"schemaVersion\" : 4"), persisted);

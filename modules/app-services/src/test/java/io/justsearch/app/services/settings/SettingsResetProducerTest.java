@@ -8,6 +8,7 @@ import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.OperationPreparationRefused;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
@@ -32,7 +33,7 @@ class SettingsResetProducerTest {
   void handlerUsesAcceptedFrozenResetAndRetryCannotRepeatIt() throws Exception {
     var settings = settings();
     var initial = new UiSettings(); initial.setTheme("dark"); initial.setServerExecutablePath("admin.exe");
-    settings.save(initial);
+    settings.replacePrepared(settings.prepare(initial, new SettingsWitness(0, null)));
     try (var operations = new SqliteOperationStore(directory.resolve("operations.db"))) {
       var owner = new SettingsCommitCoordinator(settings, new ConfigStore(ConfigStoreRebuilder.prepare(initial)),
           () -> fail("Normal reset must not restart"), candidate -> OperationResult.success("Settings committed",
@@ -60,7 +61,7 @@ class SettingsResetProducerTest {
 
   @Test
   void dispatcherReusesOutcomeAndRefusesAStaleFrozenPreview() throws Exception {
-    var settings = settings(); settings.save(new UiSettings());
+    var settings = settings(); settings.replacePrepared(settings.prepare(new UiSettings(), new SettingsWitness(0, null)));
     try (var operations = new SqliteOperationStore(directory.resolve("operations.db"))) {
       var owner = new SettingsCommitCoordinator(settings, new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings())),
           () -> fail("Normal reset must not restart"), candidate -> OperationResult.success("committed"));

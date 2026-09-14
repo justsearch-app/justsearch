@@ -12,6 +12,7 @@ import io.justsearch.app.api.AiRuntimeStatusResponse;
 import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.inference.RealizedChatIdentity;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.app.services.settings.SettingsServiceImpl;
@@ -133,7 +134,7 @@ final class RuntimeActivationServiceChatProfileTest {
     UiSettingsStore store = settingsStore();
     UiSettings s = store.load();
     s.setLlmModelPath(operatorModel.toAbsolutePath().toString());
-    store.save(s);
+    store.replacePrepared(store.prepare(s, new SettingsWitness(0, null)));
 
     RecordingAiControl control = new RecordingAiControl();
     control.observedStore = store;
@@ -198,7 +199,7 @@ final class RuntimeActivationServiceChatProfileTest {
     UiSettingsStore store = settingsStore();
     UiSettings original = store.load();
     original.setContextLength(4096);
-    store.save(original);
+    store.replacePrepared(store.prepare(original, new SettingsWitness(0, null)));
     RuntimeActivationService svc = newService(control, store);
     svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
 
@@ -300,7 +301,7 @@ final class RuntimeActivationServiceChatProfileTest {
     UiSettingsStore store = settingsStore();
     UiSettings s = store.load();
     s.setLlmModelPath(chosen.toAbsolutePath().toString());
-    store.save(s);
+    store.replacePrepared(store.prepare(s, new SettingsWitness(0, null)));
 
     RecordingAiControl control = new RecordingAiControl();
     RuntimeActivationService svc = newService(control, store);
@@ -332,7 +333,7 @@ final class RuntimeActivationServiceChatProfileTest {
     var store = settingsStore();
     var initial = store.load();
     initial.setContextLength(8192);
-    store.save(initial);
+    store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
     var control = new RecordingAiControl();
     var svc = newService(control, store);
     svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());

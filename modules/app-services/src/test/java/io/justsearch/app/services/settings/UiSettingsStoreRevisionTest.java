@@ -25,7 +25,7 @@ class UiSettingsStoreRevisionTest {
     UiSettingsStore store = new UiSettingsStore(READ_WRITE, path);
     UiSettings initial = new UiSettings();
     initial.setMaxTokens(100);
-    store.save(initial);
+    store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
     byte[] before = Files.readAllBytes(path);
     UiSettings next = store.load();
     next.setMaxTokens(200);
@@ -42,7 +42,7 @@ class UiSettingsStoreRevisionTest {
     assertEquals(200, snapshot.settings().getMaxTokens());
     assertEquals(java.util.List.of("original"), snapshot.settings().getExcludePatterns());
     assertEquals(new SettingsWitness(1, KEY), snapshot.witness());
-    assertThrows(IllegalStateException.class, () -> store.save(initial));
+    assertThrows(NoSuchMethodException.class, () -> UiSettingsStore.class.getMethod("save", UiSettings.class));
     assertEquals(snapshot.witness(), store.inspect().witness());
   }
 
@@ -53,7 +53,7 @@ class UiSettingsStoreRevisionTest {
     UiSettingsStore store = new UiSettingsStore(READ_WRITE, path);
     assertEquals(new SettingsWitness(0, null), store.inspect().witness());
     assertEquals(4096, store.load().getContextLength());
-    store.save(store.load());
+    store.replacePrepared(store.prepare(store.load(), new SettingsWitness(1, KEY)));
     assertTrue(Files.readString(path).contains("\"schemaVersion\" : 4"));
     assertThrows(UnsupportedStoreVersionException.class,
         () -> StoreFormatVersions.requireReadable("ui-settings", 3, 2, 0, 0, 1));
@@ -84,8 +84,10 @@ class UiSettingsStoreRevisionTest {
       UiSettingsStore restarted = new UiSettingsStore(READ_WRITE, path);
       restarted.load();
       assertThrows(CorruptDurableStoreException.class, restarted::inspect);
-      assertThrows(CorruptDurableStoreException.class, () -> store.save(new UiSettings()));
-      assertThrows(CorruptDurableStoreException.class, () -> restarted.save(new UiSettings()));
+      assertThrows(NoSuchMethodException.class, () -> UiSettingsStore.class.getMethod("save", UiSettings.class));
+      assertTrue(store.lastRecovery().isPresent());
+      assertTrue(restarted.lastRecovery().isEmpty(), "The restarted instance did not perform the quarantine");
+      assertEquals(raw, Files.readString(store.lastRecovery().orElseThrow().backupPath()));
     }
   }
 
@@ -107,7 +109,7 @@ class UiSettingsStoreRevisionTest {
     assertThrows(CorruptDurableStoreException.class, store::inspect);
     Files.writeString(path, "{\"schemaVersion\":2,\"settings\":{},\"acceptedRevision\":1,\"lastCommittedOperationKey\":\"" + KEY + "\"}");
     assertThrows(CorruptDurableStoreException.class, store::inspect);
-    assertThrows(CorruptDurableStoreException.class, () -> store.save(new UiSettings()));
+    assertEquals("{\"schemaVersion\":2,\"settings\":{},\"acceptedRevision\":1,\"lastCommittedOperationKey\":\"" + KEY + "\"}", Files.readString(path));
     Files.writeString(path, "{\"schemaVersion\":99}");
     assertThrows(UnsupportedStoreVersionException.class, store::inspect);
     Files.writeString(path, "{\"schemaVersion\":1,\"maxTokens\":987}");
@@ -133,7 +135,7 @@ class UiSettingsStoreRevisionTest {
     UiSettingsStore memory = new UiSettingsStore(IN_MEMORY, directory.resolve("memory.json"));
     assertThrows(IllegalStateException.class,
         () -> memory.prepare(new UiSettings(), new SettingsWitness(1, KEY)));
-    memory.save(new UiSettings());
+    assertThrows(IllegalArgumentException.class, () -> memory.replacePrepared(prepared));
     assertFalse(Files.exists(memory.settingsPath()));
   }
 

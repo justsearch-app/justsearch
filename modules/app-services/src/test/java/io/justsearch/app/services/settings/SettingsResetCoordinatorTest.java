@@ -41,7 +41,7 @@ final class SettingsResetCoordinatorTest {
     var initial = new UiSettings();
     initial.setTheme("dark"); initial.setVimMode(true); initial.setServerExecutablePath("admin-path");
     initial.setMaxTokens(8192); initial.setExcludePatterns(List.of("*.private"));
-    settings.save(initial);
+    settings.replacePrepared(settings.prepare(initial, new SettingsWitness(0, null)));
     var restarts = new AtomicInteger();
     try (var operations = operations()) {
       var owner = owner(settings, restarts::incrementAndGet, settings::replacePrepared);

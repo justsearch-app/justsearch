@@ -39,7 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Loads and saves UI settings to {@code $JUSTSEARCH_HOME/ui/settings.json} (or
+ * Loads UI settings and prepares strict owner-controlled replacements to {@code $JUSTSEARCH_HOME/ui/settings.json} (or
  * {@code ~/.config/justsearch/ui/settings.json} on Linux).
  *
  * <p>Corruption policy (ADR-0008, restored by tempdoc 882 item 24): an UNREADABLE settings file is
@@ -122,16 +122,14 @@ public final class UiSettingsStore {
     }
   }
 
-  /** The last unreadable-file recovery this store performed, until the next successful save. */
+  /** The last unreadable-file recovery this store performed, until the accepted owner confirms durable completion. */
   public Optional<RecoveredFromCorrupt> lastRecovery() {
     return Optional.ofNullable(lastRecovery);
   }
 
   /**
-   * Called once the first time {@link #save(UiSettings)} succeeds after a quarantine, whoever
-   * performs that save - the user re-authoring settings via the Settings UI, or a runtime
-   * component such as the AI autostart seed writing its own defaults - because a rewritten file is
-   * no longer the quarantined one, so the reset condition no longer describes anything true.
+   * Registers the callback invoked by {@link #notifyRecoveryCleared()} after the accepted owner
+   * establishes durable completion. File replacement alone cannot clear a recovery condition.
    */
   public void setOnRecoveryCleared(Runnable r) {
     this.onRecoveryCleared = r;
@@ -288,7 +286,7 @@ public final class UiSettingsStore {
 
   /**
    * Forward-migrates a settings payload read at {@code storedVersion} to
-   * {@link #CURRENT_SCHEMA_VERSION}. The next successful {@link #save} rewrites the file at the
+   * {@link #CURRENT_SCHEMA_VERSION}. The next accepted {@link #replacePrepared} rewrites the file at the
    * current version; until then the migration is applied on every load, so it must be idempotent.
    *
    * <p>1 → 2 (tempdoc 883): {@code contextLength} 4096 means "the pre-883 default", which is now
@@ -392,23 +390,6 @@ public final class UiSettingsStore {
 
   private static UiSettings copy(UiSettings settings) {
     return MAPPER.convertValue(settings, UiSettings.class);
-  }
-
-  /** Transitional unrecorded writer, removed by C2-6's all-producer migration. */
-  public void save(UiSettings settings) {
-    if (settings == null || mode == PersistenceMode.IN_MEMORY) return;
-    // Once recorded settings exist, this legacy path must never erase their witness.
-    SettingsWitness witness = inspect().witness();
-    if (witness.acceptedRevision() != 0) {
-      throw new IllegalStateException("Recorded settings require the accepted-revision owner");
-    }
-    PreparedSettings prepared = prepare(settings, witness);
-    try {
-      replacePrepared(prepared);
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to persist UI settings to " + settingsFile, e);
-    }
-    notifyRecoveryCleared();
   }
 
   private record PersistedSettings(

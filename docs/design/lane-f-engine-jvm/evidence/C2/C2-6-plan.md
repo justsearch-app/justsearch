@@ -1,5 +1,24 @@
 # C2-6: accepted settings revision implementation plan
 
+## 2026-09-14 item4 physical writer retirement
+
+All eight frontend callers and all production Java settings producers are migrated.
+Remove the unused public UiSettingsStore.save method. Preserve the existing physical
+prepare/replace primitive for the commit owner, guarded by executable caller checks
+covering method references and config publication. The only non-owner publication is
+the exact pre-inference boot refresh: HeadlessApp.resolveConfig calls
+rebuildAfterPostBuildWrites, which calls ConfigStoreRebuilder.rebuild. It publishes
+remembered CUDA/native-path discovery and never writes settings.json. Reusing that
+boot step is simpler and preserves ordering; introducing an accepted boot mutation
+would invent an effect and a revision. Generic ConfigStore.update remains available
+as a primitive with production callers guarded. Synthetic unauthorized calls must
+fail the same rule, and boot ordering tests must stay green.
+
+Migrate fixture seeding to explicit prepared replacements. Raw-save API tests are
+superseded by API-absence and caller-boundary tests; corruption inspection and real
+accepted-owner recovery tests retain their original assertions. This is implementation
+in progress, not completed proof. Root owns the decision and all integrated checks.
+
 ## 2026-09-14 activation and compensation writer cut
 
 The runtime-intent checkpoint `8e4706cf0` is pushed. Activation/deactivation/rollback

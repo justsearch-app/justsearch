@@ -11,10 +11,12 @@ with PMD/format and UI integration compilation passing.
 All eight frontend callers now use the shared witnessed attempt helper. Final1485
 passes6,573 tests across489 suites; typecheck/lint and independent reviews pass.
 [Retained-base proof and negative controls](evidence/C2/frontend-settings-derived.md).
-Hosted frontend CI34798352215 exposed an undeclared generated-wire consumer;
-the registry correction passes local1488 with zero findings. Fresh hosted proof is
-required ([evidence](evidence/C2/hosted-frontend-contract-correction.md)).
-Next is UI harness repair/reproof, raw settings writer retirement/guard, then required
+Hosted frontend CI34800723187 and CLA34800721640 pass at e135acb0b after the
+consumer-registration correction ([evidence](evidence/C2/hosted-frontend-contract-correction.md)).
+The raw save API is retired and the physical/config caller guard passes integrated1500:
+4,187 represented cases, four existing skips, zero failures/errors, PMD/format and
+UI integration compilation ([evidence](evidence/C2/settings-writer-retirement.md)).
+Next is completion of UI harness repair/reproof, then required
 integrated governance/live/model/installed/final-head proof and C2-8/C2-10/C2-11,
 D1/D2/E/F. UI capture1466 is partial: Settings mounted with zero axe/console errors,
 but five downstream density/search selectors timed out despite CLI exit0. Root
