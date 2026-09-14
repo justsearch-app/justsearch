@@ -9,13 +9,16 @@ import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
@@ -66,6 +69,11 @@ final class WorkerScanOps {
   private final BooleanSupplier isCancelled;
   private final BackpressureWaiter backpressureWaiter;
   private final ForcedPathSink forcedPathSink;
+  private final Runnable beforeRecordedAdmission;
+
+  private static void denyUnguardedRecordedAdmission() {
+    throw WorkerServiceException.unavailable("RECORDED_GENERATION_GUARD_REQUIRED");
+  }
 
   /** Production constructor — uses the real cloud-placeholder detector and no-op pacing hooks. */
   WorkerScanOps(JobQueue jobQueue) {
@@ -89,6 +97,12 @@ final class WorkerScanOps {
       LongSupplier queueDepthSupplier,
       BooleanSupplier isCancelled,
       ForcedPathSink forcedPathSink) {
+    this(jobQueue, queueDepthSupplier, isCancelled, forcedPathSink,
+        WorkerScanOps::denyUnguardedRecordedAdmission);
+  }
+
+  WorkerScanOps(JobQueue jobQueue, LongSupplier queueDepthSupplier,
+      BooleanSupplier isCancelled, ForcedPathSink forcedPathSink, Runnable beforeRecordedAdmission) {
     this(
         jobQueue,
         new CloudPlaceholderRecorder(jobQueue),
@@ -96,7 +110,7 @@ final class WorkerScanOps {
         queueDepthSupplier,
         isCancelled,
         WorkerScanOps::sleepForBackpressure,
-        forcedPathSink);
+        forcedPathSink, beforeRecordedAdmission);
   }
 
   /**
@@ -113,6 +127,14 @@ final class WorkerScanOps {
       BooleanSupplier isCancelled,
       BackpressureWaiter backpressureWaiter,
       ForcedPathSink forcedPathSink) {
+    this(jobQueue, cloudPlaceholderRecorder, isCloudPlaceholder, queueDepthSupplier,
+        isCancelled, backpressureWaiter, forcedPathSink, WorkerScanOps::denyUnguardedRecordedAdmission);
+  }
+
+  WorkerScanOps(JobQueue jobQueue, CloudPlaceholderRecorder cloudPlaceholderRecorder,
+      Predicate<Path> isCloudPlaceholder, LongSupplier queueDepthSupplier,
+      BooleanSupplier isCancelled, BackpressureWaiter backpressureWaiter,
+      ForcedPathSink forcedPathSink, Runnable beforeRecordedAdmission) {
     this.jobQueue = Objects.requireNonNull(jobQueue, "jobQueue");
     this.cloudPlaceholderRecorder =
         Objects.requireNonNull(cloudPlaceholderRecorder, "cloudPlaceholderRecorder");
@@ -121,6 +143,7 @@ final class WorkerScanOps {
     this.isCancelled = Objects.requireNonNull(isCancelled, "isCancelled");
     this.backpressureWaiter = Objects.requireNonNull(backpressureWaiter, "backpressureWaiter");
     this.forcedPathSink = Objects.requireNonNull(forcedPathSink, "forcedPathSink");
+    this.beforeRecordedAdmission = Objects.requireNonNull(beforeRecordedAdmission, "beforeRecordedAdmission");
   }
 
   /** Test-only convenience for the prior 3-arg constructor. */
@@ -155,18 +178,20 @@ final class WorkerScanOps {
     Objects.requireNonNull(progressEmitter, "progressEmitter");
     String scanId = request.scanId();
     Path root = request.root();
-    if (!Files.isDirectory(root)) {
+    LinkOption[] linkOptions = request.recordedEpoch() == null
+        ? new LinkOption[0] : new LinkOption[] {LinkOption.NOFOLLOW_LINKS};
+    if (request.singleFile() ? !Files.isRegularFile(root, linkOptions) : !Files.isDirectory(root, linkOptions)) {
       ScanRootProgress terminal =
           ScanRootProgress.newBuilder()
               .setComplete(true)
-              .setTerminalReasonCode("ROOT_NOT_DIRECTORY")
+              .setTerminalReasonCode(request.singleFile() ? "ROOT_NOT_FILE" : "ROOT_NOT_DIRECTORY")
               .setScanId(scanId)
               .build();
       progressEmitter.accept(terminal);
       return terminal;
     }
 
-    List<PathMatcher> excludes = buildExcludeMatchers(request.excludeGlobs());
+    List<PathMatcher> excludes = buildExcludeMatchers(request.excludeGlobs(), request.recordedEpoch() != null);
     long[] counters = new long[3]; // [walked, admitted, skipped]
     long[] bytes = new long[1];
     String[] currentDir = new String[] {root.toString()};
@@ -184,9 +209,12 @@ final class WorkerScanOps {
 
     Files.walkFileTree(
         root,
+        EnumSet.noneOf(FileVisitOption.class),
+        request.singleFile() ? 0 : Integer.MAX_VALUE,
         new SimpleFileVisitor<Path>() {
           @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+            if (request.singleFile()) throw new IOException("Recorded file changed kind during enumeration");
             // Review S5. Before this, the ONLY cancel poll in the whole walk was inside the
             // batch-flush branch below — so a scan only noticed a cancel once it had admitted a
             // full batch of files. Over a tree whose files are all excluded, skipped, or cloud
@@ -198,6 +226,7 @@ final class WorkerScanOps {
               cancelled[0] = true;
               return FileVisitResult.TERMINATE;
             }
+            if (excludedByOwnership(request, dir)) return FileVisitResult.SKIP_SUBTREE;
             String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
             if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
               return FileVisitResult.SKIP_SUBTREE;
@@ -207,7 +236,11 @@ final class WorkerScanOps {
           }
 
           @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            if (request.recordedEpoch() != null && file.equals(root)
+                && (!request.singleFile() || !attrs.isRegularFile())) {
+              throw new IOException("Recorded root changed kind during enumeration");
+            }
             // Review S5, the second poll: a directory of a million files is one preVisitDirectory
             // call, so the per-directory poll alone still leaves a long uncancellable stretch. The
             // read is a volatile load against per-file work that already includes an isReadable
@@ -217,6 +250,14 @@ final class WorkerScanOps {
               return FileVisitResult.TERMINATE;
             }
             counters[0]++; // walked
+            if (excludedByOwnership(request, file)
+                || request.recordedEpoch() != null && matchesAny(excludes, root, file)) {
+              counters[2]++;
+              return FileVisitResult.CONTINUE;
+            }
+            if (attrs.isRegularFile() && !Files.isReadable(file) && request.recordedEpoch() != null) {
+              throw new IOException("Recorded member is unreadable");
+            }
             if (!attrs.isRegularFile() || !Files.isReadable(file)) {
               counters[2]++;
               return FileVisitResult.CONTINUE;
@@ -237,8 +278,11 @@ final class WorkerScanOps {
             // 813 Slice B: the walk already holds the size — no extra stat.
             batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance()));
             if (batch.size() >= ENQUEUE_BATCH_SIZE) {
-              awaitQueueBelowThreshold();
-              flushBatch(batch, collection, enqueueScanId, forceReindex, counters, bytes);
+              if (!awaitQueueBelowThreshold() || isCancelled.getAsBoolean()) {
+                cancelled[0] = true;
+                return FileVisitResult.TERMINATE;
+              }
+              flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), forceReindex, counters, bytes);
               if (isCancelled.getAsBoolean()) {
                 cancelled[0] = true;
                 return FileVisitResult.TERMINATE;
@@ -252,7 +296,10 @@ final class WorkerScanOps {
           }
 
           @Override
-          public FileVisitResult visitFileFailed(Path file, IOException exc) {
+          public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+            if (request.recordedEpoch() != null) {
+              throw exc != null ? exc : new IOException("Recorded enumeration could not visit a member");
+            }
             log.debug(
                 "scan: skipping inaccessible path {} ({})",
                 file,
@@ -262,11 +309,12 @@ final class WorkerScanOps {
           }
         });
 
-    if (!batch.isEmpty()) {
-      awaitQueueBelowThreshold();
-      flushBatch(batch, collection, enqueueScanId, forceReindex, counters, bytes);
-      if (isCancelled.getAsBoolean()) {
+    if (!batch.isEmpty() && !cancelled[0]) {
+      if (!awaitQueueBelowThreshold() || isCancelled.getAsBoolean()) {
         cancelled[0] = true;
+      } else {
+        flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), forceReindex, counters, bytes);
+        if (isCancelled.getAsBoolean()) cancelled[0] = true;
       }
     }
 
@@ -278,17 +326,19 @@ final class WorkerScanOps {
   }
 
   private void flushBatch(
-      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, boolean forceReindex,
+      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, Long recordedEpoch, boolean forceReindex,
       long[] counters, long[] bytes) {
     String coll = collection == null || collection.isBlank() ? null : collection;
-    int accepted = jobQueue.enqueueEntries(
-        List.copyOf(batch), coll, scanId == null || scanId.isBlank() ? null : scanId);
+    if (recordedEpoch != null) beforeRecordedAdmission.run();
+    int accepted = recordedEpoch == null
+        ? jobQueue.enqueueEntries(List.copyOf(batch), coll, scanId == null || scanId.isBlank() ? null : scanId)
+        : jobQueue.enqueueRecordedEntries(scanId, recordedEpoch, List.copyOf(batch), coll);
     if (accepted != batch.size()) {
       throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
     counters[1] += accepted;
     for (JobQueue.EnqueueEntry entry : batch) bytes[0] += entry.sizeBytes();
-    if (forceReindex && !batch.isEmpty()) {
+    if (forceReindex && recordedEpoch == null && !batch.isEmpty()) {
       // Mark per batch rather than once at the end: a long walk's early batches are already
       // being extracted while later directories are still being visited, so a deferred mark
       // would arrive after the extractor had skipped them as UNCHANGED.
@@ -316,10 +366,10 @@ final class WorkerScanOps {
    * was previously above {@link #QUEUE_HIGH_WATERMARK}. Sleep duration is delegated through
    * {@link BackpressureWaiter} so tests can substitute a counter without blocking.
    */
-  private void awaitQueueBelowThreshold() {
+  private boolean awaitQueueBelowThreshold() {
     long depth = queueDepthSupplier.getAsLong();
     if (depth < QUEUE_HIGH_WATERMARK) {
-      return;
+      return !isCancelled.getAsBoolean();
     }
     log.debug(
         "Backpressure: queue depth {} above {}, waiting for < {}",
@@ -328,12 +378,13 @@ final class WorkerScanOps {
         QUEUE_LOW_WATERMARK);
     while (queueDepthSupplier.getAsLong() >= QUEUE_LOW_WATERMARK) {
       if (isCancelled.getAsBoolean()) {
-        return;
+        return false;
       }
       if (!backpressureWaiter.waitForBatch(BACKPRESSURE_POLL_MS)) {
-        return;
+        return false;
       }
     }
+    return !isCancelled.getAsBoolean();
   }
 
   private static boolean sleepForBackpressure(long millis) {
@@ -383,7 +434,12 @@ final class WorkerScanOps {
         .build();
   }
 
-  private static List<PathMatcher> buildExcludeMatchers(List<String> globs) {
+  private static boolean excludedByOwnership(ScanRequest request, Path candidate) {
+    Path normalized = candidate.toAbsolutePath().normalize();
+    return request.excludedSubtrees().stream().anyMatch(normalized::startsWith);
+  }
+
+  private static List<PathMatcher> buildExcludeMatchers(List<String> globs, boolean strict) {
     if (globs == null || globs.isEmpty()) return List.of();
     FileSystem fs = FileSystems.getDefault();
     List<PathMatcher> matchers = new ArrayList<>(globs.size());
@@ -392,6 +448,7 @@ final class WorkerScanOps {
       try {
         matchers.add(fs.getPathMatcher("glob:" + glob.trim()));
       } catch (IllegalArgumentException ignored) {
+        if (strict) throw new IllegalArgumentException("Invalid recorded scan-exclude glob", ignored);
         log.debug("Ignoring invalid scan-exclude glob: {}", glob);
       }
     }
@@ -402,7 +459,7 @@ final class WorkerScanOps {
     if (matchers.isEmpty()) return false;
     Path relative;
     try {
-      relative = root.relativize(file);
+      relative = root.equals(file) ? file.getFileName() : root.relativize(file);
     } catch (IllegalArgumentException ignored) {
       relative = file;
     }
@@ -423,13 +480,34 @@ final class WorkerScanOps {
    */
   record ScanRequest(
       Path root, String collection, ScanMode mode, List<String> excludeGlobs, String scanId,
-      JobQueue.EnqueueProvenance provenance) {
+      JobQueue.EnqueueProvenance provenance, Long recordedEpoch, List<Path> excludedSubtrees, boolean singleFile) {
     public ScanRequest {
       Objects.requireNonNull(root, "root");
       Objects.requireNonNull(provenance, "provenance");
       excludeGlobs = excludeGlobs == null ? List.of() : List.copyOf(excludeGlobs);
       mode = mode == null ? ScanMode.INITIAL : mode;
       scanId = scanId == null ? "" : scanId;
+      excludedSubtrees = List.copyOf(excludedSubtrees);
+      if (recordedEpoch != null && (recordedEpoch < 1 || scanId.isBlank())
+          || recordedEpoch == null && (!excludedSubtrees.isEmpty() || singleFile)) {
+        throw new IllegalArgumentException("Invalid recorded scan membership");
+      }
+      for (Path subtree : excludedSubtrees) {
+        if (!subtree.isAbsolute() || !subtree.normalize().equals(subtree)
+            || subtree.equals(root) || !subtree.startsWith(root)) {
+          throw new IllegalArgumentException("Excluded subtree must be a normalized descendant");
+        }
+      }
+    }
+
+    public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs,
+        String scanId, JobQueue.EnqueueProvenance provenance, Long recordedEpoch, List<Path> excludedSubtrees) {
+      this(root, collection, mode, excludeGlobs, scanId, provenance, recordedEpoch, excludedSubtrees, false);
+    }
+
+    public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs,
+        String scanId, JobQueue.EnqueueProvenance provenance) {
+      this(root, collection, mode, excludeGlobs, scanId, provenance, null, List.of(), false);
     }
 
     /** Internal maintenance scan without a caller's admission attribution. */

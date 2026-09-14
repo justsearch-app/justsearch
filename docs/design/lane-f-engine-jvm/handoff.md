@@ -2,7 +2,16 @@
 
 ## Current state (2026-09-14)
 
-2026-09-14 current pushed checkpoint064adc779 fixes coordinator startup cancellation and
+Current d.3b.1 [Java-only recorded scan admission](evidence/C2/recorded-scan-admission.md)
+is implemented and locally verified on fe5742ba5 plus its per-item diff. Final1769 executes52
+cases/five suites, zero failures/errors/skips; PMD, format and governance pass. Independent
+review corrected generation fencing and a file-kind scope race; eight expected negative-control
+assertions fail for the intended reasons and restored source passes. Next is d.3b.2: bind the
+bounded Engine producer, carry persisted generation and prove actual exit/drain and compatibility
+ordering; then prepared handlers and integrated/live/installed/hosted proof. C2 remains open;
+merge stays at F. Root owns lifecycle, SQL, builds and installation of source/test changes.
+
+Prior pushed checkpoint064adc779 fixes coordinator startup cancellation and
 synchronous producer rejection. Hosted CI34878848566 passes12/13 jobs; its sole app-ui finding
 is the still-unbound producer. CLA34878843824 passes. The obsolete maintenance helper is removed.
 [Coordinator proof](evidence/C2/ingestion-coordinator.md) preserves full1735 and corrective

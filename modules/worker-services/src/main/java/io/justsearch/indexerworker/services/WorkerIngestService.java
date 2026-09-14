@@ -1635,10 +1635,61 @@ public final class WorkerIngestService {
       io.justsearch.ipc.ScanRootRequest request,
       java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> sink,
       CallContext ctx) {
+    scanRoot(request, sink, ctx, null);
+  }
+
+  /** Java-only projection of one accepted root; the wire schema never carries operation identity. */
+  public record RecordedRootScan(io.justsearch.ipc.ScanRootRequest request,
+      String operationKey, long epoch, String expectedGeneration, boolean singleFile, List<Path> excludedSubtrees) {
+    public RecordedRootScan {
+      java.util.Objects.requireNonNull(request, "request");
+      if (operationKey == null || operationKey.isBlank() || operationKey.length() > 256 || epoch < 1) {
+        throw new IllegalArgumentException("Invalid recorded scan membership");
+      }
+      if (expectedGeneration == null || expectedGeneration.isBlank() || expectedGeneration.length() > 128) {
+        throw new IllegalArgumentException("Invalid recorded generation");
+      }
+      Path root = Path.of(request.getRootPath());
+      if (!root.isAbsolute() || !root.normalize().equals(root) || root.toString().length() > 32768) {
+        throw new IllegalArgumentException("Recorded root must be absolute and normalized");
+      }
+      excludedSubtrees = List.copyOf(excludedSubtrees);
+      if (excludedSubtrees.size() > 1024 || request.getExcludeGlobsCount() > 1024) {
+        throw new IllegalArgumentException("Recorded root policy exceeds its bound");
+      }
+      for (Path subtree : excludedSubtrees) {
+        if (!subtree.isAbsolute() || !subtree.normalize().equals(subtree)
+            || subtree.toString().length() > 32768 || subtree.equals(root) || !subtree.startsWith(root)) {
+          throw new IllegalArgumentException("Excluded subtree must be a normalized descendant");
+        }
+      }
+      for (String glob : request.getExcludeGlobsList()) {
+        if (glob.isBlank() || glob.length() > 4096) throw new IllegalArgumentException("Invalid recorded root glob");
+      }
+    }
+  }
+
+  /** Synchronous actual enumeration; the Engine supplies the admitted owner and bounded executor. */
+  public void scanRecordedRoot(RecordedRootScan recorded,
+      java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> sink, CallContext ctx) {
+    java.util.Objects.requireNonNull(recorded, "recorded");
+    validateRecordedGeneration(recorded, ctx);
+    scanRoot(recorded.request(), sink, ctx, recorded);
+  }
+
+  private void validateRecordedGeneration(RecordedRootScan recorded, CallContext ctx) {
+    if (!recorded.expectedGeneration().equals(captureServingGeneration(ctx))) {
+      throw WorkerServiceException.unavailable("RECORDED_GENERATION_CHANGED");
+    }
+  }
+
+  private void scanRoot(io.justsearch.ipc.ScanRootRequest request,
+      java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> sink,
+      CallContext ctx, RecordedRootScan recorded) {
     // Tempdoc 419 / T2 — Allocate the scanId at RPC entry. The same value is stamped on every
     // emitted ScanRootProgress event so SSE consumers (T4) can subscribe by scanId, and so
     // log entries from this scan correlate via MDC.
-    String scanId = java.util.UUID.randomUUID().toString();
+    String scanId = recorded == null ? java.util.UUID.randomUUID().toString() : recorded.operationKey();
     try (var ignored = openRequestMdc(ctx);
         var ignored2 = MdcContext.scan(scanId)) {
       String rootPath = request.getRootPath();
@@ -1660,7 +1711,9 @@ public final class WorkerIngestService {
           };
       WorkerScanOps.ScanRequest scanRequest =
           new WorkerScanOps.ScanRequest(
-              root, request.getCollection(), mode, request.getExcludeGlobsList(), scanId, ctx.provenance());
+              root, request.getCollection(), mode, request.getExcludeGlobsList(), scanId, ctx.provenance(),
+              recorded == null ? null : recorded.epoch(),
+              recorded == null ? List.of() : recorded.excludedSubtrees(), recorded != null && recorded.singleFile());
       // Tempdoc 418 B-H.3 — Worker owns backpressure + cancellation. The call's cancellation
       // signal lets WorkerScanOps stop walking when the caller drops the stream (e.g.,
       // RootLifecycleOps removes the watched root mid-scan).
@@ -1672,7 +1725,8 @@ public final class WorkerIngestService {
         // A lambda, not `indexingLoop::markForced`: a method reference dereferences its receiver
         // when the sink is CREATED, which would make every ordinary scan depend on a field only
         // the forced branch actually uses.
-        new WorkerScanOps(jobQueue, queueDepth, isCancelled, paths -> indexingLoop.markForced(paths))
+        new WorkerScanOps(jobQueue, queueDepth, isCancelled, paths -> indexingLoop.markForced(paths),
+            () -> validateRecordedGeneration(java.util.Objects.requireNonNull(recorded), ctx))
             .scan(scanRequest, sink);
       } catch (java.io.IOException e) {
         log.warn("ScanRoot walk failed for {}: {}", rootPath, e.getMessage());

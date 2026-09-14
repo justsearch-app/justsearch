@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2 d.3b.1 carries recorded child key/epoch, frozen generation and subtree policy beside the existing Java scan request, preserving indexing.proto. Revalidate generation before every batch, bound single-file traversal to the start node with consistent non-following link policy, prune nested ownership, reject malformed/partial traversal and recheck cancellation before enqueue. The recorded Worker admission seam precedes bounded Engine binding; force compatibility must use proven index work before activation. [Owning mechanism and acceptance](evidence/C2/recorded-scan-admission.md).
+
 - 2026-09-14: C2 d.3b projects the frozen force flag into the exact issued recorded claim through one enum-valued admission decision; it cannot use the raced, process-local forced-path set. [Owning mechanism, alternatives and proof plan](evidence/C2/recorded-force-claims.md).
 
 - 2026-09-14: C2-9b.3b.3 preserves cancellation before the first producer with a private never-started empty receipt and closes the token-publication race with a volatile recheck. [Owning correction and deterministic regressions](evidence/C2/C2-8d-vertical-plan.md#cancellation-before-producer-publication-2026-09-14).
