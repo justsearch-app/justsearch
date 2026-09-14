@@ -15,12 +15,23 @@ last_reviewed: 2026-09-02
 ## Status
 
 Superseded — the GGUF embedding system (in-process llama.cpp via FFM)
-was deleted in March 2026 (~10,000 LOC). Embeddings now use ONNX Runtime,
-which runs in the Worker process via `NativeSessionHandle` (formerly `OrtSessionManager`; renamed in tempdoc 397 §14.23). The mutual
-exclusion protocol (MMF `main_gpu_active` flag) is still used for VRAM
-coordination between ORT GPU sessions and llama-server, but the framing
-below (GGUF embedding model, `nomic-embed-text`, `EMBED_GPU_LAYERS`)
-is no longer accurate.
+was deleted in March 2026 (~10,000 LOC). Embeddings now use ONNX Runtime
+via `NativeSessionHandle` (formerly `OrtSessionManager`; renamed in tempdoc 397 §14.23).
+The mutual exclusion protocol is still used for VRAM coordination between
+ORT GPU sessions and llama-server, but the framing below (GGUF embedding
+model, `nomic-embed-text`, `EMBED_GPU_LAYERS`) is no longer accurate.
+
+**Correction, 2026-09-08 (ADR-0049).** The Context and Decision below describe
+this policy across a Head/Worker process split that no longer exists. Lane F
+stage A merged the application half and the index half into one JVM — the
+Engine — so the ORT encoders and the process that serves the API are now the
+same process, and `main_gpu_active` is a field on the in-process
+`GpuSchedulingGauge` (`modules/core`), not a memory-mapped flag: the MMF signal
+bus was deleted at item A10. What survives unchanged is the policy itself and
+the boundary it coordinates across — `llama-server` is still a separate process
+owning VRAM (ADR-0049 keeps it), so mutual exclusion between ORT GPU sessions
+and the generative LLM is still cross-process and still required. Read every
+"Head process" / "Worker process" below as "the Engine".
 
 ## Context
 

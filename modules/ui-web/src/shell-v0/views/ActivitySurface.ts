@@ -13,15 +13,13 @@
  * Side-effect registers `<jf-activity-surface>` for the chrome
  * dispatcher.
  *
- * Narrow scope per slice 486 §22.1:
- *   - Shows the in-memory ring buffer (~200 entries).
- *   - Lifts to Tier B at full-archive scope (would need to
- *     consume `AgentRunStore` durable persistence).
- *   - No filter / search / export V1 — Tier B widening.
+ * Shows the latest operation-history snapshot from retained operations rows,
+ * followed by live updates. Resource-declared operation keys merge replay overlap.
+ * Unkeyed observations remain independent; filtering and export are not provided.
  *
  * Backend declaration: `CoreSurfaceCatalog.ACTIVITY_SURFACE_ID`
  * (`core.activity-surface`) → mountTag `jf-activity-surface`,
- * Audience.USER, Placement.RAIL, consumes
+ * Audience.USER, Placement.DEEPLINK, consumes
  * `core.operation-history`.
  */
 
@@ -83,8 +81,8 @@ export class ActivitySurface extends JfElement {
         <div class="sub">
           What the system did — a structured audit of operations (button
           clicks, agent calls, scheduled runs) with outcomes and timing.
-          For raw diagnostic output, see Logs. Last ~200 entries; live ring
-          buffer, not a durable archive.
+          Recent activity and retained operation history, updated live.
+          For raw diagnostic output, see Logs.
         </div>
       </div>
       <div class="body">

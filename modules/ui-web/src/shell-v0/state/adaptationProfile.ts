@@ -31,6 +31,11 @@ import { getDocument, mutateDocument } from './UserStateDocument.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { applyAppearance } from './themeState.js';
 import type { DensityVariant } from '../renderers/userConfig.js';
+import {
+  createSettingsAttempt,
+  executeSettingsAttempt,
+  readSettingsObservation,
+} from '../../api/settingsAttempt.js';
 
 export interface AdaptationProfile {
   readonly density?: DensityVariant;
@@ -91,11 +96,12 @@ export function restoreAdaptationProfileOnBoot(): void {
 }
 
 /** Drop the retired legacy axis from the persisted profile — the "migrated" marker (see below). */
-function clearLegacyContrast(): void {
+function clearLegacyContrast(profileId: string, expected: 'normal' | 'high'): void {
   mutateDocument((doc) => {
+    if (doc.activeProfileId !== profileId) return doc;
     const cfg = doc.userConfig;
     const profile = cfg.accessibilityProfile;
-    if (profile?.contrast === undefined) return doc;
+    if (profile?.contrast !== expected) return doc;
     const { contrast: _retired, ...rest } = profile;
     return { ...doc, userConfig: { ...cfg, accessibilityProfile: rest } };
   });
@@ -130,32 +136,41 @@ function clearLegacyContrast(): void {
 export async function migrateLegacyContrastPreference(
   fetchImpl: typeof fetch = authorizedFetch,
 ): Promise<void> {
-  const legacy = getDocument().userConfig.accessibilityProfile?.contrast;
+  const captured = getDocument();
+  const profileId = captured.activeProfileId;
+  const legacy = captured.userConfig.accessibilityProfile?.contrast;
   if (legacy === undefined) return;
   const desired = legacy === 'high';
-  let canonical: boolean;
+
+  const isCurrent = (): boolean => {
+    const current = getDocument();
+    return current.activeProfileId === profileId
+      && current.userConfig.accessibilityProfile?.contrast === legacy;
+  };
+
   try {
-    const res = await fetchImpl('/api/settings/v2');
-    if (!res.ok) return;
-    const data = (await res.json()) as { ui?: { highContrast?: boolean } };
-    canonical = data.ui?.highContrast === true;
-  } catch {
-    // Settings endpoint unreachable — leave the legacy value in place and retry next boot rather
-    // than guessing the canonical value (guessing `false` would overwrite a persisted `true`).
-    return;
-  }
-  if (canonical !== desired) {
-    try {
-      const res = await fetchImpl('/api/settings/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ui: { highContrast: desired } }),
-      });
-      if (!res.ok) return;
-    } catch {
+    const data = await readSettingsObservation((path, init) => fetchImpl(path, init));
+    const witness = data.witness;
+    const canonical = data.ui?.highContrast === true;
+    if (!isCurrent()) return;
+    if (canonical === desired) {
+      clearLegacyContrast(profileId, legacy);
       return;
     }
+
+    const attempt = createSettingsAttempt({ ui: { highContrast: desired } }, witness);
+    // The captured profile/value guard admits this migration intent. The attempt retains the
+    // witness from the GET above; a second observation could silently replace its base.
+    if (!isCurrent()) return;
+    await executeSettingsAttempt((path, init) => fetchImpl(path, init), attempt);
+    // COMPLETE proves this exact attempt was committed. A profile switch or user edit raced the
+    // request, so do not project or clear the captured legacy preference in that case.
+    if (!isCurrent()) return;
     await applyAppearance({ highContrast: desired }, fetchImpl);
+    if (isCurrent()) clearLegacyContrast(profileId, legacy);
+  } catch {
+    // Settings endpoint unreachable or rejected — leave the legacy value in place and retry next
+    // boot rather than guessing the canonical value.
+    return;
   }
-  clearLegacyContrast();
 }

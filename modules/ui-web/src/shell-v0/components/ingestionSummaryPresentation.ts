@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 
-// Projection of IndexingController.handleIngestionOutcomeSummary / RemoteKnowledgeClient's
-// map-backed wire (no generated record schema exists). Unknown codes remain valid wire values.
+// Projection of IndexingController.handleIngestionOutcomeSummary / KnowledgeClient's map-backed
+// payload (no generated record schema exists). Unknown codes remain valid wire values.
 export const ingestionSummarySchema = z.object({
   rollups: z.array(z.object({
     outcomeClass: z.string(),

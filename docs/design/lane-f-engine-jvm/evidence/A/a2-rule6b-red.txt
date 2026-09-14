@@ -1,0 +1,57 @@
+# A2 falsification — app-services -> indexerworker.services edge reds rule 6b
+
+Date: 2026-09-07   Worktree: .claude/worktrees/lane-F-A   Branch: worktree-lane-F-A
+Rule: LayeringEnforcementTest#onlyEngineAndWorkerMayDependOnWorkerInternals
+
+This is the SECOND of the two directions A.md section 8 requires. The first
+(an app.engine -> ui edge redding onlyAppLauncherMayDependOnUi) is recorded in
+a1-ui-edge-red.txt in this directory and is not repeated here.
+
+## Injection (temporary, reverted immediately after this capture)
+
+  modules/app-services/build.gradle.kts
+      + implementation(project(":modules:worker-services"))
+      (required: app-services has NO compile edge to worker-services at HEAD, which is
+       itself part of what rule 6b pins - the probe does not compile without it)
+  modules/app-services/src/main/java/io/justsearch/app/services/Rule6bFalsificationProbe.java
+      imports io.justsearch.indexerworker.services.GrpcSearchService
+
+## Command
+
+  ./gradlew.bat :modules:app-launcher:cleanTest :modules:app-launcher:test \
+      --tests '*LayeringEnforcementTest*' -PskipWebBuild=true --no-build-cache \
+      --write-locks --console=plain
+
+  (--write-locks only because the temporary project dependency violates app-services'
+   committed gradle.lockfile; every lockfile was restored with git checkout afterwards
+   and git status confirmed clean.)
+
+## Result: BUILD FAILED (gradle exit 1) — exactly one rule red
+
+```
+LayeringEnforcementTest > onlyEngineAndWorkerMayDependOnWorkerInternals FAILED
+    java.lang.AssertionError at ArchRule.java:94
+
+26 tests completed, 1 failed
+
+> Task :modules:app-launcher:test FAILED
+BUILD FAILED in 57s
+```
+
+## Assertion detail (from modules/app-launcher/build/test-results/test/TEST-io.justsearch.app.launcher.LayeringEnforcementTest.xml)
+
+```
+java.lang.AssertionError: Architecture Violation [Priority: MEDIUM] - Rule 'sharing a JVM does not license application code to reach past a port into Lucene (ADR-0049): only io.justsearch.app.engine.., io.justsearch.indexerworker.. and io.justsearch.adapters.. may depend on io.justsearch.indexerworker.{server,services,loop}..' was violated (1 times):
+Method <io.justsearch.app.services.Rule6bFalsificationProbe.probe()> references class object <io.justsearch.indexerworker.services.GrpcSearchService> in (Rule6bFalsificationProbe.java:15)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.assertNoViolation(ArchRule.java:94)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.check(ArchRule.java:86)
+```
+
+Note the sibling rule indexerWorkerMustNotDependOnAppServices stayed GREEN: it pins
+the opposite direction, and the probe adds an edge only one way.
+
+## Revert
+
+Rule6bFalsificationProbe.java deleted; the worker-services dependency removed from
+modules/app-services/build.gradle.kts; all gradle.lockfile files restored. The green
+re-run at HEAD (12 LayeringEnforcementTest rules, 0 failures) is recorded in the A2 commit.

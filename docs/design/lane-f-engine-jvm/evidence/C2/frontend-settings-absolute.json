@@ -1,0 +1,81 @@
+{
+  "kind": "lane-f-frontend-settings-absolute.v1",
+  "baseRevision": "531128d11b583160520cbbec1d69d4eb6ebca6a8",
+  "testedSources": [
+    {
+      "path": "modules/ui-web/src/api/domains/settings.test.ts",
+      "sha256": "2ad653f8f87f7d97a9210e267f811887425d0ab54c7508732120b2c2faacf188"
+    },
+    {
+      "path": "modules/ui-web/src/api/domains/settings.ts",
+      "sha256": "fad35035cbff532f28d5d7c8172ab9b500a9ded073366ac71bb5096eacdd3ee6"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "sha256": "eaa91ec562c45c96c43e0d01b8259c69cfea79883944187c3be03e2cae8031ed"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/chrome/Shell.ts",
+      "sha256": "4cdea527afa99eb3c6d67c7ddf6c3ef4ba8f9659cfe88a9b863c6d30be1d700c"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/BrainSurface.settings-attempt.test.ts",
+      "sha256": "2261a8770a4b6f64a81188482d2dd716cd999987e0db1ebe0ab3ca3f891083d8"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/BrainSurface.ts",
+      "sha256": "7373eb3d688dad76bd98b95f25a27c9637e99ca27c5a5d551609619a404e179e"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts",
+      "sha256": "df5c43274150337d2bbecf68404a3a1fc38aafab73dfcb5684e4a804e2c4ec83"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/SettingsSurface.contextWindow.test.ts",
+      "sha256": "18ae6958ccc788f200718a6e741c1d075ec633e4897d458e2dc26ee193013ec7"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/SettingsSurface.highContrast.test.ts",
+      "sha256": "63e6df9416204cb524a462ae7fe65dc4a1bbe4deb1a9e0815fefde260b357c53"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/SettingsSurface.ts",
+      "sha256": "11198c371b31fa0242cd8e771c58f78f65e6690342370b253eeb7434a4df582e"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/SettingsSurface.ui-mode.test.ts",
+      "sha256": "ebc1ac0087c5b4edaaef94393cc4be796addae7c682bd25dd91f1dda202aae1a"
+    }
+  ],
+  "environment": "Windows; Node/Vitest4.1.9; happy-dom",
+  "commands": [
+    "npm run typecheck",
+    "npm run test:unit:run",
+    "npx eslint src/api/domains/settings.test.ts src/api/domains/settings.ts src/shell-v0/chrome/Shell.test.ts src/shell-v0/chrome/Shell.ts src/shell-v0/views/BrainSurface.settings-attempt.test.ts src/shell-v0/views/BrainSurface.ts src/shell-v0/views/BrainSurface.ui-mode.test.ts src/shell-v0/views/SettingsSurface.contextWindow.test.ts src/shell-v0/views/SettingsSurface.highContrast.test.ts src/shell-v0/views/SettingsSurface.ts src/shell-v0/views/SettingsSurface.ui-mode.test.ts"
+  ],
+  "result": {
+    "suites": 488,
+    "tests": 6557,
+    "failures": 0,
+    "skips": 0
+  },
+  "raw": [
+    "tmp/frontend-absolute-full1468.txt",
+    "tmp/frontend-absolute-typecheck1468.txt",
+    "tmp/frontend-absolute-lint1469.txt"
+  ],
+  "failedProof": {
+    "command": "python -m jseval ui-shot --affected modules/ui-web/src/shell-v0/views/SettingsSurface.ts --fixtures --output-dir tmp/ui-settings1466",
+    "raw": [
+      "tmp/frontend-ui-settings1466.txt",
+      "tmp/ui-settings1466/settings.measure.json",
+      "tmp/ui-settings1466/settings-light.measure.json"
+    ],
+    "result": "Partial capture: Settings h2 mounted in both PNGs, zero axe/console errors. Five density/search selector timeouts remain; CLI zero exit is not batch success. Initial wrong-surface claim corrected after full measurement reread."
+  },
+  "limits": [
+    "Library/adaptation next item",
+    "UI capture failure requires repair/reproof",
+    "No live/model/installed/final-head hosted claim"
+  ]
+}

@@ -51,5 +51,10 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "overrides": {
+    "orval": {
+      "js-yaml": "4.3.2"
+    }
   }
 }

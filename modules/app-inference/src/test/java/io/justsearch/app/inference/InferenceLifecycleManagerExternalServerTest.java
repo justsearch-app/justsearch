@@ -57,7 +57,7 @@ class InferenceLifecycleManagerExternalServerTest {
             99,
             false);
 
-    InferenceLifecycleManager manager = new InferenceLifecycleManager(config);
+    InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
     try {
       manager.startLlamaServer();
 
@@ -94,7 +94,7 @@ class InferenceLifecycleManagerExternalServerTest {
             0,
             false);
 
-    InferenceLifecycleManager manager = new InferenceLifecycleManager(config);
+    InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
     try {
       try {
         manager.startLlamaServer();
@@ -139,7 +139,7 @@ class InferenceLifecycleManagerExternalServerTest {
               0,
               false);
 
-      InferenceLifecycleManager manager = new InferenceLifecycleManager(config);
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
       try {
         manager.startLlamaServer();
 
@@ -184,7 +184,7 @@ class InferenceLifecycleManagerExternalServerTest {
               99,
               false);
 
-      InferenceLifecycleManager manager = new InferenceLifecycleManager(config);
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
       try {
         try {
           manager.startLlamaServer();
@@ -239,7 +239,7 @@ class InferenceLifecycleManagerExternalServerTest {
             0,
             false);
 
-    InferenceLifecycleManager manager = new InferenceLifecycleManager(config);
+    InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
     try {
       manager.switchToOnlineMode();
       assertEquals(io.justsearch.app.api.Mode.ONLINE, manager.getCurrentMode());
@@ -291,7 +291,7 @@ class InferenceLifecycleManagerExternalServerTest {
       Path fakeModel = Files.createFile(tempDir.resolve("model.gguf"));
       InferenceConfig config = new InferenceConfig(fakeExe, fakeModel, null, port, 4096, 0, false);
 
-      InferenceLifecycleManager manager = new InferenceLifecycleManager(config);
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
       try {
         // Precondition: a fresh manager has recorded no startup yet (the -1 sentinel).
         assertTrue(

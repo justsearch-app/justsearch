@@ -17,9 +17,9 @@ final class ExportDiagnosticsHandlerTest {
   @Test
   void executeReturnsSuccessWithPathFromService() {
     Path exported = Paths.get("/tmp/justsearch-diagnostics-20260506-120000.zip");
-    ExportDiagnosticsHandler handler = new ExportDiagnosticsHandler(() -> () -> exported);
+    ExportDiagnosticsHandler handler = new ExportDiagnosticsHandler(() -> engineContext -> exported);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals(exported.toAbsolutePath().toString(), result.structuredData().get("path"));
     assertTrue(result.message().contains(exported.toAbsolutePath().toString()));
@@ -28,7 +28,7 @@ final class ExportDiagnosticsHandlerTest {
   @Test
   void executeReturnsFailureWhenServiceUnavailable() {
     ExportDiagnosticsHandler handler = new ExportDiagnosticsHandler(() -> null);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Diagnostics service unavailable"));
   }
@@ -36,11 +36,11 @@ final class ExportDiagnosticsHandlerTest {
   @Test
   void executeReturnsFailureWhenServiceThrowsUnsupported() {
     DiagnosticsService throwing =
-        () -> {
+        engineContext -> {
           throw new UnsupportedOperationException("Diagnostics service unavailable");
         };
     ExportDiagnosticsHandler handler = new ExportDiagnosticsHandler(() -> throwing);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Diagnostics export failed"));
   }
@@ -48,11 +48,11 @@ final class ExportDiagnosticsHandlerTest {
   @Test
   void executeReturnsFailureWhenExportThrowsIO() {
     DiagnosticsService throwing =
-        () -> {
+        engineContext -> {
           throw new IOException("disk full");
         };
     ExportDiagnosticsHandler handler = new ExportDiagnosticsHandler(() -> throwing);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("disk full"));
   }

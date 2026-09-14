@@ -12,7 +12,7 @@ import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,9 +145,10 @@ public final class AgentToolHandlers {
    *     prerequisite (worker capability, knowledge server, or data dir) was missing.
    */
   public static boolean registerLateBound(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       HandlerRegistry operationHandlers,
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       WorkerCapability workerCapability,
       Path dataDir,
       IndexingService indexingService,
@@ -158,7 +159,9 @@ public final class AgentToolHandlers {
       io.justsearch.agent.api.memory.MemoryStore memoryStore,
       io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry,
       io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
-      DocumentService documentService) {
+      DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      java.util.function.Supplier<IndexingService> liveIndexing) {
     if (knowledgeClient == null || !workerCapability.available()) {
       log.warn("registerAgentToolHandlers skipped: knowledgeClient or worker capability unavailable");
       return false;
@@ -187,6 +190,7 @@ public final class AgentToolHandlers {
     // copies. Registration is this method's job; composition is the factory's.
     AgentToolFactory.Output tools =
         AgentToolFactory.assemble(
+            perSourceSearch,
             dataDir,
             knowledgeServer,
             knowledgeClient,
@@ -197,7 +201,7 @@ public final class AgentToolHandlers {
             existingFileOperationLog,
             scanProgressRegistry,
             scanRollupLedger,
-            documentService);
+            documentService, recordedIngestion, recordedRoots, liveIndexing);
     // Tempdoc 877 §2.10: the log line is DERIVED from what this method actually registered. It
     // used to hand-list the names, which is a second authority that drifts the moment a
     // conditional registration is skipped (READ_DOCUMENT and REMEMBER both are, below).

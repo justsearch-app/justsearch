@@ -33,7 +33,15 @@ public record WorkerConfig(
 
   private static final Logger log = LoggerFactory.getLogger(WorkerConfig.class);
 
-  static WorkerConfig load() {
+  /**
+   * Builds the worker config from the globally-resolved config.
+   *
+   * <p>Public since lane F stage A item A6: the Engine composition root ({@code EngineRoot}) is now
+   * a legitimate second caller. It reads the SAME {@code ConfigStore.global()} the Head resolved,
+   * which is what "one config, no worker snapshot" means in practice — the snapshot tier is retired
+   * at item A19, and nothing here depends on it.
+   */
+  public static WorkerConfig load() {
     ConfigStore cs = ConfigStore.globalOrNull();
     var rc = cs != null ? cs.get() : null;
     var wi = rc != null ? rc.workerIndexer() : null;

@@ -36,7 +36,7 @@
 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { hooksDisabled } from '../lib/hook-base.mjs';
+import { hooksDisabled, runHook } from '../lib/hook-base.mjs';
 
 // repoRoot resolution: the script's own location is
 // always under the MAIN checkout's scripts/ dir regardless of the session's current
@@ -159,4 +159,4 @@ async function main() {
   }
 }
 
-main().catch(() => process.exit(0));
+runHook(import.meta.url, main);

@@ -136,6 +136,7 @@ include(
   ":modules:app-util",
   ":modules:app-observability",
   ":modules:app-services",
+  ":modules:app-engine",
   ":modules:infra-core",
   ":modules:ssot-tools",
   ":modules:telemetry",

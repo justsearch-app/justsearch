@@ -163,6 +163,7 @@ def summarize_first_search(
     """
     ordered = sorted(latencies_ms)
     block: dict = {
+        "request_timeout_sec": search_load.REQUEST_TIMEOUT_SEC,
         "min_new_files": min_new_files,
         "batches_fired": batches_fired,
         "probes_ok": len(ordered),

@@ -1,0 +1,504 @@
+{
+  "date": "2026-09-13",
+  "revision": "eec44cad1 + listed settings-owner files",
+  "status": "LOCAL_OWNER_FOUNDATION_PASS; typed-witness/recovery-genesis, production composition and remaining C2-6 cuts incomplete",
+  "retention": "Through lane acceptance plus30days; export before worktree release",
+  "runs": [
+    {
+      "label": "c2-6-owner1282",
+      "revision": "0c7ca5954 + initial owner cut",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-services:spotlessApply :modules:app-services:test --tests '*SettingsCommitCoordinatorTest' --tests '*UiSettingsStoreRevisionTest' :modules:app-observability:test --tests '*OperationSettingsRunnerTest' :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-services:pmdMain :modules:app-services:pmdTest --console=plain",
+      "summary": {
+        "tests": 56,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 8
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 27,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        }
+      ],
+      "result": "FAILED_PMD",
+      "exitCode": 1
+    },
+    {
+      "label": "c2-6-owner1283",
+      "revision": "0c7ca5954 + owner cut and delayed-retry regression",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-services:spotlessApply :modules:app-services:test --tests '*SettingsCommitCoordinatorTest' --tests '*UiSettingsStoreRevisionTest' :modules:app-observability:test --tests '*OperationSettingsRunnerTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-services:pmdMain :modules:app-services:pmdTest --console=plain",
+      "summary": {
+        "tests": 97,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 28,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ],
+      "result": "PASS_INTERMEDIATE",
+      "exitCode": 0
+    },
+    {
+      "label": "c2-6-negative1284",
+      "revision": "eec44cad1 + owner diff with three deliberate mutations",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*SettingsCommitCoordinatorTest.occupiedAndStaleReservationsRefuseBeforeSqlArm' --tests '*SettingsCommitCoordinatorTest.reentrantPreparationAndCrossThreadNotificationCallsAreRefused' --tests '*SettingsCommitCoordinatorTest.recoveryIssueSubscriberCanCallOwnerAfterMutexIsReleased' --console=plain",
+      "summary": {
+        "tests": 9,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "result": "EXPECTED_FAILURE_INTERMEDIATE",
+      "exitCode": 1
+    },
+    {
+      "label": "c2-6-owner1285",
+      "revision": "eec44cad1 + owner review regressions",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-services:spotlessApply :modules:app-services:test --tests '*SettingsCommitCoordinatorTest' --tests '*UiSettingsStoreRevisionTest' :modules:app-observability:test --tests '*OperationSettingsRunnerTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-services:pmdMain :modules:app-services:pmdTest --console=plain",
+      "summary": {
+        "tests": 100,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 31,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        }
+      ],
+      "result": "FAILED_REAL_CONCURRENT_DEFECT",
+      "exitCode": 1
+    },
+    {
+      "label": "c2-6-owner1286",
+      "revision": "eec44cad1 + reviewed owner and prompt-cleanup fix",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-services:spotlessApply :modules:app-services:test --tests '*SettingsCommitCoordinatorTest' --tests '*UiSettingsStoreRevisionTest' :modules:app-observability:test --tests '*OperationSettingsRunnerTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-services:pmdMain :modules:app-services:pmdTest --console=plain",
+      "summary": {
+        "tests": 100,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 31,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ],
+      "result": "PASS_REVIEWED",
+      "exitCode": 0
+    },
+    {
+      "label": "c2-6-negative1287",
+      "revision": "eec44cad1 + reviewed owner with four deliberate mutations",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*SettingsCommitCoordinatorTest.occupiedAndStaleReservationsRefuseBeforeSqlArm' --tests '*SettingsCommitCoordinatorTest.reentrantPreparationAndCrossThreadNotificationCallsAreRefused' --tests '*SettingsCommitCoordinatorTest.recoveryIssueSubscriberCanCallOwnerAfterMutexIsReleased' --tests '*SettingsCommitCoordinatorTest.concurrentContenderIsRefusedWhilePreparationHoldsPhysicalMutex' --console=plain",
+      "summary": {
+        "tests": 10,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 10,
+          "failures": 4,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "result": "EXPECTED_FAILURE",
+      "exitCode": 1
+    },
+    {
+      "label": "c2-6-owner1288",
+      "revision": "eec44cad1 + restored reviewed owner",
+      "command": "./gradlew.bat :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-services:test --tests '*SettingsCommitCoordinatorTest' --tests '*UiSettingsStoreRevisionTest' :modules:app-observability:test --tests '*OperationSettingsRunnerTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:app-services:pmdMain :modules:app-services:pmdTest --console=plain",
+      "summary": {
+        "tests": 100,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "FROM-CACHE",
+          "tests": 31,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        }
+      ],
+      "result": "PASS_RESTORED_REUSED",
+      "exitCode": 0
+    }
+  ],
+  "sources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsCommitOwner.java",
+      "sha256": "1ca8d394a0b695ee7834b8b5e3665fb4fde87db3bd53cc39a62068345e66d6f0",
+      "bytes": 4157
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java",
+      "sha256": "29645471ca4c7dbdfde0ddd22c9cd42f2f3f74f70ca722de8581a7f475b8bcfd",
+      "bytes": 12323
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java",
+      "sha256": "8a6b43f0b7c140877508445c1859834f6dd0f9ac901e6ff1cbf35e7a769c786c",
+      "bytes": 37203
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationSettingsRunnerTest.java",
+      "sha256": "2e87bd4f48bafd95cdbcbff8ee9beae24bf5cb63e6931cec6c63413873c0ec4c",
+      "bytes": 33182
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-6-owner1282.txt",
+      "bytes": 39408,
+      "sha256": "49866fa7d3fcbf444ed42d6e3aced41db77b047f70d91fe79ad539ac4a83a2e6"
+    },
+    {
+      "path": "tmp/c2-6-owner1282-counts.json",
+      "bytes": 1021,
+      "sha256": "4201038c3b69aed3bae1d2a816712217cbc277c9b19cbf052cbdb7b94af6e4dd"
+    },
+    {
+      "path": "tmp/c2-6-owner1282-xml.zip",
+      "bytes": 144928,
+      "sha256": "a395726b7723ff9fa5dad4a3d2a6e9fc6ade57584ff85cf73a36f85b2b9e62e6"
+    },
+    {
+      "path": "tmp/c2-6-owner1283.txt",
+      "bytes": 41737,
+      "sha256": "2d364669884150644f07128b18ac044f742d0fa962d23d049d9a9d31d85703ff"
+    },
+    {
+      "path": "tmp/c2-6-owner1283-counts.json",
+      "bytes": 1307,
+      "sha256": "b52964a3a5dda077329f2d74b698d09e5d11eaf07a3afcd99ba53cfd9096ffb0"
+    },
+    {
+      "path": "tmp/c2-6-owner1283-xml.zip",
+      "bytes": 161461,
+      "sha256": "01c163b134219a106aaf5f90a3552489c09b9b26c6acef89d08eb9b6e63c5547"
+    },
+    {
+      "path": "tmp/c2-6-owner1283-source.json",
+      "bytes": 911,
+      "sha256": "10214201ae9b82cb961954af184d18843fdde778a7e2f233f5ca21f5670b0a93"
+    },
+    {
+      "path": "tmp/c2-6-negative1284.txt",
+      "bytes": 38287,
+      "sha256": "aa33bcce8894940b4835977aefb6e90654af2653fcff6b7f2636edefdbef2935"
+    },
+    {
+      "path": "tmp/c2-6-negative1284-counts.json",
+      "bytes": 749,
+      "sha256": "0c436ded06a8ff5b42489fc3ed8ecbc5d468ccbab737d2854347910071629670"
+    },
+    {
+      "path": "tmp/c2-6-negative1284-xml.zip",
+      "bytes": 48906,
+      "sha256": "35cc1ea913cac27340254ad1cb8c4c39fb49876e71a595cbf66ffafefaadda3d"
+    },
+    {
+      "path": "tmp/c2-6-negative1284-mutations.json",
+      "bytes": 304,
+      "sha256": "1ee5885e3d212ebece50c646a9b52b0d4c658c89192d4b6f9ce96de3a888a758"
+    },
+    {
+      "path": "tmp/c2-6-negative1284.original",
+      "bytes": 12054,
+      "sha256": "8b0f0b45c4aebcb537df48a15658dfb67c8ca82aaeb224b14f9b11e8d5cff329"
+    },
+    {
+      "path": "tmp/c2-6-negative1284.py",
+      "bytes": 1087,
+      "sha256": "31ad4babbbbe4b797654775b699677ec419cf83ec4cbfbf74ee37fbf4bdc6f75"
+    },
+    {
+      "path": "tmp/c2-6-owner1285.txt",
+      "bytes": 40721,
+      "sha256": "7fc2cf082a0bf3e4857528415762d73c417be0469da1afcab8f123b1d5c225b2"
+    },
+    {
+      "path": "tmp/c2-6-owner1285-counts.json",
+      "bytes": 1296,
+      "sha256": "b9c19f4d8de00e771568d587da5994a0a15e467dbf522c7644f4a3e0ce1dd6eb"
+    },
+    {
+      "path": "tmp/c2-6-owner1285-xml.zip",
+      "bytes": 182756,
+      "sha256": "494101294852b9c55bfe7ed4611d693a4398f7ecb0c778e39bf07370c6276869"
+    },
+    {
+      "path": "tmp/c2-6-owner1286.txt",
+      "bytes": 40116,
+      "sha256": "462870d7b4fbb16a8f37628a251b477abda92127d89cb2afbfbb1a0fd59699c6"
+    },
+    {
+      "path": "tmp/c2-6-owner1286-counts.json",
+      "bytes": 1307,
+      "sha256": "71a4ce55864a892f84f9e745391ca50bbd2e36b83fc213ded482a214d59359ea"
+    },
+    {
+      "path": "tmp/c2-6-owner1286-xml.zip",
+      "bytes": 183560,
+      "sha256": "6cc93614a402196b4f4ae66505b2b0a0eb1b479880ffc698b40099f3829410fd"
+    },
+    {
+      "path": "tmp/c2-6-owner1286-source.json",
+      "bytes": 911,
+      "sha256": "525be17b5223aac36da745869865feb382ded2719867df4ceba1d9570951f89f"
+    },
+    {
+      "path": "tmp/c2-6-negative1287.txt",
+      "bytes": 39026,
+      "sha256": "65ba2509b73d37da1e6b10ce96bca418101e8796537b0f701d19855913c3372d"
+    },
+    {
+      "path": "tmp/c2-6-negative1287-counts.json",
+      "bytes": 858,
+      "sha256": "9ab85e18deb3007f0c8a65c5040d444465f529f73388d69ac9060a1c0643d090"
+    },
+    {
+      "path": "tmp/c2-6-negative1287-xml.zip",
+      "bytes": 54977,
+      "sha256": "0c92069c4ba3ef21959c5d2b9fd54760fcd00738ce42d7474113b68ea4a547a2"
+    },
+    {
+      "path": "tmp/c2-6-negative1287-mutations.json",
+      "bytes": 336,
+      "sha256": "70f2ddc2b72ce89f4687d1d5f7460763ea75e0bda396ca2b2de6c6220e06106e"
+    },
+    {
+      "path": "tmp/c2-6-negative1287.original",
+      "bytes": 12323,
+      "sha256": "29645471ca4c7dbdfde0ddd22c9cd42f2f3f74f70ca722de8581a7f475b8bcfd"
+    },
+    {
+      "path": "tmp/c2-6-negative1287.py",
+      "bytes": 1215,
+      "sha256": "f7caec80ee8a47ae9441195cb558502b6c3a2d5875b014456bc5787f1534489e"
+    },
+    {
+      "path": "tmp/c2-6-owner1288.txt",
+      "bytes": 40169,
+      "sha256": "6db066ac812176b5219f15c509677a207138e4331b0153a8dead954e5f4348e9"
+    },
+    {
+      "path": "tmp/c2-6-owner1288-counts.json",
+      "bytes": 1189,
+      "sha256": "fed19934a935b2fedc59b193c2ab7f3508dcf508739953f166a194c96702673c"
+    },
+    {
+      "path": "tmp/c2-6-owner1288-xml.zip",
+      "bytes": 183560,
+      "sha256": "0c9dbdcb4e6080d8bd4617e0a4590b01384270c1d0b3f0f6c7c5317e2a33ba0a"
+    },
+    {
+      "path": "tmp/c2-6-owner1288-source.json",
+      "bytes": 911,
+      "sha256": "525be17b5223aac36da745869865feb382ded2719867df4ceba1d9570951f89f"
+    }
+  ],
+  "surfaceRegisterCorrection": {
+    "hostedRun": 34774278228,
+    "hostedRevision": "eec44cad194f25b0c74cd82c59517b26ed1faa7d",
+    "hostedConclusion": "failure",
+    "failedJob": "Public claims",
+    "failedGate": "operation-surface",
+    "otherJobsPassed": 12,
+    "claRun": 34774277424,
+    "claConclusion": "success",
+    "localBefore": "1289: three gates, one undeclared-surface finding",
+    "localAfter": "1290: three gates pass, zero findings",
+    "command": "node scripts/governance/run.mjs --gate operation-surface --gate execution-surface --gate register-guard-resolution --mode gate",
+    "files": [
+      {
+        "path": "governance/operation-surfaces.v1.json",
+        "bytes": 57509,
+        "sha256": "034e4033cc1d60eebfec1875dcb6aea8fc44c76d7c772e726372ddb6b4addb03"
+      },
+      {
+        "path": "tmp/c2-hosted34774278228-jobs.json",
+        "bytes": 49287,
+        "sha256": "90381a2c2fe1029a4a988bf87b2f5b49b480abd1b9a3473853936c5e1a399827"
+      },
+      {
+        "path": "tmp/c2-hosted34774278228-failed.txt",
+        "bytes": 3357,
+        "sha256": "d9d264882e69b615c599ffade3cf2ba96f88d5a83cc6998801842454a6075cd2"
+      },
+      {
+        "path": "tmp/c2-hosted-repro1289.txt",
+        "bytes": 176,
+        "sha256": "13a5101da542c9ead336165eabb86e62d8eca6bc3d5fdce94b4dd8f6b29006f1"
+      },
+      {
+        "path": "tmp/c2-hosted-repro1289.sarif",
+        "bytes": 2985,
+        "sha256": "2825c212519dd056ba9ba897699d794d27e6d2384025521a2ca52ba7acd9f2bb"
+      },
+      {
+        "path": "tmp/c2-hosted-repro1290.txt",
+        "bytes": 176,
+        "sha256": "5f0085e54e2c2f18da37ee66d4b912e6e8edeb7828f0bc9785fef4cb8bf7d5ea"
+      },
+      {
+        "path": "tmp/c2-hosted-repro1290.sarif",
+        "bytes": 1288,
+        "sha256": "9230da4135f8a5ad6a99b6c308c833517a9d00f68829a73a1432ec065ebccbd7"
+      }
+    ]
+  }
+}

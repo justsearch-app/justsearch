@@ -1,0 +1,57 @@
+{
+  "revision": "4f45e3af4 + lock error ownership and shutdown propagation",
+  "command": "gradlew.bat :modules:app-util:test --tests '*AppInstanceLock*' :modules:indexer-worker:test --tests '*IndexRootLock*' --tests '*KnowledgeServerCloseCompletionTest' :modules:app-launcher:test --tests '*LauncherEnvironmentCloseTest' :modules:app-util:pmdMain :modules:app-util:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 87,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 24
+  },
+  "tasks": [
+    {
+      "module": "app-util",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 30,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 44,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 16
+    }
+  ],
+  "negativeControls": [
+    {
+      "log": "tmp/c2-review-r10-lock-errors-negative884.txt",
+      "tests": 14,
+      "failures": 6,
+      "reason": "both lock owners silently accept lost metadata lock and swallow failed channel close"
+    },
+    {
+      "log": "tmp/c2-review-r10-lock-owner-negative886.txt",
+      "tests": 7,
+      "failures": 1,
+      "reason": "KnowledgeServer swallows root lock close failure and reports shutdown complete"
+    }
+  ]
+}

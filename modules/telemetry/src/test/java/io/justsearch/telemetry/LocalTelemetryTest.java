@@ -35,7 +35,7 @@ class LocalTelemetryTest {
   void writesMetricsNdjson() throws Exception {
     Path tmp = Files.createTempDirectory("telemetry-test");
     try (var t =
-        new LocalTelemetry(tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog()))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog()))) {
       t.registry().<EmptyTags>buildHistogram("pipeline.stage_ms").record(15, EmptyTags.INSTANCE);
       t.flush();
     }
@@ -50,7 +50,7 @@ class LocalTelemetryTest {
     Path tmp = Files.createTempDirectory("telemetry-flush");
     Path file = tmp.resolve("telemetry").resolve("metrics.ndjson");
     try (var t =
-        new LocalTelemetry(tmp, 60_000, "test", "0", "metrics.ndjson", List.of(catalog()))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 60_000, "test", "0", "metrics.ndjson", List.of(catalog()))) {
       // long period — verify shutdown forces flush.
       t.registry().<EmptyTags>buildCounter("pipeline.skipped").increment(EmptyTags.INSTANCE);
     }
@@ -71,7 +71,7 @@ class LocalTelemetryTest {
     Path file = tmp.resolve("telemetry").resolve("metrics.ndjson");
     AtomicLong supplied = new AtomicLong(42L);
     try (var t =
-        new LocalTelemetry(tmp, 60_000, "test", "0", "metrics.ndjson", List.of(catalog()))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 60_000, "test", "0", "metrics.ndjson", List.of(catalog()))) {
       // Long period — the value must reach NDJSON via close-time forceFlush, not periodic flush.
       t.registry()
           .<EmptyTags>buildObservableCounter("pipeline.observed", EmptyTags.INSTANCE, supplied::get);

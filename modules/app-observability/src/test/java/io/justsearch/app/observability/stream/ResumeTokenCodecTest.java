@@ -15,12 +15,14 @@ final class ResumeTokenCodecTest {
   @DisplayName("encode → decode round-trips streamId + seq")
   void roundTrip() {
     StreamId id = StreamId.registry("capabilities");
-    String token = ResumeTokenCodec.encode(id, 42L);
+    var incarnation = java.util.UUID.randomUUID();
+    String token = ResumeTokenCodec.encode(id, 42L, incarnation);
 
     Optional<ResumeTokenCodec.Decoded> decoded = ResumeTokenCodec.decode(token);
     assertTrue(decoded.isPresent());
     assertEquals(id, decoded.get().streamId());
     assertEquals(42L, decoded.get().seq());
+    assertEquals(incarnation, decoded.get().incarnation());
   }
 
   @Test
@@ -60,8 +62,9 @@ final class ResumeTokenCodecTest {
   @DisplayName("encode is deterministic for same inputs")
   void encodeDeterministic() {
     StreamId id = StreamId.surface("health-events");
-    String t1 = ResumeTokenCodec.encode(id, 100L);
-    String t2 = ResumeTokenCodec.encode(id, 100L);
+    var incarnation = java.util.UUID.randomUUID();
+    String t1 = ResumeTokenCodec.encode(id, 100L, incarnation);
+    String t2 = ResumeTokenCodec.encode(id, 100L, incarnation);
     assertEquals(t1, t2);
   }
 }

@@ -25,17 +25,28 @@ import org.slf4j.LoggerFactory;
  * <p>Tempdoc 737 (task 3): no longer holds its own {@code EnterprisePolicyService} — admin-policy
  * enforcement is the single {@link RuntimeActivationService#enforceActivationPolicy()} site.
  */
-public final class AiRuntimeController {
+public final class AiRuntimeController implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(AiRuntimeController.class);
   private static final ObjectMapper MAPPER =
       JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
   private final RuntimeActivationService service;
   private final Telemetry telemetry;
+  private final boolean ownsService;
 
   public AiRuntimeController(RuntimeActivationService service, Telemetry telemetry) {
+    this(service, telemetry, false);
+  }
+
+  AiRuntimeController(RuntimeActivationService service, Telemetry telemetry, boolean ownsService) {
     this.service = service;
     this.telemetry = telemetry;
+    this.ownsService = ownsService;
+  }
+
+  @Override
+  public void close() {
+    if (ownsService) service.close();
   }
 
   public void handleGetStatus(Context ctx) {

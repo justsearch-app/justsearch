@@ -31,7 +31,7 @@ class IndexIntegrityCheckTest extends RuntimeTestBase {
     Path indexPath = dataRoot.resolve(name);
     Files.createDirectories(indexPath);
     IndexSchema schema = buildSchemaWithDim(4);
-    RunningRuntime seed = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     for (int i = 0; i < 50; i++) {
       seed.indexingCoordinator()
           .indexSingle(

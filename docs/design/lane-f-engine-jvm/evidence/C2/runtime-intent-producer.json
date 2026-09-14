@@ -1,0 +1,588 @@
+{
+  "base": "0ad7e19140ebb57749c2b87046346d69acc27964",
+  "item": "C2-6 runtime-intent producer family",
+  "root": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "retention": "Through lane acceptance plus30 days; export before worktree release.",
+  "review": "Independent refute-first review; wire shape, accepted-refusal key and public-token corrections applied. Final review status is recorded in runtime-intent-producer.md.",
+  "limits": "Intermediate non-shippable item checkpoint. Activation/deactivation/compensation raw saves refuse after the new witness and are the immediately following required cut; all remaining writers, public witness/key flows, live/installed successor and final-head hosted proof remain required. C2-6 and F are open.",
+  "compile_failure": {
+    "label": "c2-runtime-intent1396",
+    "command": "./gradlew.bat :modules:app-services:test --tests '*RuntimeIntent*' --tests '*RuntimeSpecStoreTest' --tests '*RuntimeReconcilerTest' --tests '*SetChatEnabledHandlerTest' --tests '*SwitchInferenceModeHandlerTest' --tests '*BrainRuntimeServiceImplTest' --tests '*InferenceCapabilityWiringTest' --tests '*BootstrapProjectionsTest' --tests '*RuntimeActivationServiceChatProfileTest' :modules:ui:test --tests '*InferenceHandlersTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck :modules:app-api:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+    "reason": "Test fixture close did not propagate IOException; corrected to UncheckedIOException with cause.",
+    "artifact": {
+      "path": "tmp/c2-runtime-intent1396.txt",
+      "bytes": 49473,
+      "sha256": "86e056effd55bd0cb5e2d4f32b39363cd1be1db5e777bd0c34913a413b52595a"
+    }
+  },
+  "negative_assessment": "1399 was rejected as weak evidence: repeated mocked reads injected extra writes.1404 replaces it with one interleaving and fails because stale seed incorrectly succeeds when witness is refreshed.1401 catches REST shape/status;1402 catches lost accepted key;1403 catches public token mismatch.",
+  "restoration_sha256": "8d8d344a89e8169b6d3e6fdb55923d4973696eaa3c09c6b68e6e45e332129c04",
+  "sources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/BrainRuntimeService.java",
+      "bytes": 3601,
+      "sha256": "1a3dab2904006ac0b2516e3f786c4a2ac75af910fd960ed029ff5e09944e4fcb"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/ModeTransitionOutcome.java",
+      "bytes": 2695,
+      "sha256": "e505b712052978eb33676e21127252571d63dffba7acad7c37b08d649786a149"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java",
+      "bytes": 90598,
+      "sha256": "166b2cefdabf244d70eac96d06942f957fbef59db33796d2d19c4a37530cc6c8"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/InferenceWiring.java",
+      "bytes": 5587,
+      "sha256": "c9445cb38e88b2949356bee91f04a0987d9ff235035141af0443a56ece70b305"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServicePhase.java",
+      "bytes": 21431,
+      "sha256": "f94e0c3946bb79056e83ddf0ae98454e20277e3268ef8a9893dc624fc63bc100"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImpl.java",
+      "bytes": 8091,
+      "sha256": "eee79016409e2503dae8180199640bb9eb6df55faf12ae576396184043ef4e32"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java",
+      "bytes": 49607,
+      "sha256": "34dcf6b117d2c49fb9f94295cb7ad72845cf86ab15443c0df2f9b5ff3c2c5924"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandler.java",
+      "bytes": 5214,
+      "sha256": "1cb7deea3b3dca4d9889e0c8dbbdc94cfb503a2e5fc729d8c0c718c28a77bd35"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandler.java",
+      "bytes": 3658,
+      "sha256": "151c1404ab5ad9734310ca7a639b254d55b4ca6d028d52fe858feaa4e5120e7b"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeIntentPreparation.java",
+      "bytes": 3280,
+      "sha256": "453dc4bdc64f54d91dc1aa8ecd9a8855f2b99bea4a3941c2b8950c2b88294626"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeSpec.java",
+      "bytes": 1491,
+      "sha256": "6dcef4ae2168f1bce3b15f920689a1a1ae697515df5cdc10334af13ed308c0dd"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeSpecStore.java",
+      "bytes": 7711,
+      "sha256": "8d8d344a89e8169b6d3e6fdb55923d4973696eaa3c09c6b68e6e45e332129c04"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "bytes": 17490,
+      "sha256": "728110c0e5c7ea6585fc912e97b742641f5580ee7683d315bf509228992ba62e"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java",
+      "bytes": 6679,
+      "sha256": "0ff328afa05ebd04841e8c9cf669cd59d8f1d1f2abd15a650168e9bb2efa01db"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java",
+      "bytes": 16765,
+      "sha256": "0b7dc755bdb7f201b5d1878231cfdeb48c40e3742851544bb3da04455adb8a19"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImplTest.java",
+      "bytes": 7629,
+      "sha256": "f65861ffeaaac493ff1367d239af7d65c46efa876161b564dfa045772cb2c94a"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java",
+      "bytes": 6392,
+      "sha256": "5ff007e702713652c9fc61091da586d73212152b34884efe33f9bc50c79a7347"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandlerTest.java",
+      "bytes": 4619,
+      "sha256": "037f160851215f67ae8cf1eb6fc4192d47c6e07d6f2c66031839d532a6df1fa6"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentPreparationTest.java",
+      "bytes": 4656,
+      "sha256": "7a97963f3161733c4cda2e7c25c825f8bb902610e09006a94b924508912ac488"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentProducerTest.java",
+      "bytes": 8524,
+      "sha256": "c4bde13c6bcf8da8dc9fbf49c5629523b0fb88bc55543b7851b50b1fd1b2fb36"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentTestFixture.java",
+      "bytes": 6209,
+      "sha256": "13eb12660a341ccc01fee73d5b9ccba938fd8c2c9ad363fb02c3f713e522cc1d"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "bytes": 18479,
+      "sha256": "4e9c1e0beaba5893b618f251d86a8808c7877547bdc82debbd635dc7c01344a5"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeSpecStoreTest.java",
+      "bytes": 4014,
+      "sha256": "3461ca8aa4ec9a63e53436d4a08a95236f71f31cd20d70124071cdcae1b8be57"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/InferenceHandlers.java",
+      "bytes": 39042,
+      "sha256": "86d15585ebf8c2cbdab99f1b228c1d361996c93c14649e2434b2a287f5c7aaf7"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/InferenceHandlersTest.java",
+      "bytes": 11166,
+      "sha256": "18fac882a967456a65ec584208e906e5190f7b3e15eb5890d8bdb50fefb6fa79"
+    }
+  ],
+  "proofs": [
+    {
+      "label": "c2-runtime-intent1397",
+      "revision": "0ad7e1914 + runtime-intent batch",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*RuntimeIntent*' --tests '*RuntimeSpecStoreTest' --tests '*RuntimeReconcilerTest' --tests '*SetChatEnabledHandlerTest' --tests '*SwitchInferenceModeHandlerTest' --tests '*BrainRuntimeServiceImplTest' --tests '*InferenceCapabilityWiringTest' --tests '*BootstrapProjectionsTest' --tests '*RuntimeActivationServiceChatProfileTest' :modules:ui:test --tests '*InferenceHandlersTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck :modules:app-api:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 88,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 18
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 74,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 14
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent1397.txt",
+          "bytes": 40743,
+          "sha256": "c94f818fe48940f473b137f7ded93dfab1dac96eccfd22aad05db5af84604225"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1397-counts.json",
+          "bytes": 1238,
+          "sha256": "144c7f009585fe6643dff31fc5065f961d2368d4da2fef234cd7f71caa4b633f"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1397-xml.zip",
+          "bytes": 297174,
+          "sha256": "6c92c203ceab5ef7ec84fecf05a817c78a340313b1b883a8ad5ef48a0fa54161"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent1398",
+      "revision": "0ad7e1914 + runtime-intent batch",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*RuntimeIntent*' --tests '*RuntimeSpecStoreTest' --tests '*RuntimeReconcilerTest' --tests '*SetChatEnabledHandlerTest' --tests '*SwitchInferenceModeHandlerTest' --tests '*BrainRuntimeServiceImplTest' --tests '*InferenceCapabilityWiringTest' --tests '*BootstrapProjectionsTest' --tests '*RuntimeActivationServiceChatProfileTest' :modules:ui:test --tests '*InferenceHandlersTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck :modules:app-api:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 88,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 18
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 74,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 14
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent1398.txt",
+          "bytes": 39560,
+          "sha256": "78d56ee87f96c64c7219db7ec15914a0f66a21fa45868d5e76a424b663f3b865"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1398-counts.json",
+          "bytes": 1238,
+          "sha256": "00aff3439f99e941a33d8760036444a4500b98a59428b512eb1f5fec22eb2e5c"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1398-xml.zip",
+          "bytes": 296318,
+          "sha256": "741fbf1c7a5c752b057c78d7380a21e0e676e1110776efca94b1fa1b8ad086e6"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent-negative1399",
+      "revision": "0ad7e1914 + deliberate witness-refresh mutant",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*RuntimeIntentProducerTest.bootSeedCannotOverwriteAChoiceMadeAfterItsNoOpDecision' --console=plain",
+      "summary": {
+        "tests": 7,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent-negative1399.txt",
+          "bytes": 44960,
+          "sha256": "a46dc1260a4dfd51872d2a8232c4da2213f6c78b5d4362ec5391d0202d4956a4"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-negative1399-counts.json",
+          "bytes": 566,
+          "sha256": "75423fdc91d8a209f5865286161ad07be4ed2c1402abec04271d57e6cefc77b1"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-negative1399-xml.zip",
+          "bytes": 47015,
+          "sha256": "0933090c3438cd819b37bab43ca066de666bb4387dff1f4c1266eff25bdbf998"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent1400",
+      "revision": "0ad7e1914 + restored runtime-intent batch before wire review correction",
+      "command": "./gradlew.bat :modules:app-services:test :modules:ui:test :modules:app-api:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck :modules:app-api:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 4231,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 4,
+        "suites": 650
+      },
+      "tasks": [
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 204,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1211,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 184
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2816,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "suites": 424
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent1400.txt",
+          "bytes": 42141,
+          "sha256": "5d4d136714053f91dbe8e70e21b4463b6363662e22d1d98e918850deab08c788"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1400-counts.json",
+          "bytes": 1136,
+          "sha256": "f09dbdae422e1c59d36aa8bf854e16ba7dec7254d2dfc0f55227808c565636b6"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1400-xml.zip",
+          "bytes": 1270393,
+          "sha256": "2f9d7a950eb6302d911d219fcf40c7d3f1c15b5bd9b508615ec9af1f75e38311"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent-review-red1401",
+      "revision": "0ad7e1914 + runtime-intent wire regression before fix",
+      "command": "./gradlew.bat :modules:ui:test --tests '*InferenceHandlersTest.settingsRefusalUsesTheRestErrorContract' --tests '*InferenceHandlersTest.storageRefusalsUseTheRestErrorContract' --console=plain",
+      "summary": {
+        "tests": 4,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 4,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent-review-red1401.txt",
+          "bytes": 39016,
+          "sha256": "c3b0395afaa491e8bb483707ddee3b0a74c3bdab9fbd9e31004368463ca8b9de"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-review-red1401-counts.json",
+          "bytes": 607,
+          "sha256": "93d764aafd9e8c94f8e822c64955dcda1b020d8afd9a1e58254f103bc66f0801"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-review-red1401-xml.zip",
+          "bytes": 2814,
+          "sha256": "32d85ff4d6fcdec437aaaa99c4fc4b35be9ad632fc1990198f32e3458e92f696"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent-review-red1402",
+      "revision": "0ad7e1914 + accepted-refusal key regression before fix",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*RuntimeIntentProducerTest.acceptedRefusalStillReturnsItsServerIssuedKey' --console=plain",
+      "summary": {
+        "tests": 7,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent-review-red1402.txt",
+          "bytes": 37865,
+          "sha256": "4046776c44466f4b9a25b528c4201a4061d28d684ca8e91f0e0dfa109f2ff1ee"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-review-red1402-counts.json",
+          "bytes": 566,
+          "sha256": "dabe2e6b96b92ba2309219bd5d02604c68069b75c4ff90c6750ae357a15d1d95"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-review-red1402-xml.zip",
+          "bytes": 44149,
+          "sha256": "ab162553a6a96983a8b53f8150abb89c1dd13e97fa6b47c5d3e311e58e56cd55"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent1403",
+      "revision": "0ad7e1914 + first wire correction; public-token mismatch still red",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*RuntimeIntent*' --tests '*RuntimeSpecStoreTest' --tests '*RuntimeReconcilerTest' --tests '*SetChatEnabledHandlerTest' --tests '*SwitchInferenceModeHandlerTest' --tests '*BrainRuntimeServiceImplTest' --tests '*InferenceCapabilityWiringTest' --tests '*BootstrapProjectionsTest' --tests '*RuntimeActivationServiceChatProfileTest' :modules:ui:test --tests '*InferenceHandlersTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck :modules:app-api:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 92,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 18
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 17,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 75,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 14
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent1403.txt",
+          "bytes": 41076,
+          "sha256": "f78a48f260437b8af2e565a97eed1e3299fc148126417e7a749a8ea220a22321"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1403-counts.json",
+          "bytes": 1270,
+          "sha256": "b3cbea553217dd350ed40d4c03f129f4b709208c85fd1aef4e3ae39696b04265"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1403-xml.zip",
+          "bytes": 303176,
+          "sha256": "476289bde0da8eac10f20772741d24cec20193812ac19413b617ade925dc3756"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent-negative1404",
+      "revision": "0ad7e1914 + deliberate refresh mutant, single interleaving",
+      "command": "./gradlew.bat :modules:app-services:test --tests '*RuntimeIntentProducerTest.bootSeedCannotOverwriteAChoiceMadeAfterItsNoOpDecision' --console=plain",
+      "summary": {
+        "tests": 7,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent-negative1404.txt",
+          "bytes": 14691,
+          "sha256": "9363f840589bdf7bd9babcf03ddfde8df29c3d830c9787d031fc03850ba7630d"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-negative1404-counts.json",
+          "bytes": 579,
+          "sha256": "ffbaa133c1f723f1a4d6391ee8dc730eb6532988bf9c18f2dc907819514e430e"
+        },
+        {
+          "path": "tmp/c2-runtime-intent-negative1404-xml.zip",
+          "bytes": 46956,
+          "sha256": "bb7b05c772ef527409279debfeb72a56dd17d86719fae819bd96c7f3104b4602"
+        }
+      ]
+    },
+    {
+      "label": "c2-runtime-intent1405",
+      "revision": "0ad7e1914 + final reviewed runtime-intent batch",
+      "command": "./gradlew.bat :modules:app-services:test :modules:ui:test :modules:app-api:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck :modules:app-api:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+      "summary": {
+        "tests": 4235,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 4,
+        "suites": 650
+      },
+      "tasks": [
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 204,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2817,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "suites": 424
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1214,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 184
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "tmp/c2-runtime-intent1405.txt",
+          "bytes": 42237,
+          "sha256": "4090bd73a049b0a525bd88a117114ee3462816f8ac73e6d89f55b0af7622cb36"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1405-counts.json",
+          "bytes": 1114,
+          "sha256": "5c5fc9f21cf04094b1e206f0528ab3324296b73d7fdc92943adb6837303eb4a0"
+        },
+        {
+          "path": "tmp/c2-runtime-intent1405-xml.zip",
+          "bytes": 1276441,
+          "sha256": "9dfc49691303745973fd44d1ef4ffc6d1f2a5264d5d73bb13f8c49aaae0591c6"
+        }
+      ]
+    }
+  ]
+}

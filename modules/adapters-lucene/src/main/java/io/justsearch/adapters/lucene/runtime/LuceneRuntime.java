@@ -37,6 +37,12 @@ public sealed interface LuceneRuntime extends AutoCloseable
    */
   LuceneRuntimeBuilder origin();
 
+  /** Exact bounded executor bundle used by this runtime session. */
+  LuceneExecutorRegistrations executorRegistrations();
+
+  /** Keeps this runtime generation open through accepted asynchronous read work. */
+  io.justsearch.core.execution.EngineTaskLifetime taskLifetime();
+
   // ==========================================================================
   // Read-side ops — valid in every phase
   // ==========================================================================

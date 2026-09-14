@@ -1,0 +1,41 @@
+{
+  "kind": "lane-f-frontend-settings-attempt.v1",
+  "baseRevision": "c8aa61591dc2bd1eeedb817265513b783b84d6f6",
+  "testedSources": [
+    {
+      "path": "modules/ui-web/src/api/settingsAttempt.ts",
+      "sha256": "79f58746b78aacbba2d3bc3f72be844eae12fa28a6d28044e00b3156174d85e1"
+    },
+    {
+      "path": "modules/ui-web/src/api/settingsAttempt.test.ts",
+      "sha256": "a2522ee99198411e4aa88d48531e661a5250fa3a06fc1fa5bffdcd55f976c12b"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/uiModeState.ts",
+      "sha256": "d7f7b0718bf0da286d90cf6a521f7e1716861ea8622e6811f3b15a26542ab99b"
+    }
+  ],
+  "environment": "Windows; Node/Vitest happy-dom; active lane-f-pr1-verify",
+  "commands": [
+    "npm run typecheck",
+    "npx eslint src/api/settingsAttempt.ts src/api/settingsAttempt.test.ts src/shell-v0/state/uiModeState.ts",
+    "npm run test:unit:run -- src/api/settingsAttempt.test.ts src/api/generated/schema-types/settings-v2.test.ts src/api/admissionFetch.test.ts src/shell-v0/state/uiModeState.test.ts"
+  ],
+  "result": {
+    "tests": 47,
+    "suites": 4,
+    "failures": 0,
+    "skips": 0
+  },
+  "raw": [
+    "tmp/frontend-attempt1461.txt",
+    "tmp/frontend-attempt-typecheck1461.txt",
+    "tmp/frontend-attempt-lint1461.txt",
+    "tmp/frontend-attempt-negative1460.txt"
+  ],
+  "negative": "Restore competing queue deadline: queued timeout assertion loses code/attempt and receives TimeoutError; one intended failure, zero unhandled errors.",
+  "limits": [
+    "Eight frontend callers still await migration",
+    "No live/model/installed or frontend hosted proof"
+  ]
+}

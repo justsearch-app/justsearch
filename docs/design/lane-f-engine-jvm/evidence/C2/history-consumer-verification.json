@@ -1,0 +1,702 @@
+{
+  "base": "5df62b4f3c57f25167cd05360de0a8b897af677d",
+  "testedOverlay": "completion consumer, source-id ceiling, final attachment and activation gate; source hashes below",
+  "commands": {
+    "c2-4-consumer1191": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-launcher:spotlessApply :modules:app-observability:test --tests '*OperationHistoryProjectorTest' --tests '*OperationHistoryPendingTest' --tests '*ActionLedgerChangeRegistryTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:test --tests '*HeadAssemblyTest' --tests '*DefaultAppFacadeTest' --tests '*HeadExecutorConstructionTest' --tests '*OperationSubstrateInitTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' --tests '*UnreferencedCodeTest' :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+    "c2-4-consumer1194": "./gradlew.bat :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-services:spotlessCheck :modules:app-launcher:spotlessCheck :modules:app-observability:test --tests '*OperationHistoryProjectorTest' --tests '*OperationHistoryPendingTest' --tests '*ActionLedgerChangeRegistryTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:test --tests '*HeadAssemblyTest' --tests '*DefaultAppFacadeTest' --tests '*HeadExecutorConstructionTest' --tests '*OperationSubstrateInitTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' --tests '*UnreferencedCodeTest' :modules:ui:compileIntegrationTestJava :modules:app-launcher:installDist --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+    "c2-4-consumer-ceiling1192": "./gradlew.bat :modules:app-observability:test --tests '*OperationHistoryProjectorTest.startupCohortEndsWhileNewCompletionsKeepFillingPages' -PtestParallelism=1 --max-workers=4 --console=plain",
+    "c2-4-consumer-ack1193": "./gradlew.bat :modules:app-observability:test --tests '*OperationHistoryProjectorTest.disabledSinkStartupTraversesBeyondOneBatchWithoutCyclicReplayAndKeepsTheHook' -PtestParallelism=1 --max-workers=4 --console=plain",
+    "c2-4-consumer-install1197": "./gradlew.bat :modules:ui:installDist --console=plain",
+    "c2-4-consumer-live1198": "node tmp/c2-4-consumer-live1198.mjs",
+    "c2-4-consumer-locks1185": "./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks",
+    "c2-4-consumer-surface1190": "node scripts/governance/run.mjs --gate operation-surface --mode gate",
+    "c2-4-consumer-lockcheck1200": "./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks",
+    "c2-4-consumer-surface1200": "node scripts/governance/run.mjs --gate operation-surface --mode gate"
+  },
+  "runs": [
+    {
+      "label": "c2-4-consumer1184",
+      "counts": {
+        "revision": "5df62b4f3 plus first consumer overlay",
+        "command": "Historical argv not captured in this inventory; task outcomes and diagnostics retained in tmp/c2-4-consumer1184.txt. Final reproducible command is consumer1194.",
+        "summary": {
+          "tests": 71,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 24
+        },
+        "tasks": [
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 31,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 8
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 16
+          }
+        ]
+      },
+      "result": "FAIL"
+    },
+    {
+      "label": "c2-4-consumer1186",
+      "counts": {
+        "revision": "5df62b4f3 plus consumer test dependency; failed test API assumption",
+        "command": "Historical argv not captured in this inventory; task outcomes and diagnostics retained in tmp/c2-4-consumer1186.txt. Final reproducible command is consumer1194.",
+        "summary": {
+          "tests": 71,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 24
+        },
+        "tasks": [
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 31,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 8
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 16
+          }
+        ]
+      },
+      "result": "FAIL"
+    },
+    {
+      "label": "c2-4-consumer1187",
+      "counts": {
+        "revision": "5df62b4f3 plus consumer corrected test API",
+        "command": "Historical argv not captured in this inventory; task outcomes and diagnostics retained in tmp/c2-4-consumer1187.txt. Final reproducible command is consumer1194.",
+        "summary": {
+          "tests": 93,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 28
+        },
+        "tasks": [
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 31,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 8
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 16
+          },
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 4
+          }
+        ]
+      },
+      "result": "FAIL"
+    },
+    {
+      "label": "c2-4-consumer1188",
+      "counts": {
+        "revision": "5df62b4f3 plus bounded startup and activation gate",
+        "command": "Historical argv not captured in this inventory; task outcomes and diagnostics retained in tmp/c2-4-consumer1188.txt. Final reproducible command is consumer1194.",
+        "summary": {
+          "tests": 97,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 28
+        },
+        "tasks": [
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 24,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 4
+          },
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 33,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 8
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 16
+          }
+        ]
+      },
+      "result": "FAIL"
+    },
+    {
+      "label": "c2-4-consumer1189",
+      "counts": {
+        "revision": "5df62b4f3 plus reviewed activation and time-bound startup",
+        "command": "Historical argv not captured in this inventory; task outcomes and diagnostics retained in tmp/c2-4-consumer1189.txt. Final reproducible command is consumer1194.",
+        "summary": {
+          "tests": 97,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 28
+        },
+        "tasks": [
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 16
+          },
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 24,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 4
+          },
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 33,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 8
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "label": "c2-4-consumer1191",
+      "counts": {
+        "revision": "5df62b4f3 plus final source-id ceiling consumer",
+        "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-launcher:spotlessApply :modules:app-observability:test --tests '*OperationHistoryProjectorTest' --tests '*OperationHistoryPendingTest' --tests '*ActionLedgerChangeRegistryTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:test --tests '*HeadAssemblyTest' --tests '*DefaultAppFacadeTest' --tests '*HeadExecutorConstructionTest' --tests '*OperationSubstrateInitTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' --tests '*UnreferencedCodeTest' :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+        "summary": {
+          "tests": 98,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 28
+        },
+        "tasks": [
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 25,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 4
+          },
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 33,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 8
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 16
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "label": "c2-4-consumer1194",
+      "counts": {
+        "revision": "5df62b4f3 plus restored final completion consumer",
+        "command": "./gradlew.bat :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-services:spotlessCheck :modules:app-launcher:spotlessCheck :modules:app-observability:test --tests '*OperationHistoryProjectorTest' --tests '*OperationHistoryPendingTest' --tests '*ActionLedgerChangeRegistryTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:test --tests '*HeadAssemblyTest' --tests '*DefaultAppFacadeTest' --tests '*HeadExecutorConstructionTest' --tests '*OperationSubstrateInitTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' --tests '*UnreferencedCodeTest' :modules:ui:compileIntegrationTestJava :modules:app-launcher:installDist --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+        "summary": {
+          "tests": 98,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 28
+        },
+        "tasks": [
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "FROM-CACHE",
+            "tests": 25,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 4
+          },
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 33,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 8
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 16
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "label": "c2-4-consumer-ceiling1192",
+      "counts": {
+        "revision": "mutant: omit source-id ceiling",
+        "command": "./gradlew.bat :modules:app-observability:test --tests '*OperationHistoryProjectorTest.startupCohortEndsWhileNewCompletionsKeepFillingPages' -PtestParallelism=1 --max-workers=4 --console=plain",
+        "summary": {
+          "tests": 3,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        "tasks": [
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 3,
+            "failures": 2,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 2
+          }
+        ]
+      },
+      "result": "FAIL"
+    },
+    {
+      "label": "c2-4-consumer-ack1193",
+      "counts": {
+        "revision": "mutant: acknowledge despite rejected journal append",
+        "command": "./gradlew.bat :modules:app-observability:test --tests '*OperationHistoryProjectorTest.disabledSinkStartupTraversesBeyondOneBatchWithoutCyclicReplayAndKeepsTheHook' -PtestParallelism=1 --max-workers=4 --console=plain",
+        "summary": {
+          "tests": 2,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        "tasks": [
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 2,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 2
+          }
+        ]
+      },
+      "result": "FAIL"
+    }
+  ],
+  "live": {
+    "result": "PASS",
+    "checks": 15,
+    "sourceTransitions": [
+      [
+        "FAILED",
+        1,
+        "STANDARD"
+      ],
+      [
+        "FAILED",
+        0,
+        "STANDARD"
+      ]
+    ],
+    "raw": "tmp/c2-4-consumer-live1198-result.json"
+  },
+  "review": "Independent read-only reviewer found bootstrap ownership and unbounded startup cohort defects; root fixed both, including regressed clocks. Final reviewer found no further runtime defect. Documentation upper-bound contradiction corrected before commit.",
+  "limits": [
+    "No new full suite green boundary",
+    "No installed-v5 Windows packaging proof",
+    "Hosted runner allocation pending",
+    "No atomic SSE/front-end keyed merge proof",
+    "Controlled restart and deliberate blocked sink, not physical power loss",
+    "Direct memory/note producer covered by actual store/runner unit fixture; no placeholder product memory operation"
+  ],
+  "artifacts": [
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-ack1193-counts.json",
+      "bytes": 623,
+      "sha256": "36c15a52d1aa526137e88bf9c18e269f433b18b05c9eb8ada2993cfda8a66e47"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-ack1193-mutation.json",
+      "bytes": 314,
+      "sha256": "874c84795c436193f4e86d1fd3fb6d32799555132005b2a0b5f11e73fdbd4c9e"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-ack1193.txt",
+      "bytes": 35961,
+      "sha256": "2614d2dd6a420b438d109d85b856e7832c180c12313ea33042087dc544d9bc8b"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-ceiling1192-counts.json",
+      "bytes": 578,
+      "sha256": "ca8a4327305ab3c2a398fdd47ff5613962ab5c0762e056c6a1cfea21bb667629"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-ceiling1192-mutation.json",
+      "bytes": 313,
+      "sha256": "42c5d58f438a4dfe21cc547f6c8ab8699bbca8f2b835c0249754f14ae7dd932e"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-ceiling1192.txt",
+      "bytes": 35665,
+      "sha256": "8f706185aa1907d7df5dbb980035f11d14bce054c82c52b5b22121a8e8492f9d"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-commit.txt",
+      "bytes": 890,
+      "sha256": "b36758df44330e49a0bde41100ff503f7280ec00a7ce2a354637123ef72559e1"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-docs1196.txt",
+      "bytes": 150,
+      "sha256": "d5cac3af296e172344474c48c3651383de71b86026dfb67984a96225cea8faf3"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-docs1200.txt",
+      "bytes": 150,
+      "sha256": "d5cac3af296e172344474c48c3651383de71b86026dfb67984a96225cea8faf3"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-install1197-hashes.json",
+      "bytes": 1012,
+      "sha256": "58a347fc32844e50c430d6b563257d3ae98b7f9443c01fc4fe0ddc40168e1911"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-install1197.txt",
+      "bytes": 37497,
+      "sha256": "f5ecf133f01e2fe08bdc471b240c264bc24ed4f089e8603b2ff04e00ba8ec015"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-blocked-sink-launch.json",
+      "bytes": 3895,
+      "sha256": "99a1bb0fcc5f24c6df7dbf2c2d840d22b303799e780390f8f1ded909897caa4b"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-blocked-sink-preflight.json",
+      "bytes": 902,
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-blocked-sink-quick_health.json",
+      "bytes": 282,
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-blocked-sink-start.json",
+      "bytes": 425,
+      "sha256": "eca6e4a5d3b8812d40550761f75ec7aae83d0ff7d065f4b73640c8a40c60ee82"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-blocked-sink-stop.json",
+      "bytes": 302,
+      "sha256": "61df98d6b0f28c9a6ef6aaacfeb01b92acb67ee2e13991ff3d5ff1641aceafa0"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-FAIL-stop.json",
+      "bytes": 302,
+      "sha256": "7f21dd2a44e45fa07c42495a0869695ce7776e7c9927bf133a56bb226044b106"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-repaired-restart-launch.json",
+      "bytes": 3895,
+      "sha256": "65489a7444d3901c2dba0d5c4b6f7c2b1beed0f58ab14da5d03709a350a46866"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-repaired-restart-start.json",
+      "bytes": 425,
+      "sha256": "a0d48f84ae59f3bb7748b576b39f6028ca223c573df8d18e34ea26f6db1a293d"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195-result.json",
+      "bytes": 7716,
+      "sha256": "65c1ddfc33d545939d58c4a460ced5d18b5739ea29738e1d6953f0898978a7a7"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1195.txt",
+      "bytes": 1216,
+      "sha256": "79f5e68c407e7a72a71dd9872b33fd1d4e43de6f634ccba06e766bffb8b45309"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-blocked-sink-launch.json",
+      "bytes": 3895,
+      "sha256": "0d7dd83c759de13a9e26bdf9b7ca96205cbd1ca9da546be6ef4225c1d03fa637"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-blocked-sink-preflight.json",
+      "bytes": 902,
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-blocked-sink-quick_health.json",
+      "bytes": 282,
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-blocked-sink-start.json",
+      "bytes": 425,
+      "sha256": "e041879e6e1224cb4ec012b41ee84ab0b9a918ed91ed5ad2190872781683c9b7"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-blocked-sink-stop.json",
+      "bytes": 291,
+      "sha256": "76dc9244b3cacd46c1b1fb1cf4eb069dcc0166784b60d6d76a1eabc092089aff"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-repaired-restart-launch.json",
+      "bytes": 3894,
+      "sha256": "c8e6d666df40006e7dddf3d3182e3ebfd6d9a49ee5cba9054d432c1620c10688"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-repaired-restart-start.json",
+      "bytes": 424,
+      "sha256": "9ac3cbf016f4865a9f15b97faf7dd954f6169f151789309864a5144ed1a19e57"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-repaired-restart-stop.json",
+      "bytes": 301,
+      "sha256": "41e45c2a3d69dbe23f657f88bd89cd17350b4e592c7479d3fcbf74bd50540aa1"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198-result.json",
+      "bytes": 9428,
+      "sha256": "ade44f563ffc3cdd51ac8e632a8efa05ed9f0fa947e54eba15ac43a299902ebc"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198.mjs",
+      "bytes": 5467,
+      "sha256": "b900b637fdd3e8c85968fa0466ba554835220b0204769c59c762bf7470643948"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-live1198.txt",
+      "bytes": 200,
+      "sha256": "2499a4c9d361c365c02ffdd84b2a7cdada62e4316e16f89942f53e771f6c4eab"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-lockcheck1200.txt",
+      "bytes": 35769,
+      "sha256": "29f535aa3722415b4a7c2109f139eee0fb232b35a7413e16742ef70303ac3a9d"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-locks1185.txt",
+      "bytes": 36761,
+      "sha256": "b4919011a1a09533caea13cc3439cc9e92042ea1132139d1f95d398812770775"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-module1196.txt",
+      "bytes": 101,
+      "sha256": "2e39ff52754c4874d187c98f9384948792fbda51ea5766ebd74c1d73a4f3aae1"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-mutation.py",
+      "bytes": 1162,
+      "sha256": "b190fa55aff813ff9e6f5c989a90192dbd7926c079ba11fd431f67648ccbfcd9"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-surface-negative1185.sarif",
+      "bytes": 2146,
+      "sha256": "9ad0db91b82afc9455af913b7322bc165945d999345d939402b439bdfe31e743"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-surface-negative1185.txt",
+      "bytes": 113,
+      "sha256": "99eb108c2426a4ed057f8b11f73aab7df657201dffe5ab22868ecc36ad040225"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-surface1190.txt",
+      "bytes": 113,
+      "sha256": "74179d6795850978ecf8dda7959e90155811f2ad00399f0acb1b4ca529a5142c"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-surface1200.txt",
+      "bytes": 113,
+      "sha256": "74179d6795850978ecf8dda7959e90155811f2ad00399f0acb1b4ca529a5142c"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer-xml1199.zip",
+      "bytes": 1090650,
+      "sha256": "4c281a7ac732504c1870fac70908ecd5abf7e5c497f05ce14e30dd39ac98bfa2"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1184-counts.json",
+      "bytes": 745,
+      "sha256": "3bccfba3891e5a91a37912fac0216691d89d2e89609ea3fee290b59ccc1a2e9d"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1184.txt",
+      "bytes": 79902,
+      "sha256": "f07e694e1c3befd57ee8ca13c9bc47044aec89c4739a3836f931b7d1df58313c"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1186-counts.json",
+      "bytes": 779,
+      "sha256": "ba93b6ac4f2c783c54db70916f4016f361f4139f69ff502246f2c54d4c7b82eb"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1186.txt",
+      "bytes": 47336,
+      "sha256": "c15a949375c7a577a634949ef9984c7350c65accb8a6e02cb0e0c15179640cc7"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1187-counts.json",
+      "bytes": 951,
+      "sha256": "9b9e32261af9bf74db1a50c81687642a90bdac6de1ed6e773502a21e810c43f1"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1187.txt",
+      "bytes": 41983,
+      "sha256": "c3547a5314811db27f6d92dc07bf17c5a3819231223018e8e63425dfd4f84578"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1188-counts.json",
+      "bytes": 955,
+      "sha256": "cd43493540d013ea76e232e5822447de9f6b1662c499224bbc5929d9cc30a74c"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1188.txt",
+      "bytes": 45192,
+      "sha256": "bd23220c460ba1a3e991c75a90208e8cbabed6ec79b05c59798e8327c6070e06"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1189-counts.json",
+      "bytes": 966,
+      "sha256": "3b8ad0fca56f96e8749b0d5f86d960a0bb34638a4324bc6121f8dcaf0f6b064d"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1189.txt",
+      "bytes": 40743,
+      "sha256": "3762625855acd8997f62ffaa74d7d4f02a8345742f1946a0364d8b10b12b2fce"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1191-counts.json",
+      "bytes": 1565,
+      "sha256": "7ad167e6ca494305418bd3d3c1ab6ee75c055a8f2c067384d3dfa0dd21e23dec"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1191.txt",
+      "bytes": 48229,
+      "sha256": "5ee58bb25e19b8c7392002796625f42e9734a0719fe7d87e73c6e113a8d1c3a0"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1194-counts.json",
+      "bytes": 1643,
+      "sha256": "1eea7a64680e4f657c4c95726a994d3863eba146d839679f95e3215e702f70e9"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-consumer1194.txt",
+      "bytes": 43347,
+      "sha256": "863f5298aec4cf85a89f71f82a4e40c5d56a1dd252e6ac1d494147be0249da7f"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\tmp\\c2-4-hosted-signal1188.md",
+      "bytes": 1509,
+      "sha256": "bffe90b25b07a4757b4cd0056769338dd636e1ba1c09921427467ed8a2a6013e"
+    }
+  ],
+  "source": [
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\modules\\app-observability\\src\\main\\java\\io\\justsearch\\app\\observability\\operations\\OperationHistoryProjector.java",
+      "bytes": 7327,
+      "sha256": "fe50e84648db93eccfc163ebbd38924059fd1a93cd7d0ee43bf70a7a73d4f3b2"
+    },
+    {
+      "path": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A\\modules\\app-observability\\src\\test\\java\\io\\justsearch\\app\\observability\\operations\\OperationHistoryProjectorTest.java",
+      "bytes": 17455,
+      "sha256": "d96ed0153b66a4717b570e4ffbd127227ce7f80a4558d097476108bdbe90afaa"
+    }
+  ],
+  "retention": "Retain through lane acceptance + 30 days; export raw logs/XML bundle and live records before worktree release."
+}

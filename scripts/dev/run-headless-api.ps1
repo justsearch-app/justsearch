@@ -106,7 +106,7 @@ try {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
     Write-Host " Server starting on port $Port" -ForegroundColor Green
-    Write-Host " Worker logs: $env:LOCALAPPDATA\JustSearch\logs\worker.log" -ForegroundColor Green
+    Write-Host " Engine logs: $env:LOCALAPPDATA\JustSearch\logs\engine.log" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "Press Ctrl+C to stop" -ForegroundColor Gray

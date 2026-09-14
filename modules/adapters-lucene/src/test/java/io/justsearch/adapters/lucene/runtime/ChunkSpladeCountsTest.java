@@ -31,7 +31,7 @@ import tools.jackson.databind.ObjectMapper;
  * forever.
  */
 @DisplayName("chunk-SPLADE counts + reader merge state (931 §E item 8)")
-class ChunkSpladeCountsTest {
+class ChunkSpladeCountsTest extends LuceneExecutorTestBase {
 
   private static final String SEP = File.separator;
   private static final String ROOT = SEP + "lib" + SEP + "chunksplade";
@@ -164,7 +164,7 @@ class ChunkSpladeCountsTest {
     return new IndexDocument(fields);
   }
 
-  private static RunningRuntime openRuntime(Path indexDir) {
+  private RunningRuntime openRuntime(Path indexDir) {
     try {
       String json =
           """
@@ -186,7 +186,7 @@ class ChunkSpladeCountsTest {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .atPath(indexDir)
+          .atPath(indexDir).withExecutorRegistrations(testLuceneExecutors())
           .open();
     } catch (Exception e) {
       throw new RuntimeException(e);

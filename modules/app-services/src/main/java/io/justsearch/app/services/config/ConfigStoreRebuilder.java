@@ -3,46 +3,38 @@ package io.justsearch.app.services.config;
 
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.resolved.ConfigChangedEvent;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Rebuilds the {@link ResolvedConfig} in a {@link ConfigStore} after runtime sysprop changes.
+ * Assembles configuration for the accepted settings owner and the pre-inference boot refresh.
  *
- * <p>Extracted from {@code SettingsController.rebuildConfigStore()} so that other services
- * (RuntimeActivationService, AiInstallService, AiPackImportService) can trigger a rebuild after
- * writing system properties that affect configuration values.
- *
- * <p>Tempdoc 519 §9 Block B3.0.e: moved from {@code io.justsearch.ui.config} to {@code app-services}
- * together with the {@code contributeUiSettings} helper formerly on {@code HeadlessApp}. The
- * helper had no {@code ui} dependencies (it operated on {@code UiSettings} from {@code app-api}
- * and {@code ResolvedConfigBuilder} from {@code configuration}), so relocation broke the soft
- * cycle without introducing a new SPI.
+ * <p>Runtime producers submit candidates through SettingsService. The commit coordinator uses
+ * {@link #prepare} before physical replacement, then publishes the prepared snapshot. Only
+ * HeadlessApp's post-discovery boot step calls {@link #rebuild}; it writes no settings file.
  */
 public final class ConfigStoreRebuilder {
 
-  private static final Logger log = LoggerFactory.getLogger(ConfigStoreRebuilder.class);
   private static final ObjectMapper JSON = JsonMapper.builder().build();
 
   /**
    * The boot-time hardware probe, so a rebuild does not silently drop ordinal 150.
    *
    * <p>{@link #rebuild} re-derives the config from scratch, but ordinal-150 values do not come from
-   * any source it can re-read: the probe runs once, at startup, in the Head. Before tempdoc 883 the
+   * any source it can re-read: the probe runs once, at startup, in the Engine. Before tempdoc 883 the
    * only ordinal-150 values were GPU flags, and they survived a rebuild by ALSO being written as
    * system properties — which is the promotion pattern 883 deletes, and which resolves at ordinal
    * 500 and so reports as {@code jvm_arg}. The derived context window must not acquire the same
    * lie, so the probe result is remembered here and re-contributed at its own ordinal instead.
    *
    * <p>Process-wide static for the same reason {@code ConfigStore.setGlobal} is: there is one
-   * hardware probe per process, and the four services that call {@link #rebuild} have no path to it.
+   * hardware probe per process, and later accepted settings preparation must retain it.
    */
   private static volatile Map<String, String> autoDetected = Map.of();
 
@@ -60,28 +52,52 @@ public final class ConfigStoreRebuilder {
   }
 
   /**
-   * Rebuilds the ResolvedConfig from all sources and swaps it into the given ConfigStore.
+   * Prepares an immutable ResolvedConfig from all sources without publishing it.
+   *
+   * <p>All fallible preparation, including settings serialization, occurs before a ConfigStore
+   * snapshot can be swapped. Preparation failures propagate to the caller.
    *
    * <p>Re-reads env vars, system properties, YAML, and UI settings, and re-contributes the
-   * remembered startup hardware probe at ordinal 150 (see {@link #rememberAutoDetected}). Notifies
-   * ConfigStore listeners of any changes.
+   * remembered startup hardware probe at ordinal 150 (see {@link #rememberAutoDetected}).
+   *
+   * @param settings current UI settings (if null, UI settings contribution is skipped)
+   * @return the prepared immutable configuration snapshot
+   */
+  public static ResolvedConfig prepare(UiSettings settings) {
+    ResolvedConfigBuilder builder = ResolvedConfig.builder();
+    builder.contributeAutoDetected(autoDetected);
+    builder.contributeBaseSources();
+    if (settings != null) {
+      contributeUiSettings(builder, settings);
+    }
+    ResolvedConfig selected = builder.build();
+    var gpuSelection = selected.resolution("justsearch.gpu.layers");
+    if (autoDetected.containsKey("justsearch.context.size") && gpuSelection != null && gpuSelection.isResolved()) {
+      // The hardware observation survives rebuilds; its context projection depends on the
+      // currently selected GPU policy. Unknown GPU state cannot invalidate a remembered window.
+      builder.contributeAutoDetected(Map.of("justsearch.context.size", String.valueOf(
+          io.justsearch.app.inference.ContextWindowPolicy.autoTopRung(selected.ai().gpuLayers() > 0))));
+      return builder.build();
+    }
+    return selected;
+  }
+
+  /**
+   * Publishes the boot refresh after hardware/native-path discovery and before inference starts.
+   *
+   * <p>The snapshot swap and listener notification are separate so callers that need stronger
+   * ownership can perform the notification outside their publication lock. This convenience
+   * method runs only during boot and therefore performs both operations directly. The executable
+   * settings-publication guard excludes runtime producers from this entry.
    *
    * @param store the ConfigStore to update (if null, this is a no-op)
    * @param settings current UI settings (if null, UI settings contribution is skipped)
    */
   public static void rebuild(ConfigStore store, UiSettings settings) {
     if (store == null) return;
-    try {
-      ResolvedConfigBuilder builder = ResolvedConfig.builder();
-      builder.contributeAutoDetected(autoDetected);
-      builder.contributeBaseSources();
-      if (settings != null) {
-        contributeUiSettings(builder, settings);
-      }
-      store.update(builder.build());
-    } catch (RuntimeException e) {
-      log.warn("Failed to rebuild ConfigStore", e);
-    }
+    ResolvedConfig prepared = prepare(settings);
+    ConfigChangedEvent event = store.swap(prepared);
+    store.notifyListeners(event);
   }
 
   /**
@@ -115,7 +131,7 @@ public final class ConfigStoreRebuilder {
     putSettingIfPresent(builder, "justsearch.splade.model_path", settings.getSpladeModelPath());
     putSettingIfPresent(
         builder, "justsearch.citation.scorer.model_path", settings.getCitationScorerModelPath());
-    if (settings.getGpuLayers() > 0) {
+    if (settings.configuredGpuLayers() != null) {
       builder.putSettings("justsearch.gpu.layers", String.valueOf(settings.getGpuLayers()));
     }
     if (settings.getContextLength() > 0) {
@@ -126,8 +142,8 @@ public final class ConfigStoreRebuilder {
       try {
         builder.putSettings(
             "justsearch.ui.exclude_patterns", JSON.writeValueAsString(excludePatterns));
-      } catch (Exception ignored) {
-        // Best-effort — exclude patterns serialization failure is non-fatal
+      } catch (Exception failure) {
+        throw new IllegalStateException("Failed to serialize UI exclude patterns", failure);
       }
     }
   }

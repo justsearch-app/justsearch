@@ -2,12 +2,11 @@
 package io.justsearch.app.services.worker;
 
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
-import io.justsearch.configuration.persistence.StoreFormatVersions;
+import io.justsearch.configuration.persistence.WatchedRootsFormat;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,11 +22,10 @@ import org.slf4j.Logger;
 /**
  * Persistence adapter for watched roots (watched_roots.json).
  *
- * <p>This is extracted from {@link RemoteKnowledgeClient} to keep the gRPC client focused on
+ * <p>This is extracted from {@link KnowledgeClient} to keep the gRPC client focused on
  * transport/retry behavior.
  */
 final class WatchedRootsStore {
-  private static final int CURRENT_SCHEMA_VERSION = 1;
   private static final ObjectMapper JSON = new ObjectMapper();
   /**
    * Sentinel value used when a root is tracked but has never completed an indexing submission.
@@ -48,6 +46,12 @@ final class WatchedRootsStore {
   }
 
   void migrateLegacyRootsFileIfNeeded() {
+    if (rootsFile == null || Files.exists(rootsFile)) return;
+    migrateLegacyRootsFileIfNeeded(PlatformPaths.resolveUserHome().resolve(".justsearch").resolve("watched_roots.json"));
+  }
+
+  /** Explicit legacy source keeps migration verification isolated from the user's home. */
+  void migrateLegacyRootsFileIfNeeded(Path legacy) {
     if (rootsFile == null) {
       return;
     }
@@ -55,8 +59,6 @@ final class WatchedRootsStore {
       if (Files.exists(rootsFile)) {
         return;
       }
-      Path userHome = PlatformPaths.resolveUserHome();
-      Path legacy = userHome.resolve(".justsearch").resolve("watched_roots.json");
       if (!Files.exists(legacy)) {
         return;
       }
@@ -81,12 +83,7 @@ final class WatchedRootsStore {
         }
       }
     } catch (Exception e) {
-      if (log != null) {
-        log.warn(
-            "Failed to migrate legacy watched_roots.json to {} (continuing without migration): {}",
-            rootsFile,
-            e.getMessage());
-      }
+      throw new CorruptDurableStoreException("watched-roots", "cannot migrate legacy roots to " + rootsFile, e);
     }
   }
 
@@ -123,7 +120,7 @@ final class WatchedRootsStore {
       String content = Files.readString(rootsFile);
       if (content.trim().startsWith("{")) {
         var node = JSON.readTree(content);
-        requireReadableObject(node);
+        WatchedRootsFormat.requireReadableObject(node);
         var rootsArray = node.get("roots");
         if (rootsArray != null && rootsArray.isArray()) {
           for (var entry : rootsArray) {
@@ -196,7 +193,7 @@ final class WatchedRootsStore {
       // Try new format first: {"roots": [{"path": "...", "lastIndexed": "..."}]}
       if (content.trim().startsWith("{")) {
         var node = JSON.readTree(content);
-        requireReadableObject(node);
+        WatchedRootsFormat.requireReadableObject(node);
         var rootsArray = node.get("roots");
         if (rootsArray != null && rootsArray.isArray()) {
           for (var entry : rootsArray) {
@@ -292,7 +289,7 @@ final class WatchedRootsStore {
         rootEntries.add(rootEntry);
       }
       Map<String, Object> data = new LinkedHashMap<>();
-      data.put("schemaVersion", CURRENT_SCHEMA_VERSION);
+      data.put("schemaVersion", WatchedRootsFormat.CURRENT_SCHEMA_VERSION);
       data.put("roots", rootEntries);
       AtomicFileWrites.replace(
           rootsFile, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
@@ -304,18 +301,4 @@ final class WatchedRootsStore {
     }
   }
 
-  private static void requireReadableObject(JsonNode root) {
-    if (root == null || !root.isObject()) {
-      throw new CorruptDurableStoreException(
-          "watched-roots", "expected a legacy array or versioned object");
-    }
-    JsonNode versionNode = root.get("schemaVersion");
-    if (versionNode != null && !versionNode.isInt()) {
-      throw new CorruptDurableStoreException(
-          "watched-roots", "schemaVersion must be an integer");
-    }
-    Integer observedVersion = versionNode == null ? null : versionNode.asInt();
-    StoreFormatVersions.requireReadable(
-        "watched-roots", observedVersion, CURRENT_SCHEMA_VERSION, 0, 0);
-  }
 }

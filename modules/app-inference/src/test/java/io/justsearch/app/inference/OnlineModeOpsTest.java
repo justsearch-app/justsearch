@@ -110,7 +110,7 @@ class OnlineModeOpsTest {
     port = server.getAddress().getPort();
 
     ops =
-        new OnlineModeOps(
+        new OnlineModeOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
             HttpClient.newHttpClient(),
             MAPPER,
             mode::get,

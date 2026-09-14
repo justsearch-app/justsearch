@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.Context;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.observability.operations.OperationHistoryChangeRegistry;
@@ -9,7 +11,6 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,27 +39,34 @@ public final class OperationHistoryController {
   private static final long HEARTBEAT_SECONDS = StreamLivenessWindows.STREAM_HEARTBEAT_INTERVAL_SECONDS;
 
   private final OperationHistoryStore store;
+  private final java.util.function.Function<String, io.justsearch.app.api.operations.OperationOutcomeView> outcomes;
   private final OperationHistoryChangeRegistry changes;
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final Clock clock;
 
   public OperationHistoryController(
-      OperationHistoryStore store, OperationHistoryChangeRegistry changes) {
-    this(store, changes, Clock.systemUTC());
+      EngineExecutorRegistry processExecutors,
+      OperationHistoryStore store, OperationHistoryChangeRegistry changes,
+      java.util.function.Function<String, io.justsearch.app.api.operations.OperationOutcomeView> outcomes) {
+    this(processExecutors, store, changes, outcomes, Clock.systemUTC());
   }
 
   public OperationHistoryController(
-      OperationHistoryStore store, OperationHistoryChangeRegistry changes, Clock clock) {
+      EngineExecutorRegistry processExecutors,
+      OperationHistoryStore store, OperationHistoryChangeRegistry changes,
+      java.util.function.Function<String, io.justsearch.app.api.operations.OperationOutcomeView> outcomes, Clock clock) {
     this.store = Objects.requireNonNull(store, "store");
+    this.outcomes = Objects.requireNonNull(outcomes, "outcomes");
     this.changes = Objects.requireNonNull(changes, "changes");
     this.clock = Objects.requireNonNull(clock, "clock");
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "operation-history-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.operation-history-heartbeat",
+            "operation-history-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
   }
 
   /** Handles {@code GET /api/operation-history}. Returns the current snapshot envelope. */
@@ -71,6 +79,21 @@ public final class OperationHistoryController {
     } catch (Exception e) {
       log.error("Failed to serialize operation-history snapshot", e);
       throw new IllegalStateException("Operation-history snapshot serialization failed", e);
+    }
+  }
+
+  /** Handles the read-only client-key query; a failed operation remains a successful query. */
+  public void handleOutcome(Context ctx) {
+    ctx.header("Cache-Control", "no-store");
+    ctx.contentType("application/json");
+    try {
+      ctx.result(REST_MAPPER.writeValueAsBytes(outcomes.apply(ctx.pathParam("operationKey"))));
+    } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
+      var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
+      ctx.status("BAD_REQUEST".equals(response.errorClass()) ? 400 : 500);
+      ctx.result(REST_MAPPER.writeValueAsBytes(Map.of("error", response.message(),
+          "errorCode", response.errorCode(), "errorClass", response.errorClass(),
+          "retryable", response.retryable())));
     }
   }
 
@@ -88,5 +111,42 @@ public final class OperationHistoryController {
   /** Stops the heartbeat scheduler. Call on shutdown. */
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
   }
+
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

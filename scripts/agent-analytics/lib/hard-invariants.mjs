@@ -24,8 +24,9 @@ const AGENTS_MD = resolve(REPO_ROOT, 'AGENTS.md');
  * Parse the `## Hard invariants` numbered list out of AGENTS.md, stripping each
  * item's trailing `<!-- rule:* -->` anchor.
  *
- * @returns {string[]} invariant texts in order (e.g. "**Head never touches
- *   Lucene** - Delegate all index IO to Worker via gRPC"), or [] on failure.
+ * @returns {string[]} invariant texts in order (e.g. "**Application code never
+ *   touches Lucene.** Index I/O belongs to the index half, via a port
+ *   (ADR-0049)."), or [] on failure.
  */
 export function hardInvariants() {
   try {

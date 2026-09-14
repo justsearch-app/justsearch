@@ -53,6 +53,10 @@ public final class IngestionOutcomeJournal {
   private final CounterMetric<IngestionOutcomeTags> outcomeWriteFailureCounter;
   private final BooleanSupplier detailedTracingSupplier;
   private final List<JobQueue.IngestionLedgerTransition> pendingMarkDone = new ArrayList<>();
+  // A failed batch-exit return retries here before another poll; the queue remains claim authority.
+  private final java.util.Set<JobQueue.IndexJob> pendingReturns =
+      java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
 
   public IngestionOutcomeJournal(
       JobQueue jobQueue,
@@ -69,7 +73,35 @@ public final class IngestionOutcomeJournal {
 
   /** Enqueues a successful write's ledger transition for drain after the next commit. */
   public void enqueueTransition(JobQueue.IngestionLedgerTransition transition) {
+    java.util.Objects.requireNonNull(transition.claim(), "Committed transitions require their processing claim");
     pendingMarkDone.add(transition);
+  }
+
+  /** Whether this exact claim has handed its written effect to the existing commit owner. */
+  public boolean ownsPendingCommit(JobQueue.IndexJob claim) {
+    return pendingMarkDone.stream().anyMatch(transition -> transition.claim() == claim);
+  }
+
+  /** Called only after the synchronous batch exits, including quiescence and recoverable failure. */
+  public void returnBatchClaims(List<JobQueue.IndexJob> batch) {
+    for (JobQueue.IndexJob claim : batch) {
+      if (!ownsPendingCommit(claim)) pendingReturns.add(claim);
+    }
+    retryBatchReturns();
+  }
+
+  /** Retry exact returns before polling; SQL rollback never silently abandons their owner. */
+  public boolean retryBatchReturns() {
+    if (pendingReturns.isEmpty()) return true;
+    try {
+      jobQueue.returnUnfinishedClaims(List.copyOf(pendingReturns));
+      pendingReturns.clear();
+      return true;
+    } catch (OutcomeWriteException failure) {
+      outcomeWriteFailureCounter.increment(IngestionOutcomeTags.ofIndexingLoop());
+      log.warn("Could not return {} exited batch claims; retrying before the next poll", pendingReturns.size(), failure);
+      return false;
+    }
   }
 
   /** Test-only accessor for the pending-transition queue (read-only snapshot). */
@@ -77,9 +109,13 @@ public final class IngestionOutcomeJournal {
     return List.copyOf(pendingMarkDone);
   }
 
-  /** Clears all pending transitions without draining. Used by {@code resetForProfiling}. */
+  /** After profiling cleanup and actual loop exit, discard effects but retain exact claim returns. */
   public void clearPending() {
+    for (var transition : pendingMarkDone) {
+      if (transition.claim() != null) pendingReturns.add(transition.claim());
+    }
     pendingMarkDone.clear();
+    // Queue clear removes rows, not issued ownership. The restarted loop must retry these returns.
   }
 
   // ---- drain ----
@@ -97,6 +133,7 @@ public final class IngestionOutcomeJournal {
    * diagnostics endpoint and Search to contradict each other.
    */
   public void drainPending() {
+    retryBatchReturns();
     if (pendingMarkDone.isEmpty()) return;
     Span markDoneSpan = maybeSpan("indexing.markDone");
     markDoneSpan.setAttribute("paths.count", (long) pendingMarkDone.size());
@@ -114,9 +151,14 @@ public final class IngestionOutcomeJournal {
       drainGroup(fullSuccess, fullSuccess());
       drainGroup(partialSuccess, partialSuccess());
       drainGroup(emptySuccess, emptySuccess());
-      pendingMarkDone.removeAll(fullSuccess);
-      pendingMarkDone.removeAll(partialSuccess);
-      pendingMarkDone.removeAll(emptySuccess);
+      // Value-equal records can carry different live claims. A stale transition discarded by
+      // fallback must not remove the current claim whose outcome write rolled back.
+      java.util.Set<JobQueue.IngestionLedgerTransition> drained =
+          java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+      drained.addAll(fullSuccess);
+      drained.addAll(partialSuccess);
+      drained.addAll(emptySuccess);
+      pendingMarkDone.removeIf(drained::contains);
     } finally {
       markDoneSpan.end();
     }
@@ -124,9 +166,9 @@ public final class IngestionOutcomeJournal {
 
   /**
    * Drains one outcome-grouped batch. Try a batched {@code markDoneTransitions}; on
-   * {@link OutcomeWriteException} fall back to per-path so a single bad row doesn't block the
-   * rest. Paths that fail per-path stay in {@code pendingMarkDone} (via the caller's
-   * {@code removeAll} of the surviving in-list) so the next drain or
+   * {@link OutcomeWriteException} fall back to per-transition writes so a single bad row doesn't
+   * block the rest. Transitions that fail individually stay in {@code pendingMarkDone} (via the caller's
+   * identity removal of the surviving in-list) so the next drain or
    * {@code recoverStuckJobs} on Worker restart can retry.
    */
   private void drainGroup(
@@ -137,7 +179,7 @@ public final class IngestionOutcomeJournal {
       return;
     } catch (OutcomeWriteException e) {
       log.warn(
-          "Batch markDone for outcome {} rolled back, falling back to per-path: {}",
+          "Batch markDone for outcome {} rolled back, falling back to per-transition: {}",
           outcome.outcomeClass(),
           e.getMessage());
     }
@@ -145,7 +187,7 @@ public final class IngestionOutcomeJournal {
     while (it.hasNext()) {
       JobQueue.IngestionLedgerTransition transition = it.next();
       try {
-        jobQueue.markDone(transition.path(), outcome, transition.entry());
+        jobQueue.markDoneTransitions(List.of(transition), outcome);
       } catch (OutcomeWriteException ex) {
         log.warn(
             "Per-path markDone after commit rolled back; will retry on next drain: {}",

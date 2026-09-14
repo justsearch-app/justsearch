@@ -314,7 +314,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
    * response.
    */
   public static final OperationRef RESET_SETTINGS =
-      new OperationRef("core.reset-settings");
+      new OperationRef(io.justsearch.app.services.settings.SettingsResetPreparation.OPERATION_ID);
 
   /**
    * Slice 491 §9.D Phase E (C4 / E3) — agent navigation tool. Gives the agent loop a
@@ -880,7 +880,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             // online-bound direction of this op requires the postcondition it
             // establishes. Validation of the requested mode is internal to the handler.
             Set.of(),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(SWITCH_INFERENCE_MODE),
@@ -905,7 +905,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(),
         // Tempdoc 737 §12b: the superseding op declares what it supersedes (OperationLineage
         // javadoc — supersedes lives on the newer Operation, favored by discovery/retrospection).
@@ -1145,7 +1145,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(RESET_SETTINGS),

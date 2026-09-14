@@ -31,7 +31,8 @@ import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.app.services.observability.health.LifecycleSnapshotTap;
 import io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -83,8 +84,8 @@ final class ReadinessTriggerCompositionTest {
     InferenceCapability inference = new InferenceCapability(false);
 
     KnowledgeServerBootstrap knowledgeServer = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(knowledgeServer.client()).thenReturn(client);
 
     StatusLifecycleHandler handler = newHandler(indexBase, worker, inference);
@@ -92,7 +93,9 @@ final class ReadinessTriggerCompositionTest {
     // Mirrors CoreApiAssembly's tap wiring — the tap is the only writer of index.unavailable.
     handler.setLifecycleSnapshotTap(tap);
 
-    try (ReadinessReconciliationTrigger trigger = new ReadinessReconciliationTrigger()) {
+    try (TestEngineExecutors processExecutors = new TestEngineExecutors();
+        ReadinessReconciliationTrigger trigger =
+            new ReadinessReconciliationTrigger(processExecutors)) {
       // OrchestrationPhase's wiring.
       trigger.wireTo(worker, inference);
       // CoreApiAssembly's wiring — the production method reference, not a test lambda.

@@ -50,7 +50,7 @@ final class ExtractionDropoutPdfFixturesTest {
   void imageOnlyPdfReachesTheVlmTier() throws Exception {
     Path pdf = copyFixture("/fixtures/pdf/pdf-image-only.pdf", "pdf-image-only.pdf");
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor().extractArtifact(pdf);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()).extractArtifact(pdf);
     ExtractionResult extraction = artifact.result();
     assertNotNull(extraction);
     assertTrue(
@@ -77,7 +77,7 @@ final class ExtractionDropoutPdfFixturesTest {
   void textLayerPdfIsUntouched() throws Exception {
     Path pdf = copyFixture("/fixtures/pdf/pdf-text-layer.pdf", "pdf-text-layer.pdf");
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor().extractArtifact(pdf);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()).extractArtifact(pdf);
     ExtractionResult extraction = artifact.result();
     assertFalse(ExtractionDropoutPolicy.isDropout(extraction.content()));
 

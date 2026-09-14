@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
  * the guard is in ({@link ParityDiagnostics#determinateInputComparisonAvailable}) and which model
  * inputs it names ({@link IndexFingerprint#indeterminateModelInputs()}).
  */
-final class IndeterminateModelParityTest {
+final class IndeterminateModelParityTest extends LuceneExecutorTestBase {
 
   @AfterEach
   void resetProcessWideProviders() {
@@ -45,11 +45,11 @@ final class IndeterminateModelParityTest {
   }
 
   /** Commits one document stamped with whatever {@code meta} produces, and returns its user data. */
-  private static Map<String, String> seed(Path dir, CommitMetadataSource meta) throws Exception {
+  private Map<String, String> seed(Path dir, CommitMetadataSource meta) throws Exception {
     try (var r =
         IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), meta, new JsonSchemaCommitMetadataValidator())
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r.indexingCoordinator()
           .indexSingle(

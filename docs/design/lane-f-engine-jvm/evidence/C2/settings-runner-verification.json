@@ -1,0 +1,284 @@
+{
+  "date": "2026-09-13",
+  "revision": "1a2230bb84b57acca22b14ae7a716302f2093442 + listed runner protocol files",
+  "status": "LOCAL_RUNNER_PROTOCOL_PASS; file owner/composition/wire consumer incomplete",
+  "retention": "Through lane acceptance plus30days; export before worktree release",
+  "runs": [
+    {
+      "revision": "1a2230bb8 + runner protocol initial",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-launcher:spotlessApply :modules:app-observability:test --tests *OperationSettingsRunnerTest --tests *OperationAttemptRunnerTest --tests *OperationSettingsMarkerTest :modules:app-launcher:test --tests *OperationStoreArchitectureTest :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-launcher:spotlessCheck :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-launcher:pmdTest --console=plain",
+      "summary": {
+        "tests": 0,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 0
+      },
+      "tasks": [],
+      "result": "FAILED_PMD",
+      "exitCode": 1
+    },
+    {
+      "revision": "1a2230bb8 + intermediate runner protocol",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-launcher:spotlessApply :modules:app-observability:test --tests *OperationSettingsRunnerTest --tests *OperationAttemptRunnerTest --tests *OperationSettingsMarkerTest :modules:app-launcher:test --tests *OperationStoreArchitectureTest :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-launcher:spotlessCheck :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-launcher:pmdTest --console=plain",
+      "summary": {
+        "tests": 85,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 19
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 45,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ],
+      "result": "PASS_INTERMEDIATE",
+      "exitCode": 0
+    },
+    {
+      "revision": "1a2230bb8 + runner authority corrections",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-launcher:spotlessApply :modules:app-observability:test --tests *OperationSettingsRunnerTest --tests *OperationAttemptRunnerTest --tests *OperationSettingsMarkerTest :modules:app-launcher:test --tests *OperationStoreArchitectureTest :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-launcher:spotlessCheck :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-launcher:pmdTest --console=plain",
+      "summary": {
+        "tests": 90,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 19
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 50,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ],
+      "result": "PASS_INTERMEDIATE",
+      "exitCode": 0
+    },
+    {
+      "revision": "1a2230bb8 + deliberately disabled three runner protections",
+      "command": "./gradlew.bat :modules:app-observability:test --tests *OperationSettingsRunnerTest.foreignFabricatedRetainedAndOffBodyThreadHandlesAreRefusedAndHandlerCannotCastControl --tests *OperationSettingsRunnerTest.reservationArmsExpectedRevisionAndPublishesOnlyAfterOwnerCommit --tests *OperationSettingsRunnerTest.missingCommittedReceiptIsUncertainRatherThanPrecommitFailure --tests *OperationSettingsRunnerTest.swallowedFatalStillRequestsRestartBeforeBodyReturnsAndNeverTerminalizes --console=plain",
+      "summary": {
+        "tests": 6,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 6,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ],
+      "result": "EXPECTED_FAILURE",
+      "exitCode": 1
+    },
+    {
+      "revision": "1a2230bb8 + final runner protocol",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-launcher:spotlessApply :modules:app-observability:test --tests *OperationSettingsRunnerTest --tests *OperationAttemptRunnerTest --tests *OperationSettingsMarkerTest :modules:app-launcher:test --tests *OperationStoreArchitectureTest :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-launcher:spotlessCheck :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-launcher:pmdTest --console=plain",
+      "summary": {
+        "tests": 91,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 19
+      },
+      "tasks": [
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 51,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        }
+      ],
+      "result": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "sha256": "a68e805cd91422cafe7aa0e32a4891e333af471a5b09dc7dc4fba332624921be",
+      "bytes": 5287
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsCommitOwner.java",
+      "sha256": "5021697dfdd0a729bb534a171424c0de64224cd6effe0bb689b0064e00c27ca4",
+      "bytes": 3698
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+      "sha256": "b72de4b8c9c7b11741ac3e5b1271f8288f5298a8d9e870d581b3e096a270a24b",
+      "bytes": 26086
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationSettingsRunnerTest.java",
+      "sha256": "bea65aee56603494747933527fa51c767c204f5dd7decf62755036beea1d80e8",
+      "bytes": 33002
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+      "sha256": "1d9949d317e27ec477ba1e35406a5682d76178f216a101fec1ad81b844284eda",
+      "bytes": 12184
+    },
+    {
+      "path": "tmp/c2-6-runner1277.txt",
+      "sha256": "14132012d64a76bdac6de65772173996ea5d6afb3ed06ab220c9c49911a26c36",
+      "bytes": 61245
+    },
+    {
+      "path": "tmp/c2-6-runner1277-counts.json",
+      "sha256": "87cac25c493c5d4830f7fbd86379642d4f20320cc608117a5626a87dcbb6b383",
+      "bytes": 803
+    },
+    {
+      "path": "tmp/c2-6-runner1278.txt",
+      "sha256": "49f99da166b67ab61b02fd3f60d6e5f5a13a024c8a88a876eb38b6bf99ce649b",
+      "bytes": 43037
+    },
+    {
+      "path": "tmp/c2-6-runner1278-counts.json",
+      "sha256": "957066cf6705a86ca240e1ba6fe0f8574199251f861db157b26cf20c6a208f83",
+      "bytes": 1230
+    },
+    {
+      "path": "tmp/c2-6-runner1278-source.json",
+      "sha256": "435c49eae76b4d37e797541110a5787fd259b2f85f430505fca350d5d7f2432a",
+      "bytes": 1054
+    },
+    {
+      "path": "tmp/c2-6-runner1278-xml.zip",
+      "sha256": "46610bcea50722147c81650d652bf3c2a899056907480159f6e98dd33121f942",
+      "bytes": 26504
+    },
+    {
+      "path": "tmp/c2-6-runner1279.txt",
+      "sha256": "495a8e134f89c238686cc83d9e7407ca069a055b7512a7895357c810212d360a",
+      "bytes": 39277
+    },
+    {
+      "path": "tmp/c2-6-runner1279-counts.json",
+      "sha256": "f70b34f5ed63462caa3f20a385b81e3dc23c7575cba1e9cfc4984465b0fc0f7e",
+      "bytes": 1230
+    },
+    {
+      "path": "tmp/c2-6-runner1279-source.json",
+      "sha256": "8688a24cdfb35526d168d102fb72c5a410be0c10727a5afa11e22370922685cd",
+      "bytes": 1054
+    },
+    {
+      "path": "tmp/c2-6-runner1279-xml.zip",
+      "sha256": "472f3f27f16edfee27e2e1404f2f72e951e57b8f9fc2ee63636bca9bd98d995a",
+      "bytes": 26546
+    },
+    {
+      "path": "tmp/c2-6-negative1280.txt",
+      "sha256": "23b3ce914cc4bc42c975fc5c06abf1eb0e7a8381c83a740a6cf8f07e98e425ce",
+      "bytes": 36458
+    },
+    {
+      "path": "tmp/c2-6-negative1280-counts.json",
+      "sha256": "324555daa31736243449f483a3f46ef6b10530ffb8cdb02da2a1f630bbc822a5",
+      "bytes": 979
+    },
+    {
+      "path": "tmp/c2-6-negative1280-xml.zip",
+      "sha256": "eed3e27b72eb4461c23081efd0ebb99ffdbcd1e5347b0b8f5d35abaa1168a4dd",
+      "bytes": 10986
+    },
+    {
+      "path": "tmp/c2-6-runner1281.txt",
+      "sha256": "d18b4f194d2e6cd2fc9ca4b7d2f53ace8f4dc96dbaf69d65023beda06c2d30d5",
+      "bytes": 39297
+    },
+    {
+      "path": "tmp/c2-6-runner1281-counts.json",
+      "sha256": "1f8e77e28aaa4ea3b0c550c599cd9a148e5c5c29340d4d1f65674764b134bff3",
+      "bytes": 1210
+    },
+    {
+      "path": "tmp/c2-6-runner1281-source.json",
+      "sha256": "dc5f5309f9abcf6adb512dbd6b5c368a000f7f51f0e84b4bcdf9313eccabc68f",
+      "bytes": 1054
+    },
+    {
+      "path": "tmp/c2-6-runner1281-xml.zip",
+      "sha256": "e66108f92873045e6fe15fae6c31fbdc2b87bedd60576ef14e07468577d311ca",
+      "bytes": 27141
+    },
+    {
+      "path": "tmp/c2-6-negative1280.original",
+      "sha256": "b72de4b8c9c7b11741ac3e5b1271f8288f5298a8d9e870d581b3e096a270a24b",
+      "bytes": 26086
+    },
+    {
+      "path": "tmp/c2-6-negative1280.py",
+      "sha256": "77b9ce6a2e8d784fc5598d383406c10d0fe599b5485fa6619e142202b110d722",
+      "bytes": 1239
+    },
+    {
+      "path": "tmp/c2-6-negative1280-mutations.json",
+      "sha256": "da2ce623da7d3579539c0b445ff4db8779ece557eb35828c69bada6d56ad2dff",
+      "bytes": 565
+    },
+    {
+      "path": "tmp/c2-6-hosted1277.json",
+      "sha256": "50cf93a05f1fa9e7aafb4db086385b2874fdb03d994ad8d9a6f6b9ac4f6cbc1d",
+      "bytes": 714
+    }
+  ]
+}

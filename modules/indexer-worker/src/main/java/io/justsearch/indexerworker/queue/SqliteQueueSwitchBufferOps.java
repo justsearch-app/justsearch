@@ -162,14 +162,15 @@ final class SqliteQueueSwitchBufferOps {
       Connection conn = connSupplier.get();
       String sql =
           """
-          INSERT OR REPLACE INTO switch_buffer (key, op, payload, last_updated)
-          VALUES (?, ?, ?, ?)
+          INSERT OR REPLACE INTO switch_buffer (key, op, payload, last_updated, revision)
+          VALUES (?, ?, ?, ?, ?)
           """;
       try (PreparedStatement stmt = conn.prepareStatement(sql)) {
         stmt.setString(1, key);
         stmt.setString(2, op);
         stmt.setString(3, payload);
         stmt.setLong(4, System.currentTimeMillis());
+        stmt.setString(5, java.util.UUID.randomUUID().toString());
         stmt.executeUpdate();
         return true;
       }
@@ -188,6 +189,42 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
+  /** The existing queue lock serializes coalescing with every other buffered admission. */
+  boolean putSyncRoot(String key, SwitchBufferSyncRoot incoming) {
+    lock.lock();
+    try {
+      return put(key, "SYNC_ROOT", preserveSyncAdmission(connSupplier.get(), key, incoming));
+    } catch (SQLException e) {
+      if (onWriteFailure != null) onWriteFailure.run();
+      log.error("Cannot preserve buffered sync attribution; caller must NOT ACK key={}", key, e);
+      return false;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private String preserveSyncAdmission(Connection conn, String key, SwitchBufferSyncRoot incoming)
+      throws SQLException {
+    if (incoming.provenance() != null) return incoming.encode();
+    try (PreparedStatement prior = conn.prepareStatement(
+        "SELECT op, payload FROM switch_buffer WHERE key = ?")) {
+      prior.setString(1, key);
+      try (ResultSet rows = prior.executeQuery()) {
+        if (!rows.next()) return incoming.encode();
+        if (!"SYNC_ROOT".equals(rows.getString(1))) {
+          throw new SQLException("Cannot coalesce maintenance over a different buffered operation");
+        }
+        try {
+          var previous = SwitchBufferSyncRoot.decode(rows.getString(2));
+          return new SwitchBufferSyncRoot(incoming.rootPath(), incoming.force(), previous.provenance()).encode();
+        } catch (IllegalArgumentException | tools.jackson.core.JacksonException malformed) {
+          // Do not erase an unreadable durable request by acknowledging a maintenance replacement.
+          throw new SQLException("Cannot coalesce maintenance over an unreadable SYNC_ROOT", malformed);
+        }
+      }
+    }
+  }
+
   /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
   List<SwitchBufferCapableQueue.SwitchBufferOp> listAll() {
     lock.lock();
@@ -195,7 +232,7 @@ final class SqliteQueueSwitchBufferOps {
       Connection conn = connSupplier.get();
       String sql =
           """
-          SELECT key, op, payload, last_updated
+          SELECT key, op, payload, last_updated, revision
           FROM switch_buffer
           ORDER BY last_updated ASC
           """;
@@ -205,7 +242,7 @@ final class SqliteQueueSwitchBufferOps {
         while (rs.next()) {
           out.add(
               new SwitchBufferCapableQueue.SwitchBufferOp(
-                  rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4)));
+                  rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5)));
         }
       }
       return out;
@@ -218,20 +255,17 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
-  /** Clears all buffered ops. */
-  int clear() {
-    lock.lock();
-    try {
-      Connection conn = connSupplier.get();
-      try (Statement stmt = conn.createStatement()) {
-        return stmt.executeUpdate("DELETE FROM switch_buffer");
+  /** Caller holds the queue lock and its existing transaction through commit. */
+  int removeReplayedLocked(List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) throws SQLException {
+    try (PreparedStatement stmt = connSupplier.get().prepareStatement(
+        "DELETE FROM switch_buffer WHERE key = ? AND revision = ?")) {
+      int removed = 0;
+      for (var entry : replayed) {
+        stmt.setString(1, entry.key());
+        stmt.setString(2, entry.revision());
+        removed += stmt.executeUpdate();
       }
-    } catch (SQLException e) {
-      errorRecorder.run();
-      log.error("Failed to clear switch buffer ops", e);
-      return 0;
-    } finally {
-      lock.unlock();
+      return removed;
     }
   }
 }

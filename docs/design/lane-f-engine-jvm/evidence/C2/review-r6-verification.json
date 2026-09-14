@@ -1,0 +1,23 @@
+{
+  "revision": "2d62e3c4b + R6 named acceptance-before-effect crash witness",
+  "command": "gradlew.bat :modules:app-observability:test --tests *SqliteOperationStoreTest :modules:ui:compileIntegrationTestJava :modules:app-observability:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 20,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 2
+  },
+  "tasks": [
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    }
+  ]
+}

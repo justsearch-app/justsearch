@@ -347,11 +347,10 @@ export function renderMatrixMarkdown(model) {
       " with every `*.source=ui_settings` marker property. Each of those keys now resolves" +
       " `settings.json` when the user set one and `auto_detected` / `default` otherwise — never" +
       " `jvm_arg` merely because the value came from the GUI, which is what the promotions used to" +
-      " make them report. Two `*.source` properties survive, neither of them a settings promotion:" +
-      " `justsearch.server.exe.source` is the ownership token of the runtime GPU-variant switch" +
-      " (`RuntimeActivationService`), and `justsearch.llm.model_path.source` labels the paths" +
-      " `AiInstallService` / `AiPackImportService` write directly so `InferenceConfig` can tell an" +
-      " installer-written path from an operator lock.",
+      " make them report. The runtime GPU executable switch also uses resolver provenance:" +
+      " boot auto-detection at150, accepted settings at300, and environment/JVM sources at400/500." +
+      " Its `justsearch.server.exe.source` marker is retired. The model-path marker has no current" +
+      " writer; its compatibility reader remains for the separately designed profile persistence path.",
   );
   lines.push("");
   lines.push("| Declaration | Lifecycle | YAML key | Env var | System property | EnvRegistry constant | Owner module | Precedence notes |");

@@ -2455,7 +2455,7 @@ def _cross_encoder_problems(baseline: dict, candidate: dict) -> list[str]:
                         f"({reason}), so this query's results keep their FUSION order and the "
                         "capture records a degraded pipeline. Both sides of a pair degrade "
                         "together, so the diff gets quieter rather than noisier — a green here "
-                        "would be earned by disabling the reranker. If the Worker log shows an "
+                        "would be earned by disabling the reranker. If the Engine log shows an "
                         "ONNX Runtime arena allocation failure, raise "
                         "JUSTSEARCH_RERANK_GPU_MEM_MB or lower the rerank window; then "
                         "re-capture."

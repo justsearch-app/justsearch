@@ -10,10 +10,12 @@ import io.justsearch.app.api.EffectivePolicy;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.inference.telemetry.TransitionReason;
-import io.justsearch.app.services.settings.UiSettingsStore;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,13 +23,23 @@ import org.junit.jupiter.api.io.TempDir;
 final class RuntimeReconcilerTest {
 
   @TempDir Path tmp;
+  private final List<RuntimeIntentTestFixture> fixtures = new ArrayList<>();
+  private final AtomicInteger fixtureIds = new AtomicInteger();
 
   private RuntimeSpecStore specStore(boolean chatEnabled) {
-    UiSettingsStore store =
-        new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
-    RuntimeSpecStore spec = new RuntimeSpecStore(store);
-    spec.setChatEnabled(chatEnabled);
-    return spec;
+    try {
+      var fixture = new RuntimeIntentTestFixture(
+          tmp.resolve("runtime-intent-" + fixtureIds.incrementAndGet()), chatEnabled);
+      fixtures.add(fixture);
+      return fixture.spec();
+    } catch (Exception failure) {
+      throw new AssertionError("Failed to compose runtime intent fixture", failure);
+    }
+  }
+
+  @AfterEach
+  void closeFixtures() {
+    fixtures.forEach(RuntimeIntentTestFixture::close);
   }
 
   private RuntimeReconciler reconciler(

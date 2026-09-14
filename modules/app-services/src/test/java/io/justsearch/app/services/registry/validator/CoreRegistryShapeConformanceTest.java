@@ -7,7 +7,7 @@ import io.justsearch.agent.api.registry.Resource;
 import io.justsearch.agent.api.registry.ResourceCatalog;
 import io.justsearch.app.observability.CapabilitiesResourceCatalog;
 import io.justsearch.app.observability.advisory.AdvisoryResourceCatalog;
-import io.justsearch.app.observability.diagnostic.HeadLogDiagnosticChannelCatalog;
+import io.justsearch.app.observability.diagnostic.EngineLogDiagnosticChannelCatalog;
 import io.justsearch.app.observability.health.ConditionRecoveryIndexCatalog;
 import io.justsearch.app.observability.health.HealthResourceCatalog;
 import io.justsearch.app.observability.indexing.FailedIndexingJobsResourceCatalog;
@@ -72,7 +72,7 @@ final class CoreRegistryShapeConformanceTest {
 
   /** The production DiagnosticChannel catalogs — every {@code implements DiagnosticChannelCatalog} in core. */
   private static List<DiagnosticChannelCatalog> coreChannelCatalogs() {
-    return List.of(new HeadLogDiagnosticChannelCatalog());
+    return List.of(new EngineLogDiagnosticChannelCatalog());
   }
 
   @Test

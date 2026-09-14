@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.OperationRef;
+import io.justsearch.agent.api.registry.OperationKind;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -26,6 +27,17 @@ import tools.jackson.databind.json.JsonMapper;
 final class ValueClassWireFormatTest {
 
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+
+  @Test
+  void recordKindsRoundTripUsingThePersistentSpelling() {
+    for (OperationKind kind : OperationKind.values()) {
+      String json = MAPPER.writeValueAsString(kind);
+      assertEquals("\"" + kind.wireValue() + "\"", json);
+      assertEquals(kind, MAPPER.readValue(json, OperationKind.class));
+    }
+    assertThrows(RuntimeException.class, () -> MAPPER.readValue("\"REINDEX\"", OperationKind.class));
+    assertThrows(RuntimeException.class, () -> MAPPER.readValue("\"unknown\"", OperationKind.class));
+  }
 
   @Test
   @DisplayName("OperationRef serializes as bare JSON string")

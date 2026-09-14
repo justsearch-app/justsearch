@@ -217,9 +217,10 @@ final class ActionLedgerChangeRegistryTest {
 
   @Test
   @DisplayName("F5: a store append-listener wired to the registry fans the entry into the one log")
-  void storeAppendFansIntoTheOneLog() {
+  void storeAppendFansIntoTheOneLog(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+    try (var operations = new io.justsearch.app.observability.operations.SqliteOperationStore(directory.resolve("operations.db"))) {
     ActionLedgerChangeRegistry registry = new ActionLedgerChangeRegistry();
-    OperationHistoryStore store = new OperationHistoryStore();
+    OperationHistoryStore store = new OperationHistoryStore(operations);
     // The production wiring: the store fans every append into the one log — no explicit broadcast.
     store.addAppendListener(registry::broadcastOperation);
 
@@ -240,5 +241,6 @@ final class ActionLedgerChangeRegistryTest {
     assertEquals(
         "core.reindex",
         ((ActionEvent.Operation) log.get(0)).operationId());
+    }
   }
 }

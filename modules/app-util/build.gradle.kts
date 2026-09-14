@@ -20,6 +20,7 @@ testing {
         implementation(project())
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
+        implementation(libs.mockito.core)
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
       }

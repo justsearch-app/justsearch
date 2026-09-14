@@ -1,12 +1,10 @@
 package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -21,7 +19,6 @@ import io.justsearch.ipc.SearchResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +35,7 @@ import org.junit.jupiter.api.Test;
  * ephemeral Lucene runtime via {@code IndexSchema.fromCatalog(...).ephemeral().open()}.
  */
 @DisplayName("FacetCompute regression matrix (tempdoc 517 §Risks)")
-final class FacetRegressionMatrixTest {
+final class FacetRegressionMatrixTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   // (a) LUCENE-syntax sparse with facets — sparse-only request, LUCENE query syntax.
   //     Path: FacetCompute.FromRetrievalQuery (honours runtimeSyntax).
@@ -52,7 +49,7 @@ final class FacetRegressionMatrixTest {
                 "doc-a", "Hello world",
                 "doc-b", "Hello there",
                 "doc-c", "Goodbye world"))) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -86,7 +83,7 @@ final class FacetRegressionMatrixTest {
   void sparseWithBoostFiltersAndFacets() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithDocs(Map.of("doc-1", "Sample boosted document"))) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -116,42 +113,38 @@ final class FacetRegressionMatrixTest {
   void hybridBlankQueryWithFacetsThrows() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithDocs(Map.of("doc-1", "Hello world"))) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
-      AtomicReference<Throwable> errorRef = new AtomicReference<>();
-      AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-      service.search(
-          SearchRequest.newBuilder()
-              .setQuery("")
-              .setLimit(10)
-              .setPipeline(
-                  PipelineConfig.newBuilder().setSparseEnabled(true).setDenseEnabled(true).build())
-              .setFacets(
-                  FacetSpec.newBuilder()
-                      .setInclude(true)
-                      .addFields(FacetFieldSpec.newBuilder().setField(SchemaFields.MIME).setSize(5))
-                      .build())
-              .build(),
-          new StreamObserver<>() {
-            @Override
-            public void onNext(SearchResponse value) {
-              responseRef.set(value);
-            }
-
-            @Override
-            public void onError(Throwable t) {
-              errorRef.set(t);
-            }
-
-            @Override
-            public void onCompleted() {}
-          });
-      // gRPC bridges the IllegalArgumentException into a gRPC StatusRuntimeException;
-      // it surfaces here as a non-null error or as an INVALID_ARGUMENT status. The
-      // invariant we're asserting: the planner does NOT silently compute facets for
-      // a blank hybrid query (tempdoc §"Invariants preserved" #9 — hybrid blocks
-      // expansion / blank-query short-circuit at planner time).
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
+      WorkerServiceException error = null;
+      SearchResponse response = null;
+      try {
+        response =
+            service.search(
+                SearchRequest.newBuilder()
+                    .setQuery("")
+                    .setLimit(10)
+                    .setPipeline(
+                        PipelineConfig.newBuilder()
+                            .setSparseEnabled(true)
+                            .setDenseEnabled(true)
+                            .build())
+                    .setFacets(
+                        FacetSpec.newBuilder()
+                            .setInclude(true)
+                            .addFields(
+                                FacetFieldSpec.newBuilder().setField(SchemaFields.MIME).setSize(5))
+                            .build())
+                    .build(),
+                CallContext.none());
+      } catch (WorkerServiceException e) {
+        error = e;
+      }
+      // The service maps the planner's IllegalArgumentException onto INVALID_ARGUMENT; it
+      // surfaces here as a thrown WorkerServiceException. The invariant we're asserting:
+      // the planner does NOT silently compute facets for a blank hybrid query
+      // (tempdoc §"Invariants preserved" #9 — hybrid blocks expansion / blank-query
+      // short-circuit at planner time).
       assertTrue(
-          errorRef.get() != null || responseRef.get() == null || responseRef.get().getTotalHits() == 0,
+          error != null || response == null || response.getTotalHits() == 0,
           "Blank-query hybrid must not produce a real result with facets");
     } finally {
       restoreProperty("justsearch.config", prevConfig);
@@ -165,7 +158,7 @@ final class FacetRegressionMatrixTest {
   void hybridNonBlankQueryWithFacets() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithDocs(Map.of("doc-1", "Lorem ipsum dolor"))) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -201,7 +194,7 @@ final class FacetRegressionMatrixTest {
   void hybridMalformedSimpleQueryWithFacetsSwallowed() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithDocs(Map.of("doc-1", "Sample text"))) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       // A query that's SIMPLE-syntax-valid for retrieval but possibly problematic for
       // a fresh parse during facet construction. The discriminator's invariant:
       // composable-path facet build must not propagate ParseException — it
@@ -249,7 +242,7 @@ final class FacetRegressionMatrixTest {
                 "doc-b", "beta shared term",
                 "doc-c", "gamma shared term",
                 "doc-d", "delta unique only"))) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
 
       // "shared" matches exactly three documents (a, b, c) — matchCount must be 3, not a window.
       SearchResponse shared = invokeSearch(service, sparseWithMimeFacet("shared"));
@@ -308,32 +301,13 @@ final class FacetRegressionMatrixTest {
   // Helpers
   // ============================================================
 
-  private static SearchResponse invokeSearch(GrpcSearchService service, SearchRequest request) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-    service.search(
-        request,
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-    assertFalse(errorRef.get() != null, () -> "search() errored: " + errorRef.get());
-    SearchResponse response = responseRef.get();
+  private static SearchResponse invokeSearch(WorkerSearchService service, SearchRequest request) {
+    SearchResponse response = service.search(request, CallContext.none());
     assertNotNull(response);
     return response;
   }
 
-  private static RunningRuntime newLifecycleWithDocs(Map<String, String> docs) throws Exception {
+  private RunningRuntime newLifecycleWithDocs(Map<String, String> docs) throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-facet-matrix-test-");
     String yaml =
@@ -345,7 +319,7 @@ final class FacetRegressionMatrixTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     for (var entry : docs.entrySet()) {
       lifecycle
           .indexingCoordinator()

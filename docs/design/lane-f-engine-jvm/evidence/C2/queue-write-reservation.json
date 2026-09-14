@@ -1,0 +1,99 @@
+{
+  "base": "d245f8427",
+  "status": "local correction verified; installed lock contention rerun owed",
+  "environment": "Windows; SQLite JDBC3.51.2.0; lane-f-pr1-verify",
+  "runs": {
+    "write-reservation-negative1569": {
+      "revision": "d245f8427+regression",
+      "command": "gradlew indexer-worker spotlessApply,test QueueWriteReservationTest",
+      "summary": {
+        "tests": 7,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "FAILED",
+          "tests": 7,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "write-reservation-positive1570": {
+      "revision": "d245f8427+dirty",
+      "command": "gradlew indexer-worker spotlessApply,test QueueWriteReservationTest IndexingJobsChangeStreamTest RecordedWalkTerminalTest,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 34,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 4
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        }
+      ]
+    },
+    "write-reservation-final1571": {
+      "revision": "d245f8427+dirty",
+      "command": "gradlew indexer-worker spotlessApply,test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 524,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 12,
+        "suites": 89
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 524,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 89
+        }
+      ]
+    },
+    "write-reservation-final1572": {
+      "revision": "d245f8427+dirty",
+      "command": "gradlew indexer-worker spotlessApply,test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 524,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 12,
+        "suites": 89
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 524,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 89
+        }
+      ]
+    }
+  }
+}

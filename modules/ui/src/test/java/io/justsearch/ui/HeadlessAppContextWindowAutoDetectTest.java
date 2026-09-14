@@ -46,7 +46,7 @@ final class HeadlessAppContextWindowAutoDetectTest {
    * "unset" in this store — {@code ConfigStoreRebuilder.contributeUiSettings} only contributes the
    * key when {@code > 0} — so the ordinal-300 rung must be skipped for it.
    */
-  private static final int NO_SETTINGS_GPU_LAYERS = 0;
+  private static final Integer NO_SETTINGS_GPU_LAYERS = null;
 
   private final Map<String, String> saved = new HashMap<>();
 
@@ -219,13 +219,11 @@ final class HeadlessAppContextWindowAutoDetectTest {
   }
 
   @Test
-  @DisplayName("a settings gpu.layers of 0 means UNSET, so the probe map still decides")
-  void settingsGpuLayersZeroMeansUnset() {
-    // ConfigStoreRebuilder.contributeUiSettings only contributes gpu.layers when > 0, so treating
-    // a settings 0 as an explicit "force CPU" here would disagree with the resolver: the resolver
-    // would see only the probe's 99 at ordinal 150 and resolve 99.
+  @DisplayName("an absent GPU override preserves automatic detection")
+  void absentSettingsGpuLayersMeansAutomatic() {
+    // Schema4 represents automatic selection as null; the legacy0 migration preserves it.
     Map<String, String> augmented =
-        HeadlessApp.augmentDerivedContextWindow(Map.of(GPU_LAYERS_KEY, "99"), 0);
+        HeadlessApp.augmentDerivedContextWindow(Map.of(GPU_LAYERS_KEY, "99"), null);
 
     assertEquals(
         String.valueOf(ContextWindowPolicy.GPU_TOP_RUNG), augmented.get(CONTEXT_SIZE_KEY));
@@ -243,6 +241,12 @@ final class HeadlessAppContextWindowAutoDetectTest {
         String.valueOf(ContextWindowPolicy.CPU_TOP_RUNG),
         augmented.get(CONTEXT_SIZE_KEY),
         "an operator's -Djustsearch.gpu.layers=0 outranks the GUI's 20, as ordinal 500 > 300");
+  }
+
+  @Test
+  void explicitCpuOverridesTheGpuProbeForTheDerivedContext() {
+    var derived = HeadlessApp.augmentDerivedContextWindow(Map.of(GPU_LAYERS_KEY, "99"), 0);
+    assertEquals(String.valueOf(ContextWindowPolicy.CPU_TOP_RUNG), derived.get(CONTEXT_SIZE_KEY));
   }
 
   @Test

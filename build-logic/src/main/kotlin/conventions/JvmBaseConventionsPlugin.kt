@@ -193,8 +193,9 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         .orElse(false)
 
     // Java TEST sources are covered too (930 §22.2 follow-up 10). `pmd.includeTests` is gone:
-    // every source set PMD sees — `test`, `integrationTest`, `systemTest`, `soakTest`,
-    // `determinismTest`, `testFixtures` — runs in `check`/`build`, under a ruleset of its own.
+    // every source set PMD sees — `test`, `integrationTest`, `systemTest`, `determinismTest`,
+    // `testFixtures` — runs in `check`/`build`, under a ruleset of its own. (`soakTest` was in
+    // this list until lane F stage A item A12 removed the only source set that had one.)
     // `ruleset-tests.xml` is `ruleset.xml` minus two rules whose premise does not hold in a test
     // (`SystemPrintln`, `NonThreadSafeSingleton`); the file states why. 569 pre-existing
     // violations were cleared in the same change. Measured cost: see the CI step comment.

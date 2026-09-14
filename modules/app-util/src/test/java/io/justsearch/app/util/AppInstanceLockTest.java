@@ -1,8 +1,6 @@
 package io.justsearch.app.util;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,30 +85,4 @@ class AppInstanceLockTest {
     lock.close();
   }
 
-  @Test
-  void parsePidFromMetadata_validContent() {
-    assertEquals(12345L, AppInstanceLock.parsePidFromMetadata("pid=12345\nstarted_at=2025-01-01T00:00:00Z\n"));
-  }
-
-  @Test
-  void parsePidFromMetadata_nullContent() {
-    assertNull(AppInstanceLock.parsePidFromMetadata(null));
-  }
-
-  @Test
-  void parsePidFromMetadata_malformedContent() {
-    assertNull(AppInstanceLock.parsePidFromMetadata("not a lock file"));
-  }
-
-  @Test
-  void parseStartedAtFromMetadata_validInstant() {
-    Long result = AppInstanceLock.parseStartedAtFromMetadata("pid=1\nstarted_at=2025-06-15T12:00:00Z\n");
-    // 2025-06-15T12:00:00Z in epoch millis
-    assertEquals(java.time.Instant.parse("2025-06-15T12:00:00Z").toEpochMilli(), result);
-  }
-
-  @Test
-  void parseStartedAtFromMetadata_nullContent() {
-    assertNull(AppInstanceLock.parseStartedAtFromMetadata(null));
-  }
 }

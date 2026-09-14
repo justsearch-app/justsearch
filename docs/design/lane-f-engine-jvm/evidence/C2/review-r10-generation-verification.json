@@ -1,0 +1,26 @@
+{
+  "revision": "c94494525 + completion-aware generation fixture",
+  "command": "gradlew.bat :modules:app-engine:test --tests '*EngineGenerationCaptureTest' :modules:app-engine:pmdTest :modules:ui:compileIntegrationTestJava -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 1
+  },
+  "tasks": [
+    {
+      "module": "app-engine",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    }
+  ],
+  "raw": "tmp/c2-review-r10-generation857.txt and tmp/c2-review-r10-generation857-xml/",
+  "negative": "Full853: 2157 tests/298 suites represented, one failure expected zero active work but observed one. Original XML/output preserved before focused rerun.",
+  "remaining": "Full and hosted batch verification; independent review"
+}

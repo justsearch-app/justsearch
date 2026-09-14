@@ -1,0 +1,273 @@
+{
+  "base": "d892321c64084715be06fd59843fc57877398916",
+  "status": "WIP d.2b.1; closure/seal/retention/producer/recovery remain open",
+  "environment": "Windows; lane-f-pr1-verify",
+  "evidenceRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp",
+  "runs": {
+    "walk-terminal1559": {
+      "revision": "d892321c6+dirty",
+      "command": ":modules:worker-core:spotlessApply :modules:indexer-worker:spotlessApply :modules:indexer-worker:test --tests *RecordedWalkAdmissionTest --tests *RecordedWalkTerminalTest",
+      "summary": {
+        "tests": 15,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "FAILED",
+          "tests": 15,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        }
+      ]
+    },
+    "walk-terminal1560": {
+      "revision": "d892321c6+dirty",
+      "command": "gradlew worker-core/indexer-worker spotlessApply; indexer-worker test RecordedWalkAdmissionTest,RecordedWalkTerminalTest; worker-core/indexer-worker pmdMain,pmdTest",
+      "summary": {
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        }
+      ]
+    },
+    "walk-terminal-integrated1561": {
+      "revision": "d892321c6+dirty",
+      "command": "gradlew indexer-worker spotlessApply; worker-core/indexer-worker/worker-services test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 2220,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 20,
+        "suites": 428
+      },
+      "tasks": [
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 517,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 88
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1361,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        }
+      ]
+    },
+    "walk-terminal-negative1562": {
+      "revision": "d892321c6+negative",
+      "command": "gradlew indexer-worker test RecordedWalkTerminalTest; distinct hash dedup deliberately removed",
+      "summary": {
+        "tests": 15,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "FAILED",
+          "tests": 15,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "walk-terminal-review1563": {
+      "revision": "d892321c6+dirty",
+      "command": "gradlew indexer-worker spotlessApply,test RecordedWalkAdmissionTest RecordedWalkTerminalTest,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        }
+      ]
+    },
+    "walk-terminal-review-negative1564": {
+      "revision": "d892321c6+negative",
+      "command": "gradlew indexer-worker test RecordedWalkTerminalTest; omit membership witness, classification guard, superseded receipt",
+      "summary": {
+        "tests": 19,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "FAILED",
+          "tests": 19,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "walk-terminal-final1565": {
+      "revision": "d892321c6+restored-crlf",
+      "command": "gradlew worker-core/indexer-worker/worker-services test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 1703,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 8,
+        "suites": 340
+      },
+      "tasks": [
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 1361,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        }
+      ]
+    },
+    "walk-terminal-final1566": {
+      "revision": "d892321c6+dirty",
+      "command": "gradlew indexer-worker spotlessApply; worker-core/indexer-worker/worker-services test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 2224,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 20,
+        "suites": 428
+      },
+      "tasks": [
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 1361,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 521,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 88
+        }
+      ]
+    },
+    "walk-terminal-rollback1567": {
+      "revision": "d892321c6+dirty",
+      "command": "gradlew indexer-worker spotlessApply,test,pmdMain,pmdTest; spotlessCheck",
+      "summary": {
+        "tests": 522,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 12,
+        "suites": 88
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 522,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 88
+        }
+      ]
+    }
+  },
+  "finalRepresentedSummary": {
+    "tests": 2225,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 20,
+    "suites": 428,
+    "basis": "queue522 EXECUTED at1567; worker-core342 and worker-services1361 from1561 unchanged production/task inputs, reused at1566"
+  }
+}

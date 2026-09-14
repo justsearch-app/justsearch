@@ -192,7 +192,7 @@
       "name": "SettingsV2",
       "schema": "SSOT/schemas/settings-v2.v1.json",
       "outFile": "settings-v2.ts",
-      "consumers": ["modules/ui-web/src/api/domains/settings.ts"],
+      "consumers": ["modules/ui-web/src/api/domains/settings.ts", "modules/ui-web/src/api/settingsAttempt.ts"],
       "note": "api/schemas.ts was listed here until tempdoc 884 review S5 taught the gate to parse imports: its only occurrence of the module is the tempdoc-683 tombstone comment at :20-22 recording that the hand SettingsV2 schemas were DELETED and that the parse boundary moved to api/domains/settings.ts. It never imported this projection; the raw-substring matcher could not tell the difference."
     },
     {

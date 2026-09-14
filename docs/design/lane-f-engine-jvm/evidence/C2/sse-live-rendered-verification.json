@@ -1,0 +1,185 @@
+{
+  "revision": "e7edaf503 + rendered regression only",
+  "date": "2026-09-13",
+  "live": {
+    "command": "node tmp/c2-4-sse-live1238.mjs",
+    "result": "PASS",
+    "checks": 17,
+    "streams": 14,
+    "runtimeHashes": [
+      {
+        "module": "app-api",
+        "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-api-0.3.0.jar",
+        "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-api/build/libs/app-api-0.3.0.jar",
+        "sha256": "9c4fcce7c8adb7749f4ab7854d05151211ecdc06e166530817493c5dfeb75eeb"
+      },
+      {
+        "module": "app-agent-api",
+        "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-agent-api-0.3.0.jar",
+        "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-agent-api/build/libs/app-agent-api-0.3.0.jar",
+        "sha256": "398985f2474d75cd81f96fd67f99e08fde1b66a8314fd0d59d94ea61178f4293"
+      },
+      {
+        "module": "app-agent",
+        "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-agent-0.3.0.jar",
+        "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-agent/build/libs/app-agent-0.3.0.jar",
+        "sha256": "aae195ad06f8dc9e5edf5deda7afc55cf96b801797933dc69faeee5d7657e276"
+      },
+      {
+        "module": "app-observability",
+        "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-observability-0.3.0.jar",
+        "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-observability/build/libs/app-observability-0.3.0.jar",
+        "sha256": "96cde87002a819ea8c94c19b98743467e5545d7273b9788d630b0b3a5ef46ad2"
+      },
+      {
+        "module": "ui",
+        "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/ui-0.3.0.jar",
+        "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/libs/ui-0.3.0.jar",
+        "sha256": "f9306ef3d7518039d5d9ad38df34bc5d36e8e63a53482ed3bfca9f367ae0bb8a"
+      }
+    ]
+  },
+  "frontend": {
+    "commands": [
+      "npm run typecheck",
+      "npm run test:unit:run"
+    ],
+    "cwd": "modules/ui-web",
+    "result": "PASS",
+    "tests": 6520,
+    "files": 485
+  },
+  "negative1239": "EXPECTED_FAILURE: key-routing mutant renders five rows instead of four; production restored byte-identically",
+  "failedAttempts": {
+    "1237": "Harness jar filter matched app-agent-api as app-agent; failed before managed start. Corrected regex in1238.",
+    "1240": "TypeScript source may be undefined in new fixture; existence guard added. Full UI did not start."
+  },
+  "retention": "Through lane acceptance plus30 days; export before worktree release",
+  "artifacts": [
+    {
+      "path": "modules/ui-web/src/shell-v0/components/ResourceView.history-reconnect.test.ts",
+      "sha256": "d419348c3597a9d1b6985aab51ad0f79b01c3fa447a8f851b5477a4cfea1f196",
+      "bytes": 7205
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.ts",
+      "sha256": "5b5f1e4d623392e17ef76759bbeeb06cd82cceecc2dcad2d399cdc6b8e33cfeb",
+      "bytes": 16609
+    },
+    {
+      "path": "tmp/c2-4-rendered-affected1241.txt",
+      "sha256": "4b90e8d938e34e47b6effd10af1ffc1b48e56d22cfe64abef22ff245e9274ba9",
+      "bytes": 179
+    },
+    {
+      "path": "tmp/c2-4-rendered-coverage1241.txt",
+      "sha256": "37ab0713d91bbaeef27c95a93fdd6ab89781859fac214352447faba36a5c239c",
+      "bytes": 430
+    },
+    {
+      "path": "tmp/c2-4-rendered-negative1239.original",
+      "sha256": "5b5f1e4d623392e17ef76759bbeeb06cd82cceecc2dcad2d399cdc6b8e33cfeb",
+      "bytes": 16609
+    },
+    {
+      "path": "tmp/c2-4-rendered-negative1239.py",
+      "sha256": "32b1523e52b3481645cfb4ce83f09ed3a9c91a4d9c60fd8dde1ac5f56f0bb335",
+      "bytes": 501
+    },
+    {
+      "path": "tmp/c2-4-rendered-negative1239.txt",
+      "sha256": "fa8edc5b972f328ef4c32508db338d023c9ce01299a2100a890a7994fa06b449",
+      "bytes": 1989
+    },
+    {
+      "path": "tmp/c2-4-rendered-typecheck1240.txt",
+      "sha256": "a01fa82cff996ae4853c3c9056cc563a9578d1306aea272a1f34bb92411dce2d",
+      "bytes": 791
+    },
+    {
+      "path": "tmp/c2-4-rendered-typecheck1241.txt",
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100",
+      "bytes": 63
+    },
+    {
+      "path": "tmp/c2-4-rendered-ui1241.txt",
+      "sha256": "f5673f51732b4018c49e3699e20e2992b68f3d6f89c5735ef8e622ac2caeb085",
+      "bytes": 685206
+    },
+    {
+      "path": "tmp/c2-4-rendered1236.txt",
+      "sha256": "f09d0d4f3cd38b3f022d2ca002b01050fb510fb21c635926fcdd9dc00e937141",
+      "bytes": 374
+    },
+    {
+      "path": "tmp/c2-4-sse-install1235.txt",
+      "sha256": "977bfe32765deb7d1a1fcab96026f0e830343455cb001eebb6086c145c06cf12",
+      "bytes": 7225
+    },
+    {
+      "path": "tmp/c2-4-sse-live1237-result.json",
+      "sha256": "1b32434bd40ccf518aa898a2b64b2c558bf3047875aa3fe96150b2e5ccd0015f",
+      "bytes": 1383
+    },
+    {
+      "path": "tmp/c2-4-sse-live1237.mjs",
+      "sha256": "f1cf49ab94f5ccea698073d89160ede58374e13d409f3ffa58470fa68cec9f92",
+      "bytes": 11020
+    },
+    {
+      "path": "tmp/c2-4-sse-live1237.txt",
+      "sha256": "bc1772c724cdaca28d82fff236827146eb519b97a36b6933ca1f384eca6cba86",
+      "bytes": 743
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-initial-start.json",
+      "sha256": "de6ea64b474ee10f88f54c8106c8de612f2ee4b79f73b6e89a5dfa3ea375277d",
+      "bytes": 420
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-initial-stop.json",
+      "sha256": "fdc0cf352209753a274b5651dd212212c2b818077678a1c7d26dacb7cc6b0262",
+      "bytes": 291
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-restart-start.json",
+      "sha256": "7396ba9cbe098f1dccb896b141155279ec2a1c40b9ed14027d721d5dc109934c",
+      "bytes": 420
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-restart-stop.json",
+      "sha256": "49bbda3183e7807351c8158bec93a5d4855defbb57721890bf089bd52374a461",
+      "bytes": 290
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-result.json",
+      "sha256": "dc091a859745beed671ea5e9b866300b56b0d43b0d5ad62592eb488344a6b370",
+      "bytes": 68663
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238.mjs",
+      "sha256": "88de24f8076bdbb105f3bc50a84b2ae67e04b9820a97c0557c552260e78b1cc1",
+      "bytes": 11035
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238.txt",
+      "sha256": "d9ececc1176385953bf27fbf6d4094a1ddf6190bcee81eae479dd029f4b350d5",
+      "bytes": 1295
+    },
+    {
+      "path": "tmp/c2-4-sse-live1238-post-stop-quick-health.json",
+      "sha256": "a6bbfe5a0b950482a89e82aad7dfe76a7ef5443cd453beaaa0859236a4516da8",
+      "bytes": 283
+    }
+  ]
+}

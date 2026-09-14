@@ -54,6 +54,12 @@ public final class FrameHistoryRingBuffer {
   private final Map<String, SseEnvelope> evidence = new LinkedHashMap<>();
   private long narrativeBytes;
   private long evidenceBytes;
+  private long droppedThroughSeq;
+
+  /** Highest discarded UPDATE sequence; a stronger snapshot cursor must cover this fence. */
+  public synchronized long droppedThroughSeq() {
+    return droppedThroughSeq;
+  }
 
   public FrameHistoryRingBuffer() {
     this(FrameRetentionPolicy.DEFAULT);
@@ -114,6 +120,7 @@ public final class FrameHistoryRingBuffer {
   private void appendEvidence(String key, SseEnvelope frame) {
     SseEnvelope replaced = evidence.put(key, frame);
     if (replaced != null) {
+      droppedThroughSeq = Math.max(droppedThroughSeq, replaced.seq());
       evidenceBytes -= FrameRetentionSizer.retainedBytes(replaced);
     }
     evidenceBytes += FrameRetentionSizer.retainedBytes(frame);
@@ -135,6 +142,7 @@ public final class FrameHistoryRingBuffer {
         break;
       }
       evidenceBytes -= FrameRetentionSizer.retainedBytes(oldest.getValue());
+      droppedThroughSeq = Math.max(droppedThroughSeq, oldest.getValue().seq());
       evidence.remove(oldest.getKey());
     }
   }
@@ -151,6 +159,7 @@ public final class FrameHistoryRingBuffer {
       if (evicted == null) {
         break;
       }
+      droppedThroughSeq = Math.max(droppedThroughSeq, evicted.seq());
       if (tracksBytes) {
         narrativeBytes -= FrameRetentionSizer.retainedBytes(evicted);
       }

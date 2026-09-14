@@ -21,13 +21,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("DocumentFieldOps identity recovery scan")
-final class DocumentIdentityScanTest {
+final class DocumentIdentityScanTest extends LuceneExecutorTestBase {
 
   @Test
   @DisplayName("identity recovery scans parents and excludes their chunks")
   void scanReturnsOnlyParentIdentities(@TempDir Path tempDir) throws Exception {
     try (RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open()) {
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open()) {
       String parentId = "parent.txt";
       String parentUid = "00000000-0000-4000-8000-000000000220";
       runtime
@@ -81,7 +81,7 @@ final class DocumentIdentityScanTest {
   void missingParentUidIsSkippedAndCountedInsteadOfFailingTheScan(@TempDir Path tempDir)
       throws Exception {
     try (RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open()) {
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open()) {
       runtime
           .indexingCoordinator()
           .indexSingle(
@@ -119,7 +119,7 @@ final class DocumentIdentityScanTest {
   @DisplayName("1001 parents stream as two batches, never one whole-index list")
   void parentsAreStreamedInBoundedBatches(@TempDir Path tempDir) throws Exception {
     try (RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open()) {
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open()) {
       for (int i = 0; i < 1001; i++) {
         runtime
             .indexingCoordinator()

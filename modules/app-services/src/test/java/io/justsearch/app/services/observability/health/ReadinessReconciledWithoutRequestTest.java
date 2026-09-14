@@ -12,6 +12,7 @@ import io.justsearch.app.observability.health.ConditionStore;
 import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.Source;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
@@ -83,7 +84,9 @@ final class ReadinessReconciledWithoutRequestTest {
     CountDownLatch seedPlusTransition = new CountDownLatch(2);
 
     WorkerCapability worker = new WorkerCapability();
-    try (ReadinessReconciliationTrigger trigger = new ReadinessReconciliationTrigger()) {
+    try (TestEngineExecutors processExecutors = new TestEngineExecutors();
+        ReadinessReconciliationTrigger trigger =
+            new ReadinessReconciliationTrigger(processExecutors)) {
       trigger.wireTo(worker, null);
       trigger.attach(
           () -> {

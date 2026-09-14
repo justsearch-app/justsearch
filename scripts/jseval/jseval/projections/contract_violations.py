@@ -85,7 +85,7 @@ def aggregate(traces_path: Path) -> dict:
       This is the self-feed path — projection-dispatcher failures
       surface through the same aggregate the nightly gate already
       checks, so an always-failing projection no longer hides in the
-      worker log.
+      engine log.
     """
     total = 0
     by_tempdoc: Counter[str] = Counter()

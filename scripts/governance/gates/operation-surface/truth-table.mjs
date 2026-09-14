@@ -26,9 +26,9 @@ export function verdictForUndeclaredSurfaces({ undeclared }) {
       ruleId: 'operation-surface/undeclared-surface',
       status: 'fail',
       reason:
-        `These files reference the canonical IndexingJobView lifecycle type but are NOT registered ` +
+        `These files reference a registered operation/action lifecycle type but are NOT registered ` +
         `in governance/operation-surfaces.v1.json: ${undeclared.join(', ')}. Every surface that ` +
-        `reports indexing-job lifecycle state must be a declared projection of the one record — not ` +
+        `reports operation/action lifecycle state must declare its authoritative record — not ` +
         `an independent model (tempdoc 550 Thesis III; the §B.2 / F-2 drift class). Add each to the ` +
         `register (deciding projection vs fork), or stop referencing the canonical type.`,
     };

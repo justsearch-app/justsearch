@@ -31,8 +31,13 @@ workflows: `docs-lint.yml`, `build-installer.yml`, `codeql.yml`, `cla.yml`, `onr
 After touching any `@Tag("stress")` subject or concurrency-sensitive code, run:
 
 ```bash
-./gradlew.bat test -PincludeStress=true --tests "*Stress*"
+./gradlew.bat test -PincludeStress=true
 ```
+
+For a focused run, select only modules containing stress tests and place `--tests`
+after each selected test task. A repository-wide `--tests "*Stress*"` fails in
+modules with no matching class; keep Gradle's no-match validation enabled.
+
 
 ## Where did the CI time go? (wall-clock attribution)
 

@@ -66,6 +66,9 @@ import org.slf4j.LoggerFactory;
 @DisplayName("Golden Corpus Integration Tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class GoldenCorpusIntegrationTest {
+  private static final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
+  private static final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+
   private static final Logger log = LoggerFactory.getLogger(GoldenCorpusIntegrationTest.class);
 
   // Vector dimension is loaded from the SSOT catalog, not hardcoded
@@ -149,7 +152,7 @@ class GoldenCorpusIntegrationTest {
     }
 
     // Create and start runtime with explicit injection
-    runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(catalog).ephemeral().open();
+    runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(luceneExecutors).open();
     log.info("Lucene runtime started");
 
     // Index all corpus documents
@@ -200,34 +203,39 @@ class GoldenCorpusIntegrationTest {
 
   @AfterAll
   static void cleanup() throws Exception {
-    log.info("Cleaning up...");
+    try {
+      log.info("Cleaning up...");
 
-    if (runtime != null) {
-      runtime.close();
-    }
-
-    // Restore previous config
-    if (previousConfig == null) {
-      System.clearProperty("justsearch.config");
-    } else {
-      System.setProperty("justsearch.config", previousConfig);
-    }
-
-    // Clean up temp directory
-    if (tempDir != null && Files.exists(tempDir)) {
-      try (var walk = Files.walk(tempDir)) {
-        walk.sorted(java.util.Comparator.reverseOrder())
-            .forEach(p -> {
-              try {
-                Files.deleteIfExists(p);
-              } catch (IOException e) {
-                log.warn("Failed to delete: {}", p);
-              }
-            });
+      if (runtime != null) {
+        runtime.close();
       }
-    }
 
-    log.info("Cleanup complete");
+      // Restore previous config
+      if (previousConfig == null) {
+        System.clearProperty("justsearch.config");
+      } else {
+        System.setProperty("justsearch.config", previousConfig);
+      }
+
+      // Clean up temp directory
+      if (tempDir != null && Files.exists(tempDir)) {
+        try (var walk = Files.walk(tempDir)) {
+          walk.sorted(java.util.Comparator.reverseOrder())
+              .forEach(p -> {
+                try {
+                  Files.deleteIfExists(p);
+                } catch (IOException e) {
+                  log.warn("Failed to delete: {}", p);
+                }
+              });
+        }
+      }
+
+      log.info("Cleanup complete");
+
+    } finally {
+      try { luceneExecutors.close(); } finally { executors.close(); }
+    }
   }
 
   @Test
@@ -338,7 +346,7 @@ class GoldenCorpusIntegrationTest {
     double vectorRecall = RelevanceMetrics.recallAtK(vectorDocs, relevant, 3);
 
     // HYBRID mode
-    var hybridResult = runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, 10, null);
+    var hybridResult = runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, 10, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
     List<String> hybridDocs = hybridResult.hits().stream()
         .map(LuceneRuntimeTypes.SearchHit::docId)
         .toList();
@@ -559,7 +567,7 @@ class GoldenCorpusIntegrationTest {
         }
         case "HYBRID" -> {
           float[] vector = getEmbedding(query.text());
-          result = runtime.hybridSearchOps().searchHybridFiltered(query.text(), vector, 10, null);
+          result = runtime.hybridSearchOps().searchHybridFiltered(query.text(), vector, 10, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
         }
         default -> {
           log.warn("Unknown query mode: {}", query.mode());

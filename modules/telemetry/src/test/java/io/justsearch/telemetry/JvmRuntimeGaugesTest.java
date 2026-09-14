@@ -29,7 +29,7 @@ class JvmRuntimeGaugesTest {
     Map<String, Double> capturedValues = new LinkedHashMap<>();
 
     try (var telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             1000,
             PREFIX,
@@ -134,7 +134,7 @@ class JvmRuntimeGaugesTest {
         IllegalArgumentException.class,
         () -> {
           Path tmp = Files.createTempDirectory("jvm-gauges-empty-prefix");
-          try (var telemetry = new LocalTelemetry(tmp, 200, "test", "0")) {
+          try (var telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 200, "test", "0")) {
             JvmRuntimeGauges.register(telemetry, "");
           }
         });
@@ -146,7 +146,7 @@ class JvmRuntimeGaugesTest {
         IllegalArgumentException.class,
         () -> {
           Path tmp = Files.createTempDirectory("jvm-gauges-null-prefix");
-          try (var telemetry = new LocalTelemetry(tmp, 200, "test", "0")) {
+          try (var telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 200, "test", "0")) {
             JvmRuntimeGauges.register(telemetry, null);
           }
         });
@@ -165,7 +165,7 @@ class JvmRuntimeGaugesTest {
     snapshot.put("test_class", getClass().getName());
 
     try (var telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             1000,
             "snapshot",

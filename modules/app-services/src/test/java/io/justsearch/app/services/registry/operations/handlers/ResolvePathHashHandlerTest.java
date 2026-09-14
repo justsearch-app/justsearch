@@ -35,17 +35,17 @@ final class ResolvePathHashHandlerTest {
     }
 
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return roots.stream().map(WatchedRoot::path).toList();
     }
 
     @Override
-    public List<WatchedRoot> getWatchedRoots() {
+    public List<WatchedRoot> getWatchedRoots(io.justsearch.core.context.EngineContext engineContext) {
       return roots;
     }
 
     @Override
-    public Map<String, Object> resolvePathHash(String pathHash) {
+    public Map<String, Object> resolvePathHash(String pathHash, io.justsearch.core.context.EngineContext engineContext) {
       if (workerKnowsHash) {
         Map<String, Object> r = new HashMap<>();
         r.put("found", true);
@@ -58,15 +58,15 @@ final class ResolvePathHashHandlerTest {
     }
 
     @Override
-    public void addWatchedPath(Path path) {}
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       return 0;
     }
 
     @Override
-    public void flush() {}
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {}
   }
 
   private static String sha256Hex(String value) throws Exception {
@@ -81,7 +81,7 @@ final class ResolvePathHashHandlerTest {
     var handler =
         new ResolvePathHashHandler(
             () -> new FakeIndexingService(List.of(), /* workerKnowsHash */ true));
-    OperationResult r = handler.execute("{\"pathHash\":\"deadbeef\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"deadbeef\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success());
     assertTrue(r.message().equals("Path resolved"));
     assertEquals("/worker/path/file.txt", r.structuredData().get("path"));
@@ -98,7 +98,7 @@ final class ResolvePathHashHandlerTest {
                 new FakeIndexingService(
                     List.of(new IndexingService.WatchedRoot(null, root)),
                     /* workerKnowsHash */ false));
-    OperationResult r = handler.execute("{\"pathHash\":\"" + hash + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + hash + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success(), "Expected success, got: " + r.message());
     assertTrue(
         r.message().contains("head-side"),
@@ -118,7 +118,7 @@ final class ResolvePathHashHandlerTest {
                 new FakeIndexingService(
                     List.of(new IndexingService.WatchedRoot(null, root)),
                     /* workerKnowsHash */ false));
-    OperationResult r = handler.execute("{\"pathHash\":\"" + unknownHash + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + unknownHash + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success(), "non-fatal not-found is still a success result");
     assertEquals(false, r.structuredData().get("found"));
   }
@@ -128,7 +128,7 @@ final class ResolvePathHashHandlerTest {
   void missingArgFails() {
     var handler =
         new ResolvePathHashHandler(() -> new FakeIndexingService(List.of(), false));
-    OperationResult r = handler.execute("{}");
+    OperationResult r = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(r.message().toLowerCase().contains("pathhash"));
   }

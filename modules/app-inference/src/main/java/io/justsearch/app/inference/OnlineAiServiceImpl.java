@@ -41,14 +41,17 @@ public final class OnlineAiServiceImpl
   private static final Logger LOG = LoggerFactory.getLogger(OnlineAiServiceImpl.class);
 
   private final InferenceLifecycleManager manager;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
 
   /**
    * Creates a new OnlineAiServiceImpl.
    *
    * @param manager the inference lifecycle manager to delegate to
    */
-  public OnlineAiServiceImpl(InferenceLifecycleManager manager) {
-    this.manager = manager;
+  public OnlineAiServiceImpl(
+      io.justsearch.app.api.EngineAdmissionService admission, InferenceLifecycleManager manager) {
+    this.admission = Objects.requireNonNull(admission, "admission");
+    this.manager = Objects.requireNonNull(manager, "manager");
     LOG.info("OnlineAiServiceImpl created");
   }
 
@@ -115,6 +118,45 @@ public final class OnlineAiServiceImpl
       throw new IllegalStateException("Inference runtime not configured");
     }
 
+    InferenceConfig next =
+        profileConfig(
+            profile,
+            current,
+            current.serverExecutable(),
+            current.contextSize(),
+            current.gpuLayers());
+    applyProfileConfig(profile, next, restartPolicy);
+  }
+
+  @Override
+  public void applyChatProfileWithRuntime(
+      ChatModelProfile profile,
+      String serverExecutable,
+      Integer contextLength,
+      Integer gpuLayers,
+      RestartPolicy restartPolicy) {
+    Objects.requireNonNull(profile, "profile is required");
+    if (serverExecutable == null || serverExecutable.isBlank()) {
+      throw new IllegalArgumentException("serverExecutable is required");
+    }
+    InferenceConfig current = manager.currentConfig();
+    if (current == null) {
+      throw new IllegalStateException("Inference runtime not configured");
+    }
+
+    Path serverExe = Path.of(serverExecutable.trim());
+    int context = contextLength != null && contextLength > 0 ? contextLength : current.contextSize();
+    int layers = gpuLayers != null && gpuLayers >= 0 ? gpuLayers : current.gpuLayers();
+    InferenceConfig next = profileConfig(profile, current, serverExe, context, layers);
+    applyProfileConfig(profile, next, restartPolicy);
+  }
+
+  private static InferenceConfig profileConfig(
+      ChatModelProfile profile,
+      InferenceConfig current,
+      Path serverExecutable,
+      int contextLength,
+      int gpuLayers) {
     Path modelsDir = resolveModelsDir(current);
     Path modelPath = modelsDir.resolve(profile.modelFile());
     if (!Files.isRegularFile(modelPath)) {
@@ -138,23 +180,22 @@ public final class OnlineAiServiceImpl
       mmprojPath = null;
     }
 
-    InferenceConfig next =
-        new InferenceConfig(
-            current.serverExecutable(),
-            modelPath,
-            mmprojPath,
-            current.serverPort(),
-            current.contextSize(),
-            current.gpuLayers(),
-            current.vduMode(),
-            profile.id());
-
-    LOG.info(
-        "Applying chat profile '{}': model={} mmproj={} (modelsDir={})",
-        profile.id(),
+    return new InferenceConfig(
+        serverExecutable,
         modelPath,
         mmprojPath,
-        modelsDir);
+        current.serverPort(),
+        contextLength,
+        gpuLayers,
+        current.vduMode(),
+        profile.id());
+  }
+
+  private void applyProfileConfig(
+      ChatModelProfile profile, InferenceConfig next, RestartPolicy restartPolicy) {
+    LOG.info(
+        "Applying chat profile '{}': model={} mmproj={}",
+        profile.id(), next.modelPath(), next.mmprojPath());
 
     try {
       manager.applyConfig(
@@ -275,14 +316,28 @@ public final class OnlineAiServiceImpl
   @Override
   public CompletableFuture<OnlineAiService.VisionCompletionResult> visionCompletionDetailed(
       String prompt, byte[] imageBytes, int maxTokens) {
-    return manager.visionCompletionDetailed(prompt, imageBytes, maxTokens);
+    return missingContext("visionCompletionDetailed");
   }
 
   /** Tempdoc 677 Stage 2: sampling/seed-override overload — see {@link InferenceLifecycleManager}. */
   @Override
   public CompletableFuture<OnlineAiService.VisionCompletionResult> visionCompletionDetailed(
       String prompt, byte[] imageBytes, int maxTokens, SamplingParams sampling, Long seed) {
-    return manager.visionCompletionDetailed(prompt, imageBytes, maxTokens, sampling, seed);
+    return missingContext("visionCompletionDetailed");
+  }
+
+  @Override
+  public CompletableFuture<OnlineAiService.VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.core.context.EngineContext engineContext) {
+    int resolved = maxTokens <= 0 ? DEFAULT_QA_TOKENS : maxTokens;
+    try (var work = admission.attach(engineContext)) {
+      return manager.visionCompletionDetailed(prompt, imageBytes, resolved, sampling, seed, work);
+    }
   }
 
   @Override
@@ -338,7 +393,8 @@ public final class OnlineAiServiceImpl
     Path mmprojPath = base.mmprojPath();
     String chatProfileId = base.chatProfileId();
 
-    // Allow out-of-band override for BYO llama-server path (set via UI settings -> sysprop).
+    // The resolved snapshot owns server selection across settings, environment, JVM and derived
+    // sources. Runtime applies consume that published authority rather than a raw property.
     ConfigStore cs = ConfigStore.globalOrNull();
     String serverOverride = cs != null && cs.get().ai().serverExe() != null
         ? cs.get().ai().serverExe().toString() : null;
@@ -367,14 +423,8 @@ public final class OnlineAiServiceImpl
     }
 
     int ctx = contextLength != null && contextLength > 0 ? contextLength : base.contextSize();
-    // Tempdoc 374 alpha.13 fix A2: 0 from UiSettings means "unset" — defer to
-    // base.gpuLayers() which already reflects the resolved config (env vars,
-    // sysprops, auto-detection at ordinal 150). The previous `>= 0` check
-    // treated UiSettings.gpuLayers default 0 as an explicit override, so every
-    // Install AI completion silently clobbered a correctly-resolved 99 with 0
-    // — defeating both the auto-detect path and the JUSTSEARCH_LLM_GPU_LAYERS
-    // env-var workaround. Explicit user overrides (>0) still take precedence.
-    int layers = gpuLayers != null && gpuLayers > 0 ? gpuLayers : base.gpuLayers();
+    // Nullable settings preserve automatic choice; zero is an explicit CPU target.
+    int layers = gpuLayers != null && gpuLayers >= 0 ? gpuLayers : base.gpuLayers();
 
     return new InferenceConfig(
         serverExe,
@@ -411,6 +461,11 @@ public final class OnlineAiServiceImpl
 
   @Override
   public void stream(StreamRequest request, StreamSink sink) {
+    if (request.work() == null) {
+      sink.onError().accept(
+          new IllegalArgumentException("OnlineAiService stream requires an Engine work owner"));
+      return;
+    }
     int resolved = request.maxTokens() <= 0 ? DEFAULT_QA_TOKENS : request.maxTokens();
     LOG.debug(
         "stream(maxTokens={}, tools={}, sentinel={}) called, messages={}",
@@ -423,12 +478,14 @@ public final class OnlineAiServiceImpl
         node -> {
           try {
             sink.onToolCallDelta().accept(node.toString());
+          } catch (java.util.concurrent.CancellationException cancelled) {
+            throw cancelled;
           } catch (Exception e) {
             LOG.debug("Tool call delta callback error", e);
           }
         },
         sink.onUsage(), sink.onComplete(), sink.onError(),
-        request.sampling(), request.requireSentinel());
+        request.sampling(), request.requireSentinel(), request.work());
   }
 
   // ==================== Non-Streaming Methods ====================
@@ -436,36 +493,64 @@ public final class OnlineAiServiceImpl
   @Override
   public CompletableFuture<String> chatCompletion(
       List<Map<String, Object>> messages, int maxTokens, SamplingParams sampling) {
+    return missingContext("chatCompletion");
+  }
+
+  @Override
+  public CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.core.context.EngineContext engineContext) {
     int resolved = maxTokens <= 0 ? DEFAULT_QA_TOKENS : maxTokens;
     LOG.debug(
         "chatCompletion(maxTokens={}, sampling={}) called, messages={}",
         resolved,
         sampling,
         messages != null ? messages.size() : 0);
-    return manager.chatCompletion(messages, resolved, sampling);
+    try (var work = admission.attach(engineContext)) {
+      return manager.chatCompletion(messages, resolved, sampling, work);
+    }
   }
 
   @Override
   public CompletableFuture<String> summarize(String content) {
-    LOG.debug("summarize called, content length: {}", content != null ? content.length() : 0);
-    return manager.summarize(content, DEFAULT_SUMMARY_TOKENS);
+    return missingContext("summarize");
   }
 
   @Override
   public CompletableFuture<String> summarize(String content, int maxTokens) {
+    return missingContext("summarize");
+  }
+
+  @Override
+  public CompletableFuture<String> summarize(
+      String content, int maxTokens, io.justsearch.core.context.EngineContext engineContext) {
     int resolved = maxTokens <= 0 ? DEFAULT_SUMMARY_TOKENS : maxTokens;
     LOG.debug(
         "summarize(maxTokens={}) called, content length: {}",
         resolved,
         content != null ? content.length() : 0);
-    return manager.summarize(content, resolved);
+    try (var work = admission.attach(engineContext)) {
+      return manager.summarize(content, resolved, work);
+    }
   }
 
   @Override
   public CompletableFuture<String> askQuestion(String question, String context) {
+    return missingContext("askQuestion");
+  }
+
+  @Override
+  public CompletableFuture<String> askQuestion(
+      String question,
+      String context,
+      io.justsearch.core.context.EngineContext engineContext) {
     LOG.debug("askQuestion called, question: {}, context length: {}",
         question, context != null ? context.length() : 0);
-    return manager.askQuestion(context, question, DEFAULT_QA_TOKENS);
+    try (var work = admission.attach(engineContext)) {
+      return manager.askQuestion(context, question, DEFAULT_QA_TOKENS, work);
+    }
   }
 
   // ==================== Status Methods ====================
@@ -492,18 +577,41 @@ public final class OnlineAiServiceImpl
 
   @Override
   public java.util.Optional<Integer> countTokens(String text) {
-    return manager.countTokens(text);
+    throw new IllegalStateException("OnlineAiService countTokens requires EngineContext");
+  }
+
+  @Override
+  public java.util.Optional<Integer> countTokens(
+      String text, io.justsearch.core.context.EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      return manager.countTokens(text, work);
+    }
   }
 
   @Override
   public java.util.Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
-    return manager.countPromptTokens(messages);
+    throw new IllegalStateException("OnlineAiService countPromptTokens requires EngineContext");
   }
 
   @Override
   public java.util.Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return manager.countPromptTokens(messages, tools);
+    throw new IllegalStateException("OnlineAiService countPromptTokens requires EngineContext");
+  }
+
+  @Override
+  public java.util.Optional<Integer> countPromptTokens(
+      List<Map<String, Object>> messages,
+      List<Map<String, Object>> tools,
+      io.justsearch.core.context.EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      return manager.countPromptTokens(messages, tools, work);
+    }
+  }
+
+  private static <T> CompletableFuture<T> missingContext(String operation) {
+    return CompletableFuture.failedFuture(
+        new IllegalStateException("OnlineAiService " + operation + " requires EngineContext"));
   }
 
   // ==================== Mode Control Methods ====================

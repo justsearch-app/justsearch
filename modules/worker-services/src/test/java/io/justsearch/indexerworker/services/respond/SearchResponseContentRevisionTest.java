@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
  * for whole-document hits but not chunk hits would silently make every chunk-sourced label
  * un-ageable.
  */
-final class SearchResponseContentRevisionTest {
+final class SearchResponseContentRevisionTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final FieldCatalogDef CATALOG = FieldCatalogDef.forChunkTesting(0);
   private static final String PARENT_CONTENT = "the parent revision this label is attached to";
@@ -37,7 +37,7 @@ final class SearchResponseContentRevisionTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().open();
+    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

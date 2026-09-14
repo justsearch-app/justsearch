@@ -32,11 +32,13 @@ public enum LifecycleState {
   /** Terminal — the loop completed and produced a final response. */
   DONE,
   /** Terminal — the loop failed. */
-  ERROR;
+  ERROR,
+  /** Terminal — the run was cancelled by the user, an Engine shutdown, or its work deadline. */
+  CANCELLED;
 
   /** Whether this is a terminal state (the loop has stopped). */
   public boolean isTerminal() {
-    return this == DONE || this == ERROR;
+    return this == DONE || this == ERROR || this == CANCELLED;
   }
 
   /** Parse the persisted string form, defaulting to {@link #READY_FOR_LLM} for unknown values. */

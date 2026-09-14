@@ -76,3 +76,36 @@ class TestSurfaceCatalogFixtureConformsToWireSchema:
             "core.settings-surface must host core.security-surface, or the member->host redirect "
             "the `security` ui-shot step relies on cannot resolve"
         )
+
+
+class TestInstallPreviewScenario:
+    def test_uninstalled_status_satisfies_the_real_wire_schema(self):
+        schema = json.loads((_repo_root() / "SSOT/schemas/ai-install-status.v1.json").read_text(encoding="utf-8"))
+        body = json.loads(ui_fixtures.fixture_body("http://x/api/ai/install/status", "install-preview"))
+        jsonschema.Draft202012Validator(schema).validate(body)
+        assert body["state"] == "idle" and body["installedFully"] is False
+        status = json.loads(ui_fixtures.fixture_body("http://x/api/status", "install-preview"))
+        assert status["inference"]["engineState"] == "Down"
+        assert status["inference"]["identity"] is None
+        assert status["inference"]["chatEnabledSpec"] is False
+        assert status["aiReady"] is False
+        ordinary = json.loads(ui_fixtures.fixture_body("http://x/api/status"))
+        assert ordinary["inference"]["engineState"] == "Healthy"
+
+    def test_component_rows_and_consent_terms_share_the_registry_source(self):
+        manifest = json.loads(ui_fixtures.fixture_body("http://x/api/ai/install/manifest", "install-preview"))
+        preview = json.loads(ui_fixtures.fixture_body("http://x/api/ai/install/plan-preview", "install-preview"))
+        packages = {p["id"]: p for p in manifest["packages"]}
+        assert set(packages) == {"embedding", "reranker"}
+        assert {c["necessity"] for c in preview["components"]} == {"required", "improves-results"}
+        for component in preview["components"]:
+            package = packages[component["id"]]
+            assert component["label"] == package["label"]
+            assert package["license"] and package["termsUrl"]
+            assert component["state"] == "to-download"
+            assert component["downloadBytes"] == component["totalBytes"] > 0
+        assert preview["totalDownloadBytes"] == sum(c["downloadBytes"] for c in preview["components"])
+        assert {tier["tier"]: tier["label"] for tier in preview["tiers"]} == {
+            "retrieval-core": "Core retrieval", "retrieval-enrichment": "Retrieval enrichment",
+        }
+        assert json.loads(ui_fixtures.fixture_body("http://x/api/ai/install/plan-preview")) == {}

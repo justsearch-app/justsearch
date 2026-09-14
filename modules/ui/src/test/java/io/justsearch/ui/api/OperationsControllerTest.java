@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -19,6 +20,7 @@ import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,7 @@ final class OperationsControllerTest {
 
   private Context mockContext(String idPathParam, String body) {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/operations/" + idPathParam + "/invoke");
     when(ctx.pathParam("id")).thenReturn(idPathParam);
     when(ctx.body()).thenReturn(body);
     when(ctx.contentType(any(String.class))).thenReturn(ctx);
@@ -62,10 +65,238 @@ final class OperationsControllerTest {
     return MAPPER.readTree(body.getValue());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void preparedPreviewReplacesRawContentInGateAndPendingPeek(boolean undo) throws Exception {
+    var pending = new io.justsearch.app.services.intent.PendingAuthorizationStore();
+    var catalog = new CoreOperationCatalog();
+    controller = new OperationsController(List.of(catalog), dispatcher, java.time.Clock.systemUTC(), pending);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.randomUUID();
+    String target = "Write F:/notes/" + "long-target-".repeat(30) + ".md in designated root F:/notes";
+    var preview = new io.justsearch.agent.api.registry.OperationApprovalPreview(target);
+    var gate = new io.justsearch.agent.api.registry.ConfirmationRequiredException(
+        new io.justsearch.agent.api.registry.OperationRef("core.ping-backend"),
+        io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM,
+        io.justsearch.agent.api.registry.ConfirmStrategy.None.INSTANCE,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED, key, nonce, preview);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any())).thenThrow(gate);
+    when(dispatcher.undo(any(), any(), any(), any(), any())).thenThrow(gate);
+    var ctx = mockContext("core.ping-backend", undo ? "{\"executionId\":\"private-body\"}"
+        : "{\"args\":{\"content\":\"private-body\"}}");
+    if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+    var response = capture(ctx);
+    assertEquals(target, response.path("argsSummary").asText());
+    org.junit.jupiter.api.Assertions.assertFalse(response.toString().contains("private-body"));
+    String id = response.path("pendingId").asText();
+    var approval = new AuthorizationController(new io.justsearch.app.services.intent.ConsentCapsuleService(), pending);
+    var peek = mockContext(id, ""); approval.handlePeekPending(peek);
+    var detail = capture(peek);
+    assertEquals(target, detail.path("argsSummary").asText());
+    org.junit.jupiter.api.Assertions.assertFalse(detail.toString().contains("private-body"));
+    assertEquals(preview, pending.peek(id).orElseThrow().approvalPreview());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void preparedRetryForwardsExactReferenceOutsidePublicInput(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.randomUUID();
+    var result = OperationResult.success("exact preparation");
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(key))).thenReturn(OperationResult.success("nonce dropped"));
+    when(dispatcher.undo(any(), any(), any(), any(), any(), eq(key))).thenReturn(OperationResult.success("nonce dropped"));
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(key), eq(nonce))).thenReturn(result);
+    when(dispatcher.undo(any(), any(), any(), any(), any(), eq(key), eq(nonce))).thenReturn(result);
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context ctx = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key
+        + "\",\"preparationNonce\":\"" + nonce + "\",\"confirmationToken\":\"capsule\"}");
+    if (undo) {
+      controller.handleUndo(ctx);
+      verify(dispatcher).undo(any(), eq("exec-1"), any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce));
+    } else {
+      controller.handleInvoke(ctx);
+      verify(dispatcher).dispatch(any(), eq("{}"), any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce));
+    }
+    verify(ctx).status(200); assertEquals("exact preparation", capture(ctx).path("message").asText());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void malformedOrUnkeyedPreparationReferenceRefusesBeforeDispatch(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    for (String reference : List.of("\"preparationNonce\":\"" + java.util.UUID.randomUUID() + "\"",
+        "\"idempotencyKey\":\"" + key + "\",\"preparationNonce\":\"invalid\"",
+        "\"idempotencyKey\":\"" + key + "\",\"preparationNonce\":7")) {
+      String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+      var ctx = mockContext("core.ping-backend", "{" + input + "," + reference + "}");
+      if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+      verify(ctx).status(400); assertEquals("BAD_REQUEST", capture(ctx).path("errorClass").asText());
+    }
+    org.mockito.Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void lockedPreparationHasTypedUnlockResponse(boolean undo) throws Exception {
+    var locked = new io.justsearch.agent.api.encryption.KeyLockedException();
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenThrow(locked);
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenThrow(locked);
+    var ctx = mockContext("core.ping-backend", undo ? "{\"executionId\":\"exec-1\"}" : "{}");
+    if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+    verify(ctx).status(423);
+    var response = capture(ctx); assertEquals("STORE_LOCKED", response.path("errorCode").asText());
+    assertEquals("STORE_LOCKED", response.path("errorClass").asText());
+    org.junit.jupiter.api.Assertions.assertFalse(response.path("retryable").asBoolean(true));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void invocationAndUndoForwardTheSuppliedKey(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var result = OperationResult.success("recorded", Map.of("operationKey", key, "operationRecordId", 7));
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
+        .thenReturn(OperationResult.success("key was dropped"));
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
+        .thenReturn(OperationResult.success("key was dropped"));
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenReturn(result);
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenReturn(result);
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context ctx = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key + "\"}");
+    if (undo) {
+      controller.handleUndo(ctx);
+      verify(dispatcher).undo(any(), eq("exec-1"), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key));
+    } else {
+      controller.handleInvoke(ctx);
+      verify(dispatcher).dispatch(any(), eq("{}"), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key));
+    }
+    verify(ctx).status(200);
+    assertEquals(key, capture(ctx).path("structuredData").path("operationKey").asText());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "INVALID_OPERATION_KEY,400,BAD_REQUEST,OPERATION_KEY_INVALID,false",
+      "OPERATION_KEY_REUSED,409,CONFLICT,OPERATION_KEY_REUSED,false",
+      "OPERATION_PREPARATION_UNAVAILABLE,409,CONFLICT,OPERATION_PREPARATION_UNAVAILABLE,false",
+      "OPERATION_EXPIRED,409,CONFLICT,OPERATION_KEY_EXPIRED,false",
+      "OPERATIONS_CAPACITY,503,UNAVAILABLE,OPERATIONS_CAPACITY,true",
+      "STORAGE_FAILED,500,HANDLER_ERROR,OPERATION_STORAGE_FAILED,false"
+  })
+  void keyFailuresKeepTheirPublicCodeAndDoNotExposeNativeCauses(
+      io.justsearch.app.api.operations.OperationStoreException.Code code,
+      int status, String errorClass, String publicCode, boolean retryable) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var failure = new io.justsearch.app.api.operations.OperationStoreException(code,
+        new IllegalStateException("private SQL and invocation contents"));
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenThrow(failure);
+    when(dispatcher.undo(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class), eq(key)))
+        .thenThrow(failure);
+    for (boolean undo : new boolean[] {false, true}) {
+      String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+      Context ctx = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key + "\"}");
+      if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+      verify(ctx).status(status);
+      var response = capture(ctx);
+      assertEquals(errorClass, response.path("errorClass").asText());
+      assertEquals(publicCode, response.path("errorCode").asText());
+      assertEquals(retryable, response.path("retryable").asBoolean());
+      org.junit.jupiter.api.Assertions.assertFalse(response.toString().contains("private SQL"));
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void approvalRetainsTheOriginalKeyAndInvokeOrUndoMode(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var catalog = new CoreOperationCatalog();
+    var pending = new io.justsearch.app.services.intent.PendingAuthorizationStore();
+    controller = new OperationsController(List.of(catalog), dispatcher, java.time.Clock.systemUTC(), pending);
+    var refusal = new io.justsearch.agent.api.registry.ConfirmationRequiredException(
+        new io.justsearch.agent.api.registry.OperationRef("core.ping-backend"),
+        io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM,
+        io.justsearch.agent.api.registry.ConfirmStrategy.None.INSTANCE,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED);
+    var success = OperationResult.success("approved once", Map.of("operationKey", key, "operationRecordId", 7));
+    if (undo) {
+      when(dispatcher.undo(any(), eq("exec-1"), any(), any(), any(EngineContext.class), eq(key)))
+          .thenThrow(refusal).thenReturn(success);
+    } else {
+      when(dispatcher.dispatch(any(), eq("{}"), any(), any(), any(EngineContext.class), eq(key)))
+          .thenThrow(refusal).thenReturn(success);
+    }
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context original = mockContext("core.ping-backend", "{" + input + ",\"idempotencyKey\":\"" + key + "\"}");
+    if (undo) controller.handleUndo(original); else controller.handleInvoke(original);
+    String pendingId = capture(original).path("pendingId").asText();
+    var recorded = pending.peek(pendingId).orElseThrow();
+    assertEquals(key, recorded.operationKey());
+    assertEquals(undo, recorded.undo());
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
+    var approval = new AuthorizationController(new io.justsearch.app.services.intent.ConsentCapsuleService(),
+        pending, null, dispatcher, List.of(catalog), admission);
+    Context approve = mockContext("unused", "{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    when(approve.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+    approval.handleApprove(approve);
+    var approved = capture(approve);
+    assertTrue(approved.path("executeSuccess").asBoolean());
+    assertEquals(key, approved.path("operationKey").asText());
+    assertEquals(7, approved.path("operationRecordId").asLong());
+    if (undo) {
+      verify(dispatcher, org.mockito.Mockito.times(2)).undo(any(), eq("exec-1"), any(), any(), any(EngineContext.class), eq(key));
+      verify(dispatcher, org.mockito.Mockito.never()).dispatch(any(), any(), any(), any(), any(EngineContext.class), any());
+    } else {
+      verify(dispatcher, org.mockito.Mockito.times(2)).dispatch(any(), eq("{}"), any(), any(), any(EngineContext.class), eq(key));
+    }
+    assertTrue(pending.peek(pendingId).isEmpty());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void preparedApprovalCarriesServerMintedReferenceThroughInvokeAndUndo(boolean undo) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.randomUUID();
+    var catalog = new CoreOperationCatalog();
+    var pending = new io.justsearch.app.services.intent.PendingAuthorizationStore();
+    controller = new OperationsController(List.of(catalog), dispatcher, java.time.Clock.systemUTC(), pending);
+    var refusal = new io.justsearch.agent.api.registry.ConfirmationRequiredException(
+        new io.justsearch.agent.api.registry.OperationRef("core.ping-backend"),
+        io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM,
+        io.justsearch.agent.api.registry.ConfirmStrategy.None.INSTANCE,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED, key, nonce);
+    var success = OperationResult.success("approved frozen target", Map.of("operationKey", key, "operationRecordId", 7));
+    when(dispatcher.undo(any(), any(), any(), any(), any(EngineContext.class))).thenThrow(refusal);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(EngineContext.class))).thenThrow(refusal);
+    when(dispatcher.undo(any(), any(), any(), any(), any(EngineContext.class), eq(key), eq(nonce))).thenReturn(success);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(EngineContext.class), eq(key), eq(nonce))).thenReturn(success);
+    String input = undo ? "\"executionId\":\"exec-1\"" : "\"args\":{}";
+    Context original = mockContext("core.ping-backend", "{" + input + "}");
+    if (undo) controller.handleUndo(original); else controller.handleInvoke(original);
+    var gated = capture(original);
+    assertEquals(key, gated.path("operationKey").asText());
+    assertEquals(nonce.toString(), gated.path("preparationNonce").asText());
+    String pendingId = gated.path("pendingId").asText();
+    assertEquals(nonce, pending.peek(pendingId).orElseThrow().preparationNonce());
+    var approval = new AuthorizationController(new io.justsearch.app.services.intent.ConsentCapsuleService(),
+        pending, null, dispatcher, List.of(catalog), new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1));
+    Context approve = mockContext("unused", "{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    when(approve.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+    approval.handleApprove(approve);
+    var approved = capture(approve);
+    assertTrue(approved.path("executeSuccess").asBoolean());
+    assertEquals(nonce.toString(), approved.path("preparationNonce").asText());
+    if (undo) verify(dispatcher).undo(any(), eq("exec-1"), any(), any(), any(EngineContext.class), eq(key), eq(nonce));
+    else verify(dispatcher).dispatch(any(), eq("{}"), any(), any(), any(EngineContext.class), eq(key), eq(nonce));
+    verify(dispatcher, org.mockito.Mockito.never()).dispatch(any(), any(), any(), any(), any(EngineContext.class), any());
+    verify(dispatcher, org.mockito.Mockito.never()).undo(any(), any(), any(), any(), any(EngineContext.class), any());
+  }
+
   @Test
   @DisplayName("happy path — known operation, dispatcher returns success")
   void happyPath() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{}}");
@@ -102,7 +333,7 @@ final class OperationsControllerTest {
     // caller's transport nor a confirmation token. Stubbing the 2-arg form here would stub a method
     // the controller no longer calls (the mock would return null) — the arity moved with
     // production; this test's subject, wire-name resolution, did not.
-    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any()))
+    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("undone"));
 
     // The "undo the AI" affordance journals the agent TOOL wire-name (dots/dashes ->
@@ -120,7 +351,7 @@ final class OperationsControllerTest {
     // is the exact defect §C.7 closes.
     ArgumentCaptor<InvocationProvenance> prov =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any());
+    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.BUTTON,
         prov.getValue().transport(),
@@ -135,7 +366,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("undo declares the caller's transport, so the lattice judges the right source tier")
   void undoCarriesTheDeclaredTransport() throws Exception {
-    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any()))
+    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("undone"));
     Context ctx = mockContext("core.ping-backend", "{\"executionId\":\"exec-1\"}");
     when(ctx.header("X-JustSearch-Transport")).thenReturn("AGENT_LOOP");
@@ -144,14 +375,14 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> prov =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any());
+    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any(), any(EngineContext.class));
     assertEquals(TransportTag.AGENT_LOOP, prov.getValue().transport());
   }
 
   @Test
   @DisplayName("handler returns failure — 200 with HANDLER_FAILURE errorClass")
   void handlerReturnsFailure() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.failure("worker not running"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{}}");
@@ -167,7 +398,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("handler throws — 500 with HANDLER_ERROR errorClass")
   void handlerThrows() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenThrow(new RuntimeException("boom"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{}}");
@@ -183,7 +414,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("empty body is treated as zero-args invocation")
   void emptyBody() throws Exception {
-    when(dispatcher.dispatch(any(), eq("{}"), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), eq("{}"), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "");
@@ -208,14 +439,14 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("dispatcher receives serialized args JSON")
   void dispatcherReceivesArgsJson() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{\"foo\":\"bar\",\"n\":42}}");
     controller.handleInvoke(ctx);
 
     ArgumentCaptor<String> argsJson = ArgumentCaptor.forClass(String.class);
-    verify(dispatcher).dispatch(any(), argsJson.capture(), any(InvocationProvenance.class), any());
+    verify(dispatcher).dispatch(any(), argsJson.capture(), any(InvocationProvenance.class), any(), any(EngineContext.class));
     JsonNode parsed = MAPPER.readTree(argsJson.getValue());
     assertEquals("bar", parsed.get("foo").asText());
     assertEquals(42, parsed.get("n").asInt());
@@ -227,7 +458,7 @@ final class OperationsControllerTest {
     OperationResult result =
         OperationResult.success(
             "ok", Map.of("port", 9001, "elapsedMs", 123L));
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any())).thenReturn(result);
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenReturn(result);
 
     Context ctx = mockContext("core.ping-backend", "{}");
     controller.handleInvoke(ctx);
@@ -243,7 +474,7 @@ final class OperationsControllerTest {
   @DisplayName("OperationResult with executionId is mapped to wire response")
   void executionIdPassThrough() throws Exception {
     OperationResult result = OperationResult.success("ok", "550e8400-uuid");
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any())).thenReturn(result);
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenReturn(result);
 
     Context ctx = mockContext("core.ping-backend", "{}");
     controller.handleInvoke(ctx);
@@ -259,7 +490,7 @@ final class OperationsControllerTest {
     // TransportTag.BUTTON (FE ActionButton is the dominant caller) and ExecutorTag.UI,
     // and passes it to the dispatcher. Without this stub, the mocked dispatcher
     // returned null for the 3-arg overload and tests NPE'd.
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "{}");
@@ -267,12 +498,15 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     InvocationProvenance captured = provenance.getValue();
     assertEquals(
         TransportTag.BUTTON, captured.transport());
     assertEquals(io.justsearch.agent.api.registry.ExecutorTag.UI, captured.executor());
-    assertTrue(captured.initiator().isEmpty(), "v1 HTTP endpoint has no initiator context");
+    assertEquals(
+        Optional.of("local-webview"),
+        captured.initiator(),
+        "v1 HTTP endpoint carries the resolved client identity as the initiator projection");
     assertNotNull(captured.occurredAt());
   }
 
@@ -298,7 +532,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("X-JustSearch-Transport=URL_BAR stamps URL_BAR provenance")
   void transportHeaderUrlBarStampsUrlBar() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "URL_BAR");
@@ -306,7 +540,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.URL_BAR, provenance.getValue().transport());
   }
@@ -314,7 +548,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("X-JustSearch-Transport=PALETTE stamps PALETTE provenance")
   void transportHeaderPaletteStampsPalette() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "PALETTE");
@@ -322,7 +556,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.PALETTE, provenance.getValue().transport());
   }
@@ -330,7 +564,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("X-JustSearch-Transport=URL_DEEPLINK stamps URL_DEEPLINK provenance")
   void transportHeaderDeeplinkStampsDeeplink() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "URL_DEEPLINK");
@@ -338,7 +572,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.URL_DEEPLINK,
         provenance.getValue().transport());
@@ -347,7 +581,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("transport header is case-insensitive (url_bar → URL_BAR)")
   void transportHeaderIsCaseInsensitive() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "url_bar");
@@ -355,7 +589,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.URL_BAR, provenance.getValue().transport());
   }
@@ -363,7 +597,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("unknown transport header falls back to BUTTON (no privilege escalation)")
   void unknownTransportFallsBackToButton() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "TIME_TRAVELLER");
@@ -371,7 +605,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.BUTTON, provenance.getValue().transport());
   }
@@ -379,7 +613,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("blank transport header falls back to BUTTON (preserves prior behavior)")
   void blankTransportFallsBackToButton() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "   ");
@@ -387,7 +621,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.BUTTON, provenance.getValue().transport());
   }

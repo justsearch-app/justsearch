@@ -1,0 +1,112 @@
+{
+  "revision": "8ad4fe74b + R8 failure boundaries",
+  "command": "gradlew.bat :modules:app-agent:test --tests io.justsearch.agent.BackgroundRunServiceTest :modules:app-services:test --tests io.justsearch.app.services.worker.RootLifecycleOpsIdempotencyTest --tests io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest --tests io.justsearch.app.services.worker.IndexingJobsBridgeResubscribeTest --tests io.justsearch.app.services.HeadAssemblyTest --tests io.justsearch.app.services.OperationsRetentionTimerTest --tests *OrchestrationHandles* :modules:app-launcher:test --tests io.justsearch.applauncher.LauncherEnvironmentCloseTest :modules:indexer-worker:test --tests io.justsearch.indexerworker.queue.IndexingJobsChangeStreamTest --tests io.justsearch.indexerworker.queue.JobQueueTest :modules:app-engine:test --tests io.justsearch.app.engine.BoundedHandoffTest --tests io.justsearch.app.engine.IndexingJobsCoalescingTest --tests io.justsearch.app.engine.EngineIndexingJobsFlowTest :modules:ui:compileIntegrationTestJava :modules:app-agent:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-launcher:pmdMain :modules:app-launcher:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:app-engine:pmdMain :modules:app-engine:pmdTest -PskipWebBuild=true -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 136,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 17
+  },
+  "tasks": [
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 45,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 10
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 57,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "app-engine",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    }
+  ],
+  "environment": "Windows 11, Temurin 25.0.2; lane-F-A; no shared dev stack",
+  "raw": "tmp/c2-review-r8-final821.txt and tmp/c2-review-r8-final821-xml/",
+  "negativeControls": [
+    {
+      "label": "negative819",
+      "tests": 10,
+      "failures": 4,
+      "reason": "failed-walk terminal state, rollback after commit, cap after successful snapshot, skipped post-drain launcher cleanup",
+      "raw": "tmp/c2-review-r8-negative819.txt and matching -xml/"
+    },
+    {
+      "label": "negative820",
+      "tests": 1,
+      "failures": 1,
+      "reason": "retention drain refused but Head claimed dependency teardown",
+      "raw": "tmp/c2-review-r8-negative820.txt and matching -xml/"
+    },
+    {
+      "label": "negative822",
+      "tests": 5,
+      "failures": 4,
+      "reason": "coalescing bypass: burst, ordering/barrier and drain expectations fail; distinct-path overflow still passes",
+      "raw": "tmp/c2-review-r8-negative822.txt and matching -xml/"
+    }
+  ],
+  "restoredSourceVerification": {
+    "revision": "8ad4fe74b + exact restored R8 source",
+    "command": "gradlew.bat :modules:app-engine:test --tests io.justsearch.app.engine.IndexingJobsCoalescingTest :modules:ui:compileIntegrationTestJava :modules:app-engine:pmdMain :modules:app-engine:pmdTest -PskipWebBuild=true -PtestParallelism=1 --max-workers=4 --console=plain",
+    "summary": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    "tasks": [
+      {
+        "module": "app-engine",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      }
+    ]
+  },
+  "limits": "Item-local proof; full batch verification and final independent review remain required. app-agent result in821 is unchanged-input reuse of819."
+}

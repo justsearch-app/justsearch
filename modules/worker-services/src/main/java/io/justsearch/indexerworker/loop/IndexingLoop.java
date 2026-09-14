@@ -159,10 +159,10 @@ public class IndexingLoop implements Closeable {
 
   /**
    * Loop state, exposed for system test observability and the worker-state wire emitter
-   * ({@code GrpcHealthService.workerStateSupplier} via
+   * ({@code WorkerHealthService.workerStateSupplier} via
    * {@code DefaultWorkerAppServices.indexingLoopState()}). Wire-string identity is
    * preserved through {@link Enum#name()} — every consumer that pinned the literal
-   * {@code "IDLE"}/{@code "RUNNING"}/{@code "PAUSED"} (notably {@code ChaosSuiteTest} and
+   * {@code "IDLE"}/{@code "RUNNING"}/{@code "PAUSED"} (notably {@code EngineForegroundPacingTest} and
    * {@code KnowledgeServer}'s queue-depth gauge at L1127) keeps working unchanged.
    *
    * <p>Tempdoc 516 P2: previously a stringly-typed FSM (the {@code STATE_*} String
@@ -227,6 +227,8 @@ public class IndexingLoop implements Closeable {
    * @param signalBus The signal bus for coordination
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -234,7 +236,7 @@ public class IndexingLoop implements Closeable {
       IndexCountOps indexCountOps,
       Supplier<ResolvedConfig> resolvedConfigSupplier,
       WorkerSignalBus signalBus) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(ocrRegistration, timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         null, null, null, null, null,
@@ -254,6 +256,8 @@ public class IndexingLoop implements Closeable {
    * @param embeddingService The embedding service for vector generation (may be null)
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -262,7 +266,7 @@ public class IndexingLoop implements Closeable {
       Supplier<ResolvedConfig> resolvedConfigSupplier,
       WorkerSignalBus signalBus,
       EmbeddingService embeddingService) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(ocrRegistration, timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         embeddingService, null, null, null, null,
@@ -276,6 +280,8 @@ public class IndexingLoop implements Closeable {
    * typed histogram.
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -286,7 +292,7 @@ public class IndexingLoop implements Closeable {
       EmbeddingService embeddingService,
       IndexingPipelineMetricCatalog pipelineCatalog,
       ExtractionMetricCatalog extractionCatalog) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(ocrRegistration, timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         embeddingService, pipelineCatalog, extractionCatalog,
@@ -314,6 +320,8 @@ public class IndexingLoop implements Closeable {
    *     extractor is created)
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -349,7 +357,7 @@ public class IndexingLoop implements Closeable {
     }
     this.contentExtractor = contentExtractor != null
         ? contentExtractor
-        : ExtractionSandboxFactory.inProcessStructured(extractionCatalog);
+        : ExtractionSandboxFactory.inProcessStructured(ocrRegistration, timeboxRegistration, extractionCatalog);
     this.pipelineCatalog = pipelineCatalog;
     this.outcomeWriteFailureCounter =
         ingestionOutcomeCatalog == null
@@ -633,6 +641,11 @@ public class IndexingLoop implements Closeable {
         // Must unload embedding model when Main claims GPU, reload when released
         embeddingLifecycle.handleGpuStateTransition();
 
+        if (!journal.retryBatchReturns()) {
+          if (!sleepBrieflyAfterError()) break;
+          continue;
+        }
+
         // Poll for pending jobs
         List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pacing().pollBatchSize());
 
@@ -645,23 +658,7 @@ public class IndexingLoop implements Closeable {
             batchStats.reset();
           }
 
-          // IMPORTANT: Commit when we transition to idle with uncommitted changes.
-          //
-          // The time-based commit strategy below runs only after processing jobs. If the queue becomes empty
-          // and we go idle, we would otherwise never reach the commit check again, leaving the index
-          // uncommitted (no segments_*), which makes the main process report indexAvailable=false.
-          if (indexedSinceCommit > 0) {
-            try {
-              commitOps.commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
-              metrics.recordCommit();
-              log.debug("Committed index: {} docs, reason=batch idle", indexedSinceCommit);
-              indexedSinceCommit = 0;
-              lastCommitTime = System.currentTimeMillis();
-              journal.drainPending();
-            } catch (RuntimeException e) {
-              log.error("Failed to commit index on idle", e);
-            }
-          }
+          finishIdleCommit();
 
           // Tempdoc 516 Slice 4d (W6): BackfillScheduler owns the per-cycle backfill
           // orchestration (combined enrichment tight loop + per-stage fallback + disambiguation
@@ -780,6 +777,24 @@ public class IndexingLoop implements Closeable {
     log.info("Indexing loop stopped");
   }
 
+  /** Commit buffered effects before outcomes; retry already committed outcomes on every idle cycle. */
+  private void finishIdleCommit() {
+    try {
+      if (indexedSinceCommit > 0) {
+        commitOps.commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+        metrics.recordCommit();
+        log.debug("Committed index: {} docs, reason=batch idle", indexedSinceCommit);
+        indexedSinceCommit = 0;
+        lastCommitTime = System.currentTimeMillis();
+      }
+      // A failed SQL outcome write can outlive its successful index commit. With no new index
+      // work there is nothing to commit, but the exact committed transition still needs retry.
+      journal.drainPending();
+    } catch (RuntimeException e) {
+      log.error("Failed to commit index or record outcomes on idle", e);
+    }
+  }
+
   /**
    * Tempdoc 730 review item 2 (the "no subsequent commit" ratchet hole): a rebuild-completion or
    * fresh-compatible fingerprint stamp that becomes due right as the loop is stopping previously
@@ -813,8 +828,9 @@ public class IndexingLoop implements Closeable {
         metrics.recordCommit();
         log.info("Final commit: {} documents", indexedSinceCommit);
         recordStageMs("post_commit", System.currentTimeMillis() - commitStart, "shutdown");
-        journal.drainPending();
+        indexedSinceCommit = 0;
       }
+      journal.drainPending();
     } catch (RuntimeException e) {
       log.error("Failed final commit", e);
     }
@@ -863,18 +879,27 @@ public class IndexingLoop implements Closeable {
   }
 
   private void processBatch(List<JobQueue.IndexJob> jobs) {
-    Span batchSpan = maybeSpan("indexing.batch");
-    batchSpan.setAttribute("batch.polled", (long) jobs.size());
-    // Tempdoc 400 LR2-d.2: attach commit.* identity attrs best-effort.
+    Span batchSpan = Span.getInvalid();
+    boolean fatal = false;
     try {
-      io.justsearch.indexerworker.services.CommitMetadataSpanAttrs.applyTo(
-          batchSpan, commitMetadataSupplier.get());
-    } catch (RuntimeException e) {
-      log.debug("commit metadata supplier failed (best-effort)", e);
-    }
-    try (Scope ignored = batchSpan.makeCurrent()) {
-      processBatchInner(jobs, batchSpan);
+      batchSpan = maybeSpan("indexing.batch");
+      batchSpan.setAttribute("batch.polled", (long) jobs.size());
+      try {
+        io.justsearch.indexerworker.services.CommitMetadataSpanAttrs.applyTo(
+            batchSpan, commitMetadataSupplier.get());
+      } catch (RuntimeException e) {
+        log.debug("commit metadata supplier failed (best-effort)", e);
+      }
+      try (Scope ignored = batchSpan.makeCurrent()) {
+        processBatchInner(jobs, batchSpan);
+      }
+    } catch (VirtualMachineError failure) {
+      fatal = true;
+      throw failure;
     } finally {
+      // A stopped/failed batch may not visit every polled claim. Written claims retain their
+      // existing commit owner; the remainder return only after synchronous batch execution exits.
+      if (!fatal) journal.returnBatchClaims(jobs);
       batchSpan.end();
     }
   }
@@ -924,8 +949,9 @@ public class IndexingLoop implements Closeable {
         } else {
           embedSpan.setAttribute("embed.success", false);
         }
-      } catch (RuntimeException e) {
-        log.debug("Batch embedding failed, falling back to per-doc: {}", e.getMessage());
+      } catch (RuntimeException | Error e) {
+        if (e instanceof VirtualMachineError fatal) throw fatal;
+        log.warn("Batch embedding failed, falling back to per-doc", e);
         embedSpan.setAttribute("embed.success", false);
         embedSpan.setAttribute("embed.error", e.getMessage());
       } finally {
@@ -1046,8 +1072,8 @@ public class IndexingLoop implements Closeable {
    *
    * <p>Backed by {@link LoopState}; new callers should prefer {@link #loopState()} for
    * type safety. This String accessor is retained for the worker-state wire emission
-   * path ({@code ChaosSuiteTest}, {@code WorkerAppServices.indexingLoopState()},
-   * existing Mockito stubs in the {@code GrpcIngestService*} test family) where the
+   * path ({@code EngineForegroundPacingTest}, {@code WorkerAppServices.indexingLoopState()},
+   * existing Mockito stubs in the {@code WorkerIngestService*} test family) where the
    * String form crosses a process or test-mock boundary.
    *
    * @deprecated since tempdoc 516 Slice 2 — prefer {@link #loopState()} for typed
@@ -1107,6 +1133,13 @@ public class IndexingLoop implements Closeable {
       }
     }
 
+    // Retain all later component resources if OCR still owns a task or child. The enclosing
+    // service/server keeps this extractor reachable and can retry close after actual exit.
+    if (contentExtractor != null) {
+      try { contentExtractor.close(); }
+      catch (RuntimeException failure) { throw new IOException("Content extractor still owns resources", failure); }
+    }
+
     // Close NER service — IndexingLoop is the sole closer (KnowledgeServer does not
     // retain a reference). Other borrowed services (embeddingService, spladeEncoder,
     // disambiguationService) are closed by KnowledgeServer after this method returns.
@@ -1116,15 +1149,6 @@ public class IndexingLoop implements Closeable {
         ner.close();
       } catch (Exception e) {
         log.warn("Error closing NER service: {}", e.getMessage());
-      }
-    }
-
-    // Close the timeboxed content extractor (owned by IndexingLoop)
-    if (contentExtractor != null) {
-      try {
-        contentExtractor.close();
-      } catch (Exception e) {
-        log.warn("Error closing content extractor: {}", e.getMessage());
       }
     }
 

@@ -1,16 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.bootstrap.phases;
 
-import io.grpc.Server;
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.observability.runtime.RuntimeContext;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.app.observability.InfraHealthGrpcService;
 import io.justsearch.infra.health.InfraHealthAggregator;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +36,7 @@ public final class BootstrapHelpers {
   public static void logAiServicesConfiguration(
       OnlineAiService onlineAiService,
       InferenceLifecycleManager inferenceManager,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       AgentService agentService) {
     log.info("=== AI Services Configuration ===");
     log.info("  OnlineAiService: {}", onlineAiService.getClass().getSimpleName());
@@ -68,37 +65,6 @@ public final class BootstrapHelpers {
         Duration.ofMillis(ih.nrtStaleMs()),
         Duration.ofMillis(ih.translatorHandshakeStaleMs()),
         ih.annCacheReadyPercent());
-  }
-
-  /**
-   * Start the infra-health gRPC server. Returns null when disabled by override, or when service
-   * / config are null. Throws {@link IllegalStateException} on bind failure.
-   */
-  public static Server startInfraHealthGrpcServer(
-      InfraHealthGrpcService service, ResolvedConfig.InfraGrpc grpcCfg) {
-    boolean disable =
-        Boolean.parseBoolean(
-            System.getProperty(
-                "justsearch.infra.health.grpc.disable",
-                System.getenv().getOrDefault("JUSTSEARCH_INFRA_HEALTH_GRPC_DISABLE", "false")));
-    if (disable) {
-      log.info("Infra health gRPC server disabled via override");
-      return null;
-    }
-    if (service == null || grpcCfg == null) {
-      return null;
-    }
-    try {
-      Server server =
-          NettyServerBuilder.forAddress(new InetSocketAddress(grpcCfg.host(), grpcCfg.port()))
-              .addService(service)
-              .build()
-              .start();
-      log.info("Infra health gRPC endpoint listening on {}:{}", grpcCfg.host(), server.getPort());
-      return server;
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to start infra health gRPC server", e);
-    }
   }
 
   /**

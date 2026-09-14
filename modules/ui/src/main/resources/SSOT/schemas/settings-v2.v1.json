@@ -31,7 +31,13 @@
         }
       }
     },
+    "operationKey" : {
+      "type" : [ "string", "null" ]
+    },
     "settingsMode" : {
+      "type" : [ "string", "null" ]
+    },
+    "state" : {
       "type" : [ "string", "null" ]
     },
     "ui" : {
@@ -74,6 +80,18 @@
           "type" : [ "boolean", "null" ]
         }
       }
+    },
+    "witness" : {
+      "type" : [ "object", "null" ],
+      "properties" : {
+        "acceptedRevision" : {
+          "type" : "integer"
+        },
+        "lastCommittedOperationKey" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "acceptedRevision", "lastCommittedOperationKey" ]
     }
   }
 }

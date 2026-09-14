@@ -7,7 +7,6 @@ import io.justsearch.app.observability.stream.FrameHistoryRingBuffer;
 import io.justsearch.app.observability.stream.SseStreamChannel;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -30,7 +29,7 @@ abstract class AbstractRunChannel {
   private final java.time.Clock clock;
   private final java.util.concurrent.atomic.AtomicLong updatedAtEpochMs;
   private final AtomicBoolean retired = new AtomicBoolean(false);
-  private final CopyOnWriteArrayList<Runnable> retireListeners = new CopyOnWriteArrayList<>();
+  private final java.util.List<Runnable> retireListeners = new java.util.ArrayList<>();
 
   AbstractRunChannel(
       RunId id, RunDescriptor descriptor, RunChannelPolicy policy, java.time.Clock clock) {
@@ -92,11 +91,23 @@ abstract class AbstractRunChannel {
 
   public final Optional<SseStreamChannel.Subscription> observe(
       Consumer<SseEnvelope> listener, long sinceSeq) {
+    return observe(listener, sinceSeq, subscription -> {});
+  }
+
+  public final Optional<SseStreamChannel.Subscription> observe(
+      Consumer<SseEnvelope> listener, long sinceSeq,
+      Consumer<SseStreamChannel.Subscription> onRegistered) {
+    return observe(listener, sinceSeq, () -> {}, onRegistered);
+  }
+
+  public final Optional<SseStreamChannel.Subscription> observe(
+      Consumer<SseEnvelope> listener, long sinceSeq, Runnable beforeReplay,
+      Consumer<SseStreamChannel.Subscription> onRegistered) {
     Objects.requireNonNull(listener, "listener");
     if (sinceSeq < 0) {
       throw new IllegalArgumentException("sinceSeq must be >= 0, got " + sinceSeq);
     }
-    return channel.subscribeAndReplay(listener, sinceSeq);
+    return channel.subscribeAndReplay(listener, sinceSeq, beforeReplay, onRegistered);
   }
 
   public final boolean retired() {
@@ -105,12 +116,14 @@ abstract class AbstractRunChannel {
 
   public final void onRetire(Runnable listener) {
     Objects.requireNonNull(listener, "listener");
-    if (retired.get()) {
-      // Already terminal: run it now rather than registering it on a list that will never fire.
-      listener.run();
-      return;
+    synchronized (retireListeners) {
+      if (!retired.get()) {
+        retireListeners.add(listener);
+        return;
+      }
     }
-    retireListeners.add(listener);
+    // Registration and terminal snapshot share a lock; callbacks run outside it.
+    listener.run();
   }
 
   /**
@@ -118,18 +131,30 @@ abstract class AbstractRunChannel {
    * terminal transition is the REGISTRY's to own (§2 — retire is two sites today, and a linger that
    * only half-applies is how "retired-but-readable" and "gone" get conflated).
    */
-  final void markRetired() {
-    if (!retired.compareAndSet(false, true)) {
-      return;
+  final java.util.List<Runnable> markRetired() {
+    java.util.List<Runnable> listeners;
+    synchronized (retireListeners) {
+      if (!retired.compareAndSet(false, true)) return java.util.List.of();
+      listeners = java.util.List.copyOf(retireListeners);
+      retireListeners.clear();
     }
-    for (Runnable listener : retireListeners) {
+    return listeners;
+  }
+
+  /** Registry bookkeeping is complete before any external listener can block or reenter it. */
+  static void notifyRetired(java.util.List<Runnable> listeners) {
+    Error fatal = null;
+    for (Runnable listener : listeners) {
       try {
         listener.run();
       } catch (RuntimeException ignored) {
         // A writer failing to close its own socket must not abort the retirement of the run or of
         // the other observers' connections.
+      } catch (Error failure) {
+        if (fatal == null) fatal = failure;
+        else if (fatal != failure) fatal.addSuppressed(failure);
       }
     }
-    retireListeners.clear();
+    if (fatal != null) throw fatal;
   }
 }

@@ -49,20 +49,25 @@ public interface BrainRuntimeService {
    * the target state has been reached (tempdoc 804 §B6).
    *
    * @param mode {@code "online"} or {@code "indexing"} (case-insensitive)
-   * @return the requested mode, the live mode at return time, and whether they already agree
+   * @param context request identity inherited by the accepted operation
+   * @param idempotencyKey optional stable retry key; missing keys are issued by the runner
+   * @return the row receipt and first-execution observation, without resampling on replay
    * @throws IllegalArgumentException for an invalid mode string
    * @throws Exception when the intent cannot be recorded (runtime authority unavailable)
    */
-  ModeTransitionOutcome switchInferenceMode(String mode) throws Exception;
+  ModeTransitionOutcome switchInferenceMode(String mode,
+      io.justsearch.core.context.EngineContext context, String idempotencyKey) throws Exception;
 
   /**
-   * Trigger background offline processing (VDU + embeddings catch-up). Runs
-   * asynchronously on a virtual thread; returns immediately after dispatch.
+   * Start one captured enrichment pass and return its actual completion after owner cleanup.
+   * Progress contains only acknowledged index outcomes; embedding work is a mode handoff.
    *
    * @throws UnsupportedOperationException if the offline-processing trigger
    *     isn't configured (test paths, headless modes that don't enable it)
-   * @throws Exception on dispatch failure
+   * @throws RuntimeException on admission or dispatch failure
    */
-  void triggerOfflineProcessing() throws Exception;
+  java.util.concurrent.CompletionStage<OfflineProcessingOutcome> triggerOfflineProcessing(
+      io.justsearch.core.context.EngineContext context,
+      java.util.function.Consumer<OfflineProcessingOutcome> progress);
 
 }

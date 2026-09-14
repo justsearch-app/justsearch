@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -58,9 +60,9 @@ final class SearchToolResultBudgetTest {
   @DisplayName("a 20-hit response fits the Layer-2 cap by construction, so truncate never fires")
   void twentyHitsFitTheLayerTwoCap() {
     KnowledgeSearchResponse response = responseWithLongHits(20);
-    SearchTool tool = new SearchTool(req -> response);
+    SearchTool tool = new SearchTool((req, context) -> response);
 
-    OperationResult result = tool.execute("{\"query\":\"budget\",\"limit\":20}");
+    OperationResult result = tool.execute("{\"query\":\"budget\",\"limit\":20}", EngineContextTestFixtures.AGENT_LOOP);
     String message = result.message();
 
     assertTrue(result.success(), message);
@@ -91,9 +93,9 @@ final class SearchToolResultBudgetTest {
     // shape that made the OLD budget emit nothing for the top hits and then, budget unspent, render
     // the bottom ones. The result was a gap in the [n] numbering under a summary claiming all 20.
     KnowledgeSearchResponse response = responseWithRealisticallyLongIdentities(20);
-    SearchTool tool = new SearchTool(req -> response);
+    SearchTool tool = new SearchTool((req, context) -> response);
 
-    OperationResult result = tool.execute("{\"query\":\"budget\",\"limit\":20}");
+    OperationResult result = tool.execute("{\"query\":\"budget\",\"limit\":20}", EngineContextTestFixtures.AGENT_LOOP);
     String message = result.message();
 
     assertTrue(result.success(), message);

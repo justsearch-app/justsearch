@@ -42,7 +42,6 @@ public record WorkerDebugView(
     boolean isHealthy,
     long lastCommitTimestamp,
     DebugMigrationEnumeratorView migrationEnumerator,
-    SignalBusView signalBus,
     long uptimeMs,
     HealthNodeView healthCheck,
     Map<String, String> effectiveConfig) {

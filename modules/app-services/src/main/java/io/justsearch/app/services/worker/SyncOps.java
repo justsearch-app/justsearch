@@ -1,6 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorSpec.Kind;
+import io.justsearch.core.execution.EngineExecutorSpec.Mode;
+
 import io.justsearch.ipc.PruneRequest;
 import io.justsearch.ipc.PruneResponse;
 import io.justsearch.ipc.SyncDirectoryRequest;
@@ -11,7 +17,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -23,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * Sync and periodic maintenance operations for watched roots.
  *
  * <p>Handles prune, sync directory, and periodic sync scheduling. Extracted from
- * {@link RemoteKnowledgeClient}.
+ * {@link KnowledgeClient}.
  */
 final class SyncOps {
     private static final Logger log = LoggerFactory.getLogger(SyncOps.class);
@@ -39,6 +44,7 @@ final class SyncOps {
 
     private final IngestRpcExecutor rpc;
     private final Map<Path, Instant> watchedRoots;
+    private final EngineExecutorRegistry.Registration schedulerRegistration;
     /**
      * Tempdoc 626 §Axis-C — records the per-root delete-detection verification outcome of a force=false
      * reconcile so the FE can show a "couldn't verify" state instead of a false "✓ indexed". No-op until
@@ -57,54 +63,68 @@ final class SyncOps {
     private ScheduledFuture<?> syncTask;
     private final AtomicLong currentRootIndex = new AtomicLong(0);
 
-    SyncOps(IngestRpcExecutor rpc, Map<Path, Instant> watchedRoots) {
-        this(rpc, watchedRoots, (root, unverified) -> {}, (root, count) -> {});
+    SyncOps(
+        EngineExecutorRegistry executors, IngestRpcExecutor rpc, Map<Path, Instant> watchedRoots) {
+        this(executors, rpc, watchedRoots, (root, unverified) -> {}, (root, count) -> {});
     }
 
     SyncOps(
+        EngineExecutorRegistry executors,
         IngestRpcExecutor rpc,
         Map<Path, Instant> watchedRoots,
         java.util.function.BiConsumer<Path, Boolean> recordUnverified) {
-        this(rpc, watchedRoots, recordUnverified, (root, count) -> {});
+        this(executors, rpc, watchedRoots, recordUnverified, (root, count) -> {});
     }
 
     SyncOps(
+        EngineExecutorRegistry executors,
         IngestRpcExecutor rpc,
         Map<Path, Instant> watchedRoots,
         java.util.function.BiConsumer<Path, Boolean> recordUnverified,
         java.util.function.BiConsumer<Path, Integer> recordDriftCorrected) {
+        Objects.requireNonNull(executors, "executors");
         this.rpc = Objects.requireNonNull(rpc, "rpc");
         this.watchedRoots = Objects.requireNonNull(watchedRoots, "watchedRoots");
         this.recordUnverified =
             recordUnverified == null ? (root, unverified) -> {} : recordUnverified;
         this.recordDriftCorrected =
             recordDriftCorrected == null ? (root, count) -> {} : recordDriftCorrected;
+        EngineExecutorRegistry.Limits background = executors.limits(Kind.BACKGROUND);
+        this.schedulerRegistration =
+            executors.register(
+                new EngineExecutorSpec(
+                    "knowledge-client-periodic-sync",
+                    Kind.BACKGROUND,
+                    Mode.SCHEDULED,
+                    1,
+                    background.maxQueue(),
+                    1));
     }
 
     // ========== RPC helpers ==========
 
-    private PruneResponse executePruneMissing(String pathPrefix) {
+    private PruneResponse executePruneMissing(String pathPrefix, EngineContext engineContext) {
         PruneRequest request = PruneRequest.newBuilder().setPathPrefix(pathPrefix).build();
         return rpc.execute(
                 "pruneMissing",
-                RemoteKnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.pruneMissing(request));
+                KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
+                stub -> stub.pruneMissing(request), engineContext);
     }
 
-    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force) {
+    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force, EngineContext engineContext) {
         SyncDirectoryRequest request =
                 SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
         return rpc.execute(
                 "syncDirectory",
-                RemoteKnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.syncDirectory(request));
+                KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
+                stub -> stub.syncDirectory(request), engineContext);
     }
 
     // ========== Public operations ==========
 
-    boolean pruneMissing(String pathPrefix) {
+    boolean pruneMissing(String pathPrefix, EngineContext engineContext) {
         try {
-            PruneResponse response = executePruneMissing(pathPrefix);
+            PruneResponse response = executePruneMissing(pathPrefix, engineContext);
 
             if (response.getAborted()) {
                 log.info("Prune aborted for {} (user activity)", pathPrefix);
@@ -129,9 +149,9 @@ final class SyncOps {
         }
     }
 
-    SyncDirectoryResponse syncDirectory(String rootPath, boolean force) {
+    SyncDirectoryResponse syncDirectory(String rootPath, boolean force, EngineContext engineContext) {
         try {
-            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force);
+            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext);
 
             // Tempdoc 626 §Axis-C/§Recency — update the per-root verification state from this reconcile.
             if (response.getError().isEmpty()) {
@@ -183,13 +203,15 @@ final class SyncOps {
     }
 
     void startPeriodicSync() {
+        EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.internal(
+            "periodic-root-sync", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
         if (syncScheduler != null) {
             log.debug("Periodic sync already started");
             return;
         }
 
         syncScheduler =
-                Executors.newSingleThreadScheduledExecutor(
+                schedulerRegistration.openScheduled(
                         r -> {
                             Thread t = new Thread(r, "sync-scheduler");
                             t.setDaemon(true);
@@ -219,7 +241,7 @@ final class SyncOps {
                                         root);
 
                                 // force=false: Worker will skip if user is actively searching
-                                syncDirectory(root.toString(), /* force= */ false);
+                                syncDirectory(root.toString(), /* force= */ false, engineContext);
 
                             } catch (Exception e) {
                                 log.warn("Periodic sync failed", e);
@@ -240,16 +262,10 @@ final class SyncOps {
             syncTask = null;
         }
         if (syncScheduler != null) {
-            syncScheduler.shutdown();
-            try {
-                if (!syncScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                    syncScheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                syncScheduler.shutdownNow();
-            }
+            schedulerRegistration.close();
             syncScheduler = null;
+        } else {
+            schedulerRegistration.close();
         }
         log.debug("Periodic sync scheduler stopped");
     }

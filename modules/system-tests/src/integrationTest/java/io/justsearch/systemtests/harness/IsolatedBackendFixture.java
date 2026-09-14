@@ -51,8 +51,9 @@ import java.util.stream.Stream;
  * requests on Windows; both phases are required.
  *
  * <p>Cleanup uses {@link Process#destroyForcibly()} (~0.42&nbsp;s on Windows in the spike).
- * The spawned Head spawns its own Worker subprocess; killing the parent kills the child too
- * via the existing {@code WorkerSpawner} Job-Object cleanup. SQLite WAL files released
+ * The spawned Head used to spawn its own Worker subprocess, and killing the parent killed the child
+ * too via {@code WorkerSpawner}'s Job-Object cleanup; lane F stage A item A11 deleted both, so there
+ * is one process to kill. SQLite WAL files released
  * cleanly in the spike — the tempdir delete retry loop is defense-in-depth, not load-bearing.
  *
  * <p><strong>Known limitation:</strong> if the test JVM itself crashes, the spawned Head is
@@ -102,13 +103,7 @@ public final class IsolatedBackendFixture {
    * trying, so every remaining millisecond of the health budget is spent waiting for nothing.
    */
   private static final List<String> TERMINAL_WORKER_REASONS =
-      List.of(
-          "worker.spawn_recovery_exhausted",
-          // Tempdoc 825 review F2(b): supervision's own give-up is equally terminal — boot recovery
-          // deliberately does NOT supersede it (owner decision 2), so nothing will retry from here
-          // either. Without this row that whole path kept the blind 240s wait charter item 3 exists
-          // to remove.
-          "worker.restart_exhausted");
+      List.of("worker.spawn_recovery_exhausted");
 
   private final String ownerLabel = resolveOwnerLabel();
 
@@ -117,6 +112,16 @@ public final class IsolatedBackendFixture {
    * is the only way to exercise recovery deterministically, and it is a launch-time config value.
    */
   private final Map<String, String> extraSystemProperties = new LinkedHashMap<>();
+
+  /**
+   * Extra environment variables for the spawned Head (lane F stage A item A12 closure). A system
+   * property would do for most settings, but not for
+   * {@code JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND}: its value is a quoted argv
+   * ({@code "…\java.exe" "@…\args.txt"}), and putting embedded double quotes through a Windows
+   * {@code -Dkey=value} command-line argument is exactly the quoting hazard the argfile exists to
+   * avoid. The environment block has no such rule, so it is the honest channel.
+   */
+  private final Map<String, String> extraEnv = new LinkedHashMap<>();
 
   private Path dataDir;
   private Path runtimeDir;
@@ -131,6 +136,16 @@ public final class IsolatedBackendFixture {
    */
   public IsolatedBackendFixture withSystemProperty(String key, String value) {
     extraSystemProperties.put(key, value);
+    return this;
+  }
+
+  /**
+   * Adds an environment variable to the spawned Head. Must be called before {@link #start()}.
+   * Applied LAST in {@link #buildEnv}, so a test can deliberately override a fixture default; the
+   * test owns the consequences of doing so.
+   */
+  public IsolatedBackendFixture withEnv(String key, String value) {
+    extraEnv.put(key, value);
     return this;
   }
 
@@ -212,6 +227,38 @@ public final class IsolatedBackendFixture {
     return dataDir;
   }
 
+  /**
+   * The spawned Head's PID. Lane F stage A item A12 closure needs it to enumerate the Head's
+   * descendants: the extraction sandbox child is spawned by this process, and its parent-PID gate
+   * is keyed on this number.
+   */
+  public long pid() {
+    if (process == null) {
+      throw new IllegalStateException("pid() called before start()");
+    }
+    return process.pid();
+  }
+
+  /**
+   * Force-kills the backend WITHOUT deleting the tempdir, and blocks until it is gone.
+   *
+   * <p>Separate from {@link #stop()} because a test that asserts on what happens <em>after</em> the
+   * Head dies (orphaned children, files left on disk) has to be able to kill it and then keep
+   * looking. Returns true if the process terminated within the grace period.
+   */
+  public boolean kill() {
+    if (process == null) {
+      return true;
+    }
+    process.destroyForcibly();
+    try {
+      return process.waitFor(STOP_GRACE_MS, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
+
   /** Force-kills the backend and removes the tempdir. Safe to call even if start() failed. */
   public void stop() {
     if (process != null && process.isAlive()) {
@@ -258,14 +305,13 @@ public final class IsolatedBackendFixture {
     env.put("JUSTSEARCH_DATA_DIR", dataDir.toAbsolutePath().toString());
     env.put("JUSTSEARCH_API_PORT", "0");
     env.put("JUSTSEARCH_REPO_ROOT", repoRoot.toAbsolutePath().toString());
-    // The test JVM's working dir is the module, not the repo root, so the dev-layout
-    // lookup in KnowledgeServerConfig.resolveWorkerLibDir would fail. The Gradle task
-    // wires justsearch.worker.lib.dir as a system property; forward it as the env var
-    // KnowledgeServerConfig actually reads.
-    String workerLibDir = System.getProperty("justsearch.worker.lib.dir");
-    if (workerLibDir != null && !workerLibDir.isBlank()) {
-      env.put("JUSTSEARCH_WORKER_LIB_DIR", workerLibDir);
-    }
+    // Lane F stage A item A13 removed the JUSTSEARCH_WORKER_LIB_DIR forward that used to sit here.
+    // It existed because the spawned HeadlessApp went on to spawn a Worker from an installDist
+    // tree, and this test JVM's working dir is the module rather than the repo root, so
+    // KnowledgeServerConfig.resolveWorkerLibDir could not find it by relative walk. There is one
+    // process now: the child JVM launched below runs the index half off the classpath in
+    // writeArgfile(), and both the resolver and the distribution are deleted.
+    env.putAll(extraEnv);
     return env;
   }
 
@@ -495,19 +541,25 @@ public final class IsolatedBackendFixture {
   }
 
   /**
-   * Copies the evidence a boot failure leaves behind into {@link #resolveFailureLogDir()}.
+   * Copies boot or test-body failure evidence into {@link #resolveFailureLogDir()}. Call before
+   * {@link #stop()} when a live assertion fails, so teardown cannot delete its diagnostics.
    *
-   * <p>{@code backend.log} is only the child JVM's redirected stdout/stderr — the Head's actual
-   * application log is {@code <dataDir>/logs/headless-backend.log}
-   * ({@code modules/ui/src/main/resources/logback.xml}), and the Worker's is
-   * {@code <dataDir>/logs/worker.log}
-   * ({@code modules/indexer-worker/src/main/resources/logback.xml}). Both roll to
-   * {@code <name>.%d{yyyy-MM-dd}.%i.log.gz} / {@code <name>-%d{yyyy-MM-dd}.%i.log.gz} at 10&nbsp;MB,
-   * so the whole {@code logs/} directory is swept rather than a fixed filename list. The previous
-   * {@code app.log} copy could never fire: that file is written by the app-launcher process, which
-   * this fixture never spawns.
+   * <p>{@code backend.log} is only the child JVM's redirected stdout/stderr — the Engine's actual
+   * application log is {@code <dataDir>/logs/engine.log}
+   * ({@code modules/ui/src/main/resources/logback.xml}), rolling to
+   * {@code engine.%d{yyyy-MM-dd}.%i.log.gz} at 10&nbsp;MB, so the whole {@code logs/} directory is
+   * swept rather than a fixed filename list.
+   *
+   * <p>There is one application log now, not two. This javadoc named {@code headless-backend.log}
+   * for the Head and {@code worker.log} for the Worker; lane F items A13 and A16 deleted the second
+   * process, its {@code logback.xml} and the file itself, then renamed the survivor. Sweeping the
+   * directory rather than a filename list is what kept this method WORKING through all of that —
+   * only its explanation was wrong, which is the failure mode a directory sweep is prone to: the
+   * code keeps collecting the right evidence while the comment describes a layout that no longer
+   * exists. The previous {@code app.log} copy could never fire: that file is written by the
+   * app-launcher process, which this fixture never spawns.
    */
-  private void preserveLogOnFailure() {
+  public void preserveLogOnFailure() {
     logsPreserved = true;
     Path dest = resolveFailureLogDir();
     copyIfPresent(backendLog, dest.resolve("backend.log"));

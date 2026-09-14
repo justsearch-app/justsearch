@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.JsonNode;
 import io.justsearch.agent.api.registry.BackendIntentRouter;
 import io.justsearch.agent.api.registry.Intent;
@@ -57,17 +59,17 @@ public final class NavigateToSurfaceHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     // Test-friendly fallback (no upstream provenance available); production callers
     // route through the F6 overload below which carries the real transport.
     return execute(
         argumentsJson,
-        InvocationProvenance.fromTransport(
-            TransportTag.AGENT_LOOP, Optional.empty(), Instant.now(clock)));
+        io.justsearch.app.services.intent.EngineProvenance.invocation(
+            engineContext, io.justsearch.agent.api.registry.ExecutorTag.UI, Instant.now(clock), Optional.empty()), engineContext);
   }
 
   @Override
-  public OperationResult execute(String argumentsJson, InvocationProvenance provenance) {
+  public OperationResult execute(String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
     String surfaceId;
     try {
       JsonNode node = HandlerJson.MAPPER.readTree(argumentsJson == null ? "{}" : argumentsJson);
@@ -100,7 +102,7 @@ public final class NavigateToSurfaceHandler implements OperationHandler {
           true);
     }
     try {
-      IntentDispatchResult result = router.dispatch(intent, provenance);
+      IntentDispatchResult result = router.dispatch(intent, provenance, engineContext);
       Map<String, Object> structured = new LinkedHashMap<>();
       structured.put("surfaceId", surfaceId);
       if (result instanceof IntentDispatchResult.Forwarded f) {

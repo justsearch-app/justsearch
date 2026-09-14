@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,7 +44,7 @@ final class McpAnswerCollectionScopeTest {
         new ContextResult("[From: doc-1]\nexcerpt", 1, 1, 0, List.of(), "HYBRID", "OK", false,
             List.of());
     DocumentService documents = mock(DocumentService.class);
-    when(documents.retrieveContext(any())).thenReturn(CompletableFuture.completedFuture(result));
+    when(documents.retrieveContext(any(), any(EngineContext.class))).thenReturn(CompletableFuture.completedFuture(result));
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
@@ -54,11 +56,11 @@ final class McpAnswerCollectionScopeTest {
             () -> null,
             () -> facade,
             FIXED_CLOCK);
-    surface.callTool("justsearch_answer", args, "s1");
+    surface.callTool("justsearch_answer", args, "s1", TestRequestContexts.mcp("s1"));
 
     ArgumentCaptor<RetrieveContextParams> captor =
         ArgumentCaptor.forClass(RetrieveContextParams.class);
-    verify(documents).retrieveContext(captor.capture());
+    verify(documents).retrieveContext(captor.capture(), any(EngineContext.class));
     return captor.getValue();
   }
 
@@ -93,7 +95,8 @@ final class McpAnswerCollectionScopeTest {
         surface.callTool(
             "justsearch_answer",
             Map.of("query", "what?", "filters", Map.of("collection", "agent-history")),
-            "s1");
+            "s1",
+            TestRequestContexts.mcp("s1"));
 
     // Declaring the property (655's "declared, not opaque" shape) means the boundary validator
     // catches a malformed scope before it reaches the handler's unchecked casts.

@@ -83,7 +83,8 @@ public final class OperationHandlerRegistrations {
       Supplier<RuntimeSpecStore> runtimeSpecStoreSupplier,
       Supplier<RuntimeReconciler> runtimeReconcilerSupplier,
       // Tempdoc 542 Phase 3 — long-op handlers register op-leases via this SPI.
-      io.justsearch.app.api.OperationLeaseService operationLeaseService) {
+      io.justsearch.app.api.OperationLeaseService operationLeaseService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots) {
     final WorkerServiceImpl workerService = new WorkerServiceImpl(knowledgeServerBootstrapSupplier);
     handlers.register(
         CoreOperationCatalog.RESTART_WORKER, new RestartWorkerHandler(() -> workerService));
@@ -111,7 +112,11 @@ public final class OperationHandlerRegistrations {
     handlers.register(
         CoreOperationCatalog.RESOLVE_PATH_HASH,
         new ResolvePathHashHandler(indexingServiceSupplier));
-    handlers.register(CoreOperationCatalog.REINDEX, new ReindexHandler(indexingServiceSupplier));
+    handlers.register(CoreOperationCatalog.REINDEX, new ReindexHandler(recordedIngestion,
+        context -> recordedRoots.snapshotBindings(),
+        context -> java.util.Objects.requireNonNull(indexingServiceSupplier.get(), "Indexing service unavailable")
+            .captureServingGeneration(context),
+        io.justsearch.app.services.worker.KnowledgeClient::captureRecordedExcludePatterns));
     handlers.register(
         CoreOperationCatalog.RECONCILE_ROOT, new ReconcileRootHandler(indexingServiceSupplier));
     handlers.register(

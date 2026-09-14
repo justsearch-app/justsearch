@@ -13,10 +13,15 @@ from __future__ import annotations
 import asyncio
 
 from jseval.ui_check import (
+    _build_steps,
     _cite_card_selected_selector,
     _cite_card_selector,
     _css_escaped,
+    _set_density_in_settings,
+    _set_detail_level_in_settings,
+    _type_and_search,
 )
+from jseval import ui_selectors as S
 from jseval.ui_selectors import Selector
 
 
@@ -178,3 +183,159 @@ def test_a_key_needing_no_escaping_is_left_alone():
     assert _cite_card_selector(_css_escape(plain)) == (
         '[data-testid="sv3-turn-citations"] button.source[data-cite-key="doc-42"]'
     )
+
+
+class _HarnessLocator:
+    def __init__(self, page, selector: str):
+        self.page = page
+        self.selector = selector
+        self.first = self
+
+    async def wait_for(self, **kwargs):
+        self.page.calls.append(("wait_for", self.selector, kwargs))
+
+    async def fill(self, value: str):
+        self.page.calls.append(("fill", self.selector, value))
+        if self.selector == S.CSS_DENSITY_SLIDER:
+            self.page.density = {"0": "Compact", "1": "Comfortable", "2": "Spacious"}[value]
+
+    async def click(self, **kwargs):
+        self.page.calls.append(("click", self.selector, kwargs))
+        for label in ("Simple", "Detailed"):
+            if f"role=button;name={label};" in self.selector:
+                self.page.checked_labels = {label}
+
+    async def scroll_into_view_if_needed(self, **kwargs):
+        self.page.calls.append(("scroll", self.selector))
+
+    async def dispatch_event(self, event):
+        self.page.calls.append(("dispatch", self.selector, event))
+
+    async def get_attribute(self, name: str):
+        self.page.calls.append(("get_attribute", self.selector, name))
+        if name == "aria-valuetext":
+            return self.page.density
+        if name == "aria-pressed":
+            checked = any(
+                f"name={label};" in self.selector for label in self.page.checked_labels
+            )
+            return "true" if checked else "false"
+        return None
+
+    def get_by_role(self, role, name=None, exact=None):
+        suffix = f"role={role};name={name};exact={exact}"
+        return _HarnessLocator(self.page, f"{self.selector} >> {suffix}")
+
+
+class _Response:
+    status = 200
+    url = "http://localhost:5174/api/settings/v2"
+
+    class request:
+        method = "POST"
+
+    async def json(self):
+        return {"state": "COMPLETE"}
+
+
+class _ResponseInfo:
+    @property
+    def value(self):
+        async def get():
+            return _Response()
+        return get()
+
+
+class _ExpectResponse:
+    def __init__(self, page, predicate):
+        self.page = page
+        self.predicate = predicate
+
+    async def __aenter__(self):
+        if callable(self.predicate):
+            assert self.predicate(_Response())
+        self.page.calls.append(("expect_response", self.predicate))
+        return _ResponseInfo()
+
+    async def __aexit__(self, *_args):
+        return False
+
+
+class _HarnessPage:
+    def __init__(self):
+        self.calls = []
+        self.density = "Comfortable"
+        self.checked_labels = set()
+
+    def locator(self, selector):
+        self.calls.append(("locator", selector))
+        return _HarnessLocator(self, selector)
+
+    def get_by_role(self, role, name=None, exact=None):
+        self.calls.append(("get_by_role", role, name, exact))
+        return _HarnessLocator(self, f"page >> role={role};name={name};exact={exact}")
+
+    def get_by_test_id(self, test_id):
+        if test_id in (S.TID_INSTALL_COMPONENT_LIST, S.TID_BRAIN_SIMPLE_ACTION):
+            assert self.checked_labels == {"Simple"}, "The requested Brain control is hidden in Detailed"
+        self.calls.append(("get_by_test_id", test_id))
+        return _HarnessLocator(self, f"testid={test_id}")
+
+    async def evaluate(self, expression, *args):
+        self.calls.append(("evaluate", expression))
+
+    def expect_response(self, predicate, **kwargs):
+        self.calls.append(("expect_response_args", predicate, kwargs))
+        return _ExpectResponse(self, predicate)
+
+
+def test_search_setup_drives_the_search_v3_composer_and_explicit_palette_action():
+    page = _HarnessPage()
+    asyncio.run(_type_and_search(page, "needle"))
+    assert ("locator", S.CSS_SV3_COMPOSER_TEXTAREA) in page.calls
+    assert ("fill", S.CSS_SV3_COMPOSER_TEXTAREA, "needle") in page.calls
+    assert any("Open command palette" in call[1] for call in page.calls if call[0] == "click")
+    assert any("Search this text" in call[1] for call in page.calls if call[0] == "click")
+    assert ("locator", S.CSS_SV3_RESULT_ROW) in page.calls
+    assert ("locator", S.CSS_SEARCH_INPUT) not in page.calls
+
+
+def test_density_setup_uses_the_native_range_and_checks_its_user_facing_stop():
+    page = _HarnessPage()
+    asyncio.run(_set_density_in_settings(page, "Spacious"))
+    assert ("fill", S.CSS_DENSITY_SLIDER, "2") in page.calls
+    assert page.density == "Spacious"
+
+
+def test_detail_level_setup_awaits_a_complete_settings_post():
+    page = _HarnessPage()
+    asyncio.run(_set_detail_level_in_settings(page, "Detailed"))
+    assert any(
+        "role=group;name=Detail level" in call[1] and "role=button;name=Detailed;exact=True" in call[1]
+        for call in page.calls if call[0] == "wait_for"
+    )
+    assert any(
+        "role=button;name=Detailed" in call[1]
+        for call in page.calls if call[0] == "click"
+    )
+    predicates = [call[1] for call in page.calls if call[0] == "expect_response_args"]
+    assert len(predicates) == 1 and callable(predicates[0])
+
+
+def test_detail_level_setup_does_not_invent_a_write_when_already_selected():
+    page = _HarnessPage()
+    page.checked_labels.add("Detailed")
+    asyncio.run(_set_detail_level_in_settings(page, "Detailed"))
+    assert not any(call[0] == "expect_response_args" for call in page.calls)
+
+
+def test_brain_install_drilldowns_select_the_panel_before_using_its_controls():
+    steps = {step.name: step for step in _build_steps("http://localhost:5186", 0, 1000)}
+    for name in ("ai-brain-components", "ai-brain-consent",
+                 "ai-brain-components-light", "ai-brain-consent-light"):
+        assert steps[name].fixtures_variant == "install-preview"
+        page = _HarnessPage()
+        page.checked_labels = {"Detailed"}
+        asyncio.run(steps[name].setup(page))
+        assert page.checked_labels == {"Simple"}
+        assert any(call[0] == "expect_response_args" for call in page.calls)

@@ -2,6 +2,7 @@
 package io.justsearch.ui.runtime;
 
 import io.justsearch.app.api.runtime.Reachability;
+import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.RuntimeManifest;
 import io.justsearch.app.api.runtime.RuntimeManifestBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
@@ -38,15 +39,13 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ol>
  *   <li>Construct once at boot (auto-generates {@code instanceId}, captures PID + dataDir).
- *   <li>Call {@link #publishHead} immediately after the Local API server binds. This writes the
- *       first manifest with head-only readiness and acquires the {@code manifest.lock}.
+ *   <li>Call {@link #publishOwnershipSeed} before any child-capable asynchronous startup, then
+ *       {@link #publishHead} after the Local API server binds to enrich that durable seed.
  *   <li>Call {@link #publishWorkerReady} (or {@link #publishWorkerFailed}) after
  *       {@code connectKnowledgeServer} resolves.
  *       This rewrites the manifest with the {@code worker} sub-record.
- *   <li>Call {@link #close} in shutdown finally to remove the manifest + lock so consumers that
- *       read-and-find-nothing know the producer has cleanly torn down. Crashed producers
- *       (SIGKILL, OOM) leave both files behind; consumers defend against that case via the
- *       {@code manifest.lock} PID-alive check.
+ *   <li>The ordered shutdown callback chooses deletion or retained handoff evidence. A plain
+ *       {@link #close} cannot erase retained child ownership or an incomplete handoff.
  * </ol>
  *
  * <p>Writes are atomic (write-to-temp + atomic rename). The publisher notifies registered
@@ -100,8 +99,16 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   private final boolean uncleanPreviousShutdown;
 
   private final OptionalLong previousInstancePid;
+  private final MutableManagedChildRegistry childRegistry;
+  private volatile CloseDisposition closeDisposition = CloseDisposition.OPEN;
+
+  private enum CloseDisposition { OPEN, PENDING, RETAIN, DELETE }
 
   public RuntimeManifestPublisher(Path dataDir) {
+    this(dataDir, new MutableManagedChildRegistry());
+  }
+
+  public RuntimeManifestPublisher(Path dataDir, MutableManagedChildRegistry childRegistry) {
     if (dataDir == null) {
       throw new IllegalArgumentException("dataDir must be non-null");
     }
@@ -118,6 +125,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     this.pid = ProcessHandle.current().pid();
     this.startedAt = Instant.now().toString();
     this.mapper = new ObjectMapper();
+    this.childRegistry = java.util.Objects.requireNonNull(childRegistry, "childRegistry");
     // Tempdoc 627 (N1): classify the *previous* session BEFORE pruneInstanceHistory / the first
     // publishHead overwrite touch the runtime dir. A leftover manifest with a dead PID is the
     // reliable cross-session crash signal (clean shutdown deletes the manifest in close()).
@@ -133,6 +141,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
                     .orElse(OptionalLong.empty()));
     this.uncleanPreviousShutdown = previous.unclean();
     this.previousInstancePid = previous.pid();
+    this.childRegistry.seed(readPredecessorChildren(manifestPath, mapper));
+    this.childRegistry.installWriter(this::publishChildren);
     if (previous.unclean()) {
       log.info(
           "Previous Head session ended uncleanly (leftover manifest pid={} is dead); the app will"
@@ -147,6 +157,24 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     // immediately. The first line records construction so postmortem
     // readers can establish wall-clock zero for the publish timeline.
     appendStartLog("publisher-constructed pid=" + pid + " startedAt=" + startedAt);
+  }
+
+  private static List<ManagedChild> readPredecessorChildren(Path path, ObjectMapper mapper) {
+    try {
+      if (!Files.isRegularFile(path)) return List.of();
+      JsonNode root = mapper.readTree(Files.readString(path));
+      int version = root.path("schemaVersion").asInt(1);
+      if (version > RuntimeManifest.CURRENT_SCHEMA_VERSION) {
+        throw new IllegalStateException("runtime manifest schema " + version + " is from a future release");
+      }
+      JsonNode children = root.get("children");
+      if (children == null || !children.isArray()) return List.of();
+      List<ManagedChild> records = new ArrayList<>();
+      for (JsonNode child : children) records.add(mapper.treeToValue(child, ManagedChild.class));
+      return List.copyOf(records);
+    } catch (IOException e) {
+      throw new UncheckedIOException("could not read predecessor managed-child ownership", e);
+    }
   }
 
   /**
@@ -180,7 +208,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * deserialization fragile, and a parse failure here silently classifies clean (the live-validation
    * miss this fix resolves). The crashed predecessor's PID is all this needs.
    *
-   * <p><b>Conservative + reuse-aware (mirrors {@code AppInstanceLock.tryRecoverStaleLock}):</b> flag
+   * <p><b>Conservative + reuse-aware:</b> flag
    * unclean when the PID is dead, OR alive but its start-instant differs from the manifest's
    * {@code startedAt} (the PID was recycled — the predecessor is gone). A genuinely-alive same process,
    * our own PID, an absent manifest, or any read failure all classify clean, so no coincidental PID
@@ -368,11 +396,44 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * precedes Worker connect by definition. {@link #publishWorkerReady} and
    * {@link #publishWorkerFailed} carry the projected state from then on.
    */
-  public synchronized RuntimeManifest publishHead(
+  public RuntimeManifest publishOwnershipSeed() throws IOException {
+    return childRegistry.withStableSnapshot(this::publishOwnershipSeedLocked);
+  }
+
+  private synchronized RuntimeManifest publishOwnershipSeedLocked(List<ManagedChild> children)
+      throws IOException {
+    if (current.get() != null) throw new IllegalStateException("ownership seed already published");
+    Files.createDirectories(runtimeDir);
+    RuntimeManifest manifest =
+        RuntimeManifestBuilder.builder()
+            .schemaVersion(RuntimeManifest.CURRENT_SCHEMA_VERSION)
+            .instanceId(instanceId)
+            .pid(pid)
+            .startedAt(startedAt)
+            .dataDir(dataDir.toString())
+            .lifecycle(io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_STARTING.name())
+            .head(new RuntimeManifest.HeadInfo(null, null, null, null, null))
+            .children(children)
+            .runtimeContract(io.justsearch.app.api.runtime.RuntimeContract.current())
+            .build();
+    return commit(manifest, "publishOwnershipSeed children=" + children.size());
+  }
+
+  public RuntimeManifest publishHead(
       int apiPort, String sessionToken) throws IOException {
-    if (current.get() != null) {
-      throw new IllegalStateException("publishHead called twice");
+    return childRegistry.withStableSnapshot(
+        children -> publishHeadLocked(apiPort, sessionToken, children));
+  }
+
+  private synchronized RuntimeManifest publishHeadLocked(
+      int apiPort, String sessionToken, List<ManagedChild> children) throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) {
+      // Compatibility for embedded/test publishers. The process entrypoint calls the seed
+      // explicitly before starting any child-capable work.
+      previous = publishOwnershipSeedLocked(children);
     }
+    if (previous.head().apiPort() != null) throw new IllegalStateException("publishHead called twice");
     Files.createDirectories(runtimeDir);
 
     String apiBaseUrl = "http://127.0.0.1:" + apiPort;
@@ -395,13 +456,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             .build();
     Reachability reachability = composeReachability(apiBaseUrl);
     RuntimeManifest manifest =
-        RuntimeManifestBuilder.builder()
-            .schemaVersion(RuntimeManifest.CURRENT_SCHEMA_VERSION)
-            .instanceId(instanceId)
-            .pid(pid)
-            .startedAt(startedAt)
-            .dataDir(dataDir.toString())
-            .lifecycle(io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_STARTING.name())
+        RuntimeManifestBuilder.builder(previous)
             .head(headInfo)
             .reachability(reachability)
             // Tempdoc 654: advertise the Runtime Contract descriptor. Set once at head-publish;
@@ -420,13 +475,12 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * Worker-ready rewrite — call once {@code connectKnowledgeServer} resolves successfully
    * (a Worker bootstrap exists and is connected). Tempdoc 501 §12.1 projection.
    *
-   * @param grpcPort the worker's gRPC port (nullable if not yet read from the signal bus)
    * @param indexBasePath the resolved index path (nullable if not yet known)
    * @param lifecycle current overall lifecycle projection — from
    *     {@code LifecycleProjection.derive(workerCap, inferenceCap)}
    */
-  public synchronized RuntimeManifest publishWorkerReady(
-      Integer grpcPort, String indexBasePath, String lifecycle) throws IOException {
+  public synchronized RuntimeManifest publishWorkerReady(String indexBasePath, String lifecycle)
+      throws IOException {
     RuntimeManifest previous = current.get();
     if (previous == null) {
       throw new IllegalStateException("publishWorkerReady called before publishHead");
@@ -435,7 +489,6 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     RuntimeManifest.WorkerInfo workerInfo =
         RuntimeManifestWorkerInfoBuilder.builder()
             .state("ready")
-            .grpcPort(grpcPort)
             .indexBasePath(indexBasePath)
             .readyAt(readyAt)
             .build();
@@ -445,12 +498,11 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             .lifecycle(lifecycle != null ? lifecycle : previous.lifecycle())
             .build();
     log.info(
-        "Runtime manifest updated (worker-ready): grpcPort={}, indexBasePath={}, lifecycle={}",
-        grpcPort,
+        "Runtime manifest updated (worker-ready): indexBasePath={}, lifecycle={}",
         indexBasePath,
         lifecycle);
     return commit(
-        manifest, "publishWorkerReady grpcPort=" + grpcPort + " lifecycle=" + lifecycle);
+        manifest, "publishWorkerReady lifecycle=" + lifecycle);
   }
 
   /**
@@ -620,10 +672,89 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     return commit(manifest, "publishLifecycle lifecycle=" + lifecycle);
   }
 
+  private synchronized void publishChildren(List<ManagedChild> children) throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) throw new IOException("ownership seed has not been published");
+    commit(RuntimeManifestBuilder.builder(previous).children(children).build(),
+        "publishChildren count=" + children.size());
+  }
+
+  /** First ordered-shutdown step: record that an incomplete teardown must retain ownership. */
+  public synchronized void markShutdownPending(String reason) throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) throw new IOException("No owned runtime manifest for shutdown handoff");
+    closeDisposition = CloseDisposition.PENDING;
+    commit(
+        RuntimeManifestBuilder.builder(previous)
+            .shutdownHandoff(new RuntimeManifest.ShutdownHandoff("pending", reason, Instant.now().toString()))
+            .build(),
+        "shutdown-pending reason=" + reason);
+  }
+
+  /** Ordered-shutdown completion callback. Persistence failures are deliberately propagated. */
+  public void completeShutdown(
+      String reason, boolean preliminaryClean, String indexOutcome) throws IOException {
+    childRegistry.withStableSnapshot(
+        children -> {
+          completeShutdownLocked(reason, preliminaryClean, indexOutcome, children);
+          return null;
+        });
+  }
+
+  private synchronized void completeShutdownLocked(
+      String reason,
+      boolean preliminaryClean,
+      String indexOutcome,
+      List<ManagedChild> children)
+      throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) return;
+    boolean graceful = preliminaryClean && "GRACEFUL".equals(indexOutcome);
+    boolean terminal = "quit".equals(reason) || "upgrade".equals(reason);
+    if (terminal && graceful && children.isEmpty()) {
+      Files.deleteIfExists(manifestPath);
+      current.set(null);
+      closeDisposition = CloseDisposition.DELETE;
+      appendStartLog("shutdown-complete deleted reason=" + reason);
+      return;
+    }
+    RuntimeManifest retained =
+        RuntimeManifestBuilder.builder(previous)
+            .children(children)
+            .shutdownHandoff(
+                new RuntimeManifest.ShutdownHandoff(
+                    graceful && !terminal ? "ready" : "incomplete", reason, Instant.now().toString()))
+            .build();
+    commit(retained, "shutdown-complete retained reason=" + reason);
+    closeDisposition = CloseDisposition.RETAIN;
+    if (!graceful || (terminal && !children.isEmpty())) {
+      throw new IOException("shutdown ownership handoff is incomplete");
+    }
+  }
+
   /** Remove the manifest on clean shutdown. Best-effort. */
   @Override
-  public synchronized void close() {
+  public void close() {
+    try {
+      childRegistry.withStableSnapshot(
+          children -> {
+            closeLocked(children);
+            return null;
+          });
+    } catch (IOException e) {
+      log.debug("Manifest close failed (non-fatal)", e);
+    }
+  }
+
+  private synchronized void closeLocked(List<ManagedChild> children) {
     appendStartLog("publisher-close (clean shutdown)");
+    RuntimeManifest manifest = current.get();
+    if (closeDisposition == CloseDisposition.PENDING
+        || closeDisposition == CloseDisposition.RETAIN
+        || !children.isEmpty()
+        || (manifest != null && manifest.children() != null && !manifest.children().isEmpty())) {
+      return;
+    }
     try {
       Files.deleteIfExists(manifestPath);
     } catch (IOException e) {

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -121,27 +122,27 @@ final class IndexingControllerDeleteCollectionTest {
     final List<String> deletedCollections = new ArrayList<>();
 
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(EngineContext engineContext) {
       return List.of();
     }
 
     @Override
-    public void addWatchedPath(Path path) {
+    public void addWatchedPath(Path path, EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public void flush() {
+    public void flush(EngineContext engineContext) {
       // no-op
     }
 
     @Override
-    public int deleteDocsByCollection(String collection) {
+    public int deleteDocsByCollection(String collection, EngineContext engineContext) {
       deletedCollections.add(collection);
       return 7;
     }

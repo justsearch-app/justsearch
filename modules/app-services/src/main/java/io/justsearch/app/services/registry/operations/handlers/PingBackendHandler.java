@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import java.util.Map;
@@ -15,7 +17,7 @@ import java.util.Map;
 public final class PingBackendHandler implements OperationHandler {
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     return OperationResult.success(
         "Backend reachable",
         Map.of("timestamp", System.currentTimeMillis(), "status", "ok"));

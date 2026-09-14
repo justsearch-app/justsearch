@@ -18,7 +18,7 @@ import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.Query;
 import org.junit.jupiter.api.Test;
 
-class SoftDeletesIntegrationTest {
+class SoftDeletesIntegrationTest extends LuceneExecutorTestBase {
   private static Path writeConfig(String yaml) throws IOException {
     Path f = Files.createTempFile("justsearch-runtime-soft-delete-", ".yaml");
     Files.writeString(f, yaml);
@@ -50,7 +50,7 @@ class SoftDeletesIntegrationTest {
     System.setProperty("justsearch.config", cfg.toString());
     try {
       RunningRuntime runtime =
-          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       var a = new LifecycleTestAccessor(runtime);
       assertEquals("_soft_delete_flag", a.softDeletesField());
       SoftDeletesRetentionMergePolicy policy = (SoftDeletesRetentionMergePolicy) a.mergePolicy();
@@ -90,7 +90,7 @@ class SoftDeletesIntegrationTest {
     System.setProperty("justsearch.config", cfg.toString());
     try {
       RunningRuntime runtime =
-          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       SoftDeletesRetentionMergePolicy policy =
           (SoftDeletesRetentionMergePolicy) new LifecycleTestAccessor(runtime).mergePolicy();
       assertNotNull(policy, "Expected SoftDeletesRetentionMergePolicy");
@@ -130,7 +130,7 @@ class SoftDeletesIntegrationTest {
     System.setProperty("justsearch.config", cfg.toString());
     try {
       RunningRuntime runtime =
-          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       SoftDeletesRetentionMergePolicy policy =
           (SoftDeletesRetentionMergePolicy) new LifecycleTestAccessor(runtime).mergePolicy();
       assertNotNull(policy, "Expected SoftDeletesRetentionMergePolicy");

@@ -45,7 +45,7 @@ Source-of-truth file paths reference the post-§31-merge repository state (HEAD 
 
 | Slot | Named production consumer(s) | Verdict |
 |---|---|---|
-| `core().settings()` | `ResetSettingsHandler` (operation handler); `SettingsController` (HTTP) | healthy (≥ 2) |
+| `core().settings()` | `ResetSettingsHandler` via the service supplier registered by HeadAssembly | fragility signal (1 consumer); directly composed, no controller callback |
 | `core().policy()` | `CreateUserPolicyHandler`, `AllowlistAddDigestHandler` (operation handlers); `PolicyController` (HTTP) | healthy (≥ 3) |
 | `core().diagnostics()` | `ExportDiagnosticsHandler` (operation handler); `DiagnosticsController` (HTTP) | healthy (≥ 2) |
 | `core().agent()` | `AgentController` (HTTP); held via `ServiceGraph` for downstream HTTP routes | healthy (≥ 1 confirmed, likely ≥ 2 once orchestration is fully traced) 🟡 indirect |
@@ -67,9 +67,11 @@ Source-of-truth file paths reference the post-§31-merge repository state (HEAD 
 
 ### Late-binding holders (`BootstrapLateBindings`)
 
+Settings reset is directly composed from UiSettingsStore and OperationAttemptRunner in
+ServicePhase. Its former controller callback was removed; only diagnostic SPI bindings remain.
+
 | Slot | Named production consumer | Verdict |
 |---|---|---|
-| `settingsResetFn` | `SettingsServiceImpl` (deferred Callable wrapper resolves the function at first invocation) | **inherent — not eligible for retraction**. The 3 holders here are part of the controller-as-SPI-source pattern named by tempdoc 519 §31. Justified single-consumer cardinality. |
 | `debugStateProvider` | `DiagnosticsServiceImpl` (deferred Supplier wrapper) | **inherent** |
 | `statusSnapshotProvider` | `DiagnosticsServiceImpl` (deferred Supplier wrapper) | **inherent** |
 

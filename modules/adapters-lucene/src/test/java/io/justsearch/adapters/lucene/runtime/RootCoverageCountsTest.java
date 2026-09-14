@@ -29,7 +29,7 @@ import tools.jackson.databind.ObjectMapper;
  * mixed enrichment states plus chunk documents carrying their parent's path.
  */
 @DisplayName("per-root enrichment coverage counts")
-class RootCoverageCountsTest {
+class RootCoverageCountsTest extends LuceneExecutorTestBase {
 
   private static final String SEP = File.separator;
   /** All-lowercase like a production {@code PathNormalizer.normalizePath} result. */
@@ -246,7 +246,7 @@ class RootCoverageCountsTest {
     return new IndexDocument(fields);
   }
 
-  private static RunningRuntime openRuntime(Path indexDir) {
+  private RunningRuntime openRuntime(Path indexDir) {
     try {
       String json =
           """
@@ -271,7 +271,7 @@ class RootCoverageCountsTest {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .atPath(indexDir)
+          .atPath(indexDir).withExecutorRegistrations(testLuceneExecutors())
           .open();
     } catch (Exception e) {
       throw new RuntimeException(e);

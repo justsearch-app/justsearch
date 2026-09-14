@@ -67,8 +67,6 @@ dependencyAnalysis {
         exclude("org.junit.jupiter:junit-jupiter-api")
         // ArchUnit aggregator includes junit5 extension
         exclude("com.tngtech.archunit:archunit-junit5")
-        // worker-core uses io.grpc.Context/Metadata/ServerInterceptor from grpc-api (transitive of grpc-stub)
-        exclude("io.grpc:grpc-stub")
         // RecordBuilder annotation processor generates *Builder classes from @RecordBuilder
         // annotations on app-api records. The plugin's bytecode analysis cannot detect
         // annotation-processor usage (the processor generates code at compile time but
@@ -77,8 +75,6 @@ dependencyAnalysis {
       }
       onUsedTransitiveDependencies {
         severity("fail")
-        // gRPC-api comes through grpc-stub intentionally
-        exclude("io.grpc:grpc-api")
         // Jackson annotations come through jackson-databind
         exclude("com.fasterxml.jackson.core:jackson-annotations")
         exclude("com.fasterxml.jackson.core:jackson-core")
@@ -87,13 +83,13 @@ dependencyAnalysis {
         // ArchUnit internals come through archunit-junit5
         exclude("com.tngtech.archunit:archunit-junit5-api")
         exclude("com.tngtech.archunit:archunit")
-        // Protobuf comes through grpc-protobuf
+        // Protobuf-java reaches consumers through ipc-common, which declares it `api` because the
+        // generated message classes are part of its outward surface (lane F stage A item A14 left
+        // the messages and removed the services).
         exclude("com.google.protobuf:protobuf-java")
       }
       onIncorrectConfiguration {
         severity("fail")
-        // gRPC netty uses NettyServerBuilder/NettyChannelBuilder at compile time
-        exclude("io.grpc:grpc-netty-shaded")
       }
       onUnusedAnnotationProcessors {
         severity("fail")
@@ -588,12 +584,15 @@ tasks.named("check") {
 // Test Preparation and End-to-End Test Alias
 // ============================================================================
 
-// Unified task to build all artifacts required for system/integration tests
-// This ensures both shadow JAR and distribution are built before tests run
+// Unified task to build all artifacts required for system/integration tests.
+//
+// Lane F stage A item A13: this used to build the Worker distribution
+// (`:modules:indexer-worker:installDist`), which no longer exists. The one distribution left is
+// the Engine's, and the system tests that spawn a backend do so from the ONE remaining spawn path.
 tasks.register("prepareTests") {
   group = "verification"
   description = "Builds all artifacts required for system/integration tests"
-  dependsOn(":modules:indexer-worker:installDist")
+  dependsOn(":modules:ui:installDist")
 }
 
 // Alias for running all system tests (Process + Chaos tests)
@@ -624,7 +623,7 @@ tasks.register("quickBuild") {
 // ============================================================================
 
 // Every PMD task in every module — `pmdMain` plus one per non-main source set (`test`,
-// `integrationTest`, `systemTest`, `soakTest`, `determinismTest`, `testFixtures`). CI runs THIS,
+// `integrationTest`, `systemTest`, `determinismTest`, `testFixtures`). CI runs THIS,
 // not a hand-written list of task names: a module that registers a new `JvmTestSuite` gets a new
 // `pmd<Suite>` task, and a list would silently not cover it — the same dormancy shape follow-up 2
 // found in `pmdMain` and this change found in `modules/system-tests`. `dependsOn(provider { … })`

@@ -1,0 +1,164 @@
+{
+  "base": "7f665a33d",
+  "testedSources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/SettingsService.java",
+      "sha256": "ec9b69d603a13393c18a4b1880537edbad1902944d145b852bf552e51ed6e49b"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsV2.java",
+      "sha256": "cf9d29317c75828b94c7315d1de3d59a3a97a193e9f878b9945623b84fa96565"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServicePhase.java",
+      "sha256": "ffa9ea5cf8e301214fa77c1327729d7ad49f151378c872e2eebf4c61ba2988e1"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsServiceImpl.java",
+      "sha256": "918a2d846edb575b5b204234f7dcd6532ad9ad6ef1409804449aff6aeba23eb9"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java",
+      "sha256": "7122864395ad3a614e587047466e246418af520968f15c1f3dc0c4b58c49ffc1"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SettingsController.java",
+      "sha256": "b6e6d7b573aa4f2f0f81d75cfbd70c42cafae32159e3befd516b05b1631954f5"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsControllerSpecNudgeTest.java",
+      "sha256": "cf7d80d89c8f3d79a67c8714bb6da5541dc17ee43a00cd49920b8dfb0c65daac"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsWitnessReadTest.java",
+      "sha256": "8555ef18e353805dbab422233d9b39bee7e9ce7b48caf1ce740922b7112f6da1"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/UiModeIntentHttpContractTest.java",
+      "sha256": "0b1293b59e65f3e89e0a8d961ba93d69a45c3fdefc7bd71bd9160004838f9cd3"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsPatch.java",
+      "sha256": "8e0cce5c964bd84cd843f76bde0970919a5d416908e3f60cc4554498026cc901"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsPublicAdmissionTest.java",
+      "sha256": "5e6716e08052a37d28d73f65eb03d894750a429a1dea9d96c0f6b183a04e0863"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsPublicProducerTest.java",
+      "sha256": "4b4fec8ac6c83cf8398cefc3bf516ed5f3d383055d4edc589266f9cb1d6d4f92"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsControllerErrorProjectionTest.java",
+      "sha256": "28a658a6d9821c7ae9fe4fc185c3267afd8913f29784fa5568809e8ae28262c0"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsPublicStorageFailureHttpTest.java",
+      "sha256": "65922cb23a913de1a95fa4c0ec6474aa45dd3a2fcecf47b67f12b32fd790fa58"
+    }
+  ],
+  "verification": {
+    "revision": "7f665a33d-plus-public-final",
+    "command": "./gradlew.bat :modules:app-api:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-observability:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+    "summary": {
+      "tests": 4859,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "suites": 743
+    },
+    "tasks": [
+      {
+        "module": "app-api",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 207,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 43
+      },
+      {
+        "module": "app-observability",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 561,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 83
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 2860,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "suites": 429
+      },
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 1231,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 188
+      }
+    ]
+  },
+  "fullCommand": "./gradlew.bat :modules:app-api:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:app-observability:spotlessCheck :modules:ui:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+  "focused": "settings-public1451:32 cases, zero failures/errors/skips; typed class coverage1449:19 cases",
+  "review": "Independent production review found strict-wire, normalization, accept-race, key-code, error-class and accepted-storage-identity defects; root corrected each with executable regressions. Final accepted-storage correction independently reread.",
+  "rawRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp",
+  "artifacts": [
+    "settings-public1441-counts.json",
+    "settings-public1441-xml",
+    "settings-public1441.txt",
+    "settings-public1442.txt",
+    "settings-public1443-counts.json",
+    "settings-public1443-register.sarif",
+    "settings-public1443-register.txt",
+    "settings-public1443-xml",
+    "settings-public1443.txt",
+    "settings-public1444-counts.json",
+    "settings-public1444-xml",
+    "settings-public1444.txt",
+    "settings-public1445-counts.json",
+    "settings-public1445-xml",
+    "settings-public1445.txt",
+    "settings-public1446-counts.json",
+    "settings-public1446-xml",
+    "settings-public1446.txt",
+    "settings-public1447-counts.json",
+    "settings-public1447-xml",
+    "settings-public1447.txt",
+    "settings-public1448-counts.json",
+    "settings-public1448-register.sarif",
+    "settings-public1448-register.txt",
+    "settings-public1448-xml",
+    "settings-public1448.txt",
+    "settings-public1449-counts.json",
+    "settings-public1449-xml",
+    "settings-public1449.txt",
+    "settings-public1450-counts.json",
+    "settings-public1450-xml",
+    "settings-public1450.txt",
+    "settings-public1451-counts.json",
+    "settings-public1451-xml",
+    "settings-public1451.txt",
+    "settings-public1452-counts.json",
+    "settings-public1452-xml",
+    "settings-public1452.txt"
+  ],
+  "retention": "Through lane acceptance plus30 days; export before worktree release",
+  "limits": [
+    "Frontend producers still use old request shape and are next; checkpoint cannot ship",
+    "No new live real-model or installed successor proof",
+    "Hosted7f665a33d passed; this public producer needs its own final-head hosted proof"
+  ]
+}

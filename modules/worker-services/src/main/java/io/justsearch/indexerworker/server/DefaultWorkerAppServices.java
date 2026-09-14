@@ -21,9 +21,9 @@ import io.justsearch.indexerworker.loop.IndexingPipelineMetricCatalog;
 import io.justsearch.indexerworker.loop.IngestionOutcomeMetricCatalog;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerService;
-import io.justsearch.indexerworker.services.GrpcHealthService;
-import io.justsearch.indexerworker.services.GrpcIngestService;
-import io.justsearch.indexerworker.services.GrpcSearchService;
+import io.justsearch.indexerworker.services.WorkerHealthService;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
@@ -54,18 +54,19 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   /**
    * Tempdoc 885 item 3: the one pacing policy every indexing/backfill site throttles against.
    * Owned by {@code KnowledgeServer}, not by this class: the app services are reconstructed on a
-   * deferred-runtime upgrade and on dev hot-reload while the gRPC server (and therefore the
-   * interceptor that feeds the gauge) is not, so a per-instance gauge would be silently orphaned
-   * from its only producer.
+   * deferred-runtime upgrade and on dev hot-reload while the server — and therefore the producer
+   * that feeds the gauge, {@code ForegroundLoadGate} since item A9 and the gRPC
+   * {@code ForegroundLoadInterceptor} before it — is not, so a per-instance gauge would be
+   * silently orphaned from its only producer.
    */
   private final IndexingPacing indexingPacing;
-  private final GrpcSearchService searchService;
-  private final GrpcIngestService ingestService;
-  private final GrpcHealthService healthService;
+  private final WorkerSearchService searchService;
+  private final WorkerIngestService ingestService;
+  private final WorkerHealthService healthService;
   // W7.2: shared registry held by both IndexingLoop and SearchOrchestrator.
   private final EncoderBindings encoderBindings;
   // Tempdoc 418 Phase B — Worker-side filesystem watcher. Owned by appServices so its lifecycle
-  // matches the gRPC service set; closed during {@link #close()}.
+  // matches the service set's; closed during {@link #close()}.
   private final io.justsearch.indexerworker.services.WorkerMethvinWatcher workerWatcher;
 
   /**
@@ -73,8 +74,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * Production (KS) uses the 2-arg ctor below to pre-supply both values at ctor time so the
    * post-ctor wireMigrationActiveSupplier/wireEmbeddingTelemetryEvents paths can go away.
    */
-  public DefaultWorkerAppServices(InfraContext ctx) {
-    this(ctx, null, null, IndexingPacing.unthrottled());
+  public DefaultWorkerAppServices(WorkerExecutorRegistrations executors, InfraContext ctx) {
+    this(executors, ctx, null, null, IndexingPacing.unthrottled(),
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   /**
@@ -88,10 +90,24 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * which happens during indexing, well after KS init completes).
    */
   public DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
       InfraContext ctx,
       java.util.function.BooleanSupplier migrationActiveSupplier,
       io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
       IndexingPacing indexingPacing) {
+    this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    java.util.Objects.requireNonNull(executors, "executors");
+    java.util.Objects.requireNonNull(childRegistry, "childRegistry");
     // Tempdoc 410 §13 Slice B — publish the operator-resolved IngestionSkipPolicy before any
     // ingestion path can call it. WorkerScanOps and WorkerIngestionAuthority fire during gRPC
     // handling that always happens after this constructor returns, so installing here is safe.
@@ -105,8 +121,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     var extractionCatalog = new ExtractionMetricCatalog(ctx.metricRegistry());
     var ocrCatalog = new OcrMetricCatalog(ctx.metricRegistry());
     var ingestionOutcomeCatalog = new IngestionOutcomeMetricCatalog(ctx.metricRegistry());
-    var contentExtractor = buildContentExtractor(ctx, extractionCatalog, ocrCatalog);
-
     this.indexingPacing = java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     // Tempdoc 406 Phase 4a: services capture the current runtime via ctx.suppliers.
     // If ingest is DeferredRuntime, construct in "deferred mode": indexingLoop and
@@ -125,6 +139,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.encoderBindings = new EncoderBindings();
 
     if (ingestRunning != null) {
+      // Extraction owns an executor, a shutdown hook and (after first routed file) child-process
+      // slots. Deferred/read-only service sets cannot ingest and never close an IndexingLoop, so
+      // constructing an extractor for them leaks all three owners until process exit.
+      var contentExtractor =
+          buildContentExtractor(executors, ctx, extractionCatalog, ocrCatalog, childRegistry);
       // Tempdoc 516 P3 / Slice 5 (W7.2 followup): the 5 startup-config setters are now
       // IndexingLoopOptions record fields. Construct the options upfront so the loop is
       // immutable post-ctor (no setDetailedTracing/setCommitMetadataSupplier/etc.).
@@ -139,39 +158,54 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
               ingestRunning::latestCommitUserDataBestEffort,            // commitMetadataSupplier
               embeddingTelemetryEvents);                                // 516 P3 final — pre-wired at ctor
 
-      this.indexingLoop =
-          new IndexingLoop(
-              ctx.jobQueue(),
-              ingestRunning.indexingCoordinator(),
-              ingestRunning.commitOps(),
-              ingestRunning.documentFieldOps(),
-              ingestRunning.indexCountOps(),
-              ingestRunning::resolvedConfig,
-              ctx.signalBus(),
-              indexingPacing,
-              null, // embeddingService — wired by deferred init
-              pipelineCatalog,
-              extractionCatalog,
-              ingestionOutcomeCatalog,
-              contentExtractor,
-              encoderBindings,
-              loopOptions);
+      try {
+        this.indexingLoop =
+            new IndexingLoop(
+                executors.pdfOcr(),
+                executors.extractionTimebox(),
+                ctx.jobQueue(),
+                ingestRunning.indexingCoordinator(),
+                ingestRunning.commitOps(),
+                ingestRunning.documentFieldOps(),
+                ingestRunning.indexCountOps(),
+                ingestRunning::resolvedConfig,
+                ctx.signalBus(),
+                indexingPacing,
+                null, // embeddingService — wired by deferred init
+                pipelineCatalog,
+                extractionCatalog,
+                ingestionOutcomeCatalog,
+                contentExtractor,
+                encoderBindings,
+                loopOptions);
+      } catch (RuntimeException | Error failure) {
+        try {
+          contentExtractor.close();
+        } catch (RuntimeException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+        throw failure;
+      }
     } else {
       this.indexingLoop = null;
     }
 
-    // 2. gRPC search service (null embedding — wired by deferred init).
+    // 2. Search service (null embedding — wired by deferred init). Lane F item A3 converted it
+    // off the generated ImplBase. Item A9 deleted the DelegatingSearchService adapter with the
+    // gRPC server it was registered in; callers reach this instance through appServices().
     // Works against DeferredRuntime (read ops only) or RunningRuntime.
     // W7.2: shares the encoderBindings instance with IndexingLoop.
+    var servingRuntime = ctx.searchLifecycleSupplier().get();
     this.searchService =
-        new GrpcSearchService(ctx.searchLifecycleSupplier().get(), null, encoderBindings);
+        new WorkerSearchService(servingRuntime, null, encoderBindings);
 
-    // 3. gRPC ingest service. GrpcIngestService is null-tolerant for
-    // ingestLifecycle/indexingLoop — write methods return UNAVAILABLE when
+    // 3. Ingest service. WorkerIngestService is null-tolerant for
+    // ingestLifecycle/indexingLoop — write methods report UNAVAILABLE when
     // either is null. KS reconstructs this with non-null values after
-    // DeferredRuntime.upgradeWriter() and swaps the wrapper.
+    // DeferredRuntime.upgradeWriter(); item A9 deleted the wrapper it used to
+    // swap, so publishing the new appServices instance is the whole swap now.
     this.ingestService =
-        new GrpcIngestService(
+        new WorkerIngestService(
             ctx.jobQueue(),
             indexingLoop,
             ctx.signalBus(),
@@ -179,10 +213,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             ctx.indexBasePath(),
             ctx.activeIndexPath(),
             ingestRunning,
-            ctx.searchLifecycleSupplier().get(),
+            servingRuntime,
             ctx.migrationProgressSupplier(),
-            ctx.migrationSwitchingMaxDurationMs(),
-            ctx.initiateShutdownAction());
+            ctx.migrationSwitchingMaxDurationMs());
 
     // Tempdoc 419 / T5.3 (ADR-0028): wire the scoped reverse-lookup store. KnowledgeServer
     // constructed it; we just inject so the LookupPathByHash gRPC handler returns real data.
@@ -197,11 +230,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.searchService.setActiveGenerationSupplier(
         this.ingestService.activeGenerationSupplier());
 
-    // 4. gRPC health service
+    // 4. Health service (also converted off the ImplBase; its wire adapter went at item A9).
     List<WorkerModelDiscovery.DiscoveredModel> discoveredModels =
         WorkerModelDiscovery.discoverAll();
     this.healthService =
-        new GrpcHealthService(
+        new WorkerHealthService(
             ctx.config().serviceVersion(),
             ctx.jobQueue(),
             ctx.searchLifecycleSupplier().get().indexCountOps(),
@@ -209,7 +242,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             this::indexingLoopState,
             discoveredModels);
 
-    // 5. Cross-service wiring (previously in KnowledgeServerGrpcWiring)
+    // 5. Cross-service wiring (previously in the gRPC wiring, deleted at item A9)
     RerankerConfig.ChunkRerankerConfig chunkRerankerConfig =
         RerankerConfig.ChunkRerankerConfig.fromEnv();
     searchService.setChunkRerankerConfig(chunkRerankerConfig);
@@ -268,7 +301,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     java.util.function.BiConsumer<Path, Boolean> reconcileSink =
         this.ingestService::reconcileRoot;
     this.workerWatcher = new io.justsearch.indexerworker.services.WorkerMethvinWatcher(
-        ctx.jobQueue(), workerWatcherCatalog, deletePathSink, reconcileSink);
+        executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog, deletePathSink,
+        reconcileSink);
     this.ingestService.setRootWatcherRegistry(
         new io.justsearch.indexerworker.services.RootWatcherRegistry(this.workerWatcher));
   }
@@ -276,17 +310,17 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   // ==================== Service accessors ====================
 
   @Override
-  public GrpcSearchService grpcSearchService() {
+  public WorkerSearchService searchService() {
     return searchService;
   }
 
   @Override
-  public GrpcIngestService grpcIngestService() {
+  public WorkerIngestService ingestService() {
     return ingestService;
   }
 
   @Override
-  public GrpcHealthService grpcHealthService() {
+  public WorkerHealthService healthService() {
     return healthService;
   }
 
@@ -488,20 +522,23 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * {@link EnvRegistry#EXTRACTION_SANDBOX_COMMAND} remains as an operator override.
    */
   // Package-private for DefaultWorkerAppServicesSandboxProbeTest, like parseCsvSet above: the
-  // env-to-extractor chain has no other seam, and the probe-failure branch decides whether a
-  // session extracts at all.
+  // env-to-extractor chain has no other seam, and the probe-failure branch decides whether
+  // process-routed families are available for the session.
   static TimeboxedContentExtractor buildContentExtractor(
+      WorkerExecutorRegistrations executors,
       @SuppressWarnings("unused") InfraContext ctx,
       ExtractionMetricCatalog catalog,
-      OcrMetricCatalog ocrCatalog) {
+      OcrMetricCatalog ocrCatalog,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     String mode = EnvRegistry.EXTRACTION_SANDBOX_MODE.getString("auto").trim();
-    OcrRoutingConfig ocrConfig = resolvedOcrConfig();
+    OcrRoutingConfig ocrConfig = resolvedOcrConfig().withWorkerLimit(executors.pdfOcr().spec().threadCount());
     logEffectiveOcrConfig(ocrConfig);
     TikaExtractionPolicy extractionPolicy = resolvedExtractionPolicy();
     ExtractionSandboxFactory.Mode sandboxMode = parseSandboxMode(mode);
     if (sandboxMode == ExtractionSandboxFactory.Mode.IN_PROCESS) {
       return ExtractionSandboxFactory.inProcessStructured(
-          catalog, ocrConfig, ocrCatalog, extractionPolicy);
+          executors.pdfOcr(),
+          executors.extractionTimebox(), catalog, ocrConfig, ocrCatalog, extractionPolicy);
     }
     String rawCommand = EnvRegistry.EXTRACTION_SANDBOX_COMMAND.getString("");
     List<String> command =
@@ -522,25 +559,29 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         command);
 
     // Spawning is lazy, so without this a broken child command would be invisible until the first
-    // file and would then fail EVERY file. One bounded check here converts that into a degraded
-    // but working session.
+    // process-routed file. The probe makes the failure visible at boot, but it must not weaken the
+    // process boundary: AUTO still serves decoder-only families in process, while routed families
+    // report SANDBOX_FAILED and follow the durable retry policy.
     Optional<String> probeFailure =
         ExtractionSandboxFactory.probeChildCommand(
-            command, extractionPolicy, ocrConfig, ExtractionSandboxFactory.PROBE_TIMEOUT);
+            executors.sandboxReaders(), command, extractionPolicy, ocrConfig,
+            ExtractionSandboxFactory.PROBE_TIMEOUT,
+            childRegistry);
     if (probeFailure.isPresent()) {
       log.warn(
-          "Extraction sandbox child failed its startup probe ({}); falling back to in_process "
-              + "extraction for this session. Command: {}",
+          "Extraction sandbox child failed its startup probe ({}); process-routed extraction "
+              + "will remain unavailable until the child command recovers. Command: {}",
           probeFailure.get(),
           command);
       if (catalog != null) {
         catalog.sandboxRestartTotal.increment(
             ExtractionSandboxRestartTags.of(PersistentExtractionSandbox.REASON_PROBE_FAILED));
       }
-      return ExtractionSandboxFactory.inProcessStructured(
-          catalog, ocrConfig, ocrCatalog, extractionPolicy);
     }
     return ExtractionSandboxFactory.create(
+        executors.pdfOcr(),
+        executors.extractionTimebox(),
+        executors.sandboxReaders(),
         sandboxMode,
         extractionPolicy,
         ocrConfig,
@@ -548,7 +589,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         catalog,
         ocrCatalog,
         command,
-        poolSettings);
+        poolSettings,
+        childRegistry);
   }
 
   private static ExtractionSandboxFactory.Mode parseSandboxMode(String mode) {

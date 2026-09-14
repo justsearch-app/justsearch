@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
-class NrtGatingTriggerTest {
+class NrtGatingTriggerTest extends LuceneExecutorTestBase {
   @Test
   void maybeRefreshTriggersWhenLagExceedsTarget() throws Exception {
     Path base = Files.createTempDirectory("justsearch-data-");
@@ -22,7 +22,7 @@ class NrtGatingTriggerTest {
     String prev = System.getProperty("justsearch.config");
     System.setProperty("justsearch.config", cfg.toString());
     try {
-      var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+      var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       r.indexingCoordinator().indexSingle(
           new IndexDocument(
               java.util.Map.of(

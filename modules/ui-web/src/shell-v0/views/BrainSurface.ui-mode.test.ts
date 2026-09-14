@@ -14,14 +14,55 @@ interface BrainHost extends HTMLElement {
   updateComplete: Promise<boolean>;
 }
 
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const realFetch = globalThis.fetch;
 let posts: Array<{ url: string; body: string; intent: string | null }> = [];
 let postStatus = 200;
 let deferPosts = false;
 let postResolvers: Array<(response: Response) => void> = [];
+let acceptedRevision = 0;
+let lastCommittedOperationKey: string | null = null;
+
+function settingsSnapshot(): Response {
+  return new Response(JSON.stringify({
+    ui: { mode: 'simple' },
+    llm: {},
+    witness: { acceptedRevision, lastCommittedOperationKey },
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
 
 function response(status = postStatus): Response {
-  return new Response('{}', { status, headers: { 'content-type': 'application/json' } });
+  if (status !== 200) {
+    return new Response('{}', { status, headers: { 'content-type': 'application/json' } });
+  }
+  const request = JSON.parse(posts[posts.length - 1]?.body ?? '{}') as {
+    operationKey?: string;
+    witness?: { acceptedRevision?: number };
+  };
+  acceptedRevision = (request.witness?.acceptedRevision ?? 0) + 1;
+  lastCommittedOperationKey = request.operationKey ?? null;
+  return new Response(JSON.stringify({
+    state: 'COMPLETE',
+    operationKey: request.operationKey,
+    witness: { acceptedRevision, lastCommittedOperationKey },
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
+function expectModeAttempt(body: string, mode: 'simple' | 'advanced', revision: number): void {
+  const attempt = JSON.parse(body) as {
+    ui: { mode: string };
+    witness: { acceptedRevision: number; lastCommittedOperationKey: string | null };
+    operationKey: string;
+  };
+  expect(attempt).toEqual({
+    ui: { mode },
+    witness: {
+      acceptedRevision: revision,
+      lastCommittedOperationKey: revision === 0 ? null : expect.stringMatching(UUID_V7),
+    },
+    operationKey: expect.stringMatching(UUID_V7),
+  });
+  expect(attempt.operationKey).toMatch(UUID_V7);
 }
 
 async function settle(el: BrainHost): Promise<void> {
@@ -39,6 +80,8 @@ beforeEach(() => {
   postStatus = 200;
   deferPosts = false;
   postResolvers = [];
+  acceptedRevision = 0;
+  lastCommittedOperationKey = null;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
@@ -57,10 +100,7 @@ beforeEach(() => {
       return response();
     }
     if (url.endsWith('/api/settings/v2')) {
-      return new Response(JSON.stringify({ ui: { mode: 'simple' }, llm: {} }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return settingsSnapshot();
     }
     return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
@@ -123,7 +163,7 @@ describe('BrainSurface shared detail level', () => {
 
     expect(getUiMode()).toBe('advanced');
     expect(posts).toHaveLength(1);
-    expect(JSON.parse(posts[0]!.body)).toEqual({ ui: { mode: 'advanced' } });
+    expectModeAttempt(posts[0]!.body, 'advanced', 0);
     expect(posts[0]!.intent).toMatch(/:1$/);
   });
 
@@ -140,7 +180,7 @@ describe('BrainSurface shared detail level', () => {
     expect(getUiMode()).toBe('simple');
     expect(modeButtons(el).find((button) => button.textContent?.trim() === 'Simple')?.classList)
       .toContain('active');
-    expect(el.shadowRoot?.textContent).toContain("Couldn't save detail level (HTTP 500).");
+    expect(el.shadowRoot?.textContent).toContain('Settings request failed (HTTP_500)');
   });
 
   it('serializes rapid changes so the last click is the final persisted value', async () => {
@@ -156,13 +196,14 @@ describe('BrainSurface shared detail level', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(getUiMode()).toBe('simple');
-    expect(posts.map((post) => JSON.parse(post.body))).toEqual([{ ui: { mode: 'advanced' } }]);
+    expect(posts).toHaveLength(1);
+    expectModeAttempt(posts[0]!.body, 'advanced', 0);
+    expect(posts[0]!.intent).toMatch(/:\d+$/);
     postResolvers.shift()?.(response(200));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(posts.map((post) => JSON.parse(post.body))).toEqual([
-      { ui: { mode: 'advanced' } },
-      { ui: { mode: 'simple' } },
-    ]);
+    expect(posts).toHaveLength(2);
+    expectModeAttempt(posts[1]!.body, 'simple', 1);
+    expect(posts[1]!.intent).toMatch(/:\d+$/);
     postResolvers.shift()?.(response(200));
     await settle(el);
 
@@ -187,6 +228,6 @@ describe('BrainSurface shared detail level', () => {
 
     expect((el as unknown as { busy: { mode: boolean } }).busy.mode).toBe(false);
     expect(getUiMode()).toBe('simple');
-    expect(el.shadowRoot?.textContent).toContain("Couldn't save detail level: the request timed out.");
+    expect(el.shadowRoot?.textContent).toContain('Settings request timed out.');
   });
 });

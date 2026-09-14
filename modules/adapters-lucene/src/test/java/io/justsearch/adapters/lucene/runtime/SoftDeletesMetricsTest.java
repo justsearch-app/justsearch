@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import org.apache.lucene.index.SoftDeletesRetentionMergePolicy;
 import org.junit.jupiter.api.Test;
 
-class SoftDeletesMetricsTest {
+class SoftDeletesMetricsTest extends LuceneExecutorTestBase {
 
   @Test
   void installsTelemetryMergePolicyWhenListenerProvided() throws Exception {
@@ -32,7 +32,7 @@ class SoftDeletesMetricsTest {
                   FieldCatalogDef.forTesting(768),
                   new SsotCommitMetadataSource(),
                   new JsonSchemaCommitMetadataValidator())
-              .ephemeral()
+              .ephemeral().withExecutorRegistrations(testLuceneExecutors())
               .withSoftDeletesMetrics(
                   new SoftDeletesMetrics() {
                     @Override
@@ -63,7 +63,7 @@ class SoftDeletesMetricsTest {
     System.setProperty("justsearch.config", cfg.toString());
     try {
       RunningRuntime runtime =
-          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       var a = new LifecycleTestAccessor(runtime);
       assertNotNull(a.mergePolicy());
       assertInstanceOf(SoftDeletesRetentionMergePolicy.class, a.mergePolicy());

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.nio.file.Path;
 
 /**
@@ -24,19 +26,19 @@ public interface DiagnosticsService {
    *
    * @return absolute path to the produced ZIP
    */
-  Path exportDiagnostics() throws Exception;
+  Path exportDiagnostics(EngineContext engineContext) throws Exception;
 
   /**
    * Variant carrying an optional frontend-supplied telemetry section (opaque JSON, e.g. the
    * wire-drift ring summary) to be embedded in the export. {@code null} or blank means "no
-   * frontend section". Default delegates to {@link #exportDiagnostics()} so existing
+   * frontend section". Default delegates to {@link #exportDiagnostics(EngineContext)} so existing
    * implementations and the registry-operation path are unaffected.
    *
    * @param feTelemetryJson frontend telemetry as a JSON object string, or {@code null}
    * @return absolute path to the produced ZIP
    */
-  default Path exportDiagnostics(String feTelemetryJson) throws Exception {
-    return exportDiagnostics();
+  default Path exportDiagnostics(String feTelemetryJson, EngineContext engineContext) throws Exception {
+    return exportDiagnostics(engineContext);
   }
 
   /**

@@ -2,10 +2,7 @@
 package io.justsearch.indexerworker.queue;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -22,8 +19,7 @@ import org.slf4j.LoggerFactory;
  */
 final class SqliteQueueMigrationOps {
   private static final Logger log = LoggerFactory.getLogger(SqliteQueueMigrationOps.class);
-  private static final byte[] SQLITE_HEADER =
-      new byte[] {'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm', 'a', 't', ' ', '3', 0};
+
 
   private SqliteQueueMigrationOps() {}
 
@@ -36,34 +32,15 @@ final class SqliteQueueMigrationOps {
   /**
    * Refuses a database written by a newer binary before opening a writable SQLite connection.
    *
-   * <p>SQLite stores {@code user_version} as a big-endian integer at header offset 60. Reading that
-   * field directly avoids journal-mode and other connection setup writes before compatibility is
-   * established.
+   * <p>The private snapshot includes the WAL and cannot modify the original SHM on refusal.
    */
   static void refuseFutureSchema(Path dbPath) throws SQLException, IOException {
-    ByteBuffer header = ByteBuffer.allocate(64);
-    try (FileChannel channel = FileChannel.open(dbPath, StandardOpenOption.READ)) {
-      while (header.hasRemaining() && channel.read(header) >= 0) {
-        // Continue until the complete fixed-size header is available.
+    try (var snapshot = io.justsearch.configuration.persistence.SqliteStoreSnapshot.open(dbPath)) {
+      int version = getSchemaVersion(snapshot.connection());
+      if (version > SqliteSchema.TARGET_VERSION) {
+        throw new SQLException("Unsupported jobs database schema version " + version
+            + " (this binary supports through " + SqliteSchema.TARGET_VERSION + ")");
       }
-    }
-    if (header.position() < header.capacity()) {
-      return;
-    }
-    byte[] bytes = header.array();
-    for (int i = 0; i < SQLITE_HEADER.length; i++) {
-      if (bytes[i] != SQLITE_HEADER[i]) {
-        return;
-      }
-    }
-    int version = header.getInt(60);
-    if (version > SqliteSchema.TARGET_VERSION) {
-      throw new SQLException(
-          "Unsupported jobs database schema version "
-              + version
-              + " (this binary supports through "
-              + SqliteSchema.TARGET_VERSION
-              + ")");
     }
   }
 
@@ -113,23 +90,18 @@ final class SqliteQueueMigrationOps {
               + ")");
     }
 
-    if (current >= SqliteSchema.TARGET_VERSION) {
-      ensureV6LedgerPrivacySchema(conn);
-      log.debug("Database schema is up to date (version {})", current);
-      return;
-    }
-
-    // Backup before migration (backup action handles its own existedBeforeOpen guard)
-    backupAction.perform();
+    // One transaction owner handles both the version ladder and repairs on a current schema.
+    if (current < SqliteSchema.TARGET_VERSION) backupAction.perform();
 
     log.info("Migrating database from version {} to {}", current, SqliteSchema.TARGET_VERSION);
 
     // Run migrations in a transaction
-    // NOTE: PRAGMA user_version is NOT transactional in SQLite, so we set it
-    // only AFTER commit to ensure version matches schema state.
+    // SQLite user_version participates in this transaction. Commit it with the DDL, otherwise
+    // a failed version write can leave a newer schema stamped as an older one.
     boolean wasAutoCommit = conn.getAutoCommit();
     conn.setAutoCommit(false);
     int targetVersion = SqliteSchema.TARGET_VERSION;
+    boolean transactionEnded = false;
     try {
       while (current < targetVersion) {
         int nextVersion = current + 1;
@@ -142,20 +114,21 @@ final class SqliteQueueMigrationOps {
           stepHook.afterStep(nextVersion);
         }
       }
-      conn.commit();
       ensureV6LedgerPrivacySchema(conn);
-      // Set version AFTER commit (PRAGMA is not transactional)
       setSchemaVersion(conn, targetVersion);
+      conn.commit();
+      transactionEnded = true;
       log.info("Database migration completed successfully (now at version {})", targetVersion);
-    } catch (SQLException e) {
-      conn.rollback();
-      log.error(
-          "Migration failed, rolled back. Schema version remains at {}",
-          getSchemaVersion(conn),
-          e);
-      throw e;
+    } catch (SQLException | RuntimeException | Error failure) {
+      try { conn.rollback(); transactionEnded = true; } catch (SQLException rollbackFailure) {
+        failure.addSuppressed(rollbackFailure);
+      }
+      log.error("Migration failed; transaction cleanup requested", failure);
+      throw failure;
     } finally {
-      conn.setAutoCommit(wasAutoCommit);
+      // Restoring auto-commit after a failed rollback could commit the partial DDL.
+      if (transactionEnded) conn.setAutoCommit(wasAutoCommit);
+      else conn.close();
     }
   }
 
@@ -279,6 +252,57 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V12 to V13: Ensured deleted_at column on document_identity (tempdoc 931 §C.6)");
       }
+      case 14 -> {
+        addColumnIfMissing(conn, "originator", SqliteSchema.MIGRATE_V13_TO_V14_JOBS_ORIGINATOR);
+        addColumnIfMissing(conn, "transport", SqliteSchema.MIGRATE_V13_TO_V14_JOBS_TRANSPORT);
+        try (Statement stmt = conn.createStatement()) {
+          if (!columnExists(conn, "ingestion_ledger", "originator")) {
+            stmt.execute(SqliteSchema.MIGRATE_V13_TO_V14_LEDGER_ORIGINATOR);
+          }
+          if (!columnExists(conn, "ingestion_ledger", "transport")) {
+            stmt.execute(SqliteSchema.MIGRATE_V13_TO_V14_LEDGER_TRANSPORT);
+          }
+        }
+        log.info("V13 to V14: Ensured durable ingestion attribution");
+      }
+      case 15 -> {
+        addColumnIfMissing(conn, "content_hash", SqliteSchema.MIGRATE_V14_TO_V15_CONTENT_HASH);
+        log.info("V14 to V15: Ensured durable content hash for operation unit recovery");
+      }
+      case 16 -> {
+        try (Statement stmt = conn.createStatement()) {
+          if (!columnExists(conn, "switch_buffer", "revision")) {
+            stmt.execute(SqliteSchema.MIGRATE_V15_TO_V16_SWITCH_REVISION);
+          }
+          stmt.execute(SqliteSchema.BACKFILL_SWITCH_REVISIONS);
+        }
+        log.info("V15 to V16: Identified durable switch-buffer replacements");
+      }
+      case 17 -> {
+        addColumnIfMissing(conn, "unit_revision", SqliteSchema.MIGRATE_V16_TO_V17_UNIT_REVISION);
+        try (Statement stmt = conn.createStatement()) {
+          stmt.execute(SqliteSchema.BACKFILL_UNIT_REVISIONS);
+        }
+        log.info("V16 to V17: Identified durable queue admissions");
+      }
+      case 18 -> {
+        addColumnIfMissing(conn, "walk_seen_epoch", SqliteSchema.MIGRATE_V17_TO_V18_WALK_EPOCH);
+        try (Statement stmt = conn.createStatement()) {
+          String[][] columns = {
+              {"operation_key", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_OPERATION},
+              {"unit_revision", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_REVISION},
+              {"content_hash", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_HASH},
+              {"terminal_coverage", SqliteSchema.MIGRATE_V17_TO_V18_LEDGER_COVERAGE}};
+          for (String[] column : columns) {
+            if (!columnExists(conn, "ingestion_ledger", column[0])) stmt.execute(column[1]);
+          }
+          stmt.execute(SqliteSchema.CREATE_INGESTION_WALK_PROGRESS);
+          stmt.execute(SqliteSchema.CREATE_JOBS_WALK_EPOCH_INDEX);
+          stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_UNIT_INDEX);
+          stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_HASH_INDEX);
+        }
+        log.info("V17 to V18: Recorded finite-walk coverage and terminal receipts");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }
@@ -287,8 +311,6 @@ final class SqliteQueueMigrationOps {
     if (!tableExists(conn, "ingestion_ledger") || !columnExists(conn, "ingestion_ledger", "job_path")) {
       return;
     }
-    boolean wasAutoCommit = conn.getAutoCommit();
-    conn.setAutoCommit(false);
     try (Statement stmt = conn.createStatement()) {
       stmt.execute("ALTER TABLE ingestion_ledger RENAME TO ingestion_ledger_with_paths");
       stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
@@ -297,24 +319,22 @@ final class SqliteQueueMigrationOps {
           INSERT INTO ingestion_ledger (
             id, path_hash, collection, outcome_class, reason_code, retry_policy,
             diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
-            source_kind, artifact_status, policy_id, parser_id
+            source_kind, artifact_status, policy_id, parser_id, originator, transport,
+            operation_key, unit_revision, content_hash, terminal_coverage
           )
           SELECT id, COALESCE(path_hash, 'UNKNOWN'), collection, outcome_class, reason_code, retry_policy,
                  diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
                  COALESCE(source_kind, 'UNKNOWN'), COALESCE(artifact_status, 'NOT_CREATED'),
-                 COALESCE(policy_id, 'UNKNOWN'), COALESCE(parser_id, 'UNKNOWN')
+                 COALESCE(policy_id, 'UNKNOWN'), COALESCE(parser_id, 'UNKNOWN'), originator, transport,
+                 operation_key, unit_revision, content_hash, terminal_coverage
           FROM ingestion_ledger_with_paths
           """);
       stmt.execute("DROP TABLE ingestion_ledger_with_paths");
       stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_PATH_TIME_INDEX);
       stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_OUTCOME_INDEX);
-      conn.commit();
+      stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_UNIT_INDEX);
+      stmt.execute(SqliteSchema.CREATE_LEDGER_WALK_HASH_INDEX);
       log.info("Removed raw job paths from ingestion ledger schema");
-    } catch (SQLException | RuntimeException e) {
-      conn.rollback();
-      throw e;
-    } finally {
-      conn.setAutoCommit(wasAutoCommit);
     }
   }
 

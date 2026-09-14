@@ -6,18 +6,21 @@ package io.justsearch.app.services.worker;
  * loop (tempdoc 630 latency-hardening slice). A task scheduled every {@code expectedIntervalMs} that
  * observes an inter-tick gap far larger than its interval was almost certainly frozen — the machine
  * suspended and resumed. Pure + {@code nowMs}-injected (the project idiom; see {@code
- * SupervisionDecision} / {@code PolledStateLiveness} / {@code WorkerLivenessDecision}) so it is
+ * BootRecoveryDecision} / {@code PolledStateLiveness}) so it is
  * unit-testable without a real clock or a real suspend.
  *
  * <p>Wall-clock by necessity: only a clock that <em>advances</em> during the freeze can see the gap
  * (tempdoc 630 research pass — a monotonic clock's suspend behavior is platform-inconsistent, so it
- * cannot be relied on here). The host loop (the Head-side {@code KnowledgeServerHealthMonitor})
- * reacts to a detected resume by eagerly reconnecting the gRPC channel and re-registering watchers +
- * reconciling, instead of waiting for the reactive (first-RPC / periodic-sync) recovery.
+ * cannot be relied on here). The host loop ({@code KnowledgeServerHealthMonitor}) reacts to a
+ * detected resume by re-registering watchers and reconciling, instead of waiting for the reactive
+ * (periodic-sync) recovery. It also used to reconnect the gRPC channel; lane F stage A item A11
+ * deleted that half, because there is no channel to reconnect — the watcher half is filesystem-
+ * shaped and survives, since a watcher frozen through a suspend missed every event in the window
+ * whatever the process count.
  *
  * <p>Benign in both directions, deliberately: a missed resume (gap just under threshold) simply
  * falls back to the existing reactive recovery; a false positive (a genuine long pause) only
- * triggers one extra cheap reconnect + freshness-skipping reconcile. The tolerance is therefore set
+ * triggers one extra freshness-skipping reconcile. The tolerance is therefore set
  * generously so ordinary GC / scheduler jitter never trips it.
  */
 public final class ResumeDetector {

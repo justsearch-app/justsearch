@@ -11,6 +11,7 @@
  * load + change. Defaults to 'simple' (hide advanced affordances until known).
  */
 import { createObservableStore } from './createObservableStore.js';
+import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch, type SettingsTransport, type SettingsCompletion } from '../../api/settingsAttempt.js';
 
 export type UiMode = 'simple' | 'advanced';
 
@@ -67,6 +68,25 @@ export function enqueueUiModePersistence<T>(
   writer: (signal: AbortSignal, intent: string) => Promise<T>,
   options: UiModePersistenceOptions = {},
 ): Promise<T> {
+  return enqueuePersistence(writer, options, false);
+}
+
+/** Freeze event-time fields; observe the witness only when this queued writer starts. */
+export function enqueueUiModeSettings(
+  send: SettingsTransport, patch: SettingsPatch, options: UiModePersistenceOptions = {},
+): Promise<SettingsCompletion> {
+  const captured = captureSettingsPatch(patch);
+  return enqueuePersistence((signal, intent) => saveAbsoluteSettings(send, captured, {
+    signal, timeoutMs: options.timeoutMs,
+    headers: { [UI_MODE_INTENT_HEADER]: intent },
+  }), options, true);
+}
+
+function enqueuePersistence<T>(
+  writer: (signal: AbortSignal, intent: string) => Promise<T>,
+  options: UiModePersistenceOptions,
+  writerOwnsDeadline: boolean,
+): Promise<T> {
   const controller = new AbortController();
   // Start allocation at enqueue time, not request-start time: this sequence represents user intent
   // order even when an earlier network request is still holding the local persistence queue.
@@ -85,6 +105,9 @@ export function enqueueUiModePersistence<T>(
     try {
       const persistence = intent.then((allocatedIntent) => {
         if (controller.signal.aborted) throw controller.signal.reason;
+        // Allocation is bounded by the queue. Once the settings helper starts, its own
+        // deadline retains the frozen attempt identity; a competing queue timer would lose it.
+        if (writerOwnsDeadline && timeoutId !== undefined) clearTimeout(timeoutId);
         return writer(controller.signal, allocatedIntent);
       });
       return await Promise.race([persistence, timeout]);

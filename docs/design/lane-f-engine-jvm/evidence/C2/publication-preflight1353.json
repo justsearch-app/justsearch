@@ -1,0 +1,7 @@
+{
+  "candidate": "cfa4a78b8da6323d2852a9997cd82d2b1a1e7d07",
+  "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A",
+  "path": "tmp/c2-publication-preflight1353.txt",
+  "sha256": "b45baf244f6fc48c344c800808b63045adbbd6b2f0d6d7a4014afa7c78a0b934",
+  "result": "FAIL: Public claims passed; frontend npm ci EPERM for loaded lightningcss native module; isolated same-commit retry1355 pending"
+}

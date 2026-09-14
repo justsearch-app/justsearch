@@ -22,6 +22,7 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { saveAbsoluteSettings } from '../../api/settingsAttempt.js';
 import { present } from '../display/present.js';
 import { formatBytes } from '../display/format.js';
 import { projectFact } from '../display/facts.js';
@@ -42,8 +43,7 @@ import {
 } from '../state/aiStateStore.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import {
-  enqueueUiModePersistence,
-  UI_MODE_INTENT_HEADER,
+  enqueueUiModeSettings,
   getUiMode,
   getUiModeRevision,
   setUiMode,
@@ -1408,18 +1408,7 @@ export class BrainSurface extends JfElement {
     // queue was insufficient: a later top-bar click could otherwise persist before this request.
     let failure: string | null = null;
     try {
-      const response = await enqueueUiModePersistence((signal, intent) =>
-        authorizedFetch(this.base() + '/api/settings/v2', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            [UI_MODE_INTENT_HEADER]: intent,
-          },
-          body: JSON.stringify({ ui: { mode } }),
-          signal,
-        }),
-      );
-      if (!response.ok) failure = `Couldn't save detail level (HTTP ${response.status}).`;
+      await enqueueUiModeSettings((path, init) => authorizedFetch(this.base() + path, init), { ui: { mode } });
     } catch (err) {
       failure = err instanceof Error ? err.message : String(err);
     }
@@ -1641,12 +1630,22 @@ export class BrainSurface extends JfElement {
   // ---------- LLM settings persist ----------
 
   private async patchLlm(updates: Partial<LlmSettings>): Promise<void> {
-    this.llm = { ...this.llm, ...updates };
-    await authorizedFetch(this.base() + '/api/settings/v2', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ llm: updates }),
-    });
+    const context = updates.contextWindow;
+    const normalized = { ...updates, ...(context == null ? {} : { contextWindow: context > 0 ? Math.max(512, context) : 0 }) };
+    try {
+      const result = await saveAbsoluteSettings((path, init) => authorizedFetch(this.base() + path, init), { llm: normalized });
+      // A first completion may carry normalized values. Receipt-only replay still
+      // confirms this narrow intent; it must not overwrite unrelated LLM fields.
+      const committed: Partial<LlmSettings> = { ...normalized };
+      for (const key of Object.keys(updates) as Array<keyof LlmSettings>) {
+        const value = result.projection.llm?.[key];
+        if (value !== undefined && value !== null) Object.assign(committed, { [key]: value });
+      }
+      this.llm = { ...this.llm, ...committed };
+      this.runtimeError = null;
+    } catch (err) {
+      this.runtimeError = err instanceof Error ? err.message : String(err);
+    }
   }
 
   // ---------- Render: alerts + header ----------
@@ -3286,7 +3285,7 @@ export class BrainSurface extends JfElement {
                 type="text"
                 .value=${this.llm.modelPath ?? ''}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ modelPath: (e.target as HTMLInputElement).value || null })}
+                  void this.patchLlm({ modelPath: (e.target as HTMLInputElement).value })}
               />
             </label>
             <label class="field">
@@ -3296,7 +3295,7 @@ export class BrainSurface extends JfElement {
                 .value=${this.llm.serverExecutable ?? ''}
                 @change=${(e: Event) =>
                   void this.patchLlm({
-                    serverExecutable: (e.target as HTMLInputElement).value || null,
+                    serverExecutable: (e.target as HTMLInputElement).value,
                   })}
               />
             </label>
@@ -3308,7 +3307,7 @@ export class BrainSurface extends JfElement {
                 .value=${String(this.llm.contextWindow ?? 0)}
                 @change=${(e: Event) =>
                   void this.patchLlm({
-                    contextWindow: Number((e.target as HTMLInputElement).value) || 0,
+                    contextWindow: Math.max(0, Number.parseInt((e.target as HTMLInputElement).value, 10) || 0),
                   })}
               />
             </label>
@@ -3319,7 +3318,7 @@ export class BrainSurface extends JfElement {
                 min="0"
                 .value=${String(this.llm.maxTokens ?? 0)}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ maxTokens: Number((e.target as HTMLInputElement).value) || 0 })}
+                  void this.patchLlm({ maxTokens: Math.max(16, Math.min(16_384, Number.parseInt((e.target as HTMLInputElement).value, 10) || 16)) })}
               />
             </label>
             <label class="field">
@@ -3329,7 +3328,7 @@ export class BrainSurface extends JfElement {
                 min="0"
                 .value=${String(this.llm.gpuLayers ?? 0)}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ gpuLayers: Number((e.target as HTMLInputElement).value) || 0 })}
+                  void this.patchLlm({ gpuLayers: Math.max(0, Number.parseInt((e.target as HTMLInputElement).value, 10) || 0) })}
               />
             </label>
             <label class="field">
@@ -3338,7 +3337,7 @@ export class BrainSurface extends JfElement {
                 type="text"
                 .value=${this.llm.llamaLibPath ?? ''}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ llamaLibPath: (e.target as HTMLInputElement).value || null })}
+                  void this.patchLlm({ llamaLibPath: (e.target as HTMLInputElement).value })}
               />
             </label>
           </div>

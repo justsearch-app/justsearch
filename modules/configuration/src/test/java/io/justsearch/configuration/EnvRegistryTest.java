@@ -8,6 +8,15 @@ import org.junit.jupiter.api.Test;
 class EnvRegistryTest {
 
     @Test
+    void serverExecutableOwnershipMarkerIsRetired() {
+        assertTrue(java.util.Arrays.stream(EnvRegistry.values())
+            .noneMatch(key -> "justsearch.server.exe.source".equals(key.sysProp())));
+        var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
+        builder.contributeEnvRegistry();
+        assertNull(builder.build().resolution("justsearch.server.exe.source"));
+    }
+
+    @Test
     void sysProp_returnsCorrectValue() {
         assertEquals("justsearch.data.dir", EnvRegistry.DATA_DIR.sysProp());
         assertEquals("justsearch.ssot.path", EnvRegistry.SSOT_PATH.sysProp());
@@ -55,8 +64,13 @@ class EnvRegistryTest {
 
     @Test
     void getLong_readsSystemProperty() {
-        withSysProp(EnvRegistry.HEAD_PID.sysProp(), "1234", () ->
-            assertEquals(1234L, EnvRegistry.HEAD_PID.getLong(900L)));
+        // The key here is a FIXTURE for the accessor, not the accessor's owner: getLong parses
+        // whatever key it is handed. It used to be HEAD_PID, which lane F stage A item A10 deleted
+        // along with its last reader (the Worker process's heartbeat suicide-pact needed Head's
+        // PID; one JVM does not). No key is read as a long in production today, so pinning the
+        // accessor to a numeric key that IS read keeps the test honest about what it covers.
+        withSysProp(EnvRegistry.API_PORT.sysProp(), "1234", () ->
+            assertEquals(1234L, EnvRegistry.API_PORT.getLong(900L)));
     }
 
     @Test

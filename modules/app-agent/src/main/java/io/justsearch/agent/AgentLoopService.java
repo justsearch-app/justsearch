@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentErrorClass;
 import io.justsearch.agent.api.AgentErrorCode;
@@ -166,7 +168,7 @@ public final class AgentLoopService implements AgentService {
       OperationDispatcher operationExecutor,
       AgentToolEmitter agentToolEmitter,
       FileOperationLog fileOperationLog,
-      Supplier<List<String>> rootPathsSupplier) {
+      Function<EngineContext, List<String>> rootPathsSupplier) {
     this(
         onlineAiService,
         operationCatalog,
@@ -184,7 +186,7 @@ public final class AgentLoopService implements AgentService {
       OperationDispatcher operationExecutor,
       AgentToolEmitter agentToolEmitter,
       FileOperationLog fileOperationLog,
-      Supplier<List<String>> rootPathsSupplier,
+      Function<EngineContext, List<String>> rootPathsSupplier,
       AgentRunStore runStore,
       Telemetry telemetry) {
     this(
@@ -224,7 +226,7 @@ public final class AgentLoopService implements AgentService {
       OperationDispatcher operationExecutor,
       AgentToolEmitter agentToolEmitter,
       FileOperationLog fileOperationLog,
-      Supplier<List<String>> rootPathsSupplier,
+      Function<EngineContext, List<String>> rootPathsSupplier,
       AgentRunStore runStore,
       Telemetry telemetry,
       java.util.function.IntSupplier activeSessionSupplier,
@@ -259,7 +261,7 @@ public final class AgentLoopService implements AgentService {
       OperationDispatcher operationExecutor,
       AgentToolEmitter agentToolEmitter,
       FileOperationLog fileOperationLog,
-      Supplier<List<String>> rootPathsSupplier,
+      Function<EngineContext, List<String>> rootPathsSupplier,
       AgentRunStore runStore,
       AgentTelemetry agentTelemetry) {
     return forTesting(
@@ -284,7 +286,7 @@ public final class AgentLoopService implements AgentService {
       OperationDispatcher operationExecutor,
       AgentToolEmitter agentToolEmitter,
       FileOperationLog fileOperationLog,
-      Supplier<List<String>> rootPathsSupplier,
+      Function<EngineContext, List<String>> rootPathsSupplier,
       AgentRunStore runStore,
       AgentTelemetry agentTelemetry,
       AgentSessionTerminationObserver terminationObserver) {
@@ -313,7 +315,7 @@ public final class AgentLoopService implements AgentService {
       OperationDispatcher operationExecutor,
       AgentToolEmitter agentToolEmitter,
       FileOperationLog fileOperationLog,
-      Supplier<List<String>> rootPathsSupplier,
+      Function<EngineContext, List<String>> rootPathsSupplier,
       AgentRunStore runStore,
       AgentTelemetry agentTelemetry,
       AgentSessionTerminationObserver terminationObserver,
@@ -366,7 +368,7 @@ public final class AgentLoopService implements AgentService {
             this.operationExecutor,
             this.fileOperationLog,
             this::emitError,
-            (req, sink) -> runAgent(req, sink));
+            (req, sink, engineContext) -> runAgent(req, sink, engineContext));
   }
 
   /**
@@ -422,7 +424,7 @@ public final class AgentLoopService implements AgentService {
   private void swapSystemPrompt(AgentSession session, AgentProfile toProfile) {
     String basePrompt = toProfile.systemPrompt() != null
         ? toProfile.systemPrompt()
-        : promptComposer.buildSystemPrompt();
+        : promptComposer.buildSystemPrompt(session.engineContext());
     String newPrompt = basePrompt;
     List<Map<String, Object>> messages = session.messages();
     if (!messages.isEmpty() && "system".equals(messages.get(0).get("role"))) {
@@ -433,24 +435,29 @@ public final class AgentLoopService implements AgentService {
   }
 
 
-  // Tempdoc 561 P-D — threads the background flag onto the session created inside the synchronous
-  // runAgent body without re-plumbing its 100-line signature. runAgent blocks the calling thread, so a
-  // per-thread flag set before / cleared after is exact and race-free.
-  private final ThreadLocal<Boolean> backgroundRun = ThreadLocal.withInitial(() -> Boolean.FALSE);
-
   @Override
-  public void runAgent(
-      AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background) {
-    backgroundRun.set(background);
-    try {
-      runAgent(request, eventConsumer);
-    } finally {
-      backgroundRun.remove();
-    }
+  public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
+    runAgent(request, eventConsumer, false, engineContext);
   }
 
   @Override
-  public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+  public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background,
+      EngineContext engineContext) {
+    try (var work = engineAdmission == null ? null : engineAdmission.attach(engineContext)) {
+      runAgentOwned(request, eventConsumer, background,
+          work == null ? engineContext : work.context(), work);
+    }
+  }
+
+  private volatile io.justsearch.app.api.EngineAdmissionService engineAdmission;
+
+  /** Composition supplies the Engine's one admission owner before exposing this lazy service. */
+  public void setEngineAdmission(io.justsearch.app.api.EngineAdmissionService admission) {
+    this.engineAdmission = admission;
+  }
+
+  private void runAgentOwned(AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background,
+      EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
     String sessionId = UUID.randomUUID().toString();
 
     // Calculate initial token budget
@@ -462,7 +469,6 @@ public final class AgentLoopService implements AgentService {
     // multiplier, not one context window. The former `safetyMargin = 256` is gone: it was standing in
     // for "leave room for the response", a job the between-step gate already does properly by
     // projecting the real next prompt against the remaining budget (AgentStepRunner).
-    boolean background = Boolean.TRUE.equals(backgroundRun.get());
     int initialBudget =
         AgentBudgetPolicy.initialBudget(request.effort(), contextWindow, background);
 
@@ -471,7 +477,12 @@ public final class AgentLoopService implements AgentService {
     if (effectiveAgentId == null && !request.agentProfiles().isEmpty()) {
       effectiveAgentId = request.agentProfiles().get(0).agentId();
     }
-    var session = new AgentSession(request.messages(), initialBudget, effectiveAgentId);
+    var session = new AgentSession(request.messages(), initialBudget, effectiveAgentId,
+        new EngineContext(engineContext.clientKind(), engineContext.clientId(),
+            java.util.Optional.of(sessionId), engineContext.grantReference(), engineContext.sourceTier(),
+            engineContext.transport(), engineContext.survival(), engineContext.urgency(), engineContext.workId()), work);
+    var cancellation = work == null ? null : work.onCancel(reason -> session.cancelFromWork());
+    try {
     // Tempdoc 577 §2.14 Root II (#14) — carry the model's context window (n_ctx) onto the session so
     // each budget event can report cognitive headroom (promptTokens ÷ n_ctx) beside the economic budget.
     session.contextWindow(contextWindow);
@@ -509,7 +520,8 @@ public final class AgentLoopService implements AgentService {
                     session.toolCallsExecuted(),
                     session.messages().size(),
                     session.activeAgentId(),
-                    session.pendingApprovals(),
+                    java.util.stream.Stream.concat(session.pendingApprovals().stream(),
+                        stepRunner.pendingWorkflowApprovals(sessionId).stream()).toList(),
                     session.autonomyLevel().name(),
                     session.parkSnapshot(),
                     TraceContext.none()));
@@ -522,7 +534,7 @@ public final class AgentLoopService implements AgentService {
     // Prepend default system prompt if the conversation doesn't already have one
     if (session.messages().isEmpty()
         || !"system".equals(session.messages().get(0).get("role"))) {
-      session.messages().add(0, Map.of("role", "system", "content", promptComposer.buildSystemPrompt()));
+      session.messages().add(0, Map.of("role", "system", "content", promptComposer.buildSystemPrompt(session.engineContext())));
     }
     // For multi-agent: override system prompt with the initial profile's prompt
     if (!request.agentProfiles().isEmpty()) {
@@ -642,6 +654,10 @@ public final class AgentLoopService implements AgentService {
       session.markTerminated(TerminalDisposition.MAX_ITERATIONS, null, null);
       checkpoint(sessionId, session, LifecycleState.DONE.name(), "Max iterations reached");
 
+    } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+      sink.accept(session.cancellationEvent());
+      session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
+      checkpoint(sessionId, session, LifecycleState.CANCELLED.name(), cancelled.reasonCode());
     } catch (Exception e) {
       LOG.error("Agent loop error", e);
       agentSpan.recordException(e);
@@ -686,6 +702,9 @@ public final class AgentLoopService implements AgentService {
       // here, with attach refusing an already-removed session — so a reattach arriving in the gap
       // saw "gone" for a run whose answer had just landed.
       session.observation().retire();
+    }
+    } finally {
+      if (cancellation != null) cancellation.close();
     }
   }
 
@@ -752,6 +771,11 @@ public final class AgentLoopService implements AgentService {
   @Override
   public boolean tryApproveToolCall(String sessionId, String callId) {
     return sessionRegistry.tryApproveToolCall(sessionId, callId);
+  }
+
+  @Override
+  public java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String sessionId, String callId) {
+    return sessionRegistry.pendingToolApproval(sessionId, callId);
   }
 
   @Override
@@ -882,8 +906,8 @@ public final class AgentLoopService implements AgentService {
   }
 
   @Override
-  public OperationResult undoOperation(String toolName, String executionId) {
-    return queries.undoOperation(toolName, executionId);
+  public OperationResult undoOperation(String toolName, String executionId, EngineContext engineContext) {
+    return queries.undoOperation(toolName, executionId, engineContext);
   }
 
   @Override
@@ -917,18 +941,18 @@ public final class AgentLoopService implements AgentService {
   }
 
   @Override
-  public void resumeLastSession(Consumer<AgentEvent> eventConsumer) {
-    queries.resumeLastSession(eventConsumer);
+  public void resumeLastSession(Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
+    queries.resumeLastSession(eventConsumer, engineContext);
   }
 
   @Override
-  public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer) {
-    queries.resumeSession(sessionId, eventConsumer);
+  public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
+    queries.resumeSession(sessionId, eventConsumer, engineContext);
   }
 
   @Override
-  public void forkSession(String sessionId, String editedMessage, Consumer<AgentEvent> eventConsumer) {
-    queries.forkSession(sessionId, editedMessage, eventConsumer);
+  public void forkSession(String sessionId, String editedMessage, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
+    queries.forkSession(sessionId, editedMessage, eventConsumer, engineContext);
   }
 
   @Override

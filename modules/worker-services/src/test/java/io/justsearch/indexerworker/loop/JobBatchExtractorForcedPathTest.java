@@ -125,8 +125,33 @@ final class JobBatchExtractorForcedPathTest {
     return PathNormalizer.normalizeKey(file);
   }
 
+  @Test
+  void recordedForceReextractsWithoutAnyLegacyMarker() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("recorded-forced.txt"), "same");
+    Set<String> legacyMarks = ConcurrentHashMap.newKeySet();
+    Harness h = newHarness(legacyMarks);
+    var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, true);
+    h.extractor().extractAll(List.of(claim));
+    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong());
+    verify(h.contentExtractor()).extractArtifact(file);
+    assertTrue(legacyMarks.isEmpty());
+  }
+
+  @Test
+  void recordedUnforcedClaimNeitherUsesNorConsumesAMatchingLegacyMarker() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("recorded-normal.txt"), "same");
+    Set<String> legacyMarks = ConcurrentHashMap.newKeySet();
+    legacyMarks.add(forcedKey(file));
+    Harness h = newHarness(legacyMarks);
+    var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, false);
+    h.extractor().extractAll(List.of(claim));
+    verify(h.documentFieldOps()).isUnmodified(eq(forcedKey(file)), anyLong());
+    verify(h.contentExtractor(), never()).extractArtifact(any());
+    assertEquals(Set.of(forcedKey(file)), legacyMarks, "a recorded claim cannot steal legacy force intent");
+  }
+
   /**
-   * The derivation {@code GrpcIngestService#submitBatch} used before tempdoc 821 §P/P3: absolutize
+   * The derivation {@code WorkerIngestService#submitBatch} used before tempdoc 821 §P/P3: absolutize
    * but never {@link Path#normalize()}. Kept here ONLY as the negative control below.
    */
   private static String preP3Key(Path file) {

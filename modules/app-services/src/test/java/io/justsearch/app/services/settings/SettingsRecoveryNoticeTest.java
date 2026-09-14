@@ -21,6 +21,40 @@ import org.junit.jupiter.api.Test;
 /** Tempdoc 882 item 24: the settings-reset notice asserts and clears on the condition store. */
 class SettingsRecoveryNoticeTest {
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(io.justsearch.app.api.settings.SettingsCommitOwner.RecoveryReason.class)
+  void earlyAndLateOwnerFailuresRemainStickyAfterCorruptionNoticeClears(
+      io.justsearch.app.api.settings.SettingsCommitOwner.RecoveryReason reason) {
+    for (boolean alreadyCompleted : new boolean[] {false, true}) {
+      var signal = new java.util.concurrent.CompletableFuture<io.justsearch.app.api.settings.SettingsCommitOwner.RecoveryIssue>();
+      var owner = org.mockito.Mockito.mock(io.justsearch.app.api.settings.SettingsCommitOwner.class);
+      org.mockito.Mockito.when(owner.recoveryIssue()).thenReturn(signal.minimalCompletionStage());
+      var issue = new io.justsearch.app.api.settings.SettingsCommitOwner.RecoveryIssue(reason, 42L);
+      var store = new ConditionStore(); var changes = new HealthEventChangeRegistry();
+      if (alreadyCompleted) signal.complete(issue);
+      SettingsRecoveryNotice.observeCommitRecovery(owner, store, changes, HEAD, Clock.systemUTC());
+      if (!alreadyCompleted) { assertEquals(0, changes.currentSeq()); signal.complete(issue); }
+      String code = LifecycleReasonCode.SETTINGS_RECOVERY_REQUIRED.code();
+      var event = store.find(code, "settings").orElseThrow();
+      assertEquals(Severity.ERROR, event.severity());
+      var condition = (AssertedCondition) event.body();
+      String expectedReason = switch (reason) {
+        case UNREADABLE_WITNESS -> "SettingsWitnessUnreadable";
+        case CONTRADICTORY_WITNESS -> "SettingsWitnessContradictory";
+        case MULTIPLE_ARMED_ROWS -> "MultipleSettingsCommits";
+        case PERSISTENCE_DISABLED -> "SettingsPersistenceDisabled";
+      };
+      assertEquals(expectedReason, condition.reason());
+      assertTrue(condition.message().orElseThrow().contains("Settings changes are paused"));
+      assertEquals(1, changes.currentSeq());
+      SettingsRecoveryNotice.clear(store, changes);
+      assertTrue(store.find(code, "settings").isPresent());
+      assertEquals(1, changes.currentSeq());
+      assertEquals(io.justsearch.app.api.lifecycle.RetentionClass.STICKY,
+          LifecycleReasonCode.SETTINGS_RECOVERY_REQUIRED.retentionClass());
+    }
+  }
+
   private static final Source HEAD = new Source("head", "test-instance", Optional.empty());
 
   @Test

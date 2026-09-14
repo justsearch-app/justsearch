@@ -139,20 +139,20 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
   // window (`core.unified-chat-surface`), matching the `core.agent-surface` retirement precedent above
   // (constants removed, comment left). FE deep-links alias via RETIRED_SURFACE_ALIASES.
 
-  /** Slice 3a.2.e — Logs surface (HeadLog DiagnosticChannel consumer). */
+  /** Slice 3a.2.e — Logs surface (EngineLog DiagnosticChannel consumer). */
   public static final SurfaceRef LOGS_SURFACE_ID = new SurfaceRef("core.logs-surface");
 
   public static final String LOGS_MOUNT_TAG = "jf-log-surface";
 
   /** Slice 3a.2.e — DiagnosticChannel id consumed by the Logs surface. */
-  private static final DiagnosticChannelRef DC_HEAD_LOG =
-      new DiagnosticChannelRef("core.head-log");
+  private static final DiagnosticChannelRef DC_ENGINE_LOG =
+      new DiagnosticChannelRef("core.engine-log");
 
   /**
    * Tempdoc 571 §11 / 578 — the System hub: the one rail entry for "what is/was the system doing",
    * hosting Health · Logs · Activity as tabs. PRODUCT with EMPTY consumes — it COMPOSES members, it
    * does not itself project any authority (the honest "composes, not fuses" pattern
-   * {@code core.system-self-view} already uses). The earlier "DIAGNOSTIC via head-log channel"
+   * {@code core.system-self-view} already uses). The earlier "DIAGNOSTIC via engine-log channel"
    * framing was REVERTED in the post-review pass: declaring a channel the host never subscribes to
    * registered a false consumer hook (SurfaceConsumerIndex) and violated 571 §8's "consumes is a
    * truthful manifest" precondition. The DIAGNOSTIC / TRUST distinction lives INSIDE the composite
@@ -680,7 +680,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
           // URL-routable is retired along with it; the retrieve tier's carry-forward scope is
           // jf-results-card + route chip + scope chips + landing only. FE deep-links to
           // core.search-surface alias to core.unified-chat-surface (RETIRED_SURFACE_ALIASES).
-          // Slice 3a.2.e — Logs surface. Consumes the core.head-log
+          // Slice 3a.2.e — Logs surface. Consumes the core.engine-log
           // DiagnosticChannel (slice 448 substrate). OPERATOR audience
           // because raw log tail is operator/dev-mode UX, not end-user.
           new Surface(
@@ -696,11 +696,11 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
                   /* resources */ Set.of(),
                   /* operations */ Set.of(),
                   /* prompts */ Set.of(),
-                  /* diagnosticChannels */ Set.of(DC_HEAD_LOG)),
+                  /* diagnosticChannels */ Set.of(DC_ENGINE_LOG)),
               LOGS_MOUNT_TAG,
               Provenance.core("1.0"),
               java.util.Optional.empty(),
-              // Tempdoc 571 §4c: altitude is DERIVED from the consumed core.head-log DiagnosticChannel
+              // Tempdoc 571 §4c: altitude is DERIVED from the consumed core.engine-log DiagnosticChannel
               // ⟹ DIAGNOSTIC — not declared here (consumes-a-channel ⟹ DIAGNOSTIC).
               RiskTier.LOW),
           // Slice 486 F15-narrow — Activity surface (the trust read-view / retrospective companion to

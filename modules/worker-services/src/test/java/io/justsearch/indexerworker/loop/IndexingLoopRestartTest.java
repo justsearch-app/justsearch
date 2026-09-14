@@ -89,6 +89,24 @@ final class IndexingLoopRestartTest {
 
   // ---- helpers ----
 
+  @Test void extractorCloseFailureRetainsNerForRetry() throws Exception {
+    var extractor = mock(io.justsearch.indexerworker.extract.TimeboxedContentExtractor.class);
+    var ner = mock(io.justsearch.indexerworker.ner.NerService.class);
+    var bindings = new io.justsearch.indexerworker.server.EncoderBindings();
+    bindings.bindNerService(ner);
+    var loop = new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), mock(JobQueue.class),
+        mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
+        mock(IndexCountOps.class), () -> null, mock(WorkerSignalBus.class), IndexingPacing.unthrottled(),
+        null, null, null, null, extractor, bindings, null);
+    doThrow(new IllegalStateException("OCR child still alive")).doNothing().when(extractor).close();
+    assertThrows(java.io.IOException.class, loop::close);
+    verify(ner, never()).close();
+    loop.close();
+    verify(extractor, times(2)).close();
+    verify(ner).close();
+  }
+
   private IndexingLoop newLoopWithEmptyQueue() {
     JobQueue queue = mock(JobQueue.class);
     // Mockito strict mode: only stub what the loop actually reads (pollPending). The other
@@ -102,7 +120,7 @@ final class IndexingLoopRestartTest {
     IndexCountOps indexCountOps = mock(IndexCountOps.class);
     WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
     // signalBus.isMainGpuActive defaults to false (Mockito boolean default).
-    return new IndexingLoop(
+    return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
         queue,
         coordinator,
         commitOps,

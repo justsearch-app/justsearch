@@ -28,7 +28,13 @@ def _disable_index_cache_by_default(monkeypatch):
 
 def _make_data_dir(base: Path, *, generation: str = "g-x", populate_extra: bool = True) -> Path:
     """Build a minimal fake quiesced eval data dir, including the files that must be
-    excluded from a published entry (logs/, telemetry/, app.lock, worker_signal.lock)."""
+    excluded from a published entry (logs/, telemetry/, app.lock, worker_signal.lock).
+
+    The logs/ fixture file is named engine.log (not worker.log) because that's what a real
+    data dir contains post lane-F-stage-A merge; the exclusion below is a whole-directory
+    exclusion (index_cache._EXCLUDED_TOP_LEVEL_NAMES), so this doesn't change what's tested,
+    only keeps the fixture honest.
+    """
     data_dir = base / "data"
     idx_default = data_dir / "index" / "default"
     gen_dir = idx_default / "indices" / generation
@@ -43,7 +49,7 @@ def _make_data_dir(base: Path, *, generation: str = "g-x", populate_extra: bool 
         (data_dir / "watched_roots.json").write_text("{}", encoding="utf-8")
         logs_dir = data_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
-        (logs_dir / "worker.log").write_text("log line", encoding="utf-8")
+        (logs_dir / "engine.log").write_text("log line", encoding="utf-8")
         telemetry_dir = data_dir / "telemetry"
         telemetry_dir.mkdir(parents=True, exist_ok=True)
         (telemetry_dir / "trace.ndjson").write_text("{}", encoding="utf-8")

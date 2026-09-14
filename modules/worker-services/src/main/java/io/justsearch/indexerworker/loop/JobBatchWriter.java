@@ -105,7 +105,7 @@ public final class JobBatchWriter {
     writeSpan.setAttribute("embedding.source", embeddingSource);
     try {
       if (staleResolver.tryHandleStale(
-          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write")) {
+          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write", ex.provenance(), ex.claim())) {
         batchStats.recordSkipped();
         return;
       }
@@ -158,9 +158,10 @@ public final class JobBatchWriter {
 
       journal.enqueueTransition(
           new JobQueue.IngestionLedgerTransition(
-              ex.filePath(),
+              ex.claim(),
               LedgerEntryFactory.forEnvelope(
-                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy())));
+                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance()),
+              ex.sourceSha256()));
 
       long latencyMs = System.currentTimeMillis() - ex.startTime();
       metrics.recordDocumentIndexed(latencyMs);
@@ -168,15 +169,19 @@ public final class JobBatchWriter {
           ex.artifact().result().content() != null ? ex.artifact().result().content().length() : 0);
       log.debug("Indexed successfully: {} in {}ms", ex.filePath(), latencyMs);
 
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | Error e) {
+      if (e instanceof VirtualMachineError fatal) throw fatal;
       log.error("Failed to write: {}", ex.filePath(), e);
+      // An observer failure after handoff cannot turn an already written effect into a retry
+      // or release its live claim before the journal confirms the Lucene commit.
+      if (journal.ownsPendingCommit(ex.claim())) return;
       if (isDrainingWriteRejection(e)) {
         journal.recordOutcomeSafely(
             ex.filePath(),
             "WRITE_UNAVAILABLE_DRAINING",
             () ->
-                jobQueue.defer(
-                    ex.filePath(),
+                jobQueue.deferClaim(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_UNAVAILABLE_DRAINING,
                         IngestionReasonCodes.WRITE_UNAVAILABLE_DRAINING,
@@ -186,14 +191,14 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
       } else {
         journal.recordOutcomeSafely(
             ex.filePath(),
             "WRITE_FAILED",
             () ->
-                jobQueue.markFailed(
-                    ex.filePath(),
+                jobQueue.markClaimFailed(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_FAILED,
                         IngestionReasonCodes.WRITE_FAILED,
@@ -203,7 +208,7 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }
@@ -247,7 +252,7 @@ public final class JobBatchWriter {
     return e.getClass().getSimpleName() + ": " + message;
   }
 
-  private static boolean isDrainingWriteRejection(RuntimeException e) {
+  private static boolean isDrainingWriteRejection(Throwable e) {
     return e instanceof IndexRuntimeIOException indexRuntimeIOException
         && indexRuntimeIOException.reason() == IndexRuntimeIOException.Reason.DRAINING;
   }

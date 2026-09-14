@@ -57,8 +57,8 @@ The `EnvRegistry` enum in `modules/configuration` is the **canonical** place whe
 | Ordinal | Source | Description |
 |---------|--------|-------------|
 | 500 | JVM `-D` system property | Highest priority. Used by launch scripts and tests. |
-| 450 | Worker snapshot | Propagated from Head to Worker subprocess. |
 | 400 | Environment variable | Used by Docker/OS. |
+| 350 | CI profile | CI profile overrides. |
 | 300 | `settings.json` | User preferences persisted via UI. |
 | 200 | `application.yaml` | Static YAML config file. |
 | 150 | Auto-detected hardware | `GpuAutoDetection.probe()` in `ort-common`. Filesystem probe for CUDA DLLs; contributes GPU config keys. |
@@ -81,6 +81,47 @@ int ctx = EnvRegistry.CONTEXT_SIZE.getInt(4096);
 int gpuLayers = EnvRegistry.GPU_LAYERS.getInt(0);
 Path llmModel = Path.of(EnvRegistry.LLM_MODEL_PATH.getString("Qwen_Qwen3.5-9B-Q4_K_M.gguf"));
 ```
+
+## Settings preparation and storage
+
+`UiSettingsStore` writes a schema-v4 envelope containing settings, `acceptedRevision`, and
+`lastCommittedOperationKey`. Legacy raw settings and v1/v2/v3 envelopes remain readable;
+versions before v3 cannot carry revision fields. A witness is either revision zero with no
+key or a positive revision with a canonical UUIDv7 key. Future versions are refused.
+
+GET /api/settings/v2 projects settings and their full nested witness from one
+store inspection. Both witness members are required when present, including an
+explicit null last key for revision zero. Response-only index-path defaults do not
+write the file. Unreadable state returns503 SETTINGS_RECOVERY_REQUIRED rather than
+a fabricated initial witness. Operation receipts carry their committed witness;
+receipt-only replay need not contain a full current settings document.
+
+The GPU override is one nullable field: null means automatic selection, zero explicitly
+selects CPU, and a positive value selects GPU offload. Reading an older envelope migrates
+zero to null because the previous resolver treated it as automatic; positive values and
+revision witnesses survive. Settings reset restores automatic selection. The v2 response
+preserves null versus zero; null or omission in a partial update leaves the existing value.
+When GPU selection is known, rebuilding configuration recomputes the derived context window
+at ordinal150. Explicit settings and operator context overrides retain their precedence.
+
+Preparation copies the mutable settings and serializes the candidate before touching the
+file. `replacePrepared` forces temporary bytes and requires atomic sibling replacement;
+it never falls back to an ordinary move. This is not a guarantee against physical power
+loss. Recovery notification is a separate call after replacement. `inspect` reads the
+actual witness without substituting defaults for corrupt, inaccessible, or quarantined
+state; a preserved corrupt sibling prevents an absent file from masquerading as a fresh
+store after restart. There is no unrecorded `save` API. The application owner must establish
+recovery authority before explicitly replacing a quarantined document. An executable caller
+guard confines preparation, replacement and recovery-clear notification to that owner.
+
+`ConfigStoreRebuilder.prepare` builds an immutable resolved snapshot without publishing it
+and propagates preparation failures. `ConfigStore.swap` replaces the snapshot and returns
+a change event; `notifyListeners` is separate so an owner can release its publication lock
+before arbitrary callbacks run. The convenience `update` retains its swap-then-notify
+behavior, with runtime producers excluded by the caller guard. `rebuild` is called only by
+HeadlessApp's post-discovery boot refresh: it publishes remembered CUDA selection and the
+ORT native path before inference initialization, without writing settings.json. The guard
+also restricts entry to that refresh to configuration assembly.
 
 ## Platform Paths
 To ensure seamless operation across operating systems, we use `PlatformPaths` to resolve data directories.
@@ -114,11 +155,32 @@ Related helper (repo-root SSOT discovery):
 - `RepoRootLocator` (in `modules/configuration`) centralizes repo-root discovery and is preferred for new code that needs repo-root/SSOT discovery without re-implementing traversal logic.
 
 ### Initialization Flow
-1.  **Main Process:** `HeadlessApp` creates a `JustSearchConfigurationLoader`, loads the config **once**, and passes it downstream to `WorkerSpawner`, `AppFacade`, etc.
-2.  **Worker Process:** `IndexerWorker` loads config on startup and initializes the Worker (`KnowledgeServer`, Lucene runtimes, job queue).
-    * Critical overrides (e.g., `justsearch.index.base_path`) are forwarded by `WorkerSpawner` into the Worker JVM so Head and Worker don’t silently diverge.
 
-This ensures that both processes, even though isolated, share the exact same configuration schema.
+There is **one** resolution, in **one** JVM (the Engine, [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)).
+
+1.  `HeadlessApp` loads the SSOT artifacts and builds the resolved config **once**, then publishes it with `ConfigStore.setGlobal(...)` (`modules/ui/.../HeadlessApp.java:653`). `LauncherEnvironment` does the same for launcher-hosted entry points.
+2.  `io.justsearch.app.engine.EngineRoot` composes the index half (`KnowledgeServer`, Lucene runtimes, job queue) in the same JVM. It reads the same `ConfigStore.global()` object — nothing is serialised, forwarded, or re-resolved.
+
+The Head→Worker config-snapshot tier is **deleted** (lane F stage A item A19). It sat at ordinal
+450, was written exactly once at boot, and existed only so a second JVM could inherit the first's
+resolved values; so did the blanket `JUSTSEARCH_*` env forwarding, the declared `-D` forwarding set,
+and the post-handshake divergence detector whose whole job was to notice when those three had failed
+to agree. Two processes could disagree about their configuration; one cannot.
+
+**The surviving ordinals** (`ResolvedConfigBuilder`, higher wins):
+
+| Ordinal | Source |
+|---|---|
+| 500 | `-D` JVM argument — operator override, always wins |
+| 400 | environment variable |
+| 350 | CI profile overrides |
+| 300 | `settings.json` — user preference set via the GUI |
+| 200 | YAML `application.yaml` |
+| 150 | auto-detected values (GPU capabilities, platform paths) |
+| 100 | programmatic default |
+
+There is no 450. Every resolved value carries a `ConfigResolution` trace naming the sources
+considered and the winner, which is what `/api/debug/effective-config` reports.
 
 ## Settings → Effective Runtime (AI)
 There are two layers that matter for “what the UI shows” vs “what is running”:
@@ -128,15 +190,15 @@ There are two layers that matter for “what the UI shows” vs “what is runni
 
 In the current app:
 * **The settings→system-property promotions are gone** (tempdoc 883 decision 4 and its §C.5c residue). They predated the ordinal chain and were a precedence lie: a GUI value written as a system property resolves at ordinal 500, so `/api/debug/effective-config` reported it as `jvm_arg` and then had to read a second `*.source=ui_settings` marker sysprop to un-tell that. Every settings-borne key now reaches the resolver exactly once, at ordinal 300, via `ConfigStoreRebuilder.contributeUiSettings` — including the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, whose `/api/debug/effective-config` rows are sourced from the resolver's own provenance and read no marker.
-* **Three writes still copy a value the user or the installer chose into a system property.** Named exhaustively, because "the promotions are gone" is only checkable against a complete list. (Separately, `HeadlessApp` and `AiInstallService` also mirror *hardware-probe* and *disk-discovered* values — GPU flags, per-encoder GPU backstops, the ORT native path — to sysprops; those were never settings and are not promotions.)
-  1. `HeadlessApp` applies `UiSettings.llamaLibPath` to the raw `llama.lib.path` system property ("set only if blank"; a blank setting is "unset"). Not a JustSearch config key at all — no `EnvRegistry` entry, no resolver key, no marker — because the llama.cpp JNI loader reads it straight out of the system properties. Retiring it means giving it a config key first.
-  2. `AiInstallService.applyOnnxSettings` writes the five per-encoder ONNX `*.model_path` system properties **as well as** `settings.json`. This one is knowingly kept: the Worker is respawned immediately after that step, and `WorkerSpawner` forwards those keys as `-D` args read from the **Head's system properties** — while the ordinal-450 worker snapshot is written exactly once, at boot, so it predates the install. Deleting the write would silently disable SPLADE/NER/reranker after Install AI (tempdoc 374 alpha.19 Bug J-1). The real fix is a snapshot that can be rewritten at runtime.
-  3. The runtime GPU-variant switch writes `justsearch.server.exe` + `justsearch.server.exe.source` (`RuntimeActivationService`, `AiInstallService.applyCudaServerExe`, `HeadlessApp.maybeAutoSelectCuda12Variant`). The marker is the ownership token `applyServerExeSysProp` reads to refuse an operator lock, and the activation rollback restores it — it is a runtime decision that must beat settings, not a copy of settings.
+* **One native-loader setting still becomes a system property:** `HeadlessApp` applies `UiSettings.llamaLibPath` to raw `llama.lib.path` only when blank, because the external JNI loader reads that property directly. It is outside the JustSearch resolver vocabulary. Hardware and disk discovery properties, including ORT native-path discovery, are separate from settings promotion.
+* **Installed ONNX paths use the accepted settings owner.** Each acquisition stage commits its changed eligible paths together, publishes ConfigStore once, and leaves unchanged or pending paths alone. All five model configuration readers consume that snapshot. Reranker/citation status also reads the resolved paths while retaining independent observed session state. The five installer-written ONNX model-path system properties are retired; operator properties retain their normal precedence. ORT native discovery keeps its direct reader fallback and no longer republishes settings/configuration.
+* **Runtime executable selection uses the same precedence chain.** Boot CUDA discovery is remembered at ordinal150; installer selection and explicit activation persist at300 through the accepted settings owner. Activation refuses an environment/JVM winner at400/500. CPU deactivation persists the baseline executable so remembered CUDA discovery cannot undo it. The server-executable ownership marker and all application-written server executable JVM properties are retired. The owner publishes ConfigStore before inference applies; failed inference restores its previous runtime configuration, and a separate accepted settings compensation compares the exact activation witness so it cannot erase a newer mutation.
 * **`justsearch.llm.model_path.source` now has no writer at all.** The boot promotion went with 883 §C.5c and the installer/pack-import promotions with it, so a chat-model path reaches the resolver once, at ordinal 300. The constant survives only for tempdoc 842's unshipped profile-persistence writer; an absent marker correctly means "operator".
 * **`justsearch.context.size` no longer has a promotion or a `.source` marker.** The window is derived and contributed at ordinal 150 (`auto_detected` / `hardware_probe`); a user override rides `settings.json` at 300; an operator `-D` / env var still wins at 500 / 400 - by the chain, not by a sysprop write. See `05-ai-architecture.md`, section "The context window".
 * **`justsearch.gpu.layers`, `justsearch.server.exe` and `justsearch.ui.exclude_patterns` no longer have promotions or `.source` markers either** (883 decision 4 slice 2). All three ride `settings.json` at 300. Two consequences worth knowing: the VRAM-tier GPU auto-populate contributes `justsearch.gpu.layers=99` to the ordinal-150 probe map ONLY — mirroring it to a sysprop would put a derived number above the user's own setting — and `justsearch.ui.exclude_patterns` gained a `ResolvedConfig.Ui#excludePatterns` accessor, because it was contributed at 300 but never resolved, which is why its readers had to use the promoted sysprop.
-* **Runtime propagation:** `SettingsController.handleUpdateSettingsV2()` rebuilds the `ConfigStore` from the saved settings, which is the whole propagation path — the `maybeApply*SysProp` promotions it used to run first are deleted. Note that **inference restart is required** for GPU layer changes to take effect on the running `llama-server` process.
-* **Attribution nuance:** the three writes listed above set system properties without a settings-copy marker (`llama.lib.path`, the five ONNX `*.model_path` keys, and — with a marker of its own — the runtime `server.exe`). When debugging “which config won?”, read `/api/debug/effective-config`, whose rows are sourced from the resolver's ordinal chain rather than from any marker.
+* **Profile activation:** the named model/projector pair, selected executable, context and GPU layers are submitted in one inference apply. Runtime profile switches do not mutate the bootstrap `justsearch.chat.profile` operator property or persist a resolved model path. The running profile remains available through the realized identity observation.
+* **Runtime propagation:** Public settings mutations enter `SettingsService` and the existing accepted settings owner, which replaces the witnessed file and publishes `ConfigStore`. The controller has no raw-save or configuration-rebuild path. Chat intent changes nudge reconciliation after committed completion. **Inference restart is required** for GPU layer changes to affect the running `llama-server` process.
+* **Attribution:** `/api/debug/effective-config` reports the resolver's ordinal chain. Installer paths resolve as settings at300; explicit operator properties remain at500. The external `llama.lib.path` loader property has no settings-copy marker.
 * `InferenceConfig.fromEnvironment(...)` reads from `EnvRegistry` (`LLM_MODEL_PATH`, `GPU_LAYERS`, `CONTEXT_SIZE`, etc).
 * `InferenceLifecycleManager` also reads `llama-server`'s `GET /props` to show the **effective** `model_alias` and `n_ctx` when available (surface via `/api/inference/status`).
 * `POST /api/inference/reload` re-applies persisted settings to the inference runtime (`RESTART_IF_ONLINE`): it updates the stored `InferenceConfig` always, but restarts `llama-server` only when currently Online; if the runtime has adopted an external `llama-server` instance (no process handle), restart is rejected (use `POST /api/inference/detach` to switch to a managed server on a new port).
@@ -147,6 +209,39 @@ In the current app:
 
 ### UI settings v2 (UX-facing fields)
 The canonical contract for user preferences is `GET/POST /api/settings/v2` with `ui` and `llm` sections.
+
+POST requires the full witness observed with the edited base and one canonical
+UUIDv7 operationKey per logical attempt. The service looks up that key before
+reading settings or checking the index path. Same key and normalized patch,
+witness and mode intent returns the original outcome; changed input under that key
+returns409 OPERATION_KEY_REUSED. A fresh key with an outdated witness returns409
+VERSION_CONFLICT. Null/omitted patch fields preserve values; setters normalize
+supplied fields before canonical identity is recorded.
+
+Completed replies use the SettingsV2 shape with state COMPLETE, operationKey and
+the committed nested witness. The first reply may include its prepared settings;
+replay contains only receipt metadata, never a new settings observation. Open
+replay returns202 without a committed witness. Read-only, malformed-key, conflict
+and recovery failures retain their typed HTTP/error-code distinctions.
+
+The existing64-client mode-intent LRU advances only after the producer's own
+COMPLETE. A nonblocking admission bit serializes fresh public preparations and
+completion bookkeeping without holding a monitor across configuration callbacks.
+Contenders receive retryable RECONFIGURE_IN_PROGRESS; existing-key replay and GET
+remain available. The admission bit grants no physical write authority: internal
+writers and public writes still compare full witnesses through the same owner.
+Missing service composition permits reads and refuses mutations.
+
+Frontend writes share one frozen settings attempt: key, witness, serialized patch
+and mode header survive retry. Reads and open-row replay have bounded deadlines;
+202 never signals completion. Mode changes retain event-time sequence and acquire
+their witness only when the shared queue starts their writer. Library exclusions
+and legacy contrast migration keep the witness observed with their loaded base.
+A Library conflict preserves the draft for explicit reload; an uncertain save keeps
+its original attempt for a later check. Preview/Apply wait for COMPLETE. Migration
+clears a legacy contrast value only after completion or an equal canonical read,
+and only while its captured profile and value still match.
+
 
 New UX-facing fields introduced for market-readiness:
 
@@ -168,7 +263,7 @@ New UX-facing fields introduced for market-readiness:
 
 **Two enforcement layers:**
 1. **Cleanup** (`POST /api/indexing/excludes/apply`): walks watched roots, deletes already-indexed docs matching patterns. Directory patterns use `deleteDocsByPathPrefix` optimization; file patterns use `deleteDocById`. Supports `?dryRun=true` for per-pattern match preview without deletion.
-2. **Live prevention**: file watcher event handler (`RemoteKnowledgeClient`) filters excluded paths before submitting to the Worker. Filtered at the event handler, not at the watcher source (library limitation).
+2. **Live prevention**: file watcher event handler (`KnowledgeClient`) filters excluded paths before submitting to the Worker. Filtered at the event handler, not at the watcher source (library limitation).
 
 **Worker-side hardcoded skip lists** provide a baseline independent of user-configured patterns — see `docs/explanation/03-knowledge-server.md` § "File skip lists."
 
