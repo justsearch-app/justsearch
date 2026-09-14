@@ -1,5 +1,70 @@
 # C2-6: accepted settings revision implementation plan
 
+## 2026-09-14 activation and compensation writer cut
+
+The runtime-intent checkpoint `8e4706cf0` is pushed. Activation/deactivation/rollback
+are next: their raw saves now refuse a recorded revision. Keep the existing
+SettingsService as the producer coordinator. Add an internal-candidate entry taking
+UiSettings, the full SettingsWitness captured with its base, and explicit internal
+EngineContext. It accepts a fresh SETTINGS_APPLY row before calling the existing
+runner's settings port. Canonical invocation identity is a digest, not private
+settings content. Return the runner result including row identity on failure;
+only COMPLETE establishes the witness against which compensation may proceed.
+No second physical writer, terminal writer, durable counter or callback registry.
+
+Activation decisions must use the snapshot captured before model/self-test selection;
+do not read fresh metadata after choosing a candidate. Compensation compares the
+specific full witness activation committed, rather than refreshing from the current
+file. A competing settings mutation must survive. Runtime property/config/apply
+ordering is being traced against actual inference consumers before changing it;
+delete redundant ConfigStore publication only when the owner publication covers
+the same sources. Preserve the existing procedure bracket, operator locks, selected
+model/projector pair and failure outcomes. This mechanism pass is active, not an
+owner-gated deferral or a claim that the consumer is implemented.
+
+Resolved ordering: freeze the full candidate before selection/self-test; activation
+adds chatEnabled=true to that same candidate. Begin the existing procedure before
+commitment and keep compensation inside it. Commit through the settings owner,
+which publishes ConfigStore before inference apply. On inference failure the
+existing lifecycle manager restores its previous runtime configuration; compensate
+settings only against the completed activation row's exact witness. Do not perform
+a second inference apply during compensation. A stale compensation leaves newer
+settings/config untouched and reports rollback failure. No compensation is inferred
+from a persistence exception or an incomplete row.
+
+Retire all app-owned server.exe JVM writes in activation, boot and installer;
+the old ordinal-500 bridge masks candidate settings both before and after commit,
+so reordering it cannot fix the stale executable. Boot CUDA discovery contributes
+to the existing remembered autoDetected map at150; retain the post-boot rebuild
+for ORT native-path writes. Runtime activation refuses an environment/JVM winner
+(400/500) using existing resolver provenance. CPU deactivation persists a nonblank
+baseline executable at300, so remembered CUDA150 cannot undo it. Installer CUDA
+selection uses the accepted candidate entry and respects settings-or-higher winners.
+Retire the server-executable source marker and its dead schema/readers together.
+
+Dynamic profile selection is passed directly to inference; retire its temporary
+JVM write/restore, keeping the bootstrap CHAT_PROFILE operator key and realized
+profile observation. A narrow combined profile/runtime apply builds one config
+and calls the existing manager once. Staging APPLY_ONLY first would destroy the
+true rollback base. Profile selection still does not persist a model path.
+
+The internal producer requires registered SYSTEM_INTERNAL attribution, not a
+client-kind label, and freezes a private candidate before digesting/accepting it.
+Typed refusals return row identity; persistence uncertainty propagates from the
+runner with the row unresolved. Tests must refute untrusted INTERNAL labels and
+caller mutation at acceptance as well as stale activation/compensation, operator
+precedence, one combined profile apply, and CPU baseline survival across rebuild.
+
+Review correction: CPU baseline persistence alone does not remove a remembered
+GPU99 override. Store envelope4 therefore retains one nullable gpuLayers field:
+null=auto, zero=explicit CPU, positive=offload. Migrate older zero to null because
+the previous resolver omitted zero and used auto-detection. Preserve positive
+values and the full revision witness. The numeric convenience getter remains0
+for auto; serialization preserves null and ConfigStore contributes any explicit
+value, including zero, at300. Reset clears to null. This avoids a second GPU
+intent bit and an executable-path heuristic. Verify actual schema round-trip,
+older migration, and deactivation with remembered CUDA/GPU99 before accepting.
+
 ## 2026-09-14 runtime-intent writer cut
 
 The runtime spec remains a settings projection. Writable composition receives the

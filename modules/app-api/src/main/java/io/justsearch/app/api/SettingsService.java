@@ -5,8 +5,18 @@ import io.justsearch.agent.api.registry.OperationPreparation;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 
-/** Settings reset preparation and execution through the accepted operation owner. */
+/** Settings producers route through the existing accepted operation owner. */
 public interface SettingsService {
+  /**
+   * Accept one fresh internal attempt for a caller-owned candidate and its captured full witness.
+   * Internal producers do not reuse a public ingress key; the parent operation owns their retry.
+   * The result retains the row identity on typed refusal. Persistence uncertainty propagates
+   * from the runner and leaves its row unresolved. Only COMPLETE proves commitment.
+   */
+  io.justsearch.app.api.operations.OperationAttemptRunner.Result applyInternal(
+      UiSettings candidate, io.justsearch.app.api.settings.SettingsWitness expected,
+      io.justsearch.core.context.EngineContext context);
+
   /** Freeze the readable witness or absent-history quarantine identity without an effect. */
   OperationPreparation prepareReset(String argumentsJson);
 
