@@ -75,6 +75,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   private final OnlineAiService onlineAi;
   private final UiSettingsStore settingsStore;
+  private final io.justsearch.app.api.SettingsService settingsService;
   // Tempdoc 374 alpha.17 R3: late-bound. LocalApiServer constructs this service
   // before the worker bootstrap completes (HeadlessApp passes null at api-builder
   // time and late-binds via apiServer.lateBindKnowledgeServer). Pre-alpha.17
@@ -259,6 +260,13 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       EnterprisePolicyService policyService,
       Path aiHomeDir,
       RuntimeReconciler reconciler) {
+    this(onlineAi, settingsStore, knowledgeServer, policyService, aiHomeDir, reconciler, null);
+  }
+
+  public AiInstallService(OnlineAiService onlineAi, UiSettingsStore settingsStore,
+      KnowledgeServerBootstrap knowledgeServer, EnterprisePolicyService policyService,
+      Path aiHomeDir, RuntimeReconciler reconciler, io.justsearch.app.api.SettingsService settingsService) {
+    this.settingsService = settingsService;
     this.onlineAi = onlineAi;
     this.settingsStore = settingsStore;
     this.knowledgeServer = knowledgeServer;
@@ -305,6 +313,13 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       EnterprisePolicyService policyService,
       RuntimeReconciler reconciler) {
     this(onlineAi, settingsStore, knowledgeServer, policyService, resolveHomeDir(), reconciler);
+  }
+
+  /** Production composition with the shared accepted settings producer. */
+  public AiInstallService(OnlineAiService onlineAi, UiSettingsStore settingsStore,
+      KnowledgeServerBootstrap knowledgeServer, EnterprisePolicyService policyService,
+      RuntimeReconciler reconciler, io.justsearch.app.api.SettingsService settingsService) {
+    this(onlineAi, settingsStore, knowledgeServer, policyService, resolveHomeDir(), reconciler, settingsService);
   }
 
   /**
@@ -1872,7 +1887,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       control.applyRuntimeOverrides(
           s.getLlmModelPath(),
           s.getContextLength(),
-          s.getGpuLayers(),
+          s.configuredGpuLayers(),
           OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
     }
     return true;
@@ -1967,7 +1982,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * single Install-AI-then-apply cycle.
    *
    * <p>Respects user overrides: if a server.exe is already RESOLVED with a
-   * non-{@code auto_selected_cuda12} source (env var, settings.json, operator
+   * settings-or-higher source (env var, settings.json, operator
    * config), the explicit choice wins — see {@link #serverExeIsUserOwned}.
    *
    * @return true when the cuda12 server.exe was selected; false when the binary is absent or a user
@@ -1985,6 +2000,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           cuda12Exe);
       return false;
     }
+    var snapshot = settingsStore.inspect();
     ConfigStore store = ConfigStore.globalOrNull();
     ResolvedConfig resolved = store == null ? null : store.get();
     if (serverExeIsUserOwned(resolved)) {
@@ -1992,44 +2008,29 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           "alpha.15: justsearch.server.exe already resolved to {} (source={}); respecting user"
               + " override",
           resolved.ai().serverExe(),
-          resolved.ai().serverExeSource());
+          resolved.resolution("justsearch.server.exe").sourceName());
       return false;
     }
     String absPath = cuda12Exe.toAbsolutePath().toString();
-    System.setProperty(io.justsearch.configuration.EnvRegistry.SERVER_EXE.sysProp(), absPath);
-    System.setProperty(
-        io.justsearch.configuration.EnvRegistry.SERVER_EXE_SOURCE.sysProp(), "auto_selected_cuda12");
-
-    UiSettings s = settingsStore.load();
-    s.setServerExecutablePath(absPath);
-    settingsStore.save(s);
-    ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), s);
+    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+    UiSettings candidate = snapshot.settings();
+    candidate.setServerExecutablePath(absPath);
+    var result = settingsService.applyInternal(candidate, snapshot.witness(),
+        io.justsearch.app.services.intent.EngineProvenance.internal("ai-install-server-selection",
+            io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+            io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+    if (!result.response().success()) throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
+    if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
+      throw new IllegalStateException("Settings commitment is unresolved");
+    }
     log.info("alpha.15: server.exe set to cuda12 variant: {}", absPath);
     return true;
   }
 
-  /**
-   * True when a server executable is already resolved and was NOT chosen by a previous cuda12
-   * auto-selection — i.e. someone (env var, settings.json, operator {@code -D}) made an explicit
-   * choice that {@link #applyCudaServerExe} must not overwrite.
-   *
-   * <p>Reads the RESOLVED config rather than the {@code justsearch.server.exe} system property.
-   * Tempdoc 883 decision 4 slice 2 deleted the settings-to-sysprop promotion, so a GUI-chosen
-   * executable no longer appears in that property at all; keeping the old sysprop read would have
-   * made this guard fall through and silently replace the user's choice — including writing the
-   * cuda12 path back into their persisted {@code UiSettings}. The resolved value carries the whole
-   * ordinal chain (settings.json 300, env 400, {@code -D} 500), which is strictly more than the
-   * system property ever did.
-   *
-   * <p>Package-private and static so the guarantee is testable without an installer.
-   *
-   * @param resolved the current resolved config, or {@code null} when no store is published yet
-   */
+  /** Preserve a settings-or-higher executable winner; auto-detection is not operator authority. */
   static boolean serverExeIsUserOwned(ResolvedConfig resolved) {
-    if (resolved == null) return false;
-    Path exe = resolved.ai().serverExe();
-    if (exe == null || exe.toString().isBlank()) return false;
-    return !"auto_selected_cuda12".equals(resolved.ai().serverExeSource());
+    var source = resolved == null ? null : resolved.resolution("justsearch.server.exe");
+    return source != null && source.isResolved() && source.sourceOrdinal() >= 300;
   }
 
   /**

@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-13.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-14.
 
 Precedence note:
 1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.
@@ -20,7 +20,7 @@ The per-row notes above cover only the sources this table can derive from `EnvRe
 - **`settings.json` (300)** — `ConfigStoreRebuilder.contributeUiSettings` forwards a handful of `UiSettings` fields, including `justsearch.gpu.layers`, `justsearch.context.size`, `justsearch.server.exe`, `justsearch.ui.exclude_patterns`, `justsearch.index.base_path` and `justsearch.llm.model_path`.
 - **`auto_detected` (150, detail `hardware_probe`)** — the Head's startup probe contributes GPU detection results (including the VRAM-tier `justsearch.gpu.layers`) and, since tempdoc 883, the DERIVED `justsearch.context.size` window rung.
 
-Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearch.context.size` (slice 1) and `justsearch.gpu.layers`, `justsearch.server.exe`, `justsearch.ui.exclude_patterns` (slice 2), and its §C.5c residue deleted the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, along with every `*.source=ui_settings` marker property. Each of those keys now resolves `settings.json` when the user set one and `auto_detected` / `default` otherwise — never `jvm_arg` merely because the value came from the GUI, which is what the promotions used to make them report. Two `*.source` properties survive, neither of them a settings promotion: `justsearch.server.exe.source` is the ownership token of the runtime GPU-variant switch (`RuntimeActivationService`), and `justsearch.llm.model_path.source` labels the paths `AiInstallService` / `AiPackImportService` write directly so `InferenceConfig` can tell an installer-written path from an operator lock.
+Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearch.context.size` (slice 1) and `justsearch.gpu.layers`, `justsearch.server.exe`, `justsearch.ui.exclude_patterns` (slice 2), and its §C.5c residue deleted the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, along with every `*.source=ui_settings` marker property. Each of those keys now resolves `settings.json` when the user set one and `auto_detected` / `default` otherwise — never `jvm_arg` merely because the value came from the GUI, which is what the promotions used to make them report. The runtime GPU executable switch also uses resolver provenance: boot auto-detection at150, accepted settings at300, and environment/JVM sources at400/500. Its `justsearch.server.exe.source` marker is retired. The model-path marker has no current writer; its compatibility reader remains for the separately designed profile persistence path.
 
 | Declaration | Lifecycle | YAML key | Env var | System property | EnvRegistry constant | Owner module | Precedence notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -257,7 +257,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.SEARCH_QUERY_CLASSIFICATION_ENABLED | permanent | - | JUSTSEARCH_SEARCH_QUERY_CLASSIFICATION_ENABLED | justsearch.search.query_classification.enabled | SEARCH_QUERY_CLASSIFICATION_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SEARCH_TITLE_BOOST | permanent | - | JUSTSEARCH_SEARCH_TITLE_BOOST | justsearch.search.title_boost | SEARCH_TITLE_BOOST | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SERVER_EXE | permanent | - | JUSTSEARCH_SERVER_EXE | justsearch.server.exe | SERVER_EXE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.SERVER_EXE_SOURCE | permanent | - | JUSTSEARCH_SERVER_EXE_SOURCE | justsearch.server.exe.source | SERVER_EXE_SOURCE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SERVER_PORT | permanent | - | JUSTSEARCH_SERVER_PORT | justsearch.server.port | SERVER_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SPARSE_MODEL | permanent | - | JUSTSEARCH_SPARSE_MODEL | justsearch.sparse_model | SPARSE_MODEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SPLADE_ACTIVATION | permanent | - | JUSTSEARCH_SPLADE_ACTIVATION | justsearch.splade.activation | SPLADE_ACTIVATION | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

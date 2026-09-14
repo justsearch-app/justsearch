@@ -118,6 +118,45 @@ public final class OnlineAiServiceImpl
       throw new IllegalStateException("Inference runtime not configured");
     }
 
+    InferenceConfig next =
+        profileConfig(
+            profile,
+            current,
+            current.serverExecutable(),
+            current.contextSize(),
+            current.gpuLayers());
+    applyProfileConfig(profile, next, restartPolicy);
+  }
+
+  @Override
+  public void applyChatProfileWithRuntime(
+      ChatModelProfile profile,
+      String serverExecutable,
+      Integer contextLength,
+      Integer gpuLayers,
+      RestartPolicy restartPolicy) {
+    Objects.requireNonNull(profile, "profile is required");
+    if (serverExecutable == null || serverExecutable.isBlank()) {
+      throw new IllegalArgumentException("serverExecutable is required");
+    }
+    InferenceConfig current = manager.currentConfig();
+    if (current == null) {
+      throw new IllegalStateException("Inference runtime not configured");
+    }
+
+    Path serverExe = Path.of(serverExecutable.trim());
+    int context = contextLength != null && contextLength > 0 ? contextLength : current.contextSize();
+    int layers = gpuLayers != null && gpuLayers >= 0 ? gpuLayers : current.gpuLayers();
+    InferenceConfig next = profileConfig(profile, current, serverExe, context, layers);
+    applyProfileConfig(profile, next, restartPolicy);
+  }
+
+  private static InferenceConfig profileConfig(
+      ChatModelProfile profile,
+      InferenceConfig current,
+      Path serverExecutable,
+      int contextLength,
+      int gpuLayers) {
     Path modelsDir = resolveModelsDir(current);
     Path modelPath = modelsDir.resolve(profile.modelFile());
     if (!Files.isRegularFile(modelPath)) {
@@ -141,23 +180,22 @@ public final class OnlineAiServiceImpl
       mmprojPath = null;
     }
 
-    InferenceConfig next =
-        new InferenceConfig(
-            current.serverExecutable(),
-            modelPath,
-            mmprojPath,
-            current.serverPort(),
-            current.contextSize(),
-            current.gpuLayers(),
-            current.vduMode(),
-            profile.id());
-
-    LOG.info(
-        "Applying chat profile '{}': model={} mmproj={} (modelsDir={})",
-        profile.id(),
+    return new InferenceConfig(
+        serverExecutable,
         modelPath,
         mmprojPath,
-        modelsDir);
+        current.serverPort(),
+        contextLength,
+        gpuLayers,
+        current.vduMode(),
+        profile.id());
+  }
+
+  private void applyProfileConfig(
+      ChatModelProfile profile, InferenceConfig next, RestartPolicy restartPolicy) {
+    LOG.info(
+        "Applying chat profile '{}': model={} mmproj={}",
+        profile.id(), next.modelPath(), next.mmprojPath());
 
     try {
       manager.applyConfig(
@@ -355,7 +393,8 @@ public final class OnlineAiServiceImpl
     Path mmprojPath = base.mmprojPath();
     String chatProfileId = base.chatProfileId();
 
-    // Allow out-of-band override for BYO llama-server path (set via UI settings -> sysprop).
+    // The resolved snapshot owns server selection across settings, environment, JVM and derived
+    // sources. Runtime applies consume that published authority rather than a raw property.
     ConfigStore cs = ConfigStore.globalOrNull();
     String serverOverride = cs != null && cs.get().ai().serverExe() != null
         ? cs.get().ai().serverExe().toString() : null;
@@ -384,14 +423,8 @@ public final class OnlineAiServiceImpl
     }
 
     int ctx = contextLength != null && contextLength > 0 ? contextLength : base.contextSize();
-    // Tempdoc 374 alpha.13 fix A2: 0 from UiSettings means "unset" — defer to
-    // base.gpuLayers() which already reflects the resolved config (env vars,
-    // sysprops, auto-detection at ordinal 150). The previous `>= 0` check
-    // treated UiSettings.gpuLayers default 0 as an explicit override, so every
-    // Install AI completion silently clobbered a correctly-resolved 99 with 0
-    // — defeating both the auto-detect path and the JUSTSEARCH_LLM_GPU_LAYERS
-    // env-var workaround. Explicit user overrides (>0) still take precedence.
-    int layers = gpuLayers != null && gpuLayers > 0 ? gpuLayers : base.gpuLayers();
+    // Nullable settings preserve automatic choice; zero is an explicit CPU target.
+    int layers = gpuLayers != null && gpuLayers >= 0 ? gpuLayers : base.gpuLayers();
 
     return new InferenceConfig(
         serverExe,

@@ -152,7 +152,6 @@ public record ResolvedConfig(
       boolean useThinking,
       int reasoningBudget,
       String onnxruntimeVariantId,
-      String serverExeSource,
       long vramThreshold12gb,
       long vramThreshold8gb,
       long vramThreshold4gb,

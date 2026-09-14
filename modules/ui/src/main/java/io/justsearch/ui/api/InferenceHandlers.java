@@ -609,7 +609,7 @@ final class InferenceHandlers {
       control.applyRuntimeOverrides(
           s.getLlmModelPath(),
           s.getContextLength(),
-          s.getGpuLayers(),
+          s.configuredGpuLayers(),
           OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
       ctx.json(Map.of("success", true, "mode", onlineAi.getCurrentMode()));
     } catch (Exception e) {

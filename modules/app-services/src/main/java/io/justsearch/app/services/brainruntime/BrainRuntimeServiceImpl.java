@@ -80,7 +80,7 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
     control.applyRuntimeOverrides(
         s.getLlmModelPath(),
         s.getContextLength(),
-        s.getGpuLayers(),
+        s.configuredGpuLayers(),
         OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
     return onlineAi.getCurrentMode();
   }

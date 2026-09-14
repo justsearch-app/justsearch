@@ -63,8 +63,18 @@ class SettingsV2ProjectionTest {
     assertNull(projected.llm().modelPath());
     assertNull(projected.llm().llamaLibPath());
     assertEquals(0, projected.llm().contextWindow());
+    assertNull(projected.llm().gpuLayers(), "a full-document round trip must not invent CPU intent");
     assertEquals(List.of(), projected.indexPaths());
     assertEquals("", settings.getIndexBasePath());
+  }
+
+  @Test
+  void explicitCpuRemainsDistinctFromAutomaticOnTheCanonicalWire() {
+    var settings = new UiSettings();
+    settings.setGpuLayers(0);
+    var projected = SettingsV2Projection.toSettingsV2(settings, UiSettingsStore.PersistenceMode.READ_WRITE);
+    assertEquals(0, projected.llm().gpuLayers());
+    assertNull(LlmSettingsV2.defaults().gpuLayers());
   }
 
   @Test

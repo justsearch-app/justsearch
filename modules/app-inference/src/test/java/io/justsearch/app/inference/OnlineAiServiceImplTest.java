@@ -53,6 +53,24 @@ final class OnlineAiServiceImplTest {
   }
 
   @Test
+  void bareRuntimeApplyDistinguishesAutomaticFromExplicitCpu() throws Exception {
+    var current = InferenceConfig.builder().serverExecutable(Path.of("server.exe"))
+        .modelPath(Path.of("model.gguf")).gpuLayers(99).contextSize(32768).build();
+    when(manager.currentConfig()).thenReturn(current);
+    service.applyRuntimeOverrides(null, null, null,
+        io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
+    service.applyRuntimeOverrides(null, 8192, 0,
+        io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
+    var applied = ArgumentCaptor.forClass(InferenceConfig.class);
+    verify(manager, times(2)).applyConfig(applied.capture(),
+        eq(InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS),
+        eq(io.justsearch.app.inference.telemetry.TransitionReason.CONFIG_APPLY));
+    assertEquals(99, applied.getAllValues().get(0).gpuLayers());
+    assertEquals(0, applied.getAllValues().get(1).gpuLayers());
+    assertEquals(8192, applied.getAllValues().get(1).contextSize());
+  }
+
+  @Test
   void isAvailable_delegatesToIsOnline() {
     when(manager.isOnline()).thenReturn(true);
     assertTrue(service.isAvailable());
@@ -324,9 +342,68 @@ final class OnlineAiServiceImplTest {
     }
   }
 
+  @Test
+  @DisplayName("combined profile/runtime apply submits one config and accepts GPU zero")
+  void applyChatProfileWithRuntimeCombinesTargetInOneApply() throws Exception {
+    Path modelsDir = tmp.resolve("models-combined");
+    Files.createDirectories(modelsDir.resolve("compact"));
+    Files.writeString(modelsDir.resolve(ChatModelProfile.COMPACT.modelFile()), "x");
+    Files.writeString(modelsDir.resolve(ChatModelProfile.COMPACT.mmprojFile()), "x");
+
+    InferenceConfig current =
+        new InferenceConfig(
+            Path.of("/bin/old-server.exe"),
+            modelsDir.resolve(ChatModelProfile.STANDARD.modelFile()),
+            modelsDir.resolve(ChatModelProfile.STANDARD.mmprojFile()),
+            8082,
+            4096,
+            33,
+            false,
+            "standard");
+    when(manager.currentConfig()).thenReturn(current);
+
+    ConfigStore prevStore = ConfigStore.globalOrNull();
+    String prevModelsDir = System.getProperty("justsearch.models.dir");
+    System.setProperty("justsearch.models.dir", modelsDir.toString());
+    try {
+      TestResolvedConfigHelper.storeFromEnvironment();
+
+      service.applyChatProfileWithRuntime(
+          ChatModelProfile.COMPACT,
+          "/bin/new-server.exe",
+          16384,
+          0,
+          io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
+
+      ArgumentCaptor<InferenceConfig> captor = ArgumentCaptor.forClass(InferenceConfig.class);
+      verify(manager, times(1))
+          .applyConfig(
+              captor.capture(),
+              eq(InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS),
+              eq(io.justsearch.app.inference.telemetry.TransitionReason.CONFIG_APPLY));
+      InferenceConfig next = captor.getValue();
+      assertEquals(Path.of("/bin/new-server.exe"), next.serverExecutable());
+      assertEquals(modelsDir.resolve(ChatModelProfile.COMPACT.modelFile()), next.modelPath());
+      assertEquals(modelsDir.resolve(ChatModelProfile.COMPACT.mmprojFile()), next.mmprojPath());
+      assertEquals("compact", next.chatProfileId());
+      assertEquals(16384, next.contextSize());
+      assertEquals(0, next.gpuLayers(), "zero is an explicit CPU target");
+      assertEquals(8082, next.serverPort());
+      verify(manager, times(1)).currentConfig();
+      verifyNoMoreInteractions(manager);
+    } finally {
+      if (prevModelsDir == null) {
+        System.clearProperty("justsearch.models.dir");
+      } else {
+        System.setProperty("justsearch.models.dir", prevModelsDir);
+      }
+      TestResolvedConfigHelper.restoreGlobal(prevStore);
+    }
+  }
+
   /** Missing projector on disk warns and degrades to text-only rather than failing the switch. */
   @Test
-  @DisplayName("applyChatProfile nulls a missing mmproj instead of failing the switch")
+  @DisplayName("combined profile/runtime apply nulls a missing mmproj instead of failing")
   void applyChatProfileDegradesToTextOnlyWhenMmprojMissing() throws Exception {
     Path modelsDir = tmp.resolve("models-nomm");
     Files.createDirectories(modelsDir.resolve("compact"));
@@ -350,8 +427,11 @@ final class OnlineAiServiceImplTest {
     try {
       TestResolvedConfigHelper.storeFromEnvironment();
 
-      service.applyChatProfile(
+      service.applyChatProfileWithRuntime(
           ChatModelProfile.COMPACT,
+          "/bin/replacement-server.exe",
+          null,
+          0,
           io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.APPLY_ONLY);
 
       ArgumentCaptor<InferenceConfig> captor = ArgumentCaptor.forClass(InferenceConfig.class);
@@ -360,6 +440,8 @@ final class OnlineAiServiceImplTest {
       assertEquals(modelsDir.resolve(ChatModelProfile.COMPACT.modelFile()), next.modelPath());
       assertNull(next.mmprojPath());
       assertEquals("compact", next.chatProfileId());
+      assertEquals(Path.of("/bin/replacement-server.exe"), next.serverExecutable());
+      assertEquals(0, next.gpuLayers());
     } finally {
       if (prevModelsDir == null) {
         System.clearProperty("justsearch.models.dir");
@@ -368,6 +450,22 @@ final class OnlineAiServiceImplTest {
       }
       TestResolvedConfigHelper.restoreGlobal(prevStore);
     }
+  }
+
+  @Test
+  @DisplayName("combined profile/runtime apply refuses a blank server executable before apply")
+  void applyChatProfileWithRuntimeRequiresServerExecutable() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            service.applyChatProfileWithRuntime(
+                ChatModelProfile.COMPACT,
+                "  ",
+                null,
+                null,
+                io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS));
+
+    verifyNoInteractions(manager);
   }
 
   /**

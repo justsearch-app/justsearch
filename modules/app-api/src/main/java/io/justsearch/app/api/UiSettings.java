@@ -250,7 +250,8 @@ public final class UiSettings {
   private String llamaLibPath = "";
   // BYO AI: explicit llama-server executable path (optional override).
   private String serverExecutablePath = "";
-  private int gpuLayers = 0;
+  // One override value: null = automatic, zero = explicit CPU, positive = GPU offload.
+  private Integer gpuLayers;
   // Tempdoc 883 decision 1: 0 = auto. The context window is derived from the backend and the
   // launch ladder, not stored as a preference — this field is an override only. It is surfaced at
   // Settings → AI → Agent → Context window (wire name `llm.contextWindow`), where the readout
@@ -294,12 +295,19 @@ public final class UiSettings {
     this.serverExecutablePath = path == null ? "" : path;
   }
 
+  @com.fasterxml.jackson.annotation.JsonIgnore
   public int getGpuLayers() {
+    return gpuLayers == null ? 0 : gpuLayers;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("gpuLayers")
+  public Integer configuredGpuLayers() {
     return gpuLayers;
   }
 
-  public void setGpuLayers(int gpuLayers) {
-    this.gpuLayers = Math.max(0, gpuLayers);
+  @com.fasterxml.jackson.annotation.JsonProperty("gpuLayers")
+  public void setGpuLayers(Integer gpuLayers) {
+    this.gpuLayers = gpuLayers == null ? null : Math.max(0, gpuLayers);
   }
 
   /** The context-window override in tokens, or {@code 0} meaning "auto" (tempdoc 883). */

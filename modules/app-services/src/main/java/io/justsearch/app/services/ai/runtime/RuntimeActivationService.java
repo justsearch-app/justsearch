@@ -25,12 +25,16 @@ import io.justsearch.app.services.observability.EncoderRuntimeCache;
 import io.justsearch.app.services.observability.EncoderRuntimeExplainer;
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
+import io.justsearch.app.api.SettingsService;
+import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.services.intent.EngineProvenance;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.configuration.EnvRegistry;
-import io.justsearch.configuration.ModelPathSource;
 import io.justsearch.app.api.inference.RealizedChatIdentity;
 import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.model.InstallContract;
@@ -39,7 +43,6 @@ import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedPathResolver;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
-import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.RepoRootLocator;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.EffectivePolicy;
@@ -103,34 +106,7 @@ public final class RuntimeActivationService
    */
   private static final String CHAT_PACKAGE_ID = "chat";
 
-  // Mirror SettingsController behavior for server exe sysprop ownership.
-  private static final String SERVER_EXE_SYS_PROP = "justsearch.server.exe";
-  private static final String SERVER_EXE_SOURCE_PROP = "justsearch.server.exe.source";
-
-  /**
-   * Ownership markers this service recognizes on the server-executable sysprop.
-   *
-   * <p>Tempdoc 842: these were two private string literals here, a third private copy in
-   * {@code EffectiveConfigController}, and the writers' own literals elsewhere — four copies of one
-   * vocabulary. They now name the shared {@link ModelPathSource} constants (tempdoc 374 alpha.16
-   * fix A's finding was exactly that a divergent copy silently reclassified the boot-time
-   * CUDA auto-select as a third-party operator lock and rejected every activation).
-   *
-   * <p>Deliberately NOT {@link ModelPathSource#isSystemOwned}: that predicate also admits
-   * {@link ModelPathSource#PROFILE_RESOLVED}, which is a claim about the <em>model path</em> and
-   * says nothing about who owns the server executable. Widening this gate for free is how an
-   * ownership check quietly stops being a check.
-   */
-  private static final String SOURCE_UI_SETTINGS = ModelPathSource.UI_SETTINGS;
-
-  private static final String SOURCE_AUTO_SELECTED_CUDA12 = ModelPathSource.AUTO_SELECTED_CUDA12;
-
-  /**
-   * Chat-profile selection key (tempdoc 842 §2.3). A profile activation writes it so a later
-   * same-JVM {@code InferenceConfig} rebuild resolves the same (model, mmproj) pair the engine was
-   * just switched to, instead of falling back to the standard pair and half-reverting the switch.
-   */
-  private static final String CHAT_PROFILE_SYS_PROP = EnvRegistry.CHAT_PROFILE.sysProp();
+  private static final String SERVER_EXE_KEY = "justsearch.server.exe";
 
   // Tempdoc 374 alpha.17 R1: route through the same sysprop as
   // LlamaServerOps.HEALTH_CHECK_TIMEOUT_MS so the activation self-test honours operator
@@ -162,7 +138,7 @@ public final class RuntimeActivationService
   // persisted the intent — and nudges specChanged() so the persisted intent is honored
   // deterministically, not via a racy mode-drift event. Nullable for graceful degradation / tests.
   private final RuntimeReconciler runtimeReconciler;
-  private final RuntimeSpecStore runtimeSpecStore;
+  private final SettingsService settingsService;
 
   private final Path aiHome;
   private final Path statusPath;
@@ -444,7 +420,7 @@ public final class RuntimeActivationService
       InferenceCapability inferenceCapability,
       AiInstallService aiInstallService,
       RuntimeReconciler runtimeReconciler,
-      RuntimeSpecStore runtimeSpecStore) {
+      SettingsService settingsService) {
     Objects.requireNonNull(processExecutors, "processExecutors");
     this.onlineAi = Objects.requireNonNull(onlineAi, "onlineAi");
     this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
@@ -454,7 +430,7 @@ public final class RuntimeActivationService
     this.inferenceCapability = inferenceCapability; // may be null (graceful degradation)
     this.aiInstallService = aiInstallService; // may be null (graceful degradation)
     this.runtimeReconciler = runtimeReconciler; // may be null (graceful degradation)
-    this.runtimeSpecStore = runtimeSpecStore;
+    this.settingsService = settingsService;
     this.aiHome = resolveAiHome();
     this.statusPath = aiHome.resolve("ai").resolve(STATUS_FILE);
     loadStatusBestEffort();
@@ -509,10 +485,10 @@ public final class RuntimeActivationService
     List<AiRuntimeStatusResponse.InstalledVariant> installed = listInstalledVariants();
 
     UiSettings s = settingsStore.load();
-    String activeExe = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    if (activeExe == null || activeExe.isBlank()) {
-      activeExe = s.getServerExecutablePath();
-    }
+    var configStore = ConfigStore.globalOrNull();
+    var resolvedConfig = configStore != null ? configStore.get() : null;
+    Path configuredExe = resolvedConfig == null ? null : resolvedConfig.ai().serverExe();
+    String activeExe = configuredExe == null ? s.getServerExecutablePath() : configuredExe.toString();
     String activeVariantId = resolveVariantIdFromExePath(activeExe);
     // Tempdoc 374 alpha.14 fix P1-B: read gpu_layers from the resolved config
     // (which integrates auto-populate at ord 150 + env vars at 400 + sysprops
@@ -523,8 +499,6 @@ public final class RuntimeActivationService
     // not the running value. Falls back to UiSettings only when ConfigStore
     // is absent (shouldn't happen post-boot, but defensive).
     Integer gpuLayers;
-    var configStore = ConfigStore.globalOrNull();
-    var resolvedConfig = configStore != null ? configStore.get() : null;
     if (resolvedConfig != null && resolvedConfig.ai() != null) {
       gpuLayers = resolvedConfig.ai().gpuLayers();
     } else {
@@ -900,7 +874,9 @@ public final class RuntimeActivationService
       }
     }
 
-    UiSettings current = settingsStore.load();
+    UiSettingsStore.Snapshot base = settingsStore.inspect();
+    requireMutableServerExecutable();
+    UiSettings current = base.settings();
 
     // Tempdoc 842 §2.4: a named profile selects the (model, mmproj) pair as one unit. It is
     // resolved BEFORE the settings/contract chain and short-circuits it — a stored llmModelPath is
@@ -964,173 +940,84 @@ public final class RuntimeActivationService
 
     updateState("running", "apply", "Activating runtime variant…", null);
 
-    // Capture previous state for rollback.
-    UiSettings prevSettings = settingsStore.load();
-    String prevSys = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    String prevSysSource = System.getProperty(SERVER_EXE_SOURCE_PROP, "");
-    // Tempdoc 842: the profile sysprop joins the rollback bracket. It is captured as null-vs-value
-    // (not "" for absent) because clearing it and setting it to "" are different states to
-    // InferenceConfig: absent falls back to the STANDARD default, blank would too, but a rollback
-    // must restore *absence* rather than invent a blank claim.
-    String prevChatProfileProp = System.getProperty(CHAT_PROFILE_SYS_PROP);
-
-    try {
-      // Persist settings (so activation survives restart) AND apply sysprop (so reload works immediately).
-      UiSettings next = settingsStore.load();
-      next.setServerExecutablePath(exe.toAbsolutePath().toString());
-      if (next.getGpuLayers() <= 0) {
-        next.setGpuLayers(99);
-      }
-      // The engine is started from settings (applyRuntimeOverridesBestEffort reads
-      // next.getLlmModelPath()), so a model path recovered from the install contract has to land in
-      // settings or the activation would bring the engine up with no model.
-      //
-      // Tempdoc 842 §2.3: a PROFILE activation deliberately does NOT write llmModelPath. A profile
-      // choice is a claim about which bundle to resolve, not a stored user path; persisting the
-      // resolved file here would turn one session's dev profile into a permanent operator-looking
-      // setting that outlives it. Boot-time resolution (InferenceConfig + the chat-profile key)
-      // owns persistence semantics for profiles.
-      if (modelPathFromContract) {
-        next.setLlmModelPath(model.toAbsolutePath().toString());
-      }
-      settingsStore.save(next);
-
-      if (!applyServerExeSysProp(exe.toAbsolutePath().toString())) {
-        throw new IllegalStateException("Server executable override is locked by operator config");
-      }
-
-      // Tempdoc 737 fix pack (fix 2): bracket the engine-online + intent-write window in an
-      // ACTIVATION procedure. applyRuntimeOverrides(RESTART_ALWAYS) brings the engine ONLINE (its
-      // mode listener fires) BEFORE recordUserEnabled persists the intent; without the bracket the
-      // reconciler would see mode-up with spec still false and drift-converge the engine straight
-      // back DOWN. The procedure suppresses that drift; recordUserEnabled writes the intent;
-      // specChanged() nudges; endProcedure returns to the now-true spec — deterministically online,
-      // no spurious down/up flicker.
-      boolean activationProcedureBegun = false;
-      if (runtimeReconciler != null) {
-        runtimeReconciler.beginProcedure(
-            RuntimeStatus.ProcedureKind.ACTIVATION, "runtime-variant-activation");
-        activationProcedureBegun = true;
-      }
-      try {
-        if (profile != null) {
-          // Publish the selection BEFORE the apply: applyChatProfile restarts the engine, and any
-          // config rebuild racing that restart in this JVM must already agree on the profile.
-          System.setProperty(CHAT_PROFILE_SYS_PROP, profile.id());
-          applyChatProfileOrThrow(profile);
-        } else {
-          applyRuntimeOverridesBestEffort(next);
-        }
-
-        // Rebuild ConfigStore so readers see updated server EXE / GPU layers.
-        ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), next);
-
-        // Tempdoc 737 Phase 1: a user who successfully activated a GPU runtime wants AI on across
-        // restarts — persist the desired-state so the reconciler brings it back at boot (fixes the
-        // documented "AI offline after reopen" confusion). Null-safe; idempotent.
-        if (settingsStore != null) {
-          if (runtimeSpecStore == null) {
-            throw new IllegalStateException("Recorded runtime intent owner unavailable");
-          }
-          runtimeSpecStore.recordUserEnabled();
-        }
-        // Nudge the reconciler so the persisted intent is honored via specChanged (an explicit
-        // convergence), not only via the racy mode-drift event. Deferred while the procedure is
-        // active; applied at endProcedure below.
-        if (runtimeReconciler != null) {
-          runtimeReconciler.specChanged();
-        }
-      } finally {
-        if (activationProcedureBegun) {
-          runtimeReconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
-        }
-      }
-
-      updateState("completed", "done", "GPU runtime activated.", null);
-    } catch (Exception e) {
-      log.warn("Runtime activation failed; attempting rollback", e);
-      updateState("running", "rollback", "Activation failed; rolling back…", null);
-      restoreChatProfileProp(prevChatProfileProp);
-      boolean rolledBack = rollback(prevSettings, prevSys, prevSysSource);
-      if (!rolledBack) {
-        fail("RUNTIME_ROLLBACK_FAILED", "Rollback failed after activation error: " + safeMsg(e), e);
-        return;
-      }
-      fail("RUNTIME_ACTIVATION_FAILED", "Activation failed: " + safeMsg(e), e);
-    }
+    UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(current), UiSettings.class);
+    next.setServerExecutablePath(exe.toAbsolutePath().toString());
+    if (next.getGpuLayers() <= 0) next.setGpuLayers(99);
+    if (modelPathFromContract) next.setLlmModelPath(model.toAbsolutePath().toString());
+    next.setChatEnabled(true);
+    applyCandidate(base, next, profile, true);
   }
 
   private void runDeactivate() {
-    // Best-effort: choose CPU baseline from native-bin/llama-server (excluding variants/).
+    UiSettingsStore.Snapshot base = settingsStore.inspect();
+    requireMutableServerExecutable();
     Path baselineExe = resolveCpuBaselineExe(aiHome);
     if (baselineExe == null || !Files.isRegularFile(baselineExe)) {
       fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null);
       return;
     }
-
-    UiSettings prevSettings = settingsStore.load();
-    String prevSys = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    String prevSysSource = System.getProperty(SERVER_EXE_SOURCE_PROP, "");
-
-    try {
-      UiSettings next = settingsStore.load();
-      next.setServerExecutablePath(""); // revert to default discovery on restart
-      next.setGpuLayers(0);
-      settingsStore.save(next);
-
-      // Force immediate switch to baseline for this process.
-      forceServerExeSysProp(baselineExe.toAbsolutePath().toString());
-      applyRuntimeOverridesBestEffort(next);
-
-      // Rebuild ConfigStore so readers see reverted server EXE / GPU layers.
-      ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), next);
-
-      updateState("completed", "done", "GPU runtime deactivated (CPU baseline).", null);
-    } catch (Exception e) {
-      log.warn("Runtime deactivation failed; attempting rollback", e);
-      updateState("running", "rollback", "Deactivation failed; rolling back…", null);
-      boolean rolledBack = rollback(prevSettings, prevSys, prevSysSource);
-      if (!rolledBack) {
-        fail("RUNTIME_ROLLBACK_FAILED", "Rollback failed after deactivation error: " + safeMsg(e), e);
-        return;
-      }
-      fail("RUNTIME_DEACTIVATION_FAILED", "Deactivation failed: " + safeMsg(e), e);
-    }
+    UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(base.settings()), UiSettings.class);
+    // A blank value would expose the remembered CUDA auto-detection source again.
+    next.setServerExecutablePath(baselineExe.toAbsolutePath().toString());
+    next.setGpuLayers(0);
+    applyCandidate(base, next, null, false);
   }
 
-  private boolean rollback(UiSettings prevSettings, String prevSys, String prevSysSource) {
+  private void applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
+      ChatModelProfile profile, boolean activating) {
+    SettingsWitness committed = null;
+    boolean procedureBegun = false;
     try {
-      if (prevSettings != null) {
-        settingsStore.save(prevSettings);
+      if (runtimeReconciler != null) {
+        runtimeReconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION,
+            activating ? "runtime-variant-activation" : "runtime-variant-deactivation");
+        procedureBegun = true;
       }
-
-      // Restore sysprop if it was previously set; otherwise force baseline.
-      if (prevSys != null && !prevSys.isBlank()) {
-        System.setProperty(SERVER_EXE_SYS_PROP, prevSys);
-        if (prevSysSource != null && !prevSysSource.isBlank()) {
-          System.setProperty(SERVER_EXE_SOURCE_PROP, prevSysSource);
-        } else {
-          System.clearProperty(SERVER_EXE_SOURCE_PROP);
-        }
-      } else {
-        Path baselineExe = resolveCpuBaselineExe(aiHome);
-        if (baselineExe != null && Files.isRegularFile(baselineExe)) {
-          forceServerExeSysProp(baselineExe.toAbsolutePath().toString());
-        } else {
-          System.clearProperty(SERVER_EXE_SYS_PROP);
-          System.clearProperty(SERVER_EXE_SOURCE_PROP);
+      committed = commitCandidate(next, base.witness(), "runtime-variant-apply");
+      // The settings owner has already published the candidate ConfigStore. Inference does
+      // one transition; its lifecycle manager owns restoration of the previous runtime on failure.
+      if (profile != null) applyChatProfileOrThrow(profile, next);
+      else applyRuntimeOverridesBestEffort(next);
+    } catch (Exception failure) {
+      if (committed != null) {
+        updateState("running", "rollback", "Runtime apply failed; restoring settings…", null);
+        try {
+          commitCandidate(base.settings(), committed, "runtime-variant-compensation");
+        } catch (Exception compensationFailure) {
+          failure.addSuppressed(compensationFailure);
+          fail("RUNTIME_ROLLBACK_FAILED", "Settings restoration refused after runtime error: "
+              + safeMsg(failure), failure);
+          return;
         }
       }
+      fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
+          "Runtime apply failed: " + safeMsg(failure), failure);
+      return;
+    } finally {
+      if (procedureBegun) runtimeReconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
+    }
+    if (runtimeReconciler != null) runtimeReconciler.specChanged();
+    updateState("completed", "done", activating ? "GPU runtime activated."
+        : "GPU runtime deactivated (CPU baseline).", null);
+  }
 
-      applyRuntimeOverridesBestEffort(prevSettings);
+  private SettingsWitness commitCandidate(UiSettings candidate, SettingsWitness expected, String owner) {
+    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+    var result = settingsService.applyInternal(candidate, expected,
+        EngineProvenance.internal(owner, EngineContext.Survival.INTERACTIVE,
+            EngineContext.Urgency.FOREGROUND));
+    if (!result.response().success()) throw new SettingsCommitOwner.Refused(result.response());
+    if (result.record().state() != OperationState.COMPLETE) {
+      throw new IllegalStateException("Settings commitment is unresolved");
+    }
+    return new SettingsWitness(Math.addExact(expected.acceptedRevision(), 1), result.record().key());
+  }
 
-      // Rebuild ConfigStore so readers see restored sysprops.
-      ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), prevSettings);
-
-      return true;
-    } catch (Exception e) {
-      log.warn("Rollback failed", e);
-      return false;
+  private static void requireMutableServerExecutable() {
+    ConfigStore config = ConfigStore.globalOrNull();
+    var resolution = config == null ? null : config.get().resolution(SERVER_EXE_KEY);
+    if (resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400) {
+      throw new IllegalStateException("Server executable override is locked by operator config");
     }
   }
 
@@ -1183,7 +1070,7 @@ public final class RuntimeActivationService
    * surface that cannot apply pairs throws {@link UnsupportedOperationException} rather than
    * half-applying, and that propagates into the rollback bracket.
    */
-  private void applyChatProfileOrThrow(ChatModelProfile profile) {
+  private void applyChatProfileOrThrow(ChatModelProfile profile, UiSettings settings) {
     OnlineAiService onlineAi = this.onlineAi;
     if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
       // Same graceful degradation as applyRuntimeOverridesBestEffort: no control surface means
@@ -1191,21 +1078,14 @@ public final class RuntimeActivationService
       return;
     }
     try {
-      control.applyChatProfile(profile, OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
+      var config = ConfigStore.globalOrNull();
+      var effective = config == null ? null : config.get().ai();
+      control.applyChatProfileWithRuntime(profile, settings.getServerExecutablePath(),
+          effective == null ? settings.getContextLength() : effective.contextSize(),
+          effective == null ? settings.configuredGpuLayers() : effective.gpuLayers(),
+          OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
     } catch (Exception e) {
       throw new RuntimeException("Failed to apply chat profile '" + profile.id() + "'", e);
-    }
-  }
-
-  /**
-   * Restores the chat-profile sysprop to its pre-activation state. Absent stays absent: a rollback
-   * that wrote "" would leave a blank claim behind that no writer ever creates.
-   */
-  private static void restoreChatProfileProp(String previous) {
-    if (previous == null) {
-      System.clearProperty(CHAT_PROFILE_SYS_PROP);
-    } else {
-      System.setProperty(CHAT_PROFILE_SYS_PROP, previous);
     }
   }
 
@@ -1215,44 +1095,16 @@ public final class RuntimeActivationService
       return;
     }
     try {
+      var config = ConfigStore.globalOrNull();
+      var effective = config == null ? null : config.get().ai();
       control.applyRuntimeOverrides(
           settings == null ? null : settings.getLlmModelPath(),
-          settings == null ? null : settings.getContextLength(),
-          settings == null ? null : settings.getGpuLayers(),
+          effective == null ? settings.getContextLength() : effective.contextSize(),
+          effective == null ? settings.configuredGpuLayers() : effective.gpuLayers(),
           OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
     } catch (Exception e) {
       throw new RuntimeException("Failed to apply runtime overrides", e);
     }
-  }
-
-  private boolean applyServerExeSysProp(String exePath) {
-    String source = System.getProperty(SERVER_EXE_SOURCE_PROP, "");
-    String existing = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    // Tempdoc 374 alpha.16 fix A: treat both ui_settings and auto_selected_cuda12 as
-    // system-owned so the activation flow can overwrite them. The pre-alpha.16 check only
-    // matched ui_settings, so HeadlessApp's boot-time auto-select (and AiInstallService's
-    // applyCudaServerExe follow-up) registered as third-party operator locks and rejected
-    // every POST /api/ai/runtime/activate even when the self-test passed.
-    boolean owned =
-        SOURCE_UI_SETTINGS.equalsIgnoreCase(source)
-            || SOURCE_AUTO_SELECTED_CUDA12.equalsIgnoreCase(source);
-    boolean unset = existing == null || existing.isBlank();
-    if (!owned && !unset) {
-      // Respect explicit operator overrides.
-      return false;
-    }
-    forceServerExeSysProp(exePath);
-    return true;
-  }
-
-  private static void forceServerExeSysProp(String exePath) {
-    if (exePath == null || exePath.isBlank()) {
-      System.clearProperty(SERVER_EXE_SYS_PROP);
-      System.clearProperty(SERVER_EXE_SOURCE_PROP);
-      return;
-    }
-    System.setProperty(SERVER_EXE_SYS_PROP, exePath.trim());
-    System.setProperty(SERVER_EXE_SOURCE_PROP, SOURCE_UI_SETTINGS);
   }
 
   private SelfTestResult runSelfTest(Path exe, Path model, UiSettings settings) {

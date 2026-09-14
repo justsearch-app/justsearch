@@ -8,6 +8,15 @@ import org.junit.jupiter.api.Test;
 class EnvRegistryTest {
 
     @Test
+    void serverExecutableOwnershipMarkerIsRetired() {
+        assertTrue(java.util.Arrays.stream(EnvRegistry.values())
+            .noneMatch(key -> "justsearch.server.exe.source".equals(key.sysProp())));
+        var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
+        builder.contributeEnvRegistry();
+        assertNull(builder.build().resolution("justsearch.server.exe.source"));
+    }
+
+    @Test
     void sysProp_returnsCorrectValue() {
         assertEquals("justsearch.data.dir", EnvRegistry.DATA_DIR.sysProp());
         assertEquals("justsearch.ssot.path", EnvRegistry.SSOT_PATH.sysProp());

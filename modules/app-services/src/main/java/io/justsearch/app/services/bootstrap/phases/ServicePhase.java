@@ -267,6 +267,8 @@ public final class ServicePhase {
     // §31 Step 1.1: ExcludesService constructed via supplier-aware IndexingService.
     ExcludesService excludes = new ExcludesServiceImpl(in.indexingServiceSupplier());
 
+    SettingsService settings = new SettingsServiceImpl(in.settingsStore(), in.attempts());
+
     // §31 Phase 1.B-D: helper impls in app-services.
     AiInstallService aiInstallHelper =
         new AiInstallService(
@@ -274,9 +276,7 @@ public final class ServicePhase {
             in.settingsStore(),
             in.knowledgeServer(),
             enterprisePolicy,
-            // Tempdoc 737 fix pack (fix 3): the post-install smoke test brackets its engine use in an
-            // INSTALL_SMOKE_TEST procedure via this reconciler (null in the no-inference branch).
-            runtimeReconciler);
+            runtimeReconciler, settings);
     PackAllowlistService packAllowlistService = new PackAllowlistService();
     AiPackImportService aiPackImportHelper =
         new AiPackImportService(
@@ -305,7 +305,7 @@ public final class ServicePhase {
             // Tempdoc 737 fix pack (fix 2): brackets the activation engine-online + intent-write
             // window in an ACTIVATION procedure and nudges specChanged (null in the no-inference
             // branch).
-            runtimeReconciler, runtimeSpecStore);
+            runtimeReconciler, settings);
     // Tempdoc 805 G.3: observed ONNX execution provider beside the intent fields on
     // /api/ai/runtime/status. Same live-supplier shape as workerFeatureCache above — the RPC client
     // is null at bootstrap, so it must not be captured by value.
@@ -324,8 +324,6 @@ public final class ServicePhase {
     // observation changes with every activation and must be read at status time.
     aiInstallHelper.setFunctionalStatusSource(runtimeActivationHelper::functionalStatusByPackage);
 
-    // §31 Phase 3: 7 controller-services constructed here.
-    SettingsService settings = new SettingsServiceImpl(in.settingsStore(), in.attempts());
 
     // DiagnosticsService: SPI suppliers read from the late-bindings holder.
     Supplier<DebugStateProvider> debugProviderSupplier = in.lateBindings()::debugStateProvider;

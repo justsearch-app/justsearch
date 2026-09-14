@@ -19,6 +19,6 @@ public final class SettingsResetDefaults {
     current.setExcludePatterns(new java.util.ArrayList<>());
     current.setContextLength(0);
     current.setMaxTokens(1024);
-    current.setGpuLayers(0);
+    current.setGpuLayers(null);
   }
 }

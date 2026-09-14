@@ -34,8 +34,8 @@ public interface OnlineAiRuntimeControl {
   /**
    * Apply runtime overrides for llama-server configuration.
    *
-   * <p>Callers typically persist settings via {@code /api/settings} first, then request an apply/reload
-   * so the running llama-server (if any) is restarted with the updated config.
+   * <p>Callers typically commit settings through the recorded settings owner first, then request an
+   * apply/reload so the running llama-server (if any) is restarted with the updated config.
    *
    * @param llmModelPath full path to the generative model file (GGUF), or blank to keep current
    * @param contextLength desired context window size (tokens), or null/<=0 to keep current
@@ -96,6 +96,35 @@ public interface OnlineAiRuntimeControl {
     // this method exists to fix. An implementation that cannot apply pairs must say so.
     throw new UnsupportedOperationException(
         "applyChatProfile is not supported by " + getClass().getName());
+  }
+
+  /**
+   * Applies a named chat profile together with an explicit runtime target in one config change.
+   *
+   * <p>This is the activation counterpart of {@link #applyChatProfile}: the profile still owns the
+   * atomic model/projector pair, while the caller supplies the server executable and may replace
+   * context size and GPU layers. A {@code null} or non-positive context keeps the current value; a
+   * {@code null} or negative GPU layer count keeps the current value, while zero explicitly selects
+   * CPU execution. The executable is required and must be non-blank.
+   *
+   * <p>The default fails closed because decomposing this operation into separate applies would lose
+   * the true previous runtime configuration needed by lifecycle rollback.
+   *
+   * @param profile the profile whose model/projector pair is applied
+   * @param serverExecutable explicit llama-server executable path
+   * @param contextLength desired context size, or null/non-positive to keep the current value
+   * @param gpuLayers desired GPU layer count, including zero, or null/negative to keep current
+   * @param restartPolicy restart behavior
+   * @throws UnsupportedOperationException if this control surface cannot apply the combined target
+   */
+  default void applyChatProfileWithRuntime(
+      ChatModelProfile profile,
+      String serverExecutable,
+      Integer contextLength,
+      Integer gpuLayers,
+      RestartPolicy restartPolicy) {
+    throw new UnsupportedOperationException(
+        "applyChatProfileWithRuntime is not supported by " + getClass().getName());
   }
 
   /**

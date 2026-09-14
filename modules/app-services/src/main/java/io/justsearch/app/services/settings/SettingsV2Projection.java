@@ -21,7 +21,7 @@ public final class SettingsV2Projection {
         List.copyOf(settings.getExcludePatterns()), settings.getChatEnabled());
     var llm = new LlmSettingsV2(
         blankToNull(settings.getServerExecutablePath()), settings.getContextLength(),
-        settings.getMaxTokens(), settings.getGpuLayers(),
+        settings.getMaxTokens(), settings.configuredGpuLayers(),
         blankToNull(settings.getLlmModelPath()), blankToNull(settings.getLlamaLibPath()));
     String basePath = settings.getIndexBasePath();
     List<String> indexPaths = basePath == null || basePath.isBlank() ? List.of() : List.of(basePath);

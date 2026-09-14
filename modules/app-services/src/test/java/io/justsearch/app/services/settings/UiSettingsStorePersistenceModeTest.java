@@ -324,7 +324,7 @@ class UiSettingsStorePersistenceModeTest {
 
       String persisted = Files.readString(settingsFile);
       // Bumped to 2 by tempdoc 883 (contextLength 4096 -> 0 = auto migration).
-      assertTrue(persisted.contains("\"schemaVersion\" : 3"));
+      assertTrue(persisted.contains("\"schemaVersion\" : 4"));
       assertTrue(persisted.contains("\"settings\""));
       assertEquals(777, new UiSettingsStore(READ_WRITE, settingsFile).load().getMaxTokens());
     }

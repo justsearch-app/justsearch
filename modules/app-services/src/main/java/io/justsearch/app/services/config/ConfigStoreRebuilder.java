@@ -76,7 +76,16 @@ public final class ConfigStoreRebuilder {
     if (settings != null) {
       contributeUiSettings(builder, settings);
     }
-    return builder.build();
+    ResolvedConfig selected = builder.build();
+    var gpuSelection = selected.resolution("justsearch.gpu.layers");
+    if (autoDetected.containsKey("justsearch.context.size") && gpuSelection != null && gpuSelection.isResolved()) {
+      // The hardware observation survives rebuilds; its context projection depends on the
+      // currently selected GPU policy. Unknown GPU state cannot invalidate a remembered window.
+      builder.contributeAutoDetected(Map.of("justsearch.context.size", String.valueOf(
+          io.justsearch.app.inference.ContextWindowPolicy.autoTopRung(selected.ai().gpuLayers() > 0))));
+      return builder.build();
+    }
+    return selected;
   }
 
   /**
@@ -127,7 +136,7 @@ public final class ConfigStoreRebuilder {
     putSettingIfPresent(builder, "justsearch.splade.model_path", settings.getSpladeModelPath());
     putSettingIfPresent(
         builder, "justsearch.citation.scorer.model_path", settings.getCitationScorerModelPath());
-    if (settings.getGpuLayers() > 0) {
+    if (settings.configuredGpuLayers() != null) {
       builder.putSettings("justsearch.gpu.layers", String.valueOf(settings.getGpuLayers()));
     }
     if (settings.getContextLength() > 0) {

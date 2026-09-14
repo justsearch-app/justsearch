@@ -645,7 +645,7 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
       control.applyRuntimeOverrides(
           s.getLlmModelPath(),
           s.getContextLength(),
-          s.getGpuLayers(),
+          s.configuredGpuLayers(),
           OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
     }
   }

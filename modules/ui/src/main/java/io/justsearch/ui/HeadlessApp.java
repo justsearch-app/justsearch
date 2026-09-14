@@ -247,11 +247,11 @@ public class HeadlessApp {
    * {@code settings.json} 300, env 400, {@code -D} 500 — still wins by the ordinal chain, so the
    * headless-eval {@code JUSTSEARCH_CONTEXT_SIZE} path is unaffected.
    *
-   * @param settingsGpuLayers the user's {@code UiSettings.gpuLayers} (ordinal 300), {@code 0} when
+   * @param settingsGpuLayers the user's {@code UiSettings.gpuLayers} (ordinal 300), {@code null} when
    *     unset — see {@link #gpuLayersAfterAutoDetect} for why it has to be passed in
    */
   static Map<String, String> augmentDerivedContextWindow(
-      Map<String, String> autoDetected, int settingsGpuLayers) {
+      Map<String, String> autoDetected, Integer settingsGpuLayers) {
     java.util.LinkedHashMap<String, String> augmented =
         new java.util.LinkedHashMap<>(autoDetected == null ? Map.of() : autoDetected);
     int gpuLayers = gpuLayersAfterAutoDetect(augmented, settingsGpuLayers);
@@ -276,14 +276,13 @@ public class HeadlessApp {
    * from an operator's {@code -D}. With that promotion deleted the settings value has to be passed
    * in, or a user who set 20 layers would get the CPU rung derived on a GPU box.
    *
-   * @param settingsGpuLayers the user's {@code UiSettings.gpuLayers}; consulted only when
-   *     {@code > 0}, matching {@code ConfigStoreRebuilder.contributeUiSettings} where {@code 0}
-   *     means "unset" and is not contributed at all
+   * @param settingsGpuLayers the user's {@code UiSettings.gpuLayers}; null means automatic and zero means explicit CPU,
+   *     matching {@code ConfigStoreRebuilder.contributeUiSettings}
    */
   private static int gpuLayersAfterAutoDetect(
-      Map<String, String> autoDetected, int settingsGpuLayers) {
+      Map<String, String> autoDetected, Integer settingsGpuLayers) {
     String raw = EnvRegistry.GPU_LAYERS.get().orElse(null);
-    if ((raw == null || raw.isBlank()) && settingsGpuLayers > 0) {
+    if ((raw == null || raw.isBlank()) && settingsGpuLayers != null) {
       raw = String.valueOf(settingsGpuLayers);
     }
     if (raw == null || raw.isBlank()) {
@@ -711,7 +710,7 @@ public class HeadlessApp {
     Path detectionRoot = io.justsearch.configuration.RepoRootLocator.findRepoRootOrNull();
     Map<String, String> autoDetected = io.justsearch.ort.GpuAutoDetection.probe(detectionRoot);
     autoDetected = augmentGpuAutoDetectionAndMirrorProbeFlags(autoDetected, HeadlessApp::queryNvmlTotalVramBytes);
-    autoDetected = augmentDerivedContextWindow(autoDetected, settings.getGpuLayers());
+    autoDetected = augmentDerivedContextWindow(autoDetected, settings.configuredGpuLayers());
     // Remembered so a later ConfigStore rebuild (settings PUT, AI install, activation) does not
     // silently drop ordinal 150 and leave the derived window with no provenance.
     io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(autoDetected);
@@ -722,7 +721,12 @@ public class HeadlessApp {
     var configStore = new ConfigStore(resolvedConfig);
     ConfigStore.setGlobal(configStore);
 
-    maybeAutoSelectCuda12Variant(settings, configStore);
+    Path autoServer = maybeAutoSelectCuda12Variant(settings, configStore);
+    if (autoServer != null) {
+      autoDetected = new java.util.HashMap<>(autoDetected);
+      autoDetected.put("justsearch.server.exe", autoServer.toAbsolutePath().toString());
+      io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(autoDetected);
+    }
     maybeMirrorOrtNativePath(configStore);
 
     Path dataDir = PlatformPaths.resolveDataDir();
@@ -737,27 +741,10 @@ public class HeadlessApp {
   }
 
   /**
-   * Rebuilds the resolved config AFTER the two boot steps that write system properties the resolver
-   * has already read past — {@code maybeAutoSelectCuda12Variant} (the cuda12 {@code server.exe})
-   * and {@code maybeMirrorOrtNativePath} — and returns the config the rest of boot will see.
-   *
-   * <p><b>Lane F item A19 took the snapshot out of this method, and deliberately not the rebuild.</b>
-   * It used to do two things: rebuild, then serialise the result to
-   * {@code <dataDir>/runtime/worker-config-snapshot.json} for a second process to load at config
-   * ordinal 450. There is no second process, so the write and the whole ordinal-450 tier are gone.
-   * The REBUILD is not part of that tier and must survive it: it is what makes the two sysprop
-   * writes above visible to every later reader, and the ORT native-pack detection immediately below
-   * depends on it (review B2 — reading the pre-rebuild config there finds no pack and silently
-   * leaves the Engine on CPU, which is the tempdoc 883 §C.5c defect one field over). Deleting this
-   * method along with the snapshot would have looked like tidy residue removal and would have
-   * reintroduced that defect, which is why the name no longer says "snapshot".
-   *
-   * <p>Tempdoc 883 §C.5c, still the reason for the ordering: rebuilding through
-   * {@link io.justsearch.app.services.config.ConfigStoreRebuilder} rather than re-reading the
-   * sysprops by hand keeps ONE assembly path — the same ordinal-150 probe, ordinal-300 settings and
-   * base sources the initial build used, plus whatever the two steps just wrote at 500.
-   *
-   * @return the rebuilt config, which is also what {@link ConfigStore#get()} now returns
+   * Publishes remembered CUDA auto-selection at ordinal150 and the ORT native-path boot write.
+   * The ORT pack detector immediately consumes this rebuilt config; keep this ordering even
+   * though server selection no longer writes a JVM property. Settings and operator sources
+   * retain their normal precedence through the common config assembler.
    */
   static ResolvedConfig rebuildAfterPostBuildWrites(ConfigStore configStore, UiSettings settings) {
     io.justsearch.app.services.config.ConfigStoreRebuilder.rebuild(configStore, settings);
@@ -1741,48 +1728,42 @@ public class HeadlessApp {
    *   <li>cuda12 variant exists</li>
    * </ol>
    */
-  private static void maybeAutoSelectCuda12Variant(UiSettings settings, ConfigStore activeConfigStore) {
+  static Path maybeAutoSelectCuda12Variant(UiSettings settings, ConfigStore activeConfigStore) {
     try {
       // Check if GPU acceleration is requested
       int gpuLayers = settings.getGpuLayers();
       ConfigStore cs = activeConfigStore != null ? activeConfigStore : ConfigStore.globalOrNull();
-      if (cs != null && cs.get().ai().gpuLayers() != 0) {
+      if (cs != null) {
         gpuLayers = cs.get().ai().gpuLayers();
       }
       if (gpuLayers <= 0) {
         log.info("GPU auto-selection: SKIPPED (gpu_layers={})", gpuLayers);
-        return;
+        return null;
       }
 
-      // Check if user explicitly set server exe via environment variable (respect their choice)
-      String serverExeSource = cs != null ? cs.get().ai().serverExeSource() : "";
-      String serverExeEnv = System.getenv("JUSTSEARCH_SERVER_EXE");
-      if ("environment_variable".equals(serverExeSource)
-          || "operator".equals(serverExeSource)
-          || (serverExeEnv != null && !serverExeEnv.isBlank())) {
-        log.info(
-            "GPU auto-selection: SKIPPED (server explicitly set via {})",
-            serverExeSource.isBlank() ? "env var" : serverExeSource);
-        return;
+      var source = cs == null ? null : cs.get().resolution("justsearch.server.exe");
+      if (source != null && source.isResolved() && source.sourceOrdinal() >= 300) {
+        log.info("GPU auto-selection: SKIPPED (explicit server source={})", source.sourceName());
+        return null;
       }
 
       // Find the current/default server executable
       Path serverExe = resolveDefaultServerExecutable();
       if (serverExe == null || !Files.isRegularFile(serverExe)) {
         log.info("GPU auto-selection: SKIPPED (default server not found)");
-        return;
+        return null;
       }
 
       // Check if server already has statically-linked CUDA (no switch needed)
       if (hasStaticCuda(serverExe)) {
         log.info("GPU auto-selection: SKIPPED (server has static CUDA)");
-        return;
+        return null;
       }
 
       // Check if server has dynamically-linked CUDA with runtime available (no switch needed)
       if (hasDynamicCudaWithRuntime(serverExe)) {
         log.info("GPU auto-selection: SKIPPED (server has CUDA with runtime)");
-        return;
+        return null;
       }
 
       // At this point: server is CPU-only OR has dynamically-linked CUDA without runtime
@@ -1803,7 +1784,7 @@ public class HeadlessApp {
         log.warn("Expected: {}", expectedPath);
         log.warn("Check /api/ai/runtime/status for diagnostics");
         log.warn("========================================");
-        return;
+        return null;
       }
 
       // Verify required CUDA DLLs exist in cuda12 variant directory
@@ -1821,7 +1802,7 @@ public class HeadlessApp {
         log.warn("cuda12 variant found but missing DLLs: {}", String.join(", ", missingDlls));
         log.warn("Directory: {}", cuda12Dir);
         log.warn("========================================");
-        return;
+        return null;
       }
 
       // Auto-select cuda12 variant
@@ -1831,11 +1812,11 @@ public class HeadlessApp {
       log.info("  From: {}", serverExe);
       log.info("  To:   {}", cuda12Exe);
 
-      System.setProperty("justsearch.server.exe", cuda12Exe.toAbsolutePath().toString());
-      System.setProperty("justsearch.server.exe.source", "auto_selected_cuda12");
+      return cuda12Exe.toAbsolutePath();
 
     } catch (Exception e) {
       log.warn("GPU auto-selection failed (continuing with default)", e);
+      return null;
     }
   }
 

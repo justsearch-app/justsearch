@@ -18,17 +18,23 @@ import io.justsearch.app.api.AiInstallService;
 import io.justsearch.app.api.AiInstallStatus;
 import io.justsearch.app.api.InstallPlanPreview;
 import io.justsearch.app.api.OnlineAiService;
+import io.justsearch.app.api.OnlineAiRuntimeControl;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.app.services.ai.runtime.RuntimeActivationService;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.services.policy.EnterprisePolicyServiceImpl;
+import io.justsearch.app.services.settings.SettingsServiceImpl;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.DownloadProfile;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.model.ModelRegistry;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -36,6 +42,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -595,7 +602,7 @@ class RuntimeActivationServiceTest {
     Path settingsFile = tmp.resolve("settings.json");
     UiSettingsStore store =
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsFile);
-    io.justsearch.app.api.UiSettings s = store.load();
+    UiSettings s = store.load();
     s.setLlmModelPath(chosen.toAbsolutePath().toString());
     store.save(s);
 
@@ -636,6 +643,68 @@ class RuntimeActivationServiceTest {
     assertEquals(
         "No chat model configured. Run Install AI to download one, or import a models pack.",
         st.message);
+  }
+
+  @Test
+  void deactivationPersistsExplicitBaselineAndPublishesBeforeRuntimeApply() throws Exception {
+    setHome(tmp);
+    clearProp("justsearch.server.exe");
+    clearProp("justsearch.server.exe.source");
+    Path baseline = tmp.resolve("native-bin/llama-server/llama-server.exe");
+    Files.createDirectories(baseline.getParent());
+    Files.writeString(baseline, "cpu", StandardCharsets.UTF_8);
+    Path cuda = createVariantExe("cuda12");
+    UiSettingsStore settings =
+        new UiSettingsStore(
+            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("deactivate-settings.json"));
+    UiSettings initial = settings.load();
+    initial.setServerExecutablePath(cuda.toAbsolutePath().toString());
+    initial.setGpuLayers(99);
+    settings.save(initial);
+
+    ConfigStoreRebuilder.rememberAutoDetected(Map.of("justsearch.gpu.layers", "99",
+        "justsearch.server.exe", cuda.toAbsolutePath().toString(), "justsearch.context.size", "32768"));
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore config = new ConfigStore(ConfigStoreRebuilder.prepare(initial));
+    ConfigStore.setGlobal(config);
+    try (var fixture =
+        new io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture(
+            tmp.resolve("deactivate-intent"), settings, config)) {
+      RecordingRuntimeControl control = new RecordingRuntimeControl(settings);
+      RuntimeActivationService service =
+          new RuntimeActivationService(
+              processExecutors,
+              control,
+              settings,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              new SettingsServiceImpl(settings, fixture.runner()));
+
+      service.startDeactivate();
+      AiRuntimeActivationStatus status = awaitDone(service);
+
+      assertEquals("completed", status.state, "message=" + status.message);
+      UiSettings persisted = settings.load();
+      assertEquals(baseline.toAbsolutePath().toString(), persisted.getServerExecutablePath());
+      assertEquals(0, persisted.getGpuLayers());
+      assertEquals(io.justsearch.app.inference.ContextWindowPolicy.CPU_TOP_RUNG,
+          ConfigStore.global().get().ai().contextSize());
+      assertEquals(List.of(persisted.getLlmModelPath()), control.modelPaths);
+      assertEquals(List.of(0), control.gpuLayers);
+      assertEquals(List.of(baseline.toAbsolutePath()), control.publishedServerExecutables);
+      assertEquals(List.of(0), control.publishedGpuLayers);
+      assertEquals(
+          List.of(baseline.toAbsolutePath().toString()), control.settingsServerExecutables);
+      assertNull(System.getProperty("justsearch.server.exe"));
+      assertNull(System.getProperty("justsearch.server.exe.source"));
+    } finally {
+      TestResolvedConfigHelper.restoreGlobal(previous);
+      ConfigStoreRebuilder.rememberAutoDetected(Map.of());
+    }
   }
 
   private RuntimeActivationService createServiceWithSettingsFile() {
@@ -788,6 +857,11 @@ class RuntimeActivationServiceTest {
     System.setProperty(key, value);
   }
 
+  private void clearProp(String key) {
+    prevProps.putIfAbsent(key, System.getProperty(key));
+    System.clearProperty(key);
+  }
+
   private void setHome(Path home) {
     prevHome = System.getProperty("justsearch.home");
     System.setProperty("justsearch.home", home.toAbsolutePath().toString());
@@ -810,6 +884,59 @@ class RuntimeActivationServiceTest {
     }
     fail("Timed out waiting for runtime activation to finish");
     return svc.getActivationStatus();
+  }
+
+  private static final class RecordingRuntimeControl
+      implements OnlineAiService, OnlineAiRuntimeControl {
+    private final UiSettingsStore settings;
+    private final java.util.ArrayList<String> modelPaths = new java.util.ArrayList<>();
+    private final java.util.ArrayList<Integer> gpuLayers = new java.util.ArrayList<>();
+    private final java.util.ArrayList<Path> publishedServerExecutables = new java.util.ArrayList<>();
+    private final java.util.ArrayList<Integer> publishedGpuLayers = new java.util.ArrayList<>();
+    private final java.util.ArrayList<String> settingsServerExecutables = new java.util.ArrayList<>();
+
+    private RecordingRuntimeControl(UiSettingsStore settings) {
+      this.settings = settings;
+    }
+
+    @Override
+    public void applyRuntimeOverrides(
+        String llmModelPath,
+        Integer contextLength,
+        Integer gpuLayerCount,
+        RestartPolicy restartPolicy) {
+      modelPaths.add(llmModelPath);
+      gpuLayers.add(gpuLayerCount);
+      var published = ConfigStore.global().get().ai();
+      publishedServerExecutables.add(published.serverExe());
+      publishedGpuLayers.add(published.gpuLayers());
+      settingsServerExecutables.add(settings.load().getServerExecutablePath());
+    }
+
+    @Override
+    public DetachExternalServerResult detachExternalServer() {
+      throw new UnsupportedOperationException("not used by this test");
+    }
+
+    @Override
+    public CompletableFuture<String> summarize(String content) {
+      throw new UnsupportedOperationException("not used by this test");
+    }
+
+    @Override
+    public CompletableFuture<String> askQuestion(String question, String context) {
+      throw new UnsupportedOperationException("not used by this test");
+    }
+
+    @Override
+    public boolean isAvailable() {
+      return true;
+    }
+
+    @Override
+    public boolean isStartingUp() {
+      return false;
+    }
   }
 
 }

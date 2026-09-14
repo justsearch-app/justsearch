@@ -1019,7 +1019,6 @@ public final class ResolvedConfigBuilder {
         resolveBoolean("justsearch.llm.use_thinking", true),
         resolveReasoningBudget(),
         resolveString("justsearch.onnxruntime.variantId", ""),
-        resolveString("justsearch.server.exe.source", ""),
         resolveLong("justsearch.vram.threshold.12gb", 0L),
         resolveLong("justsearch.vram.threshold.8gb", 0L),
         resolveLong("justsearch.vram.threshold.4gb", 0L),

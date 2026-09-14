@@ -38,11 +38,12 @@ final class HeadlessAppConfigRebuildOrderingTest {
   @AfterEach
   void clearProps() {
     System.clearProperty(SERVER_EXE);
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(java.util.Map.of());
   }
 
   @Test
-  @DisplayName("a sysprop written after the build reaches the config the rest of boot sees")
-  void postBuildSyspropReachesTheReturnedConfig() {
+  @DisplayName("remembered boot discovery reaches later rebuilds at ordinal150")
+  void rememberedBootDiscoveryReachesTheReturnedConfig() {
     // The boot build: settings.json at ordinal 300 names the exe the user chose.
     ResolvedConfigBuilder builder = ResolvedConfig.builder();
     builder.putSettings(SERVER_EXE, "C:/installed/llama-server.exe");
@@ -53,8 +54,8 @@ final class HeadlessAppConfigRebuildOrderingTest {
         store.get().resolution(SERVER_EXE).value(),
         "precondition: the pre-write config names the original exe");
 
-    // What maybeAutoSelectCuda12Variant does: writes the sysprop at ordinal 500, does NOT rebuild.
-    System.setProperty(SERVER_EXE, "C:/installed/variants/cuda12/llama-server.exe");
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(
+        java.util.Map.of(SERVER_EXE, "C:/installed/variants/cuda12/llama-server.exe"));
 
     ResolvedConfig effective =
         HeadlessApp.rebuildAfterPostBuildWrites(store, new UiSettings());
@@ -67,6 +68,24 @@ final class HeadlessAppConfigRebuildOrderingTest {
         "C:/installed/variants/cuda12/llama-server.exe",
         store.get().resolution(SERVER_EXE).value(),
         "the ConfigStore is updated in place, so no reader is left on the stale config");
+    assertEquals(150, effective.resolution(SERVER_EXE).sourceOrdinal());
+    org.junit.jupiter.api.Assertions.assertNull(System.getProperty(SERVER_EXE));
+  }
+
+  @Test
+  void persistedCpuSelectionAndOperatorOverrideBeatRememberedCudaDiscovery() {
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(
+        java.util.Map.of(SERVER_EXE, "C:/installed/variants/cuda12/llama-server.exe"));
+    UiSettings settings = new UiSettings();
+    settings.setServerExecutablePath("C:/installed/llama-server.exe");
+    ConfigStore store = new ConfigStore(ResolvedConfig.builder().build());
+    var effective = HeadlessApp.rebuildAfterPostBuildWrites(store, settings);
+    assertEquals(settings.getServerExecutablePath(), effective.resolution(SERVER_EXE).value());
+    assertEquals(300, effective.resolution(SERVER_EXE).sourceOrdinal());
+    System.setProperty(SERVER_EXE, "C:/operator/llama-server.exe");
+    effective = HeadlessApp.rebuildAfterPostBuildWrites(store, settings);
+    assertEquals("C:/operator/llama-server.exe", effective.resolution(SERVER_EXE).value());
+    assertEquals(500, effective.resolution(SERVER_EXE).sourceOrdinal());
   }
 
   @Test

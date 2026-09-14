@@ -54,7 +54,7 @@ class UiSettingsStoreRevisionTest {
     assertEquals(new SettingsWitness(0, null), store.inspect().witness());
     assertEquals(4096, store.load().getContextLength());
     store.save(store.load());
-    assertTrue(Files.readString(path).contains("\"schemaVersion\" : 3"));
+    assertTrue(Files.readString(path).contains("\"schemaVersion\" : 4"));
     assertThrows(UnsupportedStoreVersionException.class,
         () -> StoreFormatVersions.requireReadable("ui-settings", 3, 2, 0, 0, 1));
   }

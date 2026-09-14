@@ -65,6 +65,16 @@ value, including zero, at300. Reset clears to null. This avoids a second GPU
 intent bit and an executable-path heuristic. Verify actual schema round-trip,
 older migration, and deactivation with remembered CUDA/GPU99 before accepting.
 
+Consumers preserve that distinction: v2 reads project null versus zero, while
+partial-update null remains no-change and reset restores auto. Bare inference
+apply honors explicit zero; settings-based callers pass the nullable override.
+Boot context derivation accepts nullable settings, and the settings assembler
+recomputes an existing derived context150 when it has a resolved GPU selection.
+Unknown GPU state preserves the remembered window; no CPU fact is invented.
+Activation/deactivation apply one published effective context/GPU snapshot so
+environment/JVM overrides win at the actual effect, including zero. Boot executable
+selection likewise uses resolved GPU zero rather than treating it as absent.
+
 ## 2026-09-14 runtime-intent writer cut
 
 The runtime spec remains a settings projection. Writable composition receives the

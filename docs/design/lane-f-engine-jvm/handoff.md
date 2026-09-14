@@ -2,12 +2,31 @@
 
 ## Current state (2026-09-14)
 
-The runtime-intent family checkpoint follows pushed `0ad7e1914` (response observations,
+Activation/deactivation/compensation is implemented and independently reviewed.
+Final1420 represents4,851 cases, four existing skips, zero failures/errors, with
+applicable PMD/format/UI integration compilation passing. It removes application
+server-executable property writes, preserves operator precedence, and distinguishes
+automatic GPU selection from explicit CPU in settings envelope4.
+[Evidence, exact sources and limits](evidence/C2/activation-settings-producer.md).
+The internal candidate producer is committed/pushed at `f15b66455`; hosted-gate
+corrections are at `e0cfb76de`. CI34790375481 at36cd600b4 failed due to a missing
+runtime-intent register entry and redundant Java qualifier; both are reproduced
+and corrected locally. No current hosted-success claim follows from that run.
+
+Next: migrate remaining AiInstallService/AiPackImportService whole-document saves
+and retire superseded publication paths. Re-verify their actual ONNX readers:
+the new investigation finds five model-path config readers already on ConfigStore,
+contrary to older plan text claiming raw property readers. Preserve genuinely
+separate ORT native-path discovery until its ownership is addressed. Then complete
+public settings update/witness wire and live/installed proof. C2-6 remains open;
+this checkpoint cannot ship while the remaining raw writers refuse recorded revisions.
+
+Earlier runtime-intent proof follows pushed `0ad7e1914` (response observations,
 hosted CI34788273439 and CLA34788272070 successful). Independent review is clear;
 final1405 represents4,235 cases, four existing skips, zero failures/errors, with
 PMD/format/UI integration compilation passing. [Proof and limits](evidence/C2/runtime-intent-producer.md).
-Continue immediately into activation/deactivation/compensation: its remaining raw
-saves refuse after a recorded witness, so this checkpoint cannot ship independently.
+Activation now consumes the accepted settings producer; the remaining installer/import
+and public writers retain their own migration obligations.
 Docs checkpoint `98a27626e` now has successful hosted CI34787367490, including Windows;
 this clears the later hosted checkpoint but does not establish the current dirty head.
 

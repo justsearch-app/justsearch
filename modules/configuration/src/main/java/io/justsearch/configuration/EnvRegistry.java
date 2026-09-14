@@ -475,9 +475,6 @@ public enum EnvRegistry {
     /** UI settings persistence mode (read-only, in-memory, etc.). */
     UI_SETTINGS_MODE("justsearch.ui.settings.mode", "JUSTSEARCH_UI_SETTINGS_MODE", LifecycleStage.PERMANENT),
 
-    /** Source of server executable selection (environment_variable / operator / etc.). */
-    SERVER_EXE_SOURCE("justsearch.server.exe.source", "JUSTSEARCH_SERVER_EXE_SOURCE", LifecycleStage.PERMANENT),
-
     /** LambdaMART reranker enabled flag (default: true when model file exists). */
     LAMBDAMART_ENABLED("justsearch.lambdamart.enabled", "JUSTSEARCH_LAMBDAMART_ENABLED", LifecycleStage.PERMANENT),
 

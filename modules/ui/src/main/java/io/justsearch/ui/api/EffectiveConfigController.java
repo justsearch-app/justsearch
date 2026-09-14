@@ -423,11 +423,8 @@ public final class EffectiveConfigController {
    * The {@code justsearch.server.exe} row, sourced from the RESOLVER's provenance (tempdoc 883
    * decision 4 slice 2) exactly as {@link #keyContextSize} is.
    *
-   * <p>The {@code justsearch.server.exe.source} marker is NOT read here any more. The marker still
-   * exists — {@code RuntimeActivationService} and {@code HeadlessApp.maybeAutoSelectCuda12Variant}
-   * write it as a genuine ownership token for a runtime GPU-variant switch — but the settings
-   * promotion it used to disambiguate is deleted, so a GUI-chosen exe now resolves as
-   * {@code settings.json} at ordinal 300 without needing a marker to say so.
+   * <p>Executable selection uses the resolver's source ordinals. Boot discovery contributes at150;
+   * a persisted choice contributes at300. The former server-executable ownership marker is retired.
    *
    * <p>The observed runtime value still wins {@code value} when a server is actually running: after
    * a variant switch the resolver holds the CONFIGURED exe and only the live runtime knows which
