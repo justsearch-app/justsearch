@@ -39,6 +39,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   private final OperationStore store;
   private final Clock clock;
   private final SettingsCommitOwner settingsOwner;
+  private final IngestPlanResolver ingestPlanResolver;
   private final Set<OperationKind> ownedKinds;
   private final List<OperationRecord> interrupted;
   private final Map<Long, Control> active = new ConcurrentHashMap<>();
@@ -57,6 +58,16 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   /** The fixed settings owner is composed before this runner and inspects all boot rows first. */
   public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds,
       SettingsCommitOwner settingsOwner) {
+    this(store, clock, ownedKinds, settingsOwner, null);
+  }
+
+  /** Ingestion preparation decoding is fixed by the process root before any parent can execute. */
+  public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds,
+      SettingsCommitOwner settingsOwner, IngestPlanResolver ingestPlanResolver) {
+    this.ingestPlanResolver = ingestPlanResolver;
+    if (ingestPlanResolver != null && !ownedKinds.contains(OperationKind.INGEST)) {
+      throw new IllegalArgumentException("Ingest resolver requires ingestion ownership");
+    }
     this.store = Objects.requireNonNull(store, "store");
     this.settingsOwner = settingsOwner;
     this.clock = Objects.requireNonNull(clock, "clock");
@@ -128,6 +139,32 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     requireOutsidePreparation(request);
     return prepared(withKey(request, stable -> store.acceptPrepared(stable.key(), stable.descriptor(),
         stable.context(), stable.provenance(), nonce, stable.historyMode())));
+  }
+
+  @Override
+  public PreparedAttempt acceptIngestChild(OperationRecordHandle parent,
+      io.justsearch.app.api.operations.RecordedRootPlan.Root root) {
+    if (!(parent instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
+        || control.done.isCompletedExceptionally() || ingestPlanResolver == null) {
+      throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
+    }
+    if (preparationLocks[Math.floorMod(control.key.hashCode(), preparationLocks.length)].isHeldByCurrentThread()) {
+      throw new IllegalStateException("Accept a child after leaving its parent preparation scope");
+    }
+    var row = store.find(control.key).orElseThrow(() ->
+        new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null));
+    var preparation = store.acceptedPreparation(control.id).orElseThrow(() ->
+        new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null));
+    final io.justsearch.app.api.operations.RecordedRootPlan selected;
+    try {
+      var plan = ingestPlanResolver.resolve(row, preparation);
+      var recordedRoot = plan.roots().stream().filter(candidate -> candidate.equals(root))
+          .findFirst().orElseThrow(() -> new IllegalArgumentException("Root is outside recorded parent scope"));
+      selected = new io.justsearch.app.api.operations.RecordedRootPlan(plan.generation(), List.of(recordedRoot));
+    } catch (IllegalArgumentException invalid) {
+      throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
+    }
+    return prepared(store.acceptIngestChild(control.key, OperationKeys.generate(clock), preparation, selected));
   }
 
   private PreparedAttempt prepared(OperationStore.Acceptance accepted) {
@@ -549,6 +586,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private final class Control implements OperationRecordHandle {
+    private final OperationAttemptRunnerImpl owner = OperationAttemptRunnerImpl.this;
     private final long id;
     private final String key;
     private final OperationKind kind;

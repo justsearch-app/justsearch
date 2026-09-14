@@ -73,7 +73,7 @@ separately. A callback retry reads the latest projection rather than applying a 
 ### Exact projection and ownership
 
 The planned `ingestion_walk_progress` row contains `operation_key` (primary key), `plan_hash`,
-`enumeration_epoch`, nullable `enumeration_closed_at`, `completed_units`, `failed_units`,
+`enumeration_epoch`, nullable `enumeration_closed_at` and terminal enumeration outcome, `completed_units`, `failed_units`,
 `revision`, nullable `sealed_at`, nullable `receipt_json`, and `acknowledged_revision`.
 All counters start at zero and only advance; a seal and its receipt are immutable. There is no
 parallel WAITING/RUNNING/FAILED operation state machine. Enumeration closure and sealing are
@@ -185,6 +185,9 @@ Both PENDING polling and PROCESSING recovery require this eligibility rule. A ca
 runs after either path has already consumed recorded work cannot establish the guarantee.
 
 ## Implementation order after design refutation
+
+The [vertical implementation map](C2-8d-vertical-plan.md) names per-item commits, module
+boundaries, notification lock order and the receipt-loss/failure rules.
 
 1. **C2-8c, admission revision foundation:** jobs v17 adds/backfills `unit_revision`; enqueue
    and reenqueue mint it, poll returns it, and exact claims validate it. Preserve it through

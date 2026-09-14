@@ -40,6 +40,14 @@ C2-8c admission revisions and reenqueue ownership preservation are locally verif
 final1533 represents2,186 cases/424 suites,20 existing skips, zero failures/errors;
 PMD/format pass. Focused1530, discriminating negative1531 and the corrected version-pin
 failure1532 are preserved. [Proof and limitations](evidence/C2/admission-revision.md).
+Hosted CI34809851127 (all13 jobs) and CLA34809849392 pass at128a0c945.
+C2-8d.1 frozen roots and child acceptance are implemented as a WIP primitive: integrated1537
+executes5,013 cases/774 suites, four existing skips, zero failures/errors; ten PMD and
+whole Spotless pass. Negative1536 discriminates stale preparation and retention defects;
+independent review's COMPLETE_WITH_GAPS correction is included. [Evidence](evidence/C2/recorded-ingest-binding.md).
+Actual producer/queue/recovery activation remains open in the [per-item vertical plan](evidence/C2/C2-8d-vertical-plan.md).
+C2-9's [authorization recovery contract](evidence/C2/ingestion-authorization-recovery.md)
+requires a server-built basis, exact grant re-resolution and sole preloaded roots/evaluator.
 PR727 managed review record is verified through07813a14a and design a5f1a0fa8.
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is

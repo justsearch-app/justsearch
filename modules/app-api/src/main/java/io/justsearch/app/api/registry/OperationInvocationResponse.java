@@ -85,7 +85,7 @@ public record OperationInvocationResponse(
       case INVALID_OPERATION_KEY -> "BAD_REQUEST";
       case OPERATION_EXPIRED, OPERATION_KEY_REUSED, OPERATION_PREPARATION_UNAVAILABLE -> "CONFLICT";
       case OPERATIONS_CAPACITY -> "UNAVAILABLE";
-      case STORAGE_FAILED -> "HANDLER_ERROR";
+      case STORAGE_FAILED, CHILD_ACCEPTANCE_REFUSED -> "HANDLER_ERROR";
     };
     return new OperationInvocationResponse(false, code, null, Map.of(), errorClass, code, null,
         failure.code() == io.justsearch.app.api.operations.OperationStoreException.Code.OPERATIONS_CAPACITY);

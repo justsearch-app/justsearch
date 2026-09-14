@@ -56,7 +56,7 @@ class OperationStoreArchitectureTest {
     @Override public void check(JavaClass item, ConditionEvents events) {
       for (var call : item.getCodeUnitAccessesFromSelf()) {
         if (call.getTargetOwner().isAssignableTo(OperationStore.class)
-            && java.util.Set.of("accept", "start", "resume", "rejectBeforeStart", "finish", "armSettingsRevision")
+            && java.util.Set.of("accept", "acceptPrepared", "acceptIngestChild", "start", "resume", "rejectBeforeStart", "finish", "armSettingsRevision")
                 .contains(call.getName())
             && !item.getFullName().equals(RUNNER) && !item.getFullName().startsWith(RUNNER + "$")) {
           events.add(SimpleConditionEvent.violated(item,
@@ -158,6 +158,19 @@ class OperationStoreArchitectureTest {
   void attemptWriterRuleRejectsAProducerArmingSettings() {
     var imported = new ClassFileImporter().importClasses(UnauthorizedSettingsMarker.class, OperationStore.class);
     assertTrue(ATTEMPT_WRITER.evaluate(imported).hasViolation());
+  }
+
+  @Test
+  void attemptWriterRuleRejectsProducerChildAcceptance() {
+    var imported = new ClassFileImporter().importClasses(UnauthorizedChildAcceptance.class, OperationStore.class);
+    assertTrue(ATTEMPT_WRITER.evaluate(imported).hasViolation());
+  }
+
+  static final class UnauthorizedChildAcceptance {
+    void accept(OperationStore store, OperationStore.Preparation preparation,
+        io.justsearch.app.api.operations.RecordedRootPlan plan) {
+      store.acceptIngestChild("parent", "child", preparation, plan);
+    }
   }
 
   static final class UnauthorizedSettingsMarker {

@@ -75,6 +75,16 @@ public interface OperationStore extends AutoCloseable {
   /** Private owner/recovery read; receipt and history projections never include this value. */
   java.util.Optional<Preparation> acceptedPreparation(long id);
 
+  /**
+   * Runner-only derived acceptance. The trusted resolver selected this root from the inspected
+   * parent preparation. Compare that exact witness and copy parent attribution atomically;
+   * never call the resolver or an operation handler under the store lock.
+   */
+  default Acceptance acceptIngestChild(String parentKey, String childKey,
+      Preparation expectedParentPreparation, RecordedRootPlan oneRootPlan) {
+    throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
+  }
+
   record Acceptance(OperationRecord record, boolean created) {}
 
   /**

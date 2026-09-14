@@ -1,5 +1,13 @@
 # C2-2 recorded root preparation
 
+**2026-09-14 supersession:** The implementation and source claims below are historical
+held-cut evidence, not the active branch's current mechanism. C2-3 separated the private
+prepared payload from public identity. The current [root/child binding](recorded-ingest-binding.md)
+and [vertical ingestion plan](C2-8d-vertical-plan.md) govern: a root-composed codec resolver
+runs outside SQLite, and insertion compares the exact persisted parent preparation witness.
+Real producer activation, queue receipts and pre-poll recovery remain owed there.
+
+
 September12 decision; source checked at82e0e185d. This refines C2-2 plan
 decisions1,3,5 and7. The common preparation seam is implemented in the current cut;
 the immutable root plan, strict generation observation and atomic root-state preparation

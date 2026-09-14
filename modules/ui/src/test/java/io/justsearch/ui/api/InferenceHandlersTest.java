@@ -184,7 +184,8 @@ final class InferenceHandlersTest {
   void storageRefusalsUseTheRestErrorContract() throws Exception {
     for (var code : io.justsearch.app.api.operations.OperationStoreException.Code.values()) {
       boolean capacity = code == io.justsearch.app.api.operations.OperationStoreException.Code.OPERATIONS_CAPACITY;
-      boolean storage = code == io.justsearch.app.api.operations.OperationStoreException.Code.STORAGE_FAILED;
+      boolean storage = code == io.justsearch.app.api.operations.OperationStoreException.Code.STORAGE_FAILED
+          || code == io.justsearch.app.api.operations.OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED;
       boolean invalid = code == io.justsearch.app.api.operations.OperationStoreException.Code.INVALID_OPERATION_KEY;
       String publicCode = switch (code) {
         case INVALID_OPERATION_KEY -> "OPERATION_KEY_INVALID";

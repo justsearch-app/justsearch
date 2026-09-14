@@ -1,5 +1,13 @@
 # C2-2: acceptance of a recorded ingest child
 
+**2026-09-14 supersession:** The implementation and source claims below are historical
+held-cut evidence, not the active branch's current mechanism. C2-3 separated the private
+prepared payload from public identity. The current [root/child binding](recorded-ingest-binding.md)
+and [vertical ingestion plan](C2-8d-vertical-plan.md) govern: a root-composed codec resolver
+runs outside SQLite, and insertion compares the exact persisted parent preparation witness.
+Real producer activation, queue receipts and pre-poll recovery remain owed there.
+
+
 September13, implemented at fc679f92a plus this item; local primitive proof complete.
 Governing scope: [recorded-root preparation, child identity and proof](recorded-root-preparation.md#child-identity-and-proof).
 This is the child acceptance primitive; production reindex/ingest activation, current

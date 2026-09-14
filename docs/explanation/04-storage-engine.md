@@ -392,15 +392,21 @@ surface reports the history loss, the preservation directory and the fence time.
 bytes refuses startup. An external rollback to a valid older database is outside this detection
 contract. Durable operation acceptance and replay are separate consumers of this store.
 
-Operation dispatch validates caller context and trust before pure handler preparation.
-`OperationPreparation` retains transient public arguments and optionally a bounded safe replay
-projection. The dispatcher persists that versioned projection beside the public-argument digest
-before invoking the same prepared value. Raw public arguments are not written to the row.
+Operation dispatch validates caller context and registered authority before pure handler
+preparation. A keyed request compares the public argument digest before preparing; a
+matching recorded outcome returns without invoking a handler. The dispatcher freezes an
+optional versioned replay payload in a bounded, nonce-bound pending preparation and
+performs the trust gate before atomically accepting that exact preparation. Content-bearing
+payloads use the existing data-key cipher; metadata payloads remain unsealed. Raw public
+arguments stay out of the public identity, although the private envelope contains the
+canonical prepared invocation. Changed public input under the same key conflicts.
+
 Preparation may read scope but must not schedule work, register roots or enqueue writes.
-Ordinary preparation failures receive an accepted attempt without a replay payload and a terminal refusal; capability
-and admission checks still gate execution after acceptance. Generic handlers use the passthrough
-default, and undo retains its existing target identity. This seam does not yet provide keyed
-ingress, recovery replay or sealed content-bearing preparation.
+Ordinary preparation failures receive an accepted attempt without a replay payload and a
+terminal refusal; capability and admission checks still gate execution after acceptance.
+Generic handlers retain their passthrough behavior. A replay handler must validate its
+schema and implement prepared execution. An accepted incomplete row does not authorize
+caller-driven re-execution; its recovery owner must revalidate authority and resume it.
 
 `OperationPolicy.recordKind` classifies ordinary, prepared, refused and undo attempts.
 Every dispatched operation accepts a durable attempt, including operations with
@@ -414,18 +420,22 @@ schema includes this backend field; the selected policy axes in the live UI regi
 projection do not include it. Java consumers of the former app-api enum must update
 their import to `io.justsearch.agent.api.registry.OperationKind`.
 
-Production catalog entries still use the ordinary default until their recorded handlers
-and recovery owners are connected. Declaring a kind does not change admitted survival:
+A record-kind declaration alone does not connect a producer or recovery owner.
+Declaring a kind does not change admitted survival:
 the work owner retains its original survival for cancellation and disconnect handling.
 Recorded producers must resolve their survival policy before admission, or admit a
 separately owned child, before activating a recovery classification.
 
-The current compiled operations API contains the shared acceptance/attempt runner.
-Recorded root-plan preparation and child-acceptance APIs are held outside the compiled
-surface until their ingest/reindex producers are implemented. Generic preparation
-remains pure and transient; a handler returning a replay schema is refused before
-its effect. Public arguments persist only as a canonical digest. Server-built replay
-payloads must not participate in that identity comparison.
+The compiled operations API includes a frozen root-plan value and derived ingestion-child
+acceptance. The process root binds the existing prepared-envelope codec resolver to the
+runner. It selects a root from the original parent preparation outside SQLite; the store
+then compares that exact preparation witness, copies parent attribution, and inserts the
+child only while the parent is RUNNING. The child identity contains a parent key and plan
+digest; its private payload holds the one-root plan. Repeated acceptance returns the same
+child, including its terminal outcome. Terminal children remain retained while their parent
+is nonterminal, including COMPLETE_WITH_GAPS, and ordinary retention resumes afterward.
+Parent completion remains the producer's explicit composition of durable child outcomes.
+These primitives do not yet activate recorded ingest/reindex producers or scoped recovery.
 
 The architecture gate forbids producers from calling the store's lifecycle methods
 directly. `governance/engine-ports.v1.json` catalogs the store and runner interfaces,

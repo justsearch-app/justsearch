@@ -2,6 +2,8 @@
 package io.justsearch.app.observability.operations;
 
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.RecordedIngestChild;
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.api.operations.OperationHistoryMode;
 import io.justsearch.app.api.operations.OperationHistoryRow;
 import io.justsearch.app.api.operations.OperationOutcomeView;
@@ -50,6 +52,13 @@ public final class SqliteOperationStore implements OperationStore {
   private static final int PREPARATION_CAP = 512;
   private static final long PREPARATION_TTL_MS = Duration.ofMinutes(5).toMillis();
   private static final String TERMINAL = "state IN ('COMPLETE', 'FAILED', 'CANCELLED')";
+  // A retained open parent may replay its children; losing a completed child could duplicate effects.
+  private static final String CHILD_REPLAY_RELEASED = """
+      NOT (kind = 'ingest' AND COALESCE(json_extract(identity_json, '$.mode'), '') = 'ingest-child'
+        AND EXISTS (SELECT 1 FROM operations parent
+          WHERE parent.operation_key = json_extract(operations.identity_json, '$.parentOperationKey')
+            AND parent.state NOT IN ('COMPLETE', 'FAILED', 'CANCELLED')))
+      """;
   private static final String INSERT_OPERATION = """
       INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
         identity_json, grant_ref, client_kind, client_id, session_id, source_tier, transport,
@@ -427,17 +436,85 @@ public final class SqliteOperationStore implements OperationStore {
 
   @Override
   public java.util.Optional<Preparation> acceptedPreparation(long id) {
-    return locked(() -> {
-      try (var query = connection.prepareStatement("SELECT preparation_nonce, preparation_sealed, "
-          + "preparation_payload FROM operations WHERE id = ?")) {
-        query.setLong(1, id);
-        try (var row = query.executeQuery()) {
-          if (!row.next() || row.getString("preparation_nonce") == null) return java.util.Optional.empty();
-          return java.util.Optional.of(new Preparation(UUID.fromString(row.getString("preparation_nonce")),
-              new OperationPreparedPayload(row.getInt("preparation_sealed") == 1, row.getString("preparation_payload"))));
+    return locked(() -> acceptedPreparationRow(id));
+  }
+
+  private java.util.Optional<Preparation> acceptedPreparationRow(long id) throws SQLException {
+    try (var query = connection.prepareStatement("SELECT preparation_nonce, preparation_sealed, "
+        + "preparation_payload FROM operations WHERE id = ?")) {
+      query.setLong(1, id);
+      try (var row = query.executeQuery()) {
+        if (!row.next() || row.getString("preparation_nonce") == null) return java.util.Optional.empty();
+        return java.util.Optional.of(new Preparation(UUID.fromString(row.getString("preparation_nonce")),
+            new OperationPreparedPayload(row.getInt("preparation_sealed") == 1, row.getString("preparation_payload"))));
+      }
+    }
+  }
+
+  @Override
+  public Acceptance acceptIngestChild(String parentKey, String childKey,
+      Preparation expectedParentPreparation, RecordedRootPlan oneRootPlan) {
+    Objects.requireNonNull(expectedParentPreparation, "expectedParentPreparation");
+    var child = new RecordedIngestChild(parentKey, oneRootPlan);
+    long keyTime = validatedKeyTime(childKey);
+    String identity = canonicalIdentity(child.descriptor().identityJson());
+    return locked(() -> transaction(() -> {
+      var parent = findRow(parentKey).orElseThrow(SqliteOperationStore::childRefused);
+      if (!acceptedPreparationRow(parent.id()).filter(expectedParentPreparation::equals).isPresent()) {
+        throw childRefused();
+      }
+      try (var query = connection.prepareStatement(
+          "SELECT * FROM operations WHERE kind = 'ingest' AND operation_ref IS NULL AND identity_json = ?")) {
+        query.setString(1, identity);
+        try (var rows = query.executeQuery()) {
+          if (rows.next()) {
+            var existing = readRecord(rows);
+            if (rows.next() || !sameChildAttribution(parent, existing)
+                || existing.historyMode() != OperationHistoryMode.NONE
+                || !acceptedPreparationRow(existing.id()).map(Preparation::payload).filter(child.payload()::equals).isPresent()) {
+              throw childRefused();
+            }
+            return new Acceptance(existing, false);
+          }
         }
       }
-    });
+      if (parent.state() != OperationState.RUNNING) throw childRefused();
+      // Enforce the same capacity and missing-key fence as ordinary acceptance.
+      if (lookupRow(childKey, keyTime, child.descriptor(), identity).isPresent()) throw childRefused();
+      pruneToLimit(ROW_CAP - 1);
+      if (rowCount() >= ROW_CAP) throw new OperationStoreException(OperationStoreException.Code.OPERATIONS_CAPACITY, null);
+      long now = clock.millis();
+      long fence = readHistorySince();
+      if (keyTime < fence) throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null, fence - now);
+      try (var insert = connection.prepareStatement(INSERT_OPERATION + """
+          SELECT ?, 'ingest', survival, urgency, 'ACCEPTED', NULL, ?, grant_ref,
+            client_kind, client_id, session_id, source_tier, transport, executor, initiator,
+            correlation_id, ?, ?, 'NONE', provenance_occurred_at
+          FROM operations WHERE id = ? AND state = 'RUNNING'
+          """)) {
+        insert.setString(1, childKey); insert.setString(2, identity);
+        insert.setLong(3, now); insert.setLong(4, now); insert.setLong(5, parent.id());
+        if (insert.executeUpdate() != 1) throw childRefused();
+      }
+      try (var update = connection.prepareStatement("UPDATE operations SET preparation_nonce = ?, "
+          + "preparation_sealed = 0, preparation_payload = ? WHERE operation_key = ?")) {
+        update.setString(1, UUID.randomUUID().toString());
+        update.setString(2, child.payload().value()); update.setString(3, childKey);
+        if (update.executeUpdate() != 1) throw new SQLException("Accepted child preparation is missing");
+      }
+      return new Acceptance(findRow(childKey).orElseThrow(() -> new SQLException("Accepted child is missing")), true);
+    }));
+  }
+
+  private static boolean sameChildAttribution(OperationRecord parent, OperationRecord child) {
+    return parent.context().equals(child.context()) && Objects.equals(parent.executor(), child.executor())
+        && Objects.equals(parent.initiator(), child.initiator())
+        && Objects.equals(parent.correlationId(), child.correlationId())
+        && Objects.equals(parent.provenanceOccurredAt(), child.provenanceOccurredAt());
+  }
+
+  private static OperationStoreException childRefused() {
+    return new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
   }
 
   private void prunePreparations(int limit) throws SQLException {
@@ -815,7 +892,7 @@ public final class SqliteOperationStore implements OperationStore {
   private void pruneToLimit(int limit) throws SQLException {
     long fence = readHistorySince();
     try (var delete = connection.prepareStatement("DELETE FROM operations WHERE " + TERMINAL
-        + " AND history_pending = 0 AND completed_at < ? RETURNING operation_key")) {
+        + " AND history_pending = 0 AND " + CHILD_REPLAY_RELEASED + " AND completed_at < ? RETURNING operation_key")) {
       delete.setLong(1, clock.millis() - RETENTION_MS);
       try (var rows = delete.executeQuery()) { fence = evictedFence(rows, fence); }
     }
@@ -823,7 +900,7 @@ public final class SqliteOperationStore implements OperationStore {
     if (excess > 0) {
       try (var delete = connection.prepareStatement("DELETE FROM operations WHERE id IN "
           + "(SELECT id FROM operations WHERE " + TERMINAL
-          + " AND history_pending = 0 ORDER BY completed_at, id LIMIT ?) RETURNING operation_key")) {
+          + " AND history_pending = 0 AND " + CHILD_REPLAY_RELEASED + " ORDER BY completed_at, id LIMIT ?) RETURNING operation_key")) {
         delete.setLong(1, excess);
         try (var rows = delete.executeQuery()) { fence = evictedFence(rows, fence); }
       }

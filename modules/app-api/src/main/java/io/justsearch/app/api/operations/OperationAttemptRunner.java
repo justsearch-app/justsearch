@@ -59,6 +59,17 @@ public interface OperationAttemptRunner {
   PreparedAttempt acceptPrepared(Request request, java.util.UUID nonce);
   java.util.Optional<OperationStore.Preparation> acceptedPreparation(long id);
 
+  /** Root-composed decoder of the actual accepted parent preparation, never supplied by a handler. */
+  @FunctionalInterface
+  interface IngestPlanResolver {
+    RecordedRootPlan resolve(OperationRecord parent, OperationStore.Preparation preparation);
+  }
+
+  /** Accept the exact frozen root beneath a runner-issued parent; parent composes child completion. */
+  default PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root) {
+    throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
+  }
+
   /** Must return before scheduling or any other effect; storage failure propagates. */
   PreparedAttempt accept(Request request);
 

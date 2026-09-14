@@ -1081,7 +1081,8 @@ public class HeadlessApp {
               io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
               io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
               io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
-              io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN), settingsOwner);
+              io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN), settingsOwner,
+          new io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver());
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
           childRegistry, requestedRestartAction);

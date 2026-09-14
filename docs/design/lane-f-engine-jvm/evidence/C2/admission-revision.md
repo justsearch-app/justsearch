@@ -44,3 +44,8 @@ preservation and future-version refusal assertions remain intact.
 Raw files live under active lane-f-pr1-verify/tmp and are retained through2026-10-14 or lane
 acceptance plus30 days, whichever is later. No live/model/installed or final-head proof follows
 from this foundation. The [owning ingestion plan](C2-8-ingestion-plan.md) retains C2-8d/C2-9.
+
+Hosted follow-up: CI34809851127 passed all13 jobs and CLA34809849392 succeeded at
+128a0c945e60fe1ba3d1afb4d30869d8242ea6d9. Raw job inventory is retained in
+`tmp/admission-revision-hosted1534.json`. This verifies that revision, not subsequent
+root/child binding or later ingestion activation.
