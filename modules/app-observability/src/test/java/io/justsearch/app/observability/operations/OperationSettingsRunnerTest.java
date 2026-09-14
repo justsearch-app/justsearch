@@ -233,7 +233,32 @@ final class OperationSettingsRunnerTest {
       });
       assertEquals(OperationState.COMPLETE, retry.record().state());
       assertEquals(11L, retry.response().structuredData().get("acceptedRevision"));
+      assertEquals(new SettingsWitness(11, request.key()), retry.response().structuredData().get("witness"));
+      assertFalse(retry.response().structuredData().containsKey("ui"));
       assertEquals(0, owner.applyCalls);
+    }
+  }
+
+  @Test
+  void openAndFailedSettingsReplayDoNotClaimACommittedWitness() throws Exception {
+    try (var store = store("uncommitted-witness")) {
+      var owner = new FakeOwner(store, ApplyMode.THROW_BEFORE_COMMIT);
+      var runner = runner(store, owner);
+      var request = request(OperationKind.SETTINGS_APPLY);
+      var accepted = runner.accept(request);
+      var open = runner.start(runner.accept(request), ignored -> {
+        throw new AssertionError("Existing acceptance cannot execute");
+      });
+      assertEquals(OperationState.ACCEPTED, open.record().state());
+      assertFalse(open.response().structuredData().containsKey("witness"));
+      assertThrows(IllegalStateException.class, () -> runner.start(accepted, handle ->
+          OperationExecution.finished(runner.applySettings(handle, witness(7), CANDIDATE))));
+      var failed = runner.start(runner.accept(request), ignored -> {
+        throw new AssertionError("Failed acceptance cannot execute");
+      });
+      assertEquals(OperationState.FAILED, failed.record().state());
+      assertFalse(failed.response().structuredData().containsKey("witness"));
+      assertFalse(failed.response().structuredData().containsKey("acceptedRevision"));
     }
   }
 

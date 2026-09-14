@@ -520,6 +520,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (row.state() == OperationState.COMPLETE && settingsKind(row.descriptor().kind())
         && row.expectedSettingsRevision() != null) {
       data.put("acceptedRevision", Math.addExact(row.expectedSettingsRevision(), 1));
+      data.put("witness", new SettingsWitness(Math.addExact(row.expectedSettingsRevision(), 1), row.key()));
     }
     return new OperationResult(!failed, "Operation " + row.state().name(),
         Optional.ofNullable(row.receipt()).map(OperationReceipt::executionId),

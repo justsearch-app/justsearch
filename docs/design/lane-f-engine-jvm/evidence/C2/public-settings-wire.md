@@ -23,3 +23,10 @@ Public writer/controller and all frontend producers are the next per-item commit
 the transitional raw writer prevents independent shipping. Live/model/installed
 and final-head hosted proof remain owed. Hosted09f91917e CI34794274393 failed the
 system-access stale-allowlist guard; that residue is being corrected separately.
+
+Follow-up replay correction at3d842f496 plus the bounded runner diff reconstructs
+the COMPLETE nested witness from the persisted expected revision and row key.
+It never reads settings. Focused1440 executes36 cases, zero failures/skips,
+with PMD/Spotless passing; tests cover store reopen with original witness/no
+full projection, and open/failed rows without committed-witness claims.
+Raw tmp/settings-replay1440.txt/-counts.json/-xml retain the exact evidence.
