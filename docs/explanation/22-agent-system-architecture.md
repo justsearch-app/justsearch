@@ -281,6 +281,12 @@ operations. API composition consumes these same objects and attaches audit sinks
 A failed roots migration or corrupt roots/grants file stops this preload; client
 construction does not read a second roots snapshot.
 
+Prepared filesystem grant scope reads the strict frozen root plan. Every frozen path
+must resolve to a real path inside a current watched root; missing paths and link
+escapes refuse coverage. The scope takes one current roots snapshot per decision.
+The existing preparation codec and resolver validate invocation identity, while
+the trusted producer owns the original input-to-plan mapping.
+
 **Recorded authorization evidence.** After the shared lattice authorizes a dispatch,
 acceptance replaces the caller's grant reference with a versioned server-selected
 basis in the operations row: structural AUTO, one-time capsule, exact operation

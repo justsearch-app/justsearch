@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-9b.2 keeps invocation identity in the codec/resolver, actual frozen-path containment in IndexedRootGrantScope, and historical input-to-plan mapping in the trusted producer. No duplicate digest or schema bump; prepared scope requires exact real paths and never falls back to raw arguments. [Owning split and proof obligations](evidence/C2/ingestion-authorization-recovery.md#c2-9b2-frozen-scope-and-identity-split-2026-09-14).
+
 - 2026-09-14: C2-9b reuses WatchedRootsState as the preloaded carrier and composes one bootstrap OperationAuthority before the asynchronous Engine fork; primary Head and index sides consume the same objects. Failed legacy copy/load prevents startup. Whole HeadAssembly remains parallel. [Per-item ownership and verification plan](evidence/C2/ingestion-authorization-recovery.md#c2-9b-implementation-sequence-2026-09-14).
 
 - 2026-09-14: C2-9a.2 fixes the independently verified grant live-before-disk defect before recovery activation: one immutable committed set of existing grant keys, serialized strict file replacement before publication, success events after commit. No additional store or journal. [Publication decision and failure proof](evidence/C2/ingestion-authorization-recovery.md#c2-9a2-publication-decision-2026-09-14).

@@ -320,3 +320,136 @@ composition item; C2-9b.2/.3 and actual producer activation remain open.
 Hosted grant checkpoint27246acd6 failed the unchanged UI context assertion;
 12 other CI jobs and CLA passed. [Exact hosted finding and correction](hosted-authorization-context.md).
 No successful hosted run for this shared-authority diff is claimed yet.
+
+
+## C2-9b.2 frozen scope and identity split (2026-09-14)
+
+The accepted envelope/row identity and actual frozen effect scope are separate
+checks with existing owners:
+
+1. PreparedInvocationCodec and RecordedIngestPlanResolver reject a descriptor /
+   public-input / envelope / accepted-context mismatch. Only the server-selected
+   grant-reference transition differs; every other frozen axis remains exact.
+2. IndexedRootGrantScope.coversPreparation accepts only a governed operation,
+   METADATA, exact RecordedRootPlan schema, strict payload and a nonempty root plan.
+   It snapshots current watched roots once, resolves every frozen path with exact
+   toRealPath, and requires each to fall inside a currently resolvable watched root.
+   Missing/unreadable paths and symlink/junction escapes fail closed. It never uses
+   public-input coverage, closest-existing-ancestor fallback, or relative resolution.
+   A raw in-root argument cannot excuse an out-of-root frozen effect. Ungoverned
+   prepared operations retain the existing default refusal.
+3. The trusted producer owns historical public-input-to-plan mapping: relative path
+   resolution, exclusions, collection, file/directory classification and partitioning.
+   Tests belong at that producer. Legitimate partitioning collapses duplicates and
+   nested roots with equal policy, so a one-to-one raw-path comparison is wrong.
+
+An unchanged frozen plan survives unrelated watched-root additions/reordering;
+removing its covering root prevents the next permission check. Initial public-input
+scope behavior is unchanged. Generation readiness and grant selection are outside
+this scope component and belong to the recovery owner.
+
+Independent review initially proposed a second argument digest in RecordedRootPlan,
+then retracted it after checking the actual callers. Only the trusted registered
+handler creates preparation, the dispatcher preserves original arguments exactly,
+and the existing codec binds the whole envelope. A duplicate digest cannot catch
+an incorrect trusted mapping or a coordinated local metadata edit. The existing
+metadata store contract excludes hostile file-level rollback; this change adds no
+digest, new schema version or parallel authority.
+
+The scope cut is C2-9b.2a; typed shared-authority revalidation is C2-9b.2b. Both are
+prerequisites to .3 activation, not completion of recovery on their own.
+
+
+### C2-9b.2b typed authority decision
+
+OperationAuthority owns a nested sealed recovery verdict: Authorized(RecordedRootPlan),
+Wait, or Refused(OperationReceipt). Reconciliation remains the runner's final
+lifecycle command: a pure authorization result cannot manufacture its Resume body.
+The evaluator takes the accepted row/preparation, an optional currently serving
+generation, and the current required-capability resolver. It has no runner/jobs
+reference, writes no store, installs no permit, and never starts an effect.
+
+Precompose the existing CoreOperationCatalog and AgentToolsOperationCatalog with
+the authority and make SubstratePhase install those same base catalogs. Current
+risk, family and required capabilities come from those canonical Operations;
+there is no recovery policy map/catalog. The existing RecordedIngestPlanResolver
+validates supported ingest/reindex identity and returns the frozen plan. Require
+explicit registered transport membership in the shared source catalog as well as
+EngineProvenance's source-tier validation (its unregistered UNTRUSTED fallback is
+insufficient for restart). The same strict scope governs INGEST_FILES and REINDEX.
+Containment applies to every resumed basis, including StructuralAuto. An initially
+approved out-of-root effect can consequently be valid to start yet non-resumable.
+
+A current DENY verdict refuses every basis, including a durable entry issued while
+the hard stop is engaged. StructuralAuto additionally requires current AUTO.
+Operation/family bases revalidate their exact existing DurableGrant key with the
+store's risk/source/family caveats; another matching grant or current AUTO never
+substitutes for a revoked selected key. EphemeralCapsule always refuses restart.
+No token or fresh confirmation is synthesized.
+
+Permanent binding/provenance, scope and authority refusals precede readiness: they
+cannot be hidden behind a simultaneous unavailable capability. Absent serving
+generation returns Wait; a different serving generation is a permanent mismatch.
+A false/null/unavailable required capability returns Wait. Only then does the pure
+check return Authorized. Compact refusal codes are RECOVERY_BINDING_INVALID,
+RECOVERY_SCOPE_REFUSED, RECOVERY_AUTHORIZATION_REFUSED and
+RECOVERY_GENERATION_MISMATCH; these use the existing bounded receipt code slot.
+
+C2-9b.3 alone maps Wait/Refused to the runner's matching lifecycle commands, or
+Authorized plus the real index-owner body to Resume. Install the permit inside
+the winning Resume body after the runner's started CAS, never while merely
+computing a verdict. Do not use the later EngineKnowledgeClient or Head
+WorkerCapability for readiness inside generation-ready startup: the former does
+not exist yet and the latter is not READY yet. Use the initialized index runtime
+at that callback. An explicit later reconciliation is required to revisit Wait.
+
+
+### C2-9b.2a verification (2026-09-14)
+
+Base9a3aa8bb0781c95159488c92f95743c28b5c881c plus strict scope and the separately
+uncommitted base-catalog reuse draft, Windows x64. Root retained production/test
+ownership after one worker correction round and repaired two fixture deficiencies.
+
+- 1645 compilation rejected the worker's wrong RecordedRootPlan import. 1646
+  executed41 focused scope/resolver cases/7 suites, no failures/errors/skips;
+  services PMD and formatting passed.
+- 1647 deliberately allowed public-argument fallback and ancestor resolution:
+  14 cases, two expected failures (out-of-root frozen effect behind valid in-root
+  public arguments, and ungoverned prepared fallback). The ancestor change was NOT
+  detected: the original missing-path fixture had already emptied the watched roots
+  and tested an outside path. 1648 restored matching production and reused the
+  passing1646 cache; it is not a fresh execution.
+- Root corrected PUBLIC_ARGUMENTS to the actual paths key and added a separate
+  absent frozen path inside an existing watched root. Isolated1649 ancestor fallback
+  executed15 cases with exactly one expected failure in that new regression.
+- 1650 restored production byte-for-byte to1646 and executed full app-services:
+  2,919 cases/432 suites, three existing skips, no failures/errors. PMD and formatting
+  passed. Root independently verified restoration bytes after the run. The Windows
+  junction escape case executed, with no skip in the focused scope tests.
+
+The two compiled catalog-reuse lines and authority getters are owned by C2-9b.2b;
+they do not implement recovery eligibility and are excluded from this scope cut's
+completion claim. The strict scope remains a prerequisite, not producer activation.
+Logs/counts/XML: `tmp/1645*` through `tmp/1650*` in the active worktree, retained
+through final lane reconciliation plus30 days, at least2026-10-14.
+
+Hosted preloaded-authority checkpoint9a3aa8bb0 passed all13 jobs in
+[CI34842534126](https://github.com/justsearch-app/justsearch/actions/runs/34842534126)
+and CLA34842532052. Exact metadata is `tmp/1650-hosted-run.json`; this also verifies
+the288113a2b UI assertion correction (its own CI was cancelled by the next push).
+No hosted proof for the later dirty frozen-scope cut is claimed yet.
+
+
+Independent refute found no production scope defect and requested a mixed-root
+regression: a covered first root must not excuse a later uncovered root. Root added
+that case. Negative1651 deliberately returned on the first covered root and executed
+seven cases with exactly one expected failure in the new mixed-plan assertion.
+Production was again restored byte-for-byte to1646 before final focused1652.
+
+Final1652 executed 43 focused cases/7 suites, no failures/errors/skips; PMD/format
+passed. Root verified restored production bytes after the run. The1650 full-suite
+result remains applicable to unchanged production;1652 also executes the added
+mixed-root test. Three governance gates, store recovery and canonical docs checks
+pass in tmp/1650-gates.txt and tmp/1652-docs.txt. Retain1651/1652 with the same
+artifacts/retention described above. C2-9b.2a is locally verified; typed authority
+revalidation, producer activation and live restart proof remain required.

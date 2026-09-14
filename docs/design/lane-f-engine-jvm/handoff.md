@@ -32,6 +32,14 @@ Hosted27246acd6 exposed the old UI assertion that omitted the server-selected ba
 exact failure. This is separate from the shared-authority implementation.
 Notification checkpoint7777be3fd passed all13 hosted jobs in CI34835832804.
 
+C2-9b.1 is pushed as9a3aa8bb0 and passed all13 CI34842534126 jobs plus CLA,
+including the separately committed288113a2b UI context assertion correction.
+C2-9b.2a strict frozen-root scope now passes full1650 services (2,919 cases,
+three existing skips, no failures), PMD/format and discriminating raw-fallback /
+missing-path controls. C2-9b.2b pure typed authorization decision and .3 actual
+fencing/producer integration are next; the catalog-reuse draft is not yet verified
+as a recovery owner. [Owning scope/decision plan and evidence](evidence/C2/ingestion-authorization-recovery.md).
+
 A/B/C1 are complete. C2 remains open; do not merge before stage F.
 The public settings producer/controller is implemented and locally verified:
 final1452 represents4,859 cases, four existing skips and zero failures/errors,

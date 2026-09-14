@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
-import io.justsearch.core.context.EngineContext;
-
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.OperationPreparation;
 import io.justsearch.agent.api.registry.OperationRef;
+import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Supplier;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -22,8 +22,9 @@ import tools.jackson.databind.json.JsonMapper;
  * operation's durable grant was granted against is <b>the indexed roots</b>.
  *
  * <p>Governs exactly the operations it is constructed with (the wiring site passes
- * {@code AgentToolsOperationCatalog.INGEST_FILES}); every other operation is in scope by definition,
- * because containment is not a defined concept for it. The governed set is injected rather than
+ * {@code AgentToolsOperationCatalog.INGEST_FILES}) for public argument coverage; every other
+ * operation is in scope by definition for that check, because containment is not a defined concept
+ * for it. Prepared coverage is stricter: an ungoverned prepared operation is refused. The governed set is injected rather than
  * imported so this class carries no catalog knowledge and no package cycle
  * ({@code services.intent} ← {@code services.registry.operations}).
  *
@@ -56,15 +57,18 @@ public final class IndexedRootGrantScope implements DurableGrantScope {
 
   /**
    * @param governedOperations the operations whose durable grants are bounded by the indexed roots;
-   *     anything outside this set is covered unconditionally.
+   *     {@link #coversArguments} treats anything outside this set as covered unconditionally; a
+   *     prepared operation outside this set remains refused because its frozen effect is ungoverned.
    */
   public IndexedRootGrantScope(Set<OperationRef> governedOperations) {
     this.governedOperations = Set.copyOf(Objects.requireNonNull(governedOperations, "governedOperations"));
   }
 
   /**
-   * Late-bind the live indexed-root lookup. Before this runs, every governed invocation is treated as
-   * unprovable containment (a confirm), so a wiring regression costs a prompt, not a silent grant.
+   * Late-bind the live indexed-root lookup. This binding normally happens after the pre-fork
+   * substrate construction, when the Worker-backed roots carrier exists. Before it runs, every
+   * governed invocation is treated as unprovable containment (a confirm), so a wiring regression
+   * costs a prompt, not a silent grant.
    */
   public void bindIndexedRoots(java.util.function.Function<EngineContext, List<Path>> roots) {
     this.indexedRoots = roots;
@@ -86,6 +90,84 @@ public final class IndexedRootGrantScope implements DurableGrantScope {
     }
     for (String candidate : paths) {
       if (!isWithinRoots(candidate, roots)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Whether the server-selected frozen root plan is currently contained by watched roots.
+   * Public arguments are deliberately not consulted here: the trusted producer already mapped
+   * those arguments to this recorded plan, while this check revalidates the effect that would run.
+   */
+  @Override
+  public boolean coversPreparation(
+      Operation op, OperationPreparation prepared, EngineContext engineContext) {
+    if (prepared == null
+        || prepared.content() != OperationPreparation.Content.METADATA
+        || !RecordedRootPlan.SCHEMA.equals(prepared.replaySchema())
+        || prepared.replayPayloadJson() == null) {
+      return false;
+    }
+
+    final RecordedRootPlan plan;
+    try {
+      plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
+    } catch (RuntimeException invalidReplay) {
+      return false;
+    }
+
+    return coversPlan(op, plan, engineContext);
+  }
+
+  /**
+   * Whether a previously parsed server-selected frozen root plan is currently contained by watched
+   * roots. Recovery uses this method after its resolver has already performed envelope and producer
+   * binding checks, avoiding a parse/serialize round trip. Public arguments are deliberately not
+   * consulted here: the trusted producer mapped those arguments to this plan.
+   */
+  public boolean coversPlan(Operation op, RecordedRootPlan plan, EngineContext engineContext) {
+    if (op == null || plan == null || !governedOperations.contains(op.id())
+        || plan.roots().isEmpty()) {
+      return false;
+    }
+
+    // Take one immutable view before any path checks. A single decision must not mix root-map
+    // generations while the watched-roots carrier is being updated.
+    List<Path> watchedRoots = currentRoots(engineContext);
+    if (watchedRoots.isEmpty()) {
+      return false;
+    }
+    List<Path> canonicalWatchedRoots = new ArrayList<>();
+    for (Path watchedRoot : watchedRoots) {
+      try {
+        canonicalWatchedRoots.add(watchedRoot.toRealPath());
+      } catch (IOException | RuntimeException unavailable) {
+        // One detached or unreadable watched root does not invalidate other resolvable roots.
+      }
+    }
+    if (canonicalWatchedRoots.isEmpty()) {
+      return false;
+    }
+
+    for (RecordedRootPlan.Root frozenRoot : plan.roots()) {
+      final Path frozenReal;
+      try {
+        // Exact toRealPath is intentional. There is no closest-existing-ancestor fallback for a
+        // recorded effect: a missing path, malformed path, or link/junction escape fails closed.
+        frozenReal = frozenRoot.path().toRealPath();
+      } catch (IOException | RuntimeException unavailable) {
+        return false;
+      }
+      boolean contained = false;
+      for (Path watchedRoot : canonicalWatchedRoots) {
+        if (frozenReal.startsWith(watchedRoot)) {
+          contained = true;
+          break;
+        }
+      }
+      if (!contained) {
         return false;
       }
     }

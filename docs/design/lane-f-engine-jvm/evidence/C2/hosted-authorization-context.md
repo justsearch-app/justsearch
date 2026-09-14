@@ -32,3 +32,12 @@ the shared-authority composition diff and this assertion correction. The latter 
 committed separately; the shared-authority change does not affect this directly
 constructed executor fixture. Logs/counts/XML are preserved at `tmp/1643*` under
 the same worktree and retention. A successful subsequent hosted run remains owed.
+
+
+## Hosted correction confirmed
+
+Successor9a3aa8bb0781c95159488c92f95743c28b5c881c passed all13 jobs in
+CI34842534126, including Unit tests (app-ui), and CLA34842532052. Exact metadata
+is `tmp/1650-hosted-run.json`. The assertion-fix-only288113a2b run34842428188 was
+cancelled by this next push; its CLA passed. This closes the reported hosted
+assertion failure without claiming final-lane completion.
