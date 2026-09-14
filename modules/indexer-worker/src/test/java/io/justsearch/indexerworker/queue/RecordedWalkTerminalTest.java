@@ -29,7 +29,7 @@ final class RecordedWalkTerminalTest {
   void indexedTerminalReceiptCarriesIdentityAndAdvancesOnce() throws Exception {
     Path db = temp.resolve("indexed.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -64,7 +64,7 @@ final class RecordedWalkTerminalTest {
   void maintenanceAtoBtoAKeepsActiveWalkAndCountsDistinctEffects() throws Exception {
     Path db = temp.resolve("maintenance.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       long epoch = walk.enumerationEpoch();
@@ -99,7 +99,7 @@ final class RecordedWalkTerminalTest {
   void transientFailureDoesNotAdvanceThenTerminalFailureCountsOncePerRevision() throws Exception {
     Path db = temp.resolve("failures.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -137,7 +137,7 @@ final class RecordedWalkTerminalTest {
   void skippedPolicyIsTerminalWithoutIndexedCount() throws Exception {
     Path db = temp.resolve("skipped.db");
     Path file = temp.resolve("policy.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -167,7 +167,7 @@ final class RecordedWalkTerminalTest {
   void ledgerTriggerRollsBackJobsAndProgressAndRetainsIssuedClaim() throws Exception {
     Path db = temp.resolve("rollback.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -223,7 +223,7 @@ final class RecordedWalkTerminalTest {
   void staleCommittedClaimKeepsItsHistoryWithoutCompletingReplacement() throws Exception {
     Path db = temp.resolve("stale.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -248,7 +248,7 @@ final class RecordedWalkTerminalTest {
   void missingProjectionCannotDowngradeIssuedCompletionToLegacy() throws Exception {
     Path db = temp.resolve("missing.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -282,7 +282,7 @@ final class RecordedWalkTerminalTest {
   void outcomeCoverageMismatchRollsBackAndRetainsClaim() throws Exception {
     Path db = temp.resolve("mismatch.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -305,7 +305,7 @@ final class RecordedWalkTerminalTest {
   void legacyMatchingScanKeyBecomesFreshRecordedAdmission() throws Exception {
     Path db = temp.resolve("legacy-key.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null, KEY);
       var legacy = queue.pollPending(1).getFirst();
@@ -345,7 +345,7 @@ final class RecordedWalkTerminalTest {
     for (int kind = 0; kind < 3; kind++) {
       Path db = temp.resolve("superseded-" + kind + ".db");
       Path file = temp.resolve("document.txt");
-      try (var queue = new SqliteJobQueue(db)) {
+      try (var queue = new SqliteJobQueue(db, ignored -> true)) {
         queue.open();
         var walk = queue.beginRecordedWalk(KEY, PLAN, true);
         queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -370,7 +370,7 @@ final class RecordedWalkTerminalTest {
   void supersededReceiptRollbackRetainsActualOwnerUntilIdempotentRetry() throws Exception {
     Path db = temp.resolve("superseded-rollback.db");
     Path file = temp.resolve("document.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),

@@ -314,6 +314,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private final MigrationStepHook migrationStepHook;
+  private final java.util.function.Predicate<String> mayClaimRecorded;
   private final SqliteQueueSwitchBufferOps switchBufferOps;
 
   /** Tempdoc 885 item 21e — enqueue/dequeue rates and lock-wait, RISK-002's instrument. */
@@ -362,9 +363,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   SqliteJobQueue(Path dbPath, int maxAttempts, Runnable onSwitchBufferWriteFailure,
                  MigrationStepHook migrationStepHook) {
+    this(dbPath, maxAttempts, onSwitchBufferWriteFailure, migrationStepHook, ignored -> false);
+  }
+
+  /** Recorded membership is fenced from open; the supplied authority is checked per unit claim. */
+  public SqliteJobQueue(Path dbPath, java.util.function.Predicate<String> mayClaimRecorded) {
+    this(dbPath, mayClaimRecorded, DEFAULT_MAX_ATTEMPTS, null);
+  }
+
+  /**
+   * Constructor-bound authority for recorded membership. The callback runs under the queue lock;
+   * it must not call a queue, operation store or runner, and must not perform an effect.
+   * Existing no-authority constructors deny recorded work while preserving legacy jobs.
+   */
+  public SqliteJobQueue(Path dbPath, java.util.function.Predicate<String> mayClaimRecorded,
+      int maxAttempts, Runnable onSwitchBufferWriteFailure) {
+    this(dbPath, maxAttempts, onSwitchBufferWriteFailure, null, mayClaimRecorded);
+  }
+
+  private SqliteJobQueue(Path dbPath, int maxAttempts, Runnable onSwitchBufferWriteFailure,
+      MigrationStepHook migrationStepHook, java.util.function.Predicate<String> mayClaimRecorded) {
     this.dbPath = dbPath;
     this.maxAttempts = maxAttempts;
     this.migrationStepHook = migrationStepHook;
+    this.mayClaimRecorded = Objects.requireNonNull(mayClaimRecorded, "mayClaimRecorded");
     this.switchBufferOps =
         new SqliteQueueSwitchBufferOps(
             lock, this::ensureOpenAndGetConnection, onSwitchBufferWriteFailure,
@@ -844,6 +866,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                       if (activeClaims.containsKey(rs.getString(1))) continue;
                       long epochValue = rs.getLong(7);
                       Long walkEpoch = rs.wasNull() ? null : epochValue;
+                      if (!recordedClaimAllowed(rs.getString(5), walkEpoch)) continue;
                       String originator = rs.getString(3);
                       String transport = rs.getString(4);
                       claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
@@ -1849,14 +1872,27 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return recoverUnownedProcessing(System.currentTimeMillis() - olderThanMs);
   }
 
+  /** The same under-lock boundary governs fresh claims and interrupted claim recovery. */
+  private boolean recordedClaimAllowed(String operationKey, Long walkEpoch) {
+    if (walkEpoch == null) return true;
+    if (operationKey == null || operationKey.isBlank()) return false;
+    try {
+      return mayClaimRecorded.test(operationKey);
+    } catch (RuntimeException unavailableAuthority) {
+      log.warn("Recorded claim authority unavailable; keeping the unit fenced", unavailableAuthority);
+      return false;
+    }
+  }
+
   private int recoverUnownedProcessing(Long cutoff) {
     lockTimed();
     try {
       ensureOpen();
       int count = inTransaction(() -> {
-        List<String> unowned = new ArrayList<>();
+        record UnownedRow(String path, String scanId, Long walkEpoch) {}
+        List<UnownedRow> unowned = new ArrayList<>();
         try (var query = connection.prepareStatement(
-            "SELECT path FROM jobs WHERE state = 'PROCESSING' AND (? IS NULL OR last_updated < ?)")) {
+            "SELECT path, scan_id, walk_seen_epoch FROM jobs WHERE state = 'PROCESSING' AND (? IS NULL OR last_updated < ?)")) {
           if (cutoff == null) {
             query.setNull(1, java.sql.Types.BIGINT);
             query.setNull(2, java.sql.Types.BIGINT);
@@ -1867,7 +1903,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           try (var rows = query.executeQuery()) {
             while (rows.next()) {
               String path = rows.getString(1);
-              if (!activeClaims.containsKey(path)) unowned.add(path);
+              if (activeClaims.containsKey(path)) continue;
+              long epoch = rows.getLong(3);
+              Long walkEpoch = rows.wasNull() ? null : epoch;
+              unowned.add(new UnownedRow(path, rows.getString(2), walkEpoch));
             }
           }
         }
@@ -1875,11 +1914,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         try (var update = connection.prepareStatement(
             "UPDATE jobs SET state = 'PENDING', last_updated = ? WHERE path = ? AND state = 'PROCESSING'")) {
           long now = System.currentTimeMillis();
-          for (String path : unowned) {
+          for (UnownedRow row : unowned) {
+            String path = row.path();
+            // Closing an orphaned stopped member records a skip, never authority to execute.
+            // Requiring a live permit here would strand cancelled work after process restart.
             if (closedUnsuccessfulMember(path)) {
               recovered += skipRecordedMember(path, IngestionOutcomeClass.SKIPPED_POLICY, "ENUMERATION_STOPPED");
               continue;
             }
+            if (!recordedClaimAllowed(row.scanId(), row.walkEpoch())) continue;
             update.setLong(1, now);
             update.setString(2, path);
             recovered += executeMutation(update::executeUpdate);

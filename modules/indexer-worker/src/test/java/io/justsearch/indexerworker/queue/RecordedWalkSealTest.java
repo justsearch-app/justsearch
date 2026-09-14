@@ -91,7 +91,7 @@ final class RecordedWalkSealTest {
       Path db = temp.resolve(outcome.name().toLowerCase() + ".db");
       Path issuedPath = temp.resolve(outcome.name().toLowerCase() + "-issued.txt");
       Path pendingPath = temp.resolve(outcome.name().toLowerCase() + "-pending.txt");
-      try (var queue = new SqliteJobQueue(db)) {
+      try (var queue = new SqliteJobQueue(db, ignored -> true)) {
         queue.open();
         var opened = queue.beginRecordedWalk(key, PLAN, true);
         queue.enqueueRecordedEntries(key, opened.enumerationEpoch(), List.of(
@@ -135,7 +135,7 @@ final class RecordedWalkSealTest {
       Path db = temp.resolve(outcome.name().toLowerCase() + "-orphan.db");
       Path file = temp.resolve(outcome.name().toLowerCase() + "-orphan.txt");
       JobQueue.IndexJob orphan;
-      try (var queue = new SqliteJobQueue(db)) {
+      try (var queue = new SqliteJobQueue(db, ignored -> true)) {
         queue.open();
         var opened = queue.beginRecordedWalk(key, PLAN, true);
         queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -167,7 +167,7 @@ final class RecordedWalkSealTest {
             + (deferred ? 0 : 1));
         Path db = temp.resolve(suffix + ".db");
         Path file = temp.resolve(suffix + ".txt");
-        try (var queue = new SqliteJobQueue(db)) {
+        try (var queue = new SqliteJobQueue(db, ignored -> true)) {
           queue.open();
           var opened = queue.beginRecordedWalk(key, PLAN, true);
           queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -196,7 +196,7 @@ final class RecordedWalkSealTest {
     String key = key(18 + selector);
     Path db = temp.resolve("admin-late-index-" + selector + ".db");
     Path file = temp.resolve("admin-late-index-" + selector + ".txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var opened = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -238,7 +238,7 @@ final class RecordedWalkSealTest {
       String key = key(22);
       Path db = temp.resolve("mismatch-" + column + ".db");
       Path file = temp.resolve("mismatch-" + column + ".txt");
-      try (var queue = new SqliteJobQueue(db)) {
+      try (var queue = new SqliteJobQueue(db, ignored -> true)) {
         queue.open();
         var opened = queue.beginRecordedWalk(key, PLAN, true);
         queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -261,7 +261,7 @@ final class RecordedWalkSealTest {
     String key = key(21);
     Path db = temp.resolve("sealed-retention.db");
     Path file = temp.resolve("sealed-retention.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var opened = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -296,7 +296,7 @@ final class RecordedWalkSealTest {
     Path db = temp.resolve("retire.db");
     Path seen = temp.resolve("seen.txt");
     Path unseen = temp.resolve("unseen.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var first = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, first.enumerationEpoch(), List.of(
@@ -334,7 +334,7 @@ final class RecordedWalkSealTest {
     String key = key(7);
     Path db = temp.resolve("maintenance-preflight.db");
     Path file = temp.resolve("maintenance.txt");
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var opened = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -382,7 +382,7 @@ final class RecordedWalkSealTest {
     Path db = temp.resolve("many-failures.db");
     List<Path> files = new ArrayList<>();
     for (int i = 0; i < 101; i++) files.add(temp.resolve("failure-" + i + ".txt"));
-    try (var queue = new SqliteJobQueue(db)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
       queue.open();
       var opened = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),

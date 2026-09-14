@@ -2,6 +2,17 @@
 
 ## Current state (2026-09-14)
 
+C2-9b.3a queue fencing now passes the full indexer suite:598 cases,15 existing skips,
+no failures, plus focused and discriminating negative controls. Constructor default
+denies recorded execution; stopped-orphan administrative closure remains possible.
+[Queue proof and remaining attachment](evidence/C2/recorded-queue-authority.md).
+A separate inherited real-model test-budget failure was reproduced and corrected;
+focused1667 passes, full Worker-core1668 is running at this checkpoint. The source
+and failed proof are preserved in [the correction record](evidence/C2/long-doc-test-budget.md).
+Next is C2-9b.3b startup/reconciliation/lifecycle, then .3c actual producer. The
+selected fresh/restart/admission design is pushed9dfaf9ee4; pure decision449f56a06
+passed all13 hosted CI34846902769 jobs plus CLA. C2 remains open.
+
 **Resumed after the user's reboot.** Checkpoint13207a960 passed all13 hosted CI34830819900 jobs; exact Linux filesystem XML
 confirms all three Windows-skipped cases executed successfully. Evidence commit a822dff0f is pushed. Resource
 preflight1611 reports no stack/foreign run/inference orphan. The preserved sealing draft is

@@ -118,7 +118,19 @@ paths before applying the batch limit, so a replacement cannot overtake its live
 starve unrelated jobs. A stopped batch returns unwritten claims without resetting retry
 budget; written claims remain with the commit journal. Failed SQL returns retry before another poll.
 
-On startup, `recoverStuckJobs()` resets unowned `PROCESSING` jobs back to `PENDING`. This heals incomplete work from a prior crash without burning retry budget (since `attempts` = failures, not claims).
+On startup, `recoverStuckJobs()` resets eligible unowned `PROCESSING` jobs back to
+`PENDING` without burning retry budget. Recorded membership (nonnull
+`walk_seen_epoch`) requires its constructor-bound permission predicate, just like a
+new claim. The same check governs the aged reaper. No-owner constructors deny
+recorded work; a legacy null-epoch row retains its existing behavior even when it
+has a scan id. False or a runtime failure in the authority denies the unit; fatal
+errors propagate. The actual generation-ready authority/producer attachment is
+still required before recorded work can run.
+
+A failed/cancelled walk's unowned orphan instead receives administrative SKIPPED
+coverage without execution permission. That lets a stopped walk seal after a crash
+without requeueing an unauthorized effect. Issued owners remain protected until
+they return or report completion.
 
 The indexing loop is also resilient *in-process*: a per-document `Error` (for example a plugin `LinkageError`, `AssertionError`, or `IOError`) is logged and uses the existing per-unit failure/retry path, allowing later batch units to proceed. A recoverable batch-embedding error uses the existing per-document fallback. A fatal `VirtualMachineError` or uncaught loop-thread failure publishes `LoopState.FAILED` and clears liveness before logging. Core status reports `indexState=FAILED` and `indexHealthy=false`; the index health port exposes the failed loop state while serving readiness remains independently probed. Ordinary document `ERROR`, deferred startup, and intentional quiescence remain distinct. A new loop start clears the fatal state.
 
@@ -162,13 +174,13 @@ On startup, if the database already exists, the queue runs `PRAGMA quick_check`:
 
 ### Atomic job claiming
 
-`pollPending()` uses a single-statement atomic claim to prevent burning attempts on crashes:
-
-```sql
-UPDATE jobs SET state = 'PROCESSING', last_updated = :now
-WHERE path IN (SELECT path FROM jobs WHERE state = 'PENDING' AND ...)
-RETURNING path;
-```
+`pollPending()` selects candidates in deterministic timestamp/path order and updates
+exactly the selected rows inside one queue transaction. Its cursor excludes live
+issued paths and checks recorded permission for each unit before applying the batch
+limit, so denied old work cannot starve eligible rows. The following guarded update
+changes those PENDING rows to PROCESSING atomically; no claim increments attempts.
+Issued objects are published only after the transaction commits. A permission
+change prevents the next check, while a unit already admitted may finish.
 
 ### Attempt semantics
 
