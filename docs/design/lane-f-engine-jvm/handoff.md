@@ -35,7 +35,10 @@ C2-8b committed content hash and idle/shutdown outcome retry are locally verifie
 integrated1525 executes2,179 cases/423 suites, 20 existing skips, zero failures/errors;
 PMD/format pass. Combined and isolated shutdown negatives are preserved; final1527
 restores the exact production source and passes65 cases. [Proof and limits](evidence/C2/committed-content-hash.md).
-Next is C2-8/C2-9 ingestion, C2-10 reindex, then
+Hosted CI34807238861 (all13 jobs) and CLA34807236808 pass at07813a14a.
+The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
+walk receipt, existing ledger and current membership after independent review. Next is
+C2-8c durable admission revisions, C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then
 required integrated/live/model/installed/final-head proofs and D1/D2/E/F. Root makes
 remaining mechanism/merge decisions; no owner reply is pending.
 
