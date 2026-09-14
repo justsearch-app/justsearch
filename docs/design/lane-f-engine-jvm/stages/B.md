@@ -289,20 +289,15 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   fixed. The general finding is the one to carry into B11-B13: a shared loop makes the DECISIONS
   common and the bindings divergent, so the actuator that CI cannot reach needs reading, not
   assuming.
-- **NAMED RED, not stage B's: `OnnxEmbeddingEncoderLongDocForensicTest.longDocEmbedWithSpansMatchesBaseEmbed`.**
-  The full `./gradlew.bat cleanTest test --no-build-cache` at the end of B10 reported one failing
-  task. Two cases in it timed out; one (`OnnxEmbeddingEncoderBoundedTokenizeTest`, a 10-minute
-  budget) passed on an isolated re-run and was load starvation, the way `agent-lessons.md` predicts.
-  The other is DETERMINISTIC: run alone on an otherwise idle machine it takes **68.4 s against its
-  own `@Timeout(30, SECONDS)`** — a 2.3x overshoot, not a race. It is not this stage's: `git diff
-  origin/main..HEAD -- .../indexerworker/embed/onnx/` is empty, and the one file the branch touches
-  in `embed/` (`EmbeddingFingerprint.java`) changed at stage A's checkpoint. Deliberately NOT
-  "fixed" by raising the number: 68 s for an 8192-token embed is the signature of a CPU fallback,
-  so the budget may be right and the machine wrong, and widening a timeout to make a red go away is
-  the move `fix-root-causes-not-symptoms` names. Recorded here and reported rather than acted on,
-  because acting on it means deciding whether the encoder is meant to be on the GPU in a unit test —
-  which is tempdoc 710's question, not stage B's. **Everything else is green: 1433 result files,
-  9001 tests, 1 failure, 0 errors, 19 skipped.**
+- **Historical B10 red: `OnnxEmbeddingEncoderLongDocForensicTest.longDocEmbedWithSpansMatchesBaseEmbed`.**
+  The full B10 suite reported9,001 tests, one failure, zero errors and19 skips.
+  An isolated long-document run took68.4s. The original interpretation incorrectly
+  described an explicit30s method annotation and suspected unintended CPU fallback.
+  Source verification on2026-09-14 establishes that the test deliberately uses FP32
+  CPU and inherits the generic30s default. Reproductions1665/1666 completed all three
+  numerical paths correctly before timeout; a method-scoped two-minute budget now
+  passes focused1667. [Correction, original failures and remaining proof](../evidence/C2/long-doc-test-budget.md).
+  This later correction does not retroactively turn the B10 run green.
 - **Open item for B11/B12: each Tauri restart starts another `watch_manifest` thread.**
   `spawn_headless_backend` starts one per spawn and the loop exits only on a spawn error, so a
   supervised restart leaves the previous watcher polling. The duplicates are idempotent (both call

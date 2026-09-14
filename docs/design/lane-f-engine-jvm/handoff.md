@@ -1099,13 +1099,12 @@ tests, `run-ui-web-gates` 27/27.
 least one module's test task did not complete (the failing task likely aborted the rest of its
 module). Re-run the full suite and reconcile the count before the stage-end claim; a total that
 is smaller than the previous one is not "one failure". (2) The one failure,
-`OnnxEmbeddingEncoderLongDocForensicTest.longDocEmbedWithSpansMatchesBaseEmbed`, ran 68 s
-against its own 30 s `@Timeout`, deterministically and alone on an idle machine; the branch
-does not touch `embed/onnx/` (`git diff origin/main..HEAD` on that path is empty). The
-implementer reads it as a CPU-fallback encoder on this machine (tempdoc 710's question), not a
-branch defect. Verify that reading (does the same test pass on `main` in a clean worktree on
-this machine? does the ORT provider log say CUDA?) before either widening the timeout or
-recording it as an environment red; do not widen the number to make it green.
+`OnnxEmbeddingEncoderLongDocForensicTest.longDocEmbedWithSpansMatchesBaseEmbed`, ran68s.
+The contemporary CPU-fallback/explicit-method-timeout interpretation was wrong:
+source verification on2026-09-14 confirms intentional FP32 CPU and the inherited30s
+JUnit default. Reproductions1665/1666 and the scoped numerical-test budget correction
+are preserved in [the correction record](evidence/C2/long-doc-test-budget.md).
+The original full run remains failed; later proof is recorded separately.
 
 **B7 to B10 have not been independently reviewed.** Run the same refute-first, read-only opus
 review used for B1 to B6 (brief shape: findings ranked by severity with file:line, a concrete
