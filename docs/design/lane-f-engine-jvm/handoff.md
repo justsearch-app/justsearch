@@ -2,14 +2,22 @@
 
 ## Current state (2026-09-14)
 
-Current d.3b.1 [Java-only recorded scan admission](evidence/C2/recorded-scan-admission.md)
-is implemented and locally verified on fe5742ba5 plus its per-item diff. Final1769 executes52
-cases/five suites, zero failures/errors/skips; PMD, format and governance pass. Independent
-review corrected generation fencing and a file-kind scope race; eight expected negative-control
-assertions fail for the intended reasons and restored source passes. Next is d.3b.2: bind the
-bounded Engine producer, carry persisted generation and prove actual exit/drain and compatibility
-ordering; then prepared handlers and integrated/live/installed/hosted proof. C2 remains open;
-merge stays at F. Root owns lifecycle, SQL, builds and installation of source/test changes.
+Current d.3b.2a.1 [selected-force/provenance correction](evidence/C2/recorded-force-compatibility.md)
+is implemented and locally verified against17d56daf0 plus this per-item diff. Selected recorded
+and ordinary force cannot transition whole-index compatibility; blocked mismatch commits preserve
+the known old fingerprint. Integrated1775 passes100 cases/12 suites, final restored1779 passes12,
+and all ten expected fault-injection failures discriminate the unsafe behavior. Independent review,
+PMD, format and documentation/governance checks pass. Live/model/hosted proof is not claimed.
+
+Next, in separate commits: .2a.2 fixes legacy recovery commit/refresh visibility, exact coverage and
+strict certification reads; .2a.3 routes compatibility remedies to the actual full rebuild. Both
+are mandatory before .2b bounded Engine producer binding/actual-exit proof, then .3 prepared
+handlers and integrated/live/installed/hosted reconciliation. No producer is bound yet. C2 stays
+open and merge stays at F; root owns lifecycle, SQL, builds and installation of source/test changes.
+
+Recorded scan admission is pushed17d56daf0 with52 final1769 cases and independent negative proofs.
+Its hosted CI34887604012 passes12/13 jobs; app-ui failure diagnosis remains to reconcile, while
+CLA34887601017 passes. [Scan evidence](evidence/C2/recorded-scan-admission.md).
 
 Prior pushed checkpoint064adc779 fixes coordinator startup cancellation and
 synchronous producer rejection. Hosted CI34878848566 passes12/13 jobs; its sole app-ui finding

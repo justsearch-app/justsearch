@@ -10,7 +10,6 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.loop.ops.EmbeddingRecoveryOps;
-import io.justsearch.indexerworker.services.WorkerIngestService;
 
 @AnalyzeClasses(packages = "io.justsearch.indexerworker", importOptions = ImportOption.DoNotIncludeTests.class)
 class IndexerWorkerGuardrailsTest {
@@ -154,15 +153,13 @@ class IndexerWorkerGuardrailsTest {
    * above is trivially bypassed: a rescue can skip the {@code maybeAutoStartRebuildFor*} family and
    * flip the state machine straight through {@code onForcedReindexRequested}.
    *
-   * <p>{@code WorkerIngestService} is deliberately legal — it triggers on a user-initiated forced
-   * reindex, where the re-embed work comes from the surrounding ingest request that rewrites
-   * documents to PENDING, not from the flag flip. That is the criterion for any future addition
-   * here: real pending work must already be guaranteed by the caller's own context.
+   * <p>A selected force-ingest request cannot attest to untouched vectors, even after its own
+   * documents become PENDING. Only whole-index recovery establishes the required coverage.
    */
   private static final DescribedPredicate<JavaCall<?>> FORCED_REINDEX_TRIGGER_OUTSIDE_ALLOWLIST =
       new DescribedPredicate<>(
           "call EmbeddingCompatibilityController.onForcedReindexRequested from outside"
-              + " EmbeddingRecoveryOps / WorkerIngestService") {
+              + " EmbeddingRecoveryOps") {
         @Override
         public boolean test(JavaCall<?> call) {
           if (!call.getTargetOwner()
@@ -175,8 +172,7 @@ class IndexerWorkerGuardrailsTest {
           }
           String origin = call.getOriginOwner().getName();
           return !origin.equals(EmbeddingRecoveryOps.class.getName())
-              && !origin.equals(EmbeddingCompatibilityController.class.getName())
-              && !origin.equals(WorkerIngestService.class.getName());
+              && !origin.equals(EmbeddingCompatibilityController.class.getName());
         }
       };
 
@@ -204,14 +200,12 @@ class IndexerWorkerGuardrailsTest {
           .should()
           .callMethodWhere(FORCED_REINDEX_TRIGGER_OUTSIDE_ALLOWLIST)
           .because(
-              "tempdoc 726 F3 — onForcedReindexRequested only flips the state machine; it queues no"
-                  + " re-embed work. It is safe from WorkerIngestService because a user-initiated"
-                  + " forced reindex rides an ingest request that rewrites documents to PENDING"
-                  + " itself. Anywhere else it is the same unsound shortcut as calling the"
-                  + " auto-rescue entry points directly: use"
-                  + " EmbeddingRecoveryOps.rescueBlockedLegacyIndex, which re-marks first. Adding a"
-                  + " caller here requires showing that real PENDING work is guaranteed by the"
-                  + " caller's own context");
+              "onForcedReindexRequested only flips the state machine; it queues no re-embed work."
+                  + " Selected force ingestion cannot prove whole-index provenance and must not"
+                  + " transition compatibility. Legacy recovery belongs to EmbeddingRecoveryOps,"
+                  + " which re-marks all unknown-provenance parents first; model mismatch belongs"
+                  + " to full-generation migration. An allowed caller must establish whole-index"
+                  + " coverage, not merely selected PENDING documents");
 
   // NOTE — a third tempdoc-517 rule ("encoder imports confined to input-capture")
   // was considered but dropped. Peer classes outside the search-execution

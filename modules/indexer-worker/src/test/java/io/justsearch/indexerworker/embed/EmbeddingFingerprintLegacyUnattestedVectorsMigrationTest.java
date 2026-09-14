@@ -112,7 +112,7 @@ class EmbeddingFingerprintLegacyUnattestedVectorsMigrationTest extends io.justse
               () -> docCountOrThrow(r2),
               () -> completedEmbeddingsOrThrow(r2));
       // Production wiring, post-A1-revert: KnowledgeServer.java:1022-1023.
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
       ecc.refresh();
 
       // Sanity: this is the exact on-disk signature from §THEORIZE A -- SPLADE fp present,

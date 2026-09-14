@@ -145,7 +145,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest extends io.justsearch.a
           new EmbeddingCompatibilityController(
               r2::latestCommitUserDataBestEffort, () -> r2.indexCountOps().docCount());
       // Production wiring, post-A1-revert: KnowledgeServer.java:1022-1023.
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
       ecc.refresh();
       assertEquals(
           EmbeddingCompatibilityController.State.BLOCKED_LEGACY,
@@ -241,7 +241,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest extends io.justsearch.a
           new EmbeddingCompatibilityController(
               r2::latestCommitUserDataBestEffort, () -> r2.indexCountOps().docCount());
       // Production wiring, post-A1-revert: KnowledgeServer.java:1022-1023.
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
       ecc.refresh();
       ecc.onForcedReindexRequested();
 
@@ -323,7 +323,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest extends io.justsearch.a
     var ecc =
         new EmbeddingCompatibilityController(
             r2::latestCommitUserDataBestEffort, () -> r2.indexCountOps().docCount());
-    fpSupplierRef.set(ecc::fingerprintToStamp);
+    fpSupplierRef.set(ecc::fingerprintForCommit);
     ecc.refresh();
     assertEquals(EmbeddingCompatibilityController.State.BLOCKED_LEGACY, ecc.state());
 
@@ -421,7 +421,7 @@ class EmbeddingFingerprintProductionWiringDurabilityTest extends io.justsearch.a
           new EmbeddingCompatibilityController(
               r2::latestCommitUserDataBestEffort, () -> r2.indexCountOps().docCount());
       // Production wiring, post-A1-revert: KnowledgeServer.java:1022-1023.
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
       ecc.refresh();
       assertEquals(EmbeddingCompatibilityController.State.BLOCKED_LEGACY, ecc.state());
 

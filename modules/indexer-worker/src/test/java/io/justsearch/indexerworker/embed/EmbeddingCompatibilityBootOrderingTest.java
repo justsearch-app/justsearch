@@ -106,7 +106,7 @@ class EmbeddingCompatibilityBootOrderingTest extends io.justsearch.adapters.luce
               () -> docCountOrThrow(runtime),
               () -> completedEmbeddingsOrThrow(runtime));
       ecc.refresh();
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
 
       assertEquals(
           EmbeddingCompatibilityController.State.COMPATIBLE,
@@ -212,7 +212,7 @@ class EmbeddingCompatibilityBootOrderingTest extends io.justsearch.adapters.luce
               () -> docCountOrThrow(runtime),
               () -> completedEmbeddingsOrThrow(runtime));
       ecc.refresh();
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
 
       assertEquals(
           EmbeddingCompatibilityController.State.COMPATIBLE,
@@ -312,7 +312,7 @@ class EmbeddingCompatibilityBootOrderingTest extends io.justsearch.adapters.luce
               () -> docCountOrThrow(runtime),
               () -> completedEmbeddingsOrThrow(runtime));
       ecc.refresh();
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
 
       assertEquals(
           EmbeddingCompatibilityController.State.BLOCKED_LEGACY,

@@ -260,11 +260,6 @@ final class IndexStatusOps {
     this.resolvedConfigSupplier = supplier;
   }
 
-  /** Returns the current embedding compatibility controller (may be {@code null}). */
-  EmbeddingCompatibilityController embeddingCompatController() {
-    return embeddingCompatController;
-  }
-
   // ==================== StatusResponse builder (341: nested sub-messages) ====================
 
   /** Builds the full {@link StatusResponse} for the indexStatus RPC. */

@@ -115,7 +115,7 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
           EmbeddingCompatibilityController.State.BLOCKED_LEGACY,
           ecc.state(),
           "populated index with no stored fingerprint must land BLOCKED_LEGACY after restart");
-      fpHolder.set(ecc::fingerprintToStamp);
+      fpHolder.set(ecc::fingerprintForCommit);
 
       // Recovery (F3): re-mark the unknown-provenance COMPLETED docs PENDING, then enter REBUILDING.
       int remarked =
@@ -234,7 +234,7 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
           EmbeddingCompatibilityController.State.BLOCKED_LEGACY,
           ecc.state(),
           "populated index with no stored fingerprint must land BLOCKED_LEGACY after restart");
-      fpHolder.set(ecc::fingerprintToStamp);
+      fpHolder.set(ecc::fingerprintForCommit);
 
       // The trap: every parent doc is already COMPLETED, not PENDING. A rescue that transitioned
       // straight to REBUILDING here would see pendingEmbeddingCount==0 and certify on the very next

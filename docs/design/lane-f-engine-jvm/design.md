@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2 d.3b.2a keeps selected force as extraction-only intent; whole-index legacy recovery and blue/green migration own embedding compatibility. Remove the unsafe batch-trigger shortcut and its architecture exemption rather than certifying untouched vectors from selected receipts. [Decision, superseded candidate and proof plan](evidence/C2/recorded-force-compatibility.md).
+
 - 2026-09-14: C2 d.3b.1 carries recorded child key/epoch, frozen generation and subtree policy beside the existing Java scan request, preserving indexing.proto. Revalidate generation before every batch, bound single-file traversal to the start node with consistent non-following link policy, prune nested ownership, reject malformed/partial traversal and recheck cancellation before enqueue. The recorded Worker admission seam precedes bounded Engine binding; force compatibility must use proven index work before activation. [Owning mechanism and acceptance](evidence/C2/recorded-scan-admission.md).
 
 - 2026-09-14: C2 d.3b projects the frozen force flag into the exact issued recorded claim through one enum-valued admission decision; it cannot use the raced, process-local forced-path set. [Owning mechanism, alternatives and proof plan](evidence/C2/recorded-force-claims.md).

@@ -29,12 +29,17 @@ Used by VECTOR block and HYBRID fallback paths:
 - `INITIALIZING`: compatibility state not yet computed (startup)
 - `NO_EMBEDDING_MODEL`: no embedding model available on this host
 - `NEW_INDEX_NO_FINGERPRINT`: new/empty index; fingerprint will be stamped on first commit
-- `LEGACY_INDEX_NO_FINGERPRINT`: index has docs but no fingerprint; vector/hybrid blocked until forced reindex
+- `LEGACY_INDEX_NO_FINGERPRINT`: index has docs but no fingerprint; vector/hybrid blocked until whole-index legacy recovery re-embeds the unknown-provenance vectors
 - `FINGERPRINT_MATCH`: stored fingerprint matches current; vector/hybrid allowed
-- `FINGERPRINT_MISMATCH`: stored fingerprint differs; vector/hybrid blocked until forced reindex
-- `REBUILD_IN_PROGRESS`: forced rebuild/reindex in progress to realign embeddings
+- `FINGERPRINT_MISMATCH`: stored fingerprint differs; vector/hybrid blocked until a full-generation rebuild restores compatibility
+- `REBUILD_IN_PROGRESS`: whole-index re-embedding is in progress to realign embeddings; forcing selected files does not authorize this compatibility transition
 - `REBUILD_COMPLETED`: rebuild completed and fingerprint stamped
 - `REBUILD_FAILED_NO_VECTORS`: rebuild drained (`pending_embedding == 0`) without a single successful embedding; the fingerprint was **refused**, not stamped, so vector/hybrid stays blocked. Terminal for the boot — the embedding runtime must be fixed and the worker restarted
+
+While `FINGERPRINT_MISMATCH` blocks embedding writes, commits preserve the known old model
+fingerprint. This keeps the mismatch visible after restart; it does not certify the current
+model. A generation with mixed vectors during rebuilding withholds the fingerprint until
+the rebuild earns an attestation.
 
 ### Search degradation reason codes (`WorkerSearchService`)
 

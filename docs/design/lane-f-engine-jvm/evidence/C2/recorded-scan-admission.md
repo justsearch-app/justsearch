@@ -46,13 +46,12 @@ The bounded Engine adapter and EngineRoot binding follow in d.3b.2. Both file an
 roots use the existing root-walk executor and scan flow, avoiding another unary response/exit
 carrier. Actual completion includes synchronous service exit, progress drain and task cleanup.
 
-Compatibility ordering is required before activation. At0aa0575b4 WorkerIngestService521-549
-can flip ECC before queue refusal; an admitted-batch sink avoids that defect but queue
-acceptance is not index PENDING evidence. The certifier ignores global queue depth and can use
-old vector evidence. Root is resolving a confirmed-index-write/operation-completion boundary
-in d.3b.2; neither a global queue-depth gate nor all-document remark is selected. This subcut's
-recorded arm performs no ECC transition. Legacy behavior is unchanged here. Compatibility,
-actual exit and public execution remain required, not waived or owner-gated.
+Compatibility ownership is resolved in
+[d.3b.2a](recorded-force-compatibility.md): selected force remains extraction intent and cannot
+attest to untouched vectors. Whole-index legacy recovery and blue/green migration own the
+transition; the unsafe legacy batch trigger is removed in that follow-up. No recorded ECC
+transition or parent-completion hook is needed. Actual exit and public execution remain
+required in d.3b.2b; this admission subcut alone does not activate a producer.
 
 ## Acceptance
 

@@ -518,14 +518,8 @@ public final class WorkerIngestService {
           return batchErrorResponse("All paths were invalid or unsafe");
         }
 
-        // Embedding/index safety: a forced reindex is an explicit "rebuild vectors" intent.
-        // Signal the compatibility controller so it can enter REBUILDING and allow embedding writes.
-        if (request.getForceReindex()) {
-          var controller = statusOps.embeddingCompatController();
-          if (controller != null) {
-            controller.onForcedReindexRequested();
-          }
-        }
+        // Force bypasses unchanged extraction for selected files. It cannot attest to untouched
+        // vectors: whole-index legacy recovery or generation migration owns compatibility.
 
         // During cutover (SWITCHING), accept the request but buffer it durably instead of
         // mutating the job queue/index directly. This avoids dropping updates while the Worker

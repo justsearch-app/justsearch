@@ -1875,7 +1875,9 @@ public final class KnowledgeServer implements Closeable {
     // would reopen the same hole from the other side — every commit between the loop starting and
     // the models finishing (the help batch again) would omit the fingerprint, so the index the
     // early refresh just certified COMPATIBLE would still persist unstamped.
-    embeddingFingerprintSupplier.set(ecc::fingerprintToStamp);
+    // Preserve a known OLD fingerprint while mismatch blocks embedding writes. This cannot
+    // certify the current model; mixed REBUILDING still withholds both fingerprints.
+    embeddingFingerprintSupplier.set(ecc::fingerprintForCommit);
     appServices.wireEmbeddingCompatController(ecc);
   }
 
