@@ -268,6 +268,30 @@ class RuntimeActivationServiceTest {
     assertEquals("not_found", features.get(1).reason());
   }
 
+  @Test
+  void onnxStatusReadsCommittedPathsWithoutPropertyPromotions() {
+    setHome(tmp);
+    clearProp("justsearch.rerank.model_path");
+    clearProp("justsearch.citation.scorer.model_path");
+    var previous = ConfigStore.globalOrNull();
+    var settings = new UiSettings();
+    settings.setRerankerModelPath(tmp.resolve("reranker").toString());
+    settings.setCitationScorerModelPath(tmp.resolve("citation").toString());
+    var published = new ConfigStore(ConfigStoreRebuilder.prepare(settings));
+    try {
+      ConfigStore.setGlobal(published);
+      var features = createServiceWithCache(List::of).getStatus().onnxFeatures();
+      assertEquals("explicit_path", features.get(0).reason());
+      assertEquals(settings.getRerankerModelPath(), features.get(0).modelPath());
+      assertEquals("explicit_path", features.get(1).reason());
+      assertEquals(settings.getCitationScorerModelPath(), features.get(1).modelPath());
+      assertFalse(features.get(0).modelActive(), "persisted path cannot fabricate a live session");
+      assertFalse(features.get(1).modelActive());
+    } finally {
+      ConfigStore.restoreGlobal(published, previous);
+    }
+  }
+
   private RuntimeActivationService createServiceWithCache(WorkerFeatureCache cache) {
     return new RuntimeActivationService(processExecutors,
         OnlineAiService.unavailable(),

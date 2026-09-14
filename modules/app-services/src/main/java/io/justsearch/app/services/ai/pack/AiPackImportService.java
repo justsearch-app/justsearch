@@ -19,7 +19,6 @@ import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.PlatformPaths;
-import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.api.InstalledPacksRecord;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.EffectivePolicy;
@@ -63,6 +62,7 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
 
   private final OnlineAiService onlineAi;
   private final UiSettingsStore settingsStore;
+  private final io.justsearch.app.api.SettingsService settingsService;
   private final KnowledgeServerBootstrap knowledgeServer;
   private final EnterprisePolicyService policyService;
   private final PackAllowlistService allowlistService;
@@ -105,6 +105,13 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
       KnowledgeServerBootstrap knowledgeServer,
       EnterprisePolicyService policyService,
       PackAllowlistService allowlistService) {
+    this(onlineAi, settingsStore, knowledgeServer, policyService, allowlistService, null);
+  }
+
+  public AiPackImportService(OnlineAiService onlineAi, UiSettingsStore settingsStore,
+      KnowledgeServerBootstrap knowledgeServer, EnterprisePolicyService policyService,
+      PackAllowlistService allowlistService, io.justsearch.app.api.SettingsService settingsService) {
+    this.settingsService = settingsService;
     this.onlineAi = Objects.requireNonNull(onlineAi, "onlineAi");
     this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
     this.knowledgeServer = knowledgeServer; // best-effort
@@ -629,23 +636,27 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
   // -------------------- Settings + worker restart --------------------
 
   private void applySettings(Path chatModel) {
-    UiSettings s = settingsStore.load();
+    var snapshot = settingsStore.inspect();
+    UiSettings s = snapshot.settings();
     s.setLlmModelPath(chatModel.toAbsolutePath().toString());
-    settingsStore.save(s);
-
-    // No sysprop write here — same reasoning as AiInstallService.applySettings (883 §C.5c residue,
-    // #605 review S1). The save above and the rebuild below deliver this path at ordinal 300, and
-    // the sysprop copy only added an ordinal-500 claim that a `.source` marker then had to correct.
-
-    // Rebuild ConfigStore so readers see updated model paths.
-    ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), s);
+    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+    var result = settingsService.applyInternal(s, snapshot.witness(),
+        io.justsearch.app.services.intent.EngineProvenance.internal("ai-pack-model-selection",
+            io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+            io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+    if (!result.response().success()) throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
+    if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
+      throw new IllegalStateException("Settings commitment is unresolved");
+    }
 
     OnlineAiService onlineAi = this.onlineAi;
     if (onlineAi instanceof OnlineAiRuntimeControl control) {
+      ConfigStore store = ConfigStore.globalOrNull();
+      var effective = store == null ? null : store.get().ai();
       control.applyRuntimeOverrides(
-          s.getLlmModelPath(),
-          s.getContextLength(),
-          s.configuredGpuLayers(),
+          effective == null ? s.getLlmModelPath() : Objects.toString(effective.llmModelPath(), null),
+          effective == null ? s.getContextLength() : effective.contextSize(),
+          effective == null ? s.configuredGpuLayers() : Integer.valueOf(effective.gpuLayers()),
           OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
     }
   }

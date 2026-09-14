@@ -40,6 +40,7 @@ import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedPathResolver;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
@@ -580,6 +581,8 @@ public final class RuntimeActivationService
   }
 
   private List<FeatureRow> resolveOnnxFeatureRows() {
+    ConfigStore store = ConfigStore.globalOrNull();
+    ResolvedConfig config = store == null ? null : store.get();
     return List.of(
         new FeatureRow(
             EncoderRole.RERANKER,
@@ -590,6 +593,7 @@ public final class RuntimeActivationService
                 EnvRegistry.RERANK_ENABLED.sysProp(),
                 EnvRegistry.RERANK_MODEL_PATH.envVar(),
                 EnvRegistry.RERANK_MODEL_PATH.sysProp(),
+                resolvedPath(config, EnvRegistry.RERANK_MODEL_PATH.sysProp()),
                 EncoderRole.RERANKER)),
         new FeatureRow(
             EncoderRole.CITATION,
@@ -600,6 +604,7 @@ public final class RuntimeActivationService
                 EnvRegistry.CITATION_SCORER_ENABLED.sysProp(),
                 EnvRegistry.CITATION_SCORER_MODEL_PATH.envVar(),
                 EnvRegistry.CITATION_SCORER_MODEL_PATH.sysProp(),
+                resolvedPath(config, EnvRegistry.CITATION_SCORER_MODEL_PATH.sysProp()),
                 EncoderRole.CITATION)),
         new FeatureRow(
             EncoderRole.EMBEDDING,
@@ -646,6 +651,7 @@ public final class RuntimeActivationService
       String enabledProp,
       String pathEnv,
       String pathProp,
+      String configuredPath,
       EncoderRole role) {
     // The Worker's model name for this feature IS the registry package id carried by the role —
     // one identity, not a second hardcoded pair (EncoderRole.packageId).
@@ -663,8 +669,8 @@ public final class RuntimeActivationService
       return onnxFeature(id, label, "inactive", "disabled", null, sessionActive, observed);
     }
 
-    // 2. Explicit model path (Head-owned: uses Head-side env vars)
-    String explicitPath = resolveEnvOrProp(pathEnv, pathProp);
+    // 2. Published configuration includes the accepted installer settings at their true ordinal.
+    String explicitPath = configuredPath == null ? resolveEnvOrProp(pathEnv, pathProp) : configuredPath;
     if (explicitPath != null && !explicitPath.isBlank()) {
       return onnxFeature(id, label, "active", "explicit_path", explicitPath, sessionActive, observed);
     }
@@ -738,6 +744,12 @@ public final class RuntimeActivationService
       }
     }
     return false;
+  }
+
+  private static String resolvedPath(ResolvedConfig config, String key) {
+    var resolution = config == null ? null : config.resolution(key);
+    return resolution == null || resolution.value() == null || resolution.value().isBlank()
+        ? null : resolution.value();
   }
 
   /** Resolves a value from system property first, then environment variable. */

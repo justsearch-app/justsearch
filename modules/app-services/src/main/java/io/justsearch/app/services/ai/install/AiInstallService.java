@@ -31,7 +31,6 @@ import io.justsearch.configuration.model.ModelVariant;
 import io.justsearch.configuration.model.SkipCause;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.api.EffectivePolicy;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.UiSettings;
@@ -1875,103 +1874,59 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     Path chatModelPath = modelsDir.resolve(chat.targetDir()).resolve(chatVariant.filename());
     if (!Files.isRegularFile(chatModelPath)) return false;
 
-    UiSettings s = settingsStore.load();
+    var snapshot = settingsStore.inspect();
+    UiSettings s = snapshot.settings();
     s.setLlmModelPath(chatModelPath.toAbsolutePath().toString());
-    settingsStore.save(s);
-
-    // No sysprop write here (883 §C.5c residue, #605 review S1). The save above plus the rebuild
-    // below already deliver this path at ordinal 300 (settings.json) through
-    // ConfigStoreRebuilder.contributeUiSettings, and every reader takes it from ResolvedConfig —
-    // InferenceConfig reads rc.ai().llmModelPath(), and LLM_MODEL_PATH was not in the spawner's
-    // forwarded-property set, so no process boundary depended on the sysprop even before lane F
-    // stage A item A11 deleted that spawner and the boundary with it.
-    // Writing it as well put a GUI/installer value at ordinal 500, which is the precedence lie
-    // tempdoc 842 (S2) then needed a companion `.source` marker to un-tell: with the write gone the
-    // marker has nothing to correct, and the installer's path classifies as STORED_SETTINGS —
-    // re-derivable, supersedable by an explicit chat profile — from the ordinal chain alone. That
-    // is 842 §2.3's rule reached structurally instead of by annotation.
-    ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), s);
+    commitSettings(s, snapshot.witness(), "ai-install-chat-model");
 
     OnlineAiService onlineAi = this.onlineAi;
     if (onlineAi instanceof OnlineAiRuntimeControl control) {
+      ConfigStore store = ConfigStore.globalOrNull();
+      var effective = store == null ? null : store.get().ai();
       control.applyRuntimeOverrides(
-          s.getLlmModelPath(),
-          s.getContextLength(),
-          s.configuredGpuLayers(),
+          effective == null ? s.getLlmModelPath() : java.util.Objects.toString(effective.llmModelPath(), null),
+          effective == null ? s.getContextLength() : effective.contextSize(),
+          effective == null ? s.configuredGpuLayers() : Integer.valueOf(effective.gpuLayers()),
           OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
     }
     return true;
   }
 
-  /**
-   * Writes per-feature ONNX model paths to UiSettings + system properties so
-   * the Head's {@code RuntimeActivationService.resolveOneOnnxFeature} sees
-   * step 2 (explicit_path) hit and stops reporting reason="not_found" for
-   * installed features. Mirrors {@link #applySettings} for the LLM path.
-   *
-   * <p>Only writes for packages that are present on disk after install (i.e.,
-   * not skipped/failed). Each package's models live at
-   * {@code modelsDir / pkg.targetDir()}.
-   *
-   * @return true when at least one feature path was written
-   */
+  /** Commits installed ONNX paths once per acquisition stage, before its runtime effects. */
   private boolean applyOnnxSettings(ModelRegistry registry, InstallPlan plan) {
     if (settingsStore == null) return false;
 
-    UiSettings s = settingsStore.load();
+    var snapshot = settingsStore.inspect();
+    UiSettings s = snapshot.settings();
     boolean dirty = false;
 
-    // Map package id → (UiSettings setter, sysprop key). Only ONNX features —
-    // chat is handled by applySettings(); pipeline-only packages have no
-    // head-side path key.
-    record OnnxFeature(String pkgId, java.util.function.Consumer<String> setter, String sysProp) {}
+    record OnnxFeature(String pkgId, String current, java.util.function.Consumer<String> setter) {}
     List<OnnxFeature> features = List.of(
-        new OnnxFeature("embedding", s::setEmbedOnnxModelPath, "justsearch.embed.onnx.model_path"),
-        new OnnxFeature("reranker", s::setRerankerModelPath, "justsearch.rerank.model_path"),
-        new OnnxFeature("ner", s::setNerModelPath, "justsearch.ner.model_path"),
-        new OnnxFeature("splade", s::setSpladeModelPath, "justsearch.splade.model_path"),
-        new OnnxFeature(
-            "citation-scorer", s::setCitationScorerModelPath, "justsearch.citation.scorer.model_path"));
+        new OnnxFeature("embedding", s.getEmbedOnnxModelPath(), s::setEmbedOnnxModelPath),
+        new OnnxFeature("reranker", s.getRerankerModelPath(), s::setRerankerModelPath),
+        new OnnxFeature("ner", s.getNerModelPath(), s::setNerModelPath),
+        new OnnxFeature("splade", s.getSpladeModelPath(), s::setSpladeModelPath),
+        new OnnxFeature("citation-scorer", s.getCitationScorerModelPath(), s::setCitationScorerModelPath));
 
     for (OnnxFeature feature : features) {
       ModelPackage pkg = registry.findPackage(feature.pkgId());
       if (pkg == null) continue;
       // Skip if Install AI didn't actually install this package.
       if (isPackageSkippedOrFailed(pkg.id(), plan)) continue;
-      // …and skip one this run has not GOT to yet. This step runs once per acquisition stage now
-      // (tempdoc 840 Phase 3), so "not skipped and not failed" is no longer the same question as
-      // "installed": at the core stage, an enrichment package is merely pending. Writing its path
-      // then would latch a sysprop (setSysPropIfBlank is first-writer-wins) toward a directory an
-      // earlier interrupted run happened to create, for a package this run may still fail.
+      // A directory left by an earlier interrupted run does not prove this stage acquired it.
       if (isPackageAwaitingItsStage(pkg.id())) continue;
 
       Path modelDir = modelsDir.resolve(pkg.targetDir());
       if (!Files.isDirectory(modelDir)) continue;
 
       String absolute = modelDir.toAbsolutePath().toString();
+      if (absolute.equals(feature.current())) continue;
       feature.setter().accept(absolute);
-      // This sysprop write SURVIVES the 883 promotion retirement, and not by oversight (#605
-      // review S1). Unlike the chat model path it is what the index half actually reads: these five
-      // keys reach it through EnvRegistry.get(), i.e. from THIS JVM'S SYSPROPS. Before lane F stage
-      // A the route was longer and the reason was the same — the Worker was respawned right after
-      // this step (ConfigurationStage's restart gate) and WorkerSpawner forwarded the five keys as
-      // `-D` args. Item A11 deleted the respawn and the forwarding; the read is now direct, so this
-      // write matters more, not less. (Item A19 has since deleted the ordinal-450 worker snapshot
-      // that used to be the alternative here. It was never a usable one: it was written exactly
-      // once, at boot, so the file always predated an install and knew nothing about the models it
-      // had just landed. The "real fix" this comment used to name — making the snapshot re-writable
-      // at runtime — is not needed and will not happen; there is one ResolvedConfig now.) Deleting
-      // this line would re-open tempdoc 374 alpha.19 Bug J-1: SPLADE/NER/reranker silently disabled
-      // after Install AI because the index half saw modelPath=null. Until the five keys are read
-      // from ResolvedConfig rather than from sysprops, this is
-      // a knowingly-kept ordinal-500 write, not a forgotten one.
-      SystemPropertyUtils.setSysPropIfBlank(feature.sysProp(), absolute);
       dirty = true;
     }
 
     if (dirty) {
-      settingsStore.save(s);
-      ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), s);
+      commitSettings(s, snapshot.witness(), "ai-install-onnx-models");
     }
     return dirty;
   }
@@ -2022,19 +1977,24 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       return false;
     }
     String absPath = cuda12Exe.toAbsolutePath().toString();
-    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
     UiSettings candidate = snapshot.settings();
     candidate.setServerExecutablePath(absPath);
-    var result = settingsService.applyInternal(candidate, snapshot.witness(),
-        io.justsearch.app.services.intent.EngineProvenance.internal("ai-install-server-selection",
+    commitSettings(candidate, snapshot.witness(), "ai-install-server-selection");
+    log.info("alpha.15: server.exe set to cuda12 variant: {}", absPath);
+    return true;
+  }
+
+  private void commitSettings(UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsWitness witness, String producer) {
+    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+    var result = settingsService.applyInternal(candidate, witness,
+        io.justsearch.app.services.intent.EngineProvenance.internal(producer,
             io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
             io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
     if (!result.response().success()) throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
     if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
       throw new IllegalStateException("Settings commitment is unresolved");
     }
-    log.info("alpha.15: server.exe set to cuda12 variant: {}", absPath);
-    return true;
   }
 
   /** Preserve a settings-or-higher executable winner; auto-detection is not operator authority. */
@@ -2072,7 +2032,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   private boolean applyOrtNativePath() {
     Path cuda12Dir = homeDir.resolve("native-bin/llama-server/variants/cuda12");
-    return writeOrtNativePathSysprop(cuda12Dir, settingsStore::load);
+    return writeOrtNativePathSysprop(cuda12Dir);
   }
 
   /**
@@ -2092,11 +2052,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * @param cuda12Dir directory containing the bundled CUDA runtime DLLs
    *     (cudart64_12.dll, cublas64_12.dll, cublasLt64_12.dll). Typically
    *     {@code %APPDATA%/io.justsearch.shell/native-bin/llama-server/variants/cuda12}.
-   * @param settingsLoader supplier for the current UiSettings (used by the
-   *     ConfigStore rebuild). Test stubs can return a default UiSettings.
    */
-  static boolean writeOrtNativePathSysprop(
-      Path cuda12Dir, java.util.function.Supplier<UiSettings> settingsLoader) {
+  static boolean writeOrtNativePathSysprop(Path cuda12Dir) {
     if (cuda12Dir == null || !Files.isDirectory(cuda12Dir)) {
       log.debug(
           "alpha.14 fix B: cuda12 variant dir not found at {} — skipping ORT native_path"
@@ -2119,8 +2076,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
     String absPath = cuda12Dir.toAbsolutePath().toString();
     SystemPropertyUtils.setSysPropIfBlank("justsearch.onnxruntime.native_path", absPath);
-    UiSettings s = settingsLoader != null ? settingsLoader.get() : null;
-    ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), s);
+    // ORT reads this fallback directly; republishing a loaded settings snapshot could erase
+    // a newer configuration already published by the accepted settings owner.
     log.info("alpha.14 fix B: ORT native path set to {}", absPath);
     return true;
   }

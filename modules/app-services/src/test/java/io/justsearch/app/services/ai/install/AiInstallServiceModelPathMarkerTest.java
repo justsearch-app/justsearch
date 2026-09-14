@@ -3,9 +3,20 @@ package io.justsearch.app.services.ai.install;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 
+import io.justsearch.app.api.OnlineAiRuntimeControl;
+import io.justsearch.app.api.OnlineAiService;
+import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
+import io.justsearch.app.services.settings.SettingsServiceImpl;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.ModelPathSource;
 import io.justsearch.configuration.model.DownloadProfile;
@@ -16,8 +27,10 @@ import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.ModelRegistry;
 import io.justsearch.configuration.model.ModelVariant;
 import io.justsearch.configuration.resolved.ConfigResolution;
+import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -25,6 +38,8 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,9 +71,19 @@ final class AiInstallServiceModelPathMarkerTest {
   @TempDir Path tmp;
 
   private final Map<String, String> prevProps = new HashMap<>();
+  private RuntimeIntentTestFixture fixture;
+  private ConfigStore previousConfigStore;
+  private ConfigStore configStore;
 
   @AfterEach
   void restore() {
+    if (fixture != null) {
+      fixture.close();
+      fixture = null;
+    }
+    TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
+    previousConfigStore = null;
+    configStore = null;
     for (var e : prevProps.entrySet()) {
       if (e.getValue() == null) {
         System.clearProperty(e.getKey());
@@ -80,10 +105,8 @@ final class AiInstallServiceModelPathMarkerTest {
     Files.createDirectories(chatModel.getParent());
     Files.writeString(chatModel, "gguf-bytes", StandardCharsets.UTF_8);
 
-    UiSettingsStore store =
-        new UiSettingsStore(
-            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
-    AiInstallService svc = new AiInstallService(null, store, null, null, tmp);
+    UiSettingsStore store = writableStore();
+    AiInstallService svc = newService(store, null);
 
     invokeApplySettings(svc, registryWithChatModel("model.gguf"), planFor(DownloadProfile.GPU_FULL));
 
@@ -112,10 +135,8 @@ final class AiInstallServiceModelPathMarkerTest {
     Files.createDirectories(chatModel.getParent());
     Files.writeString(chatModel, "gguf-bytes", StandardCharsets.UTF_8);
 
-    UiSettingsStore store =
-        new UiSettingsStore(
-            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
-    AiInstallService svc = new AiInstallService(null, store, null, null, tmp);
+    UiSettingsStore store = writableStore();
+    AiInstallService svc = newService(store, null);
     invokeApplySettings(svc, registryWithChatModel("model.gguf"), planFor(DownloadProfile.GPU_FULL));
 
     // What ConfigStoreRebuilder.rebuild does with the row applySettings just saved.
@@ -148,10 +169,8 @@ final class AiInstallServiceModelPathMarkerTest {
     Files.createDirectories(chatModel.getParent());
     Files.writeString(chatModel, "gguf-bytes", StandardCharsets.UTF_8);
 
-    UiSettingsStore store =
-        new UiSettingsStore(
-            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
-    AiInstallService svc = new AiInstallService(null, store, null, null, tmp);
+    UiSettingsStore store = writableStore();
+    AiInstallService svc = newService(store, null);
 
     invokeApplySettings(svc, registryWithChatModel("model.gguf"), planFor(DownloadProfile.GPU_FULL));
 
@@ -172,7 +191,89 @@ final class AiInstallServiceModelPathMarkerTest {
     assertEquals("jvm_arg", resolution.sourceName(), "here jvm_arg is the truth: a human set it");
   }
 
+  @Test
+  @DisplayName("the install commit publishes the operator target before one runtime apply")
+  void committedSettingsReachRuntimeAfterPublication() throws Exception {
+    clearProp(ModelPathSource.SOURCE_PROP_LLM_MODEL_PATH);
+    clearProp("justsearch.models.dir");
+    String operatorModel = tmp.resolve("operator-choice.gguf").toAbsolutePath().toString();
+    setProp(MODEL_PATH_PROP, operatorModel);
+    setProp("justsearch.context.size", "12288");
+    setProp("justsearch.gpu.layers", "0");
+
+    Path chatModel = tmp.resolve("models").resolve("chat").resolve("model.gguf");
+    Files.createDirectories(chatModel.getParent());
+    Files.writeString(chatModel, "gguf-bytes", StandardCharsets.UTF_8);
+
+    UiSettingsStore store = writableStore();
+    UiSettings settings = store.load();
+    settings.setContextLength(8192);
+    settings.setGpuLayers(23);
+    store.save(settings);
+    OnlineAiService onlineAi =
+        mock(
+            OnlineAiService.class,
+            org.mockito.Mockito.withSettings().extraInterfaces(OnlineAiRuntimeControl.class));
+    OnlineAiRuntimeControl runtime = (OnlineAiRuntimeControl) onlineAi;
+    AtomicInteger applyCount = new AtomicInteger();
+    AtomicReference<String> appliedModel = new AtomicReference<>();
+    AtomicReference<Integer> appliedContext = new AtomicReference<>();
+    AtomicReference<Integer> appliedGpu = new AtomicReference<>();
+    AtomicReference<ResolvedConfig> observedConfig = new AtomicReference<>();
+    AtomicReference<io.justsearch.app.api.settings.SettingsWitness> observedWitness =
+        new AtomicReference<>();
+    AiInstallService svc = newService(store, onlineAi);
+    var before = store.inspect().witness();
+    doAnswer(
+            invocation -> {
+              applyCount.incrementAndGet();
+              appliedModel.set(invocation.getArgument(0));
+              appliedContext.set(invocation.getArgument(1));
+              appliedGpu.set(invocation.getArgument(2));
+              observedConfig.set(configStore.get());
+              observedWitness.set(store.inspect().witness());
+              return null;
+            })
+        .when(runtime)
+        .applyRuntimeOverrides(
+            anyString(), any(), any(), eq(OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE));
+
+    invokeApplySettings(svc, registryWithChatModel("model.gguf"), planFor(DownloadProfile.GPU_FULL));
+
+    assertEquals(1, applyCount.get(), "one settings commit requests exactly one runtime apply");
+    assertEquals(operatorModel, appliedModel.get(), "the operator model remains authoritative");
+    assertEquals(12288, appliedContext.get());
+    assertEquals(0, appliedGpu.get(), "an explicit operator zero selects CPU execution");
+    assertNotNull(observedConfig.get(), "runtime must observe a published config");
+    assertEquals(operatorModel, observedConfig.get().ai().llmModelPath().toString());
+    assertEquals(12288, observedConfig.get().ai().contextSize());
+    assertEquals(0, observedConfig.get().ai().gpuLayers());
+    assertNotNull(observedWitness.get(), "runtime apply must follow a durable settings commit");
+    assertEquals(before.acceptedRevision() + 1, observedWitness.get().acceptedRevision());
+  }
+
   // ---------------------------------------------------------------- fixtures
+
+  private UiSettingsStore writableStore() {
+    return new UiSettingsStore(
+        UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
+  }
+
+  private AiInstallService newService(UiSettingsStore store, OnlineAiService onlineAi)
+      throws Exception {
+    previousConfigStore = ConfigStore.globalOrNull();
+    configStore = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
+    ConfigStore.setGlobal(configStore);
+    fixture = new RuntimeIntentTestFixture(tmp.resolve("intent"), store, configStore);
+    return new AiInstallService(
+        onlineAi,
+        store,
+        null,
+        null,
+        tmp,
+        null,
+        new SettingsServiceImpl(store, fixture.runner()));
+  }
 
   private static void invokeApplySettings(
       AiInstallService svc, ModelRegistry registry, InstallPlan plan) throws Exception {

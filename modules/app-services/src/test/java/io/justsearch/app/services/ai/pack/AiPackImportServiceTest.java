@@ -30,9 +30,28 @@ class AiPackImportServiceTest {
   @TempDir Path tmp;
 
   private String prevHome;
+  private final List<io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture> fixtures = new java.util.ArrayList<>();
+  private io.justsearch.configuration.resolved.ConfigStore installedConfig;
+  private final io.justsearch.configuration.resolved.ConfigStore previousConfig = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+
+  private AiPackImportService recordedService(OnlineAiService onlineAi, UiSettingsStore settings,
+      io.justsearch.app.services.worker.KnowledgeServerBootstrap worker,
+      io.justsearch.app.api.EnterprisePolicyService policy, PackAllowlistService allowlist) throws Exception {
+    var config = new io.justsearch.configuration.resolved.ConfigStore(
+        io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(settings.load()));
+    var fixture = new io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture(
+        tmp.resolve("operations-" + fixtures.size()), settings, config);
+    fixtures.add(fixture);
+    io.justsearch.configuration.resolved.ConfigStore.setGlobal(config);
+    installedConfig = config;
+    return new AiPackImportService(onlineAi, settings, worker, policy, allowlist,
+        new io.justsearch.app.services.settings.SettingsServiceImpl(settings, fixture.runner()));
+  }
 
   @AfterEach
   void cleanup() {
+    fixtures.forEach(io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture::close);
+    if (installedConfig != null) io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(installedConfig, previousConfig);
     if (prevHome == null) System.clearProperty("justsearch.home");
     else System.setProperty("justsearch.home", prevHome);
   }
@@ -48,7 +67,7 @@ class AiPackImportServiceTest {
         """);
 
     AiPackImportService service =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -107,7 +126,7 @@ class AiPackImportServiceTest {
     Files.write(userOwnedModel, userOwnedBytes);
 
     AiPackImportService svc =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -130,6 +149,91 @@ class AiPackImportServiceTest {
     assertNotNull(record.packs);
     assertEquals(1, record.packs.size());
     assertEquals("justsearch.ai-pack.v2.models.default", record.packs.get(0).packId);
+    assertEquals(1L, fixtures.get(0).settings().inspect().witness().acceptedRevision());
+  }
+
+  @Test
+  void staleSettingsRefusalDoesNotApplyRuntimeOrRecordPack() throws Exception {
+    setHome(tmp);
+    var pack = makeZipPack(tmp.resolve("stale.zip"), "2.0.0");
+    var online = org.mockito.Mockito.mock(OnlineAiService.class,
+        org.mockito.Mockito.withSettings().extraInterfaces(io.justsearch.app.api.OnlineAiRuntimeControl.class));
+    var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE);
+    recordedService(online, store, null, new EnterprisePolicyServiceImpl(),
+        new PackAllowlistService(Set.of(pack.manifestSha)));
+    var fixture = fixtures.get(0);
+    var runner = org.mockito.Mockito.spy(fixture.runner());
+    org.mockito.Mockito.doAnswer(call -> {
+      fixture.spec().setChatEnabled(true);
+      return call.callRealMethod();
+    }).when(runner).accept(org.mockito.ArgumentMatchers.any());
+    var service = new AiPackImportService(online, store, null, new EnterprisePolicyServiceImpl(),
+        new PackAllowlistService(Set.of(pack.manifestSha)),
+        new io.justsearch.app.services.settings.SettingsServiceImpl(store, runner));
+    var attempt = service.startImport(pack.zipPath, false);
+    var status = awaitDone(service);
+    assertEquals("PACK_APPLY_FAILED", status.errorCode);
+    assertEquals("failed", attempt.completion().toCompletableFuture()
+        .get(5, java.util.concurrent.TimeUnit.SECONDS).state);
+    assertTrue(fixture.spec().load().chatEnabled());
+    assertTrue(store.load().getLlmModelPath().isBlank());
+    assertFalse(Files.exists(tmp.resolve("installed-packs.v1.json")));
+    org.mockito.Mockito.verifyNoInteractions(online);
+  }
+
+  @Test
+  void unresolvedSettingsAttemptCannotApplyRuntimeOrRecordPack() throws Exception {
+    setHome(tmp);
+    var pack = makeZipPack(tmp.resolve("unresolved.zip"), "2.0.0");
+    var online = org.mockito.Mockito.mock(OnlineAiService.class,
+        org.mockito.Mockito.withSettings().extraInterfaces(io.justsearch.app.api.OnlineAiRuntimeControl.class));
+    var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE);
+    var settings = org.mockito.Mockito.mock(io.justsearch.app.api.SettingsService.class);
+    var row = org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationRecord.class);
+    org.mockito.Mockito.when(row.state()).thenReturn(io.justsearch.app.api.operations.OperationState.ACCEPTED);
+    org.mockito.Mockito.when(settings.applyInternal(org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(
+        new io.justsearch.app.api.operations.OperationAttemptRunner.Result(row,
+            io.justsearch.agent.api.registry.OperationResult.success("Accepted"),
+            new java.util.concurrent.CompletableFuture<>()));
+    var service = new AiPackImportService(online, store, null, new EnterprisePolicyServiceImpl(),
+        new PackAllowlistService(Set.of(pack.manifestSha)), settings);
+    var before = store.inspect().witness();
+    var terminal = service.startImport(pack.zipPath, false).completion().toCompletableFuture()
+        .get(5, java.util.concurrent.TimeUnit.SECONDS);
+    assertEquals("PACK_APPLY_FAILED", terminal.errorCode);
+    assertEquals(before, store.inspect().witness());
+    assertFalse(Files.exists(tmp.resolve("installed-packs.v1.json")));
+    org.mockito.Mockito.verifyNoInteractions(online);
+  }
+
+  @Test
+  void runtimeFailureAfterCommitDoesNotRecordInstalledPack() throws Exception {
+    setHome(tmp);
+    var pack = makeZipPack(tmp.resolve("runtime-fails.zip"), "2.0.0");
+    var online = org.mockito.Mockito.mock(OnlineAiService.class,
+        org.mockito.Mockito.withSettings().extraInterfaces(io.justsearch.app.api.OnlineAiRuntimeControl.class));
+    var control = (io.justsearch.app.api.OnlineAiRuntimeControl) online;
+    var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE);
+    org.mockito.Mockito.doAnswer(call -> {
+      assertEquals(1L, store.inspect().witness().acceptedRevision());
+      assertEquals(store.load().getLlmModelPath(), installedConfig.get().ai().llmModelPath().toString());
+      throw new IllegalStateException("Injected runtime apply failure");
+    }).when(control).applyRuntimeOverrides(org.mockito.ArgumentMatchers.anyString(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.eq(io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS));
+    var service = recordedService(online, store, null, new EnterprisePolicyServiceImpl(),
+        new PackAllowlistService(Set.of(pack.manifestSha)));
+    var attempt = service.startImport(pack.zipPath, false);
+    var status = awaitDone(service);
+    assertEquals("PACK_APPLY_FAILED", status.errorCode);
+    assertEquals("failed", attempt.completion().toCompletableFuture()
+        .get(5, java.util.concurrent.TimeUnit.SECONDS).state);
+    assertEquals(1L, store.inspect().witness().acceptedRevision());
+    assertFalse(Files.exists(tmp.resolve("installed-packs.v1.json")));
+    org.mockito.Mockito.verify(control).applyRuntimeOverrides(org.mockito.ArgumentMatchers.anyString(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.eq(io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS));
   }
 
   @Test
@@ -178,7 +282,7 @@ class AiPackImportServiceTest {
     writeZip(zip, entries);
 
     AiPackImportService svc =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -272,7 +376,7 @@ class AiPackImportServiceTest {
     writeZip(zip, entries);
 
     AiPackImportService svc =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -334,7 +438,7 @@ class AiPackImportServiceTest {
     writeZip(zip, entries);
 
     AiPackImportService svc =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -393,7 +497,7 @@ class AiPackImportServiceTest {
     writeZip(zip, entries);
 
     AiPackImportService svc =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -412,7 +516,7 @@ class AiPackImportServiceTest {
     // First install v2.0.0
     var first = makeZipPack(tmp.resolve("pack-v2.zip"), "2.0.0");
     AiPackImportService svc1 =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -425,7 +529,7 @@ class AiPackImportServiceTest {
     // Then attempt v1.0.0 without allowDowngrade
     var second = makeZipPack(tmp.resolve("pack-v1.zip"), "1.0.0");
     AiPackImportService svc2 =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -482,7 +586,7 @@ class AiPackImportServiceTest {
     writeZip(zip, entries);
 
     AiPackImportService svc =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -538,7 +642,7 @@ class AiPackImportServiceTest {
     Files.write(packRoot.resolve("payload/models/embed.gguf"), embedBytes);
 
     AiPackImportService svc =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -658,7 +762,7 @@ class AiPackImportServiceTest {
     RecordingOperationLeaseService leases = new RecordingOperationLeaseService();
 
     AiPackImportService service =
-        new AiPackImportService(
+        recordedService(
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,

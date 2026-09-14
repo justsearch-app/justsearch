@@ -2,12 +2,20 @@
 
 ## Current state (2026-09-14)
 
-The installer component-choice producer is migrated; focused1423 executes28
-passing cases with PMD/format clear. Repeated no-op allocates no row and a stale
-choice cannot erase concurrent chat intent. [Evidence](evidence/C2/component-choice-producer.md).
-Next is installer chat/ONNX and pack import, then public witness/update flows.
-The e0cfb76de hosted-gate correction now has successful CI34791639369; activation
-8c4f34a02 CI34792718785 is still running as of this record.
+Installer chat/per-stage ONNX selection and models-pack import now commit through
+the existing accepted settings owner. Redundant ONNX property writes and ORT's
+stale ConfigStore rebuild are retired; status reads the committed config without
+fabricating live sessions. Independent production review is clear. Final1430
+represents4,863 cases/716 suites, four existing skips, zero failures/errors; PMD,
+format, UI integration compilation and register gates pass. [Exact proof and limits](evidence/C2/installer-model-producers.md).
+
+Component-choice693d01314 is committed/pushed, with focused1423 passing28 cases.
+The current installer-model cut includes the old HTTP fixture's owner composition
+correction, verified by focused1429 and full1430. Next is public settings
+update/atomic witness/key wire across all consumers, then raw-writer retirement
+and integrated live/model/installed successor proof. C2-6 remains open; no stage
+completion or merge readiness is claimed. Final-head hosted proof remains owed.
+
 
 Activation/deactivation/compensation is implemented and independently reviewed.
 Final1420 represents4,851 cases, four existing skips, zero failures/errors, with
@@ -20,13 +28,9 @@ corrections are at `e0cfb76de`. CI34790375481 at36cd600b4 failed due to a missin
 runtime-intent register entry and redundant Java qualifier; both are reproduced
 and corrected locally. No current hosted-success claim follows from that run.
 
-Next: migrate remaining AiInstallService/AiPackImportService whole-document saves
-and retire superseded publication paths. Re-verify their actual ONNX readers:
-the new investigation finds five model-path config readers already on ConfigStore,
-contrary to older plan text claiming raw property readers. Preserve genuinely
-separate ORT native-path discovery until its ownership is addressed. Then complete
-public settings update/witness wire and live/installed proof. C2-6 remains open;
-this checkpoint cannot ship while the remaining raw writers refuse recorded revisions.
+Installer/import migration is now locally verified as recorded above. Public
+settings update/witness wire and live/installed proof remain open; this checkpoint
+cannot ship while the remaining public raw writer refuses recorded revisions.
 
 Earlier runtime-intent proof follows pushed `0ad7e1914` (response observations,
 hosted CI34788273439 and CLA34788272070 successful). Independent review is clear;

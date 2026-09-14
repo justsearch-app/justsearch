@@ -284,7 +284,7 @@ public final class ServicePhase {
             in.settingsStore(),
             in.knowledgeServer(),
             enterprisePolicy,
-            packAllowlistService);
+            packAllowlistService, settings);
     // Tempdoc 672 follow-up: live supplier, not a value captured at bootstrap (client is null then,
     // async Worker connect) — mirrors the same fix already shipped for the VDU offline coordinator.
     WorkerFeatureCache workerFeatureCache =

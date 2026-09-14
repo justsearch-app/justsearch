@@ -485,8 +485,8 @@ this plan does not claim implementation or authorize a second commitment owner.
    instead of restoring the previous whole document. Preserve the procedure bracket,
    profile selection and native system-property order; assert those effects separately.
 3. **Installer and import.** Migrate AiInstallService:876-898,1853-1868,1893-1949,
-   1998-2006 and AiPackImportService:631-650. The five ONNX properties at1928-1943
-   still have real readers. Pack recording at617-626 remains after settings durability.
+   1998-2006 and AiPackImportService:631-650. The five ONNX property writes are superseded by the reverified reader migration
+   below; preserve runtime-status visibility in the same cut. Pack recording at617-626 remains after settings durability.
    Carry candidate/witness together and propagate refused or uncertain commitment;
    no successful install/import claim may hide a failed settings apply.
 4. **Public settings ingress and consumers.** Replace SettingsController:109-145's
@@ -557,3 +557,46 @@ Required proof: real owner advances the witness, repeated choice preserves it,
 concurrent chat intent survives a stale choice, and missing owner writes nothing.
 Follow with chat/ONNX/import producer migration and the separate native-path
 publication investigation; all remain required within C2-6.
+
+## 2026-09-14 installer model and pack producer cut
+
+At693d01314, all five model construction paths already read ConfigStore:
+EmbeddingConfig:61-79, RerankerConfig:102-114, NerConfig:39-49,
+SpladeConfig:50-60 and CitationScorerConfig:52-63. The embedding helper's
+EnvRegistry fallback runs only without a configured path. The old raw-reader
+claim above was stale. RuntimeActivationService's reranker/citation status path
+still reads properties; migrate it to one captured resolved snapshot before
+removing all five model-path property writes. Preserve sessionActive as observed
+state: a committed path does not establish a running model.
+
+Capture chat and import settings after file/eligibility guards, with the full
+witness. Accept via the existing internal producer and require successful COMPLETE
+before inference. Apply the currently published effective model/context/GPU,
+retaining operator precedence at the actual runtime boundary. Pack recording
+stays after successful settings and inference. A precommit conflict or uncertain
+result fails the existing install/import attempt. Missing fallback composition
+cannot write raw settings. No settings compensation is added to installer/import:
+their persisted acquired path remains valid if runtime application fails; the
+outer attempt fails and no pack completion record is written.
+
+ONNX selection takes one candidate per acquisition stage; skip pending, failed,
+skipped or absent packages before effect. Skip unchanged paths; a stage changing
+one or more eligible paths accepts one settings row, preserving earlier-stage
+paths. Retire redundant raw saves and ConfigStore rebuilds. Keep existing
+acquisition/restart ordering and outer operation lifetime.
+
+ORT native-path discovery is separate from settings. OrtCudaHelper:178-197 first
+honors resolved config then reads EnvRegistry; GpuAutoDetection:63 reads that
+same registry. Therefore remove the settings supplier and rebuild entirely from
+writeOrtNativePathSysprop. A new configuration writer or settings field would add
+ownership without serving a reader. Preserve the DLL guard and operator fallback.
+Prove snapshot identity stays unchanged and the actual ORT reader sees the newly
+discovered path when no higher resolved path exists.
+
+Required checks: real accepted model path and config before one runtime apply;
+operator path/context/CPU reaches effect; per-stage ONNX paths commit once without
+sysprop promotion; unchanged stage accepts no row; stale candidate cannot erase
+newer intent or invoke runtime; unresolved producer cannot report success; import
+refusal/runtime failure never records an installed pack; updated status sees
+persisted paths without claiming live sessions. Run affected suites, PMD/format,
+independent review and final integrated/live/installed proofs.
