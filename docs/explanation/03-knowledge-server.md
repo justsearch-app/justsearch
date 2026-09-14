@@ -182,6 +182,12 @@ This ensures transient crashes don't burn retry budget.
 
 `attempts` is a **display** fact — how many times this file has been tried. It is not the terminal signal for a classified transient failure (see the failure ladder above); the seven-day window measured from `first_failed_at` is.
 
+Queue mutation transactions acquire a write reservation before reading fields to preserve.
+The zero-row write changes no job and publishes no delta; it lets SQLite apply the existing
+busy timeout before a read snapshot is established. JDBC remains in its default deferred
+mode so starting the next transaction inside commit/rollback does not add a second write-lock
+acquisition after the outcome has already committed.
+
 ### Retention & bloat
 
 `markDone` transitions jobs to `DONE` but does not delete them. A batch variant `markDoneBatch(Collection<Path>)` executes a single `UPDATE ... WHERE path IN (?, ...)` with chunking at 499 params (SQLite limit), replacing per-path individual UPDATEs at commit boundaries (tempdoc 312 item 8). A `cleanupOldJobs(retentionDays)` method exists but is not currently scheduled, so `jobs.db` can grow over time on long-running installs.

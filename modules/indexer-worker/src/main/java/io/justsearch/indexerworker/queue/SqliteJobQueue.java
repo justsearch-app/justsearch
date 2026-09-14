@@ -1439,6 +1439,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     T result = null;
     try {
       connection.setAutoCommit(false);
+      // Acquire the write reservation before any preservation reads. A deferred read snapshot
+      // cannot reliably upgrade behind another writer, even with busy_timeout configured.
+      // Keep JDBC's default DEFERRED mode: Xerial commit/rollback begins its next transaction,
+      // and globally IMMEDIATE could fail reacquiring a lock after an already successful commit.
+      // The zero-row write reserves this database without changing rows or emitting update hooks.
+      try (Statement reservation = connection.createStatement()) {
+        reservation.executeUpdate("UPDATE jobs SET state = state WHERE 0");
+      }
       result = work.run();
       connection.commit();
       committed = true;
