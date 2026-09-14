@@ -10,9 +10,13 @@ Focused1686 also proves actual SQLite corruption/restore fencing. Earlier1685
 failures and their corrections remain preserved in the owning evidence.
 [Current proof and limits](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b2-startup-and-close-attachment-2026-09-14).
 
-Next: strict sealed receipt projection, then stable activation/admission coordinator
-.3b.3 and actual producer/receipt barrier .3c. No live recorded producer is bound yet.
-The constructor defaults to denial. Root owns lifecycle/SQL/builds; C2 remains open.
+C2-8d.3a strict sealed receipt projection is implemented and locally verified:
+final indexer1698 passes625 cases/15 existing skips; unchanged Worker-core1692 passes
+342/six skips. Independent review and corruption/retention/rollback negative controls
+pass. [Receipt proof](evidence/C2/sealed-receipt-validation.md). Hosted proof awaits push.
+Next: stable activation/admission coordinator .3b.3, then actual bounded producer
+adapters d.3b. No live recorded producer is bound yet; constructor defaults to denial.
+Root owns lifecycle/SQL/builds; C2 remains open.
 Pure fresh policy2bfd30b08 also passed all13 CI34853428167 jobs and CLA34853425540.
 
 C2-9b.3a queue fencing now passes the full indexer suite:598 cases,15 existing skips,

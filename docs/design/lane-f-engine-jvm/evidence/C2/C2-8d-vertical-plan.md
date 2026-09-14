@@ -355,3 +355,90 @@ final receipt flush, then close it before the queue.
 These decisions were independently reviewed against EngineRoot, HeadAssembly,
 KnowledgeServer, IndexingLoop, the runner and SQLite owners at7777be3fd and48b38b4ea.
 They are a selected implementation contract; producer and lifecycle proof is owed.
+
+
+## Remaining producer cuts and strict receipt boundary (2026-09-14)
+
+Source inspection atae486f3e4 found that the existing sealed writer's JSON is not
+validated on read, duplicate seal or acknowledgement. This is an unimplemented part
+of the already-selected d.3 contract above. Complete d.3a (strict sealed receipt
+projection) before9b.3b.3 (stable coordinator), then d.3b (actual bounded effect adapters
+and public producer wiring). These are per-item commits; they do not change stage or
+merge placement and none independently completes C2-8d/C2-9.
+
+Keep SqliteIngestionWalkOps as the single receipt JSON schema/serialization owner.
+Add one non-durable JobQueue.SealedWalkReceipt projection and a read method returning
+it only for a sealed walk. Missing progress throws RecordedWalkGapException; only a
+present unsealed walk returns empty/not-ready. Its fields are version, revision, exact stored UTF-8 SHA256,
+historical completed/failed units, current failed units and enumeration outcome. The
+Engine needs these fields for checkpoint identity and outcome; it must not parse or
+reserialize raw receipt JSON. Reuse SqliteJobQueue's existing exact UTF-8 hash helper;
+CanonicalOperationArguments.digest canonicalizes JSON and is therefore wrong here.
+This typed view is a projection of the existing immutable row, not another receipt
+writer/table or an OperationReceipt extension.
+
+The queue parser validates an exact field set, version1, integral nonnegative counters,
+matching row revision/historical counters/enumeration, current failures no greater than
+historical failures, and the existing sorted nondecreasing lowercase SHA256 failure list. Duplicate hashes
+are retained: the writer sorts one hash per failed path and does not establish collision
+uniqueness. The parser must not introduce a new persisted v1 invariant.
+The list size is min(currentFailedUnits,100), with truncation iff currentFailedUnits>100.
+Reject duplicate JSON fields, coercions, unsupported versions, unknown/missing fields, non-object
+JSON and malformed input. Bound receipt decoding to16KiB (the compact current schema
+with100 hashes is below8KiB). Valid alternative JSON whitespace/order may change the
+exact byte hash; do not normalize it. No hash of a reserialized object is acceptable.
+
+Validate sealed rows on every queue read, duplicate seal and acknowledgement, including
+already acknowledged rows. Invalid sealed evidence raises RecordedWalkGapException and
+must not change acknowledgement or retention eligibility. Keep the existing revision
+CAS, queue lock, transaction and after-unlock notification owners. The parser can be
+reused for the typed view; a bounded repeated parse is simpler than a second cached
+receipt representation or a parallel schema in the Engine. No format/schema migration
+or new persistent data is introduced.
+
+Required proof: real queue seal/reopen roundtrip, terminal verdict versus historical
+failures, exact stored-byte hash versus canonical hash, missing/unsealed observations,
+malformed/duplicate/unknown JSON fields, wrong types/version/revision/counters/enumeration,
+negative/overflow values, sorted/hash/truncation limits including100+ failures, and
+rejection before duplicate seal/ack with the persisted acknowledgement unchanged.
+Corrupted receipts cannot become successful zero-work projections. Independent review
+also found that retention bypasses the read path. Before old-job deletion, ledger deletion
+or orphan progress pruning, validate exactly that statement's recorded walk candidates
+inside the same existing transaction. Reject non-integer SQLite storage for all numeric
+walk columns before JDBC coercion; SQLite INTEGER affinity alone permits REAL values.
+Read required/nullable integer fields without truncation and surface malformed rows as gaps.
+Reuse its WHERE expression for candidate SELECT
+and DELETE, stream distinct keys without retaining a new whole-table collection, and
+reread through the strict queue parser. A gap aborts and rolls back cleanup; do not
+silently delete invalid already-acknowledged evidence. Add regressions for each cleanup
+path and progress-only pruning with unchanged evidence/acknowledgement after rejection. Existing seal,
+notification, retention and authority suites remain required alongside these cases.
+
+## Stable completion across index replacement (2026-09-14)
+
+The runner captures its interrupted row cohort at construction and never re-enters a
+Control after its started CAS. Therefore the stable EngineRoot coordinator must retain
+each pending OperationExecution completion and live parent handle across same-process
+KnowledgeServer replacement. Attachment close revokes permissions and closes the old
+server's producers/subscription; it does not fail an unstarted pending effect or discard
+its completion owner. A replacement attachment continues the same stage after strict
+persisted binding and restart-policy validation, with no surviving fresh/capsule origin.
+Full process restart instead uses the new runner's captured cohort and ordinary Resume.
+This clarifies the earlier phrase 'settle deferred stages': settle runtime activity,
+not fabricate a terminal operation outcome. No runner rearm API is selected.
+
+acceptIngestChild validates the private runner Control, persisted parent preparation and
+RUNNING parent, but does not require its body thread. The sequential coordinator may
+therefore accept the next frozen root from the prior child's durable acknowledgement
+continuation, after the parent body returned its async stage. Settings' synchronous
+body-thread rule must not be copied into ingestion. Retain the admitted parent workId
+through the parent acknowledgement barrier; do not independently admit each child.
+
+Serialize coordinator calls to runner.reconcile and its provisional capacity handoff;
+a pure Wait creates no retained execution. Any reservation is discarded if no winning
+body consumed it, including a CAS loss or thrown reconciliation. Pending admission
+refusal is retried by client bind and existing maintenance, never thrown into the
+runner's FAILED transition. Same-process replacement proof must show nonterminal pending
+ownership, fresh-permission revocation, restart-only revalidation, one workId and later
+root acceptance after async acknowledgement. These are selected mechanisms, not executed
+proof or permission to bypass the bounded EngineKnowledgeClient effect path.

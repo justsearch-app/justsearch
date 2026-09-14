@@ -11,7 +11,16 @@ import java.util.Optional;
 
 /** SQL projection helpers borrowing the queue's connection, lock and transaction; no independent owner. */
 final class SqliteIngestionWalkOps {
-  private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
+  private static final tools.jackson.databind.ObjectMapper JSON =
+      tools.jackson.databind.json.JsonMapper.builder()
+          .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+          .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
+  // Version 1's 100 bounded hashes and numeric metadata fit below 8 KiB; allow JSON whitespace
+  // without allowing a corrupt receipt to drive unbounded decoding.
+  private static final int MAX_RECEIPT_BYTES = 16_384;
+  private static final java.util.Set<String> RECEIPT_FIELDS = java.util.Set.of(
+      "version", "revision", "completedUnits", "failedUnits", "currentFailedUnits",
+      "currentSkippedUnits", "enumerationOutcome", "failedPathHashes", "failedPathHashesTruncated");
 
   private SqliteIngestionWalkOps() {}
 
@@ -22,6 +31,67 @@ final class SqliteIngestionWalkOps {
         return row.next() ? Optional.of(read(row)) : Optional.empty();
       }
     }
+  }
+
+  static Optional<JobQueue.SealedWalkReceipt> sealedReceipt(Connection connection, String key,
+      java.util.function.Function<String, String> exactUtf8Hash) throws SQLException {
+    var sealed = find(connection, key)
+        .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded walk state is unavailable"));
+    if (sealed.sealedAt() == null) return Optional.empty();
+    // Reuse the schema owner rather than cache a second receipt representation.
+    long currentFailed = validateSealedReceipt(sealed);
+    return Optional.of(new JobQueue.SealedWalkReceipt(1, sealed.revision(),
+        exactUtf8Hash.apply(sealed.receiptJson()), sealed.completedUnits(), sealed.failedUnits(),
+        currentFailed, sealed.enumerationOutcome()));
+  }
+
+  /** Validate the stored bytes before read, duplicate seal or acknowledgement can trust them. */
+  private static long validateSealedReceipt(JobQueue.WalkProgress progress) {
+    String json = progress.receiptJson();
+    if (json == null || json.length() > MAX_RECEIPT_BYTES
+        || json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_RECEIPT_BYTES) {
+      throw new JobQueue.RecordedWalkGapException("Recorded receipt is missing or exceeds its bound");
+    }
+    final Object decoded;
+    try {
+      decoded = JSON.readValue(json, Object.class);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new JobQueue.RecordedWalkGapException("Recorded receipt JSON is invalid", malformed);
+    }
+    if (!(decoded instanceof java.util.Map<?, ?> receipt) || !receipt.keySet().equals(RECEIPT_FIELDS)) {
+      throw new JobQueue.RecordedWalkGapException("Recorded receipt fields are invalid");
+    }
+    if (receiptLong(receipt, "version") != 1 || receiptLong(receipt, "revision") != progress.revision()
+        || receiptLong(receipt, "completedUnits") != progress.completedUnits()
+        || receiptLong(receipt, "failedUnits") != progress.failedUnits()
+        || !progress.enumerationOutcome().name().equals(receipt.get("enumerationOutcome"))) {
+      throw new JobQueue.RecordedWalkGapException("Recorded receipt disagrees with its sealed row");
+    }
+    long currentFailed = receiptLong(receipt, "currentFailedUnits");
+    receiptLong(receipt, "currentSkippedUnits");
+    if (currentFailed > progress.failedUnits()
+        || !(receipt.get("failedPathHashes") instanceof java.util.List<?> hashes)
+        || hashes.size() != Math.min(100L, currentFailed)
+        || !Boolean.valueOf(currentFailed > 100).equals(receipt.get("failedPathHashesTruncated"))) {
+      throw new JobQueue.RecordedWalkGapException("Recorded receipt failure coverage is invalid");
+    }
+    String previous = null;
+    for (Object value : hashes) {
+      if (!(value instanceof String hash) || !JobQueue.IngestionLedgerTransition.isSha256(hash)
+          || (previous != null && previous.compareTo(hash) > 0)) {
+        throw new JobQueue.RecordedWalkGapException("Recorded receipt failure hashes are invalid");
+      }
+      previous = hash;
+    }
+    return currentFailed;
+  }
+
+  private static long receiptLong(java.util.Map<?, ?> receipt, String field) {
+    Object value = receipt.get(field);
+    if (!(value instanceof Integer || value instanceof Long) || ((Number) value).longValue() < 0) {
+      throw new JobQueue.RecordedWalkGapException("Recorded receipt counter is invalid: " + field);
+    }
+    return ((Number) value).longValue();
   }
 
   static JobQueue.WalkProgress begin(Connection connection, String key, String planHash,
@@ -380,15 +450,32 @@ final class SqliteIngestionWalkOps {
 
   private static JobQueue.WalkProgress read(ResultSet row) throws SQLException {
     String outcome = row.getString("enumeration_outcome");
-    return new JobQueue.WalkProgress(row.getString("operation_key"), row.getString("plan_hash"),
-        row.getLong("enumeration_epoch"), nullableLong(row, "enumeration_closed_at"),
-        outcome == null ? null : JobQueue.WalkEnumerationOutcome.valueOf(outcome),
-        row.getLong("completed_units"), row.getLong("failed_units"), row.getLong("revision"),
-        nullableLong(row, "sealed_at"), row.getString("receipt_json"), row.getLong("acknowledged_revision"));
+    final JobQueue.WalkProgress progress;
+    try {
+      progress = new JobQueue.WalkProgress(row.getString("operation_key"), row.getString("plan_hash"),
+          requiredLong(row, "enumeration_epoch"), nullableLong(row, "enumeration_closed_at"),
+          outcome == null ? null : JobQueue.WalkEnumerationOutcome.valueOf(outcome),
+          requiredLong(row, "completed_units"), requiredLong(row, "failed_units"), requiredLong(row, "revision"),
+          nullableLong(row, "sealed_at"), row.getString("receipt_json"), requiredLong(row, "acknowledged_revision"));
+    } catch (IllegalArgumentException | NullPointerException invalid) {
+      throw new JobQueue.RecordedWalkGapException("Recorded walk row is invalid", invalid);
+    }
+    if (progress.sealedAt() != null) validateSealedReceipt(progress);
+    return progress;
+  }
+
+  private static long requiredLong(ResultSet row, String column) throws SQLException {
+    Long value = nullableLong(row, column);
+    if (value == null) throw new JobQueue.RecordedWalkGapException("Recorded walk counter is missing: " + column);
+    return value;
   }
 
   private static Long nullableLong(ResultSet row, String column) throws SQLException {
-    long value = row.getLong(column);
-    return row.wasNull() ? null : value;
+    // SQLite INTEGER affinity permits REAL storage; getLong would silently truncate corruption.
+    Object value = row.getObject(column);
+    if (value == null) return null;
+    if (value instanceof Integer number) return number.longValue();
+    if (value instanceof Long number) return number;
+    throw new JobQueue.RecordedWalkGapException("Recorded walk counter is not an integer: " + column);
   }
 }

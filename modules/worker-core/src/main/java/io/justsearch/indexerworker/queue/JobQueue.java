@@ -41,7 +41,7 @@ public interface JobQueue extends Closeable {
     public WalkProgress {
       java.util.Objects.requireNonNull(operationKey, "operationKey");
       java.util.Objects.requireNonNull(planHash, "planHash");
-      if (operationKey.isBlank() || operationKey.length() > 256 || !IngestionLedgerTransition.SHA256.matcher(planHash).matches()
+      if (operationKey.isBlank() || operationKey.length() > 256 || !IngestionLedgerTransition.isSha256(planHash)
           || enumerationEpoch < 1 || completedUnits < 0 || failedUnits < 0 || revision < 1
           || acknowledgedRevision < 0 || acknowledgedRevision > revision
           || (enumerationClosedAt == null) != (enumerationOutcome == null)
@@ -69,6 +69,25 @@ public interface JobQueue extends Closeable {
 
   /** Private owner read; a missing projection is not permission to reconstruct acceptance. */
   default Optional<WalkProgress> recordedWalk(String operationKey) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
+  /** Validated non-durable projection of the one sealed queue receipt; no raw JSON crosses the port. */
+  record SealedWalkReceipt(int version, long revision, String sha256, long completedUnits,
+      long failedUnits, long currentFailedUnits, WalkEnumerationOutcome enumerationOutcome) {
+    public SealedWalkReceipt {
+      java.util.Objects.requireNonNull(sha256, "sha256");
+      java.util.Objects.requireNonNull(enumerationOutcome, "enumerationOutcome");
+      if (version != 1 || revision < 1 || !IngestionLedgerTransition.isSha256(sha256)
+          || completedUnits < 0 || failedUnits < 0 || currentFailedUnits < 0
+          || currentFailedUnits > failedUnits) {
+        throw new IllegalArgumentException("Invalid sealed walk receipt projection");
+      }
+    }
+  }
+
+  /** Present open walks have no sealed receipt; missing or malformed evidence throws a receipt gap. */
+  default Optional<SealedWalkReceipt> sealedRecordedWalkReceipt(String operationKey) {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
   }
 
@@ -689,6 +708,11 @@ public interface JobQueue extends Closeable {
     private static final java.util.regex.Pattern SHA256 =
         java.util.regex.Pattern.compile("[0-9a-f]{64}");
 
+    /** Shared syntax for committed content, root plans and sealed receipt digests/hashes. */
+    public static boolean isSha256(String value) {
+      return value != null && SHA256.matcher(value).matches();
+    }
+
     /** Administrative/fixture transition without a processing claim or known content hash. */
     public IngestionLedgerTransition(Path path, IngestionLedgerEntry entry) {
       this(path, entry, null, null);
@@ -713,7 +737,7 @@ public interface JobQueue extends Closeable {
         throw new IllegalArgumentException("Transition path differs from its claim");
       }
       if (committedContentHash != null
-          && (claim == null || !SHA256.matcher(committedContentHash).matches())) {
+          && (claim == null || !isSha256(committedContentHash))) {
         throw new IllegalArgumentException("A committed SHA-256 requires its processing claim");
       }
     }

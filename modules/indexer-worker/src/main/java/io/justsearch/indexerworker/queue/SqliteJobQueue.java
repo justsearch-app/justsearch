@@ -137,6 +137,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public java.util.Optional<SealedWalkReceipt> sealedRecordedWalkReceipt(String operationKey) {
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.sealedReceipt(
+        connection, operationKey, SqliteJobQueue::sha256), false);
+  }
+
+  @Override
   public WalkProgress closeRecordedWalkEnumeration(String operationKey, long epoch, WalkEnumerationOutcome outcome) {
     return accessRecordedWalk(() -> {
       var before = SqliteIngestionWalkOps.find(connection, operationKey)
@@ -2025,17 +2031,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       long cutoff = System.currentTimeMillis() - (retentionDays * 24L * 60L * 60L * 1000L);
 
-      String jobsSql = """
-          DELETE FROM jobs
-          WHERE state IN ('DONE', 'FAILED', 'RETRY_EXHAUSTED') AND last_updated < ?
+      String jobsWhere = """
+          state IN ('DONE', 'FAILED', 'RETRY_EXHAUSTED') AND last_updated < ?
             AND (walk_seen_epoch IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p
               WHERE p.operation_key = jobs.scan_id AND p.sealed_at IS NOT NULL AND p.acknowledged_revision = p.revision))
           """;
 
       int deleted;
-      try (PreparedStatement stmt = connection.prepareStatement(jobsSql)) {
+      try (PreparedStatement stmt = connection.prepareStatement("DELETE FROM jobs WHERE " + jobsWhere)) {
         stmt.setLong(1, cutoff);
         deleted = inTransaction(() -> {
+          validateRetentionCandidates("SELECT DISTINCT scan_id FROM jobs WHERE "
+              + "walk_seen_epoch IS NOT NULL AND " + jobsWhere, cutoff);
           int count = stmt.executeUpdate();
           pruneAcknowledgedWalks(cutoff);
           return count;
@@ -2060,13 +2067,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
       long cutoff = System.currentTimeMillis() - (retentionDays * 24L * 60L * 60L * 1000L);
+      String ledgerWhere = "observed_at < ? AND "
+          + "(operation_key IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p "
+          + "WHERE p.operation_key = ingestion_ledger.operation_key AND p.sealed_at IS NOT NULL "
+          + "AND p.acknowledged_revision = p.revision))";
       try (PreparedStatement stmt =
-          connection.prepareStatement("DELETE FROM ingestion_ledger WHERE observed_at < ? AND "
-              + "(operation_key IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p "
-              + "WHERE p.operation_key = ingestion_ledger.operation_key AND p.sealed_at IS NOT NULL "
-              + "AND p.acknowledged_revision = p.revision))")) {
+          connection.prepareStatement("DELETE FROM ingestion_ledger WHERE " + ledgerWhere)) {
         stmt.setLong(1, cutoff);
         int deleted = inTransaction(() -> {
+          validateRetentionCandidates("SELECT DISTINCT operation_key FROM ingestion_ledger WHERE "
+              + "operation_key IS NOT NULL AND " + ledgerWhere, cutoff);
           int count = stmt.executeUpdate();
           pruneAcknowledgedWalks(cutoff);
           return count;
@@ -2086,12 +2096,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private void pruneAcknowledgedWalks(long cutoff) throws SQLException {
-    try (var prune = connection.prepareStatement("DELETE FROM ingestion_walk_progress WHERE sealed_at < ? "
-        + "AND acknowledged_revision = revision "
+    String pruneWhere = "sealed_at < ? AND acknowledged_revision = revision "
         + "AND NOT EXISTS (SELECT 1 FROM jobs WHERE jobs.scan_id = ingestion_walk_progress.operation_key) "
-        + "AND NOT EXISTS (SELECT 1 FROM ingestion_ledger WHERE ingestion_ledger.operation_key = ingestion_walk_progress.operation_key)")) {
+        + "AND NOT EXISTS (SELECT 1 FROM ingestion_ledger WHERE ingestion_ledger.operation_key = ingestion_walk_progress.operation_key)";
+    validateRetentionCandidates("SELECT operation_key FROM ingestion_walk_progress WHERE " + pruneWhere, cutoff);
+    try (var prune = connection.prepareStatement("DELETE FROM ingestion_walk_progress WHERE " + pruneWhere)) {
       prune.setLong(1, cutoff);
       prune.executeUpdate();
+    }
+  }
+
+  /** Stream exactly the deletion's recorded candidates inside its transaction; no second state store. */
+  private void validateRetentionCandidates(String candidateSql, long cutoff) throws SQLException {
+    if (connection.getAutoCommit()) throw new SQLException("Receipt retention requires its transaction");
+    try (var candidates = connection.prepareStatement(candidateSql)) {
+      candidates.setLong(1, cutoff);
+      try (var rows = candidates.executeQuery()) {
+        while (rows.next()) {
+          var receipt = SqliteIngestionWalkOps.find(connection, rows.getString(1))
+              .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Retention receipt is unavailable"));
+          if (receipt.sealedAt() == null || receipt.acknowledgedRevision() != receipt.revision()) {
+            throw new JobQueue.RecordedWalkGapException("Retention receipt is not exactly acknowledged");
+          }
+        }
+      }
     }
   }
 

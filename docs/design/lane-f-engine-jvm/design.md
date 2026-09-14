@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-8d.3a validates sealed receipt JSON in the queue and exposes only a typed non-durable projection with an exact stored-byte digest; it precedes the stable coordinator and d.3b effect wiring. The coordinator retains pending operation completions across same-process index replacement while revoking fresh permissions; no runner rearm API is needed. [Owning receipt and continuation mechanisms](evidence/C2/C2-8d-vertical-plan.md#remaining-producer-cuts-and-strict-receipt-boundary-2026-09-14).
+
 - 2026-09-14: C2-9b.3b.2 attachment creation is failure-atomic; the server retains its returned handle through drain and successful close. Failed startup retains the physical server unless its close latch confirms completion, including fatal errors. Generation eligibility requires the writable serving runtime and a strict current state read. [Owning lifecycle sequence](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b2-startup-and-close-attachment-2026-09-14).
 
 - 2026-09-14: C2-9b.3b is cut into pure fresh policy, startup/drain attachment, and stable activation/reconciliation. Fresh policy uses the validated active child plan; restart retains whole-parent scope. No policy boolean proves live origin. [Owning split and signature](evidence/C2/ingestion-authorization-recovery.md#fresh-continuation-restart-admission-and-child-binding-2026-09-14).
