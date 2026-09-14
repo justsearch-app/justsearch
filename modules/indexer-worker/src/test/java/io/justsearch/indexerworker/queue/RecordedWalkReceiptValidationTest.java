@@ -92,7 +92,7 @@ final class RecordedWalkReceiptValidationTest {
     Path db = temp.resolve("historical-failure.db");
     Path file = temp.resolve("historical-failure.txt");
     Files.writeString(file, "retryable then repaired");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -420,7 +420,7 @@ final class RecordedWalkReceiptValidationTest {
 
   private static long createAcknowledgedMember(Path db, Path file) throws Exception {
     Files.writeString(file, "aged cleanup fixture");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),

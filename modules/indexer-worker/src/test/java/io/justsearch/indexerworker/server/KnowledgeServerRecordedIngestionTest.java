@@ -370,7 +370,7 @@ final class KnowledgeServerRecordedIngestionTest {
   private static void seedProcessingRecordedClaim(Path dataDir, Path path) throws Exception {
     Files.createDirectories(path.getParent());
     Files.writeString(path, "recorded boot fixture");
-    try (SqliteJobQueue queue = new SqliteJobQueue(dataDir.resolve("jobs.db"), ignored -> true)) {
+    try (SqliteJobQueue queue = new SqliteJobQueue(dataDir.resolve("jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       JobQueue.WalkProgress walk = queue.beginRecordedWalk(OPERATION, PLAN_HASH, true);
       queue.enqueueRecordedEntries(OPERATION, walk.enumerationEpoch(),
@@ -399,11 +399,11 @@ final class KnowledgeServerRecordedIngestionTest {
     private volatile boolean queueWasOpenAtAttachmentClose;
 
     @Override
-    public boolean mayClaimRecorded(String operationKey) {
+    public JobQueue.RecordedClaimDecision recordedClaimDecision(String operationKey) {
       events.add("claim");
       claims.incrementAndGet();
       if (!attached.get()) earlyClaims.incrementAndGet();
-      return false;
+      return JobQueue.RecordedClaimDecision.DENY;
     }
 
     @Override
@@ -426,7 +426,7 @@ final class KnowledgeServerRecordedIngestionTest {
     FailingLifecycle(Throwable failure) { this.failure = failure; }
 
     @Override
-    public boolean mayClaimRecorded(String operationKey) { return false; }
+    public JobQueue.RecordedClaimDecision recordedClaimDecision(String operationKey) { return JobQueue.RecordedClaimDecision.DENY; }
 
     @Override
     public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
@@ -442,7 +442,7 @@ final class KnowledgeServerRecordedIngestionTest {
     private final IOException closeFailure = new IOException("attachment close still live");
 
     @Override
-    public boolean mayClaimRecorded(String operationKey) { return false; }
+    public JobQueue.RecordedClaimDecision recordedClaimDecision(String operationKey) { return JobQueue.RecordedClaimDecision.DENY; }
 
     @Override
     public Attachment attach(JobQueue queue, CheckedServingGeneration generation,

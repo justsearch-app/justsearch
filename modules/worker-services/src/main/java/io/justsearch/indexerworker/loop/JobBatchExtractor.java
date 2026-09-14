@@ -225,7 +225,8 @@ public final class JobBatchExtractor {
       }
       try {
         String normalizedPath = envelope.normalizedPath();
-        boolean forceReindex = forcedPaths.remove(normalizedPath);
+        boolean forceReindex = claim.walkEpoch() != null
+            ? claim.recordedForce() : forcedPaths.remove(normalizedPath);
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
         if (!forceReindex && !indexEmptyForBatch) {
           if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs())) {

@@ -2,14 +2,18 @@
 
 ## Current state (2026-09-14)
 
-2026-09-14 stable coordinator checkpointfa66bb1cb passes full Engine/API/store/services
-(4,031 cases, three existing skips) in1735. Hosted CI passes12/13; remaining app-ui guard
-finds the unbound producer and a superseded maintenance overload. Root corrected two
-cancellation edges, synchronous producer rejection and removed that overload.1744 passes45
-focused cases;1745/1746 prove lost progress cannot be reconstructed as empty cancellation.
-1747 passes the whole-program audit and reuses46 unchanged focused cases. [Owning evidence and remaining work](evidence/C2/ingestion-coordinator.md).
-Next is recorded force-at-claim semantics, then actual bounded producer and prepared handler
-wiring. C2 remains open; merge remains at F.
+2026-09-14 current pushed checkpoint064adc779 fixes coordinator startup cancellation and
+synchronous producer rejection. Hosted CI34878848566 passes12/13 jobs; its sole app-ui finding
+is the still-unbound producer. CLA34878843824 passes. The obsolete maintenance helper is removed.
+[Coordinator proof](evidence/C2/ingestion-coordinator.md) preserves full1735 and corrective
+focused/negative-control evidence without treating the partial hosted run as green.
+
+The next per-item force-at-claim cut is implemented and independently reviewed.1752 executes74
+focused cases; review coverage corrections pass1755.1754/1756 produce all seven expected
+negative-control failures and sources are restored byte-for-byte. Full affected1757 is running,
+not yet passing proof. [Owning implementation, evidence and limits](evidence/C2/recorded-force-claims.md).
+Commit/push this cut before actual bounded producer DTO/adapter and prepared-handler wiring.
+C2 remains open; merge remains at F.
 
 C2-9b.3b.3 receipt-only settlement now passes integrated1718:1,069 cases/186 suites,
 zero skips/failures/errors, six PMD tasks and format. Focused15 cases, seven discriminating

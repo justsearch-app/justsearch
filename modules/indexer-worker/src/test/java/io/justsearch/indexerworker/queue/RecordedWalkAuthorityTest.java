@@ -58,14 +58,14 @@ final class RecordedWalkAuthorityTest {
       throws Exception {
     Path falseDb = temp.resolve("false.db");
     Path falseFile = temp.resolve("false.txt");
-    try (var queue = new SqliteJobQueue(falseDb, ignored -> false)) {
+    try (var queue = new SqliteJobQueue(falseDb, ignored -> JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       admit(queue, KEY, falseFile);
       assertTrue(queue.pollPending(1).isEmpty(), "false authority denies pending claim");
     }
     seedProcessing(temp.resolve("false-recovery.db"), KEY, temp.resolve("false-recovery.txt"));
     backdate(temp.resolve("false-recovery.db"), temp.resolve("false-recovery.txt"));
-    try (var queue = new SqliteJobQueue(temp.resolve("false-recovery.db"), ignored -> false)) {
+    try (var queue = new SqliteJobQueue(temp.resolve("false-recovery.db"), ignored -> JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       assertEquals(0, queue.recoverStuckJobs(), "false authority denies unconditional recovery");
       assertEquals(0, queue.recoverStuckJobs(0), "false authority denies aged recovery");
@@ -96,7 +96,10 @@ final class RecordedWalkAuthorityTest {
   void authorityReceivesTheExactRecordedOperationKey(@TempDir Path temp) throws Exception {
     var observed = new java.util.ArrayList<String>();
     Path db = temp.resolve("exact-key.db");
-    try (var queue = new SqliteJobQueue(db, observed::add)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> {
+      observed.add(ignored);
+      return JobQueue.RecordedClaimDecision.ALLOW;
+    })) {
       queue.open();
       admit(queue, KEY, temp.resolve("exact.txt"));
       assertEquals(1, queue.pollPending(1).size());
@@ -109,7 +112,7 @@ final class RecordedWalkAuthorityTest {
     Path db = temp.resolve("batch-limit.db");
     Path denied = temp.resolve("a-denied.txt");
     Path allowed = temp.resolve("z-allowed.txt");
-    try (var queue = new SqliteJobQueue(db, SECOND_KEY::equals)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> SECOND_KEY.equals(ignored) ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       admit(queue, KEY, denied);
       admit(queue, SECOND_KEY, allowed);
@@ -125,7 +128,7 @@ final class RecordedWalkAuthorityTest {
       throws Exception {
     Path db = temp.resolve("legacy-scan.db");
     Path file = temp.resolve("legacy.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> false)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null, KEY);
       var claim = queue.pollPending(1).getFirst();
@@ -140,7 +143,7 @@ final class RecordedWalkAuthorityTest {
     Path db = temp.resolve("per-unit-poll.db");
     Path first = temp.resolve("a-first.txt");
     Path second = temp.resolve("b-second.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> evaluations.getAndIncrement() == 0)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> evaluations.getAndIncrement() == 0 ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -184,7 +187,7 @@ final class RecordedWalkAuthorityTest {
     Path db = temp.resolve("revocation.db");
     Path first = temp.resolve("first.txt");
     Path second = temp.resolve("second.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> allowed.get())) {
+    try (var queue = new SqliteJobQueue(db, ignored -> allowed.get() ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -204,7 +207,7 @@ final class RecordedWalkAuthorityTest {
   void reopenDoesNotRememberAPreviouslyAllowedPermit(@TempDir Path temp) throws Exception {
     Path db = temp.resolve("reopen.db");
     Path file = temp.resolve("reopen.txt");
-    try (var queue = new SqliteJobQueue(db, KEY::equals)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> KEY.equals(ignored) ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       admit(queue, KEY, file);
     }
@@ -222,7 +225,7 @@ final class RecordedWalkAuthorityTest {
     Path file = temp.resolve("heartbeated.txt");
     seedProcessing(db, KEY, file);
     AtomicBoolean permitted = new AtomicBoolean(false);
-    try (var queue = new SqliteJobQueue(db, ignored -> permitted.get())) {
+    try (var queue = new SqliteJobQueue(db, ignored -> permitted.get() ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       assertEquals(0, queue.recoverStuckJobs(), "denied authority keeps processing fenced");
       permitted.set(true);
@@ -249,10 +252,10 @@ final class RecordedWalkAuthorityTest {
           seedStoppedProcessing(db, KEY, file, outcome);
           backdate(db, file);
           var calls = new AtomicInteger();
-          java.util.function.Predicate<String> authority = ignored -> {
+          java.util.function.Function<String, JobQueue.RecordedClaimDecision> authority = ignored -> {
             calls.incrementAndGet();
             if (throwing) throw new IllegalStateException("authority unavailable");
-            return false;
+            return JobQueue.RecordedClaimDecision.DENY;
           };
           try (var queue = new SqliteJobQueue(db, authority)) {
             queue.open();
@@ -273,7 +276,7 @@ final class RecordedWalkAuthorityTest {
   }
 
   private static void seedProcessing(Path db, String key, Path file) throws Exception {
-    try (var queue = new SqliteJobQueue(db, key::equals)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> key.equals(ignored) ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       admit(queue, key, file);
       assertEquals(1, queue.pollPending(1).size());
@@ -282,7 +285,7 @@ final class RecordedWalkAuthorityTest {
 
   private static void seedStoppedProcessing(Path db, String key, Path file,
       JobQueue.WalkEnumerationOutcome outcome) throws Exception {
-    try (var queue = new SqliteJobQueue(db, key::equals)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> key.equals(ignored) ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       var walk = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, walk.enumerationEpoch(),

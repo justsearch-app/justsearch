@@ -34,7 +34,7 @@ final class RecordedWalkIssuedClaimsTest {
   @Test
   void pendingRowsAreNotOwnersAndOnlyRecordedEpochClaimsCount() throws Exception {
     Path db = temp.resolve("pending.db");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var firstWalk = queue.beginRecordedWalk(KEY, PLAN, true);
       var secondWalk = queue.beginRecordedWalk(OTHER_KEY, PLAN, true);
@@ -86,7 +86,7 @@ final class RecordedWalkIssuedClaimsTest {
         Thread.currentThread().interrupt();
         throw new AssertionError("recorded predicate interrupted", interrupted);
       }
-      return captured;
+      return captured ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY;
     })) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
@@ -124,7 +124,7 @@ final class RecordedWalkIssuedClaimsTest {
   @Test
   void commitAndReturnReleaseOnlyTheExactIssuedOwner() throws Exception {
     Path db = temp.resolve("release.db");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       Path firstPath = temp.resolve("first.txt");
@@ -154,7 +154,7 @@ final class RecordedWalkIssuedClaimsTest {
   void failedTerminalTransactionRetainsTheIssuedOwnerUntilCommitSucceeds() throws Exception {
     Path db = temp.resolve("failed-rollback.db");
     Path path = temp.resolve("failed.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -179,7 +179,7 @@ final class RecordedWalkIssuedClaimsTest {
   void reopenedProcessingRowsHaveNoProcessLocalIssuedOwner() throws Exception {
     Path db = temp.resolve("reopen.db");
     Path path = temp.resolve("reopen.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -187,7 +187,7 @@ final class RecordedWalkIssuedClaimsTest {
       queue.pollPending(1);
       assertTrue(queue.hasIssuedRecordedClaims(KEY));
     }
-    try (var reopened = new SqliteJobQueue(db, ignored -> true)) {
+    try (var reopened = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       reopened.open();
       assertFalse(reopened.hasIssuedRecordedClaims(KEY));
       assertEquals("PROCESSING", string(db, "SELECT state FROM jobs"));
@@ -198,7 +198,7 @@ final class RecordedWalkIssuedClaimsTest {
   void missingProgressDoesNotEraseAStillIssuedOwner() throws Exception {
     Path db = temp.resolve("missing-progress.db");
     Path path = temp.resolve("missing-progress.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var walk = queue.beginRecordedWalk(KEY, PLAN, true);
       queue.enqueueRecordedEntries(KEY, walk.enumerationEpoch(),
@@ -213,7 +213,7 @@ final class RecordedWalkIssuedClaimsTest {
   @Test
   void closedQueueRejectsTheOwnershipRead() throws Exception {
     Path db = temp.resolve("closed.db");
-    var queue = new SqliteJobQueue(db, ignored -> true);
+    var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW);
     queue.open();
     queue.close();
 

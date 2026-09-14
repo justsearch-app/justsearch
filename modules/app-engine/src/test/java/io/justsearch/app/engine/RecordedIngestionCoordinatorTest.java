@@ -112,7 +112,7 @@ final class RecordedIngestionCoordinatorTest {
       try (var work = f.admission.admit(request.context(), false)) {
         var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
         work.cancel("user cancelled");
-        assertFalse(f.coordinator.mayClaimRecorded(childKeys.getFirst()), "cancellation fences claims before maintenance");
+        assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(childKeys.getFirst()), "cancellation fences claims before maintenance");
         f.coordinator.maintain();
         assertFalse(result.completion().toCompletableFuture().isDone());
         assertEquals(OperationState.RUNNING, f.operations.find(childKeys.getFirst()).orElseThrow().state());
@@ -216,7 +216,7 @@ final class RecordedIngestionCoordinatorTest {
               .get(2, java.util.concurrent.TimeUnit.SECONDS).state(), corruption);
           assertEquals(RecordedIngestionSettlement.UNAVAILABLE, f.operations.find(request.key()).orElseThrow().receipt().code());
           assertEquals(1, starts.get(), "no replacement effect from cached binding: " + corruption);
-          assertFalse(f.coordinator.mayClaimRecorded(children.getFirst()));
+          assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(children.getFirst()));
           assertEquals(0, f.queue.recordedWalk(children.getFirst()).orElseThrow().acknowledgedRevision());
           assertTrue(work.cancellationReason().isEmpty());
         }
@@ -474,7 +474,7 @@ final class RecordedIngestionCoordinatorTest {
         org.junit.jupiter.api.Assertions.assertNotNull(attachment);
         assertEquals(OperationState.RUNNING, f.operations.find(first.parent().key()).orElseThrow().state());
         assertEquals(OperationState.RUNNING, f.operations.find(secondKey).orElseThrow().state());
-        assertFalse(coordinator.mayClaimRecorded(secondKey));
+        assertEquals(JobQueue.RecordedClaimDecision.DENY, coordinator.recordedClaimDecision(secondKey));
         f.queue.returnUnfinishedClaims(issued);
         coordinator.maintain();
         var parent = f.operations.find(first.parent().key()).orElseThrow();
@@ -568,7 +568,7 @@ final class RecordedIngestionCoordinatorTest {
         var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
         assertTrue(f.queue.recordedWalk(child.key()).isEmpty());
         work.cancel("cancel before any producer exists");
-        assertFalse(f.coordinator.mayClaimRecorded(child.key()));
+        assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(child.key()));
         f.coordinator.maintain();
         assertEquals(OperationState.CANCELLED, result.completion().toCompletableFuture()
             .get(2, java.util.concurrent.TimeUnit.SECONDS).state());
@@ -632,7 +632,7 @@ final class RecordedIngestionCoordinatorTest {
           assertEquals(OperationState.CANCELLED, result.completion().toCompletableFuture()
               .get(2, java.util.concurrent.TimeUnit.SECONDS).state());
           var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
-          assertFalse(f.coordinator.mayClaimRecorded(child.key()));
+          assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(child.key()));
           var receipt = f.queue.recordedWalk(child.key()).orElseThrow();
           assertEquals(receipt.revision(), receipt.acknowledgedRevision());
         } finally {
@@ -664,7 +664,7 @@ final class RecordedIngestionCoordinatorTest {
         var receipt = f.queue.recordedWalk(child.key()).orElseThrow();
         assertEquals(receipt.revision(), receipt.acknowledgedRevision());
         assertEquals("INGEST_ENUMERATION_FAILED", f.operations.find(request.key()).orElseThrow().receipt().code());
-        assertFalse(f.coordinator.mayClaimRecorded(child.key()));
+        assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(child.key()));
       }
       assertEquals(0, f.admission.activeWorkCount());
     }
@@ -700,6 +700,52 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void reopenedQueueClaimsForceOnlyFromTheRecoveredPersistedParentPlan(boolean force) throws Exception {
+    try (Fixture f = new Fixture(temp, 1, force)) {
+      var parent = f.accept(f.request()).accepted();
+      assertTrue(f.operations.start(parent.id()));
+      String childKey = OperationKeys.generate(CLOCK);
+      var child = f.operations.acceptIngestChild(parent.key(), childKey,
+          f.operations.acceptedPreparation(parent.id()).orElseThrow(), f.plan).record();
+      assertTrue(f.operations.start(child.id()));
+      Path file = f.plan.roots().getFirst().path().resolve("recorded.txt");
+      var walk = f.queue.beginRecordedWalk(childKey, CanonicalOperationArguments.digest(f.plan.toReplayPayload()), true);
+      f.queue.enqueueRecordedEntries(childKey, walk.enumerationEpoch(), List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+      f.attachment.close();
+      f.queue.close();
+      var recoveredRunner = new OperationAttemptRunnerImpl(f.operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+      var recovered = new RecordedIngestionCoordinator(f.operations, recoveredRunner, f.admission, f.authority);
+      try (var reopened = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        reopened.open();
+        assertTrue(reopened.pollPending(1).isEmpty(), "reopen does not remember the old runtime permission");
+        try (var attachment = recovered.attach(reopened, () -> Optional.of(GENERATION), () -> true)) {
+          org.junit.jupiter.api.Assertions.assertNotNull(attachment);
+          recovered.bindProducer((root, key, epoch, context, cancellation) -> {
+            assertEquals(force, root.force(), "producer receives the persisted plan, not a new public flag");
+            reopened.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+            return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+          });
+          var claim = reopened.pollPending(1).getFirst();
+          assertEquals(force, claim.recordedForce());
+          assertEquals(childKey, claim.scanId());
+          assertEquals(1, f.admission.activeWorkCount(), "recovered children share the admitted parent work");
+          reopened.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, "d".repeat(64))),
+              io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                  io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                  io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+          recovered.maintain();
+          assertEquals(OperationState.COMPLETE, f.operations.find(parent.key()).orElseThrow().state());
+          assertEquals(0, f.admission.activeWorkCount());
+          var receipt = reopened.recordedWalk(childKey).orElseThrow();
+          assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+        }
+      }
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore operations;
     final SqliteJobQueue queue;
@@ -710,11 +756,12 @@ final class RecordedIngestionCoordinatorTest {
     final RecordedIngestionCoordinator coordinator;
     final RecordedRootPlan plan;
     io.justsearch.indexerworker.server.RecordedIngestionLifecycle.Attachment attachment;
-    Fixture(Path directory, int roots) throws Exception {
+    Fixture(Path directory, int roots) throws Exception { this(directory, roots, false); }
+    Fixture(Path directory, int roots, boolean force) throws Exception {
       Files.createDirectories(directory);
       List<RecordedRootPlan.Root> plans = new ArrayList<>();
       for (int index = 0; index < roots; index++) plans.add(new RecordedRootPlan.Root(
-          Files.createDirectory(directory.resolve("root-" + index)), null, false, false, List.of(), List.of()));
+          Files.createDirectory(directory.resolve("root-" + index)), null, force, false, List.of(), List.of()));
       plan = new RecordedRootPlan(GENERATION, plans);
       Path authorityDirectory = directory.resolve("authority");
       Files.createDirectories(authorityDirectory);
@@ -726,7 +773,7 @@ final class RecordedIngestionCoordinatorTest {
       runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
           null, new RecordedIngestPlanResolver());
       coordinator = new RecordedIngestionCoordinator(operations, runner, admission, authority);
-      queue = new SqliteJobQueue(directory.resolve("jobs.db"), key -> fixtureClaimOwner.get() || coordinator.mayClaimRecorded(key));
+      queue = new SqliteJobQueue(directory.resolve("jobs.db"), key -> fixtureClaimOwner.get() ? JobQueue.RecordedClaimDecision.ALLOW : coordinator.recordedClaimDecision(key));
       queue.open();
       attachment = coordinator.attach(queue, () -> Optional.of(GENERATION), () -> true);
     }

@@ -106,21 +106,24 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   @Override
-  public boolean mayClaimRecorded(String key) {
+  public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
     Permission permission = permissions.get(key);
     Attached physical = attached;
     if (permission == null || physical == null || physical != permission.physical || physical.stopping
-        || permission.owner.cancelled) return false;
+        || permission.owner.cancelled || permission.plan.roots().size() != 1) return JobQueue.RecordedClaimDecision.DENY;
     try {
       if (!physical.online.getAsBoolean()
-          || !physical.generation.current().filter(permission.plan.generation()::equals).isPresent()) return false;
-      return permission.fresh
+          || !physical.generation.current().filter(permission.plan.generation()::equals).isPresent()) return JobQueue.RecordedClaimDecision.DENY;
+      boolean authorized = permission.fresh
           ? authority.allowsFreshRecordedIngest(permission.parent, permission.plan)
           : authority.evaluateRecordedIngest(permission.parent, permission.preparation,
               Optional.of(permission.plan.generation()), required -> required instanceof RequiredCapability.WorkerOnline)
               instanceof RecordedIngestRecoveryDecision.Authorized;
+      if (!authorized) return JobQueue.RecordedClaimDecision.DENY;
+      return permission.plan.roots().getFirst().force()
+          ? JobQueue.RecordedClaimDecision.ALLOW_FORCE : JobQueue.RecordedClaimDecision.ALLOW;
     } catch (IOException unavailableGeneration) {
-      return false;
+      return JobQueue.RecordedClaimDecision.DENY;
     }
   }
 

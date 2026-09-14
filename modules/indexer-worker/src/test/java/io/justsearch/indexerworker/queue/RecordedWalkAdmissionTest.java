@@ -72,7 +72,7 @@ final class RecordedWalkAdmissionTest {
     Path failedPath = temp.resolve("failed.txt");
     JobQueue.EnqueueProvenance original = new JobQueue.EnqueueProvenance("agent", "recorded-test");
 
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var first = queue.beginRecordedWalk(KEY, PLAN, true);
       assertEquals(

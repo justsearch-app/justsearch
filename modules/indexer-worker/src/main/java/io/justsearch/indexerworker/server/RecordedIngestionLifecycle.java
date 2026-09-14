@@ -10,7 +10,7 @@ import java.util.function.BooleanSupplier;
 /** Indexer-local attachment for the Engine's recorded-ingestion owner. */
 public interface RecordedIngestionLifecycle {
   /** Bounded current permission check under the queue lock; never call jobs or operation storage. */
-  boolean mayClaimRecorded(String operationKey);
+  JobQueue.RecordedClaimDecision recordedClaimDecision(String operationKey);
 
   /**
    * Called after runtime/services/compatibility initialization and before recovery or polling.
@@ -35,7 +35,7 @@ public interface RecordedIngestionLifecycle {
   /** Explicit no-owner composition: opening or reopening jobs never authorizes recorded work. */
   static RecordedIngestionLifecycle denied() {
     return new RecordedIngestionLifecycle() {
-      @Override public boolean mayClaimRecorded(String operationKey) { return false; }
+      @Override public JobQueue.RecordedClaimDecision recordedClaimDecision(String operationKey) { return JobQueue.RecordedClaimDecision.DENY; }
       @Override public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
           BooleanSupplier workerOnline) { return () -> {}; }
     };

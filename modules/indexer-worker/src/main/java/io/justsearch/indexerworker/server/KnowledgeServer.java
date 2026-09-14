@@ -594,7 +594,7 @@ public final class KnowledgeServer implements Closeable {
       // Tempdoc 885 item 21d: the cap lives in ONE place. This was a bare literal `3` that agreed
       // with SqliteJobQueue.DEFAULT_MAX_ATTEMPTS only by coincidence.
       SqliteJobQueue sqliteQueue =
-          new SqliteJobQueue(dbPath, recordedIngestionLifecycle::mayClaimRecorded,
+          new SqliteJobQueue(dbPath, recordedIngestionLifecycle::recordedClaimDecision,
               SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure);
       // Tempdoc 885 item 21e: per-outcome counters. Late-bound like the write-failure callback
       // above — the catalog does not exist until registerTelemetryGauges runs.

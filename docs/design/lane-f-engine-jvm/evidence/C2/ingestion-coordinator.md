@@ -113,3 +113,10 @@ once it owns a task. Completion notification runtime failures are logged for exi
 maintenance retry, and their dependent future is retained through producer stop. This removes
 the prior ignored-future advisory without suppression. The obsolete maintenance overload is
 removed; all fixtures now call the same three-argument production helper.
+
+Checkpoint064adc779 is committed and pushed (2026-09-14,20:07 local). Hosted
+CI34878848566 passes12 of13 jobs and CLA34878843824 passes. The sole app-ui finding
+in downloaded1753-hosted-xml is the still-unbound RecordedIngestionCoordinator.bindProducer,
+reported on three attempts. The obsolete maintenance overload finding is cleared. This is
+an implementation gap in the next bounded producer cut, not a runner-capacity failure.
+Metadata1753-hosted-ci.json/1753-hosted-list.json and XML remain at the evidence location above.

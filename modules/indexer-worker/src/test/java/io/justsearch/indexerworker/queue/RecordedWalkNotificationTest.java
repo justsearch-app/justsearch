@@ -156,7 +156,7 @@ final class RecordedWalkNotificationTest {
     String key = key(103);
     Path db = temp.resolve("late-release.db");
     Path file = temp.resolve("late-release.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var opened = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -190,7 +190,7 @@ final class RecordedWalkNotificationTest {
     String supersededKey = key(104);
     Path supersededDb = temp.resolve("superseded-release.db");
     Path supersededFile = temp.resolve("superseded-release.txt");
-    try (var queue = new SqliteJobQueue(supersededDb, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(supersededDb, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var opened = queue.beginRecordedWalk(supersededKey, PLAN, true);
       queue.enqueueRecordedEntries(supersededKey, opened.enumerationEpoch(),
@@ -223,7 +223,7 @@ final class RecordedWalkNotificationTest {
     String key = key(105);
     Path db = temp.resolve("failed-rollback-notification.db");
     Path file = temp.resolve("failed-rollback-notification.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var opened = queue.beginRecordedWalk(key, PLAN, true);
       queue.enqueueRecordedEntries(key, opened.enumerationEpoch(),
@@ -369,7 +369,7 @@ final class RecordedWalkNotificationTest {
     String key = key(110);
     Path db = temp.resolve("retention-job.db");
     Path file = temp.resolve("retention-job.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var sealed = sealIndexed(queue, key, file);
       assertTrue(queue.acknowledgeRecordedWalk(key, sealed.revision()));
@@ -386,7 +386,7 @@ final class RecordedWalkNotificationTest {
     String key = key(111);
     Path db = temp.resolve("retention-ledger.db");
     Path file = temp.resolve("retention-ledger.txt");
-    try (var queue = new SqliteJobQueue(db, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var sealed = sealIndexed(queue, key, file);
       assertTrue(queue.acknowledgeRecordedWalk(key, sealed.revision()));
@@ -403,7 +403,7 @@ final class RecordedWalkNotificationTest {
     String unacknowledgedKey = key(112);
     Path unacknowledgedDb = temp.resolve("retention-unacknowledged.db");
     Path unacknowledgedFile = temp.resolve("retention-unacknowledged.txt");
-    try (var queue = new SqliteJobQueue(unacknowledgedDb, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(unacknowledgedDb, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       sealIndexed(queue, unacknowledgedKey, unacknowledgedFile);
       backdateAll(unacknowledgedDb, unacknowledgedKey, normalized(unacknowledgedFile));
@@ -415,7 +415,7 @@ final class RecordedWalkNotificationTest {
     String missingKey = key(113);
     Path missingDb = temp.resolve("retention-missing-progress.db");
     Path missingFile = temp.resolve("retention-missing-progress.txt");
-    try (var queue = new SqliteJobQueue(missingDb, ignored -> true)) {
+    try (var queue = new SqliteJobQueue(missingDb, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       var sealed = sealIndexed(queue, missingKey, missingFile);
       assertTrue(queue.acknowledgeRecordedWalk(missingKey, sealed.revision()));

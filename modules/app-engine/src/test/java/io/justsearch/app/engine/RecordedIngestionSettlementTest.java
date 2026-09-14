@@ -56,7 +56,7 @@ final class RecordedIngestionSettlementTest {
       Path db = temp.resolve("settle-" + outcome.name().toLowerCase(java.util.Locale.ROOT) + ".db");
       try (var operations = new SqliteOperationStore(temp.resolve(
           "operations-" + outcome.name().toLowerCase(java.util.Locale.ROOT) + ".db"));
-          var queue = new SqliteJobQueue(db, ignored -> true)) {
+          var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
         queue.open();
         String key = OperationKeys.generate(KEY_CLOCK);
         JobQueue.SealedWalkReceipt sealed = sealEmptyWalk(queue, key, outcome);
@@ -81,7 +81,7 @@ final class RecordedIngestionSettlementTest {
   @Test
   void exactPreexistingCheckpointFinishesWithoutAnotherAttempt() throws Exception {
     try (var operations = new SqliteOperationStore(temp.resolve("checkpoint-operations.db"));
-        var queue = new SqliteJobQueue(temp.resolve("checkpoint-jobs.db"), ignored -> true)) {
+        var queue = new SqliteJobQueue(temp.resolve("checkpoint-jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       JobQueue.SealedWalkReceipt sealed = sealEmptyWalk(queue, key,
@@ -108,7 +108,7 @@ final class RecordedIngestionSettlementTest {
     Path operationsPath = temp.resolve("third-attempt-operations.db");
     Path jobsPath = temp.resolve("third-attempt-jobs.db");
     try (var operations = new SqliteOperationStore(operationsPath);
-        var queue = new SqliteJobQueue(jobsPath, ignored -> true)) {
+        var queue = new SqliteJobQueue(jobsPath, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       JobQueue.SealedWalkReceipt sealed = sealEmptyWalk(queue, key,
@@ -170,7 +170,7 @@ final class RecordedIngestionSettlementTest {
   @Test
   void exhaustedRecoveryFailsWithoutCheckpointAndCannotAcknowledge() throws Exception {
     try (var operations = new SqliteOperationStore(temp.resolve("exhausted-operations.db"));
-        var queue = new SqliteJobQueue(temp.resolve("exhausted-jobs.db"), ignored -> true)) {
+        var queue = new SqliteJobQueue(temp.resolve("exhausted-jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       sealEmptyWalk(queue, key, JobQueue.WalkEnumerationOutcome.COMPLETE);
@@ -203,7 +203,7 @@ final class RecordedIngestionSettlementTest {
     Path operationsPath = temp.resolve("changed-plan-operations.db");
     Path jobsPath = temp.resolve("changed-plan-jobs.db");
     try (var operations = new SqliteOperationStore(operationsPath);
-        var queue = new SqliteJobQueue(jobsPath, ignored -> true)) {
+        var queue = new SqliteJobQueue(jobsPath, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       var walk = queue.beginRecordedWalk(key, PLAN, true);
@@ -234,7 +234,7 @@ final class RecordedIngestionSettlementTest {
     Path operationsPath = temp.resolve("mismatch-operations.db");
     Path jobsPath = temp.resolve("mismatch-jobs.db");
     try (var operations = new SqliteOperationStore(operationsPath);
-        var queue = new SqliteJobQueue(jobsPath, ignored -> true)) {
+        var queue = new SqliteJobQueue(jobsPath, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       JobQueue.SealedWalkReceipt sealed = sealEmptyWalk(queue, key,
@@ -256,7 +256,7 @@ final class RecordedIngestionSettlementTest {
     Path operationsPath = temp.resolve("write-failure-operations.db");
     Path jobsPath = temp.resolve("write-failure-jobs.db");
     try (var operations = new SqliteOperationStore(operationsPath);
-        var queue = new SqliteJobQueue(jobsPath, ignored -> true)) {
+        var queue = new SqliteJobQueue(jobsPath, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       sealEmptyWalk(queue, key, JobQueue.WalkEnumerationOutcome.COMPLETE);
@@ -308,7 +308,7 @@ final class RecordedIngestionSettlementTest {
     Path jobsPath = temp.resolve("issued-jobs.db");
     var permitted = new java.util.concurrent.atomic.AtomicBoolean(true);
     try (var operations = new SqliteOperationStore(temp.resolve("issued-operations.db"));
-        var queue = new SqliteJobQueue(jobsPath, ignored -> permitted.get())) {
+        var queue = new SqliteJobQueue(jobsPath, ignored -> permitted.get() ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       operations.accept(key, DESCRIPTOR, CONTEXT, null);
@@ -390,7 +390,7 @@ final class RecordedIngestionSettlementTest {
     Path operationsPath = temp.resolve(label + "-evidence-operations.db");
     Path jobsPath = temp.resolve(label + "-evidence-jobs.db");
     try (var operations = new SqliteOperationStore(operationsPath);
-        var queue = new SqliteJobQueue(jobsPath, ignored -> true)) {
+        var queue = new SqliteJobQueue(jobsPath, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
       queue.open();
       String key = OperationKeys.generate(KEY_CLOCK);
       var walk = queue.beginRecordedWalk(key, PLAN, true);

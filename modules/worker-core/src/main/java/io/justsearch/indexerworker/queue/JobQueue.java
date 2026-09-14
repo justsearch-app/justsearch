@@ -146,9 +146,18 @@ public interface JobQueue extends Closeable {
    * @param scanId durable admitting scan, or null for rowless maintenance
    * @param walkEpoch explicit recorded membership at claim time, or null for legacy work
    * @param unitRevision opaque durable admission identity; unchanged by retry or recovery
+   * @param recordedForce force decision frozen at this recorded claim admission; false for legacy work
    */
   record IndexJob(Path path, String collection, EnqueueProvenance provenance,
-      String scanId, String unitRevision, Long walkEpoch) {
+      String scanId, String unitRevision, Long walkEpoch, boolean recordedForce) {
+    public IndexJob {
+      if (recordedForce && walkEpoch == null) throw new IllegalArgumentException("Recorded force requires recorded membership");
+    }
+    /** Compatibility fixture without a force-bearing recorded admission snapshot. */
+    public IndexJob(Path path, String collection, EnqueueProvenance provenance,
+        String scanId, String unitRevision, Long walkEpoch) {
+      this(path, collection, provenance, scanId, unitRevision, walkEpoch, false);
+    }
     /** Legacy/internal admission without recorded walk membership. */
     public IndexJob(Path path, String collection, EnqueueProvenance provenance,
         String scanId, String unitRevision) {
@@ -163,6 +172,9 @@ public interface JobQueue extends Closeable {
       this(path, collection, null);
     }
   }
+
+  /** One current recorded admission decision; force is a projection of the validated frozen plan. */
+  enum RecordedClaimDecision { DENY, ALLOW, ALLOW_FORCE }
 
   /** Sentinel for {@link EnqueueEntry#sizeBytes()} when the file's byte size could not be read. */
   long UNKNOWN_SIZE_BYTES = -1L;
