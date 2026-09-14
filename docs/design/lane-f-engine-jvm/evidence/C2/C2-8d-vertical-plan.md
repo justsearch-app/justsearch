@@ -309,3 +309,49 @@ Actual claim release also schedules its key after the successful outcome/return 
 an administrative skip may already be committed, so release can make the walk sealable
 without another SQL change. Forged, rolled-back or still-owned claims never schedule that
 release hint. It shares the same outermost-unlock delivery and durable reread contract.
+
+
+## C2-8d.3 producer and receipt owner (2026-09-14)
+
+Compose one EngineRoot-bound RecordedIngestionService with accepted-root start and
+lifecycle control. Do not widen the common IndexingService. Queue read/seal/ack
+stays private to this coordinator. Effects use the sole EngineKnowledgeClient's
+bounded admission path; receipt-only bookkeeping never attaches admission or uses
+allowWhileFrozen. The coordinator survives client replacement.
+
+Parent completion requires this exact barrier: sealed queue receipt, then compact
+checkpoint(version/revision/SHA256 of the exact stored UTF-8) and historical counts,
+then durable child terminal, then reread matching terminal/current sealed receipt,
+then acknowledge that exact revision, then parent completion. OperationReceipt
+retains code and null executionId; the latter is not a hash container. Current
+failed membership and enumeration outcome decide terminal state; historical failed
+units are not a current failure verdict. The queue owner validates receipt shape,
+version/revision/counters/enumeration and the bounded sorted failure hashes. Rich
+receipts may exceed the4096-byte checkpoint; only the compact identity goes there.
+
+Use the existing30-second maintenance owner to repair missed notifications. Add a
+second shutdown flush after indexing drains and before jobs close, since the Head's
+precheckpoint flush is too early and the client closes before KnowledgeServer's
+index drain. Observer runtime failure is nonfatal; the final flush must recover a
+missed late seal. No new timer, journal or notification store is introduced.
+
+A missing/mismatched checkpoint needs the winning runner Resume handle before
+finish, within the existing maximum of three attempts. A matching checkpoint may
+terminalize directly. Parent reconciliation returns asynchronous composition so
+boot child rows can subsequently resume; the captured boot row list is not a new
+runtime scan. The open parent anchors boot catch-up including terminal children,
+and cannot finish before their exact acknowledgements. Files and directories both
+use the child key as scan_id with explicit recorded epoch. Unchanged unkeyed
+submitBatch or scanRoot cannot serve this producer. REST uses the same dispatcher.
+
+Activation depends on the C2-9b.3 fence. A winning boot Resume body installs its
+runtime permission after the runner's started CAS and returns an asynchronous
+execution immediately. Its producer waits by binding its continuation to the later
+EngineKnowledgeClient; it never blocks generation-ready startup or bypasses that
+client to invoke Worker effects. Failed startup and replacement close that server's
+activation and settle its deferred stages. Keep activation through index drain and
+final receipt flush, then close it before the queue.
+
+These decisions were independently reviewed against EngineRoot, HeadAssembly,
+KnowledgeServer, IndexingLoop, the runner and SQLite owners at7777be3fd and48b38b4ea.
+They are a selected implementation contract; producer and lifecycle proof is owed.

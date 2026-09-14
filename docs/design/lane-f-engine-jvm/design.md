@@ -27,6 +27,12 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-9b.3b/c distinguishes live fresh consent from restart revalidation, preserves one admitted parent work identity, and bounds pending activation by the running admission limit. Child recovery validates the real parent's whole frozen plan and inherited identity; roots proceed through exact acknowledgements sequentially. No public fresh-permit installer, new durable flag or separate quota authority. [Owning mechanism and proof obligations](evidence/C2/ingestion-authorization-recovery.md#fresh-continuation-restart-admission-and-child-binding-2026-09-14).
+
+- 2026-09-14: C2-9b.3a applies permission before PROCESSING-to-PENDING replay, while an unowned FAILED/CANCELLED member receives administrative SKIPPED coverage without execution permission. This repairs crash-after-stop without stranding a terminal walk; issued owners remain excluded. [Review correction](evidence/C2/ingestion-authorization-recovery.md#c2-9b3-queue-fence-and-startup-sequence-2026-09-14).
+
+- 2026-09-14: C2-9b.3 uses a constructor-bound default-deny queue predicate and an indexer-local startup collaborator, with immediate stuck-job recovery after every permission reconciliation. The existing pre-limit cursor avoids a new SQL permit representation. C2-8d.3 retains one EngineRoot-bound producer and exact child receipt acknowledgement barrier. [Owning sequence and cuts](evidence/C2/ingestion-authorization-recovery.md#c2-9b3-queue-fence-and-startup-sequence-2026-09-14); [producer contract](evidence/C2/C2-8d-vertical-plan.md#c2-8d3-producer-and-receipt-owner-2026-09-14).
+
 - 2026-09-14: C2-9b.2b uses the shared authority's canonical base catalogs and returns a pure Authorized/Wait/Refused value. Exact recorded basis, registered provenance and frozen scope precede readiness; no permit or runner command is created during evaluation. [Owning decision and proof](evidence/C2/ingestion-authorization-recovery.md#c2-9b2b-typed-authority-decision).
 
 - 2026-09-14: C2-9b.2 keeps invocation identity in the codec/resolver, actual frozen-path containment in IndexedRootGrantScope, and historical input-to-plan mapping in the trusted producer. No duplicate digest or schema bump; prepared scope requires exact real paths and never falls back to raw arguments. [Owning split and proof obligations](evidence/C2/ingestion-authorization-recovery.md#c2-9b2-frozen-scope-and-identity-split-2026-09-14).

@@ -50,9 +50,9 @@ The dependency direction remains acyclic. `worker-services` already depends on `
 
 ## Recovery sequencing and revocation boundary
 
-The generation-ready callback first revalidates each interrupted recorded ingest from its server-built basis and frozen `RecordedRootPlan`. Only authorized operation keys enter the runtime permit set. The same permit predicate gates both `PENDING` polling and `PROCESSING` recovery/reaping. No job may be released before generation compatibility, capability checks, authorization, and root containment have succeeded.
+The generation-ready callback first revalidates each interrupted recorded ingest from its server-built basis and frozen `RecordedRootPlan`. Only authorized operation keys enter the runtime permit set. The same permit predicate gates both `PENDING` polling and `PROCESSING` recovery/reaping. No recovered job may be released before generation compatibility, capability checks, authorization, and current root containment have succeeded. Fresh-attempt permission follows the separate continuation rules below; administrative stopped-orphan accounting never grants execution permission.
 
-Authorization is revalidated at each recorded-unit claim boundary, or through an equivalent invalidation path tied to the same sole grant and roots authorities. Revoking the selected durable grant, removing a watched root, changing structural policy, or engaging the hard stop prevents the next unclaimed unit. A unit that has already passed the check and been claimed has crossed its admission boundary; revocation does not retroactively cancel an effect already in progress. This boundary adds no progress counter or second authorization authority.
+Authorization is revalidated at each recorded-unit claim boundary, or through an equivalent invalidation path tied to the same sole grant and roots authorities. Revoking the selected durable grant, removing a root that supplies required containment, changing structural AUTO policy, or an applicable hard stop prevents the next unclaimed unit. Fresh AUTO/capsule consent is not derived from watched-root membership; restart containment applies to every basis. A unit that has already passed the check and been claimed has crossed its admission boundary; revocation does not retroactively cancel an effect already in progress. This boundary adds no progress counter or second authorization authority.
 
 `OperationAttemptRunner.reconcile` is an owner-readiness reconciliation entry point (`modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java:105-108`), and its implementation scans the constructor-captured interrupted rows once per explicit call (`modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java:456-480`; snapshot capture at `modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java:44-75`). A generation/capability `Wait` therefore keeps units fenced and requires an explicit later reconciliation pass; it must not be documented as self-waking.
 
@@ -502,3 +502,169 @@ verdict defect or wrong-reason pass after reading the restored source, tests and
 1654-1657 evidence. It explicitly does not establish .3 lifecycle/claim/startup
 behavior. The separate production review by /root/walk_closure_refute was clear
 before final test execution; root retained implementation and Gradle ownership.
+
+
+Checkpoint449f56a06 is pushed and passed all13 jobs in
+[CI34846902769](https://github.com/justsearch-app/justsearch/actions/runs/34846902769)
+plus CLA34846899389. Exact metadata is tmp/1660-hosted-run.json. This closes hosted
+proof for the pure decision; the queue/startup/producer cuts below remain separate.
+PR727's managed review record was updated and exact-read-back verified through
+449f56a06 before this hosted run completed (tmp/1659-review-applied.json).
+
+## C2-9b.3 queue fence and startup sequence (2026-09-14)
+
+Selected after source review at48b38b4ea and independent refute; the following is
+not yet runtime proof. Split implementation into .3a queue-only permission checks,
+.3b startup/reconciliation/lifecycle attachment and .3c the C2-8d.3 producer barrier.
+
+Use an indexer-local required KnowledgeServer startup collaborator implemented by
+EngineRoot's stable coordinator. This supersedes the earlier suggested app-api
+callback: app-engine already depends on indexer-worker and worker-core; exporting
+JobQueue through app-api would require another type/adapter and reverse dependency.
+The collaborator provides a total mayClaimRecorded(key) and generation-ready hook
+returning a server-scoped close handle. Give SqliteJobQueue its predicate at
+construction; all existing no-owner overloads default to denying recorded work.
+There is no late mutable setter or persistent permission table.
+
+For .3a, only nonnull walk_seen_epoch denotes recorded membership. PENDING polling
+checks the nonblank scan_id and predicate under its existing queue transaction lock,
+after active-claim exclusion and before counting toward the batch limit. The query
+already has no SQL LIMIT; denied oldest rows must not starve eligible work. Extend
+PROCESSING recovery's projection with scan_id and epoch and apply the same check
+before requeue. A closed FAILED/CANCELLED orphan instead receives the existing
+administrative skip without needing permission to execute; active issued owners
+remain excluded from both branches. Both unconditional startup and aged
+reaper entry points share this method. Legacy null-epoch jobs retain their existing
+behavior even when scan_id is nonnull. False or a runtime failure in the callback
+denies; fatal errors propagate. Callback is a pure bounded authority check with no
+SQL, runner, queue or cross-store callback. Existing issued claims may finish or
+return after revocation; new claims may not pass. No schema/state/ledger is added.
+
+For .3b, move recovery/reaper from their current pre-generation position to after
+app-services construction, embedding compatibility and the synchronous generation-
+ready callback, immediately before indexing starts. Callback failure aborts startup.
+Use the same idle-active-serving observation as WorkerIngestService generation
+capture: layout.activeGenerationId alone is invalid while Blue serves and Green
+receives writes. Readiness must use the initialized index runtime because the
+EngineKnowledgeClient and Head WorkerCapability are not yet available there.
+
+Only the winning Resume body can install recovery permission after runner started
+CAS and successful C1 admission. Fresh permission is minted only inside the winning
+private child start body as specified below. The under-lock predicate is the unit
+authorization boundary and revalidates current authority appropriate to that origin
+from immutable accepted row/preparation. A later
+non-Authorized verdict invalidates the permission and leaves cross-store lifecycle
+handling to after-unlock reconciliation. Every initial or later explicit
+reconciliation pass must immediately run unconditional recoverStuckJobs after
+winning bodies install permissions. An aged reaper alone cannot recover formerly
+fenced PROCESSING jobs: heartbeatProcessing refreshes all their timestamps.
+
+Refused operations get no permission. After their durable terminal, the existing
+notification/maintenance owner stops and seals their walk and repairs crashes
+between the stores. Wait keeps the operation nonterminal and fenced and requires
+explicit later reconciliation. Generation/server-scoped permissions survive drain
+and final receipt flush, then close before jobs; failed startup closes them too.
+
+Required .3a regressions: no-owner denial for PENDING and both PROCESSING recovery
+entry points; false/throwing predicate denial; old denied rows cannot consume the
+limit; nonnull legacy scan key remains eligible; exact key delivery; revocation
+blocks the next claim while an issued claim can finish; later authorization plus
+unconditional recovery revives a heartbeated row; reopen defaults to denied. Existing
+recorded terminal/seal tests explicitly supply allowed test authority, retaining all
+existing lifecycle assertions.
+
+Required .3b/.3c proofs: no recovery/reaper/poll before callback, callback failure
+aborts; migration never grants idle-serving permission; losing CAS installs no
+permission; refusal terminal-to-seal crash repair; single-file and directory
+membership; missed notification/final drain flush; exact child acknowledgement
+barrier; startup failure/restart cannot carry permission into a new generation.
+The reviewed source paths and earlier observations are retained in
+tmp/C2-9b3-discovery.md and tmp/C2-8d3-review-decisions.md, but this owning record
+contains the decisions needed to continue without those local notes.
+
+
+Independent .3a review corrected the initial predicate-before-all-mutation plan:
+a claim can be issued, its enumeration close FAILED/CANCELLED while the owner is
+still live, then the process can crash. On reopen that operation cannot earn a
+new execution permit; gating its administrative skip would leave PROCESSING
+membership permanently unsealable. Recovery therefore excludes live owners first,
+then accounts stopped orphans as SKIPPED, and checks permission only before a
+PENDING transition. This is closure accounting, not a replay authorization bypass.
+Regressions must cover both stopped outcomes and both recovery entry points with
+a denied/throwing authority, and prove the resulting receipt seals.
+
+
+### Fresh continuation, restart admission and child binding (2026-09-14)
+
+Keep evaluateRecordedIngest restart-only. The stable coordinator retains only
+process-local permission keyed by the exact child operation key and server/generation
+activation, with fresh-start versus restart origin. Fresh origin cannot be inferred
+from a persisted row or fabricated OperationRecordHandle: the registered prepared
+producer passes its live parent handle through runner.acceptIngestChild, which
+validates the private runner Control and exact parent preparation. Fresh permission
+is created only in that child's winning attempts.start body, after durable start.
+There is no public installFresh(handle,key) method or new persisted flag/token.
+
+A named boolean fresh-continuation check on the same OperationAuthority owns the
+current gate/grant rule. Binding is decoded and validated outside the jobs lock.
+Registered provenance and current non-DENY are required for every fresh basis.
+StructuralAuto still requires current AUTO but does not require watched containment.
+An exact operation/family basis still requires its selected grant and strict current
+frozen containment; another key or current AUTO cannot substitute. EphemeralCapsule
+uses only the same live fresh activation and current non-DENY; never reconsume,
+recreate or persist a capsule. Initially approved out-of-root AUTO/capsule work may
+thus run, while the same AUTO refuses out-of-root restart and any capsule refuses
+restart. Root cancellation still stops its walk; unrelated root-list changes do
+not erase consent whose authority never came from that list.
+
+Fresh producers retain executePrepared's exact attached context/workId already held
+by the dispatcher through async completion; do not admit a second parent work item.
+A boot parent obtains admission.attach(row.context()) only in its winning Resume
+body, before permission; the resulting handle/context lives through the asynchronous
+parent acknowledgement barrier. Boot child activation attaches that admitted parent's
+context, rather than minting an independent workId from its inherited durable row.
+A child waits if the parent has not obtained admission. Client bind uses that same
+workId; no allowWhileFrozen or direct unbounded Worker call is allowed.
+
+Admission can lose a freeze/capacity race after the runner CAS. Return a pending
+asynchronous execution rather than throwing a transient refusal into terminal FAILED.
+Install no permission until admission succeeds. Retry from client-bind and the
+existing maintenance/reconciliation owner, then immediately run unconditional jobs
+recovery. On shutdown, release runtime resources without fabricating a terminal
+outcome for an unstarted pending effect. Deferred scans use an EngineExecutorRegistry
+BACKGROUND registration with its existing thread/queue bounds, not a raw scheduler.
+
+The activation map itself is bounded by the running admission owner's aggregateLimit,
+read from EngineAdmissionService.limits rather than a copied default. Full capacity
+returns Reconciliation.Wait before allocating another Resume body. Serialize the
+coordinator's provisional activation/CAS handoff; a losing CAS discards the reservation
+without permission. No second quota registry, semaphore or durable marker is needed.
+Parents drive roots sequentially through child acknowledgement before activating the
+next root, so fresh child state is bounded by admitted parent work. The existing
+bounded frozen root plan supplies the remaining roots without duplicating it per child.
+
+Child recovery parses RecordedIngestChild.from from its actual accepted preparation,
+loads the named real parent and validates that parent's actual core.ingest-files or
+core.reindex envelope with canonical authority. Scope covers the WHOLE parent frozen
+plan; child generation and its sole root must match an exact member. Require inherited
+context, executor, initiator, correlation and provenance timestamp plus historyMode
+NONE. An open child below a terminal parent is invalid. COMPLETE_WITH_GAPS is not
+permission to replay: await the separate D1 decision. Parent must be RUNNING with
+admission before child Resume; reconcile REINDEX parents before INGEST children and
+retain acceptance order for INGEST parents. Terminal child receipt repair needs no
+permission. The open parent anchors all child acknowledgement catch-up.
+
+Accepted binding metadata is immutable; no new atomic multirow store API is selected.
+The coordinator must fence child permissions before initiating parent/child terminal
+completion and obey the acknowledgement barrier. Prove that ordering; separate row
+reads alone do not establish lifecycle consistency. Failed startup/generation replacement
+closes all permissions and deferred work; a fresh origin never survives it.
+
+Required proofs add fresh out-of-root AUTO/capsule versus restart, exact inherited
+child binding, fake/lost handle and CAS refusal, durable revoke/root removal with
+alternate authority present, current AUTO/DENY changes, one shared workId/no leaks,
+capacity-full Wait without retained body, transient admission retry, no pre-bind
+blocking, bounded scheduling, shutdown without false terminal failure and exact
+parent acknowledgement ordering. These are selected mechanisms and required checks,
+not completed .3b/.3c implementation. Root verified the child/admission source paths;
+independent read-only reviews were performed at449f56a06 without runtime tests.
