@@ -20,6 +20,34 @@ final class WatchedRootsStoreTest {
   @TempDir Path tempDir;
 
   @Test
+  void failedLegacyCopyRefusesStartupAndPreservesTheSource() throws Exception {
+    Path legacy = tempDir.resolve("legacy.json");
+    Files.writeString(legacy, "[]");
+    Path blocked = tempDir.resolve("blocked");
+    Files.writeString(blocked, "not-a-directory");
+    Path target = blocked.resolve("watched_roots.json");
+    var store = new WatchedRootsStore(target, null);
+    assertThrows(
+        CorruptDurableStoreException.class,
+        () -> store.migrateLegacyRootsFileIfNeeded(legacy));
+    assertEquals("[]", Files.readString(legacy));
+    assertFalse(Files.exists(target));
+  }
+
+  @Test
+  void legacyCopyLoadsBeforeBestEffortSourceRetirement() throws Exception {
+    Path legacy = tempDir.resolve("legacy.json");
+    Files.writeString(legacy, "[]");
+    Path target = tempDir.resolve("new").resolve("watched_roots.json");
+    var store = new WatchedRootsStore(target, null);
+    store.migrateLegacyRootsFileIfNeeded(legacy);
+    assertEquals("[]", Files.readString(target));
+    assertTrue(store.loadPersistedRoots().isEmpty());
+    assertTrue(Files.exists(legacy.resolveSibling("watched_roots.json.migrated")));
+  }
+
+
+  @Test
   @DisplayName("Loads new-format roots with lastIndexed when paths exist")
   void loadsNewFormat() throws Exception {
     Path root = tempDir.resolve("root1");

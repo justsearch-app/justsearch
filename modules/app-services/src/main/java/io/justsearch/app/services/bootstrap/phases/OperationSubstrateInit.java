@@ -26,12 +26,9 @@ import io.justsearch.app.observability.operations.OperationHistoryResourceCatalo
 import io.justsearch.app.observability.navigation.NavigationHistoryStore;
 import io.justsearch.app.observability.operations.OperationHistoryStore;
 import io.justsearch.app.services.intent.BackendIntentRouterImpl;
-import io.justsearch.app.services.intent.CoreIntentSourceCatalog;
 import io.justsearch.agent.api.registry.ConsentCapsuleAuthority;
 import io.justsearch.app.services.intent.ConsentCapsuleService;
-import io.justsearch.app.services.intent.CoreTrustEvaluator;
 import io.justsearch.app.services.registry.executor.OperationExecutorImpl;
-import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.NavigateToSurfaceHandler;
 import java.time.Clock;
@@ -88,8 +85,7 @@ public final class OperationSubstrateInit {
       io.justsearch.app.services.intent.IntentGateEvaluator intentGateEvaluator,
       // Tempdoc 550 thesis IV: durable allow-always grants, exposed for the approve endpoint.
       io.justsearch.app.services.intent.DurableGrantStore durableGrantStore,
-      // Tempdoc 875 C.3: the argument scope bounding those grants, exposed so HeadAssembly can bind
-      // the live indexed-root supplier once the Worker-backed IndexingService exists.
+      // The preloaded live roots scope is shared with recovery before the Worker exists.
       io.justsearch.app.services.intent.IndexedRootGrantScope durableGrantScope,
       // Tempdoc 655: shared across REST (OperationsController/AuthorizationController) and MCP
       // (McpToolSurface) so a gate fired from either transport creates a pending record either
@@ -120,6 +116,22 @@ public final class OperationSubstrateInit {
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.agent.api.registry.SurfaceCatalog coreSurfaceCatalog,
       io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
+    return run(operations, attempts, admission, executors, operationHandlers, operationCatalog,
+        agentToolsCatalog, capabilityResolver, coreSurfaceCatalog, preparationCipher,
+        io.justsearch.app.services.bootstrap.OperationAuthority.inMemory());
+  }
+
+  /** Consume the single pre-fork authority; this phase only adds projections and handlers. */
+  public static Output run(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.app.api.EngineAdmissionService admission, io.justsearch.core.execution.EngineExecutorRegistry executors,
+      HandlerRegistry operationHandlers,
+      OperationCatalog operationCatalog,
+      OperationCatalog agentToolsCatalog,
+      Function<RequiredCapability, Boolean> capabilityResolver,
+      io.justsearch.agent.api.registry.SurfaceCatalog coreSurfaceCatalog,
+      io.justsearch.agent.api.encryption.StoreCipher preparationCipher,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     OperationHistoryResourceCatalog operationHistoryResourceCatalog =
         new OperationHistoryResourceCatalog();
     // Tempdoc 571 §4c: the action-ledger Resource — the TRUST-role authority the Activity surface
@@ -156,11 +168,11 @@ public final class OperationSubstrateInit {
             PendingAuthorizationAdvisoryProjector.CLASS_ID,
             new AdvisoryLog());
     PromptCatalog promptCatalog = PromptCatalog.of("core", List.of());
-    IntentSourceCatalog intentSourceCatalog = CoreIntentSourceCatalog.catalog();
-    TrustEvaluator trustEvaluator = new CoreTrustEvaluator();
+    IntentSourceCatalog intentSourceCatalog = authority.sources();
+    TrustEvaluator trustEvaluator = authority.trust();
     // Tempdoc 550 Slice A1 (Authorize face): consent-capsule verifier. The lattice ALSO
     // accepts a valid bound capsule (additive to the legacy non-blank token path).
-    ConsentCapsuleService consentCapsuleService = new ConsentCapsuleService();
+    ConsentCapsuleService consentCapsuleService = authority.capsules();
     // Tempdoc 550 Outcome face: the gate-decision ledger sibling. The executor records every
     // non-AUTO trust-gate firing here so the action ledger / trust audit see gate decisions,
     // not only completed-dispatch outcomes.
@@ -188,13 +200,13 @@ public final class OperationSubstrateInit {
     // composition root, so its quiescence sweeper's lifetime is the substrate's.
     io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger =
         new io.justsearch.app.observability.ledger.ScanRollupLedger(executors, actionLedgerChangeRegistry);
-    // Tempdoc 550 E2: process-wide emergency stop the lattice consults (default released).
+    // Pre-fork authority is shared with recovery; this phase only adds audit projections.
     io.justsearch.app.services.registry.executor.GlobalHardStop globalHardStop =
-        new io.justsearch.app.services.registry.executor.GlobalHardStop();
+        authority.hardStop();
     // Tempdoc 550 thesis IV + 560 §28 — the durable "allow-always" grant: the second Grant-model
     // member. `persistent()` survives restarts (mode-aware: IN_MEMORY under prod/CI isolation).
     io.justsearch.app.services.intent.DurableGrantStore durableGrantStore =
-        io.justsearch.app.services.intent.DurableGrantStore.persistent();
+        authority.grants();
     // Tempdoc 655: one PendingAuthorizationStore + one broadcast registry, shared by the REST
     // gate path (OperationsController/AuthorizationController) and the MCP gate path
     // (McpToolSurface) — mirrors the capsule/grant sharing above, closing the gap where MCP had
@@ -220,13 +232,6 @@ public final class OperationSubstrateInit {
     // One audit: capsule + durable grants record their lifecycle into the one action-event log.
     consentCapsuleService.setGrantEventSink(actionLedgerChangeRegistry::broadcastActionEvent);
     durableGrantStore.setGrantEventSink(actionLedgerChangeRegistry::broadcastActionEvent);
-    // One revocation path: engaging the hard stop revokes every non-user grant — single-use capsules
-    // AND durable allow-always grants — matching the gate's UNTRUSTED hard-stop scope.
-    globalHardStop.setOnEngage(
-        () -> {
-          consentCapsuleService.revokeNonUser();
-          durableGrantStore.revokeNonUser();
-        });
     // Committed operation fan-in is attached from the durable source after Head acquires the
     // completed substrate. Navigation and authorization keep their existing source listeners.
     navigationHistoryStore.addAppendListener(actionLedgerChangeRegistry::broadcastNavigation);
@@ -253,22 +258,13 @@ public final class OperationSubstrateInit {
                             record ->
                                 advisoryLogs.get(operationCompletionProjector.classId()).append(record))),
             Clock.systemUTC(),
-            trustEvaluator,
-            intentSourceCatalog,
+            authority.evaluator(),
             capabilityResolver,
             consentCapsuleService,
             // F5: append fans the gate firing into the one log via the store's listener.
             authorizationOutcomeStore::append, preparationCipher);
     operationExecutorImpl.setGlobalHardStop(globalHardStop);
-    // Tempdoc 550 thesis IV: the gate consults the durable allow-always grants before requiring a
-    // fresh capsule. Tempdoc 875 C.3: paired with the argument scope that bounds them — the wiring
-    // API requires both, so grants can never be installed without a containment answer. The scope
-    // governs `core.ingest-files` (the one agent tool that takes filesystem paths as arguments); the
-    // governed set is injected so the scope carries no catalog knowledge. It stays UNBOUND (⇒ every
-    // governed invocation confirms) until HeadAssembly binds the live indexed roots.
-    io.justsearch.app.services.intent.IndexedRootGrantScope durableGrantScope =
-        new io.justsearch.app.services.intent.IndexedRootGrantScope(
-            java.util.Set.of(AgentToolsOperationCatalog.INGEST_FILES));
+    io.justsearch.app.services.intent.IndexedRootGrantScope durableGrantScope = authority.scope();
     operationExecutorImpl.setDurableGrantStore(durableGrantStore, durableGrantScope);
     // Tempdoc 550 thesis III: expose the executor's ONE intent-gate evaluator (built from the same
     // TrustEvaluator + IntentSourceCatalog, with the hard stop now forwarded) so the Preview

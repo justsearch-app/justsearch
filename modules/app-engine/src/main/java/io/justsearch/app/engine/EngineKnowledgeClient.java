@@ -123,7 +123,17 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       java.util.function.Supplier<WorkerAppServices> services,
       ForegroundLoadGate foregroundLoad, long deadlineMs, int batchSize, IpcTelemetry telemetry,
       Runnable requestedRestartAction, io.justsearch.app.api.EngineAdmissionService admission) {
-    super(executors, deadlineMs, batchSize, telemetry);
+    this(executors, services, foregroundLoad, deadlineMs, batchSize, telemetry, requestedRestartAction,
+        admission, io.justsearch.app.services.worker.WatchedRootsState.load(
+            io.justsearch.configuration.PlatformPaths.resolveDataDir()));
+  }
+
+  EngineKnowledgeClient(EngineExecutorRegistry executors,
+      java.util.function.Supplier<WorkerAppServices> services, ForegroundLoadGate foregroundLoad,
+      long deadlineMs, int batchSize, IpcTelemetry telemetry, Runnable requestedRestartAction,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.app.services.worker.WatchedRootsState roots) {
+    super(executors, deadlineMs, batchSize, telemetry, roots);
     Objects.requireNonNull(executors, "executors");
     this.admission = Objects.requireNonNull(admission, "admission");
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");

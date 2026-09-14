@@ -46,6 +46,12 @@ final class WatchedRootsStore {
   }
 
   void migrateLegacyRootsFileIfNeeded() {
+    if (rootsFile == null || Files.exists(rootsFile)) return;
+    migrateLegacyRootsFileIfNeeded(PlatformPaths.resolveUserHome().resolve(".justsearch").resolve("watched_roots.json"));
+  }
+
+  /** Explicit legacy source keeps migration verification isolated from the user's home. */
+  void migrateLegacyRootsFileIfNeeded(Path legacy) {
     if (rootsFile == null) {
       return;
     }
@@ -53,8 +59,6 @@ final class WatchedRootsStore {
       if (Files.exists(rootsFile)) {
         return;
       }
-      Path userHome = PlatformPaths.resolveUserHome();
-      Path legacy = userHome.resolve(".justsearch").resolve("watched_roots.json");
       if (!Files.exists(legacy)) {
         return;
       }
@@ -79,12 +83,7 @@ final class WatchedRootsStore {
         }
       }
     } catch (Exception e) {
-      if (log != null) {
-        log.warn(
-            "Failed to migrate legacy watched_roots.json to {} (continuing without migration): {}",
-            rootsFile,
-            e.getMessage());
-      }
+      throw new CorruptDurableStoreException("watched-roots", "cannot migrate legacy roots to " + rootsFile, e);
     }
   }
 

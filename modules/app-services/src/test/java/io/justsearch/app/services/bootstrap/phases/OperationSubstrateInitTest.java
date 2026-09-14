@@ -1,6 +1,8 @@
 package io.justsearch.app.services.bootstrap.phases;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -9,6 +11,8 @@ import static org.mockito.Mockito.*;
 
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.agent.api.registry.OperationCatalog;
+import io.justsearch.app.services.bootstrap.OperationAuthority;
+import io.justsearch.app.services.registry.executor.OperationExecutorImpl;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -133,5 +137,77 @@ class OperationSubstrateInitTest {
     assertTrue(
         handlers.resolve(CoreOperationCatalog.NAVIGATE_TO_SURFACE).isPresent(),
         "NAVIGATE_TO_SURFACE handler should be registered by the phase function");
+  }
+
+  @Test
+  void runReusesPrebuiltAuthorityAndHardStopRevokesOnlyNonUserGrants() {
+    HandlerRegistry handlers = new HandlerRegistry();
+    OperationCatalog ops = OperationCatalog.of("core", List.of());
+    OperationCatalog agentTools = OperationCatalog.of("core", List.of());
+    OperationAuthority authority = OperationAuthority.inMemory();
+    authority.grants().grantAllowAlways("core.authority-untrusted", SourceTier.UNTRUSTED);
+    authority.grants().grantAllowAlways("core.authority-trusted", SourceTier.TRUSTED);
+    String untrustedCapsule =
+        authority.capsules().mint("core.authority-untrusted", "{}", SourceTier.UNTRUSTED);
+    String trustedCapsule =
+        authority.capsules().mint("core.authority-trusted", "{}", SourceTier.TRUSTED);
+
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      OperationSubstrateInit.Output out =
+          OperationSubstrateInit.run(
+              mock(OperationStore.class),
+              mock(OperationAttemptRunner.class),
+              mock(io.justsearch.app.api.EngineAdmissionService.class),
+              executors,
+              handlers,
+              ops,
+              agentTools,
+              req -> true,
+              new io.justsearch.app.observability.surface.CoreSurfaceCatalog(),
+              io.justsearch.agent.api.encryption.StoreCipher.disabled(),
+              authority);
+      var rollup = out.scanRollupLedger();
+      try (rollup) {
+        OperationExecutorImpl executor =
+            (OperationExecutorImpl) out.operationExecutor();
+        assertSame(authority.sources(), out.intentSourceCatalog());
+        assertSame(authority.capsules(), out.consentCapsuleService());
+        assertSame(authority.hardStop(), out.globalHardStop());
+        assertSame(authority.evaluator(), out.intentGateEvaluator());
+        assertSame(authority.evaluator(), executor.intentGateEvaluator());
+        assertSame(authority.grants(), out.durableGrantStore());
+        assertSame(authority.scope(), out.durableGrantScope());
+
+        assertEquals(
+            GateBehavior.TYPED_CONFIRM,
+            authority.evaluator().evaluate(RiskTier.MEDIUM, TransportTag.AGENT_LOOP).gateBehavior());
+        assertEquals(
+            GateBehavior.AUTO,
+            authority.evaluator().evaluate(RiskTier.MEDIUM, TransportTag.BUTTON).gateBehavior());
+
+        authority.hardStop().engage();
+        assertTrue(authority.hardStop().isEngaged());
+        assertEquals(
+            GateBehavior.DENY,
+            out.intentGateEvaluator().evaluate(RiskTier.MEDIUM, TransportTag.AGENT_LOOP).gateBehavior());
+        assertEquals(
+            GateBehavior.AUTO,
+            out.intentGateEvaluator().evaluate(RiskTier.MEDIUM, TransportTag.BUTTON).gateBehavior());
+        assertTrue(
+            authority.grants().isAllowed(
+                "core.authority-trusted", RiskTier.MEDIUM,
+                io.justsearch.app.services.TestEngineContexts.ui()));
+        assertFalse(
+            authority.grants().isAllowed(
+                "core.authority-untrusted", RiskTier.MEDIUM,
+                io.justsearch.app.services.TestEngineContexts.agent()));
+        assertTrue(
+            authority.capsules().verifyAndConsume(
+                trustedCapsule, "core.authority-trusted", "{}"));
+        assertFalse(
+            authority.capsules().verifyAndConsume(
+                untrustedCapsule, "core.authority-untrusted", "{}"));
+      }
+    }
   }
 }

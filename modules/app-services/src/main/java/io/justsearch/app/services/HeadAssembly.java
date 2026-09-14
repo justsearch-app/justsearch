@@ -337,6 +337,24 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
+        sharedWorkerCapability, managedChildRegistry, operationLeases, engineAdmission,
+        io.justsearch.app.services.bootstrap.OperationAuthority.load(PlatformPaths.resolveDataDir()));
+  }
+
+  /** Primary boot consumes the authority loaded before the Engine bootstrap fork. */
+  public HeadAssembly(
+      io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      Telemetry telemetry,
+      ConfigManagerBootstrap configManager,
+      KnowledgeServerBootstrap knowledgeServer,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
+      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
+      io.justsearch.app.api.OperationLeaseService operationLeases,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     Objects.requireNonNull(telemetry, "telemetry");
@@ -619,7 +637,7 @@ public final class HeadAssembly implements AutoCloseable {
                     // the allowlisted entrypoint, parsed downstream (app-services may not read env).
                     io.justsearch.app.services.mcphost.McpHostConfig.fromPath(
                         io.justsearch.configuration.EnvRegistry.MCP_HOST_CONFIG.getPath()),
-                    new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager)))
+                    new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager), authority))
             .orThrow();
 
 
@@ -637,12 +655,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operationMessageResolver = key -> registryMessages.getProperty(key, key);
 
     java.util.function.Function<EngineContext, List<String>> agentRootPaths =
-        this.knowledgeClient != null
-            ? engineContext ->
-                this.services.worker().indexing().getWatchedRoots(engineContext).stream()
-                    .map(r -> r.path().toAbsolutePath().normalize().toString())
-                    .toList()
-            : null;
+        engineContext -> authority.roots().watchedPaths().stream().map(Path::toString).toList();
 
     // Tempdoc 561 P-A/P-B: the agent loop's tool activity projects into the ONE action ledger from
     // the durable AgentRunStore record (the unified thread's source) — NOT a parallel operation-path
@@ -888,23 +901,6 @@ public final class HeadAssembly implements AutoCloseable {
               // so capturing a value at composition time would bind the pre-connect (index-less)
               // IndexingService / DocumentService.
               var indexing = this.services.worker().indexing();
-              // Tempdoc 875 C.3: bind the durable-grant argument scope to the LIVE indexed roots,
-              // here — the same resolve-time point that owns the Worker-backed IndexingService, and
-              // the same projection AgentToolFactory.assemble uses for the tools' own roots supplier.
-              // WHY here and not at substrate init: the scope is constructed before the Worker exists.
-              // It fails CLOSED until bound (unbound roots ⇒ containment unprovable ⇒ the gate falls
-              // through to a confirm), so a wiring regression costs a prompt, never a silent grant.
-              var operationOut = this.substrateOut.operationOut();
-              if (operationOut != null && operationOut.durableGrantScope() != null) {
-                operationOut
-                    .durableGrantScope()
-                    .bindIndexedRoots(
-                        engineContext ->
-                            indexing.getWatchedRoots(engineContext).stream()
-                                .filter(r -> r != null && r.path() != null)
-                                .map(r -> r.path().toAbsolutePath().normalize())
-                                .toList());
-              }
               return io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.registerLateBound(
                   this.perSourceSearch,
                   this.substrateOut.operationHandlers(),

@@ -159,8 +159,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * <p>IMPORTANT: values must be non-null (ConcurrentHashMap rejects null). We use
      * {@link WatchedRootsStore#NEVER_INDEXED} as a sentinel for "tracked but never indexed".
      */
-    private final Map<Path, Instant> watchedRoots = new java.util.concurrent.ConcurrentHashMap<>();
-    private final WatchedRootsStore rootsStore;
+    private final Map<Path, Instant> watchedRoots;
     private final WatchedRootsState watchedRootsState;
 
     // Last-known-good ONNX model status from Worker's health check response (D-4, tempdoc 215).
@@ -207,6 +206,13 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             long deadlineMs,
             int batchSize,
             IpcTelemetry telemetry) {
+        this(executors, deadlineMs, batchSize, telemetry,
+            WatchedRootsState.load(PlatformPaths.resolveDataDir()));
+    }
+
+    /** Compose with roots already loaded by the process owner; never load a second view. */
+    protected KnowledgeClient(EngineExecutorRegistry executors, long deadlineMs, int batchSize,
+            IpcTelemetry telemetry, WatchedRootsState roots) {
         Objects.requireNonNull(executors, "executors");
         this.deadlineMs = deadlineMs;
         if (batchSize <= 0 || batchSize > MAX_BATCH_SIZE) {
@@ -219,12 +225,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         this.migrationOps = new MigrationOps(ingestRpcExecutor);
         this.vduOps = new VduOps(ingestRpcExecutor);
 
-        // Initialize roots persistence file + state before syncOps so the reconcile-verification
-        // recorder callback (tempdoc 626 §Axis-C) can reference the assigned watchedRootsState field.
-        Path dataDir = PlatformPaths.resolveDataDir().toAbsolutePath().normalize();
-        Path rootsFile = dataDir.resolve("watched_roots.json");
-        this.rootsStore = new WatchedRootsStore(rootsFile, log);
-        this.watchedRootsState = new WatchedRootsState(watchedRoots, rootsStore);
+        this.watchedRootsState = Objects.requireNonNull(roots, "roots");
+        this.watchedRoots = roots.rootsMap();
 
         // Tempdoc 626 §Axis-C — a force=false reconcile's delete-detection outcome updates the
         // per-root verification state; an orphan-prune records a one-shot drift-corrected signal. Both
@@ -291,8 +293,6 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 this::executeDeleteByPath, this::deleteById,
                 syncOps, walkExecutor,
                 (body, context) -> executeRootWalk(walkExecutor, body, context));
-            rootsStore.migrateLegacyRootsFileIfNeeded();
-            watchedRootsState.loadPersistedRoots();
         } catch (RuntimeException | Error failure) {
             closeBaseExecutors();
             throw failure;

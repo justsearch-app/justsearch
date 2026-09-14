@@ -2,14 +2,19 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,12 +159,95 @@ final class WatchedRootsStateTest {
 
     Path rootsFile = tempDir.resolve("watched_roots.json");
     WatchedRootsStore store = new WatchedRootsStore(rootsFile, null);
-    store.persistRoots(Map.of(normalized, ts), Map.of(), java.util.Set.of(), Map.of());
+    store.persistRoots(Map.of(normalized, ts), Map.of(), Set.of(), Map.of());
 
     Map<Path, Instant> watchedRoots = new ConcurrentHashMap<>();
     WatchedRootsState state = new WatchedRootsState(watchedRoots, store);
     state.loadPersistedRoots();
 
     assertEquals(ts, watchedRoots.get(normalized));
+  }
+
+  @Test
+  @DisplayName("load preloads timestamps, collections, and terminal walk flags before returning")
+  void loadPreloadsPersistedRootMetadata(@TempDir Path dataDirectory) throws Exception {
+    Path indexed = dataDirectory.resolve("indexed");
+    Path empty = dataDirectory.resolve("empty");
+    Path failed = dataDirectory.resolve("failed");
+    Path scanning = dataDirectory.resolve("scanning");
+    Files.createDirectories(indexed);
+    Files.createDirectories(empty);
+    Files.createDirectories(failed);
+    Files.createDirectories(scanning);
+    Path indexedN = indexed.toAbsolutePath().normalize();
+    Path emptyN = empty.toAbsolutePath().normalize();
+    Path failedN = failed.toAbsolutePath().normalize();
+    Path scanningN = scanning.toAbsolutePath().normalize();
+    Instant indexedAt = Instant.parse("2026-09-14T08:30:00Z");
+
+    Path rootsFile = dataDirectory.resolve("watched_roots.json");
+    WatchedRootsStore store = new WatchedRootsStore(rootsFile, null);
+    store.persistRoots(
+        Map.of(
+            indexedN, indexedAt,
+            emptyN, WatchedRootsStore.NEVER_INDEXED,
+            failedN, WatchedRootsStore.NEVER_INDEXED,
+            scanningN, WatchedRootsStore.NEVER_INDEXED),
+        Map.of(failedN, "walk failed"),
+        Set.of(indexedN, emptyN, failedN),
+        Map.of(indexedN, "documents", emptyN, "empty-collection"));
+
+    WatchedRootsState state = WatchedRootsState.load(dataDirectory);
+
+    assertEquals(Set.of(indexedN, emptyN, failedN, scanningN), Set.copyOf(state.watchedPaths()));
+    assertEquals(indexedAt, state.rootsMap().get(indexedN));
+    assertEquals(WatchedRootsStore.NEVER_INDEXED, state.rootsMap().get(emptyN));
+    assertEquals("documents", state.getCollection(indexedN));
+    assertEquals("empty-collection", state.getCollection(emptyN));
+    assertEquals("walk failed", state.getWalkError(failedN));
+    assertTrue(state.isWalkCompleted(indexedN));
+    assertTrue(state.isWalkCompleted(emptyN));
+    assertTrue(state.isWalkCompleted(failedN));
+    assertFalse(state.isWalkCompleted(scanningN));
+  }
+
+  @Test
+  @DisplayName("load fails closed on a corrupt persisted roots file")
+  void corruptPersistedRootsRefusePreload(@TempDir Path dataDirectory) throws Exception {
+    Path rootsFile = dataDirectory.resolve("watched_roots.json");
+    Files.writeString(rootsFile, "{not-json");
+
+    assertThrows(CorruptDurableStoreException.class, () -> WatchedRootsState.load(dataDirectory));
+  }
+
+  @Test
+  @DisplayName("watchedPaths is a read-only membership snapshot and tracks state mutations")
+  void watchedPathsSnapshotCannotMutateState(@TempDir Path dataDirectory) {
+    WatchedRootsState state = WatchedRootsState.inMemory();
+    Path root = dataDirectory.resolve("root").toAbsolutePath().normalize();
+    state.register(root, "documents", true);
+
+    var paths = state.watchedPaths();
+    assertEquals(List.of(root), paths);
+    assertThrows(UnsupportedOperationException.class, () -> paths.add(dataDirectory));
+
+    state.removeRootAndNested(root);
+    assertTrue(state.watchedPaths().isEmpty());
+  }
+
+  @Test
+  @DisplayName("rootsMap exposes the sole backing map used by state mutations")
+  void rootsMapIsIdentitySharedWithState(@TempDir Path dataDirectory) {
+    WatchedRootsState state = WatchedRootsState.inMemory();
+    Map<Path, Instant> roots = state.rootsMap();
+    Path root = dataDirectory.resolve("root").toAbsolutePath().normalize();
+
+    assertSame(roots, state.rootsMap());
+    state.markNeverIndexed(root);
+    assertEquals(WatchedRootsStore.NEVER_INDEXED, roots.get(root));
+
+    Path injected = dataDirectory.resolve("injected").toAbsolutePath().normalize();
+    roots.put(injected, Instant.parse("2026-09-14T09:00:00Z"));
+    assertTrue(state.watchedPaths().contains(injected));
   }
 }

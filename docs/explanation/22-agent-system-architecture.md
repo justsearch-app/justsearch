@@ -273,6 +273,14 @@ Every action an actor takes — whether the user clicked it, the agent proposed 
 
 **One intent verdict.** `IntentGateEvaluator` (in `app-services`) computes `(sourceTier × riskTier) → gateBehavior`, the lattice, and the Global Hard-Stop state into one `IntentVerdict`. The enforcement chokepoint (`OperationExecutorImpl.enforceTrustLattice`) and the Preview face (`/api/operations/{id}/preview`) read the *same* evaluator instance — the preview is the structural-prediction read of the one verdict (no args/token; args-bound capsule verification stays enforcement-only). A consumer cannot disagree with enforcement because there is one computation. **Undoing is dispatching.** A reversal is an operation and inherits the risk class of its forward form, so `OperationExecutorImpl.undo` runs the same chokepoint over the reversal's own canonical arguments (`OperationDispatcher.undoArguments`, `{"executionId":…}`) — same lattice cell, same risk ceiling on durable grants, same args-bound capsule. Consequences that follow from that and are not softened: the forward invocation's capsule does not authorize the reversal (capsules are args-bound), a standing grant does not cover it (a reversal names no path, so `DurableGrantScope` cannot prove containment and fails closed), and an engaged hard stop denies it. Before tempdoc 875 §C.7 this path checked `undoSupported` and the capability set only, so the reverse of a HIGH-risk write dispatched with no gate at all — an agent that could not perform an action could still undo one.
 
+The process loads one `OperationAuthority` before launching asynchronous index
+startup. It owns the durable grant store, capsule service, hard stop, evaluator and
+indexed-root scope. The existing `WatchedRootsState` loads from the configured data
+directory and supplies both that scope and the later `KnowledgeClient`/root lifecycle
+operations. API composition consumes these same objects and attaches audit sinks.
+A failed roots migration or corrupt roots/grants file stops this preload; client
+construction does not read a second roots snapshot.
+
 **Recorded authorization evidence.** After the shared lattice authorizes a dispatch,
 acceptance replaces the caller's grant reference with a versioned server-selected
 basis in the operations row: structural AUTO, one-time capsule, exact operation

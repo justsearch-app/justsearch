@@ -20,8 +20,16 @@ app-api/services has3,122 cases, three existing skips and no failures; negative1
 and restored1633 pin the new guards. [Owning evidence](evidence/C2/ingestion-authorization-recovery.md).
 C2-9a.1 is pushed as43fa7b3ac. The C2-9a.2 grant persistence-before-publication
 correction now passes full1636 (2,901 services cases, three existing skips,
-zero failures), negative1635 and independent review. Next is C2-9b shared pre-poll
-authority and C2-8d.3 actual producer. Recovery activation remains unimplemented.
+zero failures), negative1635 and independent review; pushed27246acd6.
+C2-9b.1 now preloads one shared OperationAuthority and the existing WatchedRootsState
+before the async fork, with identical state used by the client and Head. Full1642
+services/Engine:3,145 cases, three existing skips, zero failures;143 focused cases,
+three discriminating negative controls, UI compilation/PMD/format and independent
+call-path review also pass. Next is C2-9b.2 strict frozen-root scope/recovery decision,
+then C2-9b.3 fencing and C2-8d.3 actual producer. Recovery activation remains open.
+Hosted27246acd6 exposed the old UI assertion that omitted the server-selected basis;
+[the correction record](evidence/C2/hosted-authorization-context.md) preserves the
+exact failure. This is separate from the shared-authority implementation.
 Notification checkpoint7777be3fd passed all13 hosted jobs in CI34835832804.
 
 A/B/C1 are complete. C2 remains open; do not merge before stage F.

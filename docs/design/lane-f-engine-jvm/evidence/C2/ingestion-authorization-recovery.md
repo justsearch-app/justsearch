@@ -91,7 +91,7 @@ The implementation is not ready until focused tests establish all of the followi
 
 ## Missing proof
 
-The shared pre-fork authority, strict recorded-root scope, roots carrier, per-claim invalidation and generation-ready recovery callback remain unimplemented. After-lock queue notification is implemented and verified separately in [walk-notifications-retention.md](walk-notifications-retention.md). The C2-9a.1 basis/selection/binding cut is locally verified below; it does not establish live recovery, reboot permission or stage completion.
+Shared pre-fork authority and the sole roots carrier are locally verified in C2-9b.1 below. Strict recorded-root scope, per-claim invalidation and the generation-ready recovery callback remain unimplemented. After-lock queue notification is implemented and verified separately in [walk-notifications-retention.md](walk-notifications-retention.md). The C2-9a.1 basis/selection/binding cut is locally verified below; it does not establish live recovery, reboot permission or stage completion.
 
 
 ## C2-9a acceptance prerequisite (2026-09-14)
@@ -228,3 +228,95 @@ refuted against actual consumers and did not justify another queue. No hosted
 proof for this dirty cut is claimed. Logs/counts/XML remain accessible under
 `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/1634*` through `tmp/1636*`,
 retained through final lane reconciliation plus30 days, at least2026-10-14.
+
+
+## C2-9b implementation sequence (2026-09-14)
+
+1. **C2-9b.1 preloaded shared ownership.** Promote the existing WatchedRootsState
+   to the preloaded carrier instead of wrapping its map/store/state in another
+   registry. Its factory migrates then loads before any executor/server start,
+   using the process's configured data directory. KnowledgeClient and
+   RootLifecycleOps keep the exact same map/state; expose only a copied path view
+   outside the worker package. Legacy migration copy failure is fatal; failure to
+   rename an already-copied legacy source remains harmless. Retain current missing
+   path filtering (it only narrows authorization); do not authorize detached roots.
+   Compose a bootstrap OperationAuthority containing that carrier plus the one
+   store/capsule/hard-stop/scope/evaluator/catalog/trust objects before HeadlessApp's
+   async fork. Pass it through EngineRoot and primary HeadAssembly/SubstratePhase;
+   OperationSubstrateInit consumes it and only attaches existing audit sinks.
+   Explicit test-only boot factories use in-memory state. Do not move the whole
+   HeadAssembly before the fork or create another evaluator: the evaluator needs
+   only existing trust/source catalogs, not the later capability resolver.
+2. **C2-9b.2 frozen scope and recovery decision.** Add strict frozen-plan coverage,
+   shared-basis revalidation and typed refusal/wait decisions, with no public-input
+   fallback. Keep envelope identity validation in its existing owner. Record the
+   exact argument/plan validation split before implementing it.
+3. **C2-9b.3 activation fence.** Connect the generation-ready callback and per-claim
+   permit/revocation checks before any recorded poll/reaper/processing recovery;
+   connect the producer and explicit reconciliation cadence. This is required
+   activation work, not a deferral after C2.
+
+C2-9b.1 acceptance requires object identity across bootstrap/client/root lifecycle
+and scope, corruption/migration failure before worker startup, root add/remove
+visibility, no duplicate load and no changed trust boundaries. Focused tests plus
+app-services/app-engine/UI compilation and appropriate integration precede its
+per-item checkpoint. Later items still require actual live/restart proof.
+
+
+### C2-9b.1 local verification (2026-09-14)
+
+Base `27246acd6cd6278bf73c0170c78bc834805b55c1` plus this shared-authority diff,
+Windows x64, root-owned Gradle. `OperationAuthority.load(configPhase.dataDir())`
+now precedes construction of the process EngineRoot and the asynchronous bootstrap
+executor/fork. API assembly receives `engineRoot.authority()`; the substrate
+reuses its evaluator, catalogs, capsule service, hard stop, grants and roots scope.
+KnowledgeClient receives the same WatchedRootsState/map, including RootLifecycleOps
+and SyncOps. Its construction no longer migrates or reloads durable roots.
+
+- 1637 executed120 cases with no failures; PMD rejected a redundant qualified test
+  name. 1638 executed126 services cases without failure but Engine test compilation
+  rejected a fixture imported from the wrong module. Both defects were corrected.
+- 1639 executed143 cases/13 suites with no failures/errors/skips; services and Engine
+  tests, UI main/test compilation, services/Engine PMD and formatting passed. Tests
+  cover synchronous roots hydration, isolated migration-copy failure/preservation,
+  corrupt roots/grants, configured grant path, shared object identities/hard-stop
+  effects, and copied membership snapshots reflecting add/remove changes.
+- 1640 negative-control compilation failed because the injected reload called the
+  wrong method; it provides no behavioral proof. Corrected1641 executed17 cases
+  with exactly three expected failures: duplicate capsules violate identity,
+  swallowed migration-copy failure violates fatal preload, and client reload reads
+  the deliberately corrupted file changed after preload.
+- The three production files were restored byte-for-byte from the1639 snapshots
+  before integrated1642. The actual Engine client regression uses a mocked index
+  server and real roots file/state; it proves reuse and no second read, not physical
+  process startup. Pre-fork ordering and failure cleanup also require the recorded
+  production call-path review. Full live/restart recovery remains C2-9b.3.
+
+Canonical regeneration/link/config checks and the three operation/execution gates
+plus store-recoverability pass in `tmp/1642-docs.txt` and `tmp/1642-gates.txt`.
+Evidence logs/counts/XML are accessible under
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/1637*` through `tmp/1642*`;
+retain through final lane reconciliation plus30 days, at least2026-10-14.
+
+
+Independent call-path refute confirmed the canonical Headless path: preload at
+HeadlessApp:1086, EngineRoot construction at:1087, asynchronous fork at:1117;
+buildApi passes the same authority at:455-459. The failure path at:1311-1357 and
+:1381-1384 closes operations and the instance lock when preload throws before
+processRoot/Head assignment. Legacy EngineRoot process overloads have no current
+production caller; the old HeadAssembly constructor is used by the separate
+standalone launcher without another EngineRoot. Minimal search-only composition
+explicitly uses in-memory authority. These compatibility paths are not proof of
+recorded ingestion recovery; activation must use the shared process authority.
+
+
+Integrated1642 executed the full app-services and app-engine suites:3,145 cases/
+480 suites, three existing skips, no failures/errors. UI main/test compilation,
+services/Engine PMD and formatting passed (incremental reuse is recorded in the log).
+Root independently verified all three negative-control source restores remained
+byte-identical to the1639 backups after this run. This closes the C2-9b.1 local
+composition item; C2-9b.2/.3 and actual producer activation remain open.
+
+Hosted grant checkpoint27246acd6 failed the unchanged UI context assertion;
+12 other CI jobs and CLA passed. [Exact hosted finding and correction](hosted-authorization-context.md).
+No successful hosted run for this shared-authority diff is claimed yet.

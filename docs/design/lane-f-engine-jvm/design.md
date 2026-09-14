@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-9b reuses WatchedRootsState as the preloaded carrier and composes one bootstrap OperationAuthority before the asynchronous Engine fork; primary Head and index sides consume the same objects. Failed legacy copy/load prevents startup. Whole HeadAssembly remains parallel. [Per-item ownership and verification plan](evidence/C2/ingestion-authorization-recovery.md#c2-9b-implementation-sequence-2026-09-14).
+
 - 2026-09-14: C2-9a.2 fixes the independently verified grant live-before-disk defect before recovery activation: one immutable committed set of existing grant keys, serialized strict file replacement before publication, success events after commit. No additional store or journal. [Publication decision and failure proof](evidence/C2/ingestion-authorization-recovery.md#c2-9a2-publication-decision-2026-09-14).
 
 - 2026-09-14: Implement C2-9a's selected server-built authorization stamp before real ingest producer activation. Reuse grant_ref with a canonical bounded jsa1 basis, exact operation/family key and shared SourceTier; preserve every other prepared context axis. This is a prerequisite ordering within C2, not a stage change. [Encoding and owning contract](evidence/C2/ingestion-authorization-recovery.md#c2-9a-acceptance-prerequisite-2026-09-14).

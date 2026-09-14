@@ -310,6 +310,21 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService,
       Consumer<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry> authorizationOutcomeEmitter,
       io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
+    this(attempts, admission, handlers, historyEmitter, advisoryEmitters, clock,
+        trustEvaluator != null && intentSourceCatalog != null
+            ? new IntentGateEvaluator(trustEvaluator, intentSourceCatalog) : null,
+        capabilityResolver, capsuleService, authorizationOutcomeEmitter, preparationCipher);
+  }
+
+  /** Production shares the pre-fork evaluator with recovery and preview. */
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
+      HandlerRegistry handlers, Consumer<OperationHistoryEntry> historyEmitter,
+      Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters, Clock clock,
+      IntentGateEvaluator sharedEvaluator,
+      java.util.function.Function<RequiredCapability, Boolean> capabilityResolver,
+      io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService,
+      Consumer<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry> authorizationOutcomeEmitter,
+      io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
     this.preparationCodec = new PreparedInvocationCodec(preparationCipher);
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.admission = Objects.requireNonNull(admission, "admission");
@@ -318,12 +333,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     this.advisoryEmitters =
         advisoryEmitters == null ? Map.of() : Map.copyOf(advisoryEmitters);
     this.clock = Objects.requireNonNull(clock, "clock");
-    // Tempdoc 550 thesis III: collapse source-tier derivation + lattice + hard-stop into the one
-    // IntentGateEvaluator. Absent trust deps (legacy/test wiring) → null → lattice skipped.
-    this.intentGateEvaluator =
-        (trustEvaluator != null && intentSourceCatalog != null)
-            ? new IntentGateEvaluator(trustEvaluator, intentSourceCatalog)
-            : null;
+    this.intentGateEvaluator = sharedEvaluator;
     this.capabilityResolver = capabilityResolver;
     this.capsuleService = capsuleService;
     this.authorizationOutcomeEmitter = authorizationOutcomeEmitter;

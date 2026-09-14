@@ -455,7 +455,7 @@ public class HeadlessApp {
         new HeadAssembly(
             engineRoot.operations(), engineRoot.operationAttempts(),
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
-            childRegistry, engineRoot.operationLeases(), engineRoot.admission());
+            childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority());
     LocalApiServer constructedApi = null;
     try {
       log.info("HeadAssembly started (degraded — Worker connecting in background).");
@@ -1083,9 +1083,10 @@ public class HeadlessApp {
               io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
               io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN), settingsOwner,
           new io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver());
+      var operationAuthority = io.justsearch.app.services.bootstrap.OperationAuthority.load(configPhase.dataDir());
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
-          childRegistry, requestedRestartAction);
+          childRegistry, requestedRestartAction, operationAuthority);
       processRoot = engineRoot;
       processExecutors = engineRoot.executors();
 

@@ -49,6 +49,11 @@ import org.slf4j.LoggerFactory;
  * Nothing else in the repo may construct an implementation of a port.
  */
 public final class EngineRoot implements WorkerHost {
+  private final io.justsearch.app.services.bootstrap.OperationAuthority authority;
+
+  /** Preloaded process authority shared with Head; independent of index restarts. */
+  public io.justsearch.app.services.bootstrap.OperationAuthority authority() { return authority; }
+
   private final io.justsearch.app.api.operations.OperationStore operations;
   private final io.justsearch.app.api.operations.OperationAttemptRunner attempts;
   public io.justsearch.app.api.operations.OperationAttemptRunner operationAttempts() { return attempts; }
@@ -140,6 +145,15 @@ public final class EngineRoot implements WorkerHost {
         requestedRestartAction);
   }
 
+  /** Process boot must supply authority loaded before its asynchronous fork. */
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize,
+      IntConsumer terminalWriterFaultAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
+    return new EngineRoot(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction,
+        childRegistry, requestedRestartAction, authority);
+  }
+
   private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize, IntConsumer exitAction) {
     this(operations, attempts, deadlineMs, batchSize, exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
@@ -158,6 +172,15 @@ public final class EngineRoot implements WorkerHost {
       IntConsumer exitAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction) {
+    this(operations, attempts, deadlineMs, batchSize, exitAction, childRegistry, requestedRestartAction,
+        io.justsearch.app.services.bootstrap.OperationAuthority.load(
+            io.justsearch.configuration.PlatformPaths.resolveDataDir()));
+  }
+
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize,
+      IntConsumer exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this(operations, attempts,
         (gauge, executorRegistry) -> {
           WorkerConfig workerConfig = WorkerConfig.load();
@@ -173,7 +196,7 @@ public final class EngineRoot implements WorkerHost {
         deadlineMs,
         batchSize,
         exitAction,
-        requestedRestartAction);
+        requestedRestartAction, authority);
   }
 
   /** Test seam: supply the index half rather than building it from the global config. */
@@ -198,8 +221,18 @@ public final class EngineRoot implements WorkerHost {
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       Runnable requestedRestartAction) {
+    this(operations, attempts, serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
+        requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority.inMemory());
+  }
+
+  /** Test seam preserving the same supplied authority as the process factory. */
+  EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      Function<GpuSchedulingGauge, KnowledgeServer> serverFactory, long deadlineMs, int batchSize,
+      IntConsumer terminalWriterFaultAction, Runnable requestedRestartAction,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this(operations, attempts, (gauge, ignored) -> serverFactory.apply(gauge), deadlineMs, batchSize,
-        terminalWriterFaultAction, requestedRestartAction);
+        terminalWriterFaultAction, requestedRestartAction, authority);
   }
 
   private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
@@ -208,7 +241,8 @@ public final class EngineRoot implements WorkerHost {
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
-      Runnable requestedRestartAction) {
+      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
+    this.authority = Objects.requireNonNull(authority, "authority");
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
@@ -256,7 +290,7 @@ public final class EngineRoot implements WorkerHost {
     ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
     EngineKnowledgeClient built =
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
-            () -> requestRestart(started), admission);
+            () -> requestRestart(started), admission, authority.roots());
     this.client = built;
     log.info("Engine composed the index half in-process (no worker process, no channel)");
     return built;

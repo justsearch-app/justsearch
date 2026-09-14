@@ -13,7 +13,30 @@ import java.nio.file.Path;
  * <p>Keeps timestamp normalization and persist operations centralized so caller flows
  * can focus on orchestration instead of map/store bookkeeping.
  */
-final class WatchedRootsState {
+public final class WatchedRootsState {
+
+  /** Preload the sole roots state before index startup or authorization wiring. */
+  public static WatchedRootsState load(Path dataDirectory) {
+    Path rootsFile = Objects.requireNonNull(dataDirectory, "dataDirectory")
+        .toAbsolutePath().normalize().resolve("watched_roots.json");
+    var store = new WatchedRootsStore(rootsFile, org.slf4j.LoggerFactory.getLogger(WatchedRootsState.class));
+    store.migrateLegacyRootsFileIfNeeded();
+    var state = new WatchedRootsState(new java.util.concurrent.ConcurrentHashMap<>(), store);
+    state.loadPersistedRoots();
+    return state;
+  }
+
+  /** Isolated empty state for compositions that intentionally have no durable roots. */
+  public static WatchedRootsState inMemory() {
+    return new WatchedRootsState(new java.util.concurrent.ConcurrentHashMap<>(), new WatchedRootsStore(null, null));
+  }
+
+  /** A current copied membership view; no filesystem or Worker call is performed. */
+  public java.util.List<Path> watchedPaths() {
+    return java.util.List.copyOf(watchedRoots.keySet());
+  }
+
+  Map<Path, Instant> rootsMap() { return watchedRoots; }
 
   private final Map<Path, Instant> watchedRoots;
   private final Map<Path, String> walkErrors;
