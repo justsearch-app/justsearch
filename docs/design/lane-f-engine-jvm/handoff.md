@@ -54,12 +54,16 @@ budget and containment negative controls. [Proof and pending hosted run](evidenc
 Actual producer/queue/recovery activation remains open in the [per-item vertical plan](evidence/C2/C2-8d-vertical-plan.md).
 C2-9's [authorization recovery contract](evidence/C2/ingestion-authorization-recovery.md)
 requires a server-built basis, exact grant re-resolution and sole preloaded roots/evaluator.
-PR727 managed review record is verified through d892321c6. That hosted run passes
+PR727 managed review record is verified through112d2e05d. Hosted d892321c6 passes
 Windows-native tests and twelve jobs, but its advisory integration job fails; recovery
 failures are being diagnosed and remain required lane work despite overall green CI.
 C2-8d.2b.1 admission/terminal accounting passes final1567:2,225 represented cases,
 20 existing skips, no failures/errors, PMD/format pass. [Proof and review corrections](evidence/C2/walk-terminal-accounting.md).
 Next cut is administrative closure/seal, then notification/ack retention and real producer/recovery.
+Installed1568 fixes a stale positive-count recovery log assertion and passes writer, lock-boot,
+processing and operation-resume. Migration (Green fingerprint missing) and lock-ingest
+(SQLITE_BUSY admission) fail and are under active repair. Hosted initial-discovery failure
+is still unproven locally. [Owning evidence and next repairs](evidence/C2/hosted-recovery-correction.md).
 The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
 walk receipt, existing ledger and current membership after independent review. Next is
 C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then

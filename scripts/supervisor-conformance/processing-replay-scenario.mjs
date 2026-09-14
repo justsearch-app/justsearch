@@ -77,7 +77,7 @@ export async function exerciseProcessingReplay(c) {
   });
   requireThat(successor.supervisor.restartCount === 1, 'only the injected crash should spend budget');
   const recoveredLog = fs.readFileSync(path.join(data, 'logs', 'engine.log'), 'utf8');
-  requireThat(/Recovered [1-9][0-9]* stuck jobs/.test(recoveredLog), 'startup must report actual PROCESSING recovery');
+  requireThat(/Recovered [1-9][0-9]* unowned processing jobs/.test(recoveredLog), 'startup must report actual PROCESSING recovery');
   console.log('PROCESSING_REPLAY_PASS', JSON.stringify({ afterDeath,
     successor: successor.supervisor, final: jobStateFor(path.basename(file)) }));
   return { file, marker, successor, afterDeath };

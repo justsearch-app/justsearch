@@ -1,0 +1,39 @@
+{
+  "base": "112d2e05d0772936b6e9a2d6f75653e52c3ba2b2",
+  "status": "assertion corrected; installed suite still red with migration and lock admission failures",
+  "run": {
+    "revision": "112d2e05d+dirty",
+    "command": "gradlew system-tests integrationTest EngineSupervisedRecoveryE2ETest OperationResumeE2ETest",
+    "summary": {
+      "tests": 6,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    "tasks": [
+      {
+        "module": "system-tests",
+        "task": "integrationTest",
+        "status": "FAILED",
+        "tests": 6,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      }
+    ]
+  },
+  "passed": [
+    "writer",
+    "lock-boot",
+    "processing",
+    "operation"
+  ],
+  "failed": [
+    "migration",
+    "lock-ingest"
+  ],
+  "hostedArtifact": "tmp/hosted-integration1561",
+  "localHealth": "tmp/quick1569.json"
+}
