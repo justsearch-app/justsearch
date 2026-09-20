@@ -2,11 +2,13 @@
 
 ## Current state (2026-09-21)
 
-**Paused at the user's request.** Continue from `codex/lane-f-pr1` in
-`.claude/worktrees/lane-f-pr1-verify`. The latest declared-survival admission changes
-are saved in per-item commits; focused closeout checks pass, but full verification,
-independent re-review, canonical follow-through and live/restart proof remain.
-[Pause record and ordered next steps](evidence/C2/pause-2026-09-21.md).
+**Resumed at the user's request.** Continue from `codex/lane-f-pr1` in
+`.claude/worktrees/lane-f-pr1-verify`, takeover checkpoint `28d5082cd`.
+[Current working contract, transcript lessons and acceptance table](evidence/C2/resume-2026-09-21.md)
+is the context-reset entry point. Declared-survival admission is implemented;
+independent re-review, canonical follow-through, full verification and corrected
+live/restart proof remain. Pause-head CI has app-ui and operation-surface failures
+being investigated. The [pause record](evidence/C2/pause-2026-09-21.md) is historical.
 A/B/C1 are complete; C2 and D1/D2/E/F remain. Merge stays at F.
 
 The following entries preserve earlier implementation history and its evidence.

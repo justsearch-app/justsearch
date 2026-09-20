@@ -110,6 +110,14 @@ apply. A new code change, failure, environment difference, or unresolved concern
 can justify rerunning; a documentation checkpoint alone does not invalidate an
 unrelated passing test. Complete every required tier without redundant reruns.
 
+Prove the checklist's named acceptance behavior before adjacent behavior. When a
+required test cannot be written against the selected design, correct that design
+and its acceptance mapping rather than substituting an easier proof. Prefer a
+complete consumer path as the next batch outcome; counts of helpers, commits or
+reviews do not establish progress against that outcome. Keep the required proof
+tier explicit and record a concrete reason before adding a more expensive tier
+to an item, so later items do not inherit accidental verification requirements.
+
 Preserve suite output and result files before targeted reruns can overwrite them.
 Capture exit status on the first run. Keep concise summaries and reproducible
 commands in Git. Store bulky logs in retained CI artifacts or an explicitly
