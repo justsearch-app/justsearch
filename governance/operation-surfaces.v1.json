@@ -533,6 +533,15 @@
       "note": "Accepts dispatch/undo through the shared runner; history and advisory projections follow durable actual completion."
     },
     {
+      "id": "operation-work-handoff",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationWorkHandoff.java",
+      "guard": "test:DeclaredSurvivalDispatchTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "Process-local caller/effect reservation and cancellation handoff uses the runner's scoped acceptance capability. The runner remains the sole durable acceptance/completion authority; handoff flags are not an operation lifecycle model."
+    },
+    {
       "id": "recorded-background-agent-run",
       "kind": "producer",
       "lang": "java",
