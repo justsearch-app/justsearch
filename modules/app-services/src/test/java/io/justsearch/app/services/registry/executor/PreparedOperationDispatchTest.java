@@ -426,11 +426,15 @@ class PreparedOperationDispatchTest {
           currentProvenance, Optional.empty(), current, key, gated.preparationNonce()));
       assertEquals(0, fixture.effects.get());
       String token = capsules.mintPrepared(ID.value(), "{}", SourceTier.UNTRUSTED, key, gated.preparationNonce());
+      clearInvocations(admission);
       assertTrue(executor.dispatch(operation(), "{}", currentProvenance, Optional.of(token), current, key, gated.preparationNonce()).success());
       var accepted = ORIGIN.withGrantReference(Optional.of("jsa1:capsule"));
-      verify(admission).attach(accepted);
+      verify(admission).attach(ORIGIN);
+      verify(admission).attach(current);
       assertEquals(ORIGIN.clientId(), fixture.usedContext.get().clientId());
       assertNotEquals(current.workId(), fixture.usedContext.get().workId());
+      assertEquals(accepted.withWorkId(fixture.usedContext.get().workId().orElseThrow()),
+          fixture.usedContext.get());
       assertEquals(PROVENANCE, fixture.usedProvenance.get());
       assertEquals(accepted, store.find(key).orElseThrow().context());
     }

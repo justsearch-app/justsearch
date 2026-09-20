@@ -138,6 +138,25 @@ are the smallest ownership split that preserves those contracts.
 
 ## Bounded implementation and proof
 
+### Resumption review correction, 2026-09-21
+
+The reverse-survival child can be cancelled directly by `cancelInteractive`,
+independently of its durable parent. Register its cancellation delivery with the
+existing handoff lock before the final check, and detach that registration when
+the effect completes or reservation fails. This gives cancellation and acceptance
+the same ordering already used for parent cancellation. A last-minute polling
+check alone leaves a gap before store acceptance; a new admission API or durable
+marker is unnecessary. Before handler entry, check the retained work's cancellation
+reason outside the handoff lock. Acceptance-first cancellation then settles through
+the existing runner as CANCELLED without starting an effect. Prove cancel-first,
+accept-first and accepted-but-not-started cases with deterministic barriers and
+actual admission/store ownership. Handlers never run under the handoff lock.
+
+The hosted retry assertion must follow reservation-before-consent: the reservation
+receives the frozen origin without a new grant, while the accepted row and handler
+receive the server-authorized basis. Preserve all frozen-origin/provenance checks;
+do not change product ordering to satisfy the superseded mock call sequence.
+
 1. Declaration and projection: policy field/copy constructors, INGEST/REINDEX
    declarations, schema copies/projections, inheritance/equal-axis/new-work tests.
    The declaration is not locally complete until its actual admission wiring lands.

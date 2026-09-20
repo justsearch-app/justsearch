@@ -17,6 +17,7 @@ final class OperationWorkHandoff implements AutoCloseable {
   private EngineWorkHandle work;
   private EngineWorkHandle.Registration parentCancellation;
   private EngineWorkHandle.Registration parentCompletion;
+  private EngineWorkHandle.Registration workCancellation;
   private RuntimeException unavailableParent;
   private String ended;
   private boolean accepted;
@@ -41,6 +42,11 @@ final class OperationWorkHandoff implements AutoCloseable {
       Function<EngineContext, EngineContext> authorize) {
     if (unavailableParent != null) throw unavailableParent;
     work = admission.attach(effect);
+    workCancellation = work.onCancel(reason -> {
+      synchronized (lock) {
+        if (!accepted && ended == null) ended = reason;
+      }
+    });
     synchronized (lock) {
       if (ended != null || work.cancellationReason().isPresent()
           || (parent != null && parent.cancellationReason().isPresent())) {
@@ -57,10 +63,9 @@ final class OperationWorkHandoff implements AutoCloseable {
 
   /** Run outside the runner stripe, before the dispatcher relinquishes its effect reference. */
   void accepted() {
-    if (parent == null) return;
     var _ = work.onCompletion(this::removeParentListeners);
     observingCompletion = true;
-    parent.close();
+    if (parent != null) parent.close();
   }
 
   private void parentEnded(String reason, boolean cancelled) {
@@ -77,6 +82,7 @@ final class OperationWorkHandoff implements AutoCloseable {
   private void removeParentListeners() {
     if (parentCancellation != null) parentCancellation.close();
     if (parentCompletion != null) parentCompletion.close();
+    if (workCancellation != null) workCancellation.close();
   }
 
   @Override public void close() {

@@ -632,6 +632,9 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       EngineContext acceptedContext) {
     var owner = work.retain();
     try {
+      owner.cancellationReason().ifPresent(reason -> {
+        throw new java.util.concurrent.CancellationException(reason);
+      });
       EngineContext authorized = owner.context().withGrantReference(acceptedContext.grantReference());
       OperationExecution execution = undoId == null
           ? invocation.handler().executePrepared(invocation.value(), provenance, authorized, record)

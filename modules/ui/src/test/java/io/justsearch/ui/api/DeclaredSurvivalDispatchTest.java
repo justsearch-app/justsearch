@@ -154,6 +154,104 @@ class DeclaredSurvivalDispatchTest {
   }
 
   @Test
+  void interactiveOverrideRemainsCancellableWithoutCancellingDurableParent() throws Exception {
+    try (var fixture = new Fixture(directory, 4, false, EngineContext.Survival.DURABLE,
+        EngineContext.Survival.INTERACTIVE);
+        var caller = fixture.admission.admit(fixture.origin, false)) {
+      fixture.start(caller.context());
+      assertNotEquals(caller.context().workId(), fixture.effectContext.get().workId());
+      assertEquals(EngineContext.Survival.INTERACTIVE, fixture.effectContext.get().survival());
+      fixture.admission.cancelInteractive("cancel interactive override");
+      assertTrue(caller.cancellationReason().isEmpty());
+      try (var child = fixture.admission.attach(fixture.effectContext.get())) {
+        assertEquals(Optional.of("cancel interactive override"), child.cancellationReason());
+      }
+      fixture.completion.completeExceptionally(new java.util.concurrent.CancellationException("producer exited"));
+      assertEquals(1, fixture.admission.activeWorkCount());
+    }
+  }
+
+  @Test
+  void cancelledDurableCallerCannotAcceptInteractiveOverrideOrSpendConsent() throws Exception {
+    try (var fixture = new Fixture(directory, 4, false, EngineContext.Survival.DURABLE,
+        EngineContext.Survival.INTERACTIVE);
+        var caller = fixture.admission.admit(fixture.origin, false)) {
+      String key = OperationKeys.generate(Clock.systemUTC());
+      var ready = (OperationDispatchPlan.Ready) fixture.executor.prepare(fixture.operation, "{}",
+          fixture.provenance, caller.context(), key, false);
+      String token = fixture.capsules.mintPrepared(fixture.operation.id().value(), "{}",
+          SourceTier.UNTRUSTED, key, ready.preparationNonce());
+      caller.cancel("cancel before interactive acceptance");
+      assertThrows(java.util.concurrent.CancellationException.class,
+          () -> fixture.dispatch(caller.context(), key, token, ready.preparationNonce()));
+      assertTrue(fixture.store.find(key).isEmpty());
+      assertEquals(0, fixture.effects.get());
+      assertEquals(1, fixture.admission.activeWorkCount());
+      assertTrue(fixture.capsules.verifyPreparedAndConsume(token, fixture.operation.id().value(), "{}",
+          key, ready.preparationNonce()));
+    }
+  }
+
+  @Test
+  void interactiveCancellationDuringAcceptanceWaitsForHandoffAndPreventsHandler() throws Exception {
+    try (var fixture = new Fixture(directory, 4, true, EngineContext.Survival.DURABLE,
+        EngineContext.Survival.INTERACTIVE);
+        var caller = fixture.admission.admit(fixture.origin, false);
+        var calls = Executors.newFixedThreadPool(2)) {
+      String key = OperationKeys.generate(Clock.systemUTC());
+      var ready = (OperationDispatchPlan.Ready) fixture.executor.prepare(fixture.operation, "{}",
+          fixture.provenance, caller.context(), key, false);
+      String token = fixture.capsules.mintPrepared(fixture.operation.id().value(), "{}",
+          SourceTier.UNTRUSTED, key, ready.preparationNonce());
+      var dispatch = calls.submit(() -> fixture.dispatch(caller.context(), key, token, ready.preparationNonce()));
+      assertTrue(fixture.barrier.entered.await(2, TimeUnit.SECONDS));
+      var cancelStarted = new CountDownLatch(1);
+      var cancel = calls.submit(() -> {
+        cancelStarted.countDown();
+        fixture.admission.cancelInteractive("cancel during acceptance");
+      });
+      try {
+        assertTrue(cancelStarted.await(2, TimeUnit.SECONDS));
+        assertThrows(TimeoutException.class, () -> cancel.get(200, TimeUnit.MILLISECONDS),
+            "cancellation delivery must wait for the in-progress acceptance handoff");
+      } finally {
+        fixture.barrier.release.countDown();
+      }
+      cancel.get(2, TimeUnit.SECONDS);
+      assertInstanceOf(java.util.concurrent.CancellationException.class,
+          assertThrows(ExecutionException.class, () -> dispatch.get(2, TimeUnit.SECONDS)).getCause());
+      assertEquals(OperationState.CANCELLED, fixture.store.find(key).orElseThrow().state());
+      assertEquals(0, fixture.effects.get());
+      assertEquals(1, fixture.barrier.consumptions.get());
+      assertEquals(1, fixture.admission.activeWorkCount());
+      assertTrue(caller.cancellationReason().isEmpty());
+    }
+  }
+
+  @Test
+  void acceptedInteractiveOverrideCancelledByPublicationNeverEntersHandler() throws Exception {
+    try (var fixture = new Fixture(directory, 4, false, EngineContext.Survival.DURABLE,
+        EngineContext.Survival.INTERACTIVE);
+        var caller = fixture.admission.admit(fixture.origin, false)) {
+      String key = OperationKeys.generate(Clock.systemUTC());
+      var ready = (OperationDispatchPlan.Ready) fixture.executor.prepare(fixture.operation, "{}",
+          fixture.provenance, caller.context(), key, false);
+      String token = fixture.capsules.mintPrepared(fixture.operation.id().value(), "{}",
+          SourceTier.UNTRUSTED, key, ready.preparationNonce());
+      fixture.capsules.setGrantEventSink(event -> {
+        if (event instanceof io.justsearch.app.observability.ledger.ActionEvent.Grant grant
+            && "CONSUMED".equals(grant.action())) fixture.admission.cancelInteractive("publication cancelled child");
+      });
+      assertThrows(java.util.concurrent.CancellationException.class,
+          () -> fixture.dispatch(caller.context(), key, token, ready.preparationNonce()));
+      assertEquals(OperationState.CANCELLED, fixture.store.find(key).orElseThrow().state());
+      assertEquals(0, fixture.effects.get());
+      assertEquals(1, fixture.admission.activeWorkCount());
+      assertTrue(caller.cancellationReason().isEmpty());
+    }
+  }
+
+  @Test
   void missingConsentPreviewCanReenterTheRunnerAndValidConsentDoesNotRecomputeIt()
       throws Exception {
     try (var fixture = new Fixture(directory);
@@ -242,9 +340,8 @@ class DeclaredSurvivalDispatchTest {
 
   private static final class Fixture implements AutoCloseable {
     final EngineAdmissionController admission;
-    final EngineContext origin = TestRequestContexts.mcp("survival-dispatch");
-    final InvocationProvenance provenance = EngineProvenance.invocation(origin, ExecutorTag.AGENT,
-        Clock.systemUTC().instant(), Optional.empty());
+    final EngineContext origin;
+    final InvocationProvenance provenance;
     final ConsentCapsuleService capsules = new ConsentCapsuleService();
     final BarrierCapsules barrier;
     final AtomicInteger effects = new AtomicInteger();
@@ -263,6 +360,16 @@ class DeclaredSurvivalDispatchTest {
     }
 
     Fixture(Path directory, int aggregateLimit, boolean barrierConsent) throws Exception {
+      this(directory, aggregateLimit, barrierConsent, EngineContext.Survival.INTERACTIVE,
+          EngineContext.Survival.DURABLE);
+    }
+
+    Fixture(Path directory, int aggregateLimit, boolean barrierConsent,
+        EngineContext.Survival callerSurvival, EngineContext.Survival effectSurvival) throws Exception {
+      var incoming = TestRequestContexts.mcp("survival-dispatch");
+      origin = new EngineContext(incoming.clientKind(), incoming.clientId(), incoming.sessionId(),
+          incoming.grantReference(), incoming.sourceTier(), incoming.transport(), callerSurvival, incoming.urgency());
+      provenance = EngineProvenance.invocation(origin, ExecutorTag.AGENT, Clock.systemUTC().instant(), Optional.empty());
       admission = new EngineAdmissionController(2, aggregateLimit, 1);
       barrier = barrierConsent ? new BarrierCapsules(capsules) : null;
       store = new SqliteOperationStore(directory.resolve("operations.db"));
@@ -271,7 +378,7 @@ class DeclaredSurvivalDispatchTest {
           Interface.of("{\"type\":\"object\"}", "{\"type\":\"object\"}"),
           new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE, AuditPolicy.METADATA_ONLY,
               RetryPolicy.noRetry(), Set.of(), false).withRecordKind(OperationKind.NOTE)
-              .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+              .withDeclaredSurvival(effectSurvival),
           OperationAvailability.empty(), OperationLineage.empty(), Binding.of(id),
           new Provenance(TrustTier.CORE, "test", "1"), Set.of(ExecutorTag.AGENT));
       var handlers = new HandlerRegistry();
