@@ -29,6 +29,30 @@ import org.junit.jupiter.api.io.TempDir;
 class OperationSubstrateInitTest {
   @TempDir Path operationDirectory;
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(value = OperationKind.class, names = {"INGEST", "REINDEX", "NOTE"})
+  void explicitDurableCatalogRequiresTheRunnerBootOwner(OperationKind kind) throws Exception {
+    var template = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.REINDEX.value()).orElseThrow();
+    var operation = new Operation(template.id(), template.presentation(), template.intf(),
+        template.policy().withRecordKind(kind), template.availability(), template.lineage(),
+        template.binding(), template.provenance(), template.executors());
+    var catalog = OperationCatalog.of("core", List.of(operation));
+    try (var store = new SqliteOperationStore(operationDirectory.resolve("owner.db"));
+        var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      var admission = mock(io.justsearch.app.api.EngineAdmissionService.class);
+      var absent = new OperationAttemptRunnerImpl(store, Clock.systemUTC(), Set.of());
+      assertThrows(IllegalArgumentException.class, () -> OperationSubstrateInit.run(store, absent, admission,
+          executors, new HandlerRegistry(), catalog, OperationCatalog.of("core", List.of()), ignored -> true,
+          new io.justsearch.app.observability.surface.CoreSurfaceCatalog(),
+          io.justsearch.agent.api.encryption.StoreCipher.disabled()));
+      var owned = new OperationAttemptRunnerImpl(store, Clock.systemUTC(), Set.of(kind));
+      assertNotNull(OperationSubstrateInit.run(store, owned, admission, executors, new HandlerRegistry(), catalog,
+          OperationCatalog.of("core", List.of()), ignored -> true,
+          new io.justsearch.app.observability.surface.CoreSurfaceCatalog(),
+          io.justsearch.agent.api.encryption.StoreCipher.disabled()).operationExecutor());
+    }
+  }
+
   @Test
   void committedDispatcherCompletionPublishesOnceThroughTheSourceHook() throws Exception {
     verifyDispatcherHistory(false);

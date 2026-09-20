@@ -97,8 +97,6 @@ final class LauncherEnvironment implements AutoCloseable {
         }
         var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
             operations, java.time.Clock.systemUTC(), java.util.Set.of(
-                io.justsearch.agent.api.registry.OperationKind.INGEST,
-                io.justsearch.agent.api.registry.OperationKind.REINDEX,
                 io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
                 io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
                 io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,

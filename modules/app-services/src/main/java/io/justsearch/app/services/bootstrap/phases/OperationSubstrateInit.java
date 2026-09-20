@@ -130,6 +130,10 @@ public final class OperationSubstrateInit {
       io.justsearch.agent.api.registry.SurfaceCatalog coreSurfaceCatalog,
       io.justsearch.agent.api.encryption.StoreCipher preparationCipher,
       io.justsearch.app.services.bootstrap.OperationAuthority authority) {
+    java.util.stream.Stream.concat(operationCatalog.definitions().stream(), agentToolsCatalog.definitions().stream())
+        .filter(operation -> operation.policy().declaredSurvival()
+            .filter(survival -> survival == io.justsearch.core.context.EngineContext.Survival.DURABLE).isPresent())
+        .forEach(operation -> attempts.requireRecoveryOwner(operation.policy().recordKind()));
     OperationHistoryResourceCatalog operationHistoryResourceCatalog =
         new OperationHistoryResourceCatalog();
     // Tempdoc 571 §4c: the action-ledger Resource — the TRUST-role authority the Activity surface
