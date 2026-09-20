@@ -348,7 +348,8 @@ final class CoreApiAssembly {
         b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
             ? b.HeadAssembly.serviceOut().aiInstallHelper()
             : new io.justsearch.app.services.ai.install.AiInstallService(
-                onlineAi, b.settingsStore, b.knowledgeServer, enterprisePolicyService);
+                onlineAi, b.settingsStore, b.knowledgeServer, enterprisePolicyService,
+                null, b.settingsService);
     AiInstallController aiInstallController = new AiInstallController(aiInstallHelper, telemetry);
     // Tempdoc 374 alpha.17 R5: read the resolved llama-server port live from
     // ConfigStore so a runtime change (rare, but supported via UI settings or
@@ -404,7 +405,9 @@ final class CoreApiAssembly {
               enterprisePolicyService,
               b.workerFeatureCache,
               resolveInferenceCapability(b.HeadAssembly, b.inferenceCapability),
-              aiInstallHelper);
+              aiInstallHelper,
+              null,
+              b.settingsService);
       if (b.knowledgeServer != null) {
         // Tempdoc 805 G.3: observed ONNX execution provider beside the intent fields on
         // /api/ai/runtime/status, from the same explainer that backs /api/inference/encoders.
@@ -437,7 +440,8 @@ final class CoreApiAssembly {
                 b.settingsStore,
                 b.knowledgeServer,
                 enterprisePolicyService,
-                packAllowlistService);
+                packAllowlistService,
+                b.settingsService);
     AiPackController aiPackController = new AiPackController(aiPackImportHelper, telemetry);
     // §31 Phase 3: services are constructed by ServicePhase from boot. LocalApiServer no
     // longer constructs services or calls registerLateBoundHandlers. Only diagnostic

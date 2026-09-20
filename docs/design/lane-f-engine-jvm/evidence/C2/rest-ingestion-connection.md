@@ -156,3 +156,27 @@ live owner verification and generated-route capture remain .3b.3. The full produ
 restart/replacement, installed/model and final hosted acceptance remain required.
 Evidence retention follows the backend checkpoint above. This checkpoint does not
 close .3b or C2 and authorizes no earlier merge placement.
+
+Full-build1887 prerequisite: build -x test also runs UI integrationTest. Its old
+LocalApiServer fixture omits the C2 recorded settings service, so real settings and
+pack-path writes refuse with SETTINGS_RECOVERY_REQUIRED/PACK_APPLY_FAILED. Migrate
+the fixture to the existing SQLite/runner/SettingsCommitCoordinator composition
+used by current HTTP tests; retain persistence and policy assertions, and close the
+owned store after the server. No production fallback or writer bypass is introduced.
+The Windows machine-policy case also skips because Gradle retains inherited
+ProgramData beside its PROGRAMDATA override. Normalize that single environment key
+before installing the sandbox; the guard against real machine-policy writes remains.
+Original logs/XML are tmp/1887-full-build.txt and tmp/1887-integration-xml/ui.
+Corrective1891 proves all nine cases execute on Windows (no skips), but still fails
+the two writes: the public prod fixture also needs the C2 witness/key request, and
+CoreApiAssembly's no-HeadAssembly branch did not forward the explicitly injected
+settings service to its AI helpers. Pass that existing service into their existing
+constructors; the normal HeadAssembly branch retains its process-owned instances.
+This repairs composition, without creating another settings owner.
+Full1893 build -x test now passes, including all nine UI integration cases with no
+failures/errors/skips and PMD. It proves the original prod token/persistence and
+machine/user policy contracts against the recorded settings fixture. Logs and copied
+XML: tmp/1893-full-build.txt and tmp/1893-integration-xml/ui. No dependencies changed.
+Independent source review finds no actionable defect in the fixture, helper forwarding
+or environment normalization. Full1900 reruns all 1,251 UI cases (one existing skip,
+zero failures/errors) with the final helper wiring; copied XML/counts are tmp/1900-*.

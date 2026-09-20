@@ -179,7 +179,11 @@ tasks.named<Test>("integrationTest").configure {
   // resolveConfiguredPort() treats <= 0 as unset.
   systemProperty("justsearch.api.port", "0")
 
-  environment("PROGRAMDATA", layout.buildDirectory.dir("it-programdata").get().asFile.absolutePath)
+  // Windows treats environment names case-insensitively, while Gradle's map can retain both
+  // inherited ProgramData and PROGRAMDATA. Remove every spelling before installing the sandbox
+  // so process creation cannot select the real machine-policy directory.
+  setEnvironment(environment.filterKeys { !it.equals("PROGRAMDATA", ignoreCase = true) } +
+    mapOf("PROGRAMDATA" to layout.buildDirectory.dir("it-programdata").get().asFile.absolutePath))
 
   // Tempdoc 415 N10 wired a :modules:indexer-worker:installDist dependency here so UI
   // integration tests that boot a real Knowledge Server would not fail with "Worker lib directory
