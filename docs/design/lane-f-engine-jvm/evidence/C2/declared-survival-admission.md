@@ -163,6 +163,12 @@ the .3c.2a refusal matrix and .3c.2b store-reopen proof distinct from this front
 
 ## Implementation checkpoints (2026-09-21)
 
+**Current: paused at the user's request after per-item commits.** The completed
+focused closeout runs supersede the in-progress notes below. See
+[pause-2026-09-21.md](pause-2026-09-21.md) for revision mapping, retained original
+failures, corrected assertions, final results and ordered remaining work. No final
+full-suite, independent re-review, canonical or live/restart completion is claimed.
+
 Split item3 into independently reviewable commits:3a deferred consent publication,
 3b runner key arbitration, then3c dispatcher/handoff integration. Declaration/schema
 and direct fronts remain items1/2. All are C2; none changes merge placement.
@@ -206,6 +212,19 @@ Both legitimate-detach and forged-label tests pass1952 within36 coordinator case
 The launcher composition's pre-existing unavailable ingestion service needs separate
 reconciliation before claiming every declared owner is actually connected. A mere
 kind set is not proof that an alternate composition has installed the owner.
+
+Selected launcher correction: keep the existing CLI/smoke facade, whose reindex
+command already reports UNSUPPORTED and whose settings have no ordered restart
+authority. The recorded-ingestion port reports permanent composition presence
+(separate from current online/readiness state); its explicit unavailable implementation
+reports false. Project the two base catalogs through the existing catalog composer:
+omit INGEST/REINDEX only when that owner is absent, before workflow projection and
+availability derivation. This is a projection of recordKind and the supplied owner,
+not another operation registry or owner set. Remove the launcher's false INGEST/
+REINDEX boot declarations. Actual Engine boot passes the existing coordinator even
+while its physical runtime is temporarily unavailable, so it keeps both declarations
+and recovery. Prove the composed facade excludes those operations, the real owner
+keeps them, and the launcher still reports its existing unsupported indexing outcome.
 
 Old admission-refusal tests expected acceptance followed by a failed row. That behavior
 is superseded by this amendment: all four typed admission refusals now assert no row,

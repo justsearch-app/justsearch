@@ -1,8 +1,17 @@
 # Lane F handoff: implementation orchestrator
 
-## Current state (2026-09-20)
+## Current state (2026-09-21)
 
-**Resumed at the user's request.** Prepared-handler checkpoint132b25ec1 is pushed;
+**Paused at the user's request.** Continue from `codex/lane-f-pr1` in
+`.claude/worktrees/lane-f-pr1-verify`. The latest declared-survival admission changes
+are saved in per-item commits; focused closeout checks pass, but full verification,
+independent re-review, canonical follow-through and live/restart proof remain.
+[Pause record and ordered next steps](evidence/C2/pause-2026-09-21.md).
+A/B/C1 are complete; C2 and D1/D2/E/F remain. Merge stays at F.
+
+The following entries preserve earlier implementation history and its evidence.
+
+Prepared-handler checkpoint132b25ec1 is pushed;
 origin/main was already included at resumption. [Pause state and ordered remaining work](evidence/C2/session-2026-09-15-closeout.md).
 Prepared-handler review corrections and retired agent scan wiring pass full1854:
 5,128 cases/725 suites, zero failures/errors, six skips; all eight PMD tasks pass.
