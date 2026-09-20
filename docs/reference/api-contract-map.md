@@ -85,6 +85,24 @@ bounded by the packaged maximum; the diagnostic projection reports the applied v
 Origin checks still apply. Allowed browser origins can read `Retry-After` through
 `Access-Control-Expose-Headers`.
 
+Operation policies may declare `declaredSurvival` (`INTERACTIVE` or `DURABLE`);
+absence inherits the caller's survival. Ingest and reindex declare `DURABLE`.
+HTTP invoke, undo and the ingestion alias resolve the matched operation before
+admitting work. Native MCP resolves the parsed message's operation binding before
+admission, preserving its request id and notification semantics. A direct operation
+uses one slot, including at a per-client limit of one. Classification grants no
+mutation authority: Host, Origin, token, capability and consent checks still apply.
+
+A nested operation with different declared survival reserves its own work under
+the existing quotas. Reservation precedes single-use consent consumption and row
+acceptance; matching recorded keys reuse their outcome without reserving another
+effect. The dispatcher preserves frozen origin attribution, attaches the accepted
+authorization basis to the handler, and retains the effect until actual completion.
+Before acceptance, caller cancellation prevents the new effect. After acceptance,
+caller departure detaches a durable foreground effect to background; an explicitly
+interactive child remains cancellable. Operation HTTP/MCP response completion also
+ends foreground demand, while a live SSE stream retains its own demand lifecycle.
+
 REST refusal includes `retrySafe: true` only when admission refused before dispatch, including
 approval execution before consuming its pending record. A later execution refusal carries
 `retrySafe: false`; `retryable` alone never authorizes replay of a mutation. The webview waits
@@ -309,6 +327,13 @@ from an HTTP surface. Do not re-add the route.
 **Worker envelope**: returns `501 NOT_SUPPORTED` (reason: WorkerAssembly is the future tempdoc 546). Invalid discriminator returns `400 INVALID_REQUEST`.
 
 ### Operation Substrate API (tempdoc 429)
+
+An explicitly durable operation kind requires a registered boot recovery owner.
+Catalog composition omits INGEST/REINDEX and dependent workflows in the CLI/smoke
+launcher, whose ingestion owner is permanently unavailable. The real Engine keeps
+those declarations during temporary runtime outages. A durable row preserves its
+accepted context; live urgency can change after caller departure, and process-local
+work identity is reattached rather than persisted as restart authority.
 
 **Source of truth:**
 

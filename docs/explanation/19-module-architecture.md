@@ -70,6 +70,15 @@ The application source catalog validates transport/tier, and `EngineProvenance` 
 provenance using the current executor and timestamp. Pending approvals retain both records so
 server-side completion does not replace the original caller with the approving browser.
 
+`OperationPolicy.declaredSurvival` optionally selects an effect's lifetime independently
+of kind, trust and urgency. Direct HTTP/MCP operation fronts classify it before admission;
+nested effects whose survival differs acquire their own quota-counted owner. The dispatcher
+reserves that owner before consent consumption and durable acceptance, then forwards the
+accepted authorization basis with the owner's live context. Accepted rows keep their original
+context snapshot; live durable work can become background after its caller leaves. The
+process-local handoff owns cancellation ordering only; the operation runner remains the
+durable acceptance and completion authority.
+
 The Head and Body are one **Engine** JVM ([ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)). They meet at
 catalogued in-process **ports** — plain Java interfaces in contract modules — bound by the single
 composition root `EngineRoot` (`modules/app-engine`). The catalogue is
