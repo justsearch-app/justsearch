@@ -140,6 +140,8 @@ class IngestToolTest {
         EngineContextTestFixtures.AGENT_LOOP, record);
 
     assertSame(ingestion.execution, execution);
+    assertSame(record, ingestion.record);
+    assertSame(EngineContextTestFixtures.AGENT_LOOP, ingestion.context);
     assertEquals(1, ingestion.calls);
     assertEquals(1, rootReads.get());
     assertEquals(1, generationReads.get());

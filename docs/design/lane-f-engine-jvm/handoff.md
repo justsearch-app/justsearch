@@ -1,24 +1,26 @@
 # Lane F handoff: implementation orchestrator
 
-## Current state (2026-09-15)
+## Current state (2026-09-20)
 
-**Paused at the user's request for low usage.** The .3a WIP checkpoint is committed/pushed
-at closeout; resume from this branch head. [Exact pause state, proof and ordered remaining work](evidence/C2/session-2026-09-15-closeout.md).
-Production/test compilation and91 focused cases pass. Independent implementation review,
-negative controls, full suites, PMD, canonical follow-through and later C2 work remain.
+**Resumed at the user's request.** The clean .3a WIP checkpoint f51d9147e remains the
+implementation base; current origin/main is already included. [Pause state and ordered remaining work](evidence/C2/session-2026-09-15-closeout.md).
+Hosted CI34903071637 passed every job except build: PMD found two unused captured test fields.
+The test now asserts exact accepted-handle and context forwarding; local1848 executes all eight
+IngestToolTest cases successfully and passes app-agent pmdTest/spotlessCheck. Independent
+implementation review, boundary coverage, negative controls, full suites and canonical
+follow-through are active. [Resumption evidence](evidence/C2/resume-2026-09-20.md).
 
 Pushed0431bbe74 completes the bounded Engine producer item: full1826 executes3,240 cases/490
 suites with three existing skips and zero failures/errors; independent source/evidence review,
 PMD/format and docs/governance pass. Focused1831 clears the unreferenced-method check. All13
 hosted CI34900811163 jobs and CLA34900809246 pass. [Producer proof](evidence/C2/recorded-engine-producer.md).
 
-Current dirty item .3a connects prepared ingest/reindex handlers and their eager/late/replacement
+Current item .3a connects prepared ingest/reindex handlers and their eager/late/replacement
 composition. The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a
 handlers, .3b REST dispatcher/consumer retirement, then .3c real vertical integration/proof.
 Root/policy snapshots and root-owned wiring are installed; isolated handler/test work is in
 progress. 1841 passes91 focused cases with no failures/errors/skips; this is not full verification. Root owns shared lifecycle,
-source integration, builds and publication. The user requested a pause; no agents or builds remain running after closeout.
-C2 remains open; merge stays at F. No dev stack or fixture UI helper remains running.
+source integration, builds and publication. C2 remains open; merge stays at F.
 
 The active root/child contract is [C2-8d-vertical-plan.md](evidence/C2/C2-8d-vertical-plan.md)
 and [recorded-ingest-binding.md](evidence/C2/recorded-ingest-binding.md). Historical
