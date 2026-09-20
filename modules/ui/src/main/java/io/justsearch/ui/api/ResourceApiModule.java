@@ -368,14 +368,18 @@ final class ResourceApiModule implements ApiModule {
             headAssembly.substrate().conversation().pendingAuthorizationChanges());
   }
 
+  java.util.Optional<io.justsearch.agent.api.registry.Operation> admissionOperation(io.javalin.http.Context ctx) {
+    return operationsController.admissionOperation(ctx);
+  }
+
   /** Binds every cohort route. All controllers are non-null; only runtimeApiRoutes can be null. */
   @Override
   public void register(Javalin app) {
     java.util.Set<String> before = RouteManifestController.handlerPaths(app);
     // Slice 3a.1.2: Operation invocation boundary.
-    app.post("/api/operations/{id}/invoke", operationsController::handleInvoke);
-    app.post("/api/knowledge/ingest", operationsController::handleIngest);
-    app.post("/api/undo/{id}", operationsController::handleUndo);
+    app.post(OperationsController.INVOKE_PATH, operationsController::handleInvoke);
+    app.post(OperationsController.INGEST_PATH, operationsController::handleIngest);
+    app.post(OperationsController.UNDO_PATH, operationsController::handleUndo);
 
     // Tempdoc 429 §E.8.a + §F.9 closure: registry catalog endpoints.
     app.get("/api/registry/operations", registryController::handleOperations);

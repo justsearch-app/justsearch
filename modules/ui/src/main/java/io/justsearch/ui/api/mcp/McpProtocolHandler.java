@@ -67,13 +67,20 @@ public final class McpProtocolHandler {
   private final McpToolSurface surface;
   private final List<ResourceCatalog> resourceCatalogs;
   private final Clock clock;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
   private final ConcurrentHashMap<String, McpSession> sessions = new ConcurrentHashMap<>();
 
   public McpProtocolHandler(McpToolSurface surface, List<ResourceCatalog> resourceCatalogs,
       Clock clock) {
+    this(surface, resourceCatalogs, clock, null);
+  }
+
+  public McpProtocolHandler(McpToolSurface surface, List<ResourceCatalog> resourceCatalogs,
+      Clock clock, io.justsearch.app.api.EngineAdmissionService admission) {
     this.surface = Objects.requireNonNull(surface);
     this.resourceCatalogs = List.copyOf(Objects.requireNonNull(resourceCatalogs));
     this.clock = Objects.requireNonNull(clock);
+    this.admission = admission;
   }
 
   public McpProtocolHandler(McpToolSurface surface, List<ResourceCatalog> resourceCatalogs) {
@@ -115,6 +122,28 @@ public final class McpProtocolHandler {
       if (method == null) {
         writeError(ctx, id, -32600, "Invalid Request: missing method");
         return;
+      }
+
+      if (admission != null) {
+        var operation = "tools/call".equals(method) && params.has("name")
+            ? surface.admissionOperation(params.get("name").asText()) : java.util.Optional.<io.justsearch.agent.api.registry.Operation>empty();
+        if (operation.isPresent()) {
+          engineContext = io.justsearch.app.services.intent.EngineProvenance.forOperation(engineContext, operation.orElseThrow().policy());
+          ctx.attribute(io.justsearch.ui.api.RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE, true);
+        }
+        final io.justsearch.app.api.EngineWorkHandle work;
+        try {
+          work = admission.admit(engineContext, false);
+        } catch (io.justsearch.app.api.EngineAdmissionException failure) {
+          ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE, failure);
+          io.justsearch.ui.api.RequestEngineWork.status(ctx, failure);
+          if (!isNotification) writeError(ctx, id, -32000, failure.getMessage(),
+              io.justsearch.ui.api.RequestEngineWork.errorCode(failure), true);
+          return;
+        }
+        ctx.attribute(io.justsearch.ui.api.RequestEngineWork.ATTRIBUTE, work);
+        ctx.attribute(io.justsearch.ui.api.RequestEngineContext.ATTRIBUTE, work.context());
+        engineContext = work.context();
       }
 
       if (isNotification) {

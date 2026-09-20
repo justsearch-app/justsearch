@@ -313,7 +313,8 @@ public class LocalApiServer {
     this.securityFilters =
         new ApiSecurityFilters(
             this.prodMode, this.sessionToken, this.eventBuffer, slowRequestExecutor,
-            this.HeadAssemblyRef, leaseSvc, b.engineAdmission);
+            this.HeadAssemblyRef, leaseSvc, b.engineAdmission,
+            resourceApiModule == null ? ignored -> java.util.Optional.empty() : resourceApiModule::admissionOperation);
 
     // Bind to explicit port when provided (dev/prod), otherwise pick a free port.
     int bindPort = configuredPort == null ? 0 : configuredPort;

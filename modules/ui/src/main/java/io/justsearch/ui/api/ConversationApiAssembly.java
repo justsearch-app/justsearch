@@ -470,7 +470,8 @@ final class ConversationApiAssembly {
                   b.HeadAssembly.substrate().metrics().jobQueueDepthCatalog(),
                   b.HeadAssembly.substrate().metrics().documentsIndexedRateCatalog(),
                   b.HeadAssembly.substrate().metrics().gpuUtilizationCatalog(),
-                  b.HeadAssembly.substrate().metrics().gpuMemoryUtilizationCatalog()));
+                  b.HeadAssembly.substrate().metrics().gpuMemoryUtilizationCatalog()),
+              java.time.Clock.systemUTC(), b.engineAdmission);
     }
     return new Result(
         resolveAddressController,

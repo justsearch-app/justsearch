@@ -52,6 +52,14 @@ import tools.jackson.databind.json.JsonMapper;
  * three-layer architecture.
  */
 public final class McpToolSurface {
+  private static final Map<String, String> OPERATION_TOOLS = Map.of(
+      "justsearch_browse", "core.browse-folders", "justsearch_ingest", "core.ingest-files");
+
+  Optional<Operation> admissionOperation(String toolName) {
+    String operationId = OPERATION_TOOLS.get(toolName);
+    return operationId == null ? Optional.empty()
+        : Optional.ofNullable(resolveOperation(operationId));
+  }
 
   private static final Logger log = LoggerFactory.getLogger(McpToolSurface.class);
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
@@ -486,13 +494,11 @@ public final class McpToolSurface {
         return invalid;
       }
     }
+    String operationId = OPERATION_TOOLS.get(name);
+    if (operationId != null) return callOperation(operationId, arguments, requestedBy, engineContext);
     return switch (name) {
       case "justsearch_answer" -> callAnswer(arguments, engineContext);
       case "justsearch_search" -> callSearch(arguments, engineContext);
-      case "justsearch_browse" ->
-          callOperation("core.browse-folders", arguments, requestedBy, engineContext);
-      case "justsearch_ingest" ->
-          callOperation("core.ingest-files", arguments, requestedBy, engineContext);
       case "justsearch_status" -> callStatus(engineContext);
       case "justsearch_runtime_manifest" -> callRuntimeManifest();
       case "justsearch_operation_outcome" -> callOperationOutcome(arguments);

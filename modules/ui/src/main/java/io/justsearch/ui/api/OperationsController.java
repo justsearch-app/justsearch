@@ -51,6 +51,19 @@ import tools.jackson.databind.json.JsonMapper;
  * A known operation key returns its metadata receipt without authorizing a second effect.
  */
 public final class OperationsController {
+  static final String INVOKE_PATH = "/api/operations/{id}/invoke";
+  static final String INGEST_PATH = "/api/knowledge/ingest";
+  static final String UNDO_PATH = "/api/undo/{id}";
+
+  /** Matched-route classification shares the dispatch catalog; it grants no authority. */
+  Optional<Operation> admissionOperation(Context ctx) {
+    if (!"POST".equals(ctx.method().name())) return Optional.empty();
+    return switch (ctx.matchedPath()) {
+      case INGEST_PATH -> resolveOperation("core.ingest-files");
+      case INVOKE_PATH, UNDO_PATH -> resolveOperation(ctx.pathParam("id"));
+      default -> Optional.empty();
+    };
+  }
 
   private static final Logger log = LoggerFactory.getLogger(OperationsController.class);
 

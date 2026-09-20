@@ -322,10 +322,18 @@ final class EngineAdmissionTransportTest {
       app = Javalin.create(config -> config.showJavalinBanner = false);
       // Same body-preserving HTTP exception mapping as LocalApiServer's composition.
       app.exception(io.javalin.http.HttpResponseException.class, (failure, ctx) -> ctx.status(failure.getStatus()));
-      var protocol = new McpProtocolHandler(surface, List.of());
+      org.mockito.Mockito.doAnswer(invocation -> {
+        entered.countDown();
+        if (!release.await(10, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("test release missing");
+        }
+        return java.util.Map.of("tools", List.of());
+      }).when(surface).listTools();
+      var protocol = new McpProtocolHandler(
+          surface, List.of(), java.time.Clock.systemUTC(), admission);
       new ApiSecurityFilters(false, null, new EventBuffer(), events, null, admission, admission)
           .install(app, protocol::clientIdentity);
-      app.before(ctx -> {
+      app.beforeMatched(ctx -> {
         if ("true".equals(ctx.queryParam("block")) && RequestEngineWork.get(ctx) != null) {
           entered.countDown();
           if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("test release missing");
@@ -364,7 +372,8 @@ final class EngineAdmissionTransportTest {
       var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + "/mcp?block=" + block))
           .timeout(Duration.ofSeconds(15)).header("Mcp-Session-Id", session)
           .header("X-JustSearch-Client-Id", clientId)
-          .POST(HttpRequest.BodyPublishers.ofString("{\"jsonrpc\":\"2.0\",\"id\":\"request-17\",\"method\":\"ping\"}"))
+          .POST(HttpRequest.BodyPublishers.ofString(
+              "{\"jsonrpc\":\"2.0\",\"id\":\"request-17\",\"method\":\"tools/list\"}"))
           .build();
       return client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
     }
@@ -378,7 +387,7 @@ final class EngineAdmissionTransportTest {
               .header("X-JustSearch-Client-Id", clientId)
               .header("X-JustSearch-Client-Kind", "MCP_CLIENT");
       if (route.equals("/mcp")) builder.POST(HttpRequest.BodyPublishers.ofString(
-          "{\"jsonrpc\":\"2.0\",\"id\":\"request-17\",\"method\":\"ping\"}"));
+          "{\"jsonrpc\":\"2.0\",\"id\":\"request-17\",\"method\":\"tools/list\"}"));
       else if (route.equals("/api/knowledge/search")) builder.POST(HttpRequest.BodyPublishers.ofString("{}"));
       else builder.GET();
       return client.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofString());

@@ -81,6 +81,7 @@ final class ApiSecurityFilters {
   private final HeadAssembly headAssembly;
   private final OperationLeaseService operationLeases;
   private final io.justsearch.app.api.EngineAdmissionService engineAdmission;
+  private final java.util.function.Function<Context, java.util.Optional<io.justsearch.agent.api.registry.Operation>> admissionOperation;
 
   // Rate-limit bookkeeping for deny / slow-dump logging.
   private final AtomicLong lastCorsDenyUiReadyAtMs = new AtomicLong(0);
@@ -112,6 +113,14 @@ final class ApiSecurityFilters {
   ApiSecurityFilters(boolean prodMode, String sessionToken, EventBuffer eventBuffer,
       ExecutorService slowRequestExecutor, HeadAssembly headAssembly,
       OperationLeaseService operationLeases, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    this(prodMode, sessionToken, eventBuffer, slowRequestExecutor, headAssembly, operationLeases,
+        engineAdmission, ignored -> java.util.Optional.empty());
+  }
+
+  ApiSecurityFilters(boolean prodMode, String sessionToken, EventBuffer eventBuffer,
+      ExecutorService slowRequestExecutor, HeadAssembly headAssembly,
+      OperationLeaseService operationLeases, io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      java.util.function.Function<Context, java.util.Optional<io.justsearch.agent.api.registry.Operation>> admissionOperation) {
     this.prodMode = prodMode;
     this.sessionToken = sessionToken;
     this.eventBuffer = eventBuffer;
@@ -119,6 +128,7 @@ final class ApiSecurityFilters {
     this.headAssembly = headAssembly;
     this.operationLeases = operationLeases;
     this.engineAdmission = engineAdmission;
+    this.admissionOperation = java.util.Objects.requireNonNull(admissionOperation, "admissionOperation");
 
     // Tempdoc 884 item 23: FAIL CLOSED. This combination used to disable token enforcement with a
     // WARN and serve the API anyway — fail-open on the one control that gates mutation.
@@ -173,26 +183,32 @@ final class ApiSecurityFilters {
     if (engineAdmission == null) return;
     app.exception(io.justsearch.app.api.EngineAdmissionException.class,
         (failure, ctx) -> RequestEngineWork.writeRefusal(ctx, failure));
-    app.before(ctx -> {
+    app.beforeMatched(ctx -> {
       if ("OPTIONS".equals(ctx.method().name()) || "/api/health".equals(ctx.path())) return;
       if (ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE) != null) return;
+      // The native protocol parses once, resolves its operation binding and admits the message.
+      if ("/mcp".equals(ctx.path()) && "POST".equals(ctx.method().name())) return;
       try {
-        var work = engineAdmission.admit(RequestEngineContext.get(ctx),
+        var incoming = RequestEngineContext.get(ctx);
+        var operation = admissionOperation.apply(ctx);
+        var selected = operation.map(op -> io.justsearch.app.services.intent.EngineProvenance.forOperation(incoming, op.policy()))
+            .orElse(incoming);
+        if (operation.isPresent()) ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE, true);
+        var work = engineAdmission.admit(selected,
             ctx.path().startsWith("/api/upgrade/"));
         ctx.attribute(RequestEngineWork.ATTRIBUTE, work);
         ctx.attribute(RequestEngineContext.ATTRIBUTE, work.context());
       } catch (io.justsearch.app.api.EngineAdmissionException refused) {
         ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE, refused);
-        if ("/mcp".equals(ctx.path()) && "POST".equals(ctx.method().name())) {
-          // The protocol owner must parse the JSON-RPC id before shaping its refusal.
-        } else {
-          throw refused;
-        }
+        throw refused;
       }
     });
     app.after(ctx -> {
       var work = RequestEngineWork.get(ctx);
-      if (work != null) work.close();
+      if (work != null) {
+        if (Boolean.TRUE.equals(ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE))) work.waitingClientGone();
+        work.close();
+      }
     });
   }
 

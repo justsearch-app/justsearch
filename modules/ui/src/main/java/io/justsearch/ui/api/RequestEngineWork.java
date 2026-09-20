@@ -11,6 +11,7 @@ import java.util.Map;
 public final class RequestEngineWork {
   public static final String ATTRIBUTE = "__engine_work__";
   public static final String REFUSAL_ATTRIBUTE = "__engine_work_refusal__";
+  public static final String OPERATION_RESPONSE_ATTRIBUTE = "__engine_operation_response__";
 
   private RequestEngineWork() {}
 
