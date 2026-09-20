@@ -151,6 +151,13 @@ reason outside the handoff lock. Acceptance-first cancellation then settles thro
 the existing runner as CANCELLED without starting an effect. Prove cancel-first,
 accept-first and accepted-but-not-started cases with deterministic barriers and
 actual admission/store ownership. Handlers never run under the handoff lock.
+The runner callback's no-listener rule is narrowed only for this reserved work's
+local cancellation callback: immediate delivery only updates handoff state under
+its lock and never publishes, closes handles or invokes a handler. Admission's
+registration lock is released before immediate delivery. Registering before the
+stripe would require reserving work before keyed arbitration, breaking the
+single-winner/capacity contract. Caller listeners still register before the stripe;
+all arbitrary event publication and actual effect callbacks remain outside it.
 
 The hosted retry assertion must follow reservation-before-consent: the reservation
 receives the frozen origin without a new grant, while the accepted row and handler

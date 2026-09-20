@@ -5,10 +5,12 @@
 **Resumed at the user's request.** Continue from `codex/lane-f-pr1` in
 `.claude/worktrees/lane-f-pr1-verify`, takeover checkpoint `28d5082cd`.
 [Current working contract, transcript lessons and acceptance table](evidence/C2/resume-2026-09-21.md)
-is the context-reset entry point. Declared-survival admission is implemented;
-independent re-review, canonical follow-through, full verification and corrected
-live/restart proof remain. Pause-head CI has app-ui and operation-surface failures
-being investigated. The [pause record](evidence/C2/pause-2026-09-21.md) is historical.
+is the context-reset entry point. Declared-survival admission, cancellation corrections
+and canonical follow-through are pushed through `657b6b89a`. Actual front/caller
+composition and listener cleanup pass focused1972 and independent review. Full1974
+passes11,083 cases with30 qualified skips; final PMD/format1980 passes. Pause-head app-ui and operation-surface failures are locally corrected;
+hosted reconciliation and corrected live/restart proof remain.
+The [pause record](evidence/C2/pause-2026-09-21.md) is historical.
 A/B/C1 are complete; C2 and D1/D2/E/F remain. Merge stays at F.
 
 The following entries preserve earlier implementation history and its evidence.

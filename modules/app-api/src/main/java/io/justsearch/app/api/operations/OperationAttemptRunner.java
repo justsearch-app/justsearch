@@ -69,7 +69,12 @@ public interface OperationAttemptRunner {
    * Arbitrate final lookup, effect admission and raw acceptance under the existing key stripe.
    * An existing row skips the callback. An absent row must be accepted exactly once by the
    * callback, which may reserve work and consume deferred consent but must not publish events,
-   * install listeners, close handles, schedule work or execute effects. Prepared/control futures
+   * install publishing listeners, close handles, schedule work or execute effects. A reserved
+   * work's cancellation listener may only update the reservation's local handoff state, including
+   * immediate delivery. That listener must not call runner, store or admission APIs, close
+   * handles, publish, schedule, or invoke external callbacks. Caller listeners must be registered
+   * before entering this scope.
+   * Prepared/control futures
    * are attached only after releasing the stripe. The caller owns reservation cleanup on failure.
    */
   <T> AdmittedAttempt<T> admitAndAccept(Request request, java.util.UUID preparationNonce,

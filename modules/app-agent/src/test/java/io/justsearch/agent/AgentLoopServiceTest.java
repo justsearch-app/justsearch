@@ -2812,6 +2812,7 @@ class AgentLoopServiceTest {
     assertEquals(caller.transport(), forwarded.transport());
     assertEquals(caller.survival(), forwarded.survival());
     assertEquals(caller.urgency(), forwarded.urgency());
+    assertEquals(caller.workId(), forwarded.workId());
   }
 
   @Test
@@ -5656,7 +5657,7 @@ class AgentLoopServiceTest {
         "UNTRUSTED",
         "AGENT_LOOP",
         EngineContext.Survival.DURABLE,
-        EngineContext.Urgency.FOREGROUND);
+        EngineContext.Urgency.FOREGROUND).withWorkId(java.util.UUID.randomUUID());
   }
 
   private static void assertCallerContext(EngineContext expected, EngineContext actual) {
@@ -5667,6 +5668,7 @@ class AgentLoopServiceTest {
     assertEquals(expected.transport(), actual.transport());
     assertEquals(expected.survival(), actual.survival());
     assertEquals(expected.urgency(), actual.urgency());
+    assertEquals(expected.workId(), actual.workId());
   }
 
   private static OperationDispatcher capturingDispatcher(

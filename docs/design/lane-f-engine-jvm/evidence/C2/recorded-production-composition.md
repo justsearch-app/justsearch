@@ -187,3 +187,22 @@ The .3c.1 internal DURABLE fixture proves its selected composition but cannot pr
 the HTTP boundary. Root is investigating this prerequisite before process recovery
 proof. The live stack was stopped cleanly with evidence/data preserved; old failed
 rows remain failed. No C2 completion or crash-survival claim follows from live1924.
+
+### .3c.2b process-epoch boundary selected on resumption
+
+The two-store reopen test will stop and await the old producer, close its physical
+attachment (including subscriptions), then close queue and operations stores in that
+order. Only then may a separate fixture load the same authority directory and both
+SQLite paths with a new admission controller, runner and coordinator. Recovery must
+consume the runner's winning Resume bodies and retain stored preparation/parent/child
+identity; no handler preparation is invoked in the successor. Exercise INGEST and
+REINDEX and hold document settlement so enumeration alone cannot finish the parent.
+
+This simulates a new process epoch inside one JVM. Do not assert the abandoned old
+admission controller has zero active work: physical replacement deliberately retains
+its pending durable parent. Actual process death discards that volatile authority.
+Adding a production close API merely for the fixture would change this ownership
+contract and is unnecessary. The actual shutdown order is visible in EngineRoot.close
+and KnowledgeServer's attachment-before-queue close; RecordedIngestionCoordinator's
+Attached.close preserves unfinished enumeration when its uncancelled producer exits
+CANCELLED. The installed harness separately owes verified OS death and index effects.

@@ -321,8 +321,8 @@ no issued claims; the immutable versioned receipt distinguishes historical effec
 current failures and skips. Cleanup retains recorded evidence until exact final acknowledgement.
 Queue notifications deliver committed keys outside the lock. Existing age cleanup prunes old
 sealed exactly acknowledged progress only after all keyed jobs and ledger references are gone.
-Outer operation acknowledgement, notification retry cadence and producer/recovery integration
-remain under implementation.
+The Engine's `RecordedIngestionCoordinator` owns outer acknowledgement and uses queue
+notifications plus maintenance to reconcile committed progress and recover stored walks.
 Replay removes only the versions it applied and committed, preserving admissions that arrive
 during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
 roll back both.
