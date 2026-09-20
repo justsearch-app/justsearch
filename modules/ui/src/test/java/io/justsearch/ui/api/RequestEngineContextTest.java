@@ -57,6 +57,24 @@ final class RequestEngineContextTest {
   }
 
   @Test
+  void mcpProxyUsesServerIdentityAndIgnoresRotatingClientHints() {
+    for (String hint : java.util.List.of("client-a", "client-b")) {
+      var headers = Map.of(
+          "X-JustSearch-Transport", "MCP", "X-JustSearch-Client-Kind", "INTERNAL",
+          "X-JustSearch-Client-Id", hint, "X-JustSearch-Session-Id", "proxy-session");
+      var anonymous = RequestEngineContext.get(request("/api/knowledge/ingest", headers));
+      assertEquals(EngineContext.ClientKind.MCP_CLIENT, anonymous.clientKind());
+      assertEquals("mcp-anonymous", anonymous.clientId());
+      assertEquals("UNTRUSTED", anonymous.sourceTier());
+      var known = RequestEngineContext.get(request("/api/knowledge/ingest", headers),
+          session -> "proxy-session".equals(session) ? Optional.of("server-client") : Optional.empty());
+      var nativeContext = RequestEngineContext.get(request("/mcp", Map.of(
+          "Mcp-Session-Id", "proxy-session")), session -> Optional.of("server-client"));
+      assertEquals(nativeContext, known);
+    }
+  }
+
+  @Test
   void cooperativeInternalLabelDoesNotTurnAnAgentSourceIntoAuthority() {
     EngineContext context = RequestEngineContext.get(request("/api/operations/dispatch", Map.of(
         "X-JustSearch-Transport", "AGENT_LOOP",

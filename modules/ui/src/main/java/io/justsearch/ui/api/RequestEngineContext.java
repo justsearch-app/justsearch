@@ -26,12 +26,13 @@ public final class RequestEngineContext {
     EngineContext existing = request.attribute(ATTRIBUTE);
     if (existing != null) return existing;
     try {
-      boolean mcp = request.path().equals("/mcp");
-      TransportTag transport = mcp ? TransportTag.MCP : transport(request);
+      boolean nativeMcp = request.path().equals("/mcp");
+      TransportTag transport = nativeMcp ? TransportTag.MCP : transport(request);
+      boolean mcp = transport == TransportTag.MCP;
       EngineContext.ClientKind kind = mcp ? EngineContext.ClientKind.MCP_CLIENT
           : value(request, "X-JustSearch-Client-Kind", EngineContext.ClientKind.class,
               EngineContext.ClientKind.WEBVIEW);
-      Optional<String> session = optional(request, mcp ? "Mcp-Session-Id" : "X-JustSearch-Session-Id");
+      Optional<String> session = optional(request, nativeMcp ? "Mcp-Session-Id" : "X-JustSearch-Session-Id");
       String clientId = mcp ? session.flatMap(mcpClientIdentity).orElse("mcp-anonymous")
           : optional(request, "X-JustSearch-Client-Id").orElse("local-webview");
       EngineContext resolved = EngineProvenance.context(kind, clientId, session,

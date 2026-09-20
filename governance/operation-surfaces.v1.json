@@ -245,15 +245,6 @@
       "note": "Tempdoc 561 P-C: the ONE id-keyed, bounded store of the action-event log. Import-invisible (same package)."
     },
     {
-      "id": "scan-rollup-ledger",
-      "kind": "projection",
-      "lang": "java",
-      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ScanRollupLedger.java",
-      "guard": "test:ScanRollupLedgerTest",
-      "consumesProjection": "action-ledger-change-registry",
-      "note": "Tempdoc 812 D2: the scan-rollup aggregator — a projection of the SAME action-event log, not a second store. It observes terminal kind=index events (whose counts are the worker's real DONE/FAILED/RETRY_EXHAUSTED job states, carried by the capture-side scanId from jobs.scan_id) and emits ONE OPERATION-kind ActionEvent.ScanRollup per directory scan back into that log. It holds only in-flight per-scan counters for open scans; nothing is retained after a scan closes out. Import-invisible (same package); declared explicitly."
-    },
-    {
       "id": "action-ledger-change-registry",
       "kind": "projection",
       "lang": "java",

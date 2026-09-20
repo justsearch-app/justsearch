@@ -32,8 +32,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Never drop-oldest, and the reason is specific to what these streams carry rather than a
  * general preference. Both are <em>ordered state deltas folded into a keyed cache by the consumer</em>
- * ({@code RemoteIndexingJobsBridge} keys job rows by {@code pathHash}; {@code ScanProgressRegistry}
- * keeps the latest per scan). Dropping one delta is not "a lost update" — it is a cache that is
+ * ({@code RemoteIndexingJobsBridge} keys job rows by {@code pathHash}; the recorded ingestion
+ * coordinator folds committed progress by operation identity). Dropping one delta is not "a lost update" — it is a cache that is
  * permanently wrong and cannot detect that it is: a dropped Delete leaves a phantom row on the
  * Library surface until the next restart, silently. Failing the flow is bounded and visible, and
  * the consumer recovers by re-subscribing, which re-issues a snapshot.

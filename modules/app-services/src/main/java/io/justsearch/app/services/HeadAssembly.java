@@ -1568,17 +1568,7 @@ public final class HeadAssembly implements AutoCloseable {
         log.warn("Failed to close RuntimeActivationService", e);
       }
     }
-    // Tempdoc 812 D2: stop the scan-rollup quiescence sweeper (symmetric with its construction in
-    // OperationSubstrateInit — a substrate-owned thread is torn down with the substrate).
-    if (substrateOut != null && substrateOut.operationOut() != null) {
-      try {
-        substrateOut.operationOut().scanRollupLedger().close();
-      } catch (RuntimeException e) {
-        log.warn("Failed to close ScanRollupLedger", e);
-      }
-    }
-    // Tempdoc 876 §B.2a: stop the readiness-reconciliation daemon thread (same precedent as the
-    // sweeper above — a substrate-owned thread is torn down with the substrate).
+    // Stop the substrate-owned readiness-reconciliation thread with its owner.
     if (substrateOut != null && substrateOut.healthOut() != null) {
       try {
         substrateOut.healthOut().readinessReconciliationTrigger().close();

@@ -93,10 +93,8 @@ class UnreferencedCodeTest {
           Map.entry("JvmRuntimeGauges.getJvmGaugeErrorCount", "JvmRuntimeGaugesTest"),
           Map.entry("AgentLoopService.forTesting", "AgentLoopServiceTest (test-only static factory)"),
           Map.entry("RootWatcherRegistry.watchedRoots", "RootWatcherRegistryTest (tempdoc 418 Phase A)"),
-          Map.entry("ScanProgressRegistry.activeBufferCount", "ScanProgressRegistryTest (tempdoc 419 T4)"),
           Map.entry("ConsentCapsuleService.liveNonceCount", "ConsentCapsuleServiceTest (test-only nonce-eviction accessor)"),
           Map.entry("ConsentCapsuleService.liveGrantCount", "ConsentCapsuleServiceTest (test-only grant-eviction accessor, tempdoc 550)"),
-          Map.entry("ScanProgressRegistry.pruneNow", "ScanProgressRegistryTest (tempdoc 419 T4)"),
           // Reflection / test contract (method signature verified via getDeclaredMethod)
           // Tempdoc 516 Slice 4d (W6): IndexingLoop.handle*EmbeddingFailure removed —
           // wrappers had no production callers; production uses EmbeddingBackfillOps statics.

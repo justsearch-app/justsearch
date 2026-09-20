@@ -27,6 +27,10 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-20: C1's server-owned MCP client identity also applies when the REST bridge declares MCP transport; unresolved sessions share mcp-anonymous and client-id/kind hints cannot partition that quota. [C2 bridge mechanism and HTTP proof](evidence/C2/rest-ingestion-connection.md).
+
+- 2026-09-20: C2 REST ingestion becomes a flat-input alias through the existing operation controller; durable operation identity replaces accepted-count/scanId responses, and orphan live scan observation producers retire while historical ledger decoding remains. [Mechanism and per-item proof](evidence/C2/rest-ingestion-connection.md).
+
 - 2026-09-20: C2 prepared-handler review retires superseded agent adapter scan-observation wiring and applies the existing recorded-root collection bound as a typed input refusal. [Owning mechanism](evidence/C2/recorded-handler-connection.md).
 
 - 2026-09-14: C2 d.3b.3 connects prepared ingest/reindex through the existing finite owner. Snapshot membership/labels under WatchedRootsState's monitor, freeze resolved exclusions and strict generation, retain initial path classification in root-plan.v1, and retire explicit unrecorded handler/REST effects. Keyed retries and recovery consume persisted preparation. [Owning mechanism and per-item plan](evidence/C2/recorded-handler-connection.md).

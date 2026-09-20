@@ -78,8 +78,6 @@ public final class OperationSubstrateInit {
           authorizationOutcomeStore,
       io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry
           actionLedgerChangeRegistry,
-      // Tempdoc 812 D2: the scan-rollup aggregator over that log (one durable audit row per scan).
-      io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
       io.justsearch.app.services.registry.executor.GlobalHardStop globalHardStop,
       // Tempdoc 550 thesis III: the ONE intent-gate evaluator, shared with the Preview endpoint.
       io.justsearch.app.services.intent.IntentGateEvaluator intentGateEvaluator,
@@ -193,13 +191,6 @@ public final class OperationSubstrateInit {
             : io.justsearch.app.observability.ledger.ActionEventJournal.disabled();
     io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry actionLedgerChangeRegistry =
         new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(actionEventJournal);
-    // Tempdoc 812 D2: the scan-rollup aggregator listens on that one log for terminal per-document
-    // indexing outcomes and emits ONE durable `operation`-kind scan-completion row per directory
-    // scan — which the D1 journal above then persists for free, because a scan rollup IS an
-    // operation-kind event. Owned here (beside the log it projects) rather than on the API
-    // composition root, so its quiescence sweeper's lifetime is the substrate's.
-    io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger =
-        new io.justsearch.app.observability.ledger.ScanRollupLedger(executors, actionLedgerChangeRegistry);
     // Pre-fork authority is shared with recovery; this phase only adds audit projections.
     io.justsearch.app.services.registry.executor.GlobalHardStop globalHardStop =
         authority.hardStop();
@@ -316,7 +307,6 @@ public final class OperationSubstrateInit {
         healthRecoveryProjector,
         authorizationOutcomeStore,
         actionLedgerChangeRegistry,
-        scanRollupLedger,
         globalHardStop,
         intentGateEvaluator,
         durableGrantStore,

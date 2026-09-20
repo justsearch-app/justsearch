@@ -141,7 +141,7 @@ represents — orthogonal to the **transport** discriminator
 - **STATE** — current value of one thing (settings, runtime mode,
   capability flags). No retained history; updates replace prior value.
 - **EVENT_STREAM** — live typed events with bounded recent-window
-  retention (HealthEvent, agent session events, scan progress per-instance).
+  retention (HealthEvent, agent session events).
   Subscribers see a snapshot of recent + a stream of new.
 - **HISTORY** — durable past events with queryable reads (ingestion
   ledger, operation history, search history). Append-only;

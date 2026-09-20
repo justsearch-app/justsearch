@@ -113,7 +113,15 @@ public final class OperationsController {
 
   /** Handles {@code POST /api/operations/{id}/invoke}. */
   public void handleInvoke(Context ctx) {
-    String idValue = ctx.pathParam("id");
+    handleInvocation(ctx, ctx.pathParam("id"), false);
+  }
+
+  /** Flat-input HTTP alias for the same prepared ingestion operation used by MCP. */
+  public void handleIngest(Context ctx) {
+    handleInvocation(ctx, io.justsearch.agent.tools.AgentToolsOperationCatalog.INGEST_FILES.value(), true);
+  }
+
+  private void handleInvocation(Context ctx, String idValue, boolean flatIngestArguments) {
     if (idValue == null || idValue.isBlank()) {
       writeError(ctx, 400, "Missing operation id in path", "BAD_REQUEST");
       return;
@@ -133,7 +141,7 @@ public final class OperationsController {
 
     OperationInvocationRequest request;
     try {
-      request = parseRequest(ctx);
+      request = parseRequest(ctx, flatIngestArguments);
     } catch (Exception e) {
       writeError(
           ctx,
@@ -349,13 +357,24 @@ public final class OperationsController {
     return Optional.empty();
   }
 
-  private OperationInvocationRequest parseRequest(Context ctx) throws Exception {
+  private OperationInvocationRequest parseRequest(Context ctx, boolean flatIngestArguments) throws Exception {
     String body = ctx.body();
     if (body == null || body.isBlank()) {
       // Empty body is valid; treated as zero-args invocation.
       return new OperationInvocationRequest(null, null, null);
     }
-    return MAPPER.readValue(body, OperationInvocationRequest.class);
+    if (!flatIngestArguments) return MAPPER.readValue(body, OperationInvocationRequest.class);
+    var parsed = MAPPER.readTree(body);
+    if (!(parsed instanceof tools.jackson.databind.node.ObjectNode arguments)) {
+      throw new IllegalArgumentException("Ingest arguments must be a JSON object");
+    }
+    var request = MAPPER.createObjectNode();
+    for (String control : List.of("idempotencyKey", "confirmationToken", "preparationNonce")) {
+      var value = arguments.remove(control);
+      if (value != null) request.set(control, value);
+    }
+    request.set("args", arguments);
+    return MAPPER.treeToValue(request, OperationInvocationRequest.class);
   }
 
   private void writeResponse(Context ctx, int status, OperationInvocationResponse response) {

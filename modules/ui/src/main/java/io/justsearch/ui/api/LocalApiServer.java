@@ -117,10 +117,6 @@ public class LocalApiServer {
   // Carve-out: reassigned in lateBindKnowledgeServer (Worker reconnect), so it stays a mutable field
   // seeded from core.knowledgeSearchController() — it cannot live in the immutable Result.
   private volatile KnowledgeSearchController knowledgeSearchController;
-  // Tempdoc 419 / T4: shared scan-progress registry (adapter producer -> ScanProgressController),
-  // one per process, closed on shutdown.
-  private final io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry;
-  private volatile ScanProgressController scanProgressController;
   // Tempdoc 374 alpha.27: the single GPU/VRAM access point (owns its nvidia-smi-fallback VramDetector).
   private final GpuCapabilitiesService gpuCapabilitiesService;
   private final Integer configuredPort;
@@ -150,7 +146,6 @@ public class LocalApiServer {
   }
 
   private LocalApiServer(Builder b) {
-    this.scanProgressRegistry = new io.justsearch.app.services.worker.ScanProgressRegistry(b.executors);
     this.telemetry = b.telemetry;
     this.lambdaMartReranker = b.lambdaMartReranker;
     // §31 Phase 4: read helpers/infra from the bootstrap's ServicePhase output rather than
@@ -912,22 +907,6 @@ public class LocalApiServer {
                 io.justsearch.agent.api.encryption.StoreCatalog.FEEDBACK.recoverability()));
         ctrl.setFeedbackCaptureSettings(this.HeadAssemblyRef.feedbackCaptureSettings());
       }
-      // Tempdoc 419 / T4: bind the shared scan-progress registry to the adapter that drives
-      // /api/knowledge/ingest. The adapter records events into the registry as the worker
-      // emits them; the SSE controller (registered below) subscribes by scanId.
-      ctrl.getAdapter().setScanProgressRegistry(this.scanProgressRegistry);
-      // Tempdoc 812 D2: bind the substrate-owned scan-rollup aggregator to the same adapter. It
-      // listens on the one action-event log for the terminal per-document outcomes (so its counts
-      // are the REAL DONE/FAILED states, not the enqueue-time admitted count) and publishes one
-      // `operation`-kind scan-completion row back into that log. The adapter is the one Head-side
-      // place that knows a scan's id, root, collection and admitted count together.
-      if (this.HeadAssemblyRef != null) {
-        ctrl.getAdapter()
-            .setScanRollupLedger(this.HeadAssemblyRef.substrate().conversation().scanRollupLedger());
-      }
-      this.scanProgressController =
-          new ScanProgressController(this.scanProgressRegistry, this.apiCatalog);
-      io.justsearch.ui.api.routes.ScansRoutes.register(this.app, this.scanProgressController);
       RetrieveContextController ragCtrl = this.HeadAssemblyRef != null
           ? new RetrieveContextController(ks,
               this.HeadAssemblyRef.workers().documents(),
@@ -966,12 +945,6 @@ public class LocalApiServer {
 
   public void stop() {
     slowRequestOwner.close();
-    // Tempdoc 419 / T4: stop the periodic prune thread on shutdown.
-    try {
-      scanProgressRegistry.close();
-    } catch (RuntimeException e) {
-      log.warn("ScanProgressRegistry.close failed: {}", e.getMessage());
-    }
     // Tempdoc 419 C3 V2 P3: stop the GPU saturation sampler thread.
     try {
       core.gpuSaturationSampler().stop();

@@ -98,21 +98,21 @@ final class OperationHistoryProjectorTest {
       clock.setMillis(earlyTime + 1);
       for (int i = 0; i < 520; i++) complete(runner, accept(runner, OperationKind.NOTE, OperationHistoryMode.STANDARD));
       var ledger = new ActionLedgerChangeRegistry(ActionEventJournal.disabled());
-      var observed = new CopyOnWriteArrayList<ActionEvent>();
-      ledger.addEventListener(observed::add);
+      var observed = new CopyOnWriteArrayList<io.justsearch.app.api.stream.SseEnvelope>();
+      ledger.subscribe(observed::add);
       var timer = new Timer();
       var projector = new OperationHistoryProjector(store, new OperationHistoryStore(store),
           new OperationHistoryChangeRegistry(), ledger, timer.executors);
       try (projector) {
         for (int i = 0; i < 4; i++) timer.tick();
-        assertEquals(520, observed.stream().map(ActionEvent::id).distinct().count());
+        assertEquals(520, observed.stream().map(frame -> ((java.util.Map<?, ?>) frame.payload()).get("id")).distinct().count());
         int afterStartup = observed.size();
         for (int i = 0; i < 5; i++) timer.tick();
         assertEquals(afterStartup, observed.size(), "startup enumeration must stop instead of cycling past ring eviction");
         assertEquals(256, store.pendingHistoryProjection(1000).size(), "disabled journal never acknowledges source rows");
         clock.setMillis(earlyTime);
         complete(runner, late);
-        assertTrue(observed.stream().anyMatch(event -> event.id().equals("operation:" + late.accepted().key())),
+        assertTrue(observed.stream().anyMatch(frame -> ("operation:" + late.accepted().key()).equals(((java.util.Map<?, ?>) frame.payload()).get("id"))),
             "a new completion behind the startup cursor is delivered by the retained subscription");
       }
     }

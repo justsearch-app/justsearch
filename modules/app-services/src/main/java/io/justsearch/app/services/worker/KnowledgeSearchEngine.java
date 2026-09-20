@@ -19,7 +19,6 @@ import io.justsearch.app.api.knowledge.FolderBrowseRequest;
 import io.justsearch.app.api.knowledge.FolderBrowseResponse;
 import io.justsearch.app.api.knowledge.FolderFilesRequest;
 import io.justsearch.app.api.knowledge.FolderFilesResponse;
-import io.justsearch.app.api.knowledge.KnowledgeIngestResponse;
 import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponseBuilder;

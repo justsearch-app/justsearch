@@ -362,8 +362,8 @@ public final class AgentToolsOperationCatalog implements OperationCatalog {
         // Tempdoc 879: lineage is not inert — the FE renders `affects` in the operation button and
         // hover preview — and ingest queues indexing work, so it affects the indexing-jobs Resource
         // exactly as core.rebuild-index declares. NOT core.indexed-roots: that Resource is the list
-        // of WATCHED roots, changed only by the add/remove-watched-root gestures; ingest dispatches a
-          // a prepared recorded root plan and registers no watched roots.
+        // of WATCHED roots, changed only by the add/remove-watched-root gestures; ingest dispatches
+        // a prepared recorded root plan and registers no watched roots.
         new OperationLineage(Set.of(new ResourceRef("core.indexing-jobs")), Set.of()),
         Binding.of(INGEST_FILES),
         Provenance.core("1.0"),

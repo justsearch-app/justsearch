@@ -34,7 +34,9 @@ public record OperationInvocationRequest(
   }
 
   public OperationInvocationRequest {
-    args = args == null ? Map.of() : Map.copyOf(args);
+    // JSON null is a public argument value; its validity belongs to the operation schema.
+    args = args == null ? Map.of()
+        : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(args));
     if (preparationNonce != null && (idempotencyKey == null || idempotencyKey.isBlank())) {
       throw new IllegalArgumentException("A preparation nonce requires its operation key");
     }

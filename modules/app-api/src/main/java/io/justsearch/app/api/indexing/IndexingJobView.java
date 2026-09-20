@@ -68,9 +68,9 @@ public record IndexingJobView(
     Objects.requireNonNull(state, "state");
     Objects.requireNonNull(collection, "collection");
     errorMessage = errorMessage == null ? "" : errorMessage;
-    // Tempdoc 812 D2 — the directory scan that enqueued this job (the same id
-    // {@code POST /api/knowledge/ingest} returns and {@code GET /api/scans/{scanId}/progress}
-    // streams). Empty when the job came from a single-file ingest, the watcher, or a row
+    // The internal directory scan that enqueued this job. Public operation progress uses
+    // the operation key, independently of this scan identity. Empty for single-file ingest,
+    // the watcher, or a row
     // written before the worker's {@code scan_id} column existed.
     scanId = scanId == null ? "" : scanId;
   }

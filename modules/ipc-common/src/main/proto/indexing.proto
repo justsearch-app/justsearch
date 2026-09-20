@@ -1573,9 +1573,8 @@ message ScanRootProgress {
   // Populated when complete=true and the walk did not finish cleanly. Empty on success.
   string terminal_reason_code = 7;
   // Tempdoc 419 / T2 — Per-scan identity. Worker allocates a UUID at ScanRoot RPC entry and
-  // sets the same value on every emitted progress event for the scan. Callers that subscribe
-  // to live progress (T4 SSE bridge: GET /api/scans/{scanId}/progress) read this field from
-  // the first event to obtain the scanId. Stable across cancel and retry.
+  // sets the same value on every emitted progress event for that scan attempt. Public
+  // durable progress is addressed by operation key, independently of this internal identity.
   string scan_id = 8;
 }
 

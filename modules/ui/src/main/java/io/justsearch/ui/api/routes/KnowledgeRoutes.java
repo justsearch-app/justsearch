@@ -29,7 +29,6 @@ public final class KnowledgeRoutes {
         ctx.status(HttpStatus.METHOD_NOT_ALLOWED)
             .json(Map.of("error", "Use POST for /api/knowledge/search")));
     app.get("/api/knowledge/status", knowledgeSearchController::handleStatus);
-    app.post("/api/knowledge/ingest", knowledgeSearchController::handleIngest);
     app.get("/api/knowledge/suggest", knowledgeSearchController::handleSuggest);
     app.post("/api/knowledge/folders", knowledgeSearchController::handleListFolders);
     app.post("/api/knowledge/folder-files", knowledgeSearchController::handleListFolderFiles);

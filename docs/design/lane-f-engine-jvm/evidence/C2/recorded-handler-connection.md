@@ -74,6 +74,9 @@ accepted-file count. Audit and update concrete callers and canonical contracts i
 
 ## Per-item batches and verification
 
+The .3b REST alias, consumer migration and scan-producer retirement are detailed in
+[rest-ingestion-connection.md](rest-ingestion-connection.md).
+
 Review clarification, 2026-09-20: retire the agent-only scan-observation forwarding
 through HeadAssembly and AgentToolFactory with .3a. Prepared ingestion no longer uses
 that adapter; its durable operation progress is the recorded coordinator's projection.

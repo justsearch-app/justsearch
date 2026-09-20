@@ -63,7 +63,7 @@ class SseWriter {
    *
    * @return true if the event was written/flushed successfully, false on ANY failure (serialization
    *     or disconnect). Façade over {@link #writeResult} for callers that only need "did it go out"
-   *     (e.g. {@code ScanProgressController}, which cancels on {@code false}); run-observer callers
+   *     (including heartbeat delivery); run-observer callers
    *     use {@link #writeResult} to distinguish the failure modes.
    */
   boolean writeEvent(Context ctx, String event, Map<String, ?> payload) {

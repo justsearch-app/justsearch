@@ -459,8 +459,9 @@ the coordinator derives children, freezes their policy and checks generation and
 before queue effects. It checkpoints committed progress and waits for sealed child receipts
 and durable acknowledgements before completing the parent. On restart it resolves the stored
 prepared envelope rather than preparing against current filesystem or configuration state.
-The public REST ingestion controller remains a separate legacy path pending its dispatcher
-connection; these guarantees must not be inferred for that controller.
+The public REST ingestion alias enters the same operation dispatcher and prepared handler.
+Its response supplies the durable operation key; the keyed operation-history read projects
+committed progress and the terminal outcome from the operations store.
 
 The architecture gate forbids producers from calling the store's lifecycle methods
 directly. `governance/engine-ports.v1.json` catalogs the store and runner interfaces,

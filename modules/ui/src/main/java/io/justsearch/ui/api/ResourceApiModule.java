@@ -374,6 +374,7 @@ final class ResourceApiModule implements ApiModule {
     java.util.Set<String> before = RouteManifestController.handlerPaths(app);
     // Slice 3a.1.2: Operation invocation boundary.
     app.post("/api/operations/{id}/invoke", operationsController::handleInvoke);
+    app.post("/api/knowledge/ingest", operationsController::handleIngest);
     app.post("/api/undo/{id}", operationsController::handleUndo);
 
     // Tempdoc 429 §E.8.a + §F.9 closure: registry catalog endpoints.

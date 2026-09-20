@@ -28,7 +28,7 @@
     { "cohort": "resource", "tier": "exempt", "reason": "Resource-declaration substrate, internal." },
     { "cohort": "runtime", "tier": "exempt", "reason": "Runtime-manifest infra (port discovery); the /mcp reachability it also advertises is covered under the mcp cohort." },
     { "cohort": "schema", "tier": "exempt", "reason": "Schema-serving API, internal tooling." },
-    { "cohort": "other", "tier": "exempt", "reason": "Per-member: /api/library/resolve-hash is consumed by indexingJobsBridge.ts / resolvePathLazy.ts and is exercised via the Library/indexing journeys (cohort:indexing, cohort:knowledge). /api/scans/{scanId}/progress has no FE consumer found -- unwired, harmless. Remaining members (OPTIONS /*, POST /api/admin/inference/reload, POST /api/admin/runtime/reload, GET /api/meta/openapi.json, GET /api/meta/routes, GET+POST /api/ui/ready) are internal/dev-tooling utility routes with no coherent user surface." }
+    { "cohort": "other", "tier": "exempt", "reason": "Per-member: /api/library/resolve-hash is consumed by indexingJobsBridge.ts / resolvePathLazy.ts and is exercised via the Library/indexing journeys (cohort:indexing, cohort:knowledge). Remaining members (OPTIONS /*, POST /api/admin/inference/reload, POST /api/admin/runtime/reload, GET /api/meta/openapi.json, GET /api/meta/routes, GET+POST /api/ui/ready) are internal/dev-tooling utility routes with no coherent user surface." }
   ],
   "surfaceCoverage": [
     { "surfaceId": "core.library-surface", "tier": "sandbox", "validateHow": "Library / Add Folder journey; toast occlusion; progress visibility.", "reach": { "navPath": "Left rail (RAIL placement, CorePlugin.ts:30); command palette 'Go to Library' (shell.go-to-library, substrates/actions/index.ts:794)" } },

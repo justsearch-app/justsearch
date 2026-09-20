@@ -11,7 +11,6 @@ import io.justsearch.app.api.knowledge.FolderBrowseRequest;
 import io.justsearch.app.api.knowledge.FolderBrowseResponse;
 import io.justsearch.app.api.knowledge.FolderFilesRequest;
 import io.justsearch.app.api.knowledge.FolderFilesResponse;
-import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
 import io.justsearch.app.api.knowledge.KnowledgeSearchRequestFiltersBuilder;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse;
@@ -33,9 +32,7 @@ import io.justsearch.app.services.observability.HttpStatusClass;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.SearchPerSourceExecutor;
 import io.justsearch.telemetry.Telemetry;
-import io.justsearch.app.services.indexing.ExcludeGlobs;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -756,147 +753,6 @@ public class KnowledgeSearchController {
         .statusStale(true)
         .statusStaleMs(snapshot != null ? System.currentTimeMillis() - snapshot.atMs() : 0L)
         .build();
-  }
-
-  /**
-   * Handles ingest requests.
-   *
-   * POST /api/knowledge/ingest
-   * Body: { "paths": ["/path/to/file1", "/path/to/file2"], "collection": "notes" (optional) }
-   */
-  public void handleIngest(Context ctx) {
-    var engineContext = RequestEngineContext.get(ctx);
-    try {
-      @SuppressWarnings("unchecked")
-      Map<String, Object> body = (Map<String, Object>) ctx.bodyAsClass(Map.class);
-      @SuppressWarnings("unchecked")
-      List<String> paths = (List<String>) body.get("paths");
-
-      if (paths == null || paths.isEmpty()) {
-        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "Paths array is required", telemetry, ApiErrorHandler.routeOf(ctx)));
-        return;
-      }
-
-      // Tempdoc 811 (C-2a) — optional caller-supplied collection. Validated on the SERVER (the MCP
-      // tool schema is a convenience, not a guard): a present-but-non-string value, a blank string,
-      // or a reserved app-internal name is a 400.
-      Object rawCollection = body.get("collection");
-      if (rawCollection != null && !(rawCollection instanceof String)) {
-        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "collection must be a string", telemetry, ApiErrorHandler.routeOf(ctx)));
-        return;
-      }
-      String requestedCollection;
-      try {
-        requestedCollection = IngestCollectionPolicy.normalizeRequested((String) rawCollection);
-      } catch (IllegalArgumentException e) {
-        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
-        return;
-      }
-      List<IngestCollectionPolicy.RootBinding> rootBindings = watchedRootBindings(engineContext);
-
-      log.info("Knowledge ingest request: {} roots", paths.size());
-
-      // Tempdoc 418 Phase B — Worker owns the directory walk. For each requested path:
-      //  - directory: dispatch to ScanRoot RPC; Worker walks + admits via WorkerIngestionAuthority.
-      //  - regular file: keep the legacy submitBatch single-file path (no walk needed).
-      // ExcludeGlobs is no longer applied Head-side; the equivalent is handled by
-      // WorkerIngestionAuthority.shouldSkip plus the per-request exclude_globs supplied here.
-      // Tempdoc 883 decision 4 slice 2: the RESOLVED list (settings.json 300, env 400, -D 500), not
-      // the sysprop the settings promotion used to mirror it into. globalOrNull because an ingest
-      // request must not 500 on a store that is not up yet; no excludes is the safe answer.
-      io.justsearch.configuration.resolved.ConfigStore excludeStore =
-          io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-      List<String> excludeGlobs =
-          ExcludeGlobs.fromRawJsonArray(
-                  excludeStore == null ? "" : excludeStore.get().ui().excludePatterns())
-              .patterns();
-      // Tempdoc 811 (C-2a): single files are grouped by resolved collection so one request can mix
-      // in-root (inherited tag) and out-of-root (mcp-ingest) paths without forcing one label on all.
-      Map<String, List<Path>> singleFilesByCollection = new java.util.LinkedHashMap<>();
-      long totalAdmitted = 0L;
-      List<String> terminalReasons = new ArrayList<>();
-      // Per docs/reference/api-contract-map.md: directory inputs get a scanId for live progress
-      // SSE. Tempdoc 812 D2 — this is the WORKER-allocated id carried back on the scan's progress
-      // stream (`KnowledgeIngestResponse.scanId`), the same value `GET /api/scans/{scanId}/progress`
-      // subscribes on and the same value the job rows / scan-rollup audit record carry. It used to
-      // be a locally-minted UUID that matched nothing: every subscribe against it resolved to
-      // UNKNOWN_SCAN_OR_RETENTION_EXPIRED.
-      String scanId = null;
-
-      for (String p : paths) {
-          Path input = Path.of(p).toAbsolutePath().normalize();
-          if (!Files.exists(input)) {
-              continue;
-          }
-          // Tempdoc 811 (C-2a): every ad-hoc ingest now carries an addressable collection. Explicit
-          // request value wins; a path under a watched root inherits that root's collection; anything
-          // else is out-of-root and lands in `mcp-ingest`. Pre-811 documents indexed through this
-          // endpoint carry NO collection field and stay that way — there is no backfill (798
-          // precedent: no released users, no migration); they acquire a tag on re-index.
-          String collection = IngestCollectionPolicy.resolve(requestedCollection, input, rootBindings);
-          if (Files.isDirectory(input)) {
-              var scanResp = adapter.scanRoot(input.toString(), collection, excludeGlobs, engineContext);
-              if (scanId == null && scanResp.scanId() != null && !scanResp.scanId().isEmpty()) {
-                  scanId = scanResp.scanId();
-              }
-              totalAdmitted += scanResp.accepted();
-              if (scanResp.error() != null && !scanResp.error().isEmpty()) {
-                  terminalReasons.add(input + ":" + scanResp.error());
-              }
-          } else if (Files.isRegularFile(input) && Files.isReadable(input)) {
-              singleFilesByCollection
-                  .computeIfAbsent(collection == null ? "" : collection, k -> new ArrayList<>())
-                  .add(input);
-          }
-      }
-      for (Map.Entry<String, List<Path>> group : singleFilesByCollection.entrySet()) {
-          String collection = group.getKey().isEmpty() ? null : group.getKey();
-          var ingestResp = adapter.ingest(group.getValue(), collection, engineContext);
-          totalAdmitted += ingestResp.accepted();
-          if (ingestResp.error() != null && !ingestResp.error().isEmpty()) {
-              terminalReasons.add("files:" + ingestResp.error());
-          }
-      }
-
-      log.info("Worker-side scan accepted {} files across {} roots", totalAdmitted, paths.size());
-
-      // B-H.4 defect K — KnowledgeIngestResponse.accepted is int. At desktop scale the cast is a
-      // no-op; the explicit conversion documents the contract and converts overflow into an
-      // ArithmeticException caught by the outer Exception handler (→ 500) instead of silent
-      // truncation in the JSON serializer.
-      Map<String, Object> resp = new java.util.LinkedHashMap<>();
-      resp.put("accepted", Math.toIntExact(totalAdmitted));
-      resp.put("error", String.join("; ", terminalReasons));
-      if (scanId != null) {
-          resp.put("scanId", scanId);
-      }
-      ctx.json(resp);
-
-    } catch (Exception e) {
-      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
-      log.error("Knowledge ingest failed", e);
-      ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
-    }
-  }
-
-  /**
-   * Tempdoc 811 (C-2a) — the watched-root containment authority for ingest tagging. Reads the same
-   * registry {@code GET /api/indexing/roots} serves ({@code KnowledgeClient} implements {@code
-   * IndexingService}, delegating to {@code RootLifecycleOps}'s watched-root state), so an in-root
-   * ad-hoc ingest inherits exactly the collection the root's own scan writes. Best-effort: when the
-   * Worker is not connected, an empty binding list makes every path resolve out-of-root, which is
-   * the safe direction (a real tag rather than the pre-811 {@code null}).
-   */
-  private List<IngestCollectionPolicy.RootBinding> watchedRootBindings(EngineContext engineContext) {
-    try {
-      return knowledgeServer.client().getWatchedRoots(engineContext).stream()
-          .filter(r -> r != null && r.path() != null)
-          .map(r -> new IngestCollectionPolicy.RootBinding(r.path(), r.collection()))
-          .toList();
-    } catch (Exception e) {
-      log.debug("watched-root lookup for ingest tagging failed: {}", e.toString());
-      return List.of();
-    }
   }
 
   /**

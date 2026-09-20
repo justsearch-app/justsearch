@@ -709,10 +709,13 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 
 `POST /api/knowledge/ingest`:
 
-- Request body: `paths[]` (required root/file paths), `collection` (optional string).
-- Directory inputs dispatch to the Worker's `ScanRoot` RPC (the Worker owns the walk); regular-file inputs go through `submitBatch`.
-- **Collection tagging (tempdoc 811 C-2a).** Every ingest carries an addressable collection, resolved by `IngestCollectionPolicy` (`modules/app-api/.../knowledge/IngestCollectionPolicy.java`): an explicit `collection` wins; otherwise a path under a registered watched root inherits that root's collection; otherwise the path is out-of-root and gets `mcp-ingest`. A supplied `collection` must be a non-empty string and must not be one of the reserved app-internal collections (`justsearch-help`, `agent-history`) — either violation is a `400`. One request may mix in-root and out-of-root paths; single files are grouped by resolved collection. Pre-811 documents ingested here carry no `collection` field and are not backfilled; they acquire a tag on re-index.
-- Response: `accepted` (count accepted by Worker queue), `error` (best-effort error message), `scanId` (worker-allocated UUID for the scan; empty when no progress was emitted, e.g. inputs that weren't directories). Use the `scanId` to subscribe to live progress via the SSE endpoint below (tempdoc 419 / T4).
+- Flat-input alias for `core.ingest-files`, owned by `OperationsController` and registered by `ResourceApiModule`. It shares the generic operation invocation's preparation, admission, confirmation and outcome handling.
+- Request body: `paths[]` (1–100 file/directory paths), optional nonblank `collection` (at most 256 characters), and optional `idempotencyKey`, `confirmationToken`, `preparationNonce`. Only the three invocation controls are removed from the public arguments before dispatch.
+- Preparation resolves and validates the complete batch before acceptance, freezes watched-root labels/exclusions and index generation, and rejects missing, unreadable, symbolic-link or unsupported inputs. Explicit collection wins; otherwise a path inherits its containing watched root's collection (including an unlabelled root), or uses `mcp-ingest` outside watched roots. Reserved app-internal collections are refused. Effects use the recorded bounded Engine producer for files and directories.
+- Response is `OperationInvocationResponse`: `success`, `message`, optional error fields and `structuredData` containing `operationKey`, `operationRecordId` and state metadata. HTTP 200 alone does not imply operation success. Acceptance does not mean indexing completed and supplies no accepted-file count or `scanId`.
+- Poll `GET /api/operation-history/{operationKey}` for durable state, phase, committed units and terminal outcome. A read does not cancel the operation when its client disconnects.
+- Reuse a canonical UUIDv7 `idempotencyKey` with the same public arguments after an interrupted response. Known keys answer from their recorded invocation/outcome without fresh preparation; changed arguments receive HTTP 409 `OPERATION_KEY_REUSED`.
+- MCP bridges send `X-JustSearch-Transport: MCP`; the request owner supplies the MCP client partition and server-resolved identity (anonymous when unresolved). Existing Host/Origin/mutation-token protections apply. HTTP 428 retains the pending authorization, operation key, preparation nonce and approval preview; it is a refusal pending approval, never a successful ingest.
 
 `DELETE /api/indexing/collections`:
 
@@ -721,21 +724,13 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 - Refuses (`400`) the reserved app-internal collections (`justsearch-help`, `agent-history`) and the untagged `default` bucket — the latter would be a whole-index wipe wearing a collection's clothes.
 - Response: `status: "ok"`, `collection`, `deletedDocs` (documents matched and submitted for deletion).
 
-### Live Scan Progress (SSE)
+### Ingestion operation progress
 
-**Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/ScanProgressController.java`
-+ `modules/app-services/src/main/java/io/justsearch/app/services/worker/ScanProgressRegistry.java`
-+ `modules/app-api/src/main/java/io/justsearch/app/api/scan/ScanProgressEvent.java`
-
-`GET /api/scans/{scanId}/progress` — Server-Sent Events stream backed by an in-memory `ScanProgressRegistry`. Bridges the synchronous in-process scan-progress consumer to UI subscribers.
-
-- Path param: `scanId` — the value returned in `KnowledgeIngestResponse.scanId`.
-- Response: `text/event-stream`. Events:
-  - `event: progress` payload `{scanId, filesWalked, filesAdmitted, filesSkipped, bytesWalked, currentDirectory, complete: false}` per `ScanRootProgress` from the worker. `currentDirectory` is privacy-hashed (matches the tempdoc 410 / 418 path-hash contract — never a raw path).
-  - `event: complete` payload `{scanId, ..., complete: true, terminalReasonCode}` once when the scan ends. `terminalReasonCode` is empty on clean completion or one of `CLIENT_CANCELLED`, `IO_ERROR`, `RPC_FAILED`, `ROOT_NOT_DIRECTORY`, `UNKNOWN_SCAN_OR_RETENTION_EXPIRED`.
-  - `event: error` payload `{message}` on RPC-level failure during streaming.
-- **Cancel:** closing the SSE connection (`EventSource.close()`) propagates a cancel to the index half via the `CancelToken` substrate (T3 — a plain observable boolean since lane F item A10 re-homed it off `io.grpc.Context`); the scan terminates with `CLIENT_CANCELLED` within the next batch.
-- **Replay window:** each scan retains the latest events up to the Engine background queue limit (64 by default). New subscribers replay that suffix, including final counters when complete. A live subscriber overtaken by retention receives `UNKNOWN_SCAN_OR_RETENTION_EXPIRED`; this ends observation without changing the scan outcome. Completed entries expire after `30s` or are evicted oldest-first for a new scan. The registry holds at most the aggregate work limit (64) of mapped scans and the foreground queue limit (48) of open subscriptions. Subscriptions share replay storage and close on HTTP handler exit; an evicted completed ring can remain referenced by a subscription, so retained rings are bounded by the sum of those limits. If all scan entries are active or all subscription slots are occupied, the new registration/subscription receives typed capacity refusal.
+The former `GET /api/scans/{scanId}/progress` endpoint and in-memory scan registry are retired.
+Use the operation key returned by ingestion with `GET /api/operation-history/{operationKey}`.
+Its durable projection supplies `state`, `phase`, `unitsCompleted`, `unitsFailed`, optional
+`reason` and `result`. Historical scan-rollup action events remain readable; no live rollup
+aggregator or scan SSE cancellation contract remains.
 
 ### Health Event Stream API (tempdoc 430)
 

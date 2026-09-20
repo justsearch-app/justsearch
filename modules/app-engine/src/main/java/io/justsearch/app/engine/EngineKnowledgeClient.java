@@ -1018,10 +1018,9 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       AtomicReference<CompletionStage<Void>> deliveryExit) {
     String traceId = currentTraceId();
     String requestId = currentRequestId();
-    // Item A8: the same bounded hand-off item A7 built, between the WALKER thread and the SSE
-    // fan-out. `WorkerScanOps` emits one progress frame per 100 files straight into the sink, so
-    // without it a `ScanProgressRegistry` write (and every SSE writer behind it) runs inside
-    // `Files.walkFileTree` — the walk would be paced by the slowest connected browser.
+    // Keep progress delivery outside the walker thread. The recorded operation coordinator
+    // persists progress at the sink; the bounded handoff controls backpressure and exposes
+    // delivery completion separately from producer exit.
     AtomicReference<ScanRootProgress> last = new AtomicReference<>();
     AtomicReference<Throwable> deliveryFailure = new AtomicReference<>();
     BoundedHandoff<ScanRootProgress> flow =

@@ -72,30 +72,28 @@ class OperationSubstrateInitTest {
           OperationCatalog.of("core", List.of(operation)), OperationCatalog.of("core", List.of()),
           req -> true, new io.justsearch.app.observability.surface.CoreSurfaceCatalog(),
           io.justsearch.agent.api.encryption.StoreCipher.disabled());
-      var rollup = out.scanRollupLedger();
-      try (rollup) {
-        var projector = OperationSubstrateInit.attachHistoryProjection(store, executors, out);
-        try (projector) {
-          var observed = new CopyOnWriteArrayList<OperationHistoryEntry>();
-          out.operationHistoryStore().addAppendListener(observed::add);
-          if (refuseCompletion) {
-            assertThrows(OperationStoreException.class, () -> out.operationExecutor().dispatch(operation,
-                "{}", io.justsearch.app.services.TestEngineContexts.internal()));
-            assertEquals(1, observed.size());
-            assertEquals(OperationOutcome.FAILURE, observed.getFirst().outcome());
-            assertEquals(Optional.of("STORAGE_FAILED"), observed.getFirst().diagnosticsLink());
-            assertTrue(observed.getFirst().operationKey().isEmpty());
-            assertTrue(store.recentHistory(10).isEmpty());
-            assertEquals(OperationState.RUNNING, store.openRecords().getFirst().state());
-          } else {
-            out.operationExecutor().dispatch(operation, "{}", io.justsearch.app.services.TestEngineContexts.internal());
-            assertEquals(1, observed.size());
-            assertEquals(OperationOutcome.SUCCESS, observed.getFirst().outcome());
-            assertTrue(observed.getFirst().operationKey().isPresent());
-            assertEquals(1, store.recentHistory(10).size());
-          }
+      var projector = OperationSubstrateInit.attachHistoryProjection(store, executors, out);
+      try (projector) {
+        var observed = new CopyOnWriteArrayList<OperationHistoryEntry>();
+        out.operationHistoryStore().addAppendListener(observed::add);
+        if (refuseCompletion) {
+          assertThrows(OperationStoreException.class, () -> out.operationExecutor().dispatch(operation,
+              "{}", io.justsearch.app.services.TestEngineContexts.internal()));
+          assertEquals(1, observed.size());
+          assertEquals(OperationOutcome.FAILURE, observed.getFirst().outcome());
+          assertEquals(Optional.of("STORAGE_FAILED"), observed.getFirst().diagnosticsLink());
+          assertTrue(observed.getFirst().operationKey().isEmpty());
+          assertTrue(store.recentHistory(10).isEmpty());
+          assertEquals(OperationState.RUNNING, store.openRecords().getFirst().state());
+        } else {
+          out.operationExecutor().dispatch(operation, "{}", io.justsearch.app.services.TestEngineContexts.internal());
+          assertEquals(1, observed.size());
+          assertEquals(OperationOutcome.SUCCESS, observed.getFirst().outcome());
+          assertTrue(observed.getFirst().operationKey().isPresent());
+          assertEquals(1, store.recentHistory(10).size());
         }
       }
+
     }
   }
 
@@ -166,48 +164,46 @@ class OperationSubstrateInitTest {
               new io.justsearch.app.observability.surface.CoreSurfaceCatalog(),
               io.justsearch.agent.api.encryption.StoreCipher.disabled(),
               authority);
-      var rollup = out.scanRollupLedger();
-      try (rollup) {
-        OperationExecutorImpl executor =
-            (OperationExecutorImpl) out.operationExecutor();
-        assertSame(authority.sources(), out.intentSourceCatalog());
-        assertSame(authority.capsules(), out.consentCapsuleService());
-        assertSame(authority.hardStop(), out.globalHardStop());
-        assertSame(authority.evaluator(), out.intentGateEvaluator());
-        assertSame(authority.evaluator(), executor.intentGateEvaluator());
-        assertSame(authority.grants(), out.durableGrantStore());
-        assertSame(authority.scope(), out.durableGrantScope());
+      OperationExecutorImpl executor =
+          (OperationExecutorImpl) out.operationExecutor();
+      assertSame(authority.sources(), out.intentSourceCatalog());
+      assertSame(authority.capsules(), out.consentCapsuleService());
+      assertSame(authority.hardStop(), out.globalHardStop());
+      assertSame(authority.evaluator(), out.intentGateEvaluator());
+      assertSame(authority.evaluator(), executor.intentGateEvaluator());
+      assertSame(authority.grants(), out.durableGrantStore());
+      assertSame(authority.scope(), out.durableGrantScope());
 
-        assertEquals(
-            GateBehavior.TYPED_CONFIRM,
-            authority.evaluator().evaluate(RiskTier.MEDIUM, TransportTag.AGENT_LOOP).gateBehavior());
-        assertEquals(
-            GateBehavior.AUTO,
-            authority.evaluator().evaluate(RiskTier.MEDIUM, TransportTag.BUTTON).gateBehavior());
+      assertEquals(
+          GateBehavior.TYPED_CONFIRM,
+          authority.evaluator().evaluate(RiskTier.MEDIUM, TransportTag.AGENT_LOOP).gateBehavior());
+      assertEquals(
+          GateBehavior.AUTO,
+          authority.evaluator().evaluate(RiskTier.MEDIUM, TransportTag.BUTTON).gateBehavior());
 
-        authority.hardStop().engage();
-        assertTrue(authority.hardStop().isEngaged());
-        assertEquals(
-            GateBehavior.DENY,
-            out.intentGateEvaluator().evaluate(RiskTier.MEDIUM, TransportTag.AGENT_LOOP).gateBehavior());
-        assertEquals(
-            GateBehavior.AUTO,
-            out.intentGateEvaluator().evaluate(RiskTier.MEDIUM, TransportTag.BUTTON).gateBehavior());
-        assertTrue(
-            authority.grants().isAllowed(
-                "core.authority-trusted", RiskTier.MEDIUM,
-                io.justsearch.app.services.TestEngineContexts.ui()));
-        assertFalse(
-            authority.grants().isAllowed(
-                "core.authority-untrusted", RiskTier.MEDIUM,
-                io.justsearch.app.services.TestEngineContexts.agent()));
-        assertTrue(
-            authority.capsules().verifyAndConsume(
-                trustedCapsule, "core.authority-trusted", "{}"));
-        assertFalse(
-            authority.capsules().verifyAndConsume(
-                untrustedCapsule, "core.authority-untrusted", "{}"));
-      }
+      authority.hardStop().engage();
+      assertTrue(authority.hardStop().isEngaged());
+      assertEquals(
+          GateBehavior.DENY,
+          out.intentGateEvaluator().evaluate(RiskTier.MEDIUM, TransportTag.AGENT_LOOP).gateBehavior());
+      assertEquals(
+          GateBehavior.AUTO,
+          out.intentGateEvaluator().evaluate(RiskTier.MEDIUM, TransportTag.BUTTON).gateBehavior());
+      assertTrue(
+          authority.grants().isAllowed(
+              "core.authority-trusted", RiskTier.MEDIUM,
+              io.justsearch.app.services.TestEngineContexts.ui()));
+      assertFalse(
+          authority.grants().isAllowed(
+              "core.authority-untrusted", RiskTier.MEDIUM,
+              io.justsearch.app.services.TestEngineContexts.agent()));
+      assertTrue(
+          authority.capsules().verifyAndConsume(
+              trustedCapsule, "core.authority-trusted", "{}"));
+      assertFalse(
+          authority.capsules().verifyAndConsume(
+              untrustedCapsule, "core.authority-untrusted", "{}"));
+
     }
   }
 }

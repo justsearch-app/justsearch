@@ -64,8 +64,8 @@ final class ActionLedgerControllerTest {
     var changes = new ActionLedgerChangeRegistry(ActionEventJournal.at(dir));
     var controller = wiredController(changes);
     String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
-    var delivered = new java.util.ArrayList<ActionEvent>();
-    changes.addEventListener(delivered::add);
+    var delivered = new java.util.ArrayList<io.justsearch.app.api.stream.SseEnvelope>();
+    changes.subscribe(delivered::add);
     try {
       int forgedStatus = invokePost(controller, "operation:" + key);
       var entry = new io.justsearch.app.observability.operations.OperationHistoryEntry(
@@ -78,7 +78,7 @@ final class ActionLedgerControllerTest {
       assertEquals(1, snapshot.size());
       assertEquals("operation:" + key, snapshot.get(0).get("id").asString());
       assertEquals(1, delivered.size());
-      assertTrue(delivered.getFirst() instanceof ActionEvent.Operation, "The real operation must reach live observers");
+      assertEquals("operation", ((java.util.Map<?, ?>) delivered.getFirst().payload()).get("kind"), "The real operation must reach live observers");
       assertEquals(400, forgedStatus);
       assertEquals(1, ActionEventJournal.at(dir).tail(10).size());
     } finally { controller.shutdown(); }

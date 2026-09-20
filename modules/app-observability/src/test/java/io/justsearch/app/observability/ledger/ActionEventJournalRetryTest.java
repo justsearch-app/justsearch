@@ -28,8 +28,8 @@ final class ActionEventJournalRetryTest {
     Path audit = Files.writeString(temp.resolve("audit"), "blocks the directory");
     var journal = ActionEventJournal.at(audit);
     var registry = new ActionLedgerChangeRegistry(journal);
-    List<ActionEvent> seen = new ArrayList<>();
-    registry.addEventListener(seen::add);
+    List<io.justsearch.app.api.stream.SseEnvelope> seen = new ArrayList<>();
+    registry.subscribe(seen::add);
     registry.broadcastActionEvent(event("row-1"));
     assertEquals(1, seen.size(), "the live observation remains visible during journal failure");
     Files.delete(audit);
