@@ -15,6 +15,8 @@ alias beside the generic invoke endpoint, so it exists only with the actual oper
 KnowledgeSearchController and KnowledgeRoutes cease owning ingestion.
 
 The alias accepts existing paths/optional collection and the three optional controls.
+An explicit null collection has the same resolution semantics as an omitted collection;
+the operation catalog accepts string or null so the real dispatcher reaches that handler rule.
 Preserve explicit JSON null values in the existing immutable invocation argument map;
 the operation schema/handler decides whether a value is valid, rather than Map.copyOf
 rejecting nullable public JSON before the operation validator. Public arguments exclude
@@ -111,3 +113,46 @@ tmp/1865-,1870-,1873-,1875- prefixes. Retain in this worktree through lane compl
 Consumer migrations and read-only outcome tools are separate .3b.2 work. Live route snapshots,
 final focused/full/architecture/negative-control checks, independent review and hosted proof
 remain .3b.3. This is a pushed WIP item boundary, not completed .3b or C2 acceptance.
+
+Independent implementation review found the catalog still rejected explicit null before the
+handler's inherited nullable-collection rule, despite mocked alias coverage. The catalog now
+allows string/null and a real HTTP/dispatcher test covers it. It also found the production
+outcome proxy's generic parser discarded typed backend errors. The outcome reader now retains
+the complete error body and code, marks a failed query as an MCP error, and validates key shape
+before constructing its URL. Node regression checks key-invalid and storage-failed responses
+and keeps failed/unknown/expired *operation outcomes* as successful reads.
+
+## Review correction and caller checkpoint (2026-09-20)
+
+Full1876 executes 1,250 UI cases (one existing skip) and 37 launcher architecture
+cases, with no failures; system integration-test compilation and PMD pass. After the
+nullable schema correction, full1878 executes 692 app-agent and 1,251 UI cases with
+zero failures/errors and three existing skips. All four PMD tasks and format pass.
+The later historical-rollup edits change comments only. Sources are 093ef4166 plus
+the correction/caller commits following it; logs and copied XML/counts are under
+tmp/1876-* and tmp/1878-*.
+
+Negative1880 restores string-only collection validation and fails the real HTTP
+test at its success assertion. Negative1881 leaves invocation controls in public
+arguments and fails the alias's control-exclusion assertion. Negative1882 omits the
+MCP transport header and fails the actual stdio proxy HTTP assertion (undefined
+instead of MCP). Each mutation restores exact saved bytes in a finally block.
+Logs are tmp/1880-null-schema.txt, tmp/1881-alias-controls.txt and
+tmp/1882-mcp-transport.txt; 1881 also preserves failing XML. Restored1884 executes
+17 HTTP/context cases without failures/errors/skips and passes format. Restored1885
+executes all 10 Node caller tests without failures. Full-suite output was copied
+before negative runs replaced test results.
+
+The consumer item migrates both MCP proxies, reference-corpus/conformance callers,
+system-test inputs, jseval and shell fixtures, mock API receipts, examples and
+canonical contracts. Python ui_perf has eight passing cases. Documentation index,
+skill projections, MCP-doc sync and canonical links pass. The UI affected-step
+lookup reports no steps for the comment-only ActionLedgerClient change; historical
+rendering behavior is unchanged. Independent read-only review finds no remaining
+substantive implementation defect after the recorded corrections.
+
+The mounted HTTP fixture does not prove full ResourceApiModule/filter composition;
+live owner verification and generated-route capture remain .3b.3. The full producer,
+restart/replacement, installed/model and final hosted acceptance remain required.
+Evidence retention follows the backend checkpoint above. This checkpoint does not
+close .3b or C2 and authorizes no earlier merge placement.

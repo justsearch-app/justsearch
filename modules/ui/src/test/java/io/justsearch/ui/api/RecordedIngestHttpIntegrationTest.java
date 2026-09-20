@@ -127,6 +127,24 @@ final class RecordedIngestHttpIntegrationTest {
   }
 
   @Test
+  void explicitNullCollectionReachesTheRealPreparedHandler() throws Exception {
+    Path input = Files.writeString(temp.resolve("nullable.txt"), "nullable collection");
+    try (var harness = Harness.open(temp.resolve("nullable"), input, false)) {
+      String key = OperationKeys.generate(CLOCK);
+      var arguments = new java.util.LinkedHashMap<String, Object>();
+      arguments.put("paths", List.of(input.toString()));
+      arguments.put("collection", null);
+      arguments.put("idempotencyKey", key);
+      HttpResponse<String> response = harness.postArguments(arguments, Map.of());
+      assertEquals(200, response.statusCode(), response.body());
+      assertTrue(JSON.readTree(response.body()).path("success").asBoolean(), response.body());
+      assertEquals(1, harness.preparations.get());
+      assertEquals(1, harness.ingestion.executions.get());
+      assertTrue(harness.store.find(key).isPresent());
+    }
+  }
+
+  @Test
   void untrustedMcpConfirmationDoesNotInvokeTheRecordedProducer() throws Exception {
     Path input = Files.writeString(temp.resolve("confirmation.txt"), "confirmation");
     try (var harness = Harness.open(temp.resolve("confirmation"), input, true)) {
@@ -231,9 +249,12 @@ final class RecordedIngestHttpIntegrationTest {
 
     HttpResponse<String> postResponse(Path path, String key, Map<String, String> headers)
         throws Exception {
-      String body =
-          JSON.writeValueAsString(
-              Map.of("paths", List.of(path.toString()), "idempotencyKey", key));
+      return postArguments(Map.of("paths", List.of(path.toString()), "idempotencyKey", key), headers);
+    }
+
+    HttpResponse<String> postArguments(Map<String, Object> arguments, Map<String, String> headers)
+        throws Exception {
+      String body = JSON.writeValueAsString(arguments);
       HttpRequest.Builder request =
           HttpRequest.newBuilder(
                   URI.create("http://127.0.0.1:" + server.port() + "/api/knowledge/ingest"))

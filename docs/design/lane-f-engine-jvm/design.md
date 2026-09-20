@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-20: C2 REST review aligns the catalog with the existing nullable-collection handler rule and preserves typed outcome-query errors through the stdio bridge. [Corrections and real-dispatch/proxy regressions](evidence/C2/rest-ingestion-connection.md).
+
 - 2026-09-20: C1's server-owned MCP client identity also applies when the REST bridge declares MCP transport; unresolved sessions share mcp-anonymous and client-id/kind hints cannot partition that quota. [C2 bridge mechanism and HTTP proof](evidence/C2/rest-ingestion-connection.md).
 
 - 2026-09-20: C2 REST ingestion becomes a flat-input alias through the existing operation controller; durable operation identity replaces accepted-count/scanId responses, and orphan live scan observation producers retire while historical ledger decoding remains. [Mechanism and per-item proof](evidence/C2/rest-ingestion-connection.md).

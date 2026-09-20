@@ -698,7 +698,9 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 
 ### Knowledge Status and Ingest APIs
 
-**Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/KnowledgeSearchController.java`
+**Status source:** `modules/ui/src/main/java/io/justsearch/ui/api/KnowledgeSearchController.java`.
+**Ingestion sources:** `modules/ui/src/main/java/io/justsearch/ui/api/OperationsController.java`
+and `modules/ui/src/main/java/io/justsearch/ui/api/ResourceApiModule.java`.
 
 `GET /api/knowledge/status`:
 
@@ -710,7 +712,7 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 `POST /api/knowledge/ingest`:
 
 - Flat-input alias for `core.ingest-files`, owned by `OperationsController` and registered by `ResourceApiModule`. It shares the generic operation invocation's preparation, admission, confirmation and outcome handling.
-- Request body: `paths[]` (1–100 file/directory paths), optional nonblank `collection` (at most 256 characters), and optional `idempotencyKey`, `confirmationToken`, `preparationNonce`. Only the three invocation controls are removed from the public arguments before dispatch.
+- Request body: `paths[]` (1–100 file/directory paths), optional nonblank `collection` (at most 256 characters; null means omitted), and optional `idempotencyKey`, `confirmationToken`, `preparationNonce`. Only the three invocation controls are removed from the public arguments before dispatch.
 - Preparation resolves and validates the complete batch before acceptance, freezes watched-root labels/exclusions and index generation, and rejects missing, unreadable, symbolic-link or unsupported inputs. Explicit collection wins; otherwise a path inherits its containing watched root's collection (including an unlabelled root), or uses `mcp-ingest` outside watched roots. Reserved app-internal collections are refused. Effects use the recorded bounded Engine producer for files and directories.
 - Response is `OperationInvocationResponse`: `success`, `message`, optional error fields and `structuredData` containing `operationKey`, `operationRecordId` and state metadata. HTTP 200 alone does not imply operation success. Acceptance does not mean indexing completed and supplies no accepted-file count or `scanId`.
 - Poll `GET /api/operation-history/{operationKey}` for durable state, phase, committed units and terminal outcome. A read does not cancel the operation when its client disconnects.
