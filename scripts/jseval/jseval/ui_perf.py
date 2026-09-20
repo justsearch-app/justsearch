@@ -131,6 +131,11 @@ def _setup_test_corpus(api_base_url: str) -> tuple[str, str, str]:
         resp.raise_for_status()
 
         # Wait for indexing
+        invocation = resp.json()
+        if (invocation.get("success") is not True
+                or not invocation.get("structuredData", {}).get("operationKey")):
+            raise RuntimeError(f"Ingest operation was not accepted: {invocation}")
+
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
             status = client.get("/api/status").json()

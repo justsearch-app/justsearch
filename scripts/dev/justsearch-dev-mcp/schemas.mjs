@@ -491,6 +491,10 @@ export const IngestInputSchema = z
     runId: z.string().meta({ format: 'uuid' }).optional().describe('Run ID (omit to use active run)'),
     apiPort: z.number().int().positive().optional().describe('API port (alternative to runId for untracked instances)'),
     paths: z.array(z.string().min(1)).min(1),
+    collection: z.string().nullable().optional(),
+    idempotencyKey: z.string().optional(),
+    confirmationToken: z.string().optional(),
+    preparationNonce: z.string().optional(),
     timeoutMs: z.number().int().positive().max(120_000).optional(),
     maxBytes: z.number().int().positive().max(5_000_000).optional().describe(MAX_BYTES_DESCRIPTION),
     sessionId: z.string().optional(),
@@ -504,8 +508,7 @@ export const IngestOutputSchema = z.union([
       runId: z.string().meta({ format: 'uuid' }),
       url: z.string().min(1),
       statusCode: z.number().int(),
-      accepted: z.number().int(),
-      error: z.string().optional(),
+      operationResponse: z.unknown(),
     })
     .passthrough(),
   z
@@ -515,6 +518,7 @@ export const IngestOutputSchema = z.union([
       url: z.string().min(1).optional(),
       statusCode: z.number().int().nullable(),
       ...TruncationFields,
+      operationResponse: z.unknown().optional(),
       error: ToolErrorSchema,
     })
     .passthrough(),

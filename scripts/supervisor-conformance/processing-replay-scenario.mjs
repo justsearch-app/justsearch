@@ -4,7 +4,7 @@ import identity from '../dev/lib/process-identity.cjs';
 
 export async function exerciseProcessingReplay(c) {
   const { work, data, first, manifest, apiPort, readJson, waitFor, request, post,
-    requireThat, acceptedCount, matchingHit, jobStateFor } = c;
+    requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor } = c;
   const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
   const manifestFile = path.join(data, 'runtime', 'manifest.json');
   requireThat(first.pid === manifest.pid && first.instanceId === manifest.instanceId,
@@ -18,9 +18,13 @@ export async function exerciseProcessingReplay(c) {
   const file = path.join(work, 'chaos-hang-processing.txt');
   const marker = 'processingreplayedmarker';
   fs.writeFileSync(file, `${marker} platypus durable replay\n`);
-  const accepted = await post(apiPort, '/api/knowledge/ingest', { paths: [file] });
-  requireThat(accepted.status === 200 && acceptedCount(accepted) === 1,
-    `exactly one durable job must be accepted: ${JSON.stringify(accepted)}`);
+  const operationKey = createOperationKey();
+  const accepted = await post(apiPort, '/api/knowledge/ingest', {
+    paths: [file], idempotencyKey: operationKey,
+  });
+  const ingestReceipt = requireOperationSuccess(accepted, 'processing-replay ingest');
+  requireThat(ingestReceipt.operationKey === operationKey,
+    `processing-replay ingest changed its supplied key: ${accepted.text}`);
   await waitFor('actual extraction holds the claimed PROCESSING job', 30000, () => {
     const queue = jobStateFor(path.basename(file));
     const entered = path.join(work, 'processing-entered');
@@ -80,5 +84,5 @@ export async function exerciseProcessingReplay(c) {
   requireThat(/Recovered [1-9][0-9]* unowned processing jobs/.test(recoveredLog), 'startup must report actual PROCESSING recovery');
   console.log('PROCESSING_REPLAY_PASS', JSON.stringify({ afterDeath,
     successor: successor.supervisor, final: jobStateFor(path.basename(file)) }));
-  return { file, marker, successor, afterDeath };
+  return { file, marker, successor, afterDeath, ingestReceipt };
 }

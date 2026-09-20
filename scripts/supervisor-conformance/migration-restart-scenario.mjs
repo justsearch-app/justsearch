@@ -4,7 +4,7 @@ import path from 'node:path';
 // Installed-process regression, sharing the existing supervisor fixture's owned launch/cleanup.
 export async function exerciseMigrationRestart(c) {
   const { work, data, indexBase, first, manifest, apiPort, readJson,
-    post, requireThat, acceptedCount, matchingHit } = c;
+    post, requireThat, requireOperationSuccess, createOperationKey, matchingHit } = c;
   const deadline = Date.now() + 270000;
   const waitFor = (label, budget, probe) =>
     c.waitFor(label, Math.max(1, Math.min(budget, deadline - Date.now())), probe);
@@ -14,8 +14,13 @@ export async function exerciseMigrationRestart(c) {
   const b = path.join(sources, 'b.txt');
   fs.writeFileSync(a, 'migrationretainedmarker quokka');
   fs.writeFileSync(b, 'migrationblueonlymarker wombat');
-  const ingest = await post(apiPort, '/api/knowledge/ingest', { paths: [a, b] });
-  requireThat(acceptedCount(ingest) === 2, `two documents must be accepted: ${ingest.text}`);
+  const operationKey = createOperationKey();
+  const ingest = await post(apiPort, '/api/knowledge/ingest', {
+    paths: [a, b], idempotencyKey: operationKey,
+  });
+  const receipt = requireOperationSuccess(ingest, 'migration ingest');
+  requireThat(receipt.operationKey === operationKey,
+    `migration ingest changed its supplied key: ${ingest.text}`);
   const search = async (port, marker) => post(port, '/api/knowledge/search', {
     query: marker, limit: 5, mode: 'text',
   });

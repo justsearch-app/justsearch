@@ -7,6 +7,7 @@ import { exerciseMigrationRestart } from './migration-restart-scenario.mjs';
 import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
 import { exerciseOperationResume } from './operation-resume-scenario.mjs';
+import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 
 const repo = process.cwd();
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
@@ -134,8 +135,19 @@ function jobStateFor(filename) {
     database.close();
   }
 }
-function acceptedCount(response) {
-  try { return Number(JSON.parse(response.text).accepted ?? 0); } catch { return 0; }
+function requireOperationSuccess(response, label) {
+  let body;
+  try { body = JSON.parse(response.text); }
+  catch { throw new Error(`${label} returned invalid JSON: ${response.text}`); }
+  requireThat(response.status === 200 && body.success === true,
+    `${label} failed: HTTP ${response.status} ${response.text}`);
+  const metadata = body.structuredData;
+  requireThat(typeof metadata?.operationKey === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(metadata.operationKey)
+    && Number.isInteger(metadata.operationRecordId),
+  `${label} omitted canonical operation metadata: ${response.text}`);
+  return { body, operationKey: metadata.operationKey,
+    operationRecordId: metadata.operationRecordId };
 }
 function matchingHit(response, expectedPath, marker) {
   try {
@@ -185,27 +197,32 @@ try {
   });
   if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'operation') {
     await exerciseOperationResume({ work, data, first, manifest, apiPort, readJson, waitFor,
-      request, post, requireThat, acceptedCount, matchingHit, jobStateFor });
+      request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor });
   } else if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {
     await exerciseProcessingReplay({ work, data, first, manifest, apiPort, readJson, waitFor,
-      request, post, requireThat, acceptedCount, matchingHit, jobStateFor });
+      request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor });
   } else if (lockScenario) {
     await exerciseHostileLocks({ work, data, first, readJson, waitFor, request, post,
-      requireThat, acceptedCount });
+      requireThat, requireOperationSuccess, createOperationKey });
   } else if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
     await exerciseMigrationRestart({ work, data, indexBase, first, manifest, apiPort,
-      readJson, waitFor, request, post, requireThat, acceptedCount, matchingHit,
+      readJson, waitFor, request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit,
       output: () => output });
   } else {
   const firstDoc = path.join(work, 'first.txt');
   fs.writeFileSync(firstDoc, 'firstdurablemarker quokka');
+  const firstOperationKey = createOperationKey();
   const firstIngest = await waitFor('first ingest acceptance', 90000, async () => {
     try {
-      const response = await post(apiPort, '/api/knowledge/ingest', { paths: [firstDoc] });
+      const response = await post(apiPort, '/api/knowledge/ingest', {
+        paths: [firstDoc], idempotencyKey: firstOperationKey,
+      });
       return response.status >= 200 && response.status < 300 ? response : null;
     } catch { return null; }
   });
-  requireThat(acceptedCount(firstIngest) > 0, `first ingest accepted no work: ${firstIngest.text}`);
+  const firstReceipt = requireOperationSuccess(firstIngest, 'first ingest');
+  requireThat(firstReceipt.operationKey === firstOperationKey,
+    `first ingest changed its supplied operation key: ${firstIngest.text}`);
   console.log('FIRST_INGEST', firstIngest);
   const firstDone = await waitFor('first job committed DONE', 60000, async () => {
     const row = jobStateFor('first.txt');
@@ -222,9 +239,13 @@ try {
   console.log('COLLISION', collision);
   const secondDoc = path.join(work, 'second.txt');
   fs.writeFileSync(secondDoc, 'secondreplayedmarker wombat');
-  const secondIngest = await post(apiPort, '/api/knowledge/ingest', { paths: [secondDoc] });
-  requireThat(secondIngest.status === 200, `second ingest was not accepted: ${JSON.stringify(secondIngest)}`);
-  requireThat(acceptedCount(secondIngest) > 0, `second ingest accepted no work: ${secondIngest.text}`);
+  const secondOperationKey = createOperationKey();
+  const secondIngest = await post(apiPort, '/api/knowledge/ingest', {
+    paths: [secondDoc], idempotencyKey: secondOperationKey,
+  });
+  const secondReceipt = requireOperationSuccess(secondIngest, 'second ingest');
+  requireThat(secondReceipt.operationKey === secondOperationKey,
+    `second ingest changed its supplied operation key: ${secondIngest.text}`);
   const recoveryDeadline = Date.now() + 180000;
   const queuedBeforeDeath = await waitUntil('second job queue state before death', recoveryDeadline, async () => {
     const row = jobStateFor('second.txt');

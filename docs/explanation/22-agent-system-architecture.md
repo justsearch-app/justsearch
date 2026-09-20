@@ -154,8 +154,9 @@ configuration or input files. The accepted record and context reach
 `RecordedIngestionService`, whose completion waits for the recorded ingestion owner;
 calling these handlers directly does not authorize an effect. Eager and late registration
 resolve the current client when preparing, so Engine replacement cannot retain a stale
-generation supplier. The separate REST ingestion controller still has its legacy path;
-it is not yet covered by this handler connection.
+generation supplier. The flat REST ingestion alias enters this same dispatcher path.
+The dev/prod stdio MCP bridges preserve MCP attribution, operation controls and the complete
+invocation response, including confirmation refusal and its prepared identity.
 
 ### The offering
 
@@ -220,13 +221,16 @@ Explicit caller-provided filters and boost filters take precedence over inferred
 
 ## MCP Tool Surface
 
-The production MCP server exposes four task-oriented tools:
+The legacy stdio compatibility bridge exposes these task-oriented tools. New
+clients should use the Java Streamable HTTP handler documented in
+[MCP production server](../reference/mcp-production-server.md).
 
 | Tool | Purpose |
 |------|---------|
 | `justsearch_answer` | Primary QA tool over local indexed content. |
 | `justsearch_search` | Search with filters, boost filters, facets, pagination, and excerpts. |
 | `justsearch_ingest` | Index files or directories. |
+| `justsearch_operation_outcome` | Read durable progress/outcome by the returned operation key, including after interruption or restart. This never starts work. |
 | `justsearch_status` | Inspect index and ingestion health. |
 
 ADR-0015 records the design rationale for a compact task-oriented MCP surface. Local JustSearch evaluation evidence and external prompting/tool-use research should be treated separately:

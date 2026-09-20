@@ -110,7 +110,8 @@ s2=$(iso); phase_mark idle_first60s "$s1" "$s2"
 # --- ingest ---
 log "ingest docs/explanation + docs/reference"
 paths_json=$(node -e 'const p=require("path");const r=process.argv[1];console.log(JSON.stringify({paths:[p.join(r,"docs","explanation"),p.join(r,"docs","reference")]}))' "$root_win")
-curl -s -m 120 -X POST "${hdr[@]}" -d "$paths_json" "$base/api/knowledge/ingest" > "$out_abs/ingest-response.json"
+curl -fsS -m 120 -X POST "${hdr[@]}" -d "$paths_json" "$base/api/knowledge/ingest" > "$out_abs/ingest-response.json" || exit 2
+node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.success!==true||!r.structuredData?.operationKey){console.error("Ingest operation refused:",r);process.exit(2)}' "$out_abs/ingest-response.json" || exit 2
 log "ingest response: $(head -c 300 "$out_abs/ingest-response.json")"
 search_load 60 "$out_abs/search-load-during-enrich.csv"
 log "waiting for enrichment"

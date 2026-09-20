@@ -459,15 +459,18 @@ succeed immediately with no prompt — the pre-existing durable-grant
 mechanism already covers MCP callers, since `SourceTier` is
 transport-agnostic.
 
-## Legacy: Old TypeScript MCP Server
+## Legacy stdio compatibility bridge
 
-The previous TypeScript MCP server (`scripts/prod/justsearch-mcp/server.mjs`)
-is **deprecated**. It ran as a separate Node.js process via stdio
-transport with 4 tools. The Java MCP handler supersedes it with
-better transport (Streamable HTTP, no separate process), more tools
-(6 vs 4), and direct service-layer dispatch.
+The Node.js stdio bridge (`scripts/prod/justsearch-mcp/server.mjs`) remains
+available for existing stdio clients. The Java Streamable HTTP handler is the
+preferred interface and dispatches directly through the service layer.
 
-The old server remains in the codebase for reference — its tool
-descriptions and data from a tool-interface-design eval (tempdoc 366)
-informed the new handler's design. Remove after the new handler is
-eval-validated (tempdoc 500 gate).
+The bridge exposes five tools: answer, search, ingest, status and
+`justsearch_operation_outcome`. Ingestion forwards caller keys and confirmation
+controls to the recorded operation owner; the outcome tool reads durable progress
+and outcomes by key after an interrupted response or restart. It does not start
+work. These compatibility paths remain tested while the bridge is present.
+
+The bridge's tool descriptions and the tool-interface-design eval (tempdoc 366)
+informed the Java handler's design. Its eventual removal remains governed by the
+Java handler's eval validation (tempdoc 500 gate).

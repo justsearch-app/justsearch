@@ -71,7 +71,7 @@ The dev MCP surface exposes exactly these **12** tools:
 | `justsearch.dev.fetch_api_json` | Fetch predefined JSON endpoints by key. |
 | `justsearch.dev.api_call` | Call allowlisted Local API endpoints with explicit method/path/body. |
 | `justsearch.dev.search_query` | Execute `POST /api/knowledge/search`. |
-| `justsearch.dev.ingest` | Execute `POST /api/knowledge/ingest`. |
+| `justsearch.dev.ingest` | Invoke prepared ingestion with optional collection/key/confirmation controls. Returns the complete operation response; use its operation key for durable progress. Confirmation refusals remain failures requiring approval. |
 | `justsearch.dev.ai_activate` | Activate the online AI runtime. |
 | `justsearch.dev.reload` | Hot-reload the running stack's Engine: compile from the tree that stack was launched from, push method-body changes over identity-checked JDWP, reconstruct services with the ONNX encoders still loaded. Ownership-gated. |
 
@@ -217,6 +217,7 @@ Both `fetch_api_json` and `api_call` accept `jsonPath`, sharing one implementati
 | `/api/policy/user/allowlist/pack-manifest/add` | POST |
 | `/api/diagnostics/export` | POST |
 | `/api/knowledge/status` | GET |
+| `/api/operation-history/{operationKey}` | GET |
 | `/api/schemas/{name}` | GET |
 | `/api/debug/events` | GET |
 | `/api/debug/engine-log` | GET |

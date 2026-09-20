@@ -413,7 +413,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, method = 'GET' }) {
   });
 }
 
-function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, method = 'POST' }) {
+function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, method = 'POST', headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -442,6 +442,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, method = 'POST
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(bodyStr),
           Accept: 'application/json',
+          ...headers,
         },
       },
       (res) => collectLimited(res, { statusCode: typeof res.statusCode === 'number' ? res.statusCode : null, maxBytes, finish }),
@@ -766,6 +767,11 @@ export const API_CALL_ALLOWLIST = [
   // Diagnostics & knowledge
   { path: '/api/diagnostics/export', methods: ['POST'] },
   { path: '/api/knowledge/status', methods: ['GET'] },
+  {
+    path: '/api/operation-history/{operationKey}',
+    pattern: /^\/api\/operation-history\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    methods: ['GET'],
+  },
   // Wire schemas (tempdoc 913 T2). SchemaController serves the JSON Schema a route's response
   // record projects to (LocalApiServer.java:664); it is the primary-source way to check a wire
   // shape from the dev tools instead of inferring it from one sampled response body. The schema
@@ -1869,7 +1875,10 @@ export async function main() {
   mcpServer.registerTool(
     'justsearch.dev.ingest',
     {
-      description: 'Index documents into the knowledge base. Paths must be repo-relative. Requires a running dev stack.',
+      description:
+        'Submit repo-relative paths to the knowledge base. Returns the durable operation response and key; '
+        + 'use justsearch.dev.api_call with GET /api/operation-history/{operationKey} to check progress. '
+        + 'Requires a running dev stack.',
       inputSchema: IngestInputSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
     },
@@ -1898,7 +1907,13 @@ export async function main() {
       });
 
       const url = new URL('/api/knowledge/ingest', base).toString();
-      const body = { paths: absPaths };
+      const body = {
+        paths: absPaths,
+        ...(input.collection !== undefined ? { collection: input.collection } : {}),
+        ...(input.idempotencyKey !== undefined ? { idempotencyKey: input.idempotencyKey } : {}),
+        ...(input.confirmationToken !== undefined ? { confirmationToken: input.confirmationToken } : {}),
+        ...(input.preparationNonce !== undefined ? { preparationNonce: input.preparationNonce } : {}),
+      };
 
       maybeAppendNdjson(mainRepoRoot, {
         event: 'tool_start',
@@ -1907,62 +1922,62 @@ export async function main() {
         pathCount: absPaths.length,
       });
 
-      const res = await httpPostJsonLimited(url, body, { timeoutMs, maxBytes });
+      const res = await httpPostJsonLimited(url, body, {
+        timeoutMs,
+        maxBytes,
+        headers: { 'X-JustSearch-Transport': 'MCP' },
+      });
 
-      if (!res.ok || res.statusCode !== 200) {
-        const out = IngestOutputSchema.parse({
-          ok: false,
-          runId: effectiveRunId,
-          url,
-          statusCode: res.statusCode,
-          error: ToolErrorSchema.parse({ message: res.error?.message || `HTTP ${res.statusCode}` }),
-        });
-        return toToolResult(out);
+      let operationResponse;
+      let parseError = null;
+      if (res.truncated !== true && typeof res.text === 'string') {
+        try {
+          operationResponse = JSON.parse(res.text || '');
+        } catch {
+          parseError = 'Invalid JSON response';
+        }
       }
 
-      // Tempdoc 844 B4b: declare a maxBytes truncation as itself, not as a parse failure.
-      if (res.truncated === true) {
-        return toToolResult(IngestOutputSchema.parse({
-          ok: false,
-          runId: effectiveRunId,
-          url,
-          statusCode: res.statusCode,
-          truncated: true,
-          bytesRead: res.bytesRead,
-          maxBytesLimit: maxBytes,
-          error: ToolErrorSchema.parse(truncationNotice({ bytesRead: res.bytesRead, maxBytes })),
-        }));
-      }
-
-      let parsed;
-      try {
-        parsed = JSON.parse(res.text || '');
-      } catch {
-        const out = IngestOutputSchema.parse({
-          ok: false,
-          runId: effectiveRunId,
-          url,
-          statusCode: res.statusCode,
-          error: ToolErrorSchema.parse({ message: 'Invalid JSON response' }),
-        });
-        return toToolResult(out);
-      }
+      const httpSuccess = res.statusCode >= 200 && res.statusCode < 300;
+      const succeeded = res.ok === true && httpSuccess && operationResponse?.success === true;
+      const operationMessage = typeof operationResponse?.message === 'string'
+        ? operationResponse.message
+        : null;
+      const operationErrorCode = typeof operationResponse?.errorCode === 'string'
+        ? operationResponse.errorCode
+        : null;
+      const error = succeeded
+        ? undefined
+        : res.truncated === true
+          ? ToolErrorSchema.parse(truncationNotice({ bytesRead: res.bytesRead, maxBytes }))
+          : ToolErrorSchema.parse({
+          ...(operationErrorCode ? { code: operationErrorCode } : {}),
+          message: parseError
+            || res.error?.message
+            || operationMessage
+            || (httpSuccess ? 'Operation invocation failed' : `HTTP ${res.statusCode}`),
+          });
 
       const out = IngestOutputSchema.parse({
-        ok: true,
+        ok: succeeded,
         runId: effectiveRunId,
         url,
         statusCode: res.statusCode,
-        accepted: parsed.accepted ?? 0,
-        ...(parsed.error ? { error: parsed.error } : {}),
+        ...(operationResponse !== undefined ? { operationResponse } : {}),
+        ...(res.truncated === true ? {
+          truncated: true,
+          bytesRead: res.bytesRead,
+          maxBytesLimit: maxBytes,
+        } : {}),
+        ...(!succeeded ? { error } : {}),
       });
 
       maybeAppendNdjson(mainRepoRoot, {
         event: 'tool_ingest_result',
         tool: 'justsearch.dev.ingest',
         runId: effectiveRunId,
-        ok: true,
-        accepted: out.accepted,
+        ok: out.ok,
+        ...(operationErrorCode ? { errorCode: operationErrorCode } : {}),
       });
       return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId: input.sessionId || resolveAgentSessionIdForMcp(repoRoot) }));
     },

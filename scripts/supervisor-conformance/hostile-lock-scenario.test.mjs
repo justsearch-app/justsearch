@@ -5,11 +5,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 
-for (const { name, fatalExit, staleExit, accepted } of [
-  { name: 'healthy run stays attacked', fatalExit: false, accepted: 100 },
-  { name: 'release after submission incarnation exits', fatalExit: true, accepted: 100 },
-  { name: 'old counted exit does not release the new attack', staleExit: true, accepted: 100 },
-  { name: 'partial acceptance fails', fatalExit: false, accepted: 99 },
+for (const { name, fatalExit, staleExit, operationSuccess } of [
+  { name: 'healthy run stays attacked', fatalExit: false, operationSuccess: true },
+  { name: 'release after submission incarnation exits', fatalExit: true, operationSuccess: true },
+  { name: 'old counted exit does not release the new attack', staleExit: true, operationSuccess: true },
+  { name: 'operation refusal fails', fatalExit: false, operationSuccess: false },
 ]) {
   test(`hostile locks: ${name}`, async (t) => {
     const work = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-lock-phase-'));
@@ -49,10 +49,18 @@ for (const { name, fatalExit, staleExit, accepted } of [
       post: async (port, endpoint, body) => {
         if (endpoint.endsWith('/ingest')) {
           assert.equal(body.paths.length, 100);
+          assert.match(body.idempotencyKey,
+            /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
           assert.equal(fs.existsSync(path.join(work, 'intruder-stop')), false);
           submittedPaths = body.paths;
           submitted = true;
-          return { status: 200 };
+          return { status: 200, text: JSON.stringify({
+            success: operationSuccess,
+            structuredData: operationSuccess
+              ? { operationKey: body.idempotencyKey, operationRecordId: 17 }
+              : {},
+            errorClass: operationSuccess ? undefined : 'HANDLER_FAILURE',
+          }) };
         }
         searchCount += 1;
         assert.equal(acknowledgedRelease, Boolean(fatalExit),
@@ -62,11 +70,17 @@ for (const { name, fatalExit, staleExit, accepted } of [
         ] }) };
       },
       request: async () => ({ status: 200 }),
-      acceptedCount: () => accepted,
+      createOperationKey: () => '01996c43-8300-7000-8000-000000000001',
+      requireOperationSuccess: (response, label) => {
+        const body = JSON.parse(response.text);
+        assert.equal(body.success, true, `${label}: ${response.text}`);
+        return { operationKey: body.structuredData.operationKey,
+          operationRecordId: body.structuredData.operationRecordId };
+      },
       requireThat: (condition, message) => assert.ok(condition, message),
     });
-    if (accepted !== 100) {
-      await assert.rejects(run, /documents under lock contention must be accepted/);
+    if (!operationSuccess) {
+      await assert.rejects(run, /hostile-lock ingest/);
       assert.equal(searchCount, 0);
       assert.equal(fs.existsSync(path.join(work, 'intruder-stop')), false);
     } else {

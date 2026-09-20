@@ -4,7 +4,8 @@ import path from 'node:path';
 // The former embedded EngineFileLockContentionTest workload, through a killable Engine.
 // JUnit owns the real FileChannel intruder; the ordinary dev runner owns all product children.
 export async function exerciseHostileLocks(c) {
-  const { work, data, first, readJson, waitFor, request, post, requireThat, acceptedCount } = c;
+  const { work, data, first, readJson, waitFor, request, post, requireThat,
+    requireOperationSuccess, createOperationKey } = c;
   const atBoot = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'lock-boot';
   if (!atBoot) {
     fs.writeFileSync(path.join(work, 'intruder-start'), 'start');
@@ -29,9 +30,13 @@ export async function exerciseHostileLocks(c) {
   };
   const submittedBinding = await waitFor('a readable owned binding before submitting the corpus', 10000,
     currentBinding);
-  const ingested = await post(submittedBinding.port, '/api/knowledge/ingest', { paths });
-  requireThat(ingested.status === 200 && acceptedCount(ingested) === paths.length,
-    `documents under lock contention must be accepted: ${JSON.stringify(ingested)}`);
+  const operationKey = createOperationKey();
+  const ingested = await post(submittedBinding.port, '/api/knowledge/ingest', {
+    paths, idempotencyKey: operationKey,
+  });
+  const receipt = requireOperationSuccess(ingested, 'hostile-lock ingest');
+  requireThat(receipt.operationKey === operationKey,
+    `hostile-lock ingest changed its supplied key: ${ingested.text}`);
   let releasedAfterExit = null;
   const result = await waitFor('documents under hostile locks become searchable', 180000, async () => {
     const supervisor = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
@@ -61,6 +66,6 @@ export async function exerciseHostileLocks(c) {
   requireThat((await request(result.port, '/api/health')).status === 200,
     'the Engine must be healthy after indexing under contention');
   console.log('LOCK_SURVIVAL_PASS', JSON.stringify({ scenario: name,
-    accepted: acceptedCount(ingested), submittedBinding, hit: result.hit, releasedAfterExit,
+    operationKey: receipt.operationKey, submittedBinding, hit: result.hit, releasedAfterExit,
     supervisor: readJson(path.join(data, 'runtime', 'supervisor.v1.json')) }));
 }

@@ -199,8 +199,8 @@ public final class ActionLedgerProjection {
         }
       }
       case ActionEvent.ScanRollup scan -> {
-        // Tempdoc 812 D2 — rendered as an OPERATION row (kind() is OPERATION); operationId is what
-        // the FE discriminates the scan rollup on, the rest is the summary the row states.
+        // Historical scan-rollup serialization: preserve its discriminator and summary fields
+        // when serving retained journal rows. Current ingestion has no live rollup producer.
         m.put("operationId", ActionEvent.ScanRollup.OPERATION_ID);
         m.put("outcome", scan.outcome());
         m.put("scanId", scan.scanId());
@@ -241,8 +241,8 @@ public final class ActionLedgerProjection {
       Optional<String> correlationId = optional(row, "correlationId");
       return Optional.ofNullable(
           switch (kind) {
-            // Tempdoc 812 D1×D2 — a scan rollup is journaled as an OPERATION row (its kind() IS
-            // operation, which is what makes it durable), so the read path must restore the ROLLUP,
+            // Legacy scan rollups were journaled as OPERATION rows. The compatibility read path
+            // must restore the ROLLUP,
             // not a bare Operation: the latter would silently drop the counts + scan key and render
             // a restored row as "Indexed 0 documents".
             case "operation" ->

@@ -17,6 +17,14 @@ suites with three existing skips and zero failures/errors; independent source/ev
 PMD/format and docs/governance pass. Focused1831 clears the unreferenced-method check. All13
 hosted CI34900811163 jobs and CLA34900809246 pass. [Producer proof](evidence/C2/recorded-engine-producer.md).
 
+REST backend checkpoint093ef4166 and nullable-schema correction7143d6dfc are committed;
+the caller item follows as its own commit. Full1878 passes app-agent692/UI1251 cases
+(three existing skips), PMD and format. Three negative controls fail as intended;
+restored1884 passes17 HTTP/context cases and1885 passes10 Node caller tests. Python's
+eight ui_perf cases and shell syntax pass. Independent review finds no remaining
+implementation defect in this cut. Live route capture/full-server trust filters,
+final build and hosted proof remain .3b.3; the complete Java producer proof stays .3c.
+
 Current item .3b connects the REST alias to prepared ingest/reindex ownership and retires
 the superseded scan observers. The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a
 handlers, .3b REST dispatcher/consumer retirement, then .3c real vertical integration/proof.

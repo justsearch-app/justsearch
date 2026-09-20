@@ -24,13 +24,18 @@ function recordedPing(data, key) {
 // Proves the installed dispatcher/store plus existing queue replay. The six keyed
 // checkpoint/owner fault points still join this fixture with their owning items.
 export async function exerciseOperationResume(c) {
-  const { request, post, requireThat, acceptedCount, matchingHit, jobStateFor, waitFor } = c;
-  const ping = await post(c.apiPort, '/api/operations/core.ping-backend/invoke', { args: {} });
-  requireThat(ping.status === 200 && JSON.parse(ping.text).success === true,
-    `installed ping dispatch failed: ${ping.text}`);
-  const operation = recordedPing(c.data);
+  const { request, post, requireThat, requireOperationSuccess, createOperationKey,
+    matchingHit, jobStateFor } = c;
+  const pingKey = createOperationKey();
+  const ping = await post(c.apiPort, '/api/operations/core.ping-backend/invoke', {
+    args: {}, idempotencyKey: pingKey,
+  });
+  const pingReceipt = requireOperationSuccess(ping, 'installed ping dispatch');
+  requireThat(pingReceipt.operationKey === pingKey,
+    `installed ping changed its supplied operation key: ${ping.text}`);
+  const operation = recordedPing(c.data, pingKey);
   console.log('OPERATION_ROW_BEFORE_DEATH', JSON.stringify(operation));
-  const { file, marker, successor, afterDeath } = await exerciseProcessingReplay({ ...c,
+  const { file, marker, successor, afterDeath, ingestReceipt } = await exerciseProcessingReplay({ ...c,
     observeAfterDeath: () => {
       const row = recordedPing(c.data, operation.operation_key);
       requireThat(JSON.stringify(row) === JSON.stringify(operation),
@@ -49,13 +54,25 @@ export async function exerciseOperationResume(c) {
   const countBefore = JSON.parse(statusBefore.text).indexedDocuments;
   requireThat(Number.isInteger(countBefore) && countBefore === 1,
     `the eval-mode fixture must contain exactly one indexed document: ${statusBefore.text}`);
-  const retry = await post(apiPort, '/api/knowledge/ingest', { paths: [file] });
-  requireThat(retry.status === 200 && acceptedCount(retry) === 1,
-    `retry must accept exactly one job: ${JSON.stringify(retry)}`);
-  const retried = await waitFor('retry completes a new queue attempt', 60000, () => {
-    const row = jobStateFor(path.basename(file));
-    return row?.state === 'DONE' && row.last_updated > before.last_updated ? row : null;
+  const pingRetry = await post(apiPort, '/api/operations/core.ping-backend/invoke', {
+    args: {}, idempotencyKey: pingKey,
   });
+  const pingRetryReceipt = requireOperationSuccess(pingRetry, 'installed ping retry');
+  requireThat(pingRetryReceipt.operationKey === pingReceipt.operationKey
+    && pingRetryReceipt.operationRecordId === pingReceipt.operationRecordId,
+  `ping retry did not return the original receipt: ${pingRetry.text}`);
+  requireThat(JSON.stringify(recordedPing(c.data, pingKey)) === JSON.stringify(operation),
+    'ping retry altered the completed operation row');
+  const retry = await post(apiPort, '/api/knowledge/ingest', {
+    paths: [file], idempotencyKey: ingestReceipt.operationKey,
+  });
+  const retryReceipt = requireOperationSuccess(retry, 'ingest retry');
+  requireThat(retryReceipt.operationKey === ingestReceipt.operationKey
+    && retryReceipt.operationRecordId === ingestReceipt.operationRecordId,
+  `ingest retry did not return the original receipt: ${retry.text}`);
+  const retried = jobStateFor(path.basename(file));
+  requireThat(JSON.stringify(retried) === JSON.stringify(before),
+    `same-key retry created or changed queue work: before=${JSON.stringify(before)} after=${JSON.stringify(retried)}`);
   const search = await post(apiPort, '/api/knowledge/search', { query: marker, limit: 10, mode: 'text' });
   requireThat(search.status === 200 && matchingHit(search, file, marker),
     `retried document must remain searchable: ${search.text}`);
@@ -67,7 +84,8 @@ export async function exerciseOperationResume(c) {
     && JSON.parse(statusAfter.text).indexedDocuments === countBefore,
   `indexed document count changed after retry: ${statusAfter.text}`);
   console.log('OPERATION_RETRY_NO_DUPLICATES_PASS', JSON.stringify({
-    proof: 'recorded-operation-survival-and-processing-path-retry', operation, afterDeath, before, retried,
+    proof: 'recorded-operation-survival-and-same-key-retry', operation, afterDeath, before, retried,
+    pingReceipt, pingRetryReceipt, ingestReceipt, retryReceipt,
     indexedDocuments: countBefore, matchingDocuments: hits.length,
   }));
 }
