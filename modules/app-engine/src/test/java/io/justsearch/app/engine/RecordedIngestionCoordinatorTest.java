@@ -63,6 +63,40 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void acceptedForegroundParentRequiresLiveOwnerProofForBackgroundInvocation(boolean detached) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var seed = f.request();
+      var context = seed.context().withUrgency(EngineContext.Urgency.FOREGROUND);
+      var request = new OperationAttemptRunner.Request(seed.key(), seed.descriptor(), context, seed.provenance());
+      var accepted = f.accept(request);
+      AtomicInteger producers = new AtomicInteger();
+      f.coordinator.bindProducer((plan, key, epoch, incoming, cancellation) -> {
+        producers.incrementAndGet();
+        assertEquals(EngineContext.Urgency.BACKGROUND, incoming.urgency());
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      try (var work = f.admission.admit(context, false)) {
+        if (detached) work.waitingClientGone();
+        var background = work.context().withUrgency(EngineContext.Urgency.BACKGROUND);
+        if (detached) {
+          var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, background));
+          assertEquals(OperationState.COMPLETE, result.completion().toCompletableFuture()
+              .get(2, java.util.concurrent.TimeUnit.SECONDS).state());
+          assertEquals(1, producers.get());
+        } else {
+          assertThrows(IllegalArgumentException.class,
+              () -> f.runner.start(accepted, handle -> f.coordinator.execute(handle, background)));
+          assertEquals(0, producers.get(), "A forged scheduling label cannot enter the producer");
+        }
+        assertEquals(EngineContext.Urgency.FOREGROUND, f.operations.find(seed.key()).orElseThrow().context().urgency());
+        assertEquals(1, f.admission.activeWorkCount());
+      }
+      assertEquals(0, f.admission.activeWorkCount());
+    }
+  }
+
   @Test
   void freshRootsShareOneWorkAndAdvanceOnlyAfterDurableChildAcknowledgement() throws Exception {
     try (Fixture f = new Fixture(temp, 2)) {

@@ -79,10 +79,17 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   @Override
   public OperationExecution execute(OperationRecordHandle handle, EngineContext context) {
+    if (context.workId().isEmpty()) throw new IllegalArgumentException("Recorded parent requires admitted work");
+    try (var admitted = admission.attach(context)) {
     synchronized (lock) {
       OperationRecord row = operations.find(handle.key()).orElseThrow();
+      var live = admitted.context();
+      boolean detached = row.context().survival() == EngineContext.Survival.DURABLE
+          && row.context().urgency() == EngineContext.Urgency.FOREGROUND
+          && context.urgency() == EngineContext.Urgency.BACKGROUND;
       if (row.id() != handle.id() || row.state() != OperationState.RUNNING
-          || context.workId().isEmpty() || !unattached(context).equals(unattached(row.context()))) {
+          || live.survival() != context.survival() || live.urgency() != context.urgency()
+          || !unattached(detached ? context.withUrgency(row.context().urgency()) : context).equals(unattached(row.context()))) {
         throw new IllegalArgumentException("Recorded parent requires its exact admitted context");
       }
       var stored = preparation(row);
@@ -96,12 +103,13 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       var child = attempts.acceptIngestChild(handle, plan.roots().getFirst());
       var parent = new Parent(row, stored, plan, handle, true);
       parent.physical = attached;
-      parent.work = admission.attach(context);
+      parent.work = admitted.retain();
       observeCancellation(parent);
       parents.put(row.key(), parent);
       startFreshChild(parent, child, oneRoot(plan, 0));
       maintain();
       return pending(parent.completion);
+    }
     }
   }
 

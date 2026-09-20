@@ -931,7 +931,7 @@ final class OperationExecutorImplTest {
 
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.EnumSource(io.justsearch.app.api.EngineAdmissionException.Reason.class)
-  void admissionRefusalRetainsItsReasonInDurableAttempt(io.justsearch.app.api.EngineAdmissionException.Reason reason)
+  void admissionRefusalPreservesItsReasonWithoutAcceptingAnAttempt(io.justsearch.app.api.EngineAdmissionException.Reason reason)
       throws Exception {
     var handlers = new HandlerRegistry();
     var id = new OperationRef("core.admission-reason");
@@ -947,13 +947,9 @@ final class OperationExecutorImplTest {
     try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
         var statement = connection.createStatement();
         var rows = statement.executeQuery("SELECT state, failure_reason FROM operations")) {
-      assertTrue(rows.next());
-      assertEquals("FAILED", rows.getString("state"));
-      assertEquals(reason.name(), rows.getString("failure_reason"));
       assertFalse(rows.next());
     }
-    assertEquals(1, history.size());
-    assertEquals(Optional.of(reason.name()), history.getFirst().diagnosticsLink());
+    assertTrue(history.isEmpty(), "Unaccepted work has no completed operation history");
   }
 
   @org.junit.jupiter.params.ParameterizedTest

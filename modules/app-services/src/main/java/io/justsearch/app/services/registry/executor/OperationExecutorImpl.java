@@ -392,25 +392,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Optional<String> confirmationToken, EngineContext context, String undoId, String key, java.util.UUID nonce) {
     var existing = existingInvocation(op, argumentsJson, provenance, context, key, undoId != null);
     if (existing.isPresent()) return existing.get();
-    InvocationPlan plan = planInvocation(op, argumentsJson, provenance, context, undoId, key, nonce);
+    InvocationPlan plan = planInvocation(op, argumentsJson, provenance,
+        EngineProvenance.forOperation(context, op.policy()), undoId, key, nonce);
     // A winner can accept while this request leaves its pure scope. Receipt lookup never
     // publishes under a preparation lock and never consumes another mutation capsule.
     existing = existingInvocation(op, argumentsJson, provenance, context, plan.request().key(), undoId != null);
     if (existing.isPresent()) return existing.get();
     if (plan.existing()) throw preparationUnavailable();
-    var request = plan.request();
-    Optional<String> acceptedBasis = Optional.empty();
-    if (intentGateEvaluator != null) {
-      var basis = enforceTrustLattice(op, argumentsJson, request.provenance(),
-          confirmationToken, request.context(), plan.invocation().value(), request.key(),
-          plan.pending() == null ? null : plan.pending().nonce());
-      acceptedBasis = Optional.of(basis.encode());
-    }
-    // A caller header is never server evidence, including in ungated legacy/test wiring.
-    var acceptedContext = request.context().withGrantReference(acceptedBasis);
-    plan = new InvocationPlan(new OperationAttemptRunner.Request(request.key(), request.descriptor(),
-        acceptedContext, request.provenance(), request.historyMode()), plan.invocation(), plan.pending(), false);
-    return executeAttempt(op, plan, undoId);
+    return executeAttempt(op, plan, undoId, argumentsJson, confirmationToken, context);
   }
 
   @Override
@@ -419,7 +408,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     validateRequest(op, argumentsJson, provenance, Optional.empty(), context);
     var existing = existingInvocation(op, argumentsJson, provenance, context, operationKey, false);
     if (existing.isPresent()) return new OperationDispatchPlan.Recorded(operationKey, existing.get());
-    InvocationPlan plan = planInvocation(op, argumentsJson, provenance, context, null, operationKey, null);
+    InvocationPlan plan = planInvocation(op, argumentsJson, provenance,
+        EngineProvenance.forOperation(context, op.policy()), null, operationKey, null);
     String stableKey = plan.request().key();
     existing = existingInvocation(op, argumentsJson, provenance, context, stableKey, false);
     if (existing.isPresent()) return new OperationDispatchPlan.Recorded(stableKey, existing.get());
@@ -466,6 +456,9 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       io.justsearch.app.api.operations.OperationStore.Preparation pending) {
     var envelope = preparationCodec.decode(pending.payload(), request.key(), pending.nonce(), request.descriptor());
     EngineContext origin = envelope.context();
+    if (op.policy().declaredSurvival().filter(survival -> survival != envelope.context().survival()).isPresent()) {
+      throw preparationUnavailable();
+    }
     // Only reattach identical attribution and work axes. A different caller remains separately
     // admitted; attach(origin) admits a fresh original-context child instead of relabelling it.
     if (request.context().workId().isPresent()
@@ -483,53 +476,78 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         io.justsearch.app.api.operations.OperationStoreException.Code.OPERATION_PREPARATION_UNAVAILABLE, null);
   }
 
-  /** Pure preparation freezes scope; acceptance still precedes all effects and refusals. */
-  private OperationResult executeAttempt(Operation op, InvocationPlan plan, String undoId) {
+  /** Pure preparation freezes scope; reservation precedes consent and acceptance precedes effects. */
+  private OperationResult executeAttempt(Operation op, InvocationPlan plan, String undoId,
+      String argumentsJson, Optional<String> confirmationToken, EngineContext caller) {
     Instant startedAt = clock.instant();
     PreparedInvocation invocation = plan.invocation();
     EngineContext context = plan.request().context();
     InvocationProvenance provenance = plan.request().provenance();
-    // Every declaration has a record kind. Audit only controls history projection.
-    OperationAttemptRunner.PreparedAttempt prepared = plan.pending() == null
-        ? attempts.accept(plan.request()) : attempts.acceptPrepared(plan.request(), plan.pending().nonce());
-    if (prepared.existing()) {
-      return attempts.start(prepared, ignored -> {
-        throw new IllegalStateException("Existing acceptance must never execute");
-      }).response();
-    }
-    var _ = prepared.completion().whenComplete((row, failure) -> {
-      if (failure != null) {
-        emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty(), null);
-        return;
+    OperationResult refusal = preflight(op, invocation.refusal());
+    boolean valid = refusal == null && invocation.failure() == null;
+    var publications = new java.util.ArrayList<Runnable>();
+    try (var handoff = valid ? new OperationWorkHandoff(admission, caller, context) : null) {
+      java.util.function.Function<EngineContext, EngineContext> authorize = admitted -> {
+        Optional<String> basis = intentGateEvaluator == null ? Optional.empty()
+            : Optional.of(enforceTrustLattice(op, argumentsJson, provenance, confirmationToken,
+                admitted, invocation.value(), plan.request().key(),
+                plan.pending() == null ? null : plan.pending().nonce(), publications).encode());
+        // A caller header is never server evidence, including ungated test wiring.
+        return admitted.withGrantReference(basis);
+      };
+      OperationAttemptRunner.AdmittedAttempt<EngineContext> admitted;
+      try {
+        admitted = attempts.admitAndAccept(plan.request(), plan.pending() == null ? null : plan.pending().nonce(), scope -> {
+          if (handoff != null) return handoff.accept(scope, authorize);
+          EngineContext authorized = authorize.apply(context);
+          scope.accept(authorized);
+          return authorized;
+        });
+      } finally {
+        // Both capsule and gate events may call arbitrary subscribers. Never publish under a key stripe.
+        publications.forEach(Runnable::run);
       }
-      boolean success = row.state() == OperationState.COMPLETE;
-      OperationOutcome outcome = success
-          ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
-      Optional<String> undoExecution = success && undoId == null && op.policy().undoSupported()
-          ? Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::executionId)
-          : Optional.empty();
-      emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution, row);
-    });
-    try {
-      OperationResult refusal = preflight(op, invocation.refusal());
+      OperationAttemptRunner.PreparedAttempt prepared = admitted.attempt();
+      if (prepared.existing()) {
+        return attempts.start(prepared, ignored -> {
+          throw new IllegalStateException("Existing acceptance must never execute");
+        }).response();
+      }
+      if (handoff != null) handoff.accepted();
+      var _ = prepared.completion().whenComplete((row, failure) -> {
+        if (failure != null) {
+          emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty(), null);
+          return;
+        }
+        boolean success = row.state() == OperationState.COMPLETE;
+        OperationOutcome outcome = success
+            ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
+        Optional<String> undoExecution = success && undoId == null && op.policy().undoSupported()
+            ? Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::executionId)
+            : Optional.empty();
+        emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution, row);
+      });
       if (refusal != null) {
         attempts.rejectBeforeStart(prepared, refusal.errorCode().orElse("HANDLER_FAILED"));
         return recordedResponse(refusal, prepared.accepted());
       }
-      if (invocation.failure() != null) throw invocation.failure();
-      try (var work = admission.attach(context)) {
+      try {
+        if (invocation.failure() != null) throw invocation.failure();
+        EngineWorkHandle work = Objects.requireNonNull(handoff).work();
         var result = attempts.start(prepared,
-            handle -> invokeOwnedHandler(invocation, provenance, work, undoId, handle));
+            handle -> invokeOwnedHandler(invocation, provenance, work, undoId, handle,
+                admitted.admission().orElseThrow()));
         return recordedResponse(result.response(), result.record());
+      } catch (RuntimeException failure) {
+        try { attempts.rejectBeforeStart(prepared, "UNCAUGHT_EXCEPTION"); }
+        catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
+        throw failure;
       }
-    } catch (io.justsearch.app.api.EngineAdmissionException failure) {
-      try { attempts.rejectBeforeStart(prepared, failure.reason().name()); }
-      catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
-      throw failure;
-    } catch (RuntimeException failure) {
-      try { attempts.rejectBeforeStart(prepared, "UNCAUGHT_EXCEPTION"); }
-      catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
-      throw failure;
+    } catch (ConfirmationRequiredException required) {
+      if (required.preparationNonce() == null) throw required;
+      var preview = Objects.requireNonNull(invocation.handler().approvalPreview(invocation.value()), "approvalPreview");
+      throw new ConfirmationRequiredException(required.operationRef(), required.gateBehavior(), required.declaredStrategy(),
+          required.sourceTier(), required.operationKey(), required.preparationNonce(), preview);
     }
   }
 
@@ -610,12 +628,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
 
   /** Retain exact admitted work before invoking a handler that may fork before returning. */
   private OperationExecution invokeOwnedHandler(PreparedInvocation invocation,
-      InvocationProvenance provenance, EngineWorkHandle work, String undoId, OperationRecordHandle record) {
+      InvocationProvenance provenance, EngineWorkHandle work, String undoId, OperationRecordHandle record,
+      EngineContext acceptedContext) {
     var owner = work.retain();
     try {
+      EngineContext authorized = owner.context().withGrantReference(acceptedContext.grantReference());
       OperationExecution execution = undoId == null
-          ? invocation.handler().executePrepared(invocation.value(), provenance, owner.context(), record)
-          : invocation.handler().undoPrepared(invocation.value(), undoId, provenance, owner.context(), record);
+          ? invocation.handler().executePrepared(invocation.value(), provenance, authorized, record)
+          : invocation.handler().undoPrepared(invocation.value(), undoId, provenance, authorized, record);
       return new OperationExecution(execution.response(),
           execution.completion().whenComplete((result, failure) -> owner.close()));
     } catch (RuntimeException | Error failure) {
@@ -868,7 +888,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       String argumentsJson,
       InvocationProvenance provenance,
       Optional<String> confirmationToken, EngineContext engineContext, OperationPreparation prepared,
-      String operationKey, java.util.UUID preparationNonce) {
+      String operationKey, java.util.UUID preparationNonce, List<Runnable> publications) {
     // Tempdoc 550 thesis III: ONE structural verdict (derived source tier + (SourceTier × RiskTier)
     // lattice gate + Global Hard Stop override), the same computation/instance the Preview endpoint
     // reads. The E2 hard-stop DENY (engaged → DENY every UNTRUSTED dispatch, user-driven untouched)
@@ -900,8 +920,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         if (selected.isPresent()
             && (preparationNonce == null ? scope.coversArguments(op, argumentsJson, engineContext)
                 : scope.coversPreparation(op, prepared, engineContext))) {
-          emitGateOutcome(op, provenance, sourceTier, gate,
-              io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
+          publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
+              io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED));
           var grant = selected.orElseThrow();
           return switch (grant.kind()) {
             case OPERATION -> new OperationAuthorizationBasis.OperationGrant(grant.target(), grant.sourceTier());
@@ -920,24 +940,25 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         // route through an approval that mints a capsule (C3 ceremony). With the nominal
         // path removed, the audit caller-migration is complete: a fabricated or stale
         // non-capsule token from ANY source now fails closed.
-        if (capsuleService != null
-            && (preparationNonce == null ? capsuleService.verifyAndConsume(token, op.id().value(), argumentsJson)
-                : capsuleService.verifyPreparedAndConsume(token, op.id().value(), argumentsJson, operationKey, preparationNonce))) {
+        var consumed = capsuleService == null
+            ? Optional.<io.justsearch.agent.api.registry.ConsentCapsuleAuthority.Consumption>empty()
+            : preparationNonce == null ? capsuleService.consumeDeferred(token, op.id().value(), argumentsJson)
+                : capsuleService.consumePreparedDeferred(token, op.id().value(), argumentsJson, operationKey, preparationNonce);
+        if (consumed.isPresent()) {
+          publications.add(consumed.orElseThrow()::publish);
           // Tempdoc 550 Outcome face: record the gate firing as APPROVED, then proceed.
-          emitGateOutcome(op, provenance, sourceTier, gate,
-              io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
+          publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
+              io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED));
           return new OperationAuthorizationBasis.EphemeralCapsule();
         }
-        var preview = preparationNonce == null ? null
-            : Objects.requireNonNull(resolveHandler(op).approvalPreview(prepared), "approvalPreview");
-        emitGateOutcome(op, provenance, sourceTier, gate,
-            io.justsearch.app.observability.operations.AuthorizationDisposition.GATED);
+        publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
+            io.justsearch.app.observability.operations.AuthorizationDisposition.GATED));
         throw new ConfirmationRequiredException(op.id(), gate, op.policy().confirm(), sourceTier,
-            operationKey, preparationNonce, preview);
+            operationKey, preparationNonce);
       }
       case DENY -> {
-        emitGateOutcome(op, provenance, sourceTier, gate,
-            io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED);
+        publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
+            io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED));
         throw new TrustGateDeniedException(op.id(), sourceTier);
       }
     }
