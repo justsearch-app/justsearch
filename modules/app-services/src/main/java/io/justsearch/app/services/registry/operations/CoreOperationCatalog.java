@@ -21,6 +21,7 @@ import io.justsearch.agent.api.registry.RequiredCapability;
 import io.justsearch.agent.api.registry.ResourceRef;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -666,7 +667,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
-            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(REINDEX),

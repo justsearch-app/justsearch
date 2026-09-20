@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api.registry;
 
+import io.justsearch.core.context.EngineContext;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -35,7 +36,8 @@ public record OperationPolicy(
     Optional<ResourceRef> advisoryClass,
     Optional<OperationRef> inverseOperationRef,
     Optional<String> capabilityFamily,
-    OperationKind recordKind) {
+    OperationKind recordKind,
+    Optional<EngineContext.Survival> declaredSurvival) {
 
   public OperationPolicy {
     Objects.requireNonNull(risk, "risk");
@@ -46,6 +48,7 @@ public record OperationPolicy(
     Objects.requireNonNull(inverseOperationRef, "inverseOperationRef");
     Objects.requireNonNull(capabilityFamily, "capabilityFamily");
     Objects.requireNonNull(recordKind, "recordKind");
+    Objects.requireNonNull(declaredSurvival, "declaredSurvival");
     requiredCapabilities =
         requiredCapabilities == null ? Set.of() : Set.copyOf(requiredCapabilities);
   }
@@ -76,7 +79,8 @@ public record OperationPolicy(
         advisoryClass,
         Optional.of(Objects.requireNonNull(inverse, "inverse")),
         capabilityFamily,
-        recordKind);
+        recordKind,
+        declaredSurvival);
   }
 
   /**
@@ -99,13 +103,33 @@ public record OperationPolicy(
         advisoryClass,
         inverseOperationRef,
         Optional.of(Objects.requireNonNull(family, "family")),
-        recordKind);
+        recordKind,
+        declaredSurvival);
   }
 
   /** Backend record classification; declaring a kind requires its corresponding recovery owner. */
   public OperationPolicy withRecordKind(OperationKind kind) {
     return new OperationPolicy(risk, confirm, audit, retry, requiredCapabilities, undoSupported,
-        advisoryClass, inverseOperationRef, capabilityFamily, kind);
+        advisoryClass, inverseOperationRef, capabilityFamily, kind, declaredSurvival);
+  }
+
+  /** Explicit survival for an effect; absence inherits the caller's survival. */
+  public OperationPolicy withDeclaredSurvival(EngineContext.Survival survival) {
+    return new OperationPolicy(risk, confirm, audit, retry, requiredCapabilities, undoSupported,
+        advisoryClass, inverseOperationRef, capabilityFamily, recordKind,
+        Optional.of(Objects.requireNonNull(survival, "survival")));
+  }
+
+  /**
+   * Backwards-compatible canonical shape ending in {@code recordKind}; absent declared survival
+   * preserves caller-inherited behavior.
+   */
+  public OperationPolicy(RiskTier risk, ConfirmStrategy confirm, AuditPolicy audit, RetryPolicy retry,
+      Set<RequiredCapability> requiredCapabilities, boolean undoSupported,
+      Optional<ResourceRef> advisoryClass, Optional<OperationRef> inverseOperationRef,
+      Optional<String> capabilityFamily, OperationKind recordKind) {
+    this(risk, confirm, audit, retry, requiredCapabilities, undoSupported, advisoryClass,
+        inverseOperationRef, capabilityFamily, recordKind, Optional.empty());
   }
 
   /** Existing declarations remain ordinary operations until their recorded owners are connected. */

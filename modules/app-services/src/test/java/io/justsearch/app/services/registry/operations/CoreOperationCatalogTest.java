@@ -12,6 +12,7 @@ import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.TrustTier;
+import io.justsearch.core.context.EngineContext;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -178,6 +179,8 @@ final class CoreOperationCatalogTest {
     Operation op = catalog.findById(CoreOperationCatalog.REINDEX).orElseThrow();
     assertEquals(RiskTier.LOW, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
+    assertEquals(EngineContext.Survival.DURABLE,
+        op.policy().declaredSurvival().orElseThrow());
     assertEquals(Set.of(ExecutorTag.UI, ExecutorTag.AGENT), op.executors());
   }
 

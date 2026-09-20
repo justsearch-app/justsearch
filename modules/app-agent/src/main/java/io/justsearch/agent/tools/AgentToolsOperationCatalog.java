@@ -22,6 +22,7 @@ import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.agent.api.registry.ResourceRef;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -358,7 +359,8 @@ public final class AgentToolsOperationCatalog implements OperationCatalog {
             // `paths` canonicalize inside an indexed root (IndexedRootGrantScope); an out-of-root
             // ingest still runs, it just costs an approval that names the path (811 C-2a preserved).
             .withCapabilityFamily("file-operations")
-            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.INGEST),
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.INGEST)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         // Tempdoc 879: lineage is not inert — the FE renders `affects` in the operation button and
         // hover preview — and ingest queues indexing work, so it affects the indexing-jobs Resource

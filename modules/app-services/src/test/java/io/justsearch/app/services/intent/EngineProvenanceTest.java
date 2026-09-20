@@ -2,14 +2,24 @@
 package io.justsearch.app.services.intent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.justsearch.agent.api.registry.AuditPolicy;
+import io.justsearch.agent.api.registry.ConfirmStrategy;
 import io.justsearch.agent.api.registry.ExecutorTag;
+import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.agent.api.registry.OperationPolicy;
+import io.justsearch.agent.api.registry.RetryPolicy;
+import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.SourceTier;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.core.context.EngineContext;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 final class EngineProvenanceTest {
@@ -63,5 +73,45 @@ final class EngineProvenanceTest {
         EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
     assertThrows(IllegalArgumentException.class, () -> EngineProvenance.invocation(context,
         ExecutorTag.UI, Instant.EPOCH, Optional.empty()));
+  }
+
+  @Test
+  void inheritedOrEqualDeclaredSurvivalReusesTheIncomingContext() {
+    for (var survival : EngineContext.Survival.values()) {
+      var incoming = context(survival);
+      assertSame(incoming, EngineProvenance.forOperation(incoming, policy(Optional.empty())));
+      assertSame(incoming,
+          EngineProvenance.forOperation(incoming, policy(Optional.of(survival))));
+    }
+  }
+
+  @Test
+  void differingDeclaredSurvivalPreservesAttributionButClearsWorkIdentity() {
+    for (var incomingSurvival : EngineContext.Survival.values()) {
+      var declaredSurvival = incomingSurvival == EngineContext.Survival.INTERACTIVE
+          ? EngineContext.Survival.DURABLE : EngineContext.Survival.INTERACTIVE;
+      var incoming = context(incomingSurvival);
+
+      var projected = EngineProvenance.forOperation(incoming,
+          policy(Optional.of(declaredSurvival)));
+
+      assertNotSame(incoming, projected);
+      assertEquals(new EngineContext(EngineContext.ClientKind.MCP_CLIENT, "client",
+          Optional.of("session"), Optional.of("grant"), "UNTRUSTED", "MCP",
+          declaredSurvival, EngineContext.Urgency.BACKGROUND), projected);
+      assertEquals(Optional.empty(), projected.workId());
+    }
+  }
+
+  private static EngineContext context(EngineContext.Survival survival) {
+    return new EngineContext(EngineContext.ClientKind.MCP_CLIENT, "client",
+        Optional.of("session"), Optional.of("grant"), "UNTRUSTED", "MCP", survival,
+        EngineContext.Urgency.BACKGROUND, Optional.of(new UUID(0, 1)));
+  }
+
+  private static OperationPolicy policy(Optional<EngineContext.Survival> declaredSurvival) {
+    return new OperationPolicy(RiskTier.LOW, ConfirmStrategy.None.INSTANCE, AuditPolicy.NONE,
+        RetryPolicy.noRetry(), Set.of(), false, Optional.empty(), Optional.empty(), Optional.empty(),
+        OperationKind.INGEST, declaredSurvival);
   }
 }

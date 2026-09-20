@@ -4,6 +4,7 @@ package io.justsearch.app.services.intent;
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.IntentSourceCatalog;
+import io.justsearch.agent.api.registry.OperationPolicy;
 import io.justsearch.agent.api.registry.SourceTier;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.core.context.EngineContext;
@@ -37,6 +38,17 @@ public final class EngineProvenance {
     return new EngineContext(incoming.clientKind(), incoming.clientId(), sessionId,
         incoming.grantReference(), IntentGateEvaluator.sourceTierFor(SOURCES, transport).name(),
         transport.name(), survival, urgency, incoming.workId());
+  }
+
+  /** Project an operation's explicit survival while retaining attribution and clearing old work ownership. */
+  public static EngineContext forOperation(EngineContext incoming, OperationPolicy policy) {
+    Objects.requireNonNull(incoming, "incoming");
+    Objects.requireNonNull(policy, "policy");
+    var survival = policy.declaredSurvival().orElse(incoming.survival());
+    if (survival == incoming.survival()) return incoming;
+    return new EngineContext(incoming.clientKind(), incoming.clientId(), incoming.sessionId(),
+        incoming.grantReference(), incoming.sourceTier(), incoming.transport(), survival,
+        incoming.urgency());
   }
 
   /**
