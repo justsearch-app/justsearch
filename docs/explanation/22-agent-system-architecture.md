@@ -140,6 +140,23 @@ Key classes:
 
 Wire-name projection is deliberate. Dotted operation IDs such as `core.search-index` are projected to model-visible tool names such as `core_search_index`.
 
+`core.ingest-files` and `core.reindex` use prepared, recorded execution. Preparation
+copies watched-root membership and collection labels from `WatchedRootsState`, captures
+resolved exclusions and the currently serving generation, and freezes a `root-plan.v1`
+metadata payload. Ingest resolves and classifies every requested path before acceptance;
+unresolved, missing, unreadable or symbolic-link inputs refuse the requested set. An explicit
+collection applies to the whole request; otherwise nested watched roots keep their labels
+and out-of-root inputs use `mcp-ingest`. Reindex freezes all watched directory roots and
+the requested force flag. Neither preparation starts a scan or enqueues writes.
+
+Approval preview and replay read this frozen preparation. They do not reread roots,
+configuration or input files. The accepted record and context reach
+`RecordedIngestionService`, whose completion waits for the recorded ingestion owner;
+calling these handlers directly does not authorize an effect. Eager and late registration
+resolve the current client when preparing, so Engine replacement cannot retain a stale
+generation supplier. The separate REST ingestion controller still has its legacy path;
+it is not yet covered by this handler connection.
+
 ### The offering
 
 The set of tools a run puts in front of the model — the *offering* — is produced in exactly one place, `AgentToolEmitter.offer(...)`, by filtering the composed catalog through executor tag, an audience allow-list (`USER`/`AGENT`), the caller's optional tool selection, and each operation's evaluated availability. `GET /api/chat/agent/tools` and the build-time registry snapshot are projections of that same call, not independent re-derivations, so the trust panel and the governance witness cannot disagree with what the model was sent.

@@ -1,6 +1,5 @@
 package io.justsearch.app.services.bootstrap.phases;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -14,17 +13,13 @@ import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.OnlineAiService;
-import io.justsearch.app.observability.ledger.ScanRollupLedger;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.ScanProgressRegistry;
-import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
-import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -33,123 +28,33 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Tempdoc 832 (lane D) — the agent-owned adapter's scan observability. {@code IngestTool} calls
- * {@code agentSearchAdapter::scanRoot}, but only the controller-owned adapter ever had the
- * scan-progress registry / rollup ledger bound, so an agent- or MCP-driven directory ingest emitted
- * no SSE progress and left no rollup row. These assertions read the adapter's bound collaborators
- * back (the adapter exposes no getters — a reflective read keeps the fix from needing a
- * production-side test seam).
- *
- * <p>Tempdoc 832 extended this with the one-construction-authority guards: that bug was possible
- * only because the eager and late-bound paths each assembled the bundle themselves, so the tests
- * below also pin the two paths to the same composition.
- */
-@DisplayName("AgentToolFactory — scan wiring and single construction authority")
-final class AgentToolFactoryScanWiringTest {
+/** Agent bundle registration, adapter reuse and file-operation journal ownership. */
+@DisplayName("AgentToolFactory — single construction authority")
+final class AgentToolFactoryCompositionTest {
 
   // KnowledgeHttpApiAdapter's constructor builds a KnowledgeSearchEngine, which reads the global
   // reranker config — so the adapter cannot be constructed without a published ConfigStore.
   private ConfigStore previousConfigStore;
-  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void publishConfigStore() {
     previousConfigStore = ConfigStore.globalOrNull();
     TestResolvedConfigHelper.storeWithDefaults();
-    processExecutors = new TestEngineExecutors();
   }
 
   @AfterEach
   void restoreConfigStore() {
-    processExecutors.close();
     TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
-  }
-
-  private static Object boundField(KnowledgeHttpApiAdapter adapter, String name) {
-    try {
-      Field f = KnowledgeHttpApiAdapter.class.getDeclaredField(name);
-      f.setAccessible(true);
-      return f.get(adapter);
-    } catch (ReflectiveOperationException e) {
-      throw new AssertionError(
-          "KnowledgeHttpApiAdapter." + name + " is gone — re-point this wiring assertion", e);
-    }
   }
 
   private static KnowledgeHttpApiAdapter agentAdapter() {
     return new KnowledgeHttpApiAdapter(mock(KnowledgeServerBootstrap.class), mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
   }
 
-  @Test
-  @DisplayName("binds registry + ledger onto the agent adapter (agent/MCP ingest emitted neither)")
-  void bindsBoth() {
-    KnowledgeHttpApiAdapter adapter = agentAdapter();
-    assertNull(boundField(adapter, "scanProgressRegistry"), "unbound before the wiring call");
-    assertNull(boundField(adapter, "scanRollupLedger"), "unbound before the wiring call");
-
-    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
-      ScanRollupLedger ledger = mock(ScanRollupLedger.class);
-      AgentToolFactory.bindScanObservability(adapter, registry, ledger);
-
-      assertSame(registry, boundField(adapter, "scanProgressRegistry"));
-      assertSame(ledger, boundField(adapter, "scanRollupLedger"));
-    }
-  }
-
-  @Test
-  @DisplayName("a null adapter (prerequisites unmet in build) is a no-op, not an NPE")
-  void nullAdapterIsNoOp() {
-    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
-      assertDoesNotThrow(
-          () -> AgentToolFactory.bindScanObservability(null, registry, mock(ScanRollupLedger.class)));
-    }
-  }
-
-  @Test
-  @DisplayName("the late-bound registration binds the adapter its IngestTool drives")
-  void lateBoundRegistrationBinds(@TempDir Path dataDir) {
-    // The wrong-gate this guards: on the normal boot the Worker connects asynchronously, so the
-    // eager AgentToolFactory.build produces nothing and THIS registration is what builds the
-    // adapter behind core.ingest-files (MCP justsearch_ingest / the agent loop).
-    KnowledgeHttpApiAdapter adapter = agentAdapter();
-    WorkerCapability capability = mock(WorkerCapability.class);
-    when(capability.available()).thenReturn(true);
-
-    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
-      ScanRollupLedger ledger = mock(ScanRollupLedger.class);
-      boolean registered =
-          AgentToolHandlers.registerLateBound(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
-              new HandlerRegistry(),
-              mock(KnowledgeServerBootstrap.class),
-              mock(KnowledgeClient.class),
-              capability,
-              dataDir,
-              mock(KnowledgeClient.class),
-              OnlineAiService.unavailable(),
-              null,
-              adapter,
-              null,
-              null,
-              registry,
-              ledger,
-              mock(DocumentService.class),
-            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
-            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
-            () -> mock(KnowledgeClient.class));
-
-      assertTrue(registered, "registration ran (prerequisites met)");
-      assertSame(registry, boundField(adapter, "scanProgressRegistry"));
-      assertSame(ledger, boundField(adapter, "scanRollupLedger"));
-    }
-  }
-
   /**
    * Tempdoc 832 — the two-authorities regression guard. The eager path and the late-bound path used
    * to assemble the bundle independently, so a wiring added to one silently missed the other. These
-   * assert they now compose the same bundle: same tool set, same adapter-identity semantics, same
-   * scan bindings.
+   * assert they now compose the same bundle: same tool set, same adapter-identity semantics, recorded-owner composition (covered by RecordedHandlerCompositionTest).
    *
    * <p><b>Tempdoc 876 §B.5 — this assertion is vacuous on REMEMBER.</b> {@code eager} and
    * {@code lateBound} are two SEPARATE registries, and this call passes {@code null} for
@@ -192,8 +97,6 @@ final class AgentToolFactoryScanWiringTest {
             dataDir,
             client,
             OnlineAiService.unavailable(),
-            null,
-            null,
             null,
             null,
             null,
@@ -271,8 +174,6 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             MemoryStore.noop(),
-            null,
-            null,
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
@@ -309,8 +210,6 @@ final class AgentToolFactoryScanWiringTest {
             null,
             existing,
             null,
-            null,
-            null,
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
@@ -328,43 +227,12 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             null,
-            null,
-            null,
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
             () -> mock(KnowledgeClient.class));
     assertNotNull(fresh.agentSearchAdapter(), "a fresh adapter is built when none is supplied");
     assertNotSame(existing, fresh.agentSearchAdapter());
-  }
-
-  @Test
-  @DisplayName("the freshly built adapter — the normal async-Worker boot — gets the scan bindings")
-  void freshAdapterGetsScanBindings(@TempDir Path dataDir) {
-    KnowledgeClient client = mock(KnowledgeClient.class);
-    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
-      ScanRollupLedger ledger = mock(ScanRollupLedger.class);
-      AgentToolFactory.Output out =
-          AgentToolFactory.assemble(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
-              dataDir,
-              mock(KnowledgeServerBootstrap.class),
-              client,
-              client,
-              OnlineAiService.unavailable(),
-              null,
-              null,
-              null,
-              registry,
-              ledger,
-              mock(DocumentService.class),
-            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
-            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
-            () -> mock(KnowledgeClient.class));
-
-      assertSame(registry, boundField(out.agentSearchAdapter(), "scanProgressRegistry"));
-      assertSame(ledger, boundField(out.agentSearchAdapter(), "scanRollupLedger"));
-    }
   }
 
   @Test
@@ -477,8 +345,6 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             existing,
-            null,
-            null,
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
@@ -496,8 +362,6 @@ final class AgentToolFactoryScanWiringTest {
             null,
             null,
             null,
-            null,
-            null,
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
@@ -506,17 +370,4 @@ final class AgentToolFactoryScanWiringTest {
     assertNotSame(existing, fresh.fileOperationLog());
   }
 
-  @Test
-  @DisplayName("a null collaborator does not clobber an already-bound one")
-  void nullCollaboratorDoesNotUnbind() {
-    KnowledgeHttpApiAdapter adapter = agentAdapter();
-    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
-      ScanRollupLedger ledger = mock(ScanRollupLedger.class);
-      AgentToolFactory.bindScanObservability(adapter, registry, ledger);
-      AgentToolFactory.bindScanObservability(adapter, null, null);
-
-      assertSame(registry, boundField(adapter, "scanProgressRegistry"));
-      assertSame(ledger, boundField(adapter, "scanRollupLedger"));
-    }
-  }
 }

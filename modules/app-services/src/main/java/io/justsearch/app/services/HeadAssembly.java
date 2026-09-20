@@ -112,9 +112,6 @@ public final class HeadAssembly implements AutoCloseable {
   // so the write side (FileOperationsTool) and the read side (AgentRunQueryService.operationHistory
   // → GET /api/chat/agent/history) are the same instance over the same directory.
   private final FileOperationLog fileOperationLog;
-  // Tempdoc 832 (lane D): published by LocalApiServer (its owner) before connectKnowledgeServer, so
-  // the late-bound agent ingest adapter can be bound to the same scan-progress stream.
-  private volatile io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry;
   // §31 Step 1.1: ExcludesService constructed by ServicePhase (first dissolution of LateBoundServices).
   private final io.justsearch.app.api.ExcludesService excludes;
   // §31 Phase 3: ServicePhase output held to feed assembleServiceGraph + expose helpers to
@@ -935,8 +932,6 @@ public final class HeadAssembly implements AutoCloseable {
                   this.agentSearchAdapter,
                   this.fileOperationLog,
                   this.memoryStore,
-                  this.scanProgressRegistry,
-                  scanRollupLedgerOrNull(),
                   this.services.worker().documents(), recordedIngestion, authority.roots(),
                   () -> this.knowledgeClient);
             });
@@ -1770,27 +1765,6 @@ public final class HeadAssembly implements AutoCloseable {
   /** §4 Phase 2 typed output. */
   public io.justsearch.app.services.bootstrap.CapabilityGraph capabilities() {
     return this.capabilities;
-  }
-
-  /**
-   * Tempdoc 832 (lane D) — publishes the process-wide scan-progress registry (owned by
-   * {@code LocalApiServer}, which constructs it) so the agent-owned ingest adapter gets the same
-   * scan observability the controller-owned one has: without it, an agent- or MCP-driven directory
-   * ingest emitted no scan-progress SSE and left no rollup ledger row.
-   *
-   * <p>Called before {@link #connectKnowledgeServer}, which is where the late-bound registration
-   * builds the adapter that {@code IngestTool} actually drives on the normal (async-Worker) boot.
-   * The eager-path adapter, when one exists, is bound here directly.
-   */
-  public void setScanProgressRegistry(
-      io.justsearch.app.services.worker.ScanProgressRegistry registry) {
-    this.scanProgressRegistry = registry;
-    io.justsearch.app.services.bootstrap.phases.AgentToolFactory.bindScanObservability(
-        this.agentSearchAdapter, registry, scanRollupLedgerOrNull());
-  }
-
-  private io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedgerOrNull() {
-    return this.substrateOut == null ? null : this.substrateOut.operationOut().scanRollupLedger();
   }
 
   /** §6 typed substrate graph built once at end of constructor. */

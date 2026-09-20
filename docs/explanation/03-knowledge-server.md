@@ -163,9 +163,11 @@ The job queue uses `PRAGMA user_version` for linear schema evolution:
 Version 18 adds `ingestion_walk_progress`, `jobs.walk_seen_epoch`, and nullable ledger
 operation/revision/hash/coverage fields inside the existing queue store. The projection
 primitive persists a plan hash, enumeration epoch and closure outcome, rejects stale closure
-callbacks, and refuses to recreate missing recovery state. This checkpoint does not yet
-connect producers or operation recovery; by itself it cannot certify
-that a root walk completed. Ledger privacy repair preserves attribution and recorded fields.
+callbacks, and refuses to recreate missing recovery state. The Engine coordinator binds this
+projection to the bounded recorded root producer and checks live authorization before replay.
+Enumeration closure alone cannot certify completion: the coordinator requires sealed committed
+coverage and durable receipt acknowledgement. Ledger privacy repair preserves attribution
+and recorded fields.
 
 ### Pre-migration backups
 

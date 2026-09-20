@@ -453,7 +453,14 @@ digest; its private payload holds the one-root plan. Repeated acceptance returns
 child, including its terminal outcome. Terminal children remain retained while their parent
 is nonterminal, including COMPLETE_WITH_GAPS, and ordinary retention resumes afterward.
 Parent completion remains the producer's explicit composition of durable child outcomes.
-These primitives do not yet activate recorded ingest/reindex producers or scoped recovery.
+The Engine's `RecordedIngestionCoordinator` now connects these records to the actual bounded
+Java root producer. Prepared ingest/reindex handlers forward the issued parent handle;
+the coordinator derives children, freezes their policy and checks generation and authorization
+before queue effects. It checkpoints committed progress and waits for sealed child receipts
+and durable acknowledgements before completing the parent. On restart it resolves the stored
+prepared envelope rather than preparing against current filesystem or configuration state.
+The public REST ingestion controller remains a separate legacy path pending its dispatcher
+connection; these guarantees must not be inferred for that controller.
 
 The architecture gate forbids producers from calling the store's lifecycle methods
 directly. `governance/engine-ports.v1.json` catalogs the store and runner interfaces,

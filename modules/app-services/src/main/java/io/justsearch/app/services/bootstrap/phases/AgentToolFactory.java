@@ -90,8 +90,6 @@ public final class AgentToolFactory {
         lambdaMartReranker,
         null,
         null,
-        null,
-        null,
         documentService, recordedIngestion, recordedRoots, liveIndexing);
   }
 
@@ -113,8 +111,7 @@ public final class AgentToolFactory {
    *
    * @param existingAdapter reuse this adapter when non-null, otherwise build a fresh one. The
    *     late-bound path passes the eager-path adapter when the eager path produced one; on the
-   *     normal (async-Worker) boot it is null and the adapter built here is the one
-   *     {@code IngestTool} actually drives.
+   *     normal asynchronous boot it is null and this factory builds the search/browse adapter.
    * @param existingFileOperationLog reuse this journal when non-null, otherwise build a fresh one —
    *     the same reuse contract as {@code existingAdapter}, added by tempdoc 913 D5. On the normal
    *     boot the eager path always produces one now, so the late-bound path receives it and the
@@ -122,10 +119,6 @@ public final class AgentToolFactory {
    *     the one {@code FileOperationsTool} writes through. It also drops the second run of the
    *     constructor's 30-day retention prune that {@code AgentToolHandlers} calls out as the reason
    *     re-assembling is not side-effect free.
-   * @param scanProgressRegistry scan-progress SSE registry, bound onto whichever adapter is used;
-   *     null on the eager path, where neither collaborator exists yet (see
-   *     {@link #bindScanObservability}).
-   * @param scanRollupLedger scan-rollup ledger, same lifecycle caveat as the registry.
    * @param documentService the Worker-backed document fetch {@code ReadDocumentTool} pages over
    *     (tempdoc 868 §B.2). Null only where no read capability can be offered; the tool is then
    *     null and its handler is not registered, exactly as the other null-tolerant fields behave.
@@ -140,8 +133,6 @@ public final class AgentToolFactory {
       LambdaMartReranker lambdaMartReranker,
       KnowledgeHttpApiAdapter existingAdapter,
       FileOperationLog existingFileOperationLog,
-      io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry,
-      io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
       DocumentService documentService,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
       Supplier<IndexingService> liveIndexing) {
@@ -149,7 +140,6 @@ public final class AgentToolFactory {
         existingAdapter != null
             ? existingAdapter
             : new KnowledgeHttpApiAdapter(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker);
-    bindScanObservability(agentSearchAdapter, scanProgressRegistry, scanRollupLedger);
     FileOperationLog fileOperationLog =
         existingFileOperationLog != null ? existingFileOperationLog : fileOperationLog(dataDir);
     java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier =
@@ -162,8 +152,8 @@ public final class AgentToolFactory {
                             r.path().getFileName().toString()))
                 .toList();
     // Tempdoc 877 §2.4: ONE roots view for the whole bundle. Every tool that resolves or validates a
-    // path reads the indexed roots through it, so there is one guarded accessor, one degrade-open
-    // rule and one relative→absolute algorithm rather than the five near-copies this replaced.
+    // read path uses this guarded accessor. Recorded ingestion instead snapshots the root-state
+    // owner and fails preparation if that view is unavailable.
     AgentToolPaths.RootsView rootsView = AgentToolPaths.RootsView.of(rootsSupplier);
     // Tempdoc 877 §2.7: file-operations takes the roots view too — NOT as a second sandbox (that
     // stays `indexingService::getWatchedPaths`, one argument earlier) but so a root-relative path
@@ -205,29 +195,6 @@ public final class AgentToolFactory {
         browseTool,
         ingestTool,
         readDocumentTool);
-  }
-
-  /**
-   * Tempdoc 832 (lane D) — binds the scan-progress registry and scan-rollup ledger onto an
-   * agent-owned adapter. Without this, a directory ingest driven through {@code IngestTool} (agent
-   * loop / MCP {@code justsearch_ingest}) emitted no scan-progress SSE and left no rollup row, while
-   * the byte-identical ingest through {@code /api/knowledge/ingest} did — the setters were only ever
-   * called on the controller-owned adapter.
-   *
-   * <p>{@link #assemble} calls this for the adapter it composes the bundle around. It stays public
-   * because the eager path cannot supply the collaborators at composition time — neither exists yet
-   * when {@link #build} runs (the ledger is created by the substrate phase and the registry by
-   * {@code LocalApiServer}, both strictly after the service phase), so {@code HeadAssembly} binds
-   * the eager adapter later, out of band. The agent adapter stays its own instance — sharing the
-   * controller's would couple two lifecycles.
-   */
-  public static void bindScanObservability(
-      KnowledgeHttpApiAdapter agentSearchAdapter,
-      io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry,
-      io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger) {
-    if (agentSearchAdapter == null) return;
-    if (scanProgressRegistry != null) agentSearchAdapter.setScanProgressRegistry(scanProgressRegistry);
-    if (scanRollupLedger != null) agentSearchAdapter.setScanRollupLedger(scanRollupLedger);
   }
 
 }

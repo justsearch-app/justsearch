@@ -74,6 +74,14 @@ accepted-file count. Audit and update concrete callers and canonical contracts i
 
 ## Per-item batches and verification
 
+Review clarification, 2026-09-20: retire the agent-only scan-observation forwarding
+through HeadAssembly and AgentToolFactory with .3a. Prepared ingestion no longer uses
+that adapter; its durable operation progress is the recorded coordinator's projection.
+Keep the REST adapter's existing scan observation until its .3b dispatcher retirement.
+Preserve factory registration and journal-reuse tests while replacing obsolete scan-binding
+assertions with recorded-owner composition coverage. Explicit collection length validation
+uses the existing RecordedRootPlan bound and returns BAD_REQUEST before owner reads.
+
 1. .3a: atomic root/policy observation, both prepared handlers, eager/late/replacement composition,
    removal of their old effect paths, focused regressions and relevant docs. Test snapshot coherence,
    relative/absolute/file/directory/nested policies, unavailable state, strict generation, frozen

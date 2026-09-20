@@ -82,7 +82,7 @@ final class RecordedHandlerCompositionTest {
       var capability = mock(WorkerCapability.class);
       when(capability.available()).thenReturn(true);
       assertTrue(AgentToolHandlers.registerLateBound(search, registry, server, first, capability,
-          directory, first, OnlineAiService.unavailable(), null, null, null, null, null, null,
+          directory, first, OnlineAiService.unavailable(), null, null, null, null,
           mock(DocumentService.class), ingestion, roots, current::get));
       handler = registry.resolve(AgentToolsOperationCatalog.INGEST_FILES).orElseThrow();
     } else {

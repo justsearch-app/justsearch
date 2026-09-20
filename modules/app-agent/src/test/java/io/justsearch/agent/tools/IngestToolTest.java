@@ -45,6 +45,7 @@ class IngestToolTest {
 
     assertEquals("generation-1", plan.generation());
     assertEquals(2, plan.roots().size());
+    assertTrue(plan.roots().stream().noneMatch(RecordedRootPlan.Root::singleFile));
     assertEquals(root.toAbsolutePath().normalize(), plan.roots().get(0).path());
     assertEquals("public", plan.roots().get(0).collection());
     assertEquals(nested.toAbsolutePath().normalize(), plan.roots().get(1).path());

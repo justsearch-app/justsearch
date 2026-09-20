@@ -37,7 +37,7 @@ final class RootPlanReplayProjection {
           "excludePatterns", "excludedSubtrees"));
       Path path = requirePath(root.get("path"));
       if (root.get("collection") != null) {
-        String collection = requireText(root.get("collection"), 256);
+        String collection = requireText(root.get("collection"), RecordedRootPlan.MAX_COLLECTION_LENGTH);
         IngestCollectionPolicy.normalizeRequested(collection);
       }
       if (!(root.get("force") instanceof Boolean)
@@ -86,7 +86,7 @@ final class RootPlanReplayProjection {
           root.get("collection") == null
               ? null
               : IngestCollectionPolicy.normalizeRequested(
-                  requireText(root.get("collection"), 256)),
+                  requireText(root.get("collection"), RecordedRootPlan.MAX_COLLECTION_LENGTH)),
           (Boolean) root.get("force"),
           (Boolean) root.get("singleFile"),
           textList(root.get("excludePatterns"), 4096),

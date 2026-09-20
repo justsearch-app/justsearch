@@ -40,7 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p><b>What this closes.</b> {@code core.remember} is declared with no availability expression
  * (offered to the model on every run) but was only registered by ONE of the two agent-tool
- * handler-registration paths ({@link AgentToolFactoryScanWiringTest} pins the registration
+ * handler-registration paths ({@link AgentToolFactoryCompositionTest} pins the registration
  * mechanism directly). This test closes the mirror-image gap: it asserts the invariant over the
  * ACTUAL composed offering an
  * {@link AgentOperationEmitter} hands the model — every {@code Operation} that survives
@@ -83,7 +83,7 @@ final class AgentOfferingIsExecutableTest {
     // exactly as production runs them (SubstratePhase.run's eager call at construction time,
     // then HeadAssembly's Memoized field triggering the late-bound call once the worker
     // connects) — the SAME shape as
-    // AgentToolFactoryScanWiringTest#eagerThenLateBoundRegistersAllSixOnTheSameRegistry.
+    // AgentToolFactoryCompositionTest#eagerThenLateBoundRegistersAllSixOnTheSameRegistry.
     HandlerRegistry operationHandlers = new HandlerRegistry();
 
     AgentToolFactory.Output eagerTools =
@@ -115,8 +115,6 @@ final class AgentOfferingIsExecutableTest {
             null,
             null,
             MemoryStore.noop(),
-            null,
-            null,
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),

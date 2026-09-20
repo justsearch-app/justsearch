@@ -157,8 +157,6 @@ public final class AgentToolHandlers {
       KnowledgeHttpApiAdapter existingAdapter,
       io.justsearch.agent.tools.FileOperationLog existingFileOperationLog,
       io.justsearch.agent.api.memory.MemoryStore memoryStore,
-      io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry,
-      io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
       DocumentService documentService,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
       java.util.function.Supplier<IndexingService> liveIndexing) {
@@ -199,8 +197,6 @@ public final class AgentToolHandlers {
             lambdaMartReranker,
             existingAdapter,
             existingFileOperationLog,
-            scanProgressRegistry,
-            scanRollupLedger,
             documentService, recordedIngestion, recordedRoots, liveIndexing);
     // Tempdoc 877 §2.10: the log line is DERIVED from what this method actually registered. It
     // used to hand-list the names, which is a second authority that drifts the moment a

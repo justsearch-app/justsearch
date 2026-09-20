@@ -197,7 +197,12 @@ public final class IngestTool implements OperationHandler {
       throw badInput("collection must be a string");
     }
     try {
-      return IngestCollectionPolicy.normalizeRequested(node.asString());
+      String collection = IngestCollectionPolicy.normalizeRequested(node.asString());
+      if (collection.length() > RecordedRootPlan.MAX_COLLECTION_LENGTH) {
+        throw badInput("collection must contain at most "
+            + RecordedRootPlan.MAX_COLLECTION_LENGTH + " characters");
+      }
+      return collection;
     } catch (IllegalArgumentException e) {
       throw badInput(e.getMessage());
     }

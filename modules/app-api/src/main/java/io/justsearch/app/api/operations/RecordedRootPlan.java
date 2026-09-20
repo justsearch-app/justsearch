@@ -15,6 +15,8 @@ public record RecordedRootPlan(String generation, List<RecordedRootPlan.Root> ro
   public static final String SCHEMA = RootPlanReplayProjection.SCHEMA;
 
   private static final int MAX_ROOTS = 1024;
+  /** Maximum collection length in a frozen recorded root. */
+  public static final int MAX_COLLECTION_LENGTH = 256;
   private static final tools.jackson.databind.json.JsonMapper JSON =
       tools.jackson.databind.json.JsonMapper.builder().build();
 
@@ -154,7 +156,7 @@ public record RecordedRootPlan(String generation, List<RecordedRootPlan.Root> ro
       }
       collection = collection == null ? null
           : io.justsearch.app.api.knowledge.IngestCollectionPolicy.normalizeRequested(collection);
-      if (collection != null && collection.length() > 256) {
+      if (collection != null && collection.length() > MAX_COLLECTION_LENGTH) {
         throw new IllegalArgumentException("Invalid root collection");
       }
       List<String> patterns = new ArrayList<>();

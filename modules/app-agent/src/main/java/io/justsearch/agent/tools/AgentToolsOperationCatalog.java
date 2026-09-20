@@ -363,7 +363,7 @@ public final class AgentToolsOperationCatalog implements OperationCatalog {
         // hover preview — and ingest queues indexing work, so it affects the indexing-jobs Resource
         // exactly as core.rebuild-index declares. NOT core.indexed-roots: that Resource is the list
         // of WATCHED roots, changed only by the add/remove-watched-root gestures; ingest dispatches a
-        // one-shot ScanRoot over a path (IngestTool.scanRootCallback) and registers nothing.
+          // a prepared recorded root plan and registers no watched roots.
         new OperationLineage(Set.of(new ResourceRef("core.indexing-jobs")), Set.of()),
         Binding.of(INGEST_FILES),
         Provenance.core("1.0"),

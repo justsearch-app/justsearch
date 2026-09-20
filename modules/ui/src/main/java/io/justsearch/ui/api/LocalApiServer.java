@@ -295,14 +295,6 @@ public class LocalApiServer {
             ? new ConversationBackupController(
                 this.HeadAssemblyRef, this.HeadAssemblyRef.dataKeyManager())
             : null;
-    // Tempdoc 832 (lane D): publish the registry the setters below bind onto the controller-owned
-    // adapter, so the AGENT-owned ingest adapter gets the same scan observability — an agent- or
-    // MCP-driven directory ingest emitted no scan-progress SSE and left no rollup row. Done here
-    // (not in AgentToolFactory.build) because the registry does not exist during the service phase,
-    // and this runs before connectKnowledgeServer builds the late-bound agent adapter.
-    if (this.HeadAssemblyRef != null) {
-      this.HeadAssemblyRef.setScanProgressRegistry(this.scanProgressRegistry);
-    }
     this.configuredPort = resolveConfiguredPort();
     ConfigStore cs = ConfigStore.globalOrNull();
     this.prodMode = cs != null && cs.get().policy().prodMode();
