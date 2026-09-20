@@ -140,7 +140,6 @@ export const API_ROUTES = {
   "GET /api/runtime/manifest": { method: "GET", path: "/api/runtime/manifest", cohort: "runtime", requiredCapabilities: [] },
   "GET /api/runtime/manifest/stream": { method: "GET", path: "/api/runtime/manifest/stream", cohort: "runtime", requiredCapabilities: [] },
   "GET /api/runtime/ready": { method: "GET", path: "/api/runtime/ready", cohort: "runtime", requiredCapabilities: [] },
-  "GET /api/scans/{scanId}/progress": { method: "GET", path: "/api/scans/{scanId}/progress", cohort: "other", requiredCapabilities: [] },
   "GET /api/schemas/{name}": { method: "GET", path: "/api/schemas/{name}", cohort: "schema", requiredCapabilities: [] },
   "GET /api/settings/v2": { method: "GET", path: "/api/settings/v2", cohort: "config", requiredCapabilities: [] },
   "GET /api/shell-events/stream": { method: "GET", path: "/api/shell-events/stream", cohort: "other", requiredCapabilities: [] },

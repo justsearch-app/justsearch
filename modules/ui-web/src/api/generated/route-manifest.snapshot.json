@@ -1,8 +1,8 @@
 {
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
-  "count": 246,
+  "count": 245,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:808aac191a9383af58d242bda38631fc35d709c1a912c38401ece242b95c1d75",
+  "routeDigest": "sha256:9d409ab8da66d5428ebed8524ae5d56ed7979e2ff96fdb3c62ca7f4a209e86ca",
   "routes": [
     {
       "method": "GET",
@@ -2063,7 +2063,7 @@
       "method": "POST",
       "path": "/api/knowledge/ingest",
       "cohort": "knowledge",
-      "owningModule": null,
+      "owningModule": "ResourceApiModule",
       "requiredCapabilities": [
         "WORKER"
       ],
@@ -2713,20 +2713,6 @@
       "path": "/api/meta/routes",
       "cohort": "other",
       "owningModule": "MetaApiModule",
-      "requiredCapabilities": [],
-      "responseSchema": null,
-      "stability": null,
-      "sdkOperationId": null,
-      "requestSchema": null,
-      "queryParameters": null,
-      "responseSchemas": null,
-      "lifecycle": null
-    },
-    {
-      "method": "GET",
-      "path": "/api/scans/{scanId}/progress",
-      "cohort": "other",
-      "owningModule": null,
       "requiredCapabilities": [],
       "responseSchema": null,
       "stability": null,

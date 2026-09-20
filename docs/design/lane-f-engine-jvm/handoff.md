@@ -22,8 +22,11 @@ the caller item follows as its own commit. Full1878 passes app-agent692/UI1251 c
 (three existing skips), PMD and format. Three negative controls fail as intended;
 restored1884 passes17 HTTP/context cases and1885 passes10 Node caller tests. Python's
 eight ui_perf cases and shell syntax pass. Independent review finds no remaining
-implementation defect in this cut. Live route capture/full-server trust filters,
-final build and hosted proof remain .3b.3; the complete Java producer proof stays .3c.
+implementation defect in this cut. Fixture correctionce1e813cd passes full1893 build
+and all nine UI integration cases without skips. Final1900 UI1,251 and1901 frontend6,589
+cases pass; live1902-1904 prove the server/bridge confirmation and outcome contracts.
+Live1896 regenerates245 routes and removes scan progress. Final hosted proof remains
+pending; the complete Java producer proof stays .3c.
 
 Current item .3b connects the REST alias to prepared ingest/reindex ownership and retires
 the superseded scan observers. The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a

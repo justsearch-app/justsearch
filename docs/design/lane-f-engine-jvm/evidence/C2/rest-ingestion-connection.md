@@ -180,3 +180,46 @@ XML: tmp/1893-full-build.txt and tmp/1893-integration-xml/ui. No dependencies ch
 Independent source review finds no actionable defect in the fixture, helper forwarding
 or environment normalization. Full1900 reruns all 1,251 UI cases (one existing skip,
 zero failures/errors) with the final helper wiring; copied XML/counts are tmp/1900-*.
+
+## Live connection and generated surface (2026-09-20)
+
+Owned run ab5238fd-1dbe-4259-85eb-7b8e84502cad starts from e50b3789f plus the
+ce1e813cd fixture/helper correction (distribution stamp 8aba8506131c7c82), with
+fresh tmp/1895-rest-live-data and eval-mode help suppression. Preflight1888 and
+post-start quick_health confirm the selected worktree, current distribution,
+owned lease, ready Engine and no foreign listener. This is the normal dev runner,
+not an offline or mocked server; model activation is not claimed by this run.
+
+Live1902 executes nine bounded HTTP requests: initial/final zero documents, health,
+non-loopback Host403, invalid MCP Origin403, retired /api/scans/{scanId}/progress404,
+and both REST alias/generic invoke428 for the same nullable prepared input under
+MCP attribution. The refusal preserves key, nonce, UNTRUSTED tier and confirmation
+class; keyed outcome is unknown, proving no accepted row. Live1903 drives the
+actual current-worktree stdio dev bridge against this server and preserves that
+keyed refusal. Live1904 reads its unknown outcome through the new GET allowlist.
+The final prod token proof is the real prod-mode integration case in1893; this
+dev-runner instance intentionally has no production token enforcement.
+
+The first temporary probe1897 used Node fetch, which did not transmit the explicit
+Host override; its 200 application refusal is not Host-boundary evidence. Corrected
+probes use node:http and capture sentHost. The intermediate1898 also queried the
+wrong retired suffix (events); only1902's actual progress route supplies teardown
+proof. Those adverse captures remain alongside the final evidence.
+
+Live1896 codegen captures245 routes and matching OpenAPI digest
+9d409ab8da66d5428ebed8524ae5d56ed7979e2ff96fdb3c62ca7f4a209e86ca.
+It removes only the retired scan route and records ResourceApiModule ownership for
+ingestion. Both offline generator checks pass. Final1901 frontend typecheck and all
+6,589 unit cases/490 files pass. Existing happy-dom teardown diagnostics remain in
+the successful suite log; they are not suppressed.
+
+Commands: node scripts/codegen/gen-api-client.mjs --from-live=http://127.0.0.1:33221;
+node scripts/codegen/gen-api-client.mjs --check;
+./gradlew.bat :modules:ui:test :modules:ui:generateReferenceClientOpenApiSnapshot
+-PreferenceClientOpenApiCheck=true; npm run typecheck; npm run test:unit:run.
+Live script and raw captures: tmp/1897-live-rest-proof.mjs,
+tmp/1902-live-rest-proof.json, tmp/1903-check-bridge.mjs, tmp/1903-mcp-response.json,
+tmp/1904-outcome-response.json; launcher/codegen logs tmp/1895-start.txt,
+tmp/1896-live-routes.txt; test logs tmp/1900-ui-final.txt and tmp/1901-frontend.txt.
+Retain under the same worktree retention rule above. Final hosted checks remain
+pending at publication; .3c production composition and C2 completion stay open.

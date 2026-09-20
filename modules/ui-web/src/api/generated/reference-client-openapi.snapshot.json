@@ -2422,6 +2422,7 @@
         "tags": [
           "knowledge"
         ],
+        "x-owning-module": "ResourceApiModule",
         "x-required-capabilities": [
           "WORKER"
         ]
@@ -3543,29 +3544,6 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
-    "/api/scans/{scanId}/progress": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "scanId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/scans/{scanId}/progress",
-        "tags": [
-          "other"
-        ]
-      }
-    },
     "/api/schemas/{name}": {
       "get": {
         "parameters": [
@@ -3941,8 +3919,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 246,
-    "routeDigest": "sha256:808aac191a9383af58d242bda38631fc35d709c1a912c38401ece242b95c1d75"
+    "routeCount": 245,
+    "routeDigest": "sha256:9d409ab8da66d5428ebed8524ae5d56ed7979e2ff96fdb3c62ca7f4a209e86ca"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",
