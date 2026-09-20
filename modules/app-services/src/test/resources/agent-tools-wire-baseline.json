@@ -82,7 +82,7 @@
           }
         },
         "collection" : {
-          "type" : "string"
+          "type" : [ "string", "null" ]
         }
       },
       "required" : [ "paths" ]

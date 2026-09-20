@@ -81,6 +81,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 These edges exist only in test suites and should not be treated as production layering:
 
 - `:modules:app-agent` uses `testImplementation` on `:modules:app-observability`
+- `:modules:app-engine` uses `testImplementation` on `:modules:app-agent`
 - `:modules:app-launcher` uses `testImplementation` on `:modules:gpu-bridge`
 - `:modules:dead-code-audit` uses `testImplementation` on `:modules:$m`
 - `:modules:system-tests` uses `testImplementation` on `:modules:app-services`, `:modules:indexer-worker`, `:modules:worker-services`

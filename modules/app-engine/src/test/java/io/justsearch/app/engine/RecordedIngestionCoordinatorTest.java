@@ -3,11 +3,16 @@ package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.registry.ExecutorTag;
+import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.TransportTag;
+import io.justsearch.agent.tools.AgentToolsOperationCatalog;
+import io.justsearch.agent.tools.IngestTool;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.operations.CanonicalOperationArguments;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationAuthorizationBasis;
@@ -15,13 +20,19 @@ import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.bootstrap.OperationAuthority;
 import io.justsearch.app.services.intent.EngineProvenance;
+import io.justsearch.app.services.intent.CoreIntentSourceCatalog;
+import io.justsearch.app.services.intent.CoreTrustEvaluator;
+import io.justsearch.app.services.registry.executor.OperationExecutorImpl;
 import io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver;
 import io.justsearch.app.services.registry.executor.RecordedParentFixture;
+import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
+import io.justsearch.app.services.registry.operations.handlers.ReindexHandler;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
@@ -31,12 +42,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import io.justsearch.app.api.operations.OperationRecord;
 import org.junit.jupiter.api.io.TempDir;
@@ -539,7 +553,7 @@ final class RecordedIngestionCoordinatorTest {
         var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
         var issued = f.queue.pollPending(1).getFirst();
         f.coordinator.stopProducers(1000);
-        org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, f.attachment::close,
+        assertThrows(java.io.IOException.class, f.attachment::close,
             "failed final close retains the attachment while an issued index owner is live");
         f.queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(issued, null, "a".repeat(64))),
             io.justsearch.indexerworker.ingest.IngestionOutcome.of(
@@ -803,13 +817,191 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  private enum RegisteredDispatchCase {
+    FILE_INGEST,
+    DIRECTORY_INGEST,
+    DIRECTORY_REINDEX,
+    FORCED_DIRECTORY_REINDEX
+  }
+
+  @ParameterizedTest
+  @EnumSource(RegisteredDispatchCase.class)
+  void registeredPreparedHandlersReachTheActualProducerAndRetryOneRecordedIdentity(
+      RegisteredDispatchCase scenario) throws Exception {
+    boolean ingest = scenario == RegisteredDispatchCase.FILE_INGEST
+        || scenario == RegisteredDispatchCase.DIRECTORY_INGEST;
+    boolean singleFile = scenario == RegisteredDispatchCase.FILE_INGEST;
+    boolean force = scenario == RegisteredDispatchCase.FORCED_DIRECTORY_REINDEX;
+    Path scenarioDirectory = temp.resolve(scenario.name().toLowerCase(java.util.Locale.ROOT));
+    var generations = new io.justsearch.indexerworker.index.IndexGenerationManager(
+        scenarioDirectory.resolve("index"));
+    var layout = generations.initializeOrLoad();
+    String generation = layout.activeGenerationPath().getFileName().toString();
+    try (Fixture f = new Fixture(scenarioDirectory.resolve("fixture"), 1, false, generation, singleFile);
+        var executors = new DefaultEngineExecutorRegistry()) {
+      Path target = f.plan.roots().getFirst().path();
+      Path enumeratedFile = singleFile ? target
+          : Files.writeString(target.resolve("frozen.txt"), "frozen recorded target");
+      Path replacement = Files.createDirectory(scenarioDirectory.resolve("replacement-root"));
+      Files.writeString(replacement.resolve("replacement.txt"), "must not be enumerated");
+      Path outside = Files.writeString(scenarioDirectory.resolve("outside.txt"), "outside frozen target");
+      var roots = new AtomicReference<>(List.of(new RootBinding(
+          singleFile ? target.getParent() : target, "documents")));
+      var currentGeneration = new AtomicReference<>(generation);
+      var exclusions = new AtomicReference<List<String>>(List.of());
+      AtomicInteger preparations = new AtomicInteger();
+      AtomicInteger producerCalls = new AtomicInteger();
+      var handlers = new HandlerRegistry();
+      if (ingest) {
+        handlers.register(AgentToolsOperationCatalog.INGEST_FILES,
+            new IngestTool(f.coordinator, context -> {
+              preparations.incrementAndGet();
+              return roots.get();
+            }, context -> currentGeneration.get(), exclusions::get));
+      } else {
+        handlers.register(CoreOperationCatalog.REINDEX,
+            new ReindexHandler(f.coordinator, context -> {
+              preparations.incrementAndGet();
+              return roots.get();
+            }, context -> currentGeneration.get(), exclusions::get));
+      }
+      var dispatcher = new OperationExecutorImpl(f.runner, f.admission, handlers, null, Map.of(),
+          CLOCK, new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog());
+      var operation = ingest
+          ? new AgentToolsOperationCatalog().findByIdValue(
+              AgentToolsOperationCatalog.INGEST_FILES.value()).orElseThrow()
+          : new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.REINDEX.value()).orElseThrow();
+      String arguments = ingest
+          ? tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+              Map.of("paths", List.of(target.toString()), "collection", "documents"))
+          : "{\"force\":" + force + "}";
+      String changedArguments = ingest
+          ? tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+              Map.of("paths", List.of(replacement.toString()), "collection", "documents"))
+          : "{\"force\":" + !force + "}";
+      var seed = f.request();
+      String operationKey = OperationKeys.generate(CLOCK);
+      var enumerated = new java.util.concurrent.CountDownLatch(1);
+      var parentCompletion = new CompletableFuture<OperationRecord>();
+      var runtime = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+      // This is the production filesystem enumerator and queue journal. The controlled terminal
+      // transition below is deliberately not evidence of a Lucene write or flush.
+      var service = new io.justsearch.indexerworker.services.WorkerIngestService(f.queue, null, null,
+          io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled(), layout.basePath(),
+          layout.activeGenerationPath(), runtime, runtime, null, 0L);
+      var services = org.mockito.Mockito.mock(io.justsearch.indexerworker.server.WorkerAppServices.class);
+      org.mockito.Mockito.when(services.ingestService()).thenReturn(service);
+      try (var client = new EngineKnowledgeClient(executors, () -> services,
+          new ForegroundLoadGate(new io.justsearch.indexerworker.loop.pacing.ForegroundLoad()),
+          5_000, 100, io.justsearch.app.services.worker.IpcTelemetry.noop(), () -> {}, f.admission,
+          f.authority.roots());
+          var _ = f.queue.subscribeRecordedWalks(key -> {
+            if (f.queue.recordedWalk(key).orElseThrow().enumerationClosedAt() != null) {
+              enumerated.countDown();
+            }
+          });
+          var _ = f.operations.subscribeCompletions(row -> {
+            if (operationKey.equals(row.key())) parentCompletion.complete(row);
+          })) {
+        f.coordinator.bindProducer((acceptedPlan, childKey, epoch, context, cancellation) -> {
+          producerCalls.incrementAndGet();
+          var parent = f.operations.find(operationKey).orElseThrow();
+          var preparation = f.operations.acceptedPreparation(parent.id()).orElseThrow();
+          RecordedRootPlan frozen = new RecordedIngestPlanResolver().resolve(parent, preparation);
+          var child = f.operations.findIngestChild(operationKey, frozen).orElseThrow();
+          assertEquals(OperationState.RUNNING, parent.state());
+          assertEquals(OperationState.RUNNING, child.state());
+          assertEquals(frozen, RecordedRootPlan.fromReplayPayload(
+              f.operations.acceptedPreparation(child.id()).orElseThrow().payload().value()));
+          assertEquals(frozen, acceptedPlan);
+          assertEquals(parent.context().withWorkId(context.workId().orElseThrow()), context);
+          return client.enumerateRecordedRoot(acceptedPlan, childKey, epoch, context, cancellation);
+        });
+        var first = dispatcher.dispatch(operation, arguments, seed.provenance(), Optional.empty(),
+            seed.context(), operationKey);
+        assertTrue(first.success());
+        assertEquals(operationKey, first.structuredData().get("operationKey"));
+        long parentId = ((Number) first.structuredData().get("operationRecordId")).longValue();
+        assertEquals(1, preparations.get());
+        assertEquals(1, producerCalls.get());
+
+        roots.set(List.of(new RootBinding(replacement, "replacement")));
+        currentGeneration.set("replacement-generation");
+        exclusions.set(List.of("**/frozen.txt"));
+        var runningRetry = dispatcher.dispatch(operation, arguments, seed.provenance(), Optional.empty(),
+            seed.context(), operationKey);
+        assertTrue(runningRetry.success());
+        assertEquals(parentId, ((Number) runningRetry.structuredData().get("operationRecordId")).longValue());
+        assertEquals(1, preparations.get(), "running retry cannot resample preparation suppliers");
+        assertEquals(1, producerCalls.get(), "running retry cannot start another producer");
+        var conflict = assertThrows(OperationStoreException.class,
+            () -> dispatcher.dispatch(operation, changedArguments, seed.provenance(), Optional.empty(),
+                seed.context(), operationKey));
+        assertEquals(OperationStoreException.Code.OPERATION_KEY_REUSED, conflict.code());
+        assertEquals(1, preparations.get());
+        assertEquals(1, producerCalls.get());
+
+        assertTrue(enumerated.await(5, java.util.concurrent.TimeUnit.SECONDS),
+            "real filesystem enumeration must close");
+        var parent = f.operations.find(operationKey).orElseThrow();
+        var frozen = new RecordedIngestPlanResolver().resolve(parent,
+            f.operations.acceptedPreparation(parent.id()).orElseThrow());
+        assertEquals(generation, frozen.generation());
+        assertEquals(target.toAbsolutePath().normalize(), frozen.roots().getFirst().path());
+        assertEquals(force, frozen.roots().getFirst().force());
+        var child = f.operations.findIngestChild(operationKey, frozen).orElseThrow();
+        var progress = f.queue.recordedWalk(child.key()).orElseThrow();
+        assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE, progress.enumerationOutcome());
+        assertFalse(f.operations.find(operationKey).orElseThrow().state().terminal(),
+            "enumeration alone cannot complete the recorded parent");
+        var jobs = f.queue.pollPending(10);
+        assertEquals(1, jobs.size(), "only the frozen target is enumerated");
+        var issued = jobs.getFirst();
+        assertEquals(enumeratedFile.toAbsolutePath().normalize(), issued.path());
+        assertFalse(issued.path().equals(outside));
+        assertFalse(issued.path().startsWith(replacement));
+        assertEquals(force, issued.recordedForce());
+        assertEquals(child.key(), issued.scanId());
+        assertTrue(f.queue.pollPending(10).isEmpty(), "retry cannot duplicate queue work");
+
+        f.queue.markDoneTransitions(List.of(
+            new JobQueue.IngestionLedgerTransition(issued, null, "f".repeat(64))),
+            io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+        OperationRecord completed = parentCompletion.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(OperationState.COMPLETE, completed.state());
+        assertEquals(1, completed.unitsCompleted());
+        assertEquals(0, completed.unitsFailed());
+        var completedChild = f.operations.find(child.key()).orElseThrow();
+        assertEquals(OperationState.COMPLETE, completedChild.state());
+        assertEquals(1, completedChild.unitsCompleted());
+        assertEquals(0, completedChild.unitsFailed());
+        var sealed = f.queue.sealedRecordedWalkReceipt(child.key()).orElseThrow();
+        assertEquals(1, sealed.completedUnits());
+        assertEquals(0, sealed.failedUnits());
+        var acknowledged = f.queue.recordedWalk(child.key()).orElseThrow();
+        assertEquals(sealed.revision(), acknowledged.acknowledgedRevision());
+
+        var terminalRetry = dispatcher.dispatch(operation, arguments, seed.provenance(),
+            Optional.empty(), seed.context(), operationKey);
+        assertTrue(terminalRetry.success());
+        assertEquals(parentId,
+            ((Number) terminalRetry.structuredData().get("operationRecordId")).longValue());
+        assertEquals(1, preparations.get(), "terminal retry cannot resample preparation suppliers");
+        assertEquals(1, producerCalls.get(), "terminal retry cannot start another producer");
+        assertTrue(f.queue.pollPending(10).isEmpty(), "terminal retry cannot duplicate queue work");
+      }
+    }
+  }
+
   @Test
   void actualProducerReplacementWaitsForExitWithoutCancellingDurableParent() throws Exception {
     var entered = new java.util.concurrent.CountDownLatch(1);
     var release = new java.util.concurrent.CountDownLatch(1);
     try (Fixture f = new Fixture(temp, 1); var executors = new DefaultEngineExecutorRegistry()) {
       var firstService = org.mockito.Mockito.mock(io.justsearch.indexerworker.services.WorkerIngestService.class);
-      var seen = new java.util.concurrent.atomic.AtomicReference<io.justsearch.indexerworker.services.CallContext>();
+      var seen = new AtomicReference<io.justsearch.indexerworker.services.CallContext>();
       org.mockito.Mockito.doAnswer(call -> {
         seen.set(call.getArgument(2));
         entered.countDown();
@@ -820,8 +1012,8 @@ final class RecordedIngestionCoordinatorTest {
       }).when(firstService).scanRecordedRoot(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
       var services = org.mockito.Mockito.mock(io.justsearch.indexerworker.server.WorkerAppServices.class);
       org.mockito.Mockito.when(services.ingestService()).thenReturn(firstService);
-      var current = new java.util.concurrent.atomic.AtomicReference<>(services);
-      var firstExit = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletionStage<JobQueue.WalkEnumerationOutcome>>();
+      var current = new AtomicReference<>(services);
+      var firstExit = new AtomicReference<java.util.concurrent.CompletionStage<JobQueue.WalkEnumerationOutcome>>();
       try (var client = new EngineKnowledgeClient(executors, current::get,
           new ForegroundLoadGate(new io.justsearch.indexerworker.loop.pacing.ForegroundLoad()), 5_000, 100,
           io.justsearch.app.services.worker.IpcTelemetry.noop(), () -> {}, f.admission, f.authority.roots())) {
@@ -835,11 +1027,11 @@ final class RecordedIngestionCoordinatorTest {
         try (var work = f.admission.admit(request.context(), false)) {
           var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
           assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS));
-          org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, () -> f.coordinator.stopProducers(10));
+          assertThrows(java.io.IOException.class, () -> f.coordinator.stopProducers(10));
           assertTrue(seen.get().cancelled());
           assertTrue(work.cancellationReason().isEmpty(), "physical replacement must retain durable parent authority");
           assertFalse(result.completion().toCompletableFuture().isDone());
-          org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, f.attachment::close);
+          assertThrows(java.io.IOException.class, f.attachment::close);
           release.countDown();
           assertEquals(JobQueue.WalkEnumerationOutcome.CANCELLED,
               firstExit.get().toCompletableFuture().get(3, java.util.concurrent.TimeUnit.SECONDS));
@@ -890,8 +1082,8 @@ final class RecordedIngestionCoordinatorTest {
       Path authorityDirectory = directory.resolve("authority");
       Files.createDirectories(authorityDirectory);
       Files.writeString(authorityDirectory.resolve("watched_roots.json"),
-          tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(java.util.Map.of(
-              "schemaVersion", 1, "roots", List.of(java.util.Map.of("path", directory.toAbsolutePath().toString())))));
+          tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(Map.of(
+              "schemaVersion", 1, "roots", List.of(Map.of("path", directory.toAbsolutePath().toString())))));
       authority = OperationAuthority.load(authorityDirectory);
       operations = new SqliteOperationStore(directory.resolve("operations.db"));
       runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),

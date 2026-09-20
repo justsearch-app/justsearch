@@ -357,7 +357,8 @@ public final class AgentToolsOperationCatalog implements OperationCatalog {
             // Tempdoc 875 C.3: and even for this member the grant only covers invocations whose
             // `paths` canonicalize inside an indexed root (IndexedRootGrantScope); an out-of-root
             // ingest still runs, it just costs an approval that names the path (811 C-2a preserved).
-            .withCapabilityFamily("file-operations"),
+            .withCapabilityFamily("file-operations")
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.INGEST),
         OperationAvailability.empty(),
         // Tempdoc 879: lineage is not inert — the FE renders `affects` in the operation button and
         // hover preview — and ingest queues indexing work, so it affects the indexing-jobs Resource

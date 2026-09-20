@@ -97,6 +97,8 @@ uses the existing RecordedRootPlan bound and returns BAD_REQUEST before owner re
    retarget, key-first retry, stale generation/authorization refusal, receipt/ack barrier, restart
    and replacement. Reconcile full affected tests, architecture/PMD/format, governance and hosted
    results. Final live/model/installed and remaining C2 items stay required, not waived.
+   The concrete two-family fixture and per-item sequence are in
+   [recorded-production-composition.md](recorded-production-composition.md).
 
 Commit and push each batch; checkpoint owned WIP at least hourly. Root owns shared lifecycle,
 composition, source integration and all builds. Bounded test/handler drafts may be delegated

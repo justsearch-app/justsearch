@@ -189,7 +189,8 @@ final class AgentToolCatalogBaselineTest {
                 RetryPolicy.noRetry(),
                 Set.of(),
                 false)
-            .withCapabilityFamily("file-operations"),
+            .withCapabilityFamily("file-operations")
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.INGEST),
         Set.of(ExecutorTag.AGENT),
         Audience.USER,
         new OperationLineage(Set.of(new ResourceRef("core.indexing-jobs")), Set.of()),

@@ -19,6 +19,9 @@ plugins {
 // that EngineRoot's own signatures will carry outward at A6.
 dependencies {
   testImplementation(testFixtures(project(":modules:core")))
+  // C2 .3c composes the actual ingest handler/catalog with the Engine-owned queue fixture.
+  // Keep the explicit test configuration visible to the canonical dependency projection.
+  testImplementation(project(":modules:app-agent"))
   // Port contracts — part of this module's outward surface.
   api(project(":modules:app-api"))
   api(project(":modules:core"))

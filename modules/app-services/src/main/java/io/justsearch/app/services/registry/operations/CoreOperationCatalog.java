@@ -666,7 +666,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(REINDEX),

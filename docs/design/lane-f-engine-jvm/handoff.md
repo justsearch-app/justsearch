@@ -28,13 +28,21 @@ cases pass; live1902-1904 prove the server/bridge confirmation and outcome contr
 Live1896 regenerates245 routes and removes scan progress. Final hosted proof remains
 pending; the complete Java producer proof stays .3c.
 
-Current item .3b connects the REST alias to prepared ingest/reindex ownership and retires
-the superseded scan observers. The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a
+Current item [.3c production composition](evidence/C2/recorded-production-composition.md)
+has exposed and corrected missing INGEST/REINDEX kinds in the production catalogs.
+Live1909 and all four new registered-handler cases in1912 fail at the strict resolver;
+1914 passes all30 coordinator cases after the catalog fix. Full1917 Engine299 cases
+pass; restored1922 tests/lint and1923 architecture37 cases pass after review fixes.
+Actual live success/recovery and .3c.2 remain in progress. Hosted CI35536949678
+at30792f547 fails app-ui catalog projections and system integration; CLA35536948211
+passes. Original failures are retained and are not treated as completed hosted proof.
+
+The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a
 handlers, .3b REST dispatcher/consumer retirement, then .3c real vertical integration/proof.
 Root/policy snapshots and root-owned wiring are installed and verified. The current
 [REST bridge item](evidence/C2/rest-ingestion-connection.md) implements the alias, consumer
-migration and scan-observer retirement; prepared HTTP/store proof, full checks and live
-route projections are being reconciled before .3c production integration. Root owns shared lifecycle,
+migration and scan-observer retirement; its prepared HTTP/store proof and live route
+projections are recorded. Final hosted reconciliation follows .3c. Root owns shared lifecycle,
 source integration, builds and publication. C2 remains open; merge stays at F.
 
 The active root/child contract is [C2-8d-vertical-plan.md](evidence/C2/C2-8d-vertical-plan.md)

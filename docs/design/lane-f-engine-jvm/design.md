@@ -27,6 +27,10 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-20: C2 real producer composition exposes missing INGEST/REINDEX policy declarations in the two public catalogs; declare the existing kinds at their source rather than weakening resolver ownership checks. [Reproduction and correction](evidence/C2/recorded-production-composition.md#first-composed-failure-2026-09-20).
+
+- 2026-09-20: C2 .3c extends the Engine-owned real-store/coordinator fixture through both production handlers and catalogs; synthetic terminal queue transitions remain distinct from required installed index-write proof. [Composition proof sequence](evidence/C2/recorded-production-composition.md).
+
 - 2026-09-20: C2 REST review aligns the catalog with the existing nullable-collection handler rule and preserves typed outcome-query errors through the stdio bridge. [Corrections and real-dispatch/proxy regressions](evidence/C2/rest-ingestion-connection.md).
 
 - 2026-09-20: C1's server-owned MCP client identity also applies when the REST bridge declares MCP transport; unresolved sessions share mcp-anonymous and client-id/kind hints cannot partition that quota. [C2 bridge mechanism and HTTP proof](evidence/C2/rest-ingestion-connection.md).
