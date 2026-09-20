@@ -160,3 +160,49 @@ Root owns cross-module admission integration, builds and publication. Delegate o
 bounded declaration/front tests after this mechanism is reviewed; unresolved
 ownership/cancellation behavior returns to root before implementation grows. Keep
 the .3c.2a refusal matrix and .3c.2b store-reopen proof distinct from this front fix.
+
+## Implementation checkpoints (2026-09-21)
+
+Split item3 into independently reviewable commits:3a deferred consent publication,
+3b runner key arbitration, then3c dispatcher/handoff integration. Declaration/schema
+and direct fronts remain items1/2. All are C2; none changes merge placement.
+
+Item3a is implemented: the existing grant map atomically consumes a capsule and
+returns an idempotent publication handle. Public verification wrappers still publish
+immediately. Prepared and public bindings remain distinct; unsupported authorities
+fail closed rather than invoking a synchronous callback inside the stripe. Independent
+review found no remaining defect in this primitive. Restored1952 executes all18
+ConsentCapsuleServiceTest cases within121 app-services cases, no failures/skips, with
+both app-services PMD tasks passing. Log tmp/1952-live-urgency.txt and copied
+tmp/1952-xml/app-services are the proof. This credits the primitive, not the still
+uncommitted full admission integration.
+
+Other work is implemented but remains under verification: policy/schema/projection,
+REST matched admission, native MCP parsing/admission, runner scope, nested handoff
+and recovery-owner declaration validation. Initial real REST proof1944 passes44
+selected UI cases. Stronger restored1948 passes15 selected UI cases, including the
+real Engine/SQLite capacity/freeze/reusable-consent and parent-detachment tests;
+its aggregate fails two test-only PMD qualifiers, subsequently corrected. Native
+MCP proof1951 passes its new cases but four pre-existing REST quota tests fail:
+their test barrier still ran in `before`, ahead of the new matched admission. Move
+that barrier to `beforeMatched` without changing the quota assertions. Rerun owed.
+
+Review moves approval preview callbacks outside the runner stripe and supplies live
+owner urgency to the handler. The row retains accepted urgency. The ingestion
+coordinator accepts FOREGROUND→BACKGROUND only for durable work whose live owner
+confirms that urgency; it still rejects forged work axes and all changed attribution.
+Both legitimate-detach and forged-label tests pass1952 within36 coordinator cases.
+The launcher composition's pre-existing unavailable ingestion service needs separate
+reconciliation before claiming every declared owner is actually connected. A mere
+kind set is not proof that an alternate composition has installed the owner.
+
+Old admission-refusal tests expected acceptance followed by a failed row. That behavior
+is superseded by this amendment: all four typed admission refusals now assert no row,
+no completion history and no handler effect, preserving the original thrown reason.
+Additional barriers for same-key consent/admission, pre-handler detach and preview
+reentry remain in progress. Full local suites, live DURABLE rows, installed recovery
+and hosted final-revision proof remain required.
+
+Evidence bookkeeping: tmp/1950-xml was copied after1951 overwrote the service reports,
+so it is not credited to1950. Use retained1951/1952 outputs for those respective
+revisions; tmp/1950-survival-services.txt alone retains its aggregate successful run.

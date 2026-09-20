@@ -20,6 +20,12 @@ package io.justsearch.agent.api.registry;
  */
 public interface ConsentCapsuleAuthority {
 
+  /** A successfully consumed capsule whose lifecycle audit can be published after acceptance. */
+  @FunctionalInterface
+  interface Consumption {
+    void publish();
+  }
+
   /**
    * Mints a single-use capsule approving {@code operationId} with exactly {@code argumentsJson},
    * recording the {@code sourceTier} of the action it authorizes (tempdoc 550 critical-analysis
@@ -44,6 +50,15 @@ public interface ConsentCapsuleAuthority {
    */
   boolean verifyAndConsume(String token, String operationId, String argumentsJson);
 
+  /**
+   * Atomically validates and consumes a public-argument capsule without publishing its audit
+   * event yet. Implementations that do not support deferred publication fail closed.
+   */
+  default java.util.Optional<Consumption> consumeDeferred(
+      String token, String operationId, String argumentsJson) {
+    return java.util.Optional.empty();
+  }
+
   /** Approve one frozen preparation in a domain distinct from ordinary public-argument capsules. */
   default String mintPrepared(String operationId, String argumentsJson, SourceTier sourceTier,
       String operationKey, java.util.UUID preparationNonce) {
@@ -54,5 +69,15 @@ public interface ConsentCapsuleAuthority {
   default boolean verifyPreparedAndConsume(String token, String operationId, String argumentsJson,
       String operationKey, java.util.UUID preparationNonce) {
     return false;
+  }
+
+  /**
+   * Atomically validates and consumes the exact frozen preparation without publishing its audit
+   * event yet. There is deliberately no fallback to public-argument consent.
+   */
+  default java.util.Optional<Consumption> consumePreparedDeferred(
+      String token, String operationId, String argumentsJson, String operationKey,
+      java.util.UUID preparationNonce) {
+    return java.util.Optional.empty();
   }
 }

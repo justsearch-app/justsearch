@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.agent.api.registry.ConsentCapsuleAuthority;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -9,8 +11,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import io.justsearch.app.api.operations.CanonicalOperationArguments;
@@ -51,7 +55,7 @@ import io.justsearch.app.api.operations.CanonicalOperationArguments;
  * ShellAddress.Invocation.confirmationToken} field (no new wire field).
  */
 public final class ConsentCapsuleService
-    implements io.justsearch.agent.api.registry.ConsentCapsuleAuthority {
+    implements ConsentCapsuleAuthority {
 
   /** Prefix the signed binding itself: no ordinary SHA-256 hex digest can inhabit this domain. */
   private static String preparedDigest(String publicArguments, String operationKey, UUID preparationNonce) {
@@ -71,11 +75,24 @@ public final class ConsentCapsuleService
   @Override
   public boolean verifyPreparedAndConsume(String token, String operationId, String argumentsJson,
       String operationKey, UUID preparationNonce) {
-    if (token == null || operationId == null || argumentsJson == null || preparationNonce == null) return false;
+    return consumePreparedDeferred(token, operationId, argumentsJson, operationKey, preparationNonce)
+        .map(consumption -> {
+          consumption.publish();
+          return true;
+        })
+        .orElse(false);
+  }
+
+  @Override
+  public Optional<ConsentCapsuleAuthority.Consumption> consumePreparedDeferred(
+      String token, String operationId, String argumentsJson, String operationKey,
+      UUID preparationNonce) {
+    if (token == null || operationId == null || argumentsJson == null || operationKey == null
+        || preparationNonce == null) return Optional.empty();
     final String digest;
     try { digest = preparedDigest(argumentsJson, operationKey, preparationNonce); }
-    catch (IllegalArgumentException invalid) { return false; }
-    return verifyBoundAndConsume(token, operationId, digest);
+    catch (IllegalArgumentException invalid) { return Optional.empty(); }
+    return consumeBoundDeferred(token, operationId, digest);
   }
 
   private static final String HMAC_ALGO = "HmacSHA256";
@@ -228,16 +245,26 @@ public final class ConsentCapsuleService
    */
   @Override
   public boolean verifyAndConsume(String token, String operationId, String argsJson) {
-    if (token == null || operationId == null || argsJson == null) {
-      return false;
-    }
-    return verifyBoundAndConsume(token, operationId, CanonicalOperationArguments.digest(argsJson));
+    return consumeDeferred(token, operationId, argsJson)
+        .map(consumption -> {
+          consumption.publish();
+          return true;
+        })
+        .orElse(false);
   }
 
-  private boolean verifyBoundAndConsume(String token, String operationId, String argumentDigest) {
+  @Override
+  public Optional<ConsentCapsuleAuthority.Consumption> consumeDeferred(
+      String token, String operationId, String argsJson) {
+    if (token == null || operationId == null || argsJson == null) return Optional.empty();
+    return consumeBoundDeferred(token, operationId, CanonicalOperationArguments.digest(argsJson));
+  }
+
+  private Optional<ConsentCapsuleAuthority.Consumption> consumeBoundDeferred(
+      String token, String operationId, String argumentDigest) {
     int dot = token.indexOf('.');
     if (dot <= 0 || dot == token.length() - 1) {
-      return false;
+      return Optional.empty();
     }
     final String payload;
     final byte[] presentedMac;
@@ -245,22 +272,22 @@ public final class ConsentCapsuleService
       payload = new String(unbase64(token.substring(0, dot)), StandardCharsets.UTF_8);
       presentedMac = unbase64(token.substring(dot + 1));
     } catch (IllegalArgumentException malformed) {
-      return false;
+      return Optional.empty();
     }
     // Signature first (constant-time) — reject forgeries before reading fields.
     byte[] expectedMac = hmac(payload.getBytes(StandardCharsets.UTF_8));
     if (!MessageDigest.isEqual(expectedMac, presentedMac)) {
-      return false;
+      return Optional.empty();
     }
     String[] parts = payload.split("\\|", -1);
     if (parts.length != 4) {
-      return false;
+      return Optional.empty();
     }
     long expiryMillis;
     try {
       expiryMillis = Long.parseLong(parts[3]);
     } catch (NumberFormatException e) {
-      return false;
+      return Optional.empty();
     }
     // Reconstruct the Grant this token encodes and validate it through the one Grant primitive
     // (tempdoc 550 thesis IV): scope binding, then expiry, then single-use consumption.
@@ -271,25 +298,28 @@ public final class ConsentCapsuleService
     // order / whitespace differences between mint-side and verify-side serializations of the same
     // logical args do not break the match).
     if (!capsule.scope().authorizes(operationId, argumentDigest)) {
-      return false;
+      return Optional.empty();
     }
     // Revocation (tempdoc 550 thesis IV): a revoked grant id fails closed, before expiry/consume.
     if (revoked.contains(capsule.grantId())) {
       liveGrants.remove(capsule.grantId());
-      return false;
+      return Optional.empty();
     }
     // Expiry.
     if (capsule.isExpired(clock.instant())) {
       liveGrants.remove(capsule.grantId());
-      return false;
+      return Optional.empty();
     }
     // Single-use: consume the grant id iff still live. remove() is atomic, so concurrent
     // double-spend resolves to exactly one winner.
-    boolean consumed = liveGrants.remove(capsule.grantId()) != null;
-    if (consumed) {
-      emitGrant(capsule.grantId(), "CONSUMED", operationId, clock.instant());
-    }
-    return consumed;
+    if (liveGrants.remove(capsule.grantId()) == null) return Optional.empty();
+    Instant consumedAt = clock.instant();
+    AtomicBoolean published = new AtomicBoolean();
+    return Optional.of(() -> {
+      if (published.compareAndSet(false, true)) {
+        emitGrant(capsule.grantId(), "CONSUMED", operationId, consumedAt);
+      }
+    });
   }
 
   /** Test/diagnostic: count of issued-and-unconsumed grants (does not prune). */
