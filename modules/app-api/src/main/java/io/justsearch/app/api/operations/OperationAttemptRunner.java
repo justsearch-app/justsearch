@@ -57,6 +57,27 @@ public interface OperationAttemptRunner {
    */
   <T> T withPreparation(Request request, Function<PreparationScope, T> prepare);
 
+  /** One nonpublishing acceptance capability, valid only on the callback thread and within its scope. */
+  interface AcceptanceScope {
+    Request request();
+    void accept(EngineContext authorizedContext);
+  }
+
+  record AdmittedAttempt<T>(PreparedAttempt attempt, java.util.Optional<T> admission) {}
+
+  /**
+   * Arbitrate final lookup, effect admission and raw acceptance under the existing key stripe.
+   * An existing row skips the callback. An absent row must be accepted exactly once by the
+   * callback, which may reserve work and consume deferred consent but must not publish events,
+   * install listeners, close handles, schedule work or execute effects. Prepared/control futures
+   * are attached only after releasing the stripe. The caller owns reservation cleanup on failure.
+   */
+  <T> AdmittedAttempt<T> admitAndAccept(Request request, java.util.UUID preparationNonce,
+      Function<AcceptanceScope, T> reserve);
+
+  /** Composition must not promise explicit durable survival without a boot recovery owner. */
+  void requireRecoveryOwner(OperationKind kind);
+
   java.util.Optional<OperationStore.Preparation> pendingPreparation(Request request);
   java.util.Optional<OperationStore.Preparation> savePreparation(Request request, OperationStore.Preparation preparation);
   PreparedAttempt acceptPrepared(Request request, java.util.UUID nonce);

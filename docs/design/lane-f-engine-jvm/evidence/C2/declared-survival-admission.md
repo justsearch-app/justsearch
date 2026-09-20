@@ -177,6 +177,17 @@ both app-services PMD tasks passing. Log tmp/1952-live-urgency.txt and copied
 tmp/1952-xml/app-services are the proof. This credits the primitive, not the still
 uncommitted full admission integration.
 
+Item3a is pushed3846e814a. Item3b's runner primitive passes1953:20 cases across
+OperationAdmissionRunnerTest, OperationPreparationRunnerTest, OperationKeyLookupTest
+and the automatic store-ownership guard; no skips/failures/errors, both PMD tasks
+pass. Exact command/output is tmp/1953-runner-arbitration.txt, copied XML/counts at
+tmp/1953-xml/app-observability and tmp/1953-counts.json. Independent review confirms
+raw lookup/reservation/acceptance are inside the existing stripe while control/future
+publication is outside. This proves one reservation callback, not the still-owed
+combined real-Engine/capsule concurrency test. `requireRecoveryOwner` checks the
+runner's boot declaration; actual alternate composition still needs the connection
+correction described below.
+
 Other work is implemented but remains under verification: policy/schema/projection,
 REST matched admission, native MCP parsing/admission, runner scope, nested handoff
 and recovery-owner declaration validation. Initial real REST proof1944 passes44

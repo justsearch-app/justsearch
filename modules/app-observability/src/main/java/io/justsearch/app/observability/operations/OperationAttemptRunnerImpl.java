@@ -127,6 +127,54 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     }
   }
 
+  private record AdmissionSnapshot<T>(OperationStore.Acceptance acceptance, Optional<T> admission) {}
+
+  @Override
+  public <T> AdmittedAttempt<T> admitAndAccept(Request request, java.util.UUID preparationNonce,
+      Function<AcceptanceScope, T> reserve) {
+    requireOutsidePreparation(request);
+    Objects.requireNonNull(reserve, "reserve");
+    AdmissionSnapshot<T> result = withKey(request, stable -> {
+      var existing = store.lookup(stable.key(), stable.descriptor());
+      if (existing.isPresent()) return new AdmissionSnapshot<>(
+          new OperationStore.Acceptance(existing.orElseThrow(), false), Optional.empty());
+      final class Scope implements AcceptanceScope {
+        private final Thread owner = Thread.currentThread();
+        private boolean open = true;
+        private OperationStore.Acceptance accepted;
+
+        @Override public Request request() { return stable; }
+
+        @Override public void accept(EngineContext context) {
+          if (!open || Thread.currentThread() != owner || accepted != null) {
+            throw new IllegalStateException("Accept exactly once within the owning callback");
+          }
+          Objects.requireNonNull(context, "context");
+          accepted = preparationNonce == null
+              ? store.accept(stable.key(), stable.descriptor(), context, stable.provenance(), stable.historyMode())
+              : store.acceptPrepared(stable.key(), stable.descriptor(), context, stable.provenance(),
+                  preparationNonce, stable.historyMode());
+        }
+      }
+      var scope = new Scope();
+      try {
+        T reserved = Objects.requireNonNull(reserve.apply(scope), "admission result");
+        if (scope.accepted == null) throw new IllegalStateException("Admission callback did not accept its row");
+        return new AdmissionSnapshot<>(scope.accepted, Optional.of(reserved));
+      } finally {
+        scope.open = false;
+      }
+    });
+    return new AdmittedAttempt<>(prepared(result.acceptance()), result.admission());
+  }
+
+  @Override
+  public void requireRecoveryOwner(OperationKind kind) {
+    if (!ownedKinds.contains(Objects.requireNonNull(kind, "kind"))) {
+      throw new IllegalArgumentException("Kind has no declared owner: " + kind);
+    }
+  }
+
   @Override
   public PreparedAttempt accept(Request request) {
     requireOutsidePreparation(request);
