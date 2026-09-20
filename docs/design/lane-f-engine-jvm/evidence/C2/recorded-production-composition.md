@@ -55,8 +55,9 @@ composition tests reproduce that failure for all four cases (30 cases total, fou
 failures). The production catalogs had never declared their INGEST/REINDEX kinds;
 the dispatcher correctly used their default generic policy. Declare the existing
 record kinds at those two catalog entries, where classification belongs. Do not add
-operation-id inference to the dispatcher or relax the resolver. This also gives the
-accepted invocation its designed durable survival/recovery owner. Logs: tmp/1909-stage-live.txt,
+operation-id inference to the dispatcher or relax the resolver. This selects the
+recorded recovery owner; live1929 later shows survival admission still needs the
+separate correction described below. Logs: tmp/1909-stage-live.txt,
 tmp/1912-composition-red.txt and copied tmp/1912-xml/app-engine; the first1911 command
 compiled but selected a nonexistent test method, so it is not runtime evidence.
 
@@ -124,3 +125,65 @@ Preflight1926 via this worktree's configured MCP client passes all checks. The
 desktop's main-checkout MCP still expects the retired Worker distribution; its
 negative preflight is a stale client implementation, not a reason to recreate that
 distribution. Use the active worktree client and normal owned dev runner.
+
+## .3c.2 execution split
+
+Keep the existing fixture's stores and owners stable for the first refusal cut
+(.3c.2a): use actual registered ingest/reindex preparation, stop and replace its
+physical attachment, then change the serving generation or engage the real hard
+stop. Assert typed refusal, no successor producer/claim and zero committed units,
+with unchanged parent/child identities and accepted preparation. This uses the
+existing replacement lifetime and avoids making every fixture field mutable just
+to add a refusal matrix.
+
+The following .3c.2b owns reopening both SQLite stores and constructing a new
+runner/coordinator, consuming the winning Resume bodies and preserving the real
+producer-exit barrier. Establish the old admission/work lifetime explicitly before
+choosing which process-owned authorities a store-reopen test retains; attachment
+replacement deliberately preserves the pending parent and is not process shutdown.
+Keep real process-death and actual index-write proof in the installed/live harness.
+
+## Live indexing and remaining survival defect
+
+Component refusal cut .3c.2a is implemented. Initial1933 runs34 cases with two
+failures: trusted SYSTEM_INTERNAL/StructuralAuto is intentionally immune to hard
+stop, so that fixture was not revocable. Correct it to real MCP/UNTRUSTED authority:
+ingest uses the shared durable operation grant, reindex uses the LOW-risk structural
+auto branch. Both prove an Authorized verdict before revocation. Restored1935
+passes all34 cases and PMD; copied results are tmp/1935-xml/app-engine. Source/evidence
+review finds no substantive defect. Full1936 passes304 cases/57 suites with no skips,
+failures or errors and both PMD tasks. Negative1938 disables only the authority's
+generation check and still passes because the coordinator independently refuses the
+same mismatch. Negative1939 disables both generation-refusal branches: both stale
+cases fail awaiting the missing terminal refusal; both hard-stop cases still pass.
+Both production files are restored byte-for-byte in a finally block. Restored1940
+passes all34 coordinator cases and both PMD tasks. Logs/copied XML/counts are under
+tmp/1936-*, tmp/1938-*, tmp/1939-* and tmp/1940-*; the mutation harness is
+tmp/1938-negative-refusal.py. This is proof of refusal rather than a claim that the
+mutant produced an index effect. None of these directly constructed durable contexts prove HTTP
+classification; that missing production boundary remains separately recorded below.
+
+Pushed3898195ab runs in owned dev instance44158f69-0242-4bdd-9a10-6319316df599,
+distribution7e8f708999bf517f, standard Qwen3.5-9B model online. Preflight1926 and
+health1928 verify fresh artifacts and no foreign stack. Actual reference consumer
+1924 indexes five files and finds the cinnamon canary. Read-only SQLite capture1929
+shows parent4/child5 COMPLETE, five committed units each, no failures, and walk
+receipt revision9 sealed and acknowledged. jseval tier2-eval1925 retrieves five
+anchored chunks and the served standard model answers Captain Mortimer Flux exactly,
+with no query/anchor errors. This is one real-model smoke query, not a quality suite.
+Commands/results: tmp/1924-stage-live.*, tmp/1925-live-query.json,
+tmp/1925-live-rag.txt, tmp/1925-live-rag/tier2-eval.json, tmp/1929-live-rows.json and
+tmp/1929-live-walks.json. Retained outcome/matching retry/changed-input409 pass1931;
+1930 used the wrong GET route and is retained as a harness error, not product proof.
+
+The live rows also expose survival=INTERACTIVE for both parent and child. The kind
+correction alone therefore does not complete the declared-kind prerequisite:
+RequestEngineContext admits HTTP work as interactive before resolving the operation,
+and the dispatcher attaches to that existing owner. The design already requires
+durable ingestion/reindex admission, including nested agent calls. Resolve that
+classification before the actual producer work is admitted; do not relabel only the
+row or attached context, because cancellation reads the owner's original survival.
+The .3c.1 internal DURABLE fixture proves its selected composition but cannot prove
+the HTTP boundary. Root is investigating this prerequisite before process recovery
+proof. The live stack was stopped cleanly with evidence/data preserved; old failed
+rows remain failed. No C2 completion or crash-survival claim follows from live1924.

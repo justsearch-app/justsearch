@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-20: Live C2 rows expose interactive HTTP survival despite recorded ingestion kind. Make survival an explicit optional operation declaration; classify direct fronts before admission and give nested effects a distinct admitted lifetime when required, preserving quotas, key-first retry and cancellation ordering. [Owning mechanism and proof](evidence/C2/declared-survival-admission.md).
+
 - 2026-09-20: C2 real producer composition exposes missing INGEST/REINDEX policy declarations in the two public catalogs; declare the existing kinds at their source rather than weakening resolver ownership checks. [Reproduction and correction](evidence/C2/recorded-production-composition.md#first-composed-failure-2026-09-20).
 
 - 2026-09-20: C2 .3c extends the Engine-owned real-store/coordinator fixture through both production handlers and catalogs; synthetic terminal queue transitions remain distinct from required installed index-write proof. [Composition proof sequence](evidence/C2/recorded-production-composition.md).

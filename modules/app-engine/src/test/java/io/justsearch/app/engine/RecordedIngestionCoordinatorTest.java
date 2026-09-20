@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.agent.api.registry.SourceTier;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.agent.tools.IngestTool;
@@ -46,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -824,6 +826,30 @@ final class RecordedIngestionCoordinatorTest {
     FORCED_DIRECTORY_REINDEX
   }
 
+  private enum RegisteredRecoveryRefusalCase {
+    INGEST_STALE_GENERATION(RegisteredDispatchCase.DIRECTORY_INGEST,
+        "replacement-generation", false, "RECOVERY_GENERATION_MISMATCH"),
+    REINDEX_STALE_GENERATION(RegisteredDispatchCase.DIRECTORY_REINDEX,
+        "replacement-generation", false, "RECOVERY_GENERATION_MISMATCH"),
+    INGEST_REVOKED_AUTHORITY(RegisteredDispatchCase.DIRECTORY_INGEST,
+        GENERATION, true, "RECOVERY_AUTHORIZATION_REFUSED"),
+    REINDEX_REVOKED_AUTHORITY(RegisteredDispatchCase.DIRECTORY_REINDEX,
+        GENERATION, true, "RECOVERY_AUTHORIZATION_REFUSED");
+
+    final RegisteredDispatchCase dispatchCase;
+    final String servingGeneration;
+    final boolean revokeAuthority;
+    final String refusalCode;
+
+    RegisteredRecoveryRefusalCase(RegisteredDispatchCase dispatchCase, String servingGeneration,
+        boolean revokeAuthority, String refusalCode) {
+      this.dispatchCase = dispatchCase;
+      this.servingGeneration = servingGeneration;
+      this.revokeAuthority = revokeAuthority;
+      this.refusalCode = refusalCode;
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(RegisteredDispatchCase.class)
   void registeredPreparedHandlersReachTheActualProducerAndRetryOneRecordedIdentity(
@@ -995,6 +1021,123 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(RegisteredRecoveryRefusalCase.class)
+  void registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect(
+      RegisteredRecoveryRefusalCase scenario) throws Exception {
+    boolean ingest = scenario.dispatchCase == RegisteredDispatchCase.DIRECTORY_INGEST;
+    Path scenarioDirectory = temp.resolve(scenario.name().toLowerCase(java.util.Locale.ROOT));
+    try (Fixture f = new Fixture(scenarioDirectory, 1)) {
+      Path target = f.plan.roots().getFirst().path();
+      AtomicInteger preparations = new AtomicInteger();
+      AtomicInteger producerCalls = new AtomicInteger();
+      AtomicBoolean oldProducerExited = new AtomicBoolean();
+      var handlers = new HandlerRegistry();
+      if (ingest) {
+        handlers.register(AgentToolsOperationCatalog.INGEST_FILES,
+            new IngestTool(f.coordinator, context -> {
+              preparations.incrementAndGet();
+              return List.of(new RootBinding(target, "documents"));
+            }, context -> GENERATION, List::of));
+      } else {
+        handlers.register(CoreOperationCatalog.REINDEX,
+            new ReindexHandler(f.coordinator, context -> {
+              preparations.incrementAndGet();
+              return List.of(new RootBinding(target, "documents"));
+            }, context -> GENERATION, List::of));
+      }
+      var dispatcher = new OperationExecutorImpl(f.runner, f.admission, handlers, null, Map.of(),
+          CLOCK, new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog());
+      var operation = ingest
+          ? new AgentToolsOperationCatalog().findByIdValue(
+              AgentToolsOperationCatalog.INGEST_FILES.value()).orElseThrow()
+          : new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.REINDEX.value()).orElseThrow();
+      String arguments = ingest
+          ? tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+              Map.of("paths", List.of(target.toString()), "collection", "documents"))
+          : "{\"force\":false}";
+      if (ingest) {
+        f.authority.grants().grantAllowAlways(operation.id().value(), SourceTier.UNTRUSTED);
+        dispatcher.setDurableGrantStore(f.authority.grants(), f.authority.scope());
+      }
+      String operationKey = OperationKeys.generate(CLOCK);
+      var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      f.coordinator.bindProducer((plan, childKey, epoch, context, cancellation) -> {
+        producerCalls.incrementAndGet();
+        cancellation.onCancel(() -> {
+          oldProducerExited.set(true);
+          producerExit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED);
+        });
+        return producerExit;
+      });
+
+      var seed = f.mcpRequest();
+      var response = dispatcher.dispatch(operation, arguments, seed.provenance(), Optional.empty(),
+          seed.context(), operationKey);
+      assertTrue(response.success());
+      assertEquals(1, preparations.get());
+      assertEquals(1, producerCalls.get());
+      var parentBefore = f.operations.find(operationKey).orElseThrow();
+      var parentPreparation = f.operations.acceptedPreparation(parentBefore.id()).orElseThrow();
+      var frozenPlan = new RecordedIngestPlanResolver().resolve(parentBefore, parentPreparation);
+      var childBefore = f.operations.findIngestChild(operationKey, frozenPlan).orElseThrow();
+      var childPreparation = f.operations.acceptedPreparation(childBefore.id()).orElseThrow();
+      OperationAuthorizationBasis acceptedBasis = ingest
+          ? new OperationAuthorizationBasis.OperationGrant(operation.id().value(), SourceTier.UNTRUSTED)
+          : new OperationAuthorizationBasis.StructuralAuto();
+      assertEquals(Optional.of(acceptedBasis.encode()), parentBefore.context().grantReference());
+      assertEquals(SourceTier.UNTRUSTED.name(), parentBefore.context().sourceTier());
+      assertEquals(TransportTag.MCP.name(), parentBefore.context().transport());
+      assertTrue(f.authority.evaluateRecordedIngest(parentBefore, parentPreparation,
+          Optional.of(GENERATION), ignored -> true)
+          instanceof OperationAuthority.RecordedIngestRecoveryDecision.Authorized,
+          "the dispatcher-selected grant must authorize recovery before revocation");
+
+      f.coordinator.stopProducers(1_000);
+      assertTrue(oldProducerExited.get(), "the old producer must exit before replacement");
+      f.attachment.close();
+      if (scenario.revokeAuthority) f.authority.hardStop().engage();
+      var parentCompletion = new CompletableFuture<OperationRecord>();
+      try (var _ = f.operations.subscribeCompletions(row -> {
+        if (operationKey.equals(row.key())) parentCompletion.complete(row);
+      })) {
+        f.attachment = f.coordinator.attach(f.queue,
+            () -> Optional.of(scenario.servingGeneration), () -> true);
+        f.coordinator.bindProducer((plan, childKey, epoch, context, cancellation) -> {
+          producerCalls.incrementAndGet();
+          return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+        });
+        OperationRecord refused = parentCompletion.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(OperationState.FAILED, refused.state());
+        assertEquals(scenario.refusalCode, refused.receipt().code());
+      }
+
+      var parentAfter = f.operations.find(operationKey).orElseThrow();
+      var childAfter = f.operations.find(childBefore.key()).orElseThrow();
+      assertEquals(parentBefore.id(), parentAfter.id());
+      assertEquals(childBefore.id(), childAfter.id());
+      assertEquals(parentPreparation,
+          f.operations.acceptedPreparation(parentAfter.id()).orElseThrow());
+      assertEquals(childPreparation,
+          f.operations.acceptedPreparation(childAfter.id()).orElseThrow());
+      assertEquals(1, preparations.get(), "recovery cannot invoke handler preparation");
+      assertEquals(1, producerCalls.get(), "replacement producer cannot run refused work");
+      assertTrue(f.queue.pollPending(10).isEmpty());
+      assertFalse(f.queue.hasIssuedRecordedClaims(childAfter.key()));
+      assertEquals(0, parentAfter.unitsCompleted());
+      assertEquals(0, parentAfter.unitsFailed());
+      assertEquals(0, childAfter.unitsCompleted());
+      assertEquals(0, childAfter.unitsFailed());
+      var progress = f.queue.recordedWalk(childAfter.key()).orElseThrow();
+      assertEquals(0, progress.completedUnits());
+      assertEquals(0, progress.failedUnits());
+      f.queue.sealedRecordedWalkReceipt(childAfter.key()).ifPresent(receipt -> {
+        assertEquals(0, receipt.completedUnits(), "an empty receipt is not an index effect");
+        assertEquals(0, receipt.failedUnits(), "an empty receipt is not an index effect");
+      });
+    }
+  }
+
   @Test
   void actualProducerReplacementWaitsForExitWithoutCancellingDurableParent() throws Exception {
     var entered = new java.util.concurrent.CountDownLatch(1);
@@ -1060,7 +1203,7 @@ final class RecordedIngestionCoordinatorTest {
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore operations;
     final SqliteJobQueue queue;
-    final java.util.concurrent.atomic.AtomicBoolean fixtureClaimOwner = new java.util.concurrent.atomic.AtomicBoolean();
+    final AtomicBoolean fixtureClaimOwner = new AtomicBoolean();
     final OperationAuthority authority;
     final EngineAdmissionController admission = new EngineAdmissionController(2, 2, 1);
     final OperationAttemptRunnerImpl runner;
@@ -1094,6 +1237,14 @@ final class RecordedIngestionCoordinatorTest {
       attachment = coordinator.attach(queue, () -> Optional.of(generation), () -> true);
     }
     OperationAttemptRunner.Request request() { return request(new OperationAuthorizationBasis.StructuralAuto()); }
+    OperationAttemptRunner.Request mcpRequest() {
+      EngineContext context = EngineProvenance.context(EngineContext.ClientKind.MCP_CLIENT,
+          "coordinator-test", Optional.empty(), Optional.empty(), TransportTag.MCP,
+          EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+      return new OperationAttemptRunner.Request(OperationKeys.generate(CLOCK),
+          OperationDescriptor.invocation(OperationKind.INGEST, "core.ingest-files", "{}", false), context,
+          EngineProvenance.invocation(context, ExecutorTag.AGENT, Instant.now(CLOCK), Optional.empty()));
+    }
     OperationAttemptRunner.Request request(OperationAuthorizationBasis basis) {
       EngineContext context = EngineProvenance.context(EngineContext.ClientKind.INTERNAL, "coordinator-test",
           Optional.empty(), Optional.of(basis.encode()), TransportTag.SYSTEM_INTERNAL,

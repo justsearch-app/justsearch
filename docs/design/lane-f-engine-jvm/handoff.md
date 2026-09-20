@@ -37,6 +37,16 @@ Actual live success/recovery and .3c.2 remain in progress. Hosted CI35536949678
 at30792f547 fails app-ui catalog projections and system integration; CLA35536948211
 passes. Original failures are retained and are not treated as completed hosted proof.
 
+Pushed3898195ab passes live1924 ingestion/search (five documents),1925 one real
+standard-model query, and1931 retained outcome/retry/conflict checks. Live1929 also
+shows INTERACTIVE survival in those rows. Root is closing the already owed
+[declared survival admission](evidence/C2/declared-survival-admission.md) before
+crash-survival proof. The owned live stack is stopped with data retained. Component
+refusal matrix1935 passes34 cases and PMD; full1936 passes304 cases, no skips/failures.
+Negative1939 removes both generation guards and fails both stale cases; restored1940
+passes34 coordinator cases and PMD. None of that substitutes
+for the front admission/cancellation fix or .3c.2b both-store recovery proof.
+
 The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a
 handlers, .3b REST dispatcher/consumer retirement, then .3c real vertical integration/proof.
 Root/policy snapshots and root-owned wiring are installed and verified. The current
