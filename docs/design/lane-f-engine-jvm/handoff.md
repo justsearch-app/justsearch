@@ -48,7 +48,24 @@ the fixture's10second allowance before any product assertion. Fixture-only30seco
 allowance plus diagnostics passes direct2099 and full11-file suite2100; hosted proof
 remains. The replay timeout is a fixture producer-isolation
 defect under intended latest-revision supersession, not grounds for a second claim
-table. A separate stale untagged batch-effect ledger omission needs a bounded fix.
+table. The separate stale untagged batch-effect ledger omission is fixed in77a2693e8.
+Helper-startup correction is pushed as7b2c31555. Current WIP is the initial
+accepted-generation preflight wait on the existing producer/deadline, with typed
+contention/missing-file retries only; root owns production and two agents own bounded
+worker/Engine tests. Corrected2103 passes40 cases and affected PMD/format; negative2104
+fails all three intended regressions and restores production sources byte-for-byte.
+FinalNode2110 passes9 hostile-fixture tests. Restored focused plus13 installed cases
+pass2107 (53 represented cases), including both attacks with100 exact paths and the
+original durable SUCCESS. Fullindexer2109 passes670 cases with15 model/filesystem
+skips; affected PMD/format pass. Every owned stack is stopped; no build is active.
+Hosted2105
+passes Windows-native but search-worker has a stale-claim assertion failure and
+the green integration job conceals one explicit OPERATION_STORAGE_FAILED ingest;
+the stale assertion is corrected without weakening job-hash safety. Isolated SQLite
+proof distinguishes prewriteBUSY/cleanrollback from commitIOERR_WRITE/uncertainrollback;
+no generic retry is permitted, and the historicalHTTP500 still lacks exact SQL cause.
+SQLite acceptance ambiguity,
+final full/hosted proof and bulk/later-stage work remain open.
 Next: close those real integration failures, then the still-owed
 [C2-10 bulk durable row/plan/resume](evidence/C2/bulk-reindex-connection.md),
 and C2-12 sweep/full verification. Streamed `core.reindex` proof does not discharge

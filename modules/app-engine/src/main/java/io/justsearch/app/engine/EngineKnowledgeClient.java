@@ -1073,8 +1073,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           var call = new CallContext(traceId, requestId, cancel, work.context(),
               enqueueProvenance(work.context()), () -> work.retain()::close);
           var service = requireService(WorkerAppServices::ingestService);
-          if (recorded == null) service.scanRoot(request, sink, call);
-          else service.scanRecordedRoot(recorded, sink, call);
+          try {
+            if (recorded == null) service.scanRoot(request, sink, call);
+            else service.scanRecordedRoot(recorded, sink, call);
+          } catch (WorkerServiceException cancelled) {
+            // The alarm can fire before service entry. Preserve the direct service's CANCELLED
+            // refusal, but let this recorded deadline reach the normal actual-exit projection.
+            if (recorded == null || !deadlineExpired.get()
+                || cancelled.status() != WorkerServiceException.Status.CANCELLED) throw cancelled;
+          }
         } finally {
           alarm.cancel(false);
           // The walk has ended; let the frames it already handed over reach the consumer before the

@@ -11,17 +11,23 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.services.worker.CancelToken;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.WatchedRootsState;
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.loop.IndexingLoop;
+import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.server.WorkerAppServices;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.WorkerIngestService;
@@ -29,6 +35,7 @@ import io.justsearch.ipc.ScanMode;
 import io.justsearch.ipc.ScanRootProgress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.List;
 
@@ -37,9 +44,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Adapter contract for one accepted recorded root. The worker service is mocked only at the real
@@ -51,6 +61,7 @@ final class EngineRecordedIngestionProducerTest {
   private static final String KEY = "recorded-child-0001";
   private static final long EPOCH = 37L;
   private static final String GENERATION = "serving-generation-37";
+  private static final String RECORDED_PLAN_HASH = "b".repeat(64);
 
   @Test
   void completeRecordedRootPreservesFrozenIdentityPolicyAndCallerContext(@TempDir Path directory)
@@ -66,7 +77,7 @@ final class EngineRecordedIngestionProducerTest {
     doAnswer(invocation -> {
       capturedScan.set(invocation.getArgument(0));
       capturedContext.set(invocation.getArgument(2));
-      invocation.<java.util.function.Consumer<ScanRootProgress>>getArgument(1).accept(
+      invocation.<Consumer<ScanRootProgress>>getArgument(1).accept(
           ScanRootProgress.newBuilder().setComplete(true).build());
       return null;
     }).when(ingest).scanRecordedRoot(any(), any(), any());
@@ -258,6 +269,150 @@ final class EngineRecordedIngestionProducerTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void realWorkerGenerationPreflightCancellationWaitsForServiceExit(boolean deadlineCancellation,
+      @TempDir Path directory) throws Exception {
+    long deadlineMs = deadlineCancellation ? 5 : 5_000;
+    try (var fixture = workerFixture(directory, deadlineMs)) {
+      CompletionStage<JobQueue.WalkEnumerationOutcome> result;
+      CancelToken token = new CancelToken();
+      try (var stateChannel = java.nio.channels.FileChannel.open(fixture.statePath(),
+          StandardOpenOption.READ, StandardOpenOption.WRITE);
+          var heldState = stateChannel.lock()) {
+        assertTrue(heldState.isValid(), "the fixture must hold the authoritative state lock");
+        result = fixture.client().enumerateRecordedRoot(fixture.plan(), KEY, fixture.epoch(),
+            TestEngineContexts.FOREGROUND, token);
+
+        assertTrue(fixture.scanEntered().await(2, TimeUnit.SECONDS),
+            "Engine must call the actual WorkerIngestService boundary");
+        assertTrue(awaitCondition(() -> stackContains(fixture.scanThread().get(),
+            "io.justsearch.configuration.persistence.ContendedFileReads", "readAllBytes"),
+            Duration.ofSeconds(1)), "the real service must be waiting on the held authoritative state file");
+        assertEquals(0, fixture.queue().queueDepth(), "preflight must precede every real queue admission");
+        assertFalse(result.toCompletableFuture().isDone(),
+            "the Engine producer must remain owned while the real service is in preflight");
+
+        if (deadlineCancellation) {
+          assertTrue(awaitCondition(() -> fixture.callContext().get() != null
+              && fixture.callContext().get().cancelled(), Duration.ofSeconds(3)),
+              "the LONG_RUNNING deadline must cancel the actual worker call context");
+          assertFalse(token.isCancelled(), "deadline cancellation must remain distinct from caller cancellation");
+        } else {
+          token.cancel("caller cancelled while generation state was held");
+          assertTrue(awaitCondition(() -> fixture.callContext().get() != null
+              && fixture.callContext().get().cancelled(), Duration.ofSeconds(2)),
+              "caller cancellation must reach the actual worker call context");
+        }
+
+        assertFalse(result.toCompletableFuture().isDone(),
+            "cancellation must not complete the producer before the synchronous service exits");
+        assertEquals(0, fixture.queue().queueDepth(), "cancelled preflight must admit no files");
+      }
+
+      assertEquals(JobQueue.WalkEnumerationOutcome.CANCELLED,
+          result.toCompletableFuture().get(5, TimeUnit.SECONDS),
+          "the actual worker cancellation must project as CANCELLED after exit");
+      assertEquals(0, fixture.queue().queueDepth());
+      assertEquals(0, fixture.admission().activeWorkCount());
+    }
+  }
+
+  @Test
+  void releasingRealGenerationPreflightAdmitsExactlyOneFile(@TempDir Path directory) throws Exception {
+    try (var fixture = workerFixture(directory, 8_000)) {
+      CompletionStage<JobQueue.WalkEnumerationOutcome> result;
+      try (var stateChannel = java.nio.channels.FileChannel.open(fixture.statePath(),
+          StandardOpenOption.READ, StandardOpenOption.WRITE);
+          var heldState = stateChannel.lock()) {
+        assertTrue(heldState.isValid(), "the fixture must hold the authoritative state lock");
+        result = fixture.client().enumerateRecordedRoot(fixture.plan(), KEY, fixture.epoch(),
+            TestEngineContexts.FOREGROUND, new CancelToken());
+        assertTrue(fixture.scanEntered().await(2, TimeUnit.SECONDS));
+        assertTrue(awaitCondition(() -> stackContains(fixture.scanThread().get(),
+            "io.justsearch.configuration.persistence.ContendedFileReads", "readAllBytes"),
+            Duration.ofSeconds(1)), "the actual service must reach strict generation preflight");
+        assertFalse(result.toCompletableFuture().isDone());
+        assertEquals(0, fixture.queue().queueDepth());
+      }
+
+      assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE,
+          result.toCompletableFuture().get(5, TimeUnit.SECONDS));
+      assertEquals(1, fixture.queue().queueDepth(),
+          "releasing a valid generation read must allow exactly one real queue admission");
+      var admitted = fixture.queue().pollPending(10);
+      assertEquals(1, admitted.size());
+      assertEquals(fixture.root().resolve("entry.txt"), admitted.getFirst().path());
+      assertEquals(KEY, admitted.getFirst().scanId());
+      assertEquals(fixture.epoch(), admitted.getFirst().walkEpoch());
+    }
+  }
+
+  @Test
+  void transientlyMissingAuthoritativeGenerationStateWaitsForItsExactRestoration(@TempDir Path directory)
+      throws Exception {
+    try (var fixture = workerFixture(directory, 8_000)) {
+      byte[] authoritativeState = Files.readAllBytes(fixture.statePath());
+      Files.delete(fixture.statePath());
+      var result = fixture.client().enumerateRecordedRoot(fixture.plan(), KEY, fixture.epoch(),
+          TestEngineContexts.FOREGROUND, new CancelToken());
+
+      assertTrue(fixture.scanEntered().await(2, TimeUnit.SECONDS));
+      assertTrue(awaitCondition(() -> stackContains(fixture.scanThread().get(),
+          "io.justsearch.indexerworker.services.WorkerIngestService",
+          "awaitRecordedGenerationBeforeTraversal"), Duration.ofSeconds(1)),
+          "the real service must remain in its transient-missing-state preflight loop");
+      assertFalse(result.toCompletableFuture().isDone());
+      assertEquals(0, fixture.queue().queueDepth(), "absence is not generation authority for admission");
+
+      Files.write(fixture.statePath(), authoritativeState, StandardOpenOption.CREATE_NEW,
+          StandardOpenOption.WRITE);
+      assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE,
+          result.toCompletableFuture().get(5, TimeUnit.SECONDS));
+      assertEquals(1, fixture.queue().queueDepth());
+      var admitted = fixture.queue().pollPending(10);
+      assertEquals(1, admitted.size());
+      assertEquals(fixture.root().resolve("entry.txt"), admitted.getFirst().path());
+      assertEquals(KEY, admitted.getFirst().scanId());
+      assertEquals(fixture.epoch(), admitted.getFirst().walkEpoch());
+      assertEquals(fixture.generation(), new IndexGenerationManager(fixture.indexBase())
+          .idleActiveGeneration(fixture.activeGenerationPath()).orElseThrow(),
+          "the exact original authoritative generation bytes must still be the authority");
+    }
+  }
+
+  @Test
+  void deadlineBeforeActualWorkerEntryProjectsCancelledWithoutQueueAdmission(@TempDir Path directory)
+      throws Exception {
+    try (var fixture = workerFixture(directory, 5)) {
+      CountDownLatch releaseServiceEntry = new CountDownLatch(1);
+      fixture.beforeRealService().set(context -> {
+        fixture.callContext().set(context);
+        fixture.scanEntered().countDown();
+        await(releaseServiceEntry);
+      });
+      CancelToken callerToken = new CancelToken();
+      CompletionStage<JobQueue.WalkEnumerationOutcome> result = fixture.client().enumerateRecordedRoot(
+          fixture.plan(), KEY, fixture.epoch(), TestEngineContexts.FOREGROUND, callerToken);
+      try {
+        assertTrue(fixture.scanEntered().await(2, TimeUnit.SECONDS));
+        assertTrue(awaitCondition(() -> fixture.callContext().get().cancelled(), Duration.ofSeconds(2)),
+            "the deadline must expire while the real service entry is deliberately held");
+        assertFalse(callerToken.isCancelled(), "the Engine deadline must not mutate the caller token");
+        assertFalse(result.toCompletableFuture().isDone(),
+            "the producer must retain ownership until the synchronous service call returns");
+        assertEquals(0, fixture.queue().queueDepth());
+      } finally {
+        releaseServiceEntry.countDown();
+      }
+
+      assertEquals(JobQueue.WalkEnumerationOutcome.CANCELLED,
+          result.toCompletableFuture().get(5, TimeUnit.SECONDS),
+          "a service that observes the expired Engine deadline at entry is cancelled, not failed");
+      assertEquals(0, fixture.queue().queueDepth());
+    }
+  }
+
   @Test
   void missingIncompleteAndRefusedTerminalsCannotComplete(@TempDir Path directory) throws Exception {
     Path root = Files.createDirectory(directory.resolve("terminal"));
@@ -270,7 +425,7 @@ final class EngineRecordedIngestionProducerTest {
         var ingest = mock(WorkerIngestService.class);
         doAnswer(invocation -> {
           @SuppressWarnings("unchecked")
-          var sink = (java.util.function.Consumer<ScanRootProgress>) invocation.getArgument(1);
+          var sink = (Consumer<ScanRootProgress>) invocation.getArgument(1);
           switch (kind) {
             case "incomplete" -> sink.accept(ScanRootProgress.newBuilder().setComplete(false).build());
             case "refused" -> sink.accept(ScanRootProgress.newBuilder().setComplete(true)
@@ -307,6 +462,71 @@ final class EngineRecordedIngestionProducerTest {
         root, "documents", false, false, List.of("*.tmp"), List.of())));
   }
 
+  private static WorkerFixture workerFixture(Path directory, long deadlineMs) throws Exception {
+    Path root = Files.createDirectory(directory.resolve("real-worker-root"));
+    Files.writeString(root.resolve("entry.txt"), "recorded worker preflight fixture");
+    Path indexBase = directory.resolve("real-worker-index");
+    var layout = new IndexGenerationManager(indexBase).initializeOrLoad();
+    var queue = new SqliteJobQueue(indexBase.resolve("jobs.db"),
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE);
+    queue.open();
+    long epoch = queue.beginRecordedWalk(KEY, RECORDED_PLAN_HASH, true).enumerationEpoch();
+
+    var runtime = mock(RunningRuntime.class);
+    var service = spy(new WorkerIngestService(queue, mock(IndexingLoop.class), null,
+        IndexingPacing.unthrottled(), indexBase, layout.activeGenerationPath(), runtime, runtime, null, 0L));
+    var scanEntered = new CountDownLatch(1);
+    var callContext = new AtomicReference<CallContext>();
+    var scanThread = new AtomicReference<Thread>();
+    var beforeRealService = new AtomicReference<Consumer<CallContext>>(ignored -> {});
+    doAnswer(invocation -> {
+      CallContext context = invocation.getArgument(2);
+      callContext.set(context);
+      scanThread.set(Thread.currentThread());
+      scanEntered.countDown();
+      beforeRealService.get().accept(context);
+      invocation.callRealMethod();
+      return null;
+    }).when(service).scanRecordedRoot(any(), any(), any());
+
+    var registry = new DefaultEngineExecutorRegistry();
+    var admission = new EngineAdmissionController(8, 8, 1);
+    var client = client(registry, () -> services(service), admission, deadlineMs);
+    var rootPlan = new RecordedRootPlan(layout.activeGenerationId(), List.of(
+        new RecordedRootPlan.Root(root, "documents", true, false, List.of(), List.of())));
+    return new WorkerFixture(root, indexBase, layout.statePath(), layout.activeGenerationPath(),
+        layout.activeGenerationId(), epoch, queue, registry, admission, client, rootPlan,
+        scanEntered, callContext, scanThread, beforeRealService);
+  }
+
+  private static boolean stackContains(Thread thread, String className, String methodName) {
+    if (thread == null || !thread.isAlive()) return false;
+    for (StackTraceElement frame : thread.getStackTrace()) {
+      if (className.equals(frame.getClassName()) && methodName.equals(frame.getMethodName())) return true;
+    }
+    return false;
+  }
+
+  private record WorkerFixture(Path root, Path indexBase, Path statePath, Path activeGenerationPath,
+      String generation, long epoch, SqliteJobQueue queue, DefaultEngineExecutorRegistry registry,
+      EngineAdmissionController admission, EngineKnowledgeClient client, RecordedRootPlan plan,
+      CountDownLatch scanEntered, AtomicReference<CallContext> callContext,
+      AtomicReference<Thread> scanThread, AtomicReference<Consumer<CallContext>> beforeRealService)
+      implements AutoCloseable {
+    @Override
+    public void close() throws Exception {
+      try {
+        client.close();
+      } finally {
+        try {
+          registry.close();
+        } finally {
+          queue.close();
+        }
+      }
+    }
+  }
+
   private static WorkerAppServices services(WorkerIngestService ingest) {
     var services = mock(WorkerAppServices.class);
     when(services.ingestService()).thenReturn(ingest);
@@ -324,7 +544,7 @@ final class EngineRecordedIngestionProducerTest {
 
   private static void complete(org.mockito.invocation.InvocationOnMock invocation) {
     @SuppressWarnings("unchecked")
-    var sink = (java.util.function.Consumer<ScanRootProgress>) invocation.getArgument(1);
+    var sink = (Consumer<ScanRootProgress>) invocation.getArgument(1);
     sink.accept(ScanRootProgress.newBuilder().setComplete(true).build());
   }
 

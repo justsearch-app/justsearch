@@ -1667,8 +1667,42 @@ public final class WorkerIngestService {
   public void scanRecordedRoot(RecordedRootScan recorded,
       java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> sink, CallContext ctx) {
     java.util.Objects.requireNonNull(recorded, "recorded");
-    validateRecordedGeneration(recorded, ctx);
+    if (ctx.cancelled()) {
+      throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
+    }
+    if (!awaitRecordedGenerationBeforeTraversal(recorded, ctx)) return;
     scanRoot(recorded.request(), sink, ctx, recorded);
+  }
+
+  private boolean awaitRecordedGenerationBeforeTraversal(RecordedRootScan recorded, CallContext ctx) {
+    // The existing Engine root producer owns this wait, its deadline and actual-exit completion.
+    // No traversal or queue admission has begun. Never replay scanRoot or a completed batch here.
+    while (!ctx.cancelled()) {
+      try {
+        validateRecordedGeneration(recorded, ctx);
+        return true;
+      } catch (WorkerServiceException unavailable) {
+        if (ctx.cancelled()) return false;
+        if (unavailable.status() != WorkerServiceException.Status.UNAVAILABLE) throw unavailable;
+        Throwable cause = unavailable.getCause();
+        if (cause instanceof io.justsearch.configuration.persistence.ContendedFileReads.FileReadContendedException) {
+          // The strict read already spent its bounded, interruptible lock wait.
+          continue;
+        }
+        if (!(cause instanceof java.nio.file.NoSuchFileException)) throw unavailable;
+        // The generation owner rotates current to .prev before publishing its completed temp.
+        // Reread only current; never authorize from .prev, and do not spin if absence persists.
+        try {
+          Thread.sleep(10);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          if (ctx.cancelled()) return false;
+          throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED,
+              "Generation preflight interrupted", interrupted);
+        }
+      }
+    }
+    return false;
   }
 
   private void validateRecordedGeneration(RecordedRootScan recorded, CallContext ctx) {

@@ -45,6 +45,13 @@ or restore IDLE merely because the current pointer is locked. Strict generation 
 never authorize from a cache or backup, and are observations rather than generation
 leases. Watched-root JSON retains strict UTF-8 decoding.
 
+An accepted recorded root walk retries only typed read-lock exhaustion or a temporarily
+missing current generation pointer before traversal starts. Its existing Engine producer
+and LONG_RUNNING deadline own this wait; every attempt reads current authority again.
+Cancellation waits for the actual producer exit and yields CANCELLED, including a
+deadline that expires before service entry. Malformed, changed or non-IDLE generation
+state refuses immediately, and validation after traversal begins does not replay batches.
+
 On Windows, even an ordinary open reader can temporarily deny atomic replacement.
 `AtomicFileWrites` retains the completed temporary file and retries only an atomic
 rename's `AccessDeniedException`, for at most two seconds. It never converts that

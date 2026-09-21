@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -17,10 +18,21 @@ import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.ipc.ScanMode;
 import io.justsearch.ipc.ScanRootProgress;
 import io.justsearch.ipc.ScanRootRequest;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -115,6 +127,234 @@ final class WorkerRecordedScanAdmissionTest {
     }
   }
 
+  @Test
+  void missingCurrentGenerationWithValidPreviousWaitsForPublicationBeforeAdmission() throws Exception {
+    Path file = Files.writeString(temp.resolve("entry.txt"), "source");
+    try (var queue =
+        new SqliteJobQueue(
+            temp.resolve("jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE)) {
+      queue.open();
+      long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
+      var service = service(queue, mock(IndexingLoop.class));
+      Path state = temp.resolve("index/state.json");
+      Path previous = temp.resolve("index/state.json.prev");
+      byte[] validState = Files.readAllBytes(state);
+      Files.copy(state, previous);
+      Files.delete(state);
+
+      List<ScanRootProgress> frames = new CopyOnWriteArrayList<>();
+      CountDownLatch started = new CountDownLatch(1);
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+      try {
+        Future<?> scan =
+            submitScan(executor, started, service, file, epoch, frames, CallContext.none());
+        assertTrue(started.await(1, TimeUnit.SECONDS), "recorded scan must start");
+        assertThrows(
+            TimeoutException.class,
+            () -> scan.get(100, TimeUnit.MILLISECONDS),
+            "valid state.json.prev must not authorize traversal while current state is absent");
+        assertEquals(0, queue.queueDepth(), "preflight waiting must not admit queue work");
+        assertTrue(frames.isEmpty(), "preflight waiting must not emit traversal progress");
+        assertFalse(Files.exists(state), "the worker must not restore the missing current state");
+        assertArrayEquals(validState, Files.readAllBytes(previous));
+
+        Files.write(state, validState);
+        scan.get(3, TimeUnit.SECONDS);
+
+        assertEquals(1L, frames.stream().filter(ScanRootProgress::getComplete).count());
+        assertEquals(1, queue.queueDepth());
+        var admitted = queue.pollPending(10);
+        assertEquals(1, admitted.size(), "a successful retry must admit exactly one member");
+        assertEquals(file, admitted.getFirst().path());
+      } finally {
+        if (!Files.exists(state)) Files.write(state, validState);
+        executor.shutdownNow();
+        assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS), "scan executor must terminate");
+      }
+    }
+  }
+
+  @Test
+  void heldGenerationLockPastStrictReadTimeoutRetriesBeforeAdmission() throws Exception {
+    Path file = Files.writeString(temp.resolve("entry.txt"), "source");
+    try (var queue =
+        new SqliteJobQueue(
+            temp.resolve("jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE)) {
+      queue.open();
+      long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
+      var service = service(queue, mock(IndexingLoop.class));
+      Path state = temp.resolve("index/state.json");
+      List<ScanRootProgress> frames = new CopyOnWriteArrayList<>();
+      CountDownLatch started = new CountDownLatch(1);
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+
+      try (FileChannel channel =
+          FileChannel.open(state, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+        FileLock lock = channel.lock();
+        try {
+          Future<?> scan =
+              submitScan(executor, started, service, file, epoch, frames, CallContext.none());
+          assertTrue(started.await(1, TimeUnit.SECONDS), "recorded scan must start");
+          assertThrows(
+              TimeoutException.class,
+              () -> scan.get(2_200, TimeUnit.MILLISECONDS),
+              "the producer must remain in preflight after one bounded lock attempt expires");
+          assertEquals(0, queue.queueDepth(), "lock contention must not admit queue work");
+          assertTrue(frames.isEmpty(), "lock contention must not emit traversal progress");
+
+          lock.release();
+          scan.get(3, TimeUnit.SECONDS);
+
+          assertEquals(1L, frames.stream().filter(ScanRootProgress::getComplete).count());
+          var admitted = queue.pollPending(10);
+          assertEquals(1, admitted.size(), "release must allow one clean admission");
+          assertEquals(file, admitted.getFirst().path());
+        } finally {
+          if (lock.isValid()) lock.release();
+        }
+      } finally {
+        executor.shutdownNow();
+        assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS), "scan executor must terminate");
+      }
+    }
+  }
+
+  @Test
+  void cancellationDuringMissingStatePreflightReturnsWithoutRestoringOrAdmitting() throws Exception {
+    Path file = Files.writeString(temp.resolve("entry.txt"), "source");
+    try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"))) {
+      queue.open();
+      long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
+      var service = service(queue, mock(IndexingLoop.class));
+      Path state = temp.resolve("index/state.json");
+      Path previous = temp.resolve("index/state.json.prev");
+      byte[] validState = Files.readAllBytes(state);
+      Files.copy(state, previous);
+      Files.delete(state);
+
+      AtomicBoolean cancelled = new AtomicBoolean();
+      CallContext context = cancellableContext(cancelled);
+      List<ScanRootProgress> frames = new CopyOnWriteArrayList<>();
+      CountDownLatch started = new CountDownLatch(1);
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+      try {
+        Future<?> scan = submitScan(executor, started, service, file, epoch, frames, context);
+        assertTrue(started.await(1, TimeUnit.SECONDS), "recorded scan must start");
+        assertThrows(
+            TimeoutException.class,
+            () -> scan.get(100, TimeUnit.MILLISECONDS),
+            "missing authoritative state must remain pending until publication or cancellation");
+        assertEquals(0, queue.queueDepth());
+        assertTrue(frames.isEmpty());
+
+        cancelled.set(true);
+        scan.get(1, TimeUnit.SECONDS);
+
+        assertEquals(0, queue.queueDepth(), "cancellation must not admit queue work");
+        assertTrue(frames.isEmpty(), "cancellation before traversal must not emit progress");
+        assertFalse(Files.exists(state), "preflight cancellation must not restore state.json");
+        assertArrayEquals(validState, Files.readAllBytes(previous));
+      } finally {
+        cancelled.set(true);
+        executor.shutdownNow();
+        assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS), "scan executor must terminate");
+      }
+    }
+  }
+
+  @Test
+  void cancellationDuringHeldGenerationLockReturnsWithoutAdmissionOrStateRewrite() throws Exception {
+    Path file = Files.writeString(temp.resolve("entry.txt"), "source");
+    try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"))) {
+      queue.open();
+      long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
+      var service = service(queue, mock(IndexingLoop.class));
+      Path state = temp.resolve("index/state.json");
+      byte[] validState = Files.readAllBytes(state);
+      AtomicBoolean cancelled = new AtomicBoolean();
+      CallContext context = cancellableContext(cancelled);
+      List<ScanRootProgress> frames = new CopyOnWriteArrayList<>();
+      CountDownLatch started = new CountDownLatch(1);
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+
+      try (FileChannel channel =
+          FileChannel.open(state, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+        FileLock lock = channel.lock();
+        try {
+          Future<?> scan = submitScan(executor, started, service, file, epoch, frames, context);
+          assertTrue(started.await(1, TimeUnit.SECONDS), "recorded scan must start");
+          assertThrows(
+              TimeoutException.class,
+              () -> scan.get(100, TimeUnit.MILLISECONDS),
+              "the scan must still be waiting on the held generation lock");
+          assertEquals(0, queue.queueDepth());
+          assertTrue(frames.isEmpty());
+
+          cancelled.set(true);
+          scan.get(3, TimeUnit.SECONDS);
+
+          assertEquals(0, queue.queueDepth(), "cancellation must not admit queue work");
+          assertTrue(frames.isEmpty(), "cancellation before traversal must not emit progress");
+        } finally {
+          if (lock.isValid()) lock.release();
+        }
+      } finally {
+        cancelled.set(true);
+        executor.shutdownNow();
+        assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS), "scan executor must terminate");
+      }
+
+      assertArrayEquals(
+          validState, Files.readAllBytes(state), "cancelled preflight must preserve state bytes");
+      assertFalse(
+          Files.exists(temp.resolve("index/state.json.prev")), "preflight must not rotate state");
+    }
+  }
+
+  @Test
+  void nonIdleGenerationRefusesImmediatelyBeforeRecordedTraversal() throws Exception {
+    Path file = Files.writeString(temp.resolve("entry.txt"), "source");
+    try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"))) {
+      queue.open();
+      long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
+      var service = service(queue, mock(IndexingLoop.class));
+      new IndexGenerationManager(temp.resolve("index"))
+          .updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING);
+      List<ScanRootProgress> frames = new ArrayList<>();
+
+      var failure = assertThrows(
+          WorkerServiceException.class,
+          () -> service.scanRecordedRoot(request(file, true, epoch), frames::add, CallContext.none()));
+
+      assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
+      assertEquals(
+          "Recorded ingestion requires the current idle serving generation", failure.getMessage());
+      assertEquals(0, queue.queueDepth());
+      assertTrue(frames.isEmpty(), "non-IDLE state must refuse before traversal");
+    }
+  }
+
+  private Future<?> submitScan(
+      ExecutorService executor,
+      CountDownLatch started,
+      WorkerIngestService service,
+      Path file,
+      long epoch,
+      List<ScanRootProgress> frames,
+      CallContext context) {
+    return executor.submit(
+        () -> {
+          started.countDown();
+          service.scanRecordedRoot(request(file, true, epoch), frames::add, context);
+        });
+  }
+
+  private static CallContext cancellableContext(AtomicBoolean cancelled) {
+    CallContext none = CallContext.none();
+    return new CallContext(
+        null, null, cancelled::get, none.engineContext(), none.provenance(), none.childLifetime());
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {2001, 4000})
   void generationSwitchAfterFirstBatchRefusesFinalOrFullNextBatch(int fileCount) throws Exception {
@@ -125,7 +365,7 @@ final class WorkerRecordedScanAdmissionTest {
       long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
       var service = service(queue, mock(IndexingLoop.class));
       List<ScanRootProgress> frames = new ArrayList<>();
-      var switched = new java.util.concurrent.atomic.AtomicBoolean();
+    var switched = new AtomicBoolean();
       var failure = assertThrows(WorkerServiceException.class, () -> service.scanRecordedRoot(
           request(root, false, epoch), frame -> {
             frames.add(frame);

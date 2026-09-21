@@ -58,6 +58,9 @@ final class CommittedContentHashTest {
       assertTrue(queue.pollPending(1).isEmpty());
       queue.markDoneTransitions(List.of(transition(old, HASH)), success());
       assertEquals(new Stored("PENDING", null), stored(db));
+      var obsoleteHistory = queue.recentIngestionEvents(10);
+      assertEquals(1, obsoleteHistory.size(), "the exact issued obsolete claim retains general history");
+      assertGeneralHistoryHasNoRecordedHash(db, 1);
       var current = queue.pollPending(1).getFirst();
       var forged = new JobQueue.IndexJob(
           current.path(), current.collection(), current.provenance(), current.scanId(),
@@ -65,11 +68,16 @@ final class CommittedContentHashTest {
       assertEquals(current, forged);
       queue.markDoneTransitions(List.of(transition(old, HASH), transition(forged, HASH)), success());
       assertEquals(new Stored("PROCESSING", null), stored(db));
-      assertTrue(queue.recentIngestionEvents(10).isEmpty());
+      assertEquals(obsoleteHistory, queue.recentIngestionEvents(10),
+          "replayed obsolete and equal-valued forged claims must not add history");
       queue.markDoneTransitions(List.of(transition(current, OTHER_HASH)), success());
+      var completedHistory = queue.recentIngestionEvents(10);
       queue.markDoneTransitions(List.of(transition(current, HASH)), success());
       assertEquals(new Stored("DONE", OTHER_HASH), stored(db));
-      assertEquals(1, queue.recentIngestionEvents(10).size());
+      assertEquals(2, completedHistory.size());
+      assertEquals(completedHistory, queue.recentIngestionEvents(10),
+          "a duplicate completion cannot add history or replace the committed hash");
+      assertGeneralHistoryHasNoRecordedHash(db, 2);
     }
   }
 
@@ -152,6 +160,20 @@ final class CommittedContentHashTest {
     try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
         var statement = connection.createStatement()) {
       statement.execute(sql);
+    }
+  }
+
+  private static void assertGeneralHistoryHasNoRecordedHash(Path db, int expected) throws Exception {
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement();
+        var rows = statement.executeQuery(
+            "SELECT operation_key, unit_revision, content_hash, terminal_coverage FROM ingestion_ledger")) {
+      int actual = 0;
+      while (rows.next()) {
+        actual++;
+        for (int column = 1; column <= 4; column++) assertNull(rows.getString(column));
+      }
+      assertEquals(expected, actual);
     }
   }
 }

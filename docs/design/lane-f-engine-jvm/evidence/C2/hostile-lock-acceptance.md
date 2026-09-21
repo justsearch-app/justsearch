@@ -213,6 +213,116 @@ release-success and1021ms bounded exhaustion. Full2100 dev-runner discovery pass
 11/11 test files. Logs are `tmp/2099-supervisor-readiness.txt` and
 `tmp/2100-dev-runner-suite.txt`. Corrected hosted Windows proof is still required.
 
+## Accepted initial preflight: bounded owner, no false enumeration failure
+
+The helper-startup correction is pushed as7b2c31555. The next selected correction
+keeps the initial recorded-generation preflight inside the existing admitted Engine
+root-walk producer and its LONG_RUNNING cancellation alarm. Retry only a strict read's
+typed FileReadContendedException or NoSuchFileException, before scanRoot starts.
+The latter is a real interval in writeState's current→prev→completed-temp sequence.
+Every retry rereads current state; neither cache nor backup supplies authority.
+The lock helper already waits up to2seconds; missing-file observations wait10ms to
+avoid a busy loop. No timer, coordinator state machine or durable marker is added.
+
+The alternatives were an Engine-scheduled retry contract and coordinator wakeups;
+those require new pre-effect result/lifetime state because maintain is event-driven.
+The existing producer already owns cancellation, deadline and actual walker/delivery
+exit, so it is the smaller correct owner. A permanently missing/contended pointer
+remains unavailable until that existing cancellation/deadline, then returns through
+the Engine's ordinary CANCELLED terminal. This is not successful enumeration and
+cannot admit a path. Already-cancelled entry preserves its existing refusal. Missing
+state still fails immediately in standalone strict capture; malformed bytes, non-IDLE
+state and changed generation are never retried. Post-start batch validation and
+enumeration failure behavior remain unchanged; no completed batch is re-executed.
+
+Root owns WorkerIngestService implementation. Bounded worker tests cover real missing
+and locked files, unchanged refusal cases and cancellation; separate Engine tests
+must exercise the real service path and actual-exit/cancellation composition. Required
+proof is pending. SQLite acceptance ambiguity and the bulk/later-stage work remain.
+
+Independent review found an additional deadline-before-service-entry race: the
+service's existing CANCELLED exception bypassed Engine's ordinary deadline terminal
+and the coordinator saw FAILED because its separate child token was not cancelled.
+Engine now catches only recorded-call CANCELLED when its own deadline has expired,
+then retains normal actual-exit, frame-drain and delivery-error handling before
+projecting CANCELLED. A real-service test holds entry until that deadline expires.
+
+Focused2102 executes40 cases in4 suites:38 pass, two new Engine deadline fixtures
+fail because they supplied the base timeout without accounting for LONG_RUNNING's
+multiplier. Production compile/main PMD and format pass; test PMD reports six local
+qualifier/unused-lock violations. Original output, XML and counts are preserved at
+`tmp/2102-recorded-preflight*`; fixture inputs and style are being corrected without
+weakening assertions. No installed proof of this batch has run yet.
+
+The hostile-lock acceptance fixture now requires the original durable operation's
+SUCCESS with zero failed units and all100 expected paths searchable, not merely one
+hit. It submits exactly once. An actual socket loss permits only read-only resolution
+of that supplied key after a counted owned exit; unknown/expired/failed outcomes
+cannot pass. The original attack intensity and180second bound remain; healthy Engine
+runs retain the intruder, and only the previously permitted counted exit releases it.
+The qualifying successor must have a higher incarnation. Deterministic fixture tests
+and installed proof remain pending; these stronger assertions may expose further
+product defects rather than discharge the unresolved SQLite ambiguity by assumption.
+
+Corrected2103 passes40 cases/4 suites, zero failures/errors/skips, affected PMD and
+format; indexer-worker23 reuses matching2102 results, Engine17 executes. Negative2104
+backs out the initial wait and Engine deadline catch: all three selected new tests
+fail for their intended reason (missing/current-lock refuses instead of waiting,
+deadline-before-entry completes exceptionally instead of CANCELLED). Six auxiliary
+cases pass. Both production files are restored byte-for-byte in a finally block;
+output/XML/counts and source backups are retained under `tmp/2104-*`.
+
+Node2106 passes all8 hostile-fixture tests, including explicit500/no replay,
+socket-loss/exact-key successor resolution, UNKNOWN/FAILED refusal, stale-exit
+non-release and99-of100 rejection. Review withdraws a proposed completedUnits=100
+check: SqliteIngestionWalkOps counts only novel INDEXED path/content pairs, so
+watcher-first unchanged skips correctly yield fewer completed units. Parent SUCCESS
+requires all frozen roots' sealed and acknowledged children; exact100 searchable
+paths supplies the corpus-effect proof without mislabeling that counter.
+
+Hosted2105 at7b2c31555 (CI35557544658) passes Windows-native, including the helper
+startup correction. Search-worker fails CommittedContentHashTest's stale/equal-valued
+claim assertion at68 on all three attempts. Integration job reports SUCCESS but
+its test log reports100 cases, one lock-ingest failure,42 skips; it is not green
+integration proof. The failed fixture returns explicitHTTP500 OPERATION_STORAGE_FAILED,
+so no socket-loss recovery may hide it. Artifacts/logs are `tmp/2105-*`; the exact
+failed fixture suffix is a2528441-d20a-4f56-b043-a1c1c08a29df. Read-only source/numeric
+SQLite triage is active. Restored focused tests plus the13 installed cases are now
+running as2107 with the strengthened fixture. No result is claimed yet.
+
+Final2107 finishes in5m48s:53 cases/6 suites, zero failures/errors/skips. The13
+installed cases execute; the40 unchanged focused cases reuse matching cache results.
+Both original lock attacks pass with100 exact paths, original-key COMPLETE/SUCCESS,
+zero failures, one counted exit and a higher successor. Each reports one completed
+unit because automatic ingestion already handled other members; this confirms the
+counter distinction above. All13 owned stops report portsClosed=true and final health
+is ABSENT with no foreign run/orphan. Exact fixture manifests are
+`tmp/2107-installed-preflight-installed-artifacts.json` (eight) and
+`tmp/2107-installed-preflight-supervised-artifacts.json` (five, including both proofs).
+
+The hosted hash test's intent remains unchanged: stale, forged and duplicate claims
+cannot publish or replace a job hash. Its old zero/one history assertions predated
+77a's preservation of an exact issued obsolete claim's general effect. Updated checks
+compare unchanged histories across forged/duplicate callbacks, retain every job-hash
+assertion and verify operation/unit/hash/coverage are null in those general events.
+Full indexer-worker2109 passes670 cases/102 suites with15 qualified skips:12 unavailable
+ONNX embedding-model checks and three filesystem/privilege checks. No test result
+is reused; affected test PMD and format pass. Skips are retained in
+`tmp/2109-indexer-ledger-skips.json`. Final Node2110 passes9 cases, preserving the
+original HTTP200 success:false refusal case as well as new HTTP500/no-replay proof.
+Canonical index/skill/link regeneration checks pass; no shared skill content changes.
+
+Independent SQLite reproduction distinguishes two real failure classes using a copy
+of the hosted database and sqlite-jdbc3.51.2.0 on Windows. Shared SHM locking yields
+SQLITE_BUSY(5) at acceptance's first prune DELETE, with a successful rollback and
+zero operations/one retained preparation. Exclusive WAL locking can instead fail at
+commit with IOERR_WRITE(778), followed by rollback reporting no active transaction.
+The archived HTTP500 has no retained SQL exception, so neither phase is attributed
+to that historical request. A generic retry is rejected; any next correction must
+preserve phase and proven rollback/commit outcomes. Diagnostic evidence is being
+retained under `tmp/2111-sqlite-acceptance-probe/`. This remains open after this
+preflight checkpoint, together with final full-stress/hosted proof and bulk/later stages.
+
 Root owns production lifecycle/state changes and the single build/stack. Bounded
 tests/review may be delegated once contracts are fixed. Run focused deterministic
 regressions, preserve the original red evidence, then the installed five-case
