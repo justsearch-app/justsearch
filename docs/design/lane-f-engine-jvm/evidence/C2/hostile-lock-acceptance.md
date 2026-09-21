@@ -198,6 +198,21 @@ is retained under `tmp/2096-*`; bounded source triage is active. This checkpoint
 does not close prolonged post-accept preflight classification or SQLite acceptance
 ambiguity, nor C2 bulk work, final full-stress/hosted proof or D1/D2/E/F.
 
+The reviewed authority/replay batch is committed and pushed as77a2693e8.
+Hosted Windows triage identifies the exact failure at the PowerShell helper's
+first readiness line, before either publication assertion. Listener registration
+is synchronous, helper failure has a different branch, and clean cleanup about
+three seconds after the ten-second bound establishes slow cold startup. A prior
+hosted failure has the same symptom. Only the fixture startup allowance increases
+to30seconds, with elapsed/PID/stderr diagnostics; the product's one-second rename
+deadline and the five-second publication watchdog remain unchanged. No new generic
+readiness abstraction or product retry policy is introduced.
+
+Direct2099 passes both actual Windows reader handles, EPERM under the held handle,
+release-success and1021ms bounded exhaustion. Full2100 dev-runner discovery passes
+11/11 test files. Logs are `tmp/2099-supervisor-readiness.txt` and
+`tmp/2100-dev-runner-suite.txt`. Corrected hosted Windows proof is still required.
+
 Root owns production lifecycle/state changes and the single build/stack. Bounded
 tests/review may be delegated once contracts are fixed. Run focused deterministic
 regressions, preserve the original red evidence, then the installed five-case

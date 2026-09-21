@@ -112,6 +112,10 @@ async function testOverlappingStatePublicationsStayInTransitionOrder() {
 }
 
 async function withWindowsReadHandle(filePath, body) {
+  // Cold hosted PowerShell startup has exceeded ten seconds before this helper opens the file.
+  // This is only fixture readiness; the product's one-second rename bound stays unchanged.
+  const startupBudgetMs = 30_000;
+  const startupStarted = performance.now();
   const script = `
 $ErrorActionPreference = 'Stop'
 $reader = [IO.File]::Open($env:JUSTSEARCH_TEST_READ_HANDLE, [IO.FileMode]::Open,
@@ -141,8 +145,14 @@ try {
     assert.equal(result.code, 0, `read-handle helper failed: ${stderr || result.error || result.signal}`);
   };
   try {
+    const readiness = once(lines, 'line', { signal: AbortSignal.timeout(startupBudgetMs) })
+      .catch(error => {
+        if (error.name !== 'AbortError') throw error;
+        throw new Error(`read-handle helper was not ready after ${Math.round(performance.now() - startupStarted)}ms`
+          + ` (budget=${startupBudgetMs}ms, pid=${child.pid}, stderr=${stderr || '<empty>'})`, { cause: error });
+      });
     const [line] = await Promise.race([
-      once(lines, 'line', { signal: AbortSignal.timeout(10_000) }),
+      readiness,
       exited.then(result => { throw new Error(`reader exited before holding: ${stderr || JSON.stringify(result)}`); }),
     ]);
     assert.equal(line, 'held');
