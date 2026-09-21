@@ -120,7 +120,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public WalkProgress beginRecordedWalk(String operationKey, String planHash, boolean createIfMissing) {
-    return accessRecordedWalk(() -> SqliteIngestionWalkOps.begin(connection, operationKey, planHash, createIfMissing), true);
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.begin(connection, operationKey, planHash, createIfMissing, false), true);
+  }
+
+  @Override
+  public WalkProgress beginCapturedWalk(String operationKey, String planHash, boolean createIfMissing) {
+    return accessRecordedWalk(() -> SqliteIngestionWalkOps.begin(connection, operationKey, planHash, createIfMissing, true), true);
+  }
+
+  @Override
+  public java.util.Optional<CapturedWalkSettlement> capturedWalkSettlement(String operationKey) {
+    return accessRecordedWalk(() -> SqliteCapturedWalkOps.settlement(connection, operationKey), false);
   }
 
   @Override
@@ -713,7 +723,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // there, the re-enqueue re-stats the file, so its silence really does mean unknown.
       String sql = """
           INSERT OR REPLACE INTO jobs
-            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch)
+            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256)
           VALUES (
             ?, 'PENDING', 0, ?,
             COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
@@ -721,7 +731,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             ?,
             COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
             COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-            lower(hex(randomblob(16))), ?)
+            lower(hex(randomblob(16))), ?, ?)
           """;
 
       long now = System.currentTimeMillis();
@@ -757,6 +767,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             stmt.setString(10, normalizedPath);
             if (membership.epoch() == null) stmt.setNull(11, java.sql.Types.BIGINT);
             else stmt.setLong(11, membership.epoch());
+            stmt.setString(12, membership.plannedSourceSha256());
             stmt.executeUpdate();
             if (membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
             accepted++;
@@ -816,13 +827,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 """
                 INSERT OR REPLACE INTO jobs
                   (path, state, attempts, last_updated, collection, size_bytes, scan_id,
-                   originator, transport, unit_revision, walk_seen_epoch)
+                   originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256)
                 VALUES (?, 'PENDING', 0, ?,
                   (SELECT prior.collection FROM jobs prior WHERE prior.path = ?), ?,
                   ?,
                   COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
                   COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-                  lower(hex(randomblob(16))), ?)
+                  lower(hex(randomblob(16))), ?, ?)
                 """;
             int accepted;
             try (PreparedStatement write = connection.prepareStatement(sql)) {
@@ -840,6 +851,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               write.setString(8, entry.provenance() == null ? null : entry.provenance().transport());
               write.setString(9, normalizedPath);
               setNullableLong(write, 10, membership.epoch());
+              write.setString(11, membership.plannedSourceSha256());
               accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
             if (accepted > 0 && membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -872,7 +884,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // Local carrier for a candidate row selected before any mutation happens.
       record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance,
-        String scanId, String unitRevision, Long walkEpoch, RecordedClaimDecision decision) {}
+        String scanId, String unitRevision, Long walkEpoch, RecordedClaimDecision decision, String plannedHash) {}
 
       // Claim is atomic via an explicit transaction (BEGIN/COMMIT through the existing
       // inTransaction() helper), not a single UPDATE...RETURNING statement: SQLite's RETURNING
@@ -891,11 +903,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           inTransaction(
               () -> {
                 String selectSql = """
-                    SELECT path, collection, originator, transport, scan_id, unit_revision, walk_seen_epoch FROM jobs
+                    SELECT path, collection, originator, transport, scan_id, unit_revision, walk_seen_epoch, planned_source_sha256 FROM jobs
                     WHERE state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?)
                       AND (walk_seen_epoch IS NULL OR EXISTS (
                         SELECT 1 FROM ingestion_walk_progress p WHERE p.operation_key = jobs.scan_id
-                        AND p.sealed_at IS NULL AND (p.enumeration_outcome IS NULL OR p.enumeration_outcome = 'COMPLETE')))
+                        AND p.sealed_at IS NULL AND (p.enumeration_outcome IS NULL OR p.enumeration_outcome = 'COMPLETE')
+                        AND (p.captured_plan = 0 OR (p.enumeration_outcome = 'COMPLETE' AND p.manifest_sha256 IS NOT NULL))))
                     ORDER BY last_updated ASC, path ASC
                     """;
 
@@ -909,14 +922,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                       if (activeClaims.containsKey(rs.getString(1))) continue;
                       long epochValue = rs.getLong(7);
                       Long walkEpoch = rs.wasNull() ? null : epochValue;
-                      var decision = recordedClaimDecision(rs.getString(5), walkEpoch);
+                      var decision = recordedClaimDecision(rs.getString(5), walkEpoch, rs.getString(8));
                       if (decision == RecordedClaimDecision.DENY) continue;
                       String originator = rs.getString(3);
                       String transport = rs.getString(4);
                       claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
                           originator == null && transport == null ? null
                               : new JobQueue.EnqueueProvenance(originator, transport),
-                          rs.getString(5), rs.getString(6), walkEpoch, decision));
+                          rs.getString(5), rs.getString(6), walkEpoch, decision, rs.getString(8)));
                     }
                   }
                 }
@@ -954,7 +967,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 List<IndexJob> claimed = new ArrayList<>(claimedRows.size());
                 for (ClaimedRow row : claimedRows) {
                   claimed.add(new IndexJob(Path.of(row.path()), row.collection(), row.provenance(),
-                      row.scanId(), row.unitRevision(), row.walkEpoch(), row.decision() == RecordedClaimDecision.ALLOW_FORCE));
+                      row.scanId(), row.unitRevision(), row.walkEpoch(), row.decision() == RecordedClaimDecision.ALLOW_FORCE,
+                      row.plannedHash()));
                 }
                 return claimed;
               });
@@ -1770,10 +1784,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           path_hash, collection, outcome_class, reason_code, retry_policy,
           diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
           source_kind, artifact_status, policy_id, parser_id, originator, transport,
-          operation_key, unit_revision, content_hash, terminal_coverage
+          operation_key, unit_revision, content_hash, terminal_coverage, planned_source_sha256
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           CASE WHEN ? THEN ? ELSE (SELECT originator FROM jobs WHERE path = ?) END,
-          CASE WHEN ? THEN ? ELSE (SELECT transport FROM jobs WHERE path = ?) END, ?, ?, ?, ?)
+          CASE WHEN ? THEN ? ELSE (SELECT transport FROM jobs WHERE path = ?) END, ?, ?, ?, ?, ?)
         """;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       JobQueue.IngestionLedgerEntry normalizedEntry = normalizeLedgerEntry(normalizedPath, entry);
@@ -1803,6 +1817,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       stmt.setString(21, receipt == null ? null : receipt.unitRevision());
       stmt.setString(22, receipt == null ? null : receipt.contentHash());
       stmt.setString(23, receipt == null || receipt.coverage() == null ? null : receipt.coverage().name());
+      stmt.setString(24, receipt == null ? null : receipt.plannedSourceSha256());
       executeMutation(stmt::executeUpdate);
     }
   }
@@ -1919,12 +1934,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   /** The same under-lock boundary governs fresh claims and interrupted claim recovery. */
-  private RecordedClaimDecision recordedClaimDecision(String operationKey, Long walkEpoch) {
+  private RecordedClaimDecision recordedClaimDecision(String operationKey, Long walkEpoch, String plannedHash) {
     if (walkEpoch == null) return RecordedClaimDecision.ALLOW;
     if (operationKey == null || operationKey.isBlank()) return RecordedClaimDecision.DENY;
     try {
+      var progress = SqliteIngestionWalkOps.find(connection, operationKey)
+          .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded claim projection is unavailable"));
+      if (progress.sealedAt() != null) return RecordedClaimDecision.DENY;
+      if (progress.capturedPlan() && (progress.enumerationOutcome() != WalkEnumerationOutcome.COMPLETE
+          || !IngestionLedgerTransition.isSha256(plannedHash))) return RecordedClaimDecision.DENY;
+      if (!progress.capturedPlan() && plannedHash != null) return RecordedClaimDecision.DENY;
       return Objects.requireNonNull(recordedClaimPolicy.apply(operationKey), "recorded claim decision");
-    } catch (RuntimeException unavailableAuthority) {
+    } catch (SQLException | RuntimeException unavailableAuthority) {
       log.warn("Recorded claim authority unavailable; keeping the unit fenced", unavailableAuthority);
       return RecordedClaimDecision.DENY;
     }
@@ -1935,10 +1956,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
       int count = inTransaction(() -> {
-        record UnownedRow(String path, String scanId, Long walkEpoch) {}
+        record UnownedRow(String path, String scanId, Long walkEpoch, String plannedHash) {}
         List<UnownedRow> unowned = new ArrayList<>();
         try (var query = connection.prepareStatement(
-            "SELECT path, scan_id, walk_seen_epoch FROM jobs WHERE state = 'PROCESSING' AND (? IS NULL OR last_updated < ?)")) {
+            "SELECT path, scan_id, walk_seen_epoch, planned_source_sha256 FROM jobs WHERE state = 'PROCESSING' AND (? IS NULL OR last_updated < ?)")) {
           if (cutoff == null) {
             query.setNull(1, java.sql.Types.BIGINT);
             query.setNull(2, java.sql.Types.BIGINT);
@@ -1952,7 +1973,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               if (activeClaims.containsKey(path)) continue;
               long epoch = rows.getLong(3);
               Long walkEpoch = rows.wasNull() ? null : epoch;
-              unowned.add(new UnownedRow(path, rows.getString(2), walkEpoch));
+              unowned.add(new UnownedRow(path, rows.getString(2), walkEpoch, rows.getString(4)));
             }
           }
         }
@@ -1968,7 +1989,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               recovered += skipRecordedMember(path, IngestionOutcomeClass.SKIPPED_POLICY, "ENUMERATION_STOPPED");
               continue;
             }
-            if (recordedClaimDecision(row.scanId(), row.walkEpoch()) == RecordedClaimDecision.DENY) continue;
+            if (recordedClaimDecision(row.scanId(), row.walkEpoch(), row.plannedHash()) == RecordedClaimDecision.DENY) continue;
             update.setLong(1, now);
             update.setString(2, path);
             recovered += executeMutation(update::executeUpdate);
@@ -2117,6 +2138,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         int deleted = inTransaction(() -> {
           validateRetentionCandidates("SELECT DISTINCT operation_key FROM ingestion_ledger WHERE "
               + "operation_key IS NOT NULL AND " + ledgerWhere, cutoff);
+          try (var selection = connection.prepareStatement("DELETE FROM ingestion_walk_sealed_units WHERE ledger_id IN "
+              + "(SELECT id FROM ingestion_ledger WHERE " + ledgerWhere + ")")) {
+            selection.setLong(1, cutoff);
+            selection.executeUpdate();
+          }
           int count = stmt.executeUpdate();
           pruneAcknowledgedWalks(cutoff);
           return count;

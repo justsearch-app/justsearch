@@ -70,7 +70,7 @@ final class RecordedWalkProjectionTest {
     assertEquals(0, scalar(db, "SELECT count(*) FROM pragma_table_info('jobs') WHERE name='walk_seen_epoch'"));
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
-      assertEquals(18, scalar(db, "PRAGMA user_version"));
+      assertEquals(19, scalar(db, "PRAGMA user_version"));
       assertTrue(queue.recordedWalk(KEY).isEmpty(), "migration must not invent operation acceptance");
       assertEquals(1, scalar(db, "SELECT count(*) FROM jobs WHERE state='PROCESSING' AND attempts=2 "
           + "AND last_updated=123 AND scan_id='legacy-scan' AND unit_revision='11111111111111111111111111111111'"));

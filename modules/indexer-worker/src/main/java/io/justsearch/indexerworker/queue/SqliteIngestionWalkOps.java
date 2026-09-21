@@ -40,7 +40,7 @@ final class SqliteIngestionWalkOps {
     if (sealed.sealedAt() == null) return Optional.empty();
     // Reuse the schema owner rather than cache a second receipt representation.
     long currentFailed = validateSealedReceipt(sealed);
-    return Optional.of(new JobQueue.SealedWalkReceipt(1, sealed.revision(),
+    return Optional.of(new JobQueue.SealedWalkReceipt(sealed.manifestSha256() != null ? 2 : 1, sealed.revision(),
         exactUtf8Hash.apply(sealed.receiptJson()), sealed.completedUnits(), sealed.failedUnits(),
         currentFailed, sealed.enumerationOutcome()));
   }
@@ -58,10 +58,12 @@ final class SqliteIngestionWalkOps {
     } catch (tools.jackson.core.JacksonException malformed) {
       throw new JobQueue.RecordedWalkGapException("Recorded receipt JSON is invalid", malformed);
     }
-    if (!(decoded instanceof java.util.Map<?, ?> receipt) || !receipt.keySet().equals(RECEIPT_FIELDS)) {
+    var fields = new java.util.HashSet<>(RECEIPT_FIELDS);
+    if (progress.manifestSha256() != null) fields.addAll(SqliteCapturedWalkOps.RECEIPT_FIELDS);
+    if (!(decoded instanceof java.util.Map<?, ?> receipt) || !receipt.keySet().equals(fields)) {
       throw new JobQueue.RecordedWalkGapException("Recorded receipt fields are invalid");
     }
-    if (receiptLong(receipt, "version") != 1 || receiptLong(receipt, "revision") != progress.revision()
+    if (receiptLong(receipt, "version") != (progress.manifestSha256() != null ? 2 : 1) || receiptLong(receipt, "revision") != progress.revision()
         || receiptLong(receipt, "completedUnits") != progress.completedUnits()
         || receiptLong(receipt, "failedUnits") != progress.failedUnits()
         || !progress.enumerationOutcome().name().equals(receipt.get("enumerationOutcome"))) {
@@ -83,6 +85,7 @@ final class SqliteIngestionWalkOps {
       }
       previous = hash;
     }
+    if (progress.manifestSha256() != null) SqliteCapturedWalkOps.validateReceipt(progress, receipt);
     return currentFailed;
   }
 
@@ -95,20 +98,22 @@ final class SqliteIngestionWalkOps {
   }
 
   static JobQueue.WalkProgress begin(Connection connection, String key, String planHash,
-      boolean createIfMissing) throws SQLException {
+      boolean createIfMissing, boolean capturedPlan) throws SQLException {
     // Validate the value before writing; acceptance/key authority remains the outer operations owner.
-    var initial = new JobQueue.WalkProgress(key, planHash, 1, null, null, 0, 0, 1, null, null, 0);
+    var initial = new JobQueue.WalkProgress(key, planHash, 1, null, null, 0, 0, 1, null, null, 0,
+        capturedPlan, null, null);
     var existing = find(connection, key);
     if (existing.isEmpty()) {
       if (!createIfMissing) throw new IllegalStateException("Recorded walk state is unavailable");
       try (var insert = connection.prepareStatement("INSERT INTO ingestion_walk_progress "
-          + "(operation_key, plan_hash, enumeration_epoch) VALUES (?, ?, 1)")) {
-        insert.setString(1, key); insert.setString(2, planHash);
+          + "(operation_key, plan_hash, enumeration_epoch, captured_plan) VALUES (?, ?, 1, ?)")) {
+        insert.setString(1, key); insert.setString(2, planHash); insert.setBoolean(3, capturedPlan);
         if (insert.executeUpdate() != 1) throw new SQLException("Walk projection was not created");
       }
       return initial;
     }
     var progress = existing.get();
+    if (progress.capturedPlan() != capturedPlan) throw new IllegalArgumentException("Recorded walk mode changed");
     if (!progress.planHash().equals(planHash)) throw new IllegalArgumentException("Recorded walk plan changed");
     if (progress.enumerationClosedAt() != null) return progress;
     requireAdvance(progress);
@@ -135,6 +140,9 @@ final class SqliteIngestionWalkOps {
     String declaredCollection = collection == null || collection.isBlank() ? null : collection;
     for (var entry : entries) {
       Objects.requireNonNull(entry, "entry");
+      if (progress.capturedPlan() != (entry.plannedSourceSha256() != null)) {
+        throw new IllegalArgumentException("Source identity must match the recorded walk mode");
+      }
       String path = io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
           Objects.requireNonNull(entry.path(), "entry.path").toAbsolutePath().toString());
       if (!seen.add(path)) continue;
@@ -170,8 +178,8 @@ final class SqliteIngestionWalkOps {
       try (var insert = connection.prepareStatement("""
           INSERT OR REPLACE INTO jobs
             (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator,
-             transport, unit_revision, walk_seen_epoch)
-          VALUES (?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?)
+             transport, unit_revision, walk_seen_epoch, planned_source_sha256)
+          VALUES (?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?, ?)
           """)) {
         insert.setString(1, path); insert.setLong(2, now);
         insert.setString(3, declaredCollection != null ? declaredCollection : priorCollection);
@@ -180,7 +188,7 @@ final class SqliteIngestionWalkOps {
         insert.setString(5, key);
         insert.setString(6, entry.provenance() == null ? null : entry.provenance().originator());
         insert.setString(7, entry.provenance() == null ? null : entry.provenance().transport());
-        insert.setLong(8, epoch);
+        insert.setLong(8, epoch); insert.setString(9, entry.plannedSourceSha256());
         if (insert.executeUpdate() != 1) throw new SQLException("Recorded admission was not written");
         changed = true;
       }
@@ -206,6 +214,9 @@ final class SqliteIngestionWalkOps {
       return progress;
     }
     requireAdvance(progress);
+    if (progress.capturedPlan() && outcome == JobQueue.WalkEnumerationOutcome.COMPLETE) {
+      SqliteCapturedWalkOps.captureManifest(connection, key);
+    }
     try (var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET "
         + "enumeration_closed_at = ?, enumeration_outcome = ?, revision = revision + 1 WHERE operation_key = ?")) {
       update.setLong(1, now); update.setString(2, outcome.name()); update.setString(3, key);
@@ -261,12 +272,15 @@ final class SqliteIngestionWalkOps {
     long revision = progress.revision() + 1;
     failed.sort(String::compareTo);
     var receipt = new java.util.LinkedHashMap<String, Object>();
-    receipt.put("version", 1); receipt.put("revision", revision);
+    receipt.put("version", progress.manifestSha256() != null ? 2 : 1); receipt.put("revision", revision);
     receipt.put("completedUnits", progress.completedUnits()); receipt.put("failedUnits", progress.failedUnits());
     receipt.put("currentFailedUnits", failed.size()); receipt.put("currentSkippedUnits", skipped);
     receipt.put("enumerationOutcome", progress.enumerationOutcome().name());
     receipt.put("failedPathHashes", java.util.List.copyOf(failed.subList(0, Math.min(100, failed.size()))));
     receipt.put("failedPathHashesTruncated", failed.size() > 100);
+    if (progress.manifestSha256() != null) {
+      SqliteCapturedWalkOps.seal(connection, progress, revision, pathHash, receipt);
+    }
     try (var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET "
         + "sealed_at = ?, receipt_json = ?, revision = ? WHERE operation_key = ? AND sealed_at IS NULL")) {
       update.setLong(1, now); update.setString(2, JSON.writeValueAsString(receipt));
@@ -280,6 +294,7 @@ final class SqliteIngestionWalkOps {
     var existing = find(connection, key);
     if (existing.isEmpty() || existing.get().sealedAt() == null || existing.get().revision() != revision) return false;
     if (existing.get().acknowledgedRevision() == revision) return true;
+    if (existing.get().manifestSha256() != null) SqliteCapturedWalkOps.settlement(connection, key);
     try (var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET acknowledged_revision = ? "
         + "WHERE operation_key = ? AND sealed_at IS NOT NULL AND revision = ?")) {
       update.setLong(1, revision); update.setString(2, key); update.setLong(3, revision);
@@ -287,19 +302,21 @@ final class SqliteIngestionWalkOps {
     }
   }
 
-  record Membership(String key, Long epoch) {}
+  record Membership(String key, Long epoch, String plannedSourceSha256) {}
 
   /** Maintenance can replace an existing member, but cannot silently add another walk member. */
   static Membership maintenanceMembership(Connection connection, String path, String requestedKey)
       throws SQLException {
     String priorKey = null;
     Long epoch = null;
-    try (var query = connection.prepareStatement("SELECT scan_id, walk_seen_epoch FROM jobs WHERE path = ?")) {
+    String plannedHash = null;
+    try (var query = connection.prepareStatement("SELECT scan_id, walk_seen_epoch, planned_source_sha256 FROM jobs WHERE path = ?")) {
       query.setString(1, path);
       try (var row = query.executeQuery()) {
         if (row.next()) {
           priorKey = row.getString(1);
           long value = row.getLong(2); epoch = row.wasNull() ? null : value;
+          plannedHash = row.getString(3);
         }
       }
     }
@@ -311,7 +328,7 @@ final class SqliteIngestionWalkOps {
             || progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.CANCELLED) {
           throw new SQLException("Stopped recorded walk awaits issued owners before maintenance admission");
         }
-        return new Membership(priorKey, epoch);
+        return new Membership(priorKey, epoch, plannedHash);
       }
       // Post-seal maintenance is outside that immutable finite walk.
       if (Objects.equals(requestedKey, priorKey)) requestedKey = null;
@@ -321,7 +338,7 @@ final class SqliteIngestionWalkOps {
     if (selected != null && find(connection, selected).isPresent()) {
       throw new SQLException("Recorded membership requires explicit enumeration admission");
     }
-    return new Membership(selected, null);
+    return new Membership(selected, null, null);
   }
 
   static void noteMutation(Connection connection, String key) throws SQLException {
@@ -340,7 +357,12 @@ final class SqliteIngestionWalkOps {
   enum Coverage { INDEXED, FAILED, SKIPPED }
 
   /** Metadata for the existing ledger row, supplied only within its queue-owned transaction. */
-  record UnitReceipt(String operationKey, String unitRevision, Coverage coverage, String contentHash) {}
+  record UnitReceipt(String operationKey, String unitRevision, Coverage coverage, String contentHash,
+      String plannedSourceSha256) {
+    UnitReceipt(String operationKey, String unitRevision, Coverage coverage, String contentHash) {
+      this(operationKey, unitRevision, coverage, contentHash, null);
+    }
+  }
 
   static UnitReceipt claimReceipt(Connection connection, JobQueue.IndexJob claim,
       Coverage coverage, String hash) throws SQLException {
@@ -348,13 +370,13 @@ final class SqliteIngestionWalkOps {
     var progress = find(connection, claim.scanId())
         .orElseThrow(() -> new SQLException("Recorded unit state is unavailable"));
     if (progress.sealedAt() != null) throw new SQLException("Issued unit cannot change a sealed receipt");
-    return new UnitReceipt(claim.scanId(), claim.unitRevision(), coverage, hash);
+    return new UnitReceipt(claim.scanId(), claim.unitRevision(), coverage, hash, claim.plannedSourceSha256());
   }
 
   static UnitReceipt currentReceipt(Connection connection, String path, Coverage coverage)
       throws SQLException {
     try (var query = connection.prepareStatement(
-        "SELECT scan_id, unit_revision, walk_seen_epoch FROM jobs WHERE path = ?")) {
+        "SELECT scan_id, unit_revision, walk_seen_epoch, planned_source_sha256 FROM jobs WHERE path = ?")) {
       query.setString(1, path);
       try (var row = query.executeQuery()) {
         if (!row.next()) return null;
@@ -365,7 +387,7 @@ final class SqliteIngestionWalkOps {
             .orElseThrow(() -> new SQLException("Recorded unit state is unavailable"));
         // Retained terminal jobs may outlive their immutable sealed receipt.
         return progress.sealedAt() == null
-            ? new UnitReceipt(key, row.getString(2), coverage, null) : null;
+            ? new UnitReceipt(key, row.getString(2), coverage, null, row.getString(4)) : null;
       }
     }
   }
@@ -456,12 +478,19 @@ final class SqliteIngestionWalkOps {
           requiredLong(row, "enumeration_epoch"), nullableLong(row, "enumeration_closed_at"),
           outcome == null ? null : JobQueue.WalkEnumerationOutcome.valueOf(outcome),
           requiredLong(row, "completed_units"), requiredLong(row, "failed_units"), requiredLong(row, "revision"),
-          nullableLong(row, "sealed_at"), row.getString("receipt_json"), requiredLong(row, "acknowledged_revision"));
+          nullableLong(row, "sealed_at"), row.getString("receipt_json"), requiredLong(row, "acknowledged_revision"),
+          capturedMode(row), row.getString("manifest_sha256"), nullableLong(row, "planned_units"));
     } catch (IllegalArgumentException | NullPointerException invalid) {
       throw new JobQueue.RecordedWalkGapException("Recorded walk row is invalid", invalid);
     }
     if (progress.sealedAt() != null) validateSealedReceipt(progress);
     return progress;
+  }
+
+  private static boolean capturedMode(ResultSet row) throws SQLException {
+    long mode = requiredLong(row, "captured_plan");
+    if (mode != 0 && mode != 1) throw new JobQueue.RecordedWalkGapException("Recorded capture mode is invalid");
+    return mode == 1;
   }
 
   private static long requiredLong(ResultSet row, String column) throws SQLException {

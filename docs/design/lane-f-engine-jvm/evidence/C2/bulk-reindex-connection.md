@@ -208,3 +208,78 @@ restart. Candidate reuse is another recorded walk requiring that same property;
 do not broaden ordinary streaming walks without need. Retire the selection table
 if the queue later preserves exact unit identity through outer terminal ACK without
 blocking newer work. No implementation or execution proof is claimed by this design.
+
+## Queue implementation in progress (2026-09-21, after85154fed1)
+
+Root owns the first sequence item. Schema19 extends the existing jobs/ledger rows
+with planned_source_sha256 and progress with captured_plan/manifest_sha256/planned_units.
+The queue denies captured claims until COMPLETE enumeration, retaining first H1
+across interrupted epochs and maintenance admissions. COMPLETE hashes canonical
+ordered path-hash/H1 pairs; the manifest includes earlier-epoch disappeared members,
+which close as explicit gaps. Failed/cancelled capture never receives a completed
+manifest and uses the ordinary version1 refusal receipt. Empty COMPLETE is valid.
+
+SqliteCapturedWalkOps is a projection helper under the existing queue connection,
+lock and transaction, not a writer owner or second journal. Its selected ledger IDs
+are installed in the seal transaction. Version2 receipts bind exact selected members,
+full terminal history, manifest, gap count and uncapped failed/superseded event counts.
+Readback uses ledger references rather than live paths, rehashes selection/history
+and refuses inconsistent evidence. Full current gaps are returned with a deterministic
+200-entry failed/superseded history sample. Exact ACK validates retained settlement
+before permitting normal age cleanup to delete selection references with ledger rows.
+
+Migration19 retains streaming receipts as version1; the privacy-repair copy also
+preserves H1 and ledger IDs. Tests are being added for actual upgrade/rollback,
+interrupted capture, claim gating, missing sources, stable/superseded processing,
+post-seal path reuse, history limits and retention. No executed proof is claimed yet.
+The application bulk consumer and both restart boundaries remain unimplemented.
+
+Read-only generation inspection confirms the next seam: MigrationControlOps already
+returns a building generation ID, but MigrationOps/MigrationOutcome discard it and
+EngineKnowledgeClient immediately requests restart. Extend the existing response
+projection and expose a narrow recorded-path restart request only after the runner
+persists binding. Preserve ordinary automatic migration's allocator and immediate
+restart behavior. Accepted OperationRecordHandle.key supplies the exact target;
+preparation has no accepted key. The root owns this subsequent lifecycle change.
+
+### Queue verification and consolidated review
+
+The first2127 run compiled and represented138 cases with two failures: the history
+fixture polled an older pending guard ahead of replacements, and an existing
+migration test still asserted schema18. Formatting also failed. The corrected
+fixture claims the three intended current members, completes replacements, then
+settles its held guard. It does not relax capture-before-claim or pre-maintenance seal.
+
+One consolidated independent review identified three fail-closed omissions:
+validate terminal ledger outcome/retry compatibility and hash retry policy; reject
+capture-mode values other than integer0/1; validate completed capture projection and
+member H1 before issuing claims. Root implemented these at the existing owners and
+added pre-seal corruption, post-seal read/ACK refusal and pre-effect claim regressions.
+The first full2129 executes1,036 cases, with only three remaining old schema18
+expectations failing and21 existing qualified skips; one PMD redundant qualifier
+also failed. Those expectations now assert schema19 without changing preserved-row
+or migration-rollback predicates. No product behavior was weakened to pass them.
+
+Negative2131 temporarily removes capture closure gating, first-H1 maintenance
+preservation and terminal-outcome validation. Nine represented cases contain exactly
+three intended failures: premature ALLOW_FORCE claim, H1 replaced by H2, and missing
+pre-seal refusal. Six other represented cases pass. The script restores both
+production files byte-for-byte in finally; original sources and XML are retained.
+
+Final2133 represents1,036 cases/188 suites, zero failures/errors and21 skips.
+Indexer-worker executes690 cases; unchanged worker-core346 results reuse the matching
+2129 execution. Skips are18 unavailable model checks and3 filesystem/privilege checks;
+none belongs to the new captured-plan cases. Both modules' main/test PMD and format
+pass. Store gate2133 passes6 catalogs/46 authorities; canonical index/skills/links pass.
+
+Exact command/revision/result inventories and XML: tmp/2127-captured-queue*,
+tmp/2129-captured-queue*, tmp/2131-captured-negative*, tmp/2133-captured-queue*.
+Final sources and skip cases have separate2133 JSON inventories. The negative script
+and source backups are tmp/2131-captured-negative.py and tmp/2131-original-*.java.
+Retain through lane acceptance plus30 days; export before worktree release. No stack
+was started for this queue proof. Full stress remains owed at the coherent C2 boundary.
+
+Sequence1's queue capability is implemented and locally verified. It is not the
+application bulk consumer or installed bulk restart proof. Next is exact generation
+start and response witness, then prepared bulk/rebuild/REST routing and the existing
+runner's recovery/cutover connection. D1/D2/E/F remain unchanged obligations.

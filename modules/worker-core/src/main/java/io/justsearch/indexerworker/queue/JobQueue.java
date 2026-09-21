@@ -37,10 +37,17 @@ public interface JobQueue extends Closeable {
   record WalkProgress(String operationKey, String planHash, long enumerationEpoch,
       Long enumerationClosedAt, WalkEnumerationOutcome enumerationOutcome,
       long completedUnits, long failedUnits, long revision, Long sealedAt,
-      String receiptJson, long acknowledgedRevision) {
+      String receiptJson, long acknowledgedRevision, boolean capturedPlan,
+      String manifestSha256, Long plannedUnits) {
     public WalkProgress {
       java.util.Objects.requireNonNull(operationKey, "operationKey");
       java.util.Objects.requireNonNull(planHash, "planHash");
+      if ((manifestSha256 == null) != (plannedUnits == null)
+          || manifestSha256 != null && (!capturedPlan || !IngestionLedgerTransition.isSha256(manifestSha256)
+              || plannedUnits < 0 || enumerationOutcome != WalkEnumerationOutcome.COMPLETE)
+          || capturedPlan && enumerationOutcome == WalkEnumerationOutcome.COMPLETE && manifestSha256 == null) {
+        throw new IllegalArgumentException("Invalid captured plan projection");
+      }
       if (operationKey.isBlank() || operationKey.length() > 256 || !IngestionLedgerTransition.isSha256(planHash)
           || enumerationEpoch < 1 || completedUnits < 0 || failedUnits < 0 || revision < 1
           || acknowledgedRevision < 0 || acknowledgedRevision > revision
@@ -50,6 +57,38 @@ public interface JobQueue extends Closeable {
         throw new IllegalArgumentException("Invalid recorded walk projection");
       }
     }
+    public WalkProgress(String operationKey, String planHash, long enumerationEpoch,
+        Long enumerationClosedAt, WalkEnumerationOutcome enumerationOutcome,
+        long completedUnits, long failedUnits, long revision, Long sealedAt,
+        String receiptJson, long acknowledgedRevision) {
+      this(operationKey, planHash, enumerationEpoch, enumerationClosedAt, enumerationOutcome,
+          completedUnits, failedUnits, revision, sealedAt, receiptJson, acknowledgedRevision,
+          false, null, null);
+    }
+  }
+
+  /** Capture source identities before any claim or generation creation. */
+  default WalkProgress beginCapturedWalk(String operationKey, String planHash, boolean createIfMissing) {
+    throw new UnsupportedOperationException("Captured walks are unavailable");
+  }
+
+  /** Immutable privacy-safe terminal evidence selected by the queue owner. */
+  record CapturedUnit(String pathHash, String unitRevision, String plannedSourceSha256,
+      String contentHash, String coverage, String outcomeClass, String reasonCode, String retryPolicy) {}
+
+  /** Full current gaps and a deterministic sample of earlier failures/superseded effects. */
+  record CapturedWalkSettlement(long revision, String sha256, String manifestSha256,
+      long plannedUnits, long failedEvents, long supersededEvents,
+      List<CapturedUnit> gaps, List<CapturedUnit> processingHistory) {
+    public CapturedWalkSettlement {
+      gaps = List.copyOf(gaps);
+      processingHistory = List.copyOf(processingHistory);
+    }
+  }
+
+  /** Only sealed captured walks have a settlement; inconsistent retained evidence refuses. */
+  default Optional<CapturedWalkSettlement> capturedWalkSettlement(String operationKey) {
+    throw new UnsupportedOperationException("Captured walks are unavailable");
   }
 
   /**
@@ -86,7 +125,7 @@ public interface JobQueue extends Closeable {
     public SealedWalkReceipt {
       java.util.Objects.requireNonNull(sha256, "sha256");
       java.util.Objects.requireNonNull(enumerationOutcome, "enumerationOutcome");
-      if (version != 1 || revision < 1 || !IngestionLedgerTransition.isSha256(sha256)
+      if ((version != 1 && version != 2) || revision < 1 || !IngestionLedgerTransition.isSha256(sha256)
           || completedUnits < 0 || failedUnits < 0 || currentFailedUnits < 0
           || currentFailedUnits > failedUnits) {
         throw new IllegalArgumentException("Invalid sealed walk receipt projection");
@@ -158,9 +197,16 @@ public interface JobQueue extends Closeable {
    * @param recordedForce force decision frozen at this recorded claim admission; false for legacy work
    */
   record IndexJob(Path path, String collection, EnqueueProvenance provenance,
-      String scanId, String unitRevision, Long walkEpoch, boolean recordedForce) {
+      String scanId, String unitRevision, Long walkEpoch, boolean recordedForce, String plannedSourceSha256) {
     public IndexJob {
+      if (plannedSourceSha256 != null && (walkEpoch == null || !IngestionLedgerTransition.isSha256(plannedSourceSha256))) {
+        throw new IllegalArgumentException("Invalid captured source identity");
+      }
       if (recordedForce && walkEpoch == null) throw new IllegalArgumentException("Recorded force requires recorded membership");
+    }
+    public IndexJob(Path path, String collection, EnqueueProvenance provenance,
+        String scanId, String unitRevision, Long walkEpoch, boolean recordedForce) {
+      this(path, collection, provenance, scanId, unitRevision, walkEpoch, recordedForce, null);
     }
     /** Compatibility fixture without a force-bearing recorded admission snapshot. */
     public IndexJob(Path path, String collection, EnqueueProvenance provenance,
@@ -212,7 +258,16 @@ public interface JobQueue extends Closeable {
    * @param path the file path to index
    * @param sizeBytes byte size at enqueue time, or {@link #UNKNOWN_SIZE_BYTES} when unknown
    */
-  record EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance) {
+  record EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance, String plannedSourceSha256) {
+    public EnqueueEntry {
+      if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
+        throw new IllegalArgumentException("Invalid captured source identity");
+      }
+    }
+
+    public EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance) {
+      this(path, sizeBytes, provenance, null);
+    }
 
     /** Maintenance without new attribution preserves the existing durable job attribution. */
     public EnqueueEntry(Path path, long sizeBytes) {

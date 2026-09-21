@@ -618,8 +618,8 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v18",
-      "currentVersion": 18,
+      "format": "SQLite WAL schema v19",
+      "currentVersion": 19,
       "readableLegacyVersions": [
         0,
         1,
@@ -638,7 +638,8 @@
         14,
         15,
         16,
-        17
+        17,
+        18
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "futureVersionRefusalTest": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
@@ -649,6 +650,7 @@
       "status": "READY",
       "implementationSources": [
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteCapturedWalkOps.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteDocumentIdentityStore.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
@@ -656,6 +658,8 @@
       ],
       "tests": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/CapturedWalkPlanTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/CapturedWalkSettlementTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStoreTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SqliteDocumentIdentityStoreTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DocumentIdentityBootImportTest.java",

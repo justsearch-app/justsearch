@@ -429,3 +429,14 @@ cases remain cross-platform. Wiring is not hosted execution;2121 proves local di
 All artifacts retain the lane-acceptance-plus30-days policy and must be exported
 before this worktree is released. Final full stress, fresh hosted proof, C2 bulk and
 later stages remain open; this checkpoint is not lane completion.
+
+Hosted2130 closes the SQLite checkpoint's pending hosted proof at85154fed1.
+CI35561341238 passes every job. Windows job106214653794 has117 cases/11 suites,
+zero failures/errors/skips, including all three acceptance-lock cases and the
+startup-lock case. Integration job106214653779 has96 cases/21 suites, zero
+failures/errors and42 explicit model/external-fixture skips; all8 OperationResume
+and5 EngineSupervisedRecovery cases execute successfully. Exact logs/downloaded
+XML and counts are retained under tmp/2130-hosted-windows* and
+ tmp/2130-hosted-integration*. The job inventory is tmp/2127-hosted-snapshot.json;
+artifact inventory is tmp/2129-hosted-artifacts.json. This is executed hosted proof
+for the SQLite correction, not the subsequent captured-queue WIP or final lane proof.

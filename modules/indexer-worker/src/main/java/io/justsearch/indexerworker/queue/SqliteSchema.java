@@ -27,6 +27,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V16: Added switch-buffer replacement identity for conditional replay removal (lane F C2)</li>
  *   <li>V17: Added stable queue admission revisions for operation recovery (lane F C2)</li>
  *   <li>V18: Added finite-walk receipts and ledger terminal coverage (lane F C2)</li>
+ *   <li>V19: Added captured source plans and immutable sealed member selection (lane F C2)</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -39,7 +40,28 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 18;
+  public static final int TARGET_VERSION = 19;
+
+  public static final String MIGRATE_V18_TO_V19_JOB_PLAN =
+      "ALTER TABLE jobs ADD COLUMN planned_source_sha256 TEXT";
+  public static final String MIGRATE_V18_TO_V19_LEDGER_PLAN =
+      "ALTER TABLE ingestion_ledger ADD COLUMN planned_source_sha256 TEXT";
+  public static final String MIGRATE_V18_TO_V19_CAPTURE_MODE =
+      "ALTER TABLE ingestion_walk_progress ADD COLUMN captured_plan INTEGER NOT NULL DEFAULT 0 CHECK(captured_plan IN (0,1))";
+  public static final String MIGRATE_V18_TO_V19_MANIFEST =
+      "ALTER TABLE ingestion_walk_progress ADD COLUMN manifest_sha256 TEXT";
+  public static final String MIGRATE_V18_TO_V19_PLAN_COUNT =
+      "ALTER TABLE ingestion_walk_progress ADD COLUMN planned_units INTEGER CHECK(planned_units >= 0)";
+  public static final String CREATE_INGESTION_WALK_SEALED_UNITS = """
+      CREATE TABLE IF NOT EXISTS ingestion_walk_sealed_units (
+        operation_key TEXT NOT NULL,
+        sealed_revision INTEGER NOT NULL CHECK(sealed_revision > 0),
+        path_hash TEXT NOT NULL,
+        unit_revision TEXT NOT NULL,
+        ledger_id INTEGER NOT NULL UNIQUE,
+        PRIMARY KEY(operation_key, path_hash)
+      )
+      """;
 
   public static final String MIGRATE_V17_TO_V18_WALK_EPOCH =
       "ALTER TABLE jobs ADD COLUMN walk_seen_epoch INTEGER";
@@ -208,7 +230,8 @@ public final class SqliteSchema {
         operation_key TEXT,
         unit_revision TEXT,
         content_hash TEXT,
-        terminal_coverage TEXT CHECK(terminal_coverage IN ('INDEXED', 'FAILED', 'SKIPPED'))
+        terminal_coverage TEXT CHECK(terminal_coverage IN ('INDEXED', 'FAILED', 'SKIPPED')),
+        planned_source_sha256 TEXT
       )
       """;
 

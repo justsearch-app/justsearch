@@ -339,7 +339,7 @@ replayed or reported as success. SQL error codes and causes remain in internal l
 The schema starts
 at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 bytes
 for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
-history fence; `jobs.db` independently uses version 18. Versions 15–17 retain nullable
+history fence; `jobs.db` independently uses version 19. Versions 15–17 retain nullable
 `jobs.content_hash` for legacy rows and add opaque revisions to switch-buffer replacements
 and queue admissions. Version 18 adds the finite-walk projection schema and epoch primitives. Explicit recorded
 enumeration preserves same-walk retry state; maintenance preserves active membership while
@@ -353,6 +353,20 @@ Enumeration closure and administrative skips commit with their ledger coverage. 
 requires closed enumeration, terminal current members, exact matching ledger coverage and
 no issued claims; the immutable versioned receipt distinguishes historical effects from
 current failures and skips. Cleanup retains recorded evidence until exact final acknowledgement.
+Version 19 adds an explicit captured-plan mode. Capture admits raw-source H1 hashes
+before claims, retains the first H1 across interrupted enumeration and maintenance,
+and closes COMPLETE with a canonical path-hash/H1 manifest digest and member count.
+Only COMPLETE captured plans can claim; failed/cancelled capture retains an ordinary
+refusal receipt and never acquires a complete manifest. Claims carry their own H1,
+so an obsolete callback cannot borrow a replacement's source identity. Raw committed
+H2 comes from extraction, not Lucene's extracted-text hash. Sealing selects exact
+terminal ledger IDs into `ingestion_walk_sealed_units` before mutable paths can be
+reused. Its version-2 receipt binds the selected evidence, complete terminal history,
+full current gap count and manifest; the public projection retains full gaps and at
+most 200 failed/superseded history entries with uncapped event counts. Readers rebuild
+that projection from selected immutable ledger rows and refuse mismatched evidence.
+Exact acknowledgement precedes retention of those references being released. The
+queue capability is distinct from the bulk operation's application/restart integration.
 Queue notifications deliver committed keys outside the lock. Existing age cleanup prunes old
 sealed exactly acknowledged progress only after all keyed jobs and ledger references are gone.
 The Engine's `RecordedIngestionCoordinator` owns outer acknowledgement and uses queue

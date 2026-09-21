@@ -2,91 +2,38 @@
 
 ## Current state (2026-09-21)
 
-**Resumed at the user's request.** Continue from `codex/lane-f-pr1` in
-`.claude/worktrees/lane-f-pr1-verify`, takeover checkpoint `28d5082cd`.
-[Current working contract, transcript lessons and acceptance table](evidence/C2/resume-2026-09-21.md)
-is the context-reset entry point. Declared-survival admission, cancellation corrections
-and canonical follow-through are pushed through `657b6b89a`. Actual front/caller
-composition and listener cleanup pass focused1972 and independent review. Full1974
-passes11,083 cases with30 qualified skips; final PMD/format1980 passes. Pause-head app-ui and operation-surface failures are locally corrected;
-hosted reconciliation and restart proof remain. The [corrected live run](evidence/C2/live-resumption-2026-09-21.md)
-proves DURABLE ingest and Library reindex rows, acknowledged receipts, exact retained
-retry/conflict behavior and one standard-model query. Its owned stack is stopped.
-The [reindex alias correction](evidence/C2/reindex-alias-connection.md) passes64
-focused cases, PMD/format, review and production incremental alias/retained-retry proof;
-its owned stack is stopped. Both-store reopen cases execute for real prepared
-INGEST/REINDEX dispatch with new owners; all38 coordinator cases and PMD/format
-pass2018. [Proof and limits](evidence/C2/recorded-production-composition.md).
-Installed processing/retry baseline2022/2027 passes after persisting its watched corpus
-scope. Baseline2020 also exposed a real closed-enumeration refusal defect; the
-[active correction](evidence/C2/closed-enumeration-refusal.md) persists the refusal
-before retiring unfinished units and preserves receipt settlement at the attempt limit.
-The reviewed correction is committed and pushed in `1a94b5c0a`.
-The [installed fault batch](evidence/C2/installed-fault-plan-2026-09-21.md) passes
-all eight cases in2051, including six exact fault boundaries, real HTTP caller
-disconnect and the original baseline. Review, PMD/format and focused governance pass.
-The [paired changed-input proof](evidence/C2/resume-dependency-pair.md) and its exposed
-public-settings history defect are pushed in `0a23b0a4f`; focused2057/2060 and all8
-installed2061 cases pass. Full stress2064 finished with one new configuration-funnel
-failure in11,119 cases; its XML is preserved. The reviewed configuration correction
-and harness-marker classification pass final2075 (288 cases, including all8 installed)
-and store2076. Health2080 is ABSENT, no foreign run/orphan. [Current full/hosted
-reconciliation and remaining integration failures](evidence/C2/hosted-governance-reconciliation.md).
-Governance correction is pushed as4f276a46c. The rooted writer fixture passes2082;
-installed2083 passes4/5 but exposes boot-time file-lock misclassification.
-[Active correction and exact retained failures](evidence/C2/hostile-lock-acceptance.md).
-Read-lock correction is pushed as77a2693e8:2085 isolated ordinary Windows read-handle/atomic-rename
-contention;2089 passes281 configuration cases. Generation2087 exposed a cold-cache
-unavailable-read→IDLE adoption defect, now corrected and covered by full worker-core2090.
-Reviewed roots/queue2093 passes65 cases; all three2094 negative controls fail for
-their intended reasons and fixed sources are restored. Final2095 passes89 cases,
-including all13 installed recovery scenarios with original hostile attacks and
-exact recorded Resume evidence. Every owned stack is stopped; no build is active.
-Latest4f276 hosted governance jobs pass but Windows-native supervisor test fails
-and integration is cancelled. Triage2096 proves cold PowerShell startup exceeds
-the fixture's10second allowance before any product assertion. Fixture-only30second
-allowance plus diagnostics passes direct2099 and full11-file suite2100; hosted proof
-remains. The replay timeout is a fixture producer-isolation
-defect under intended latest-revision supersession, not grounds for a second claim
-table. The separate stale untagged batch-effect ledger omission is fixed in77a2693e8.
-Helper-startup correction is pushed as7b2c31555. Current WIP is the initial
-accepted-generation preflight wait on the existing producer/deadline, with typed
-contention/missing-file retries only; root owns production and two agents own bounded
-worker/Engine tests. Corrected2103 passes40 cases and affected PMD/format; negative2104
-fails all three intended regressions and restores production sources byte-for-byte.
-FinalNode2110 passes9 hostile-fixture tests. Restored focused plus13 installed cases
-pass2107 (53 represented cases), including both attacks with100 exact paths and the
-original durable SUCCESS. Fullindexer2109 passes670 cases with15 model/filesystem
-skips; affected PMD/format pass. Every owned stack is stopped; no build is active.
-Hosted2105
-passes Windows-native but search-worker has a stale-claim assertion failure and
-the green integration job conceals one explicit OPERATION_STORAGE_FAILED ingest;
-the stale assertion is corrected without weakening job-hash safety. Isolated SQLite
-proof distinguishes prewriteBUSY/cleanrollback from commitIOERR_WRITE/uncertainrollback;
-no generic retry is permitted, and the historicalHTTP500 still lacks exact SQL cause.
-Preflight checkpoint03c5d0487 is pushed. Native2113 proves raw BEGIN IMMEDIATE waits
-for short SHM locks, retains transaction visibility and rolls back correctly. Root
-has replaced the runtime transaction helper with explicit SQL begin/commit/rollback;
-this uses the existing busy timeout, avoiding both an application retry loop and
-JDBC's implicit next transaction after commit. Final full app-observability2116 passes586 cases with no failures or skips;
-PMD/format pass. Negative controls2115/2117 fail the intended deferred-upgrade and
-cleanup-preservation predicates, then restore sources. Final2118 executes28 focused
-and installed cases, including all13 recovery scenarios, with zero failures/skips.
-Both hostile attacks prove100 exact paths and original-key durable SUCCESS; all
-owned stacks are stopped. Windows-only selection2121 executes all4 native storage
-cases. CI now schedules app-observability in that tagged Windows lane; workflow and
-store-authority gates2122/2123 pass. Hosted2119 at03c5d0487 is green at job and test
-level (96 integration cases,42 explicit unrelated skips); it precedes the SQLite
-correction and cannot prove it. Historical HTTP500's exact SQL cause remains unknown;
-the structural deferred-upgrade defect is independently reproduced and corrected.
-The SQLite batch is ready for a compiling checkpoint. No build or stack is active.
-Next: push that checkpoint, then implement the still-owed
-[C2-10 bulk durable row/plan/resume](evidence/C2/bulk-reindex-connection.md),
-and C2-12 sweep/full verification. Streamed `core.reindex` proof does not discharge
-`core.bulk-reindex`; its source-grounded design and implementation sequence are now
-settled in the linked record. D1 retains journal/replay/live-activation/gap-refusal ownership.
-The [pause record](evidence/C2/pause-2026-09-21.md) is historical.
-A/B/C1 are complete; C2 and D1/D2/E/F remain. Merge stays at F.
+Continue autonomously in `.claude/worktrees/lane-f-pr1-verify`, branch
+`codex/lane-f-pr1`; main contains unrelated work. The user resumed this lane and
+retained checkpoint publication/merge authorization. No routine owner approval is
+pending. Merge remains at stage F; C2 and D1/D2/E/F are open.
+
+[Working contract and transcript lessons](evidence/C2/resume-2026-09-21.md) is the
+context-reset entry point. Do not reread historical amendments to reconstruct the
+current task. Root owns production lifecycle, shared Gradle and the dev stack;
+subagents may own bounded tests or read-only investigation/review.
+
+The prior recovery/lock correction is pushed as85154fed1. It passes full operations
+storage, all13 local installed scenarios and fresh hosted CI35561341238 at job and
+XML level, including4 Windows storage cases and13 installed recovery cases.
+[Exact proof and historical failure limits](evidence/C2/hostile-lock-acceptance.md).
+
+Current compiling batch: C2-10 queue capture and immutable settlement, schema19.
+Final2133 represents1,036 cases, zero failures/errors,21 existing model/filesystem
+skips;690 indexer cases execute,346 unchanged worker-core results reuse2129.
+PMD/format, canonical checks and store gate pass. One consolidated review is fixed;
+negative2131 fails all3 intended predicates and restores production bytes. No build
+or dev stack is active. [Design, current implementation and exact evidence](evidence/C2/bulk-reindex-connection.md).
+
+Next: commit/push that queue batch, then exact generation start/witness, prepared
+bulk/rebuild/manual REST dispatch, runner-owned metadata and recovery across both
+restarts, and installed bulk fault proof. Generation inspection found existing
+manifests lack target-settings compatibility and managers lack shared mutation
+serialization; resolve these under the existing generation owner, recording the
+smallest justified contract. The application bulk consumer is still unimplemented.
+Then finish C2-12/full stress/hosted reconciliation and D1/D2/E/F. Full2064's known
+configuration-funnel failure is corrected, but no final full-stress green is claimed.
+Artifacts stay accessible in this worktree's tmp through lane acceptance plus30 days
+and must be exported before releasing the worktree.
 
 The following entries preserve earlier implementation history and its evidence.
 

@@ -928,9 +928,9 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(18, rs.getInt(1));
+        assertEquals(19, rs.getInt(1));
       }
-      assertEquals(18, SqliteSchema.TARGET_VERSION);
+      assertEquals(19, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -1047,7 +1047,7 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(18, rs.getInt(1));
+        assertEquals(19, rs.getInt(1));
       }
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity)")) {
@@ -1126,7 +1126,7 @@ final class JobQueueMigrationTest {
         Statement statement = db.createStatement()) {
       try (ResultSet version = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(version.next());
-        assertEquals(18, version.getInt(1));
+        assertEquals(19, version.getInt(1));
       }
       assertTrue(hasColumn(statement, "content_hash"));
       try (ResultSet row = statement.executeQuery(
@@ -1267,6 +1267,67 @@ final class JobQueueMigrationTest {
       assertEquals(1, queue.pollPending(1).size());
       assertThrows(SQLException.class, queue::open, "double open cannot abandon the current owner");
       assertEquals(1, queue.jobStateCounts().processingCount());
+    }
+  }
+
+  @Test
+  void v18CaptureUpgradePreservesStreamingReceiptAndLegacyRows() throws Exception {
+    Path path = tempDir.resolve("v18-capture.db");
+    createV18Fixture(path);
+    try (var queue = new SqliteJobQueue(path)) {
+      queue.open();
+      var prior = queue.recordedWalk("v18-stream").orElseThrow();
+      assertFalse(prior.capturedPlan());
+      assertNull(prior.manifestSha256());
+      assertEquals(1, queue.sealedRecordedWalkReceipt("v18-stream").orElseThrow().version());
+      assertTrue(queue.acknowledgeRecordedWalk("v18-stream", prior.revision()));
+    }
+    assertMatchesFreshSchema(path);
+    try (var db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        var query = db.createStatement();
+        var row = query.executeQuery("SELECT state, planned_source_sha256 FROM jobs WHERE path = '/v18/retained.txt'")) {
+      assertTrue(row.next());
+      assertEquals("PENDING", row.getString(1));
+      assertNull(row.getString(2));
+    }
+  }
+
+  @Test
+  void v19FailureRollsBackCaptureColumnsSelectionAndVersion() throws Exception {
+    Path path = tempDir.resolve("v19-rollback.db");
+    createV18Fixture(path);
+    var before = tableColumns(path);
+    try (var queue = new SqliteJobQueue(path, 3, null, version -> {
+      if (version == 19) throw new SQLException("injected failure after capture DDL");
+    })) {
+      assertThrows(SQLException.class, queue::open);
+    }
+    assertEquals(before, tableColumns(path));
+    try (var db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        var query = db.createStatement(); var row = query.executeQuery("PRAGMA user_version")) {
+      assertTrue(row.next()); assertEquals(18, row.getInt(1));
+    }
+    try (var queue = new SqliteJobQueue(path)) { queue.open(); }
+    assertMatchesFreshSchema(path);
+  }
+
+  /** Remove every V19 object, retaining a real V18 streaming receipt and legacy job. */
+  private static void createV18Fixture(Path path) throws Exception {
+    try (var queue = new SqliteJobQueue(path)) {
+      queue.open();
+      var opened = queue.beginRecordedWalk("v18-stream", "a".repeat(64), true);
+      queue.closeRecordedWalkEnumeration("v18-stream", opened.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      queue.trySealRecordedWalk("v18-stream");
+    }
+    try (var db = DriverManager.getConnection("jdbc:sqlite:" + path); var query = db.createStatement()) {
+      query.execute("DROP TABLE ingestion_walk_sealed_units");
+      query.execute("ALTER TABLE jobs DROP COLUMN planned_source_sha256");
+      query.execute("ALTER TABLE ingestion_ledger DROP COLUMN planned_source_sha256");
+      query.execute("ALTER TABLE ingestion_walk_progress DROP COLUMN captured_plan");
+      query.execute("ALTER TABLE ingestion_walk_progress DROP COLUMN manifest_sha256");
+      query.execute("ALTER TABLE ingestion_walk_progress DROP COLUMN planned_units");
+      query.execute("INSERT INTO jobs(path, state, last_updated) VALUES ('/v18/retained.txt', 'PENDING', 123)");
+      query.execute("PRAGMA user_version = 18");
     }
   }
 

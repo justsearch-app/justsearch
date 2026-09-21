@@ -303,6 +303,21 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V17 to V18: Recorded finite-walk coverage and terminal receipts");
       }
+      case 19 -> {
+        try (Statement stmt = conn.createStatement()) {
+          String[][] columns = {
+              {"jobs", "planned_source_sha256", SqliteSchema.MIGRATE_V18_TO_V19_JOB_PLAN},
+              {"ingestion_ledger", "planned_source_sha256", SqliteSchema.MIGRATE_V18_TO_V19_LEDGER_PLAN},
+              {"ingestion_walk_progress", "captured_plan", SqliteSchema.MIGRATE_V18_TO_V19_CAPTURE_MODE},
+              {"ingestion_walk_progress", "manifest_sha256", SqliteSchema.MIGRATE_V18_TO_V19_MANIFEST},
+              {"ingestion_walk_progress", "planned_units", SqliteSchema.MIGRATE_V18_TO_V19_PLAN_COUNT}};
+          for (String[] column : columns) {
+            if (!columnExists(conn, column[0], column[1])) stmt.execute(column[2]);
+          }
+          stmt.execute(SqliteSchema.CREATE_INGESTION_WALK_SEALED_UNITS);
+        }
+        log.info("V18 to V19: Captured source plans and immutable sealed members");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }
@@ -320,13 +335,13 @@ final class SqliteQueueMigrationOps {
             id, path_hash, collection, outcome_class, reason_code, retry_policy,
             diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
             source_kind, artifact_status, policy_id, parser_id, originator, transport,
-            operation_key, unit_revision, content_hash, terminal_coverage
+            operation_key, unit_revision, content_hash, terminal_coverage, planned_source_sha256
           )
           SELECT id, COALESCE(path_hash, 'UNKNOWN'), collection, outcome_class, reason_code, retry_policy,
                  diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
                  COALESCE(source_kind, 'UNKNOWN'), COALESCE(artifact_status, 'NOT_CREATED'),
                  COALESCE(policy_id, 'UNKNOWN'), COALESCE(parser_id, 'UNKNOWN'), originator, transport,
-                 operation_key, unit_revision, content_hash, terminal_coverage
+                 operation_key, unit_revision, content_hash, terminal_coverage, planned_source_sha256
           FROM ingestion_ledger_with_paths
           """);
       stmt.execute("DROP TABLE ingestion_ledger_with_paths");
