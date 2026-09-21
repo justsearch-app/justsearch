@@ -48,15 +48,13 @@ the governing design; trust boundaries and permissions still apply.
 
 ## Start every substantial task
 
-Read this file and relevant canonical docs. Run
-`node scripts/agent-analytics/world-state.mjs` before selecting a tempdoc number,
-worktree, shared stack, or concurrent lane. Inspect the owning module and nearby
-implementations before creating helpers, registries, schemas, or representations.
-Discover unfamiliar file paths with `rg --files` before reading; reuse verified
-owner maps rather than guessing sibling paths after context resets.
-Adopt an active tempdoc for non-trivial implementation; every acceptance item is
-part of the contract. Orientation: Codex `$justsearch-start`, Claude `/start`.
-Translate tool-specific commands to the active harness.
+Read this file and relevant canonical docs. Before selecting a tempdoc,
+worktree, shared stack or concurrent lane, run
+`node scripts/agent-analytics/world-state.mjs`. Inspect owners and nearby code
+before adding helpers, registries, schemas or representations. Discover unfamiliar
+paths with `rg --files`; reuse owner maps after compaction. Non-trivial implementation
+needs an active tempdoc; all acceptance items bind. Orient with Codex
+`$justsearch-start` or Claude `/start`; adapt harness commands.
 
 ## Implementation discipline
 

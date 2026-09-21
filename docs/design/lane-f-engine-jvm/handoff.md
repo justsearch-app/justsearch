@@ -74,12 +74,20 @@ passes. Full installed matrix, stress/dead-code and hosted reproof remain open.
 Agent instruction update2248 promotes path discovery/owner reuse to AGENTS and its
 generated CLAUDE projection; projection check passes, no new hook is introduced.
 
-Independent final review matches all14 sources and finds no remaining defect in
-this bounded correction. Installed matrix2260 is running on2258. Next: preserve the
-checkpoint, reconcile2260, then final full stress/dead-code and corrected hosted
-test-level evidence.
-Full2064 had a later-fixed SystemAccessFunnel failure; focused2075 does not replace
-final full-stress proof. Reconcile C2 before starting D1/D2/E/F.
+Independent final review matches all14 production sources and finds no remaining
+defect in the bounded publication/restart correction. Pushed checkpoint ba1440624
+passes installed2260 all11 cases and full stress2264 (11,329 cases,31skips,zero
+failures/errors, including executed WholeProgramDeadCodeTest). Hosted2268 verifies
+OperationResume11/11 and migration at actual synthetic merge da29d619; broader
+integration57passes/42skips. Standard-model2269 answers correctly on this installed
+build; owned stack stopped with closed ports and health ABSENT/no orphans.
+[Current verification and exact evidence](evidence/C2/verification-2026-09-21.md).
+
+Public claims on35594867134 failed only the AGENTS byte-budget ratchet. The pending
+docs correction retains obligations at8566/8573bytes and passes local checks;
+push it and require hosted reproof. C2-12 residue is reconciled, including historical
+I10 and current jobs-db citations. Final acceptance audit remains in progress;
+do not infer C2 completion from these aggregate greens. Then continue D1/D2/E/F.
 
 ### D1 preparation after C2 reconciliation
 
@@ -89,8 +97,9 @@ D1's source anchors predate current C2 and must be re-grounded. Before Flow A,
 reconcile streaming core.reindex versus captured core.bulk-reindex: D1 abandonment
 cannot delete C2 evidence before terminal ownership and exact queue ACK, and its
 COMPLETE_WITH_GAPS/accept-gaps/live activation supersedes current promoted-with-gaps
-failure/replacement behavior only through an explicit design and proof. Start with
-EngineRoot, EngineExecutorRegistry, StatusLifecycleHandler and EnvRegistry owners.
+failure/replacement behavior only through an explicit design and proof. Use the [current D1-1 owner map](evidence/D1/regrounding-2026-09-21.md) before
+reading owners; it preserves actual front/index/model composition paths and the
+configuration-authority ambiguity for D1-3.
 
 ### Owner and evidence map
 

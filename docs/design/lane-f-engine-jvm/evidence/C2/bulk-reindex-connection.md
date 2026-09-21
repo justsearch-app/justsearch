@@ -233,8 +233,33 @@ and canonical link/index/skill checks pass. Full installed matrix, full stress/d
 and corrected hosted test-level success remain required; these focused results do
 not close C2. The independent final reread matches all14 current source hashes to2256
 and2258, confirms the six intended negative assertions, and reports no remaining
-actionable defect within the reviewed publication/restart scope. Installed matrix2260
-is running against2258.
+actionable defect within the reviewed publication/restart scope.
+
+Checkpoint `ba1440624` is pushed. Installed JUnit2260 executes all11 cases in4m36s,
+zero failures/errors/skips. This includes both acceptance-edge INGEST cuts, all
+SETTINGS cuts, disconnect/processing replay and allthree bulk boundaries. Copied
+logs/XML/counts are `tmp/2260-installed-junit-matrix*`; the separately checked
+`tmp/2260-installed-runtime-inventory.json` links all11 raw runtime folders and
+confirms every PASS marker, owned STOP and portsClosed:true. Subsequent quick_health
+is ABSENT with no foreign/orphan process. Installed stamp remains e98118e565edd1b9.
+
+Full stress2264 has passed (11,329 cases,31 skips,zero failures/errors), via `gradlew.bat -PtestParallelism=1 --continue test
+-PincludeStress=true`. Hosted CI35594867134 integration passes on the synthetic merge of ba1440624; exact test and skip inventory is in [current verification](verification-2026-09-21.md). Earlier cfd83ca07's
+CI35590854675 again reported aggregate success despite integration BUILD FAILED;
+its exact log is `tmp/2262-hosted-cfd83ca07.txt`, under test-level triage. Do not count
+that old aggregate as C2 completion or erase its failed cases with newer local proof.
+Artifact triage2263 maps all13 old failures: ingest-before-accept once and
+ingest-after-accept-before-effect three times are the stale-service publication
+race; bulk partial three times is the old boot-witness refusal; the other six bulk
+failures are wrapper assertions despite successful underlying scripts. All mechanisms
+are corrected in ba1440624; migration itself passed in that older run.
+
+Hosted35594867134 Public claims fails the always-loaded AGENTS byte-budget gate.
+The added discovery rule exceeded8573bytes by148. The startup paragraph is compressed
+without dropping obligations; regenerated AGENTS is8566bytes, CLAUDE remains below
+its ceiling, and both budget/projection checks pass. No ceiling is raised or hook
+introduced. This docs-only correction awaits the next coherent checkpoint; product
+proofs on ba1440624 retain their source identity.
 
 ## Scope and existing owners
 
