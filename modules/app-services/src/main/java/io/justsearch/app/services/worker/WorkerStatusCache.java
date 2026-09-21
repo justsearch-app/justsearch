@@ -48,13 +48,13 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
   /** 385: Cached set of known meta_source values (lowercased) from the last facet refresh. */
   private volatile Set<String> cachedSourceVocabulary = Set.of();
 
-  private volatile io.justsearch.app.services.lifecycle.WorkerCapability workerCapability;
+  private volatile io.justsearch.app.api.lifecycle.Capability workerCapability;
 
   WorkerStatusCache(KnowledgeServerBootstrap knowledgeServer) {
     this.knowledgeServer = knowledgeServer;
   }
 
-  void setWorkerCapability(io.justsearch.app.services.lifecycle.WorkerCapability cap) {
+  void setWorkerCapability(io.justsearch.app.api.lifecycle.Capability cap) {
     this.workerCapability = cap;
   }
 

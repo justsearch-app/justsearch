@@ -17,7 +17,8 @@ it before its executor. The private single-worker identity suppresses synchronou
 self-publication only; a different publisher during sampling still queues one
 follow-up. Tests use the production registry, blocked observation, full-snapshot
 CAS and FIFO executor barriers; background assertion failures are surfaced.
-Actual production registry subscription wiring remains open.
+Actual production registry subscription wiring was subsequently connected and
+verified in the [production trigger proof](production-trigger-verification-2026-09-21.md).
 
 `HeadAssembly.connectKnowledgeServer` now resolves late-bound tool registration
 after the client and service graph exist, without waiting for sampled READY.

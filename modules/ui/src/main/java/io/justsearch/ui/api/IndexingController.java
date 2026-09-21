@@ -40,7 +40,7 @@ public class IndexingController {
   private final ExcludesService excludesService;
   private final Path userHome; // nullable — null means "not available"
   private final Telemetry telemetry;
-  private volatile io.justsearch.app.services.lifecycle.WorkerCapability workerCapability;
+  private volatile io.justsearch.app.api.lifecycle.Capability workerCapability;
 
   public IndexingController(
       Supplier<IndexingService> indexingServiceSupplier,
@@ -57,7 +57,7 @@ public class IndexingController {
     return indexingServiceSupplier.get();
   }
 
-  public void setWorkerCapability(io.justsearch.app.services.lifecycle.WorkerCapability cap) {
+  public void setWorkerCapability(io.justsearch.app.api.lifecycle.Capability cap) {
     this.workerCapability = cap;
   }
 

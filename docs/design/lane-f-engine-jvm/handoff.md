@@ -57,8 +57,13 @@ and close, retiring the generation counter and capability-edge initialization.
 Combined2313 passes108 cases/21 suites, fresh, zero failures/skips, with full
 spotlessCheck/pmdAll green. Negative2311/2312 prove close contention and retry;
 all mutations are restored. See [bootstrap proof](evidence/D1/bootstrap-initialization-verification-2026-09-21.md).
+These preparation changes are pushed at `3f22be975`. Production registry trigger
+wiring, an explicit post-bind sample request, and constructor-failure cleanup now
+pass restored2320:92 cases/13 suites, fresh, zero failures/errors/skips, affected
+static checks green. Negative2318/2319 prove all three owners; mutations restored.
+See [production trigger proof](evidence/D1/production-trigger-verification-2026-09-21.md).
 Runtime capability/schema/host migration remains open. No Gradle or stack is
-active; next run2314. Temporary physical capability READY publication remains;
+active; next run2321. Temporary physical capability READY publication remains;
 replace it when the registry sampler owns READY. Continue with mutable-capability
 retirement and actual registry/status/manifest wiring; this is not a lane stop.
 D1 is not accepted.

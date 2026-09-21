@@ -645,6 +645,10 @@ public class HeadlessApp {
       String startError) {
     bootstrap.connectKnowledgeServer(knowledgeServer);
     apiServer.lateBindKnowledgeServer(knowledgeServer, startError);
+    // Client binding is structural and need not change any registry state. Sample only after both
+    // composition seams see the new client, including a late boot-recovery handover.
+    var readinessTrigger = bootstrap.substrate().health().readinessReconciliationTrigger();
+    if (readinessTrigger != null) readinessTrigger.request();
   }
 
   /**

@@ -59,7 +59,7 @@ public class KnowledgeSearchController {
   private final Telemetry telemetry;
   private final HeadApiMetricCatalog apiCatalog;
   private final KnowledgeHttpApiAdapter adapter;
-  private volatile io.justsearch.app.services.lifecycle.WorkerCapability workerCapability;
+  private volatile io.justsearch.app.api.lifecycle.Capability workerCapability;
   // Tempdoc 580 §17 P1 — lazily-built per-query feature-snapshot store (the trace-feature capture).
   private volatile NdjsonAppendStore<FeatureSnapshot> featureSnapshots;
   // Tempdoc 580 §17 P3 — lazily-built disposition store (the search-interaction contributor sink).
@@ -81,7 +81,7 @@ public class KnowledgeSearchController {
     return adapter;
   }
 
-  public void setWorkerCapability(io.justsearch.app.services.lifecycle.WorkerCapability cap) {
+  public void setWorkerCapability(io.justsearch.app.api.lifecycle.Capability cap) {
     this.workerCapability = cap;
   }
 

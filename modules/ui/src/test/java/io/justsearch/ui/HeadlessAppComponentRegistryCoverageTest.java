@@ -85,13 +85,14 @@ final class HeadlessAppComponentRegistryCoverageTest {
       manifest = new RuntimeManifestPublisher(dataDir);
       root = new EngineRoot(operations, mock(OperationAttemptRunner.class), 30_000L, 100);
 
+      var workerCapability = new WorkerCapability();
       apiPhase =
           buildApi(
               infraPhase,
               settings,
               manifest,
               io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
-              new WorkerCapability(),
+              workerCapability,
               new UpgradeShutdownBridge(),
               new LifecycleShutdownBridge(),
               root);
@@ -131,6 +132,51 @@ final class HeadlessAppComponentRegistryCoverageTest {
       assertEquals(LifecycleReasonCode.INFERENCE_OFFLINE.code(), generative.reasonCode());
       assertEquals(ComponentState.ABSENT, component(components, "index").state());
       assertEquals(ComponentState.ABSENT, component(components, "encoders").state());
+
+      // Actual HeadAssembly/OrchestrationPhase wiring plus actual CoreApiAssembly attachment.
+      // No manual registration, trigger subscription, thunk replacement or monitoring timer.
+      var trigger = apiPhase.bootstrap().substrate().health().readinessReconciliationTrigger();
+      var executorField = trigger.getClass().getDeclaredField("executor");
+      executorField.setAccessible(true);
+      var samplerExecutor = (java.util.concurrent.ExecutorService) executorField.get(trigger);
+      drainSampler(samplerExecutor);
+      var calls = new java.util.concurrent.atomic.AtomicInteger();
+      var nextSample = new java.util.concurrent.atomic.AtomicReference<>(
+          new java.util.concurrent.CountDownLatch(1));
+      var client = mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+      org.mockito.Mockito.when(client.getWorkerOperationalView(org.mockito.ArgumentMatchers.any()))
+          .thenAnswer(invocation -> {
+            calls.incrementAndGet();
+            nextSample.get().countDown();
+            return io.justsearch.app.api.status.WorkerOperationalView.fallback("READY");
+          });
+      var knowledgeServer = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      org.mockito.Mockito.when(knowledgeServer.client()).thenReturn(client);
+      org.mockito.Mockito.when(knowledgeServer.hasClient()).thenReturn(true);
+      org.mockito.Mockito.when(knowledgeServer.workerCapability()).thenReturn(workerCapability);
+      org.mockito.Mockito.when(knowledgeServer.gpuScheduling())
+          .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
+      workerCapability.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
+      drainSampler(samplerExecutor); // A legacy capability event cannot satisfy the bind assertion.
+      assertEquals(0, calls.get());
+      var connect = HeadlessApp.class.getDeclaredMethod("connectAndBind",
+          io.justsearch.app.services.HeadAssembly.class, io.justsearch.ui.api.LocalApiServer.class,
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.class, String.class);
+      connect.setAccessible(true);
+      connect.invoke(null, apiPhase.bootstrap(), apiPhase.apiServer(), knowledgeServer, null);
+      assertTrue(nextSample.get().await(5, java.util.concurrent.TimeUnit.SECONDS),
+          "the real post-bind handover must request the first observation");
+      drainSampler(samplerExecutor);
+      int beforeStop = calls.get();
+      assertEquals(1, beforeStop, "binding must schedule exactly one real Worker observation");
+      nextSample.set(new java.util.concurrent.CountDownLatch(1));
+      apiPhase.apiServer().stop();
+      assertTrue(nextSample.get().await(5, java.util.concurrent.TimeUnit.SECONDS),
+          "the real API component's ABSENT transition must drive the real sampler");
+      drainSampler(samplerExecutor);
+      assertEquals(beforeStop + 1, calls.get());
+      assertEquals(ComponentState.ABSENT,
+          component(root.components().snapshot().components(), "api").state());
     } finally {
       Throwable cleanupFailure = null;
       if (apiPhase != null) {
@@ -152,6 +198,10 @@ final class HeadlessAppComponentRegistryCoverageTest {
       if (cleanupFailure instanceof Exception failure) throw failure;
       if (cleanupFailure instanceof Error failure) throw failure;
     }
+  }
+
+  private static void drainSampler(java.util.concurrent.ExecutorService executor) throws Exception {
+    executor.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
   }
 
   private static io.justsearch.core.component.EngineComponentSnapshot.Component component(

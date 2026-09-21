@@ -703,7 +703,9 @@ public final class HeadAssembly implements AutoCloseable {
                         EnvRegistry.MCP_HOST_CONFIG.getPath()),
                     new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager), authority, recordedIngestion))
             .orThrow();
-
+    // Later composition can fail after the trigger acquires its registry subscription.
+    // Constructor failure cannot use normal close(), so enroll this owner immediately.
+    acquiredOwners.add(this.substrateOut.healthOut().readinessReconciliationTrigger());
 
     // Tempdoc 560 Phase 1 — wire the host LLM as the MCP sampling answerer (an external MCP server
     // may ask the host to run a completion). Set post-substrate now that OnlineAiService is in hand.
@@ -842,6 +844,7 @@ public final class HeadAssembly implements AutoCloseable {
                         this.gpuBroadcastListener,
                         this.substrateOut,
                         this.capabilities,
+                        componentRegistry,
                         this.operationMessageResolver,
                         engineAdmission,
                         fileOperationLogFinal,

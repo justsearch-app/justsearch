@@ -57,6 +57,7 @@ public final class OrchestrationPhase {
       io.justsearch.app.api.ModeChangeListener gpuBroadcastListener,
       SubstratePhase.Output substrateOut,
       CapabilityGraph capabilities,
+      io.justsearch.core.component.EngineComponentRegistry components,
       Function<String, String> operationMessageResolver,
       // The one Engine admission owner shared with LocalApiServer and the agent loop.
       io.justsearch.app.api.EngineAdmissionService engineAdmission,
@@ -126,10 +127,13 @@ public final class OrchestrationPhase {
     // own index.unavailable et al. reconcile on an event rather than only on GET /api/status. The
     // thunk itself is attached later, by CoreApiAssembly; until then request() is a no-op and
     // attach() self-seeds.
-    in.substrateOut()
-        .healthOut()
-        .readinessReconciliationTrigger()
-        .wireTo(in.capabilities().worker(), in.capabilities().inference());
+    var readinessTrigger = in.substrateOut().healthOut().readinessReconciliationTrigger();
+    if (in.components() != null) {
+      readinessTrigger.wireTo(in.components());
+    } else {
+      // Isolated legacy constructors have no component registry; retired with capability migration.
+      readinessTrigger.wireTo(in.capabilities().worker(), in.capabilities().inference());
+    }
 
     // Tempdoc 561 P-D: a read-only previewer over the ONE intent-gate authority — the backend
     // ISSUANCE policy. The agent loop's pending-approval event carries the GateBehavior the backend

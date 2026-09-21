@@ -265,6 +265,59 @@ class HeadAssemblyTest {
   }
 
   @Test
+  void lateConstructorFailureClosesTheAlreadyWiredReadinessSubscription() throws Exception {
+    var failure = new IllegalStateException("history attachment failed");
+    var subscribed = new java.util.concurrent.atomic.AtomicBoolean();
+    var released = new java.util.concurrent.atomic.AtomicBoolean();
+    var readinessOwners = new java.util.ArrayList<io.justsearch.core.execution.EngineExecutorRegistry.Registration>();
+    try (var components = org.mockito.Mockito.spy(
+            new io.justsearch.core.component.TestEngineComponents());
+        var executors = org.mockito.Mockito.spy(new io.justsearch.core.execution.TestEngineExecutors())) {
+      org.mockito.Mockito.doAnswer(invocation -> {
+        var owner = (io.justsearch.core.execution.EngineExecutorRegistry.Registration)
+            invocation.callRealMethod();
+        var spec = (io.justsearch.core.execution.EngineExecutorSpec) invocation.getArgument(0);
+        if (spec.name().equals("head.readiness-reconcile")) {
+          var observedOwner = org.mockito.Mockito.spy(owner);
+          readinessOwners.add(observedOwner);
+          return observedOwner;
+        }
+        return owner;
+      }).when(executors).register(org.mockito.ArgumentMatchers.any());
+      org.mockito.Mockito.doAnswer(invocation -> {
+        var subscription = (io.justsearch.core.component.EngineComponentRegistry.Subscription)
+            invocation.callRealMethod();
+        subscribed.set(true);
+        return (io.justsearch.core.component.EngineComponentRegistry.Subscription) () -> {
+          subscription.close();
+          released.set(true);
+        };
+      }).when(components).subscribe(org.mockito.ArgumentMatchers.any());
+      var operations = mockOperationStore();
+      org.mockito.Mockito.when(operations.subscribeCompletions(org.mockito.ArgumentMatchers.any()))
+          .thenAnswer(invocation -> {
+            assertTrue(subscribed.get(), "the injected failure must follow actual subscription wiring");
+            throw failure;
+          });
+      assertSame(failure, assertThrows(IllegalStateException.class, () -> new HeadAssembly(
+          operations, org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+          executors, new NoopTelemetry(), new ConfigManagerBootstrap(), null,
+          new io.justsearch.app.services.settings.UiSettingsStore(
+              io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+          new io.justsearch.app.services.lifecycle.WorkerCapability(),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+          new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
+          org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class),
+          io.justsearch.app.services.bootstrap.OperationAuthority.load(tempDir),
+          io.justsearch.app.api.operations.RecordedIngestionService.unavailable(), components)));
+      assertTrue(released.get(), "constructor failure must release its registry subscription");
+      assertEquals(1, readinessOwners.size());
+      org.mockito.Mockito.verify(readinessOwners.getFirst()).close();
+      org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
+    }
+  }
+
+  @Test
   void defaultConstructorBootsSearchRuntime() throws Exception {
     Telemetry telemetry = new NoopTelemetry();
     var operations = mockOperationStore();

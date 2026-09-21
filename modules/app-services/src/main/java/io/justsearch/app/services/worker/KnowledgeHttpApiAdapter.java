@@ -68,7 +68,7 @@ public final class KnowledgeHttpApiAdapter {
     return searchEngine.getCachedFacetSnapshot();
   }
 
-  public void setWorkerCapability(io.justsearch.app.services.lifecycle.WorkerCapability cap) {
+  public void setWorkerCapability(io.justsearch.app.api.lifecycle.Capability cap) {
     searchEngine.setWorkerCapability(cap);
   }
 

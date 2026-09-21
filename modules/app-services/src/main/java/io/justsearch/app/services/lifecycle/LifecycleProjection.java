@@ -113,7 +113,7 @@ public final class LifecycleProjection {
    * @param inference the inference capability
    * @return the external lifecycle state for /api/health
    */
-  public static LifecycleState derive(WorkerCapability worker, InferenceCapability inference) {
+  public static LifecycleState derive(io.justsearch.app.api.lifecycle.Capability worker, io.justsearch.app.api.lifecycle.Capability inference) {
     CapabilityHealth wh = worker.health();
     switch (wh) {
       case PENDING -> {

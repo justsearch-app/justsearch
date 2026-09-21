@@ -89,8 +89,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private final OnlineAiService onlineAi;
   private final AgentService agentService;
   private final Supplier<InferenceRuntimeView> inferenceSnapshotSupplier;
-  private final io.justsearch.app.services.lifecycle.WorkerCapability workerCapability;
-  private final io.justsearch.app.services.lifecycle.InferenceCapability inferenceCapability;
+  private final io.justsearch.app.api.lifecycle.Capability workerCapability;
+  private final io.justsearch.app.api.lifecycle.Capability inferenceCapability;
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private volatile String knowledgeServerStartError;
 
@@ -215,8 +215,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       Supplier<RerankerService> lambdamartRerankerSupplier,
       Supplier<GplStatusProvider> gplCoordinatorSupplier,
       Supplier<GpuCapabilitiesService> gpuCapabilitiesSupplier,
-      io.justsearch.app.services.lifecycle.WorkerCapability workerCapability,
-      io.justsearch.app.services.lifecycle.InferenceCapability inferenceCapability) {
+      io.justsearch.app.api.lifecycle.Capability workerCapability,
+      io.justsearch.app.api.lifecycle.Capability inferenceCapability) {
     // Tempdoc 412 Phase 3: engineMonitorSupplier removed (Phase 0 finding 2: EngineMonitor was
     // dead code; setters never called in production, so the supplier was always null in
     // practice). Inference status is now sourced from {@link InferenceLifecycleManager}'s
@@ -1223,7 +1223,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * carry one sentence the consumer had to discard.
    */
   private static String resolveInferenceReasonCode(
-      io.justsearch.app.services.lifecycle.InferenceCapability inferenceCapability) {
+      io.justsearch.app.api.lifecycle.Capability inferenceCapability) {
     String reason = inferenceCapability.pendingReason();
     return LifecycleReasonCode.isKnown(reason) ? reason : LifecycleReasonCode.INFERENCE_OFFLINE.code();
   }
@@ -1238,7 +1238,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * and collapsed everything else onto {@code worker.spawn.failed}.
    */
   private static String resolveWorkerReasonCode(
-      io.justsearch.app.services.lifecycle.WorkerCapability workerCapability,
+      io.justsearch.app.api.lifecycle.Capability workerCapability,
       LifecycleReasonCode fallback) {
     String reason = workerCapability.pendingReason();
     return LifecycleReasonCode.isKnown(reason) ? reason : fallback.code();

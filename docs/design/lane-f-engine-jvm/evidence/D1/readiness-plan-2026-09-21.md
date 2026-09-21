@@ -192,3 +192,39 @@ for the new component message while preserving JSON name `components`. Never
 reuse old head/worker/inference tags for different meanings. Retire unreferenced
 old messages after a reference sweep. Keep unknown numeric proto values permitted
 for forward compatibility; readiness decisions accept only known READY.
+
+## Generative state mapping decision (2026-09-21)
+
+The temporary HeadAssembly mirror mechanically maps every legacy DEGRADED to
+FAILED. Retire that mapping with the mutable capability: normal GPU yielding and
+background-only mode are not failed composition. Preserve admission semantics
+from InferenceCapabilityWiring and the runtime chat intent, with intentional
+absence taking precedence:
+
+| Observed intent and mode | Registry state |
+| --- | --- |
+| AI/lite disabled, or chat intentionally disabled (including online background work) | ABSENT |
+| Requested chat, ONLINE | READY |
+| Requested chat, missing model/runtime, policy refusal or ordinary OFFLINE | UNAVAILABLE |
+| Requested chat, INDEXING / scheduled GPU yield | UNAVAILABLE |
+| Requested chat, observed TRANSITIONING | RELOADING |
+| Requested chat, crashed or generic activation failure | FAILED |
+| Initial requested activation before a stable mode observation | STARTING |
+
+Keep precise existing reasons, including `inference.up_for_background`,
+`inference.gpu_yielded_to_indexing`, and `inference.crashed`. Disabling chat after a
+crash changes state to ABSENT; retained crash evidence may remain diagnostic but
+cannot retain FAILED. RegistryBackedCapability.available remains false for ABSENT;
+ApiSecurityFilters checks available, not the optional required flag, so chat
+admission stays closed. The optional aggregate may be READY when chat is
+intentionally absent. This is a deliberate correction to the temporary mirror,
+not a second lifecycle authority or a new mutable configured flag.
+
+Grounded at `3f22be975`: InferenceDecision.java:29-42,44-74;
+InferenceCapabilityWiring.java:57-80,107-149,153-177;
+RuntimeActivationService.java:1390-1423; RegistryBackedCapability.java:121-146;
+ApiSecurityFilters.java:570-589. `InferenceCapability.setConfigured` has no
+production caller and must retire. Pin intent precedence, initial STARTING versus
+observed RELOADING, crash recovery, background-only ONLINE and GPU yield in the
+producer tests when the actual owner migration lands. Callback publication must
+not let a stale activation failure overwrite a newer disable/READY observation.

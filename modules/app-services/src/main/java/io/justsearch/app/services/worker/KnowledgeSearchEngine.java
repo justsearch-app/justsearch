@@ -573,7 +573,7 @@ final class KnowledgeSearchEngine {
     return statusCache.getCachedFacetSnapshot();
   }
 
-  public void setWorkerCapability(io.justsearch.app.services.lifecycle.WorkerCapability cap) {
+  public void setWorkerCapability(io.justsearch.app.api.lifecycle.Capability cap) {
     statusCache.setWorkerCapability(cap);
   }
 
