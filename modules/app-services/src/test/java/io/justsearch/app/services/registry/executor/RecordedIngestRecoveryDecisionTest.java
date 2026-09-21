@@ -39,6 +39,8 @@ final class RecordedIngestRecoveryDecisionTest {
   private static final String PUBLIC_ARGUMENTS =
       "{\"paths\":[\"C:/public-requested-root\"],\"generation\":\"public-generation\"}";
   private static final String GENERATION = "frozen-generation";
+  private static final UUID PREPARATION_NONCE =
+      UUID.fromString("00000000-0000-4000-8000-000000000510");
 
   @Test
   void trustedStructuralAutoIngestAuthorizesTheExactFrozenPlan(@TempDir Path temp)
@@ -101,6 +103,20 @@ final class RecordedIngestRecoveryDecisionTest {
 
     assertTrue(fixture.authority().allowsFreshRecordedIngest(fixture.row(), fixture.plan()),
         "the same bound plan may continue fresh but must not gain restart permission");
+    assertRefused("RECOVERY_AUTHORIZATION_REFUSED", fixture.authority().evaluateRecordedIngest(
+        fixture.row(), fixture.preparation(), Optional.of(GENERATION), ignored -> true));
+  }
+
+  @Test
+  void preparedBulkContinuationCannotAuthorizeOrdinaryIngestRecovery(@TempDir Path temp)
+      throws IOException {
+    Path watchedRoot = Files.createDirectory(temp.resolve("watched"));
+    String key = OperationKeys.generate(KEY_CLOCK);
+    var continuation = new OperationAuthorizationBasis.PreparedContinuation(
+        key, PREPARATION_NONCE);
+    Fixture fixture = fixture(temp.resolve("data"), watchedRoot, watchedRoot, OperationKind.INGEST,
+        "core.ingest-files", TransportTag.SYSTEM_INTERNAL, continuation, key);
+
     assertRefused("RECOVERY_AUTHORIZATION_REFUSED", fixture.authority().evaluateRecordedIngest(
         fixture.row(), fixture.preparation(), Optional.of(GENERATION), ignored -> true));
   }
@@ -316,10 +332,16 @@ final class RecordedIngestRecoveryDecisionTest {
   private static Fixture fixture(Path dataDirectory, Path watchedRoot, Path planRoot,
       OperationKind kind, String operationRef, TransportTag transport,
       OperationAuthorizationBasis basis) throws IOException {
+    return fixture(dataDirectory, watchedRoot, planRoot, kind, operationRef, transport, basis,
+        OperationKeys.generate(KEY_CLOCK));
+  }
+
+  private static Fixture fixture(Path dataDirectory, Path watchedRoot, Path planRoot,
+      OperationKind kind, String operationRef, TransportTag transport,
+      OperationAuthorizationBasis basis, String key) throws IOException {
     writeWatchedRoots(dataDirectory, watchedRoot);
     OperationAuthority authority = OperationAuthority.load(dataDirectory);
-    String key = OperationKeys.generate(KEY_CLOCK);
-    UUID nonce = UUID.randomUUID();
+    UUID nonce = PREPARATION_NONCE;
     String arguments = kind == OperationKind.REINDEX ? "{\"force\":true}" : PUBLIC_ARGUMENTS;
     OperationDescriptor descriptor = OperationDescriptor.invocation(kind, operationRef, arguments, false);
     EngineContext context = EngineProvenance.context(EngineContext.ClientKind.INTERNAL,

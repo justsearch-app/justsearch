@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.operations;
 
+import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.agent.api.registry.ConfirmStrategy;
+import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.agent.api.registry.OperationPreparation;
 import io.justsearch.app.api.status.MigrationSource;
 import java.util.Map;
@@ -58,6 +63,34 @@ public record RecordedBulkPlan(Profile profile, String source, RecordedRootPlan 
   }
 
   public String planHash() { return CanonicalOperationArguments.digest(toReplayPayload()); }
+
+  /** Closed catalog contract for the only profiles whose one-time approval spans restarts. */
+  public static boolean continuationPolicy(Operation operation) {
+    if (operation == null) return false;
+    try { Profile.fromOperationRef(operation.id().value()); }
+    catch (IllegalArgumentException unrelated) { return false; }
+    if (!operation.binding().handlerId().equals(operation.id().value())
+        || operation.provenance().tier() != io.justsearch.agent.api.registry.TrustTier.CORE
+        || !"core".equals(operation.provenance().contributorId())) return false;
+    var policy = operation.policy();
+    return policy.risk() == RiskTier.HIGH
+        && policy.confirm() instanceof ConfirmStrategy.Inline
+        && policy.recordKind() == OperationKind.REINDEX
+        && policy.declaredSurvival().orElse(null) == EngineContext.Survival.DURABLE;
+  }
+
+  /** Validate the frozen profile before minting or revalidating a continuation locator. */
+  public static boolean continuationPreparation(Operation operation,
+      OperationPreparation preparation) {
+    if (!continuationPolicy(operation) || preparation == null
+        || preparation.content() != OperationPreparation.Content.METADATA
+        || !SCHEMA.equals(preparation.replaySchema())) return false;
+    try {
+      var plan = fromReplayPayload(preparation.replayPayloadJson());
+      return plan.profile().operationRef().equals(operation.id().value())
+          && plan.source().equals(sourceForArguments(plan.profile(), preparation.argumentsJson()));
+    } catch (IllegalArgumentException malformed) { return false; }
+  }
 
   /** Public arguments retain legacy corpus labels; this operation rebuilds all frozen watched roots. */
   public static String sourceForArguments(Profile profile, String argumentsJson) {

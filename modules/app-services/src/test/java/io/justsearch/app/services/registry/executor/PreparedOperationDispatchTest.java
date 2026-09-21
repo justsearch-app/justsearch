@@ -14,11 +14,19 @@ import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.app.services.intent.*;
 import io.justsearch.core.context.EngineContext;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -64,6 +72,116 @@ class PreparedOperationDispatchTest {
     return new OperationExecutorImpl(new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.NOTE)),
         admission(), handlers, null, Map.of(), CLOCK, new CoreTrustEvaluator(),
         CoreIntentSourceCatalog.catalog(), null, capsules);
+  }
+
+  private static OperationExecutorImpl bulkExecutor(SqliteOperationStore store, HandlerRegistry handlers,
+      ConsentCapsuleService capsules) {
+    return new OperationExecutorImpl(new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.REINDEX)),
+        admission(), handlers, null, Map.of(), CLOCK, new CoreTrustEvaluator(),
+        CoreIntentSourceCatalog.catalog(), null, capsules);
+  }
+
+  private static Operation bulkOperation(RecordedBulkPlan.Profile profile) {
+    var id = new OperationRef(profile.operationRef());
+    return new Operation(id, Presentation.of(new I18nKey("test.bulk"), new I18nKey("test.bulk.desc")),
+        Interface.of("{\"type\":\"object\"}", "{\"type\":\"object\"}"),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE, AuditPolicy.METADATA_ONLY,
+            RetryPolicy.noRetry(), Set.of(), false).withRecordKind(OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(id),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI));
+  }
+
+  private static String bulkArguments(RecordedBulkPlan.Profile profile) {
+    return profile == RecordedBulkPlan.Profile.USER_BULK ? "{\"corpusIds\":[\"docs\"]}" : "{}";
+  }
+
+  private static InvocationProvenance bulkProvenance(EngineContext context) {
+    return EngineProvenance.invocation(context, ExecutorTag.UI, CLOCK.instant(), Optional.empty());
+  }
+
+  private static OperationResult invokeBulk(OperationExecutorImpl executor, Operation operation, String arguments,
+      InvocationProvenance provenance, Optional<String> token, EngineContext context, String key, UUID nonce) {
+    return executor.dispatch(operation, arguments, provenance, token, context, key, nonce);
+  }
+
+  private static final class RecordedBulkFixture implements OperationHandler {
+    final Operation operation;
+    final String arguments;
+    final RecordedBulkPlan.Profile profile;
+    final Path root;
+    final AtomicInteger effects = new AtomicInteger();
+    final AtomicReference<EngineContext> usedContext = new AtomicReference<>();
+
+    RecordedBulkFixture(RecordedBulkPlan.Profile profile, Path root) {
+      this.profile = profile;
+      this.operation = bulkOperation(profile);
+      this.arguments = bulkArguments(profile);
+      this.root = root;
+    }
+
+    @Override public OperationResult execute(String args, EngineContext context) {
+      throw new AssertionError("Recorded bulk execution must use its frozen preparation");
+    }
+
+    @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
+        EngineContext context) {
+      var scope = new RecordedRootPlan("serving-generation", List.of(
+          new RecordedRootPlan.Root(root, "documents", true, false, List.of("*.tmp"), List.of())));
+      String inputs = "{\"dimension\":768}";
+      var target = new IndexTargetSnapshot(sha256(inputs), inputs);
+      var plan = new RecordedBulkPlan(profile, profile.defaultSource(), scope, target);
+      return new OperationPreparation(args, RecordedBulkPlan.SCHEMA, plan.toReplayPayload(),
+          OperationPreparation.Content.METADATA);
+    }
+
+    @Override public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+      return new OperationApprovalPreview("Continue the approved bulk operation across restarts");
+    }
+
+    @Override public void validatePreparation(OperationPreparation prepared) {
+      if (!RecordedBulkPlan.continuationPreparation(operation, prepared)
+          || !arguments.equals(prepared.argumentsJson())) {
+        throw new IllegalArgumentException("Invalid recorded bulk fixture preparation");
+      }
+    }
+
+    @Override public OperationExecution executePrepared(OperationPreparation prepared,
+        InvocationProvenance provenance, EngineContext context, OperationRecordHandle record) {
+      effects.incrementAndGet();
+      usedContext.set(context);
+      assertNotNull(record);
+      return OperationExecution.finished(OperationResult.success("recorded bulk accepted"));
+    }
+
+    HandlerRegistry registry() {
+      var handlers = new HandlerRegistry();
+      handlers.register(operation.id(), this);
+      return handlers;
+    }
+  }
+
+  private static final class MutableClock extends Clock {
+    private final AtomicReference<Instant> now;
+    private final ZoneId zone;
+    MutableClock(Instant now) { this(now, ZoneId.of("UTC")); }
+    private MutableClock(Instant now, ZoneId zone) {
+      this.now = new AtomicReference<>(now);
+      this.zone = zone;
+    }
+    @Override public ZoneId getZone() { return zone; }
+    @Override public Clock withZone(ZoneId requested) { return new MutableClock(now.get(), requested); }
+    @Override public Instant instant() { return now.get(); }
+    void advance(Duration duration) { now.updateAndGet(value -> value.plus(duration)); }
+  }
+
+  private static String sha256(String value) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+          .digest(value.getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException impossible) {
+      throw new AssertionError(impossible);
+    }
   }
 
   private static final class Fixture implements OperationHandler {
@@ -163,6 +281,85 @@ class PreparedOperationDispatchTest {
       assertEquals(Optional.of("jsa1:capsule"), row.context().grantReference());
       assertEquals(undo ? OperationHistoryMode.UNDO : OperationHistoryMode.UNDOABLE, row.historyMode());
       assertEquals(PROVENANCE.occurredAt(), row.provenanceOccurredAt());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(RecordedBulkPlan.Profile.class)
+  void approvedRecordedBulkMintsBoundContinuationOnlyAfterCapsuleAndOverwritesCallerMarker(
+      RecordedBulkPlan.Profile profile) throws Exception {
+    var fixture = new RecordedBulkFixture(profile, directory.resolve("bulk-root"));
+    Instant start = Instant.now();
+    var capsuleClock = new MutableClock(start);
+    var capsules = new ConsentCapsuleService(capsuleClock, Duration.ofMinutes(5));
+    String key = OperationKeys.generate(CLOCK);
+    EngineContext caller = ORIGIN.withGrantReference(Optional.of("jsa1:auto"));
+    InvocationProvenance provenance = bulkProvenance(caller);
+    try (var store = new SqliteOperationStore(directory.resolve("bulk-operations.db"))) {
+      var executor = bulkExecutor(store, fixture.registry(), capsules);
+      var gated = assertThrows(ConfirmationRequiredException.class,
+          () -> invokeBulk(executor, fixture.operation, fixture.arguments, provenance, Optional.empty(), caller,
+              key, null));
+      UUID nonce = gated.preparationNonce();
+      assertNotNull(nonce);
+      assertTrue(store.find(key).isEmpty(), "Approval preparation must not create an accepted operation");
+      assertTrue(store.openRecords().isEmpty());
+      assertEquals(0, fixture.effects.get());
+
+      String expiredToken = capsules.mintPrepared(fixture.operation.id().value(), fixture.arguments,
+          SourceTier.UNTRUSTED, key, nonce);
+      capsuleClock.advance(Duration.ofMinutes(6));
+      String wrongKey = OperationKeys.generate(CLOCK);
+      String wrongKeyToken = capsules.mintPrepared(fixture.operation.id().value(), fixture.arguments,
+          SourceTier.UNTRUSTED, wrongKey, nonce);
+      String wrongNonceToken = capsules.mintPrepared(fixture.operation.id().value(), fixture.arguments,
+          SourceTier.UNTRUSTED, key, UUID.randomUUID());
+      for (String invalid : List.of("not-a-capsule", wrongKeyToken, wrongNonceToken, expiredToken)) {
+        assertThrows(ConfirmationRequiredException.class,
+            () -> invokeBulk(executor, fixture.operation, fixture.arguments, provenance,
+                Optional.of(invalid), caller, key, nonce));
+        assertTrue(store.find(key).isEmpty(), "Invalid approval must not stamp a continuation basis");
+        assertEquals(0, fixture.effects.get());
+      }
+
+      String validToken = capsules.mintPrepared(fixture.operation.id().value(), fixture.arguments,
+          SourceTier.UNTRUSTED, key, nonce);
+      var accepted = invokeBulk(executor, fixture.operation, fixture.arguments, provenance,
+          Optional.of(validToken), caller, key, nonce);
+      assertTrue(accepted.success());
+      assertEquals(1, fixture.effects.get());
+
+      var row = store.find(key).orElseThrow();
+      var basis = assertInstanceOf(OperationAuthorizationBasis.PreparedContinuation.class,
+          OperationAuthorizationBasis.decode(row.context().grantReference().orElseThrow()));
+      assertEquals(key, basis.operationKey());
+      assertEquals(nonce, basis.preparationNonce());
+      assertEquals(row.context().grantReference(), fixture.usedContext.get().grantReference());
+      assertNotEquals(caller.grantReference(), row.context().grantReference(),
+          "Caller-supplied grant reference must not become server authorization evidence");
+      var stored = store.acceptedPreparation(row.id()).orElseThrow();
+      var envelope = new PreparedInvocationCodec(io.justsearch.agent.api.encryption.StoreCipher.disabled())
+          .decode(stored.payload(), key, stored.nonce(), row.descriptor());
+      assertEquals(caller.grantReference(), envelope.context().grantReference(),
+          "The caller marker remains frozen only as attribution, not as accepted authorization");
+      assertEquals(caller.clientId(), envelope.context().clientId());
+      assertTrue(capsules.consumePreparedDeferred(validToken, fixture.operation.id().value(),
+          fixture.arguments, key, nonce).isEmpty(), "The accepted capsule is consumed even with its original binding");
+
+      var replay = invokeBulk(executor, fixture.operation, fixture.arguments, provenance,
+          Optional.of(validToken), caller, key, nonce);
+      assertTrue(replay.success());
+      assertEquals(1, fixture.effects.get(), "Accepted retries reuse the receipt without replaying the effect");
+
+      String replayKey = OperationKeys.generate(CLOCK);
+      var secondGate = assertThrows(ConfirmationRequiredException.class,
+          () -> invokeBulk(executor, fixture.operation, fixture.arguments, provenance, Optional.empty(), caller,
+              replayKey, null));
+      assertThrows(ConfirmationRequiredException.class,
+          () -> invokeBulk(executor, fixture.operation, fixture.arguments, provenance,
+              Optional.of(validToken), caller, replayKey, secondGate.preparationNonce()));
+      assertTrue(store.find(replayKey).isEmpty(), "A consumed capsule cannot authorize a copied operation key");
+      assertEquals(1, fixture.effects.get());
     }
   }
 
@@ -288,7 +485,7 @@ class PreparedOperationDispatchTest {
     var context = transport == TransportTag.AGENT_LOOP ? TestEngineContexts.agent() : TestEngineContexts.workflow();
     try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
       var dispatcher = executor(store, fixture.registry(), capsules);
-      var router = new BackendIntentRouterImpl(OperationCatalog.of("core", java.util.List.of(operation())),
+      var router = new BackendIntentRouterImpl(OperationCatalog.of("core", List.of(operation())),
           dispatcher, CoreIntentSourceCatalog.catalog(),
           new io.justsearch.app.observability.intent.IntentEnvelopeChangeRegistry());
       var gated = new GatedOperationExecutor(() -> router, () -> capsules, transport);
@@ -485,7 +682,7 @@ class PreparedOperationDispatchTest {
       try {
         assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS));
         fixture.target.set("later-target"); second.start();
-        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(3).toNanos();
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
         while (second.isAlive() && second.getState() != Thread.State.WAITING && System.nanoTime() < deadline) Thread.onSpinWait();
         assertEquals(Thread.State.WAITING, second.getState());
         release.countDown();
@@ -494,8 +691,8 @@ class PreparedOperationDispatchTest {
         assertEquals(firstGate.preparationNonce(), secondGate.preparationNonce());
         assertEquals(1, fixture.prepares.get()); assertEquals(0, fixture.effects.get());
       } finally {
-        release.countDown(); first.join(java.time.Duration.ofSeconds(3));
-        if (second.getState() != Thread.State.NEW) second.join(java.time.Duration.ofSeconds(3));
+        release.countDown(); first.join(Duration.ofSeconds(3));
+        if (second.getState() != Thread.State.NEW) second.join(Duration.ofSeconds(3));
       }
     }
   }

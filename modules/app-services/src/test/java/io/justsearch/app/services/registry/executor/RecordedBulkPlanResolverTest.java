@@ -11,6 +11,7 @@ import io.justsearch.agent.api.registry.OperationPreparation;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.OperationDescriptor;
+import io.justsearch.app.api.operations.OperationAuthorizationBasis;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
@@ -92,7 +93,7 @@ final class RecordedBulkPlanResolverTest {
   }
 
   @Test
-  void acceptedPreparationMustMatchPersistedOperationKeyNonceContextAndProvenance() {
+  void acceptedPreparationMustMatchContinuationKeyNonceContextAndProvenance() {
     Fixture fixture = fixture(RecordedBulkPlan.Profile.USER_BULK, USER_ARGUMENTS,
         MigrationSource.USER_REQUESTED_BULK_REINDEX.wire(), RecordedBulkPlan.Profile.USER_BULK);
     OperationRecord differentKey = withKey(fixture.row(), OperationKeys.generate(
@@ -136,7 +137,8 @@ final class RecordedBulkPlanResolverTest {
         EngineProvenance.invocation(context, ExecutorTag.UI, OCCURRED_AT, Optional.empty()));
     OperationStore.Preparation stored = new OperationStore.Preparation(NONCE, codec.encode(envelope));
     OperationRecord row = row(key, descriptor,
-        context.withGrantReference(Optional.of("jsa1:auto")), "UI", "root-owner", "session-id", OCCURRED_AT);
+        context.withGrantReference(Optional.of(new OperationAuthorizationBasis.PreparedContinuation(
+            key, NONCE).encode())), "UI", "root-owner", "session-id", OCCURRED_AT);
     return new Fixture(plan, row, stored);
   }
 

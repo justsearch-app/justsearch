@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.bootstrap;
 
+import io.justsearch.app.api.operations.RecordedBulkPlan;
+import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.agent.api.registry.ExecutorTag;
+import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
 import io.justsearch.agent.api.registry.IntentSourceCatalog;
 import io.justsearch.agent.api.registry.TrustEvaluator;
 import io.justsearch.app.services.intent.ConsentCapsuleService;
@@ -50,7 +54,8 @@ public final class OperationAuthority {
   private OperationAuthority(WatchedRootsState roots, DurableGrantStore grants) {
     this.roots = Objects.requireNonNull(roots, "roots");
     this.grants = Objects.requireNonNull(grants, "grants");
-    scope = new IndexedRootGrantScope(Set.of(AgentToolsOperationCatalog.INGEST_FILES, CoreOperationCatalog.REINDEX));
+    scope = new IndexedRootGrantScope(Set.of(AgentToolsOperationCatalog.INGEST_FILES, CoreOperationCatalog.REINDEX,
+        CoreOperationCatalog.BULK_REINDEX, CoreOperationCatalog.REBUILD_INDEX));
     scope.bindIndexedRoots(context -> roots.watchedPaths());
     evaluator.setHardStopSignal(hardStop::isEngaged);
     hardStop.setOnEngage(() -> {
@@ -120,6 +125,7 @@ public final class OperationAuthority {
       case OperationAuthorizationBasis.StructuralAuto ignored ->
           verdict.gateBehavior() == GateBehavior.AUTO;
       case OperationAuthorizationBasis.EphemeralCapsule ignored -> false;
+      case OperationAuthorizationBasis.PreparedContinuation ignored -> false;
       case OperationAuthorizationBasis.OperationGrant grant -> grants.isAllowed(
           new DurableGrantStore.DurableGrant(DurableGrantStore.GrantKind.OPERATION,
               grant.target(), grant.sourceTier()), operation.id().value(),
@@ -176,6 +182,7 @@ public final class OperationAuthority {
       case OperationAuthorizationBasis.StructuralAuto ignored ->
           verdict.gateBehavior() == GateBehavior.AUTO;
       case OperationAuthorizationBasis.EphemeralCapsule ignored -> true;
+      case OperationAuthorizationBasis.PreparedContinuation ignored -> false;
       case OperationAuthorizationBasis.OperationGrant grant ->
           scope.coversPlan(operation, boundPlan, parent.context()) && grants.isAllowed(
               new DurableGrantStore.DurableGrant(DurableGrantStore.GrantKind.OPERATION,
@@ -217,6 +224,54 @@ public final class OperationAuthority {
 
   private static RecordedIngestRecoveryDecision.Refused refused(String code) {
     return new RecordedIngestRecoveryDecision.Refused(new OperationReceipt(code, null));
+  }
+
+  /** Current policy only: the Engine must separately prove readiness, target and generation before effects. */
+  public sealed interface RecordedBulkRecoveryDecision {
+    record Authorized(RecordedBulkPlan plan)
+        implements RecordedBulkRecoveryDecision {
+      public Authorized { Objects.requireNonNull(plan, "plan"); }
+    }
+    record Refused(OperationReceipt receipt) implements RecordedBulkRecoveryDecision {
+      public Refused { Objects.requireNonNull(receipt, "receipt"); }
+    }
+  }
+
+  /** Revalidate the one accepted bulk approval; this does not issue a claim or execution capability. */
+  public RecordedBulkRecoveryDecision evaluateRecordedBulk(OperationRecord row, OperationStore.Preparation stored) {
+    final RecordedBulkPlan plan;
+    final Operation operation;
+    final TransportTag transport;
+    try {
+      if (row.state() != OperationState.ACCEPTED
+          && row.state() != OperationState.RUNNING) {
+        return bulkRefused("RECOVERY_OPERATION_INACTIVE");
+      }
+      plan = new RecordedBulkPlanResolver().resolve(row, stored);
+      operation = coreOperations.findByIdValue(row.descriptor().operationRef()).orElseThrow();
+      if (!RecordedBulkPlan.continuationPolicy(operation)
+          || !operation.executors().contains(ExecutorTag.valueOf(row.executor()))
+          || !(OperationAuthorizationBasis.decode(row.context().grantReference().orElse(null))
+              instanceof OperationAuthorizationBasis.PreparedContinuation)) {
+        return bulkRefused("RECOVERY_AUTHORIZATION_REFUSED");
+      }
+      transport = TransportTag.valueOf(row.context().transport());
+      if (sources.findByTransport(transport).isEmpty()) return bulkRefused("RECOVERY_BINDING_INVALID");
+      EngineProvenance.sourceTier(row.context());
+    } catch (IllegalArgumentException | NullPointerException | java.util.NoSuchElementException invalid) {
+      return bulkRefused("RECOVERY_BINDING_INVALID");
+    }
+    if (evaluator.evaluate(operation.policy().risk(), transport).gateBehavior() == GateBehavior.DENY) {
+      return bulkRefused("RECOVERY_AUTHORIZATION_REFUSED");
+    }
+    if (!scope.coversBulkPlan(operation, plan, row.context())) {
+      return bulkRefused("RECOVERY_SCOPE_REFUSED");
+    }
+    return new RecordedBulkRecoveryDecision.Authorized(plan);
+  }
+
+  private static RecordedBulkRecoveryDecision.Refused bulkRefused(String code) {
+    return new RecordedBulkRecoveryDecision.Refused(new OperationReceipt(code, null));
   }
 
   public WatchedRootsState roots() { return roots; }

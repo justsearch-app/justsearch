@@ -9,6 +9,7 @@ import io.justsearch.agent.api.registry.SourceTier;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 final class OperationAuthorizationBasisTest {
@@ -20,6 +21,12 @@ final class OperationAuthorizationBasisTest {
         OperationAuthorizationBasis.decode("jsa1:auto"));
     assertEquals(new OperationAuthorizationBasis.EphemeralCapsule(),
         OperationAuthorizationBasis.decode("jsa1:capsule"));
+
+    String key = "01994180-0000-7000-8000-000000000abc";
+    UUID nonce = UUID.fromString("00000000-0000-4000-8000-000000000abc");
+    var continuation = new OperationAuthorizationBasis.PreparedContinuation(key, nonce);
+    assertEquals("jsa1:continuation:" + key + ":" + nonce, continuation.encode());
+    assertEquals(continuation, OperationAuthorizationBasis.decode(continuation.encode()));
 
     for (SourceTier tier : SourceTier.values()) {
       for (String target : List.of("core.ingest", "file operations/ß:未来")) {
@@ -51,6 +58,27 @@ final class OperationAuthorizationBasisTest {
       assertThrows(IllegalArgumentException.class,
           () -> OperationAuthorizationBasis.decode(malformed), malformed);
     }
+  }
+
+  @Test
+  void rejectsMalformedPreparedContinuationKeyAndNonce() {
+    String key = "01994180-0000-7000-8000-000000000abc";
+    String nonce = "00000000-0000-4000-8000-000000000abc";
+    for (String malformed : List.of(
+        "jsa2:continuation:" + key + ":" + nonce,
+        "jsa1:continuation:01994180-0000-4000-8000-000000000121:" + nonce,
+        "jsa1:continuation:01994180-0000-7000-c000-000000000abc:" + nonce,
+        "jsa1:continuation:" + key.toUpperCase(java.util.Locale.ROOT) + ":" + nonce,
+        "jsa1:continuation:" + key + ":00000000-0000-4000-8000-00000000012Z",
+        "jsa1:continuation:" + key + ":" + nonce.toUpperCase(java.util.Locale.ROOT),
+        "jsa1:continuation:" + key + ":" + nonce + ":extra")) {
+      assertThrows(IllegalArgumentException.class,
+          () -> OperationAuthorizationBasis.decode(malformed), malformed);
+    }
+
+    assertThrows(IllegalArgumentException.class,
+        () -> new OperationAuthorizationBasis.PreparedContinuation(
+            "00000000-0000-4000-8000-000000000121", UUID.fromString(nonce)));
   }
 
   @Test

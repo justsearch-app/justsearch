@@ -19,6 +19,7 @@ import java.util.Objects;
 public sealed interface OperationAuthorizationBasis
     permits OperationAuthorizationBasis.StructuralAuto,
         OperationAuthorizationBasis.EphemeralCapsule,
+        OperationAuthorizationBasis.PreparedContinuation,
         OperationAuthorizationBasis.OperationGrant,
         OperationAuthorizationBasis.FamilyGrant {
   int MAX_ENCODED_CHARS = 256;
@@ -44,6 +45,9 @@ public sealed interface OperationAuthorizationBasis
     if (parts.length != 4 || !VERSION.equals(parts[0])) {
       throw invalid("Malformed authorization basis");
     }
+    if ("continuation".equals(parts[1])) {
+      return new PreparedContinuation(parts[2], canonicalNonce(parts[3]));
+    }
     SourceTier sourceTier;
     try {
       sourceTier = SourceTier.valueOf(parts[2]);
@@ -66,6 +70,31 @@ public sealed interface OperationAuthorizationBasis
   /** One-time process-local capsule admission marker. */
   record EphemeralCapsule() implements OperationAuthorizationBasis {
     @Override public String encode() { return VERSION + ":capsule"; }
+  }
+
+  /** Locator for the single accepted prepared bulk invocation approved across its restarts. */
+  record PreparedContinuation(String operationKey, java.util.UUID preparationNonce)
+      implements OperationAuthorizationBasis {
+    public PreparedContinuation {
+      OperationKeys.timestampMillis(operationKey);
+      Objects.requireNonNull(preparationNonce, "preparationNonce");
+    }
+
+    @Override public String encode() {
+      return VERSION + ":continuation:" + operationKey + ":" + preparationNonce;
+    }
+  }
+
+  private static java.util.UUID canonicalNonce(String value) {
+    final java.util.UUID parsed;
+    try { parsed = java.util.UUID.fromString(value); }
+    catch (IllegalArgumentException | NullPointerException malformed) {
+      throw invalid("Invalid prepared continuation identity");
+    }
+    if (!parsed.toString().equals(value)) {
+      throw invalid("Non-canonical prepared continuation identity");
+    }
+    return parsed;
   }
 
   /** Exact durable operation grant selected by the server-side gate. */

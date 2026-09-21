@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -152,6 +153,19 @@ final class RecordedIngestFreshPolicyTest {
         "TRUSTED", TransportTag.SYSTEM_INTERNAL, Optional.empty()), fixture.plan()));
     assertFalse(fixture.authority().allowsFreshRecordedIngest(withContext(fixture.parent(),
         "TRUSTED", TransportTag.SYSTEM_INTERNAL, Optional.of("jsa1:unknown")), fixture.plan()));
+  }
+
+  @Test
+  void preparedBulkContinuationCannotAuthorizeAFreshOrdinaryIngest(@TempDir Path temp)
+      throws IOException {
+    Path watched = Files.createDirectory(temp.resolve("watched"));
+    var continuation = new OperationAuthorizationBasis.PreparedContinuation(
+        KEY, UUID.fromString("00000000-0000-4000-8000-000000000501"));
+    Fixture fixture = fixture(temp.resolve("continuation"), watched, watched,
+        OperationKind.INGEST, "core.ingest-files", TransportTag.SYSTEM_INTERNAL, continuation);
+
+    assertFalse(fixture.authority().allowsFreshRecordedIngest(fixture.parent(), fixture.plan()),
+        "bulk approval continuation is scoped to its bulk producer, never a fresh ingest child");
   }
 
   @Test

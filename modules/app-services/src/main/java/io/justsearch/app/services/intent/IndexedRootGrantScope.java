@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.app.api.operations.RecordedBulkPlan;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationPreparation;
@@ -136,6 +137,23 @@ public final class IndexedRootGrantScope implements DurableGrantScope {
     // Take one immutable view before any path checks. A single decision must not mix root-map
     // generations while the watched-roots carrier is being updated.
     List<Path> watchedRoots = currentRoots(engineContext);
+    return coversRoots(plan, watchedRoots);
+  }
+
+  /** Bulk may freeze no roots; an unavailable supplier must not masquerade as that empty scope. */
+  public boolean coversBulkPlan(Operation op, RecordedBulkPlan plan,
+      EngineContext engineContext) {
+    if (op == null || plan == null || !governedOperations.contains(op.id())
+        || !op.id().value().equals(plan.profile().operationRef())) return false;
+    var supplier = indexedRoots;
+    if (supplier == null) return false;
+    final List<Path> watchedRoots;
+    try { watchedRoots = List.copyOf(supplier.apply(engineContext)); }
+    catch (RuntimeException unavailable) { return false; }
+    return plan.scope().roots().isEmpty() || coversRoots(plan.scope(), watchedRoots);
+  }
+
+  private static boolean coversRoots(RecordedRootPlan plan, List<Path> watchedRoots) {
     if (watchedRoots.isEmpty()) {
       return false;
     }

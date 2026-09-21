@@ -558,7 +558,16 @@ generation change during capture refuse preparation. The shared handler preserve
 legacy bulk corpus labels in public identity while its approval preview explicitly
 states that all captured watched locations are rebuilt. Both profiles declare
 REINDEX/DURABLE and forward only accepted prepared handles to the recorded owner.
-The bulk restart consumer and authorization continuation are not yet connected.
+Successful prepared capsule approval for these fixed core handler bindings mints
+`PreparedContinuation`, an existing grant-reference locator bound to the one
+operation key and preparation nonce. It is neither a reusable grant nor a capsule
+secret. Recovery verifies the accepted envelope and current catalog, executor,
+transport-derived source tier, gate and root scope; only ACCEPTED/RUNNING rows may
+continue. Ordinary ingestion refuses this locator in both fresh and restart
+policy, and ordinary capsule recovery remains refused. Empty bulk scope is valid
+only with an available current roots view. The Engine must still prove the target,
+runtime and queue state, and check cancellation before effects. The bulk restart
+consumer remains unconnected; policy authorization alone cannot execute it.
 
 `BulkReindexProgress` projects owner evidence into the existing operation columns;
 it adds no journal or schema version. Only the issuing runner's live asynchronous

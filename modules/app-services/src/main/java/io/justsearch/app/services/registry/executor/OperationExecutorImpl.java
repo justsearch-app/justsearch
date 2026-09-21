@@ -952,6 +952,10 @@ public final class OperationExecutorImpl implements OperationDispatcher {
           // Tempdoc 550 Outcome face: record the gate firing as APPROVED, then proceed.
           publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED));
+          if (preparationNonce != null
+              && io.justsearch.app.api.operations.RecordedBulkPlan.continuationPreparation(op, prepared)) {
+            return new OperationAuthorizationBasis.PreparedContinuation(operationKey, preparationNonce);
+          }
           return new OperationAuthorizationBasis.EphemeralCapsule();
         }
         publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,

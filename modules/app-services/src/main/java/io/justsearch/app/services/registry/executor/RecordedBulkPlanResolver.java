@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.executor;
 
+import io.justsearch.app.api.operations.OperationAuthorizationBasis;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationRecord;
@@ -18,6 +19,13 @@ public final class RecordedBulkPlanResolver {
       throw new IllegalArgumentException("Bulk preparation requires a durable reindex row");
     }
     var preparation = PreparedInvocationCodec.decodeAcceptedMetadata(row, stored);
+    var basis = OperationAuthorizationBasis.decode(
+        row.context().grantReference().orElse(null));
+    if (basis instanceof OperationAuthorizationBasis.PreparedContinuation continuation
+        && (!continuation.operationKey().equals(row.key())
+            || !continuation.preparationNonce().equals(stored.nonce()))) {
+      throw new IllegalArgumentException("Bulk continuation identity mismatch");
+    }
     if (!RecordedBulkPlan.SCHEMA.equals(preparation.replaySchema())
         || !descriptor.hasSameIdentity(OperationDescriptor.invocation(
             OperationKind.REINDEX, profile.operationRef(), preparation.argumentsJson(), false))) {

@@ -33,7 +33,7 @@ zero failures/errors and12 qualified skips; PMD/format pass. Final fixture2144 h
 passing cases without skips. Hosted CI35565311927 passes;2145 preserves Linux XML with all18 exact-generation
 cases passing without skips, including the locally skipped symlink regression.
 
-Current uncommitted sequence3 batch: physical target snapshot, immutable runner-owned
+Pushed 65afa81fc, sequence3 preparation batch: physical target snapshot, immutable runner-owned
 bulk progress in existing operation columns, accepted bulk plan resolver, and shared
 prepared bulk/rebuild handler/catalog profiles. Focused2149 passes96 cases; negative2152 fails all three intended guards.
 Full2153 executes5,538 cases with only the deliberate wire-golden mismatch;
@@ -50,6 +50,19 @@ continuation design in the bulk owner document. Existing HIGH-risk capsule appro
 cannot survive the two required restarts; preserve ordinary capsule refusal and
 mint the new exact key/nonce basis only after successful prepared consent. The
 implementation and adversarial proof are still outstanding.
+Current uncommitted work implements the continuation locator, minting after prepared
+capsule consumption, exact accepted key/nonce resolution, and current bulk policy.
+Focused 2165 passes 92 cases, including the dead-code gate. Independent review's
+alternate-handler finding is fixed; negative 2166 fails all three intended guards
+and production bytes are restored. Hosted 35569918097 exposed missing resolver
+surface registration and its then-missing caller; both are corrected locally,
+with operation-surface 2167 passing. Full 2168 has one Windows resource-exhaustion
+cleanup failure and four test qualifier PMD violations. Root identified and
+stopped the lane's orphaned 47 GB PowerShell evidence collector, restoring 26 GiB
+free physical memory, and fixed qualifiers. Full 2170 passes 3,240 tests with
+zero failures/errors and three existing skips; app-services executes and unchanged
+app-api results reuse 2168. All four PMD and both format checks pass. No build or stack is active.
+Both test workers are frozen; independent read-only boot design review continues.
 Next: finish batch verification, implement continuation authority plus one shared
 REINDEX recovery consumer, captured file traversal, manual REST dispatch and both
 restart boundaries, then installed bulk fault proof.

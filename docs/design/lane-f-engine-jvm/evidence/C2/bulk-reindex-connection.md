@@ -558,3 +558,68 @@ may read operations or jobs from the queue's claim-permission lock. ACK remains
 after durable terminalization. These changes belong to the single existing
 REINDEX reconciliation owner, not a second reconciler or journal. This decision
 is source-reviewed but not yet implemented or verified.
+
+The integration must also account for an earlier boot boundary:
+IndexGenerationManager.initializeOrLoad calls loadStateBestEffort, which can
+restore state.json.prev or allocate after invalid current state. A pending
+recorded bulk target cannot acquire its authority through that fallback before
+the later boot decision. Establish strict current-state handling for pending
+recorded work before that initialization path, while preserving ordinary native
+bootstrap behavior. Add a corruption/previous-state regression at the actual
+boot boundary; a strict check only after initialization would pass for the wrong
+reason because initialization has already rewritten the evidence.
+
+Preparation/storage checkpoint 65afa81fc is pushed; hosted CI 35569918097 is
+running. The next uncommitted authorization batch adds PreparedContinuation in
+the existing grant_ref encoding, reusing OperationKeys for canonical UUIDv7
+validation. Minting is confined to successful prepared capsule consumption and
+the closed bulk profile policy. Accepted plan resolution binds its key and nonce;
+OperationAuthority's bulk verdict rechecks active operation state, catalog,
+executor, transport-derived tier, current gate and root scope. Ordinary ingestion
+refuses the new basis in both fresh and recovery policy. The bulk verdict is only
+current authorization: the Engine must still prove physical target, runtime and
+queue readiness, and observe cancellation before every effect. Tests and security
+review are in progress; no execution proof is claimed for this batch yet.
+
+Authorization focused run 2165 executes 92 cases in 16 suites with no failures,
+errors or skips, including WholeProgramDeadCodeTest. Independent review found a
+producer-confusion defect in the initial eligibility predicate: the public core
+operation name and policy shape alone could allow a different handler binding.
+The predicate now requires the exact core handler ID and core provenance;
+lookalike binding and trusted-plugin regressions pass. Root also corrected a
+wrong-reason dispatch fixture: wrong-key and wrong-nonce capsules are minted
+after the expiry-clock advance, so only the dedicated expired token is expired.
+Same-binding consumption is tested separately from cross-key replay refusal.
+
+Negative run 2166 removes three guards and fails exactly the three intended
+tests: alternate producer binding, copied continuation key, and borrowing bulk
+continuation for fresh ordinary ingestion. All production files are restored
+byte-for-byte. Full affected API/services tests and static checks run as 2168.
+
+Hosted preparation CI 35569918097 exposed two checkpoint gaps: missing operation
+surface registration for RecordedBulkPlanResolver, and that resolver being
+unreferenced before its consumer existed. The current authority calls the
+resolver; local 2165 proves the dead-code gate passes without a baseline change.
+The resolver is now registered as a consumer of the existing operation row,
+owning no lifecycle or admission authority; operation-surface gate 2167 passes.
+Raw hosted logs and actual failure XML are retained under tmp/2162-*.
+
+Full 2168 executes 3,240 tests in 489 suites: one cleanup failure, no errors and
+three existing skips. SettingsResetProducerTest's assertions completed, then
+JUnit's temporary-directory cleanup failed with Windows "Insufficient system
+resources." Root traced this to the lane's orphaned 2145 PowerShell XML collector
+(PID 13336, parent Codex PID 13036, exact artifact-parser command), which held
+47,336 MiB private memory; Windows had only 5 MiB available. After verifying its
+identity, root stopped that owned evidence process. Available physical memory
+recovered to about 26 GiB. No test or production behavior was changed for this
+failure. Four redundant test qualifiers introduced by new imports also failed
+PMD and are corrected. Full 2170 reruns after the resource cause is removed;
+2168 XML remains preserved separately. The collector and isolated-negative-test
+lessons are added to the context-reset working contract.
+
+Final 2170 passes 3,240 cases in 489 suites, zero failures/errors and three
+existing skips. App-services executes afresh; unchanged app-api results reuse
+2168. All four PMD and both format checks pass. The source inventory records
+13 Java files and preserves the skip details; docs regeneration, canonical links
+and operation-surface checks pass. This closes the bounded continuation policy
+checkpoint, not the still-required bulk capture, boot and promotion consumer.
