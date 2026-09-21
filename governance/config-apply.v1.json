@@ -1,0 +1,1114 @@
+{
+  "schemaVersion": 1,
+  "note": "D1-3 governed apply-scope classification for every unique configuration declaration. Scope classifies the required apply lifecycle; it does not prove dispatch or fingerprint binding. The 22 generation-bound rows partition into 8 current direct IndexFingerprint inputs and 14 explicitly named D1-12 identity gaps whose binding and boot requirements remain open. ChunkSplitter chunking parameters are fixed constants, generation-bound by construction, and therefore have no configurable register row.",
+  "entries": [
+    {
+      "key": "egress.block_all",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "index.auto_recovery",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.boosts",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.collections",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.commit.meta.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.commit.timer_interval_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.directory.type",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.adaptive_weights_enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.bm25_low_signal_top_score_threshold",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.bm25_low_signal_total_hits_threshold",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.bm25_score_boost_weight",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.branch_cc_weight_chunk",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.branch_cc_weight_whole",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.branch_cc_zero_exclude",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.branch_chunk_min_weight_multiplier",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.branch_fusion_strategy",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.branch_ramp.full_weight_max_tokens",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.branch_ramp.zero_weight_min_tokens",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.candidate_limit_max",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.cc_alpha",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.cc_weight_dense",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.cc_weight_sparse",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.cc_weight_splade",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.cc_zero_exclude",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.chunk_branch_requires_base_results",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.chunk_cc_weight_dense",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.chunk_cc_weight_sparse",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.chunk_cc_weight_splade",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.chunk_cc_zero_exclude",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.chunk_collapse_limit_multiplier",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.chunk_leg_recall_complete_enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.chunk_leg_recall_complete_top_n",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.fusion_strategy",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.leg_arbitration_alpha_diverge",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.leg_arbitration_bm25_incoherence_min",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.leg_arbitration_enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.leg_recall_complete_enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.leg_recall_complete_top_n",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.rrf_k",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.text_candidate_multiplier",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.vector_candidate_multiplier",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.vector_low_signal_top_score_threshold",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.vector_only_cap_low_signal",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.vector_rrf_weight",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.vector_rrf_weight_low_signal",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.hybrid.vector_skip_min_chars",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.hybrid.vector_skip_min_df_fraction",
+      "applyScope": "hot"
+    },
+    {
+      "key": "index.identity.deletion_grace_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.integrity_check",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.merge.tiered.max_merged_segment_mb",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.merge.tiered.segs_per_tier",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.migration.cutover.max_failed_jobs",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.nrt.background_reopen_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.nrt.max_stale_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.nrt.mode",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.nrt.on_demand_max_stale_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.nrt.target_max_stale_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.languages",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.limits.max_image_dimension",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.limits.max_image_pixels",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.limits.max_pages",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.limits.per_file_timeout_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.limits.render_dpi",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.ocr.workers",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.queue.max_depth",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.recovery.policy",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.schema_mismatch.policy",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.similarity.text.b",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.similarity.text.k1",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.similarity.text.type",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.soft_deletes.field",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.soft_deletes.retention.days",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.soft_deletes.retention.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.soft_deletes.retention.max_versions",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.sort",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.validation.mode",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.vector.dimension",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.vector.ef_search",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.vector.exhaustive_search",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.vector.hnsw.ef_construction",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "index.vector.hnsw.m",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "index.vector.quantization.enabled",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "index.writer.max_buffered_docs",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "index.writer.ram_buffer_mb",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "indexer.worker.version",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "infra.health.poll_interval_ms",
+      "applyScope": "hot"
+    },
+    {
+      "key": "infra.health.thresholds.ann_cache_ready_percent",
+      "applyScope": "hot"
+    },
+    {
+      "key": "infra.health.thresholds.nrt_stale_ms",
+      "applyScope": "hot"
+    },
+    {
+      "key": "infra.health.thresholds.translator_handshake_stale_ms",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.agent.browse.default_max_folders",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.agent.context_compression.enabled",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.agent.context_compression.keep_last_results",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.agent.context_compression.min_chars",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.agent.max_completion_tokens",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.agent.max_tool_result_chars",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.agent.search.default_limit",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.agent.search.default_mode",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.ai.disabled",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.ai.embed.enabled",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.api.port",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.app.version",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.backfill.bge_m3_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.bge_m3_interleave_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.chunk_slots_per_batch",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.commit_interval_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.disambiguation_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.embedding_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.max_docs_before_commit",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.ner_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.poll_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.splade_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.splade_interleave_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.splade_interleave_interval_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.bgem3.enabled",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.bgem3.gpu_device_id",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.bgem3.gpu_enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.bgem3.gpu_mem_mb",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.bgem3.max_seq_len",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.bgem3.model_path",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.build.stamp",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.chat.profile",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.citation.match_threshold",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.citation.scorer.deadline_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.citation.scorer.enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.citation.scorer.max_seq_len",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.citation.scorer.model_path",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.citation.scorer.threshold",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.config",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.context.size",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.data.dir",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.dev.hotreload",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.embed.backend",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.embed.context_length",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.embed.gpu.device_id",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.embed.gpu.enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.embed.gpu_mem_mb",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.embed.late_chunking_context_length",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.embed.late_chunking_enabled",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.embed.onnx.model_path",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.engine.admission.aggregate_limit",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.extraction.sandbox.command",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.extraction.sandbox.heap",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.extraction.sandbox.max_requests",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.extraction.sandbox.mode",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.extraction.sandbox.pool",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.fieldCatalog",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.filter_norm.enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.gpl.reeval_size_factor",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.gpu.enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.gpu.layers",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.head.stamp",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.head.tracing_level",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.home",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.index.base_path",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.index.parity.allow_mismatch",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.index.tracing_level",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.indexing.foreground_cooldown_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.indexing.foreground_duty_pct",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.ingestion.skip.directory_names",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.ingestion.skip.extensions",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.ingestion.skip.patterns",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.lambdamart.enabled",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.lite.mode",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.llm.enabled",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.llm.kv_type",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.llm.model_path",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.llm.reasoning_budget",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.llm.slots",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.llm.use_thinking",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.mcp.host.config",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.mmproj.model",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.mode",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.models.capability_contract_strict",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.models.dir",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.ner.confidence_threshold",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.ner.enabled",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.ner.gpu_device_id",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.ner.gpu_enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.ner.gpu_mem_mb",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.ner.max_seq_len",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.ner.model_path",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.onnxruntime.intra_op_threads",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.onnxruntime.native_path",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.onnxruntime.variantId",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.ort.profiling_dir",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.ort.verbose",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.path_resolution.retention_days",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.power.force_energy_state",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.prod",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.qu.enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.rag.top_k",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.repo.root",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.rerank.chunks.deadline_ms",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.gpu.device_id",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.gpu.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.max_gpu_candidates",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.max_seq_len",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.min_hits",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.model_path",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.order",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.chunks.top_k",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.deadline_ms",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.gpu.device_id",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.gpu.enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.gpu_mem_mb",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.judge_arbitration_alpha_diverge",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.judge_arbitration_enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.judge_arbitration_skip_enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.judge_blend_alpha",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.judge_blend_enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.max_avg_doc_length_chars",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.max_seq_len",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.min_hits",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rerank.model_path",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.rerank.top_k",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.rule.tick.ms",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.search.query_classification.enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.search.title_boost",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.server.exe",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.server.port",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.sparse_model",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.splade.activation",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.splade.enabled",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.splade.evidence_path",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.splade.gpu_device_id",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.splade.gpu_enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.splade.gpu_mem_mb",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.splade.max_seq_len",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.splade.model_path",
+      "applyScope": "generation-bound"
+    },
+    {
+      "key": "justsearch.splade.query_mode",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.ssot.path",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.summary.max_tokens",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.telemetry.flushMs",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.tessdata.path",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.tesseract.path",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.ui.automation.enabled",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.ui.automation.forceDiagnostics",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.ui.exclude_patterns",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.ui.settings.mode",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.ui.settings.readOnly",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.vdu.quality_threshold",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.vlm.model",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.vlm.profile",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.vram.threshold.12gb",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.vram.threshold.4gb",
+      "applyScope": "hot"
+    },
+    {
+      "key": "justsearch.vram.threshold.8gb",
+      "applyScope": "hot"
+    },
+    {
+      "key": "policy.gpu_acceleration_enabled",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "rag.chunk_splade.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.chunk_vectors.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.diversify.mode",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.max_chunks_per_article",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.mmr.lambda",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.mmr.max_candidates",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.retrieve.mode",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.retrieve.overretrieve_factor",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "rag.union.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.chunk_aware.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.corrections.df_threshold",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.corrections.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.corrections.max_edit_distance",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.corrections.zero_hit_retry_enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.evidence_preview.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.evidence_span.enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.evidence_span.entity_signal",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.mcp_delivery.budget_bytes",
+      "applyScope": "hot"
+    },
+    {
+      "key": "search.mcp_delivery.entity_carriage_enabled",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "search.mcp_delivery.entity_carriage_max_chars",
+      "applyScope": "hot"
+    },
+    {
+      "key": "search.mcp_framing.calibrated_absence_enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "search.mcp_framing.continuation_enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "search.mcp_framing.evidence_not_answer_enabled",
+      "applyScope": "hot"
+    },
+    {
+      "key": "search.mcp_framing.thin_result_floor_bytes",
+      "applyScope": "hot"
+    },
+    {
+      "key": "search.mcp_framing.weak_score_floor",
+      "applyScope": "hot"
+    },
+    {
+      "key": "worker.limits.max_content_length",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "worker.limits.max_file_size",
+      "applyScope": "component:index"
+    }
+  ]
+}

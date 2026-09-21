@@ -337,3 +337,57 @@ metadata or a second registry solely to carry unfinished work. The minimal regis
 remains key/applyScope entries with a document note. The test rejects a fifteenth
 unaccounted gap or any omitted/misclassified current input. Applied overall revision
 is still a separate D1-3 deliverable; exhaustive labels alone do not satisfy D1-3.
+
+## Register and count projection proof (2026-09-22)
+
+Implemented governance/config-apply.v1.json with277 sorted unique entries and the
+closed configuration-module validator. Scope counts are34 restart,22 generation,
+119 index,38 encoders,13 generative and51 hot. The validator derives declarations
+from both enums, rejects unknown/missing/duplicate rows before collapsing identity,
+checks exact schema/types/component vocabulary and the8+14 generation partition.
+Five transitive root selectors retain restart precedence. Fixed ChunkSplitter
+constants remain generation-bound by construction and have no configurable rows.
+
+The matrix projects applyScopeCount from register entries, and config-surface
+ratchets apply_scope277 with a declared initial metric. It does not infer scope
+semantics or claim dispatch. The gate now rejects absent/noninteger/negative
+metrics instead of silently skipping them. Tests prove independent silent growth,
+declared-but-unpinned growth, successful declared repin, and malformed metric refusal.
+2403 passes all31 governance test files; the focused scalar run includes17 repin
+checks,13 cross-gate checks and5 matrix tests. Actual config-surface passes with
+5 informational findings. Both positive/negative fixture reports carry the scalar.
+
+2404's four validator failures exposed locale sorting in the initial proposal.
+The register was reordered using Java-compatible lexical ordering; validation was
+preserved and its diagnostic names both adjacent keys. New Jackson reads use the
+nondeprecated stringValue API. Repository discovery resolves the current worktree
+before loading the register, so a missing file cannot fall through to main.
+Gradle declares the register as a test input; no dependency was changed.
+
+2405 passes all4 validator cases. Actual register mutations then prove the specified
+acceptance:2406 removes a declared row and fails on missing declared keys;2407 adds
+zzzz.unknown and fails on unknown keys. Each runs exactly the production register
+test, records one failure, and preserves XML before the next run. Exact original
+register bytes are restored in finally. Reproduction driver:
+tmp/2406-register-negative-proof.py; logs/counts/XML:tmp/2405*,tmp/2406*,tmp/2407*.
+
+2408 runs `./gradlew.bat :modules:configuration:test spotlessCheck pmdAll --continue
+--console=plain` at921053650 plus restored register/scalar WIP:294 freshly executed
+cases across36 suites, zero failures/errors/skips; full static checks pass in14s.
+Evidence:tmp/2408-register-integrated.txt, counts/XML/source inventory. The source
+inventory covers Java; the governed JSON and Gradle input wiring are retained in
+the checkpoint diff. Matrix/docs validation and actual count gate pass again.
+Independent review identified a redundant277 literal in JUnit: exact declaration
+parity already proves coverage, while the gate owns count changes. Removed that
+literal, preserving the generation/selector semantic oracle.2409 reruns all4
+validator cases plus configuration Spotless successfully. Its source inventory also
+captures concurrent applied-revision files; those are explicitly outside this
+configuration-only proof and remain unverified implementation WIP.
+The second review finding exposed deleted baseline pins falling back to the current
+count. The gate now requires every metric's nonnegative integer live pin and emits
+baseline-malformed on absence/invalidity.2410 passes all31 governance files,
+including missing/negative/fractional apply_scope pin regressions; actual count gate
+passes with5 informational findings. Independent correction review is bounded-clear.
+No pin or validator was weakened.
+Overall applied revision, dispatch and all14
+generation-binding gaps remain open; D1-3 is not yet complete.

@@ -3,3 +3,4 @@
 yaml_keys 102 2026-09-21
 env_sysprop_pairs 236 2026-09-21
 config_keys 53 2026-09-21
+apply_scope 277 2026-09-22

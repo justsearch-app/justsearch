@@ -32,3 +32,9 @@ testing {
     }
   }
 }
+
+tasks.named<Test>("test") {
+  // ConfigApplyRegisterTest reads this governed input outside the Java source tree.
+  inputs.file(rootProject.layout.projectDirectory.file("governance/config-apply.v1.json"))
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+}

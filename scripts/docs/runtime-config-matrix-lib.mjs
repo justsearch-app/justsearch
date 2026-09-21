@@ -232,6 +232,9 @@ export function buildMatrixModel(opts = {}) {
   const envRegistryPath = opts.envRegistryPath ?? path.join(configBase, "EnvRegistry.java");
   const configKeyPath = opts.configKeyPath ?? path.join(configBase, "ConfigKey.java");
   const builderPath = opts.builderPath ?? path.join(configBase, "resolved", "ResolvedConfigBuilder.java");
+  const configApplyPath = opts.configApplyPath ?? path.join(repoRoot, "governance", "config-apply.v1.json");
+  // Classification/schema parity belongs to ConfigApplyRegisterTest; this is a count projection.
+  const configApply = JSON.parse(fs.readFileSync(configApplyPath, "utf8"));
 
   const envRegistry = parseEnvRegistry(envRegistryPath);
   const configKeys = parseConfigKeys(configKeyPath);
@@ -286,6 +289,7 @@ export function buildMatrixModel(opts = {}) {
     yamlKeyCount: yamlContrib.yamlKeys.length,
     envSyspropPairCount: envRegistry.entries.length,
     configKeyCount: configKeys.entries.length,
+    applyScopeCount: configApply.entries.length,
     rows,
   };
 }
@@ -318,6 +322,8 @@ export function renderMatrixMarkdown(model) {
   lines.push("2. `YAML > default` for YAML-only keys (ConfigKey entries, no env var override).");
   lines.push("3. `sysprop > env > default` for env/sysprop-only runtime knobs.");
   lines.push("4. Every declaration explicitly carries `permanent`, `experimental`, or `deprecated`; non-permanent rows require joined review metadata in `governance/config-lifecycle.v1.json`.");
+  lines.push("");
+  lines.push("Apply scopes are classified in `governance/config-apply.v1.json`. Its entry count is projected as `applyScopeCount` and ratcheted by the `config-surface` gate's `apply_scope` metric. `ConfigApplyRegisterTest` validates schema, canonical declaration parity and scope classification. Classification does not establish runtime dispatch or complete generation fingerprint binding; remaining integration is tracked in the Lane F D1 design.");
   lines.push("");
   lines.push(
     "The per-row notes above cover only the sources this table can derive from `EnvRegistry` /" +

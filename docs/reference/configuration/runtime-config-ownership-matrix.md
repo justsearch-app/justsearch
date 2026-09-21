@@ -15,6 +15,8 @@ Precedence note:
 3. `sysprop > env > default` for env/sysprop-only runtime knobs.
 4. Every declaration explicitly carries `permanent`, `experimental`, or `deprecated`; non-permanent rows require joined review metadata in `governance/config-lifecycle.v1.json`.
 
+Apply scopes are classified in `governance/config-apply.v1.json`. Its entry count is projected as `applyScopeCount` and ratcheted by the `config-surface` gate's `apply_scope` metric. `ConfigApplyRegisterTest` validates schema, canonical declaration parity and scope classification. Classification does not establish runtime dispatch or complete generation fingerprint binding; remaining integration is tracked in the Lane F D1 design.
+
 The per-row notes above cover only the sources this table can derive from `EnvRegistry` / `ConfigKey`. The full ordinal chain in `ResolvedConfigBuilder` has more: `jvm_arg` 500 > `worker_snapshot` 450 > `env_var` 400 > `ci_profile` 350 > `settings.json` 300 > `yaml` 200 > `auto_detected` 150 > `default` 100. Two of those contributors are invisible here because they are written by callers rather than declared as keys:
 
 - **`settings.json` (300)** — `ConfigStoreRebuilder.contributeUiSettings` forwards a handful of `UiSettings` fields, including `justsearch.gpu.layers`, `justsearch.context.size`, `justsearch.server.exe`, `justsearch.ui.exclude_patterns`, `justsearch.index.base_path` and `justsearch.llm.model_path`.

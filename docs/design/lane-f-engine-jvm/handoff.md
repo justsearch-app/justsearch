@@ -9,8 +9,10 @@ are authorized; merge remains at stage F. No routine owner approval is pending.
 Continue after status answers, commits and reviews. C2 is accepted; D1/D2/E/F
 remain open. Root owns all Gradle runs, stack lifecycle and integration.
 
-Latest committed/pushed checkpoint: `51b01365d` (explicit schema2 wire3.0.0 migration),
-CI35664958821 pending/running. `c948cf85f` registered the generated status consumer;
+Latest committed/pushed checkpoint: `921053650` (captured live query feature controls),
+CI35666267869 pending/running. `51b01365d` declares schema2 wire3.0.0 migration;
+its Public claims and Windows-native passed, integration was cancelled by successor.
+`c948cf85f` registered the generated status consumer;
 its wire gate exposed the missing major declaration, now locally proved by2401.
 `ecfa96797` contains captured LLM existence/config,
 citation defaults,14th retirement and hosted fixture/schema corrections. Its Public
@@ -69,8 +71,8 @@ Do not connect suppliers while retaining those double reads.
 
 ## Next coherent work
 
-1. Inspect51b's hosted successor while continuing implementation.
-2. Complete current QU/filter ConfigStore wiring with once-per-operation sampling while
+1. Inspect921053650's hosted successor while continuing implementation.
+2. Completed QU/filter ConfigStore wiring with once-per-operation sampling while
    preserving KSE feature gating and retrieve-context deterministic normalization.
    The bounded plan is evidence/D1/query-reader-plan-2026-09-22.md.
    Focused2395 passes377 cases/3 existing skips. HTTP2397 passes13 UI cases but
@@ -80,8 +82,19 @@ Do not connect suppliers while retaining those double reads.
    real-model query passes; actual QU author boost and hybrid filter projection
    return200. Owned stack stopped portsClosed:true. Reader slice complete; preserve
    source inventory and raw proof in tmp/2400* and tmp/2402*. Next run2403.
-3. Continue full governed apply register, dependency/value projections and D1
-   dispatch. All D1/D2/E/F acceptance remains binding, including identity gaps.
+3. Governed277-key register/validator and fourth scalar are implemented.2403 count
+   gate passes5 informational findings; all31 governance
+   Node test files pass.2404 found locale-vs-natural sorting mismatch in the draft;
+   corrected register preserves strict validation.2405 passes4cases,2406/2407 real
+   missing/unknown mutations fail for the intended reasons and exactbytes restore.
+   Register is a declared Gradle test input; no new dependency.2408 fullconfiguration
+   passes294cases/static. Review removes duplicate277JUnitcountauthority;2409
+   passes4cases/configSpotless. Review also closes deleted-pin bypass;2410all31
+   governance files and actual count gate pass. Overall applied revision implementation follows
+   evidence/D1/applied-revision-plan-2026-09-22.md; runtime-owner/client/registry
+   fences are required. No build/stack active. Next run2411.
+   Continue dependency/value projections and D1 dispatch. All D1/D2/E/F acceptance
+   remains binding, including the14 identity gaps.
 4. Preserve compiling checkpoints/push authorization to PR727 and inspect hosted
    successor results. Status answers and commits do not stop work.
 
@@ -94,9 +107,9 @@ ACK. COMPLETE_WITH_GAPS/accept-gaps/live activation requires explicit design/pro
 - Root: shared-owner integration, all builds, stack, evidence and scoped publication.
 - Root: integrated verification, live proof, staged/source ownership and next register.
 - `bulk_engine_restart_proof`: QU/filter source-frozen; no builds.
-- `d1_encoder_projection`: source-frozen; preparing tmp-only277-row register proposal.
-- `query_http_composition`: HTTP/controller/request tests source-frozen; no builds.
-- `d1_owner_review`: QU/filter production review clear; wire triage delivered, idle.
+- `d1_encoder_projection`: strict index generation/committed metadata observation and tests.
+- `query_http_composition`: independent register/scalar review; no builds.
+- `d1_owner_review`: applied-generation race design delivered; reviewing null-version semantics.
 
 ## Evidence and owner map
 
