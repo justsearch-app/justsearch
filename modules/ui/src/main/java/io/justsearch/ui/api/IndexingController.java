@@ -332,28 +332,6 @@ public class IndexingController {
     }
   }
 
-  public void handleReindex(Context ctx) {
-    try {
-      boolean force = Boolean.parseBoolean(ctx.queryParam("force"));
-      IndexingService indexing = indexingService();
-      indexing.reindexWatchedRoots(force, RequestEngineContext.get(ctx));
-      indexing.flush(RequestEngineContext.get(ctx));
-
-      String status = force ? "force reindex triggered" : "reindex triggered";
-      ctx.status(200).json(Map.of("status", status, "force", force));
-    } catch (KnowledgeClientException e) {
-      // Fail closed: don't return 200 when the Worker rejected the request (queue full, unavailable, etc.)
-      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
-      ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
-    } catch (KnowledgeServerNotConnectedException e) {
-      ctx.status(503)
-          .json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, "Knowledge Server not ready", telemetry, ApiErrorHandler.routeOf(ctx)));
-    } catch (Exception e) {
-      log.error("Failed to trigger reindex", e);
-      ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
-    }
-  }
-
   /**
    * Applies exclude patterns by deleting already-indexed documents whose paths match the configured globs.
    *

@@ -29,7 +29,9 @@ For the overall migration architecture, see `docs/explanation/11-index-schema-mi
 
 In the browser UI (and via `POST /api/indexing/reindex`), a reindex can appear to “do nothing” even though:
 
-- The HTTP endpoint returns success (e.g. `{"status":"reindex triggered"}`).
+- The HTTP endpoint returns an operation receipt with `success: true` and a durable
+  `structuredData.operationKey`. This acknowledges the operation, not completed indexing;
+  follow the key through operation history for its terminal result.
 - `/api/status` may briefly show `indexState=INDEXING` with `pendingJobs>0`, then quickly return to `IDLE`.
 - The indexed document count may stay constant.
 - The Library root’s `lastIndexed` timestamp may update even though content wasn’t re-processed.
@@ -121,4 +123,3 @@ struck accordingly. Current state: `docs/explanation/11-index-schema-migration.m
   - ~~A production profile resolves `index.schema_mismatch.policy=FAIL_CLOSED` by default — but only the `FieldInfos` detector can reach it today (the fingerprint detector is warn-only, above).~~ A production profile now resolves `index.schema_mismatch.policy=BLUE_GREEN_MIGRATE` by default, and the fingerprint detector (`index_fingerprint`) enforces.
   - Dev/demo resolves `REBUILD_BACKUP_FIRST` by default (unchanged — a developer wants the fast rebuild).
   - `BLUE_GREEN_MIGRATE` is available everywhere as an explicit override for “no search downtime on mismatch”.
-

@@ -87,7 +87,7 @@ Origin checks still apply. Allowed browser origins can read `Retry-After` throug
 
 Operation policies may declare `declaredSurvival` (`INTERACTIVE` or `DURABLE`);
 absence inherits the caller's survival. Ingest and reindex declare `DURABLE`.
-HTTP invoke, undo and the ingestion alias resolve the matched operation before
+HTTP invoke, undo and the ingestion/reindex aliases resolve the matched operation before
 admitting work. Native MCP resolves the parsed message's operation binding before
 admission, preserving its request id and notification semantics. A direct operation
 uses one slot, including at a per-client limit of one. Classification grants no
@@ -733,6 +733,21 @@ and `modules/ui/src/main/java/io/justsearch/ui/api/ResourceApiModule.java`.
 - Always returns a full `KnowledgeStatusView` record (consistent shape regardless of Worker state). When the index half is unreachable, serves the last-known-good cached view with `statusStale: true` and `statusStaleMs: <elapsed>` (120s cap, then falls back to defaults).
 - Key fields: `state`, `ready`, `indexState`, `healthy`, `indexedDocuments`, `embeddingCoveragePercent`, `spladeCoveragePercent`, `chunkEmbeddingReady` (chunk-level vector queryability, independent from parent-doc `embeddingCoveragePercent`), `statusStale`, `statusStaleMs`.
 - When `statusStale: true`, `healthy` is overridden to `false` and `indexState` to `"UNKNOWN"` — other enrichment fields reflect the last-known-good state.
+
+`POST /api/indexing/reindex`:
+
+- Alias for prepared `core.reindex`, owned by `OperationsController` and registered
+  by `ResourceApiModule`. It uses the same durable admission, consent, recorded
+  producer and completion owner as the Library action; it performs no extra flush.
+- `?force=true` requests forced reindex; the query parameter uses Boolean parsing
+  and defaults to false. The query is authoritative over any body `force` field.
+  An empty body is valid. Optional flat JSON `idempotencyKey`, `preparationNonce`
+  and `confirmationToken` are dispatch controls, outside operation arguments.
+- Returns the standard operation invocation envelope, including the durable key
+  and row in `structuredData`. Acceptance is distinct from terminal completion.
+  Same-key retries retain the original operation; changed arguments return 409.
+  The shared typed consent/locked-store/admission failures and local API security
+  boundary apply. Without recorded composition there is no direct-service fallback.
 
 `POST /api/knowledge/ingest`:
 

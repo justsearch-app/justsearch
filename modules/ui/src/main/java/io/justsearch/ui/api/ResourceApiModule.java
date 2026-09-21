@@ -379,6 +379,7 @@ final class ResourceApiModule implements ApiModule {
     // Slice 3a.1.2: Operation invocation boundary.
     app.post(OperationsController.INVOKE_PATH, operationsController::handleInvoke);
     app.post(OperationsController.INGEST_PATH, operationsController::handleIngest);
+    app.post(OperationsController.REINDEX_PATH, operationsController::handleReindex);
     app.post(OperationsController.UNDO_PATH, operationsController::handleUndo);
 
     // Tempdoc 429 §E.8.a + §F.9 closure: registry catalog endpoints.

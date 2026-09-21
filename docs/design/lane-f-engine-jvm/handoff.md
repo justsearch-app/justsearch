@@ -12,8 +12,10 @@ passes11,083 cases with30 qualified skips; final PMD/format1980 passes. Pause-he
 hosted reconciliation and restart proof remain. The [corrected live run](evidence/C2/live-resumption-2026-09-21.md)
 proves DURABLE ingest and Library reindex rows, acknowledged receipts, exact retained
 retry/conflict behavior and one standard-model query. Its owned stack is stopped.
-Next: correct the existing direct reindex alias where required by C2, then the
-both-store reopen and installed fault scenarios. Live forced-disconnect proof is
+The [reindex alias correction](evidence/C2/reindex-alias-connection.md) passes64
+focused cases, PMD/format, review and production incremental alias/retained-retry proof;
+its owned stack is stopped. Next: both-store reopen and installed fault scenarios.
+Live forced-disconnect proof is
 still distinct from the controlled frontend detachment tests.
 The [pause record](evidence/C2/pause-2026-09-21.md) is historical.
 A/B/C1 are complete; C2 and D1/D2/E/F remain. Merge stays at F.

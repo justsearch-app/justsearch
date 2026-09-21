@@ -53,13 +53,17 @@ import tools.jackson.databind.json.JsonMapper;
 public final class OperationsController {
   static final String INVOKE_PATH = "/api/operations/{id}/invoke";
   static final String INGEST_PATH = "/api/knowledge/ingest";
+  static final String REINDEX_PATH = "/api/indexing/reindex";
   static final String UNDO_PATH = "/api/undo/{id}";
+
+  private enum InputForm { ENVELOPE, INGEST, REINDEX }
 
   /** Matched-route classification shares the dispatch catalog; it grants no authority. */
   Optional<Operation> admissionOperation(Context ctx) {
     if (!"POST".equals(ctx.method().name())) return Optional.empty();
     return switch (ctx.matchedPath()) {
       case INGEST_PATH -> resolveOperation("core.ingest-files");
+      case REINDEX_PATH -> resolveOperation("core.reindex");
       case INVOKE_PATH, UNDO_PATH -> resolveOperation(ctx.pathParam("id"));
       default -> Optional.empty();
     };
@@ -126,15 +130,20 @@ public final class OperationsController {
 
   /** Handles {@code POST /api/operations/{id}/invoke}. */
   public void handleInvoke(Context ctx) {
-    handleInvocation(ctx, ctx.pathParam("id"), false);
+    handleInvocation(ctx, ctx.pathParam("id"), InputForm.ENVELOPE);
   }
 
   /** Flat-input HTTP alias for the same prepared ingestion operation used by MCP. */
   public void handleIngest(Context ctx) {
-    handleInvocation(ctx, io.justsearch.agent.tools.AgentToolsOperationCatalog.INGEST_FILES.value(), true);
+    handleInvocation(ctx, io.justsearch.agent.tools.AgentToolsOperationCatalog.INGEST_FILES.value(), InputForm.INGEST);
   }
 
-  private void handleInvocation(Context ctx, String idValue, boolean flatIngestArguments) {
+  /** Query-force HTTP alias for the same prepared reindex operation used by the Library. */
+  public void handleReindex(Context ctx) {
+    handleInvocation(ctx, io.justsearch.app.services.registry.operations.CoreOperationCatalog.REINDEX.value(), InputForm.REINDEX);
+  }
+
+  private void handleInvocation(Context ctx, String idValue, InputForm inputForm) {
     if (idValue == null || idValue.isBlank()) {
       writeError(ctx, 400, "Missing operation id in path", "BAD_REQUEST");
       return;
@@ -154,7 +163,7 @@ public final class OperationsController {
 
     OperationInvocationRequest request;
     try {
-      request = parseRequest(ctx, flatIngestArguments);
+      request = parseRequest(ctx, inputForm);
     } catch (Exception e) {
       writeError(
           ctx,
@@ -370,21 +379,24 @@ public final class OperationsController {
     return Optional.empty();
   }
 
-  private OperationInvocationRequest parseRequest(Context ctx, boolean flatIngestArguments) throws Exception {
+  private OperationInvocationRequest parseRequest(Context ctx, InputForm inputForm) throws Exception {
     String body = ctx.body();
     if (body == null || body.isBlank()) {
-      // Empty body is valid; treated as zero-args invocation.
-      return new OperationInvocationRequest(null, null, null);
+      body = "{}";
     }
-    if (!flatIngestArguments) return MAPPER.readValue(body, OperationInvocationRequest.class);
+    if (inputForm == InputForm.ENVELOPE) return MAPPER.readValue(body, OperationInvocationRequest.class);
     var parsed = MAPPER.readTree(body);
     if (!(parsed instanceof tools.jackson.databind.node.ObjectNode arguments)) {
-      throw new IllegalArgumentException("Ingest arguments must be a JSON object");
+      throw new IllegalArgumentException("Alias arguments must be a JSON object");
     }
     var request = MAPPER.createObjectNode();
     for (String control : List.of("idempotencyKey", "confirmationToken", "preparationNonce")) {
       var value = arguments.remove(control);
       if (value != null) request.set(control, value);
+    }
+    if (inputForm == InputForm.REINDEX) {
+      // Preserve the existing alias's query contract; a body force value never overrides it.
+      arguments.put("force", Boolean.parseBoolean(ctx.queryParam("force")));
     }
     request.set("args", arguments);
     return MAPPER.treeToValue(request, OperationInvocationRequest.class);

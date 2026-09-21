@@ -12,6 +12,7 @@ import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.intent.*;
 import io.justsearch.app.services.registry.executor.OperationExecutorImpl;
+import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.ui.api.mcp.McpProtocolHandler;
 import io.justsearch.ui.api.mcp.McpToolSurface;
@@ -29,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -38,17 +40,20 @@ class DeclaredSurvivalFrontIntegrationTest {
   @TempDir Path directory;
 
   @ParameterizedTest
-  @ValueSource(strings = {"alias", "invoke", "mcp"})
+  @ValueSource(strings = {"alias", "invoke", "mcp", "reindex", "reindex-force"})
   void directFrontPersistsDurableContextUsingOneSlot(String front) throws Exception {
-    try (var fixture = new Fixture(directory)) {
+    try (var fixture = new Fixture(directory, front)) {
       String path = switch (front) {
         case "alias" -> OperationsController.INGEST_PATH;
         case "invoke" -> "/api/operations/core.ingest-files/invoke";
+        case "reindex" -> OperationsController.REINDEX_PATH;
+        case "reindex-force" -> OperationsController.REINDEX_PATH + "?force=true";
         default -> LocalApiServer.MCP_ENDPOINT_PATH;
       };
       String body = switch (front) {
         case "alias" -> "{\"paths\":[]}";
         case "invoke" -> "{\"args\":{\"paths\":[]}}";
+        case "reindex", "reindex-force" -> "{}";
         default -> """
             {"jsonrpc":"2.0","id":"ingest-1","method":"tools/call","params":{
               "name":"justsearch_ingest","arguments":{"paths":[]}}}
@@ -97,8 +102,34 @@ class DeclaredSurvivalFrontIntegrationTest {
     }
   }
 
+  @Test
+  void reindexAliasRetriesRetainIdentityAndChangedForceConflicts() throws Exception {
+    // The original durable effect remains live; its HTTP retry needs transient ingress capacity.
+    // The separate direct-front cases retain capacity one to prove first-accept ownership.
+    try (var fixture = new Fixture(directory, "reindex", 2)) {
+      String key = OperationKeys.generate(Clock.systemUTC());
+      String body = "{\"idempotencyKey\":\"" + key + "\"}";
+      assertEquals(200, fixture.post(OperationsController.REINDEX_PATH, body).statusCode());
+      var accepted = fixture.store.find(key).orElseThrow();
+      assertEquals(OperationKind.REINDEX, accepted.descriptor().kind());
+      assertEquals(200, fixture.post(OperationsController.REINDEX_PATH, body).statusCode());
+      assertEquals(accepted, fixture.store.find(key).orElseThrow());
+      assertEquals(1, fixture.admission.activeWorkCount());
+      var conflict = fixture.post(OperationsController.REINDEX_PATH + "?force=true", body);
+      assertEquals(409, conflict.statusCode(), conflict.body());
+      assertTrue(conflict.body().contains("OPERATION_KEY_REUSED"));
+      fixture.completion.complete(OperationResult.success("effect finished"));
+      var completed = fixture.store.find(key).orElseThrow();
+      var retry = fixture.post(OperationsController.REINDEX_PATH, body);
+      assertEquals(200, retry.statusCode(), retry.body());
+      assertTrue(retry.body().contains("\"operationRecordId\":" + completed.id()));
+      assertEquals(completed, fixture.store.find(key).orElseThrow());
+      assertEquals(0, fixture.admission.activeWorkCount());
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
-    final EngineAdmissionController admission = new EngineAdmissionController(1, 1, 1);
+    final EngineAdmissionController admission;
     final AtomicReference<EngineContext> handler = new AtomicReference<>();
     final CompletableFuture<OperationResult> completion = new CompletableFuture<>();
     final SqliteOperationStore store;
@@ -106,12 +137,21 @@ class DeclaredSurvivalFrontIntegrationTest {
     final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
     final Javalin app;
 
-    Fixture(Path directory) throws Exception {
+    Fixture(Path directory, String front) throws Exception {
+      this(directory, front, 1);
+    }
+
+    Fixture(Path directory, String front, int capacity) throws Exception {
+      admission = new EngineAdmissionController(capacity, capacity, 1);
       var clock = Clock.systemUTC();
-      var catalog = new AgentToolsOperationCatalog();
-      var operation = catalog.findById(AgentToolsOperationCatalog.INGEST_FILES).orElseThrow();
+      boolean reindex = front.startsWith("reindex");
+      OperationCatalog catalog = reindex ? new CoreOperationCatalog() : new AgentToolsOperationCatalog();
+      var operation = catalog.findById(reindex ? CoreOperationCatalog.REINDEX
+          : AgentToolsOperationCatalog.INGEST_FILES).orElseThrow();
+      String expectedArguments = reindex ? "{\"force\":" + "reindex-force".equals(front) + "}"
+          : "{\"paths\":[]}";
       store = new SqliteOperationStore(directory.resolve("operations.db"));
-      var runner = new OperationAttemptRunnerImpl(store, clock, java.util.Set.of(OperationKind.INGEST));
+      var runner = new OperationAttemptRunnerImpl(store, clock, java.util.Set.of(OperationKind.INGEST, OperationKind.REINDEX));
       var handlers = new HandlerRegistry();
       handlers.register(operation.id(), new OperationHandler() {
         @Override public OperationResult execute(String args, EngineContext context) { throw new AssertionError("raw dispatch"); }
@@ -127,6 +167,7 @@ class DeclaredSurvivalFrontIntegrationTest {
         @Override public OperationExecution executePrepared(OperationPreparation preparation,
             InvocationProvenance provenance, EngineContext context, OperationRecordHandle record) {
           assertTrue(handler.compareAndSet(null, context));
+          assertEquals(expectedArguments, preparation.argumentsJson());
           assertEquals(1, admission.activeWorkCount());
           return new OperationExecution(OperationResult.success("effect started"), completion);
         }
@@ -141,7 +182,7 @@ class DeclaredSurvivalFrontIntegrationTest {
         @Override public boolean coversArguments(Operation op, String args, EngineContext context) { return false; }
         @Override public boolean coversPreparation(Operation op, OperationPreparation prepared, EngineContext context) {
           return op.id().equals(operation.id()) && "front-composition.v1".equals(prepared.replaySchema())
-              && "{\"paths\":[]}".equals(prepared.argumentsJson());
+              && expectedArguments.equals(prepared.argumentsJson());
         }
       });
       var controller = new OperationsController(List.of(catalog), executor, clock);
@@ -154,6 +195,7 @@ class DeclaredSurvivalFrontIntegrationTest {
       new ApiSecurityFilters(true, TOKEN, new EventBuffer(), events, null, admission, admission,
           controller::admissionOperation).install(app, protocol::clientIdentity);
       app.post(OperationsController.INGEST_PATH, controller::handleIngest);
+      app.post(OperationsController.REINDEX_PATH, controller::handleReindex);
       app.post(OperationsController.INVOKE_PATH, controller::handleInvoke);
       app.post(LocalApiServer.MCP_ENDPOINT_PATH, protocol::handlePost);
       app.start("127.0.0.1", 0);

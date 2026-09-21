@@ -66,6 +66,32 @@ final class OperationsControllerTest {
   }
 
   @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({"true,true", "TRUE,true", "false,false", "invalid,false"})
+  void reindexQueryIsAuthoritativeAndControlFieldsStayOutsideArguments(String query, boolean force) throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.randomUUID();
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(key), eq(nonce)))
+        .thenReturn(OperationResult.success("prepared reindex"));
+    var ctx = mockContext("core.reindex", "{\"force\":" + !force + ",\"idempotencyKey\":\"" + key
+        + "\",\"preparationNonce\":\"" + nonce + "\",\"confirmationToken\":\"capsule\"}");
+    when(ctx.queryParam("force")).thenReturn(query);
+    controller.handleReindex(ctx);
+    verify(dispatcher).dispatch(org.mockito.ArgumentMatchers.argThat(op -> op.id().equals(CoreOperationCatalog.REINDEX)),
+        eq("{\"force\":" + force + "}"), any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce));
+    verify(ctx).status(200);
+    assertTrue(capture(ctx).path("success").asBoolean());
+  }
+
+  @Test
+  void emptyReindexRequestDefaultsToIncremental() throws Exception {
+    when(dispatcher.dispatch(any(), any(), any(), any(), any())).thenReturn(OperationResult.success("incremental"));
+    var ctx = mockContext("core.reindex", "");
+    controller.handleReindex(ctx);
+    verify(dispatcher).dispatch(any(), eq("{\"force\":false}"), any(), any(), any());
+    verify(ctx).status(200);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void preparedPreviewReplacesRawContentInGateAndPendingPeek(boolean undo) throws Exception {
     var pending = new io.justsearch.app.services.intent.PendingAuthorizationStore();

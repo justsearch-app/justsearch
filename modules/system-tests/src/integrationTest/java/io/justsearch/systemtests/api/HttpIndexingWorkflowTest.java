@@ -182,10 +182,9 @@ class HttpIndexingWorkflowTest {
 
         if (response.statusCode() == 200) {
             JsonNode json = objectMapper.readTree(response.body());
-            assertTrue(
-                json.get("status").asText().contains("reindex"),
-                "Status should mention reindex"
-            );
+            assertTrue(json.path("success").asBoolean(), response.body());
+            assertFalse(json.path("structuredData").path("operationKey").asText().isBlank(), response.body());
+            assertTrue(json.path("structuredData").path("operationRecordId").asLong() > 0, response.body());
         }
     }
 
@@ -211,7 +210,9 @@ class HttpIndexingWorkflowTest {
 
         if (response.statusCode() == 200) {
             JsonNode json = objectMapper.readTree(response.body());
-            assertTrue(json.get("force").asBoolean(), "Force flag should be true");
+            assertTrue(json.path("success").asBoolean(), response.body());
+            assertFalse(json.path("structuredData").path("operationKey").asText().isBlank(), response.body());
+            assertTrue(json.path("structuredData").path("operationRecordId").asLong() > 0, response.body());
         }
     }
 

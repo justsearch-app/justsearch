@@ -154,7 +154,7 @@ configuration or input files. The accepted record and context reach
 `RecordedIngestionService`, whose completion waits for the recorded ingestion owner;
 calling these handlers directly does not authorize an effect. Eager and late registration
 resolve the current client when preparing, so Engine replacement cannot retain a stale
-generation supplier. The flat REST ingestion alias enters this same dispatcher path.
+generation supplier. The REST ingestion and reindex aliases enter this same dispatcher path.
 The dev/prod stdio MCP bridges preserve MCP attribution, operation controls and the complete
 invocation response, including confirmation refusal and its prepared identity.
 
