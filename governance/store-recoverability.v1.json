@@ -1502,6 +1502,28 @@
       "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about."
     },
     {
+      "id": "operation-fault-harness-barrier",
+      "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Opt-in installed-test coordination only: operation keys, phase, receipt cursor/counters and PID, with no document content, credentials or user settings. The release file carries a timestamp but is consumed only as a presence signal. Normal product startup does not create these files.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": ["runtime/operation-fault-reached.json", "runtime/operation-fault-reached.pending", "runtime/operation-fault-release"],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "RESET",
+      "format": "Unversioned installed-test marker JSON and timestamped release presence signal",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REACHED_PUBLICATION_AND_SINGLE_WRITE_PENDING_RELEASE",
+      "corruptionPolicy": "FAIL_LOUD",
+      "reconciliation": "The selected harness run preserves the reached marker across its forced restart so the successor cannot retrigger the same barrier. The Engine directly writes pending JSON and atomically moves it to reached; the harness directly writes the release timestamp, whose contents the Engine never parses. The Engine checks presence only; the harness parses and validates exact phase/key/PID before killing. Malformed evidence fails that test rather than authorizing a kill. Each new case gets a fresh data directory; no product recovery or upgrade consumes this evidence. A pending write is never treated as reached.",
+      "status": "READY",
+      "implementationSources": ["modules/ui/src/main/java/io/justsearch/ui/OperationFaultBarrier.java", "scripts/supervisor-conformance/operation-fault-scenario.mjs"],
+      "tests": ["modules/ui/src/test/java/io/justsearch/ui/OperationFaultBarrierTest.java", "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/OperationResumeE2ETest.java"],
+      "fixtures": []
+    },
+    {
       "id": "operations-db",
       "pathVerification": "COMPOSED",
       "pathVerificationNote": "HeadlessApp and LauncherEnvironment resolve operations.db under DATA_DIR; SqliteOperationStore composes SQLite sidecars and timestamped preservation directories.",

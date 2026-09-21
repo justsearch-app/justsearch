@@ -1074,7 +1074,7 @@ public class HeadlessApp {
                 "ui", response.ui(), "llm", response.llm(), "indexPaths", response.indexPaths(),
                 "settingsMode", response.settingsMode()));
           });
-      var operationFaultHook = OperationFaultBarrier.fromEnvironment(configPhase.dataDir(), System.getenv());
+      var operationFaultHook = OperationFaultBarrier.fromEnvironment(configPhase.dataDir(), SystemAccess::rawEnvVar);
       var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
           operations, java.time.Clock.systemUTC(), java.util.Set.of(
               io.justsearch.agent.api.registry.OperationKind.INGEST,

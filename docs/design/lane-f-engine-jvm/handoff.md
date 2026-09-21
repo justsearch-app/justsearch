@@ -26,11 +26,17 @@ The [installed fault batch](evidence/C2/installed-fault-plan-2026-09-21.md) pass
 all eight cases in2051, including six exact fault boundaries, real HTTP caller
 disconnect and the original baseline. Review, PMD/format and focused governance pass.
 The [paired changed-input proof](evidence/C2/resume-dependency-pair.md) and its exposed
-public-settings history defect pass focused2057/2060 and all8 installed2061 cases.
-Next: integrated full stress, the still-owed
+public-settings history defect are pushed in `0a23b0a4f`; focused2057/2060 and all8
+installed2061 cases pass. Full stress2064 finished with one new configuration-funnel
+failure in11,119 cases; its XML is preserved. The reviewed configuration correction
+and harness-marker classification pass final2075 (288 cases, including all8 installed)
+and store2076. Health2080 is ABSENT, no foreign run/orphan. [Current full/hosted
+reconciliation and remaining integration failures](evidence/C2/hosted-governance-reconciliation.md).
+No dev stack is running. Next: close those real integration/gate failures, then the still-owed
 [C2-10 bulk durable row/plan/resume](evidence/C2/bulk-reindex-connection.md),
 and C2-12 sweep/full verification. Streamed `core.reindex` proof does not discharge
-`core.bulk-reindex`; D1 retains journal/replay/live-activation/gap-refusal ownership.
+`core.bulk-reindex`; its source-grounded design and implementation sequence are now
+settled in the linked record. D1 retains journal/replay/live-activation/gap-refusal ownership.
 The [pause record](evidence/C2/pause-2026-09-21.md) is historical.
 A/B/C1 are complete; C2 and D1/D2/E/F remain. Merge stays at F.
 

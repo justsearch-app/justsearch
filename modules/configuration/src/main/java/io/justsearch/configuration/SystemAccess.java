@@ -37,8 +37,13 @@ public final class SystemAccess {
   }
 
   public static String envVar(String key) {
-    if (key == null || key.isBlank()) return null;
-    String v = System.getenv(key);
+    String v = rawEnvVar(key);
     return (v == null || v.isBlank()) ? null : v;
+  }
+
+  /** Presence-sensitive process selectors must distinguish an invalid blank value from absence. */
+  public static String rawEnvVar(String key) {
+    if (key == null || key.isBlank()) return null;
+    return System.getenv(key);
   }
 }

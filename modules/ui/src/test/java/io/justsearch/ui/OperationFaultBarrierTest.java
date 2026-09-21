@@ -24,12 +24,26 @@ final class OperationFaultBarrierTest {
 
   @Test
   void absentSelectionUsesTheExactNoopAndAnySelectionRequiresHarnessMode() {
-    assertSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK, OperationFaultBarrier.fromEnvironment(data, Map.of()));
+    assertSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK, OperationFaultBarrier.fromEnvironment(data, Map.<String, String>of()::get));
     var env = new HashMap<>(selection());
     env.remove("JUSTSEARCH_SUPERVISOR_HARNESS");
-    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env));
+    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env::get));
     assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data,
-        Map.of("JUSTSEARCH_OPERATION_FAULT_KEY", KEY)));
+        Map.of("JUSTSEARCH_OPERATION_FAULT_KEY", KEY)::get));
+  }
+
+  @Test
+  void blankSelectorsArePresentAndCannotSilentlyDisableTheBarrier() {
+    for (String field : java.util.List.of("JUSTSEARCH_OPERATION_FAULT_POINT",
+        "JUSTSEARCH_OPERATION_FAULT_KEY", "JUSTSEARCH_OPERATION_FAULT_KIND")) {
+      for (String blank : java.util.List.of("", " ")) {
+        var env = new HashMap<String, String>();
+        env.put(field, blank);
+        assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env::get));
+        env.put("JUSTSEARCH_SUPERVISOR_HARNESS", "1");
+        assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env::get));
+      }
+    }
   }
 
   @Test
@@ -37,16 +51,16 @@ final class OperationFaultBarrierTest {
     for (String field : selection().keySet()) {
       var env = new HashMap<>(selection());
       env.remove(field);
-      assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env));
+      assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env::get));
     }
     var env = new HashMap<>(selection());
     env.put("JUSTSEARCH_OPERATION_FAULT_POINT", "arbitrary-write");
-    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env));
+    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env::get));
   }
 
   @Test
   void exactBoundaryPublishesEvidenceAndSuccessorDoesNotRetrigger() throws Exception {
-    var hook = OperationFaultBarrier.fromEnvironment(data, selection());
+    var hook = OperationFaultBarrier.fromEnvironment(data, selection()::get);
     var boundary = new OperationAttemptRunnerImpl.FaultBoundary("after-effect", OperationKind.INGEST,
         KEY, "01994180-0000-7000-8000-000000000002", 17, "ingest-receipt:1:9:hash", 1, 0);
     hook.accept(new OperationAttemptRunnerImpl.FaultBoundary("before-accept", OperationKind.INGEST,
@@ -70,7 +84,7 @@ final class OperationFaultBarrierTest {
     assertEquals(1, json.path("completed").asLong());
     assertEquals(ProcessHandle.current().pid(), json.path("pid").asLong());
     Files.delete(release);
-    var successor = OperationFaultBarrier.fromEnvironment(data, selection());
+    var successor = OperationFaultBarrier.fromEnvironment(data, selection()::get);
     assertTimeoutPreemptively(Duration.ofSeconds(1), () -> successor.accept(boundary));
     assertEquals(evidence, Files.readString(reached));
   }

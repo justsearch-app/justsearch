@@ -8,22 +8,22 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import tools.jackson.databind.json.JsonMapper;
 
 /** File barrier for the identity-verified installed supervisor tests, selected only at boot. */
 final class OperationFaultBarrier {
   private OperationFaultBarrier() {}
 
-  static Consumer<OperationAttemptRunnerImpl.FaultBoundary> fromEnvironment(Path data, Map<String, String> env) {
-    String phase = env.get("JUSTSEARCH_OPERATION_FAULT_POINT");
-    String key = env.get("JUSTSEARCH_OPERATION_FAULT_KEY");
-    String kind = env.get("JUSTSEARCH_OPERATION_FAULT_KIND");
+  static Consumer<OperationAttemptRunnerImpl.FaultBoundary> fromEnvironment(Path data, Function<String, String> env) {
+    String phase = env.apply("JUSTSEARCH_OPERATION_FAULT_POINT");
+    String key = env.apply("JUSTSEARCH_OPERATION_FAULT_KEY");
+    String kind = env.apply("JUSTSEARCH_OPERATION_FAULT_KIND");
     if (phase == null && key == null && kind == null) return OperationAttemptRunnerImpl.NO_FAULT_HOOK;
-    if (!"1".equals(env.get("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+    if (!"1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
       throw new IllegalArgumentException("Operation fault selection requires supervisor harness mode");
     }
     if (phase == null || !Set.of("before-accept", "after-accept", "after-effect").contains(phase)
