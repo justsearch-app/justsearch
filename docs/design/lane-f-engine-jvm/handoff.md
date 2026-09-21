@@ -5,7 +5,7 @@
 Continue autonomously in `.claude/worktrees/lane-f-pr1-verify`, branch
 `codex/lane-f-pr1`. Main has unrelated work. Existing checkpoint publication and
 stage-F merge authorization persists; no routine owner approval is pending.
-C2 and D1/D2/E/F remain open. Root owns shared Gradle and dev-stack lifecycle.
+C2 is accepted; D1/D2/E/F remain open. Root owns shared Gradle and dev-stack lifecycle.
 
 Pushed checkpoint `0f1bec7e324a7aa8fab86bab0452d6167dd2d940` connects recorded bulk
 admission, captured enumeration, exact generation recovery/promotion, durable
@@ -83,11 +83,12 @@ integration57passes/42skips. Standard-model2269 answers correctly on this instal
 build; owned stack stopped with closed ports and health ABSENT/no orphans.
 [Current verification and exact evidence](evidence/C2/verification-2026-09-21.md).
 
-Public claims on35594867134 failed only the AGENTS byte-budget ratchet. The pending
-docs correction retains obligations at8566/8573bytes and passes local checks;
-push it and require hosted reproof. C2-12 residue is reconciled, including historical
-I10 and current jobs-db citations. Final acceptance audit remains in progress;
-do not infer C2 completion from these aggregate greens. Then continue D1/D2/E/F.
+Public claims correction passes hosted2271 on492af9b89 (synthetic1028274b),
+including8566/8573byte budget. Independent reconciliation finds no remaining C2
+acceptance gap. C2 is accepted; D1 batch1 is active. The newer workflow's remaining
+jobs are still running, not claimed green. Root owns integration and shared builds;
+bounded agent owns new component contract/registry/tests, explorers map configuration
+and readiness. [Current D1 plan](evidence/D1/component-plan-2026-09-21.md).
 
 ### D1 preparation after C2 reconciliation
 

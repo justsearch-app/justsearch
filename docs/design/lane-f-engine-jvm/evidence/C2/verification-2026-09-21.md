@@ -14,10 +14,20 @@ This record reconciles evidence; it does not waive outstanding acceptance items.
 Hosted run35594867134 overall failed only Public claims: AGENTS8721bytes exceeded
 8573 by148. The pending wording correction preserves obligations at8566bytes,
 regenerates CLAUDE, and passes the existing local budget/projection/parity checks.
-No ceiling was raised. Hosted proof of that correction remains required. The
+No ceiling was raised. Hosted proof of that correction now passes: run35597743409, Public claims job106326384172 at branch492af9b892563e70f709d0a0fa564a1af6a80ae7, actual synthetic checkout1028274b48740bf836c5f243e70b58e44588fadc. Its budget step reports8566/8573bytes and passes; full job log `tmp/2271-public-claims.txt`, job/step inventory `tmp/2271-public-claims.json`. The rest of that new workflow is still running; its aggregate result is not claimed. The
 workflow support advisory also identifies Gradle9.6.1 superseded by9.7.1; no
 unrelated toolchain upgrade is claimed here.
 
 Bulky raw artifacts remain in this worktree's ignored `tmp` through lane acceptance
 plus30days; export them before releasing the worktree. Source/test summaries live
 in Git; a hash alone is not the evidence destination.
+
+## Acceptance reconciliation
+
+Independent read-only audit reconciled every remaining C2 acceptance requirement
+against current owner evidence. Both supervisor adapters passed17/17 in2038/2039,
+as retained in `installed-fault-plan-2026-09-21.md`; their unchanged paths remain
+covered. C2-12 residue/store citations and whole-program/full-suite proof are closed.
+The final outstanding hosted byte-budget correction passed2271. C2 is accepted at
+this boundary; Stage B's separately named final platform duties and D1/D2/E/F remain
+assigned to their existing stages. No missing check was reclassified as a pass.
