@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -41,9 +42,23 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
   private final File repoRoot;
   private final SsotAnalyzerRegistry analyzerRegistry;
   private final SsotAnalyzerRegistry.AnalyzerFingerprintingService fingerprintingService;
+  private final ResolvedConfig resolvedConfigSnapshot;
   private volatile String cachedAnalyzerFingerprint;
 
   public SsotCommitMetadataSource() {
+    this(null, false);
+  }
+
+  /** Builds metadata from one captured configuration snapshot. */
+  public SsotCommitMetadataSource(ResolvedConfig snapshot) {
+    this(snapshot, true);
+  }
+
+  private SsotCommitMetadataSource(ResolvedConfig snapshot, boolean requireSnapshot) {
+    if (requireSnapshot) {
+      Objects.requireNonNull(snapshot, "snapshot");
+    }
+    this.resolvedConfigSnapshot = snapshot;
     this.repoRoot = resolveRepoRoot();
     this.analyzerRegistry = new SsotAnalyzerRegistry();
     this.fingerprintingService = new SsotAnalyzerRegistry.AnalyzerFingerprintingService();
@@ -60,6 +75,7 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
   @Override
   public Map<String, Object> build() {
     try {
+      ResolvedConfig resolved = configForCallOrNull();
       Map<String, Object> out = new LinkedHashMap<>();
 
       // versions/catalog.json — grammar/template observability only. The index's identity no
@@ -84,7 +100,7 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
       // boot in the same state can still tell a changed vector dimension from an unchanged one
       // (tempdoc 931 §C.5). It is the same statement as the digest, not a second one — see
       // IndexFingerprint.COMMIT_META_INPUTS_KEY on why it is not a parity key.
-      IndexFingerprint.Inputs inputs = fingerprintInputs();
+      IndexFingerprint.Inputs inputs = fingerprintInputs(resolved);
       IndexFingerprint.compute(inputs).ifPresent(fp -> out.put(IndexFingerprint.COMMIT_META_KEY, fp));
       out.put(
           IndexFingerprint.COMMIT_META_INPUTS_KEY,
@@ -109,9 +125,10 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
       // key: similarity_fp is BM25 k1/b (observability only), boosts_fp is the one *benign*
       // parity key — a mismatch means the running config disagrees with the index, which is worth
       // reporting but never worth a reindex.
-      out.put("similarity_fp", sha256Bytes(similarityDescriptorFromConfig().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+      out.put("similarity_fp", sha256Bytes(
+          similarityDescriptor(resolved).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
       // boosts fingerprint from app-config index.boosts (deterministic)
-      String boostsJson = boostsCanonicalJson();
+      String boostsJson = boostsCanonicalJson(resolved);
       out.put("boosts_fp", sha256Bytes(boostsJson.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
 
       // feature toggle for grammar (default ON in this slice)
@@ -120,7 +137,7 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
       // Vector storage format stamp. Also an index_fingerprint input (a different
       // KnnVectorsFormat is a different on-disk encoding); kept as its own key because
       // VectorFormatDetector and the status surface report it directly.
-      out.put("vector_format", vectorFormat());
+      out.put("vector_format", vectorFormat(resolved));
 
       return Map.copyOf(out);
     } catch (IOException e) {
@@ -150,10 +167,10 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
   }
 
   /** {@code float32} unless vector quantization is enabled. */
-  private static String vectorFormat() {
+  private static String vectorFormat(ResolvedConfig resolved) {
     try {
-      ResolvedConfig rc = resolvedConfigOrFallback();
-      boolean quantized = rc != null && Boolean.TRUE.equals(rc.index().vectorQuantizationEnabled());
+      boolean quantized =
+          resolved != null && Boolean.TRUE.equals(resolved.index().vectorQuantizationEnabled());
       return quantized ? "int8_sq" : "float32";
     } catch (RuntimeException e) {
       return "float32";
@@ -173,21 +190,24 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
    * edits each falsely demanded a reindex (tempdoc 804).
    */
   IndexFingerprint.Inputs fingerprintInputs() throws IOException {
+    return fingerprintInputs(configForCallOrNull());
+  }
+
+  private IndexFingerprint.Inputs fingerprintInputs(ResolvedConfig resolved) throws IOException {
     JsonNode catalog = M.readTree(file("SSOT/catalogs/fields.v1.json"));
-    ResolvedConfig rc = resolvedConfigOrNull();
 
     return new IndexFingerprint.Inputs(
             catalog.path("version").asText(),
             projectFields(catalog, IndexFingerprint.effectiveVectorDimension()),
             analyzerFingerprint(),
-            vectorFormat(),
+            vectorFormat(resolved),
             new IndexFingerprint.Hnsw(
-                rc == null
+                resolved == null
                     ? ResolvedConfig.Index.DEFAULT_VECTOR_HNSW_M
-                    : rc.index().effectiveVectorHnswM(),
-                rc == null
+                    : resolved.index().effectiveVectorHnswM(),
+                resolved == null
                     ? ResolvedConfig.Index.DEFAULT_VECTOR_HNSW_EF_CONSTRUCTION
-                    : rc.index().effectiveVectorHnswEfConstruction()),
+                    : resolved.index().effectiveVectorHnswEfConstruction()),
             new IndexFingerprint.Chunking(
                 ChunkSplitter.DEFAULT_CHUNK_TOKENS,
                 ChunkSplitter.DEFAULT_OVERLAP_TOKENS,
@@ -249,7 +269,10 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
     return fields;
   }
 
-  private static ResolvedConfig resolvedConfigOrNull() {
+  private ResolvedConfig configForCallOrNull() {
+    if (resolvedConfigSnapshot != null) {
+      return resolvedConfigSnapshot;
+    }
     try {
       return resolvedConfigOrFallback();
     } catch (RuntimeException e) {
@@ -306,18 +329,18 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
     }
   }
 
-  private static String similarityDescriptorFromConfig() {
+  private static String similarityDescriptor(ResolvedConfig resolved) {
     try {
-        ResolvedConfig rc = resolvedConfigOrFallback();
-        ResolvedConfig.Index idx = rc != null ? rc.index() : null;
-        String cls = org.apache.lucene.search.similarities.BM25Similarity.class.getName();
-        float k1 = idx != null && idx.similarityTextK1() != null
-            ? idx.similarityTextK1().floatValue() : 0.9f;
-        float b = idx != null && idx.similarityTextB() != null
-            ? idx.similarityTextB().floatValue() : 0.4f;
-        return cls + "(k1=" + trimFloat(k1) + ",b=" + trimFloat(b) + ")";
+      ResolvedConfig.Index idx = resolved != null ? resolved.index() : null;
+      String cls = org.apache.lucene.search.similarities.BM25Similarity.class.getName();
+      float k1 = idx != null && idx.similarityTextK1() != null
+          ? idx.similarityTextK1().floatValue() : 0.9f;
+      float b = idx != null && idx.similarityTextB() != null
+          ? idx.similarityTextB().floatValue() : 0.4f;
+      return cls + "(k1=" + trimFloat(k1) + ",b=" + trimFloat(b) + ")";
     } catch (Exception e) {
-        return org.apache.lucene.search.similarities.BM25Similarity.class.getName() + "(k1=0.900,b=0.400)";
+      return org.apache.lucene.search.similarities.BM25Similarity.class.getName()
+          + "(k1=0.900,b=0.400)";
     }
   }
 
@@ -338,9 +361,9 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
     return String.format(java.util.Locale.ROOT, "%.3f", v);
   }
 
-  private static String boostsCanonicalJson() throws IOException {
+  private static String boostsCanonicalJson(ResolvedConfig resolved) throws IOException {
     try {
-      Map<String, Double> boosts = resolvedConfigOrFallback().index().boosts();
+      Map<String, Double> boosts = resolved == null ? Map.of() : resolved.index().boosts();
       // boosts is already TreeMap-backed (deterministic key order) from ResolvedConfig
       return M.writeValueAsString(boosts);
     } catch (Exception e) {
