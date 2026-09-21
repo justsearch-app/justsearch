@@ -65,10 +65,11 @@ public final class EngineRoot implements WorkerHost {
       new DefaultEngineExecutorRegistry(resources);
   private final io.justsearch.core.component.EngineComponentRegistry components =
       new DefaultEngineComponentRegistry(resources.retained());
-  private final io.justsearch.core.component.ComponentHandle indexComponent = components.register(
+  private final io.justsearch.core.component.ComponentHandle indexComponent =
+      new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(components.register(
       new io.justsearch.core.component.ComponentSpec("index", true, KnowledgeServer.componentDependencies(),
           io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
-          java.time.Duration.ofSeconds(60), 2));
+          java.time.Duration.ofSeconds(60), 2)));
   private final io.justsearch.core.component.ComponentHandle encoderComponent = components.register(
       new io.justsearch.core.component.ComponentSpec("encoders", false,
           io.justsearch.indexerworker.server.InferenceCompositionRoot.componentDependencies(),
@@ -80,6 +81,9 @@ public final class EngineRoot implements WorkerHost {
 
   /** Process-owned observations shared by all four component owners and their projections. */
   public io.justsearch.core.component.EngineComponentRegistry components() { return components; }
+
+  /** The shared physical and sampled index publisher, with the same reason-retention policy. */
+  public io.justsearch.core.component.ComponentHandle indexComponent() { return indexComponent; }
 
   /** The same owner is shared by the API front, library calls and ordered shutdown. */
   public io.justsearch.app.api.EngineAdmissionService admission() { return admission; }

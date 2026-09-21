@@ -228,3 +228,26 @@ production caller and must retire. Pin intent precedence, initial STARTING versu
 observed RELOADING, crash recovery, background-only ONLINE and GPU yield in the
 producer tests when the actual owner migration lands. Callback publication must
 not let a stale activation failure overwrite a newer disable/READY observation.
+
+## Index sampler source-state clarification
+
+At `ad9ac55ba`, direct physical loss keeps a client in KnowledgeServerBootstrap;
+a later healthy conjunction is therefore allowed to recover FAILED as well as
+STARTING and UNAVAILABLE. A successful fresh observation preserves ABSENT and
+RELOADING: completed teardown and an owner-controlled replacement may not be
+erased by a retained healthy incumbent. Failed observations demote only READY.
+The full-registry conditional transition separately rejects API/index changes
+during observation. This adds no lifecycle authority or generation marker.
+
+Sampler cache acceptance and registry publication share a short synchronized
+section; RPC remains outside it so normal cached reads do not wait for contact.
+An invalidated observation is not installed as the latest sample. HTTP/manifest
+schema migration remains required; these publications alone do not replace the
+legacy lifecycle projection.
+
+Fresh debug requests and background sampling share one sampling lock, including
+their tap delivery, while cached reads bypass that lock. Full-registry CAS alone
+cannot order two RPCs when a newer healthy result leaves READY unchanged. Serial
+ownership avoids an extra sequence counter/epoch and keeps observation callbacks
+ordered without making ordinary cached reads wait for a stalled RPC. The initial
+cache-miss path rechecks the cache after acquiring the sampling lock.

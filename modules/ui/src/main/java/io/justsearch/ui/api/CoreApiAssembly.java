@@ -186,6 +186,9 @@ final class CoreApiAssembly {
             () -> gpuCapabilitiesService,
             resolveWorkerCapability(headAssemblyRef, b.knowledgeServer, b.knowledgeServerStartError),
             resolveInferenceCapability(headAssemblyRef, b.inferenceCapability));
+    if (b.indexComponent != null) {
+      statusLifecycleHandler.setIndexComponent(b.componentRegistry, b.indexComponent);
+    }
     // 419 C3 V1: wire head-side time-series + telemetry-health suppliers.
     if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry lt) {
       statusLifecycleHandler.setRrdStoreSupplier(lt::getRrdStore);

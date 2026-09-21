@@ -1123,6 +1123,7 @@ public class LocalApiServer {
     io.justsearch.app.api.OperationLeaseService operationLeaseService;
     io.justsearch.app.api.EngineAdmissionService engineAdmission;
     EngineComponentRegistry componentRegistry;
+    ComponentHandle indexComponent;
     ComponentHandle apiComponent;
     io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
 
@@ -1243,6 +1244,12 @@ public class LocalApiServer {
     /** Process boot supplies the one component registry; tests may omit it. */
     public Builder componentRegistry(EngineComponentRegistry registry) {
       this.componentRegistry = java.util.Objects.requireNonNull(registry);
+      return this;
+    }
+
+    /** Shares the Engine's existing index publisher with the readiness sampler. */
+    public Builder indexComponent(ComponentHandle handle) {
+      this.indexComponent = java.util.Objects.requireNonNull(handle);
       return this;
     }
 

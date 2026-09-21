@@ -61,14 +61,15 @@ final class WorkerStatusSamplerTest {
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     // A real capability, starting PENDING exactly as it is before the Worker connects.
     var worker = new io.justsearch.app.services.lifecycle.WorkerCapability();
-    StatusLifecycleHandler handler = handlerWith(indexBase, client, worker);
+    var attached = new java.util.concurrent.atomic.AtomicBoolean();
+    StatusLifecycleHandler handler = handlerWith(indexBase, client, worker, attached::get);
 
     ConditionStore conditions = new ConditionStore();
     handler.setLifecycleSnapshotTap(
         new LifecycleSnapshotTap(
             conditions, new HealthEventChangeRegistry(), HEAD_SRC, Clock.systemUTC()));
 
-    // First tick with the worker capability still PENDING: the tap must ASSERT index.unavailable.
+    // First tick before client attachment: the tap must ASSERT index.unavailable.
     // Asserting only the cleared end-state would be vacuous — "absent" is also what a tap that
     // never ran leaves behind.
     handler.sampleAndBuildStatusSnapshot();
@@ -79,6 +80,7 @@ final class WorkerStatusSamplerTest {
     // Now the worker is reachable and READY; the next tick must CLEAR it. Only a tap that really
     // ran on both ticks can produce the transition.
     worker.transition(CapabilityHealth.READY, null);
+    attached.set(true);
     StatusResponse sampled = handler.sampleAndBuildStatusSnapshot();
 
     verify(client, times(1)).getWorkerOperationalView(TestRequestContexts.internal());
@@ -314,8 +316,16 @@ final class WorkerStatusSamplerTest {
       Path indexBase,
       KnowledgeClient client,
       io.justsearch.app.services.lifecycle.WorkerCapability worker) {
+    return handlerWith(indexBase, client, worker, () -> true);
+  }
+
+  private static StatusLifecycleHandler handlerWith(
+      Path indexBase, KnowledgeClient client,
+      io.justsearch.app.services.lifecycle.WorkerCapability worker,
+      java.util.function.BooleanSupplier attached) {
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     when(ks.client()).thenReturn(client);
+    when(ks.hasClient()).thenAnswer(invocation -> attached.getAsBoolean());
 
     io.justsearch.app.services.lifecycle.InferenceCapability inference =
         mock(io.justsearch.app.services.lifecycle.InferenceCapability.class);

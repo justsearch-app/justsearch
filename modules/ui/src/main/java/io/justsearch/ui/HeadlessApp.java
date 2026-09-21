@@ -477,6 +477,7 @@ public class HeadlessApp {
           LocalApiServer.builder(engineRoot.executors(), settingsStore, indexBasePath)
               .HeadAssembly(bootstrap)
               .componentRegistry(engineRoot.components())
+              .indexComponent(engineRoot.indexComponent())
               .engineAdmission(engineRoot.admission())
               .knowledgeServer(null)
               .configRoot(configRoot)
@@ -979,7 +980,6 @@ public class HeadlessApp {
     LocalApiServer apiServer = null;
     io.justsearch.app.services.settings.UiSettingsStore settingsStore = null; // NOPMD - defensive init
     KnowledgeServerBootstrap knowledgeServer = null;
-    String knowledgeServerStartError = null; // NOPMD - defensive init
     RuntimeManifestPublisher manifestPublisher = null;
     AppInstanceLock appInstanceLock = null;
     CountDownLatch latch = new CountDownLatch(1);
@@ -1211,10 +1211,9 @@ public class HeadlessApp {
       // Phase 3: Wait for Worker and connect
       WorkerConnectionResult workerResult = connectWorker(apiPhase, workerFuture);
       knowledgeServer = workerResult.knowledgeServer();
-      knowledgeServerStartError = workerResult.startError();
 
-      // Tempdoc 501 Phase 29 + Phase 33: manifest-listener wiring extracted into
-      // RuntimeManifestListenerWiring.
+      // D1-2: one publisher-owned Engine component subscription drives the manifest aggregate and
+      // its legacy worker/AI/mode projections from the same immutable registry observation.
       // Tempdoc 657: the install/runtime intent is a launch-time config value
       // (-Djustsearch.mode / JUSTSEARCH_MODE), read once here and projected onto the
       // manifest's mode.intent by the listener wiring.
@@ -1222,18 +1221,10 @@ public class HeadlessApp {
           io.justsearch.configuration.model.InstallIntent.fromConfig(
                   EnvRegistry.MODE.get().orElse(null))
               .id();
-      // Lane F stage A item A11: the live-knowledge-server supplier that used to be threaded in
-      // here is gone with the thing it existed for. Tempdoc 825 review F3 added it so the worker
-      // listener could re-read the CURRENT bootstrap at re-attainment time and publish the gRPC
-      // port a restarted Worker had just been given. There is no worker process, no restart and no
-      // port now — the index half is composed in this JVM — so the only reader of that supplier
-      // (RuntimeManifestListenerWiring#readGrpcPort) went with it, and passing a supplier nothing
-      // reads would be residue, not caution.
       io.justsearch.ui.runtime.RuntimeManifestListenerWiring.wire(
           manifestPublisher,
           bootstrap,
-          knowledgeServer,
-          knowledgeServerStartError,
+          engineRoot.components(),
           () -> configStore.get().paths().indexBasePath(),
           modeIntent);
 

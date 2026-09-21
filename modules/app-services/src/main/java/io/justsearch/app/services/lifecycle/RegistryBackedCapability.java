@@ -136,7 +136,8 @@ public final class RegistryBackedCapability implements Capability {
         legacyName);
   }
 
-  static CapabilityHealth healthOf(ComponentState state) {
+  /** Maps the registry's component state to the legacy read-only capability vocabulary. */
+  public static CapabilityHealth healthOf(ComponentState state) {
     return switch (state) {
       case ABSENT, UNAVAILABLE -> CapabilityHealth.OFFLINE;
       case STARTING -> CapabilityHealth.PENDING;

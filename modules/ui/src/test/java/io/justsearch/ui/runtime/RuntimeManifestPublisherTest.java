@@ -11,15 +11,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.RuntimeManifest;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentSpec;
+import io.justsearch.core.component.EngineComponentRegistry;
+import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.core.component.TestEngineComponents;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
@@ -74,11 +84,10 @@ class RuntimeManifestPublisherTest {
     publisher.publishHead(54321, null);
 
     // Lane F B11 removed grpcPort: the index half is composed in this JVM and has no process port.
-    RuntimeManifest updated =
-        publisher.publishWorkerReady(tmp.resolve("index").toString(), "LIFECYCLE_STATE_READY");
+    RuntimeManifest updated = publisher.publishWorkerReady(tmp.resolve("index").toString(), Instant.now());
 
     assertEquals(54321, updated.head().apiPort());
-    assertEquals("LIFECYCLE_STATE_READY", updated.lifecycle());
+    assertEquals("LIFECYCLE_STATE_STARTING", updated.lifecycle());
     assertNotNull(updated.worker());
     assertEquals("ready", updated.worker().state());
     assertEquals(tmp.resolve("index").toString(), updated.worker().indexBasePath());
@@ -87,15 +96,14 @@ class RuntimeManifestPublisherTest {
   }
 
   @Test
-  void publishWorkerFailedRecordsReasonAndDegradedLifecycle(@TempDir Path tmp)
+  void publishWorkerFailedRecordsReasonWithoutChangingLifecycle(@TempDir Path tmp)
       throws IOException {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, null);
 
-    RuntimeManifest updated =
-        publisher.publishWorkerFailed("native library missing", "LIFECYCLE_STATE_DEGRADED");
+    RuntimeManifest updated = publisher.publishWorkerFailed("native library missing");
 
-    assertEquals("LIFECYCLE_STATE_DEGRADED", updated.lifecycle());
+    assertEquals("LIFECYCLE_STATE_STARTING", updated.lifecycle());
     assertNotNull(updated.worker());
     assertEquals("failed", updated.worker().state());
     assertEquals("native library missing", updated.worker().spawnError());
@@ -103,26 +111,254 @@ class RuntimeManifestPublisherTest {
   }
 
   @Test
-  void publishLifecycleNoopsWhenUnchanged(@TempDir Path tmp) throws IOException {
+  void componentAggregatePublishesApiAndEncoderOnlyChanges(@TempDir Path tmp)
+      throws IOException {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      publisher.observeComponents(components, ignored -> {});
+      assertEquals(
+          "LIFECYCLE_STATE_READY",
+          publisher.current().lifecycle());
 
-    RuntimeManifest before = publisher.current();
-    RuntimeManifest same = publisher.publishLifecycle("LIFECYCLE_STATE_STARTING");
+      components.handle("api").transition(ComponentState.FAILED, "local_api.bind_failed", null);
+      assertEquals(
+          "LIFECYCLE_STATE_ERROR",
+          publisher.current().lifecycle(),
+          "an API-only state change must refresh the aggregate");
 
-    assertEquals(before, same, "publishLifecycle is a no-op when the value is unchanged");
+      components.handle("api").transition(ComponentState.READY, null, null);
+      assertEquals("LIFECYCLE_STATE_READY", publisher.current().lifecycle());
+      components
+          .handle("encoders")
+          .transition(ComponentState.UNAVAILABLE, "encoders.model_not_installed", null);
+      assertEquals(
+          "LIFECYCLE_STATE_DEGRADED",
+          publisher.current().lifecycle(),
+          "an encoder-only state change must refresh the aggregate");
+    }
   }
 
   @Test
-  void publishLifecycleUpdatesOnTransition(@TempDir Path tmp) throws IOException {
+  void subscribeBeforeBootstrapReadCannotRegressToCapturedOlderSnapshot(@TempDir Path tmp)
+      throws IOException {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, null);
-    assertEquals("LIFECYCLE_STATE_STARTING", publisher.current().lifecycle());
+    EngineComponentSnapshot ready;
+    EngineComponentSnapshot failed;
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      ready = components.snapshot();
+      components.handle("api").transition(ComponentState.FAILED, "local_api.bind_failed", null);
+      failed = components.snapshot();
+    }
+    var registry = new ManualComponentRegistry(ready);
+    registry.onNextSnapshot(() -> registry.emit(failed));
 
-    RuntimeManifest updated = publisher.publishLifecycle("LIFECYCLE_STATE_READY");
+    publisher.observeComponents(registry, ignored -> {});
 
-    assertEquals("LIFECYCLE_STATE_READY", updated.lifecycle());
-    assertEquals(updated, publisher.current(), "current() reflects the transition");
+    assertEquals("LIFECYCLE_STATE_ERROR", publisher.current().lifecycle());
+  }
+
+  @Test
+  void initialWriteFailureKeepsSubscriptionForNextRevisionRetry(@TempDir Path tmp)
+      throws IOException {
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
+    publisher.publishHead(54321, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+
+      Path runtimeDir = tmp.resolve("runtime");
+      try (var paths = Files.walk(runtimeDir)) {
+        for (Path path : paths.sorted((left, right) -> right.compareTo(left)).toList()) {
+          Files.deleteIfExists(path);
+        }
+      }
+      Files.writeString(runtimeDir, "blocker");
+
+      assertThrows(IOException.class, () -> publisher.observeComponents(components, ignored -> {}));
+      assertThrows(
+          IllegalStateException.class,
+          () -> publisher.observeComponents(components, ignored -> {}),
+          "a transient initial write failure must retain the live subscription");
+
+      Files.delete(runtimeDir);
+      Files.createDirectories(runtimeDir);
+      components
+          .handle("encoders")
+          .transition(ComponentState.UNAVAILABLE, "encoders.model_not_installed", null);
+
+      assertEquals("LIFECYCLE_STATE_DEGRADED", publisher.current().lifecycle());
+      assertTrue(Files.exists(publisher.manifestPath()));
+    } finally {
+      publisher.close();
+    }
+  }
+
+  @Test
+  void initialProjectionBugReleasesSubscriptionForCorrectedWiring(@TempDir Path tmp)
+      throws IOException {
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
+    publisher.publishHead(54321, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              publisher.observeComponents(
+                  components,
+                  ignored -> {
+                    throw new IllegalArgumentException("invalid projection");
+                  }));
+
+      publisher.observeComponents(components, ignored -> {});
+    } finally {
+      publisher.close();
+    }
+  }
+
+  @Test
+  void olderListenerDeliveryCannotRegressSiblingProjection(@TempDir Path tmp) throws IOException {
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
+    publisher.publishHead(54321, null);
+    EngineComponentSnapshot ready;
+    EngineComponentSnapshot failed;
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      ready = components.snapshot();
+      components.handle("api").transition(ComponentState.FAILED, "local_api.bind_failed", null);
+      failed = components.snapshot();
+    }
+    var registry = new ManualComponentRegistry(ready);
+    var siblingStates = new ArrayList<ComponentState>();
+    publisher.observeComponents(
+        registry,
+        snapshot ->
+            siblingStates.add(
+                snapshot.components().stream()
+                    .filter(component -> component.spec().name().equals("api"))
+                    .findFirst()
+                    .orElseThrow()
+                    .state()));
+
+    registry.emit(failed);
+    registry.emit(ready);
+
+    assertEquals(List.of(ComponentState.READY, ComponentState.FAILED), siblingStates);
+    assertEquals("LIFECYCLE_STATE_ERROR", publisher.current().lifecycle());
+  }
+
+  @Test
+  void closeUnsubscribesAndPreventsLateRetainedManifestRewrite(@TempDir Path tmp)
+      throws IOException {
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
+    publisher.publishHead(54321, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      publisher.observeComponents(components, ignored -> {});
+      assertThrows(
+          IllegalStateException.class,
+          () -> publisher.observeComponents(components, ignored -> {}),
+          "rewiring would create a second authority subscription");
+      publisher.markShutdownPending("restart");
+      publisher.close();
+      String retained = Files.readString(publisher.manifestPath());
+
+      components.handle("api").transition(ComponentState.FAILED, "local_api.bind_failed", null);
+
+      assertEquals(retained, Files.readString(publisher.manifestPath()));
+      assertThrows(
+          IllegalStateException.class,
+          () -> publisher.observeComponents(components, ignored -> {}));
+    }
+  }
+
+  @Test
+  void lateOlderComponentRevisionCannotRegressManifest(@TempDir Path tmp) throws IOException {
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
+    publisher.publishHead(54321, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      var olderReady = components.snapshot();
+      components.handle("api").transition(ComponentState.FAILED, "local_api.bind_failed", null);
+      var newerFailed = components.snapshot();
+
+      RuntimeManifest failed = publisher.publishLifecycle(newerFailed);
+      RuntimeManifest rejected = publisher.publishLifecycle(olderReady);
+
+      assertSame(failed, rejected, "a late older observation must be ignored");
+      assertEquals("LIFECYCLE_STATE_ERROR", publisher.current().lifecycle());
+    }
+  }
+
+  @Test
+  void newerNoOpRevisionStillRejectsOlderChange(@TempDir Path tmp) throws IOException {
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
+    RuntimeManifest starting = publisher.publishHead(54321, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      var olderReady = components.snapshot();
+      components
+          .handle("api")
+          .transition(ComponentState.STARTING, "local_api.starting", null);
+      var newerStarting = components.snapshot();
+
+      assertSame(
+          starting,
+          publisher.publishLifecycle(newerStarting),
+          "the newer observation has the already-published STARTING aggregate");
+      assertSame(
+          starting,
+          publisher.publishLifecycle(olderReady),
+          "the no-op observation must still advance the revision high-water mark");
+      assertEquals("LIFECYCLE_STATE_STARTING", publisher.current().lifecycle());
+    }
+  }
+
+  @Test
+  void failedComponentWriteCanRetrySameRevision(@TempDir Path tmp) throws IOException {
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
+    publisher.publishHead(54321, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      publisher.publishLifecycle(components.snapshot());
+      components.handle("api").transition(ComponentState.FAILED, "local_api.bind_failed", null);
+      var failedSnapshot = components.snapshot();
+
+      Path runtimeDir = tmp.resolve("runtime");
+      try (var paths = Files.walk(runtimeDir)) {
+        for (Path path : paths.sorted((left, right) -> right.compareTo(left)).toList()) {
+          Files.deleteIfExists(path);
+        }
+      }
+      Files.writeString(runtimeDir, "blocker");
+
+      assertThrows(IOException.class, () -> publisher.publishLifecycle(failedSnapshot));
+      assertEquals(
+          "LIFECYCLE_STATE_READY",
+          publisher.current().lifecycle(),
+          "a failed disk write must not advance current");
+
+      Files.delete(runtimeDir);
+      Files.createDirectories(runtimeDir);
+      RuntimeManifest retried = publisher.publishLifecycle(failedSnapshot);
+      assertEquals("LIFECYCLE_STATE_ERROR", retried.lifecycle());
+      assertEquals(
+          "LIFECYCLE_STATE_ERROR",
+          new ObjectMapper()
+              .readTree(Files.readString(publisher.manifestPath()))
+              .path("lifecycle")
+              .asText(),
+          "the equal-revision retry must persist before current advances");
+    }
   }
 
   @Test
@@ -130,10 +366,10 @@ class RuntimeManifestPublisherTest {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     assertThrows(
         IllegalStateException.class,
-        () -> publisher.publishWorkerReady("/tmp/index", "READY"));
+        () -> publisher.publishWorkerReady("/tmp/index", Instant.now()));
     assertThrows(
         IllegalStateException.class,
-        () -> publisher.publishWorkerFailed("oops", "DEGRADED"));
+        () -> publisher.publishWorkerFailed("oops"));
   }
 
   @Test
@@ -147,7 +383,12 @@ class RuntimeManifestPublisherTest {
   void manifestFileIsValidJsonWithExpectedShape(@TempDir Path tmp) throws IOException {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, "tok");
-    publisher.publishWorkerReady("/tmp/index", "READY");
+    publisher.publishWorkerReady("/tmp/index", Instant.now());
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      publisher.publishLifecycle(components.snapshot());
+    }
 
     String content = Files.readString(publisher.manifestPath());
     JsonNode root = new ObjectMapper().readTree(content);
@@ -155,7 +396,7 @@ class RuntimeManifestPublisherTest {
     assertEquals(2, root.get("schemaVersion").asInt());
     assertEquals(publisher.instanceId(), root.get("instanceId").asText());
     assertTrue(root.get("pid").asLong() > 0);
-    assertEquals("READY", root.get("lifecycle").asText());
+    assertEquals("LIFECYCLE_STATE_READY", root.get("lifecycle").asText());
     // `head.apiPort` is the API-port discovery contract for the NON-JVM consumers — the MCPB
     // stdio bridge (packaging/mcpb/server/index.js) and scripts/sandbox/mcp-typed-confirm.mjs
     // read exactly this path (tempdoc 930 repointed both off the removed api-port.txt sibling;
@@ -207,8 +448,8 @@ class RuntimeManifestPublisherTest {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
     RuntimeManifest seed = publisher.publishOwnershipSeed();
 
-    assertEquals(java.util.List.of(child), registry.snapshot());
-    assertEquals(java.util.List.of(child), seed.children());
+    assertEquals(List.of(child), registry.snapshot());
+    assertEquals(List.of(child), seed.children());
     assertNull(seed.head().apiPort(), "the durable ownership seed precedes API bind");
     JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
     assertEquals("predecessor-child", disk.get("children").get(0).get("id").asText());
@@ -256,9 +497,13 @@ class RuntimeManifestPublisherTest {
 
     // Capability callbacks can still fire while ordered close is draining. The handoff,
     // unlike aggregate readiness, must survive all those projections and finally cleanup.
-    publisher.publishLifecycle("LIFECYCLE_STATE_READY");
-    publisher.publishWorkerFailed("closing", "LIFECYCLE_STATE_DEGRADED");
-    publisher.publishAi("ready", false, null, true, "LIFECYCLE_STATE_READY", null, null, null, null);
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(ComponentState.READY, null, null);
+      publisher.publishLifecycle(components.snapshot());
+    }
+    publisher.publishWorkerFailed("closing");
+    publisher.publishAi("ready", false, null, Instant.now(), null, null, null, null);
     publisher.close();
     var retained = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
     assertEquals(original.get("shutdownHandoff"), retained.get("shutdownHandoff"));
@@ -376,7 +621,7 @@ class RuntimeManifestPublisherTest {
   @Test
   void shutdownDispositionCoversEveryReasonAndCompletionOutcome(@TempDir Path tmp)
       throws IOException {
-    for (String reason : java.util.List.of("restart", "hang")) {
+    for (String reason : List.of("restart", "hang")) {
       RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp.resolve(reason));
       publisher.publishOwnershipSeed();
       publisher.markShutdownPending(reason);
@@ -386,7 +631,7 @@ class RuntimeManifestPublisherTest {
       assertEquals("ready", disk.path("shutdownHandoff").path("state").asText());
     }
 
-    for (String reason : java.util.List.of("quit", "upgrade")) {
+    for (String reason : List.of("quit", "upgrade")) {
       RuntimeManifestPublisher publisher =
           new RuntimeManifestPublisher(tmp.resolve(reason + "-clean"));
       publisher.publishOwnershipSeed();
@@ -395,7 +640,7 @@ class RuntimeManifestPublisherTest {
       assertFalse(Files.exists(publisher.manifestPath()));
     }
 
-    for (String reason : java.util.List.of("restart", "hang", "quit", "upgrade")) {
+    for (String reason : List.of("restart", "hang", "quit", "upgrade")) {
       RuntimeManifestPublisher publisher =
           new RuntimeManifestPublisher(tmp.resolve(reason + "-unclean"));
       publisher.publishOwnershipSeed();
@@ -429,7 +674,7 @@ class RuntimeManifestPublisherTest {
             + "Replay-on-register conflates 'snapshot' and 'change event' semantics and causes "
             + "spurious SSE UPDATE frames at controller-init time (Phase 2 live-verify finding).");
 
-    publisher.publishWorkerReady("/tmp/idx", "READY");
+    publisher.publishWorkerReady("/tmp/idx", Instant.now());
     assertNotNull(seen.get(), "listener must fire on subsequent publish");
     assertEquals("/tmp/idx", seen.get().worker().indexBasePath());
   }
@@ -451,7 +696,7 @@ class RuntimeManifestPublisherTest {
         });
 
     // Should not throw — notifyListeners catches per-listener exceptions.
-    publisher.publishWorkerReady("/tmp/idx", "READY");
+    publisher.publishWorkerReady("/tmp/idx", Instant.now());
 
     // start.log must contain BOTH the publishHead and the publishWorkerReady
     // entries — Phase 34's reorder put appendStartLog before notifyListeners
@@ -464,7 +709,7 @@ class RuntimeManifestPublisherTest {
         content.contains("publishHead apiPort=54321"),
         "start.log must record publishHead: " + content);
     assertTrue(
-        content.contains("publishWorkerReady lifecycle=READY"),
+        content.contains("publishWorkerReady"),
         "start.log must record publishWorkerReady even though the listener threw: " + content);
   }
 
@@ -479,7 +724,7 @@ class RuntimeManifestPublisherTest {
   void startLogRecordsTimestampedEventNarrative(@TempDir Path tmp) throws IOException {
     try (RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp)) {
       publisher.publishHead(54321, null);
-      publisher.publishWorkerReady("/tmp/idx", "READY");
+      publisher.publishWorkerReady("/tmp/idx", Instant.now());
       Path startLog =
           tmp.resolve("runtime").resolve("instances").resolve(publisher.instanceId()).resolve("start.log");
       assertTrue(Files.isRegularFile(startLog));
@@ -487,7 +732,7 @@ class RuntimeManifestPublisherTest {
       // happen AFTER close so the closing event is also recorded.
     }
     // Reconstruct path; publisher is closed but file persists.
-    java.util.List<Path> instanceDirs;
+    List<Path> instanceDirs;
     try (var s = Files.list(tmp.resolve("runtime").resolve("instances"))) {
       instanceDirs = s.toList();
     }
@@ -508,7 +753,7 @@ class RuntimeManifestPublisherTest {
     }
     assertTrue(content.contains("publisher-constructed"), "missing constructed entry");
     assertTrue(content.contains("publishHead apiPort=54321"), "missing publishHead entry");
-    assertTrue(content.contains("publishWorkerReady lifecycle=READY"), "missing publishWorkerReady entry");
+    assertTrue(content.contains("publishWorkerReady"), "missing publishWorkerReady entry");
     assertTrue(content.contains("publisher-close"), "missing close entry");
   }
 
@@ -543,7 +788,7 @@ class RuntimeManifestPublisherTest {
 
     assertThrows(
         IOException.class,
-        () -> publisher.publishWorkerReady("/tmp/idx", "READY"),
+        () -> publisher.publishWorkerReady("/tmp/idx", Instant.now()),
         "write failure must propagate");
 
     assertEquals(
@@ -632,5 +877,61 @@ class RuntimeManifestPublisherTest {
                 io.justsearch.app.api.inference.RealizedChatIdentity.of(
                     "compact", tmp.resolve("m.gguf"), null)),
         "same ordering contract every other publish* method has");
+  }
+
+  /** Deterministic registry boundary for callback ordering; publication stays production code. */
+  private static final class ManualComponentRegistry implements EngineComponentRegistry {
+    private EngineComponentSnapshot current;
+    private Consumer<EngineComponentSnapshot> listener;
+    private Runnable nextSnapshotHook;
+
+    private ManualComponentRegistry(EngineComponentSnapshot current) {
+      this.current = current;
+    }
+
+    @Override
+    public ComponentHandle register(ComponentSpec spec) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public EngineComponentSnapshot snapshot() {
+      EngineComponentSnapshot captured = current;
+      Runnable hook = nextSnapshotHook;
+      nextSnapshotHook = null;
+      if (hook != null) hook.run();
+      return captured;
+    }
+
+    @Override
+    public Subscription subscribe(Consumer<EngineComponentSnapshot> next) {
+      if (listener != null) throw new IllegalStateException("already subscribed");
+      listener = next;
+      return this::unsubscribe;
+    }
+
+    private void unsubscribe() {
+      listener = null;
+    }
+
+    @Override
+    public ApplyAttempt tryApply() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void close() {
+      listener = null;
+    }
+
+    private void emit(EngineComponentSnapshot snapshot) {
+      current = snapshot;
+      Consumer<EngineComponentSnapshot> target = listener;
+      if (target != null) target.accept(snapshot);
+    }
+
+    private void onNextSnapshot(Runnable hook) {
+      nextSnapshotHook = hook;
+    }
   }
 }

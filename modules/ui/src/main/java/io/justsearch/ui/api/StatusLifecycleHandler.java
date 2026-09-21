@@ -7,6 +7,10 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
 import io.justsearch.contract.wire.LifecycleState;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentRegistry;
+import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.app.api.lifecycle.ReadinessDimension;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
@@ -93,6 +97,17 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private final io.justsearch.app.api.lifecycle.Capability inferenceCapability;
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private volatile String knowledgeServerStartError;
+  private EngineComponentRegistry componentRegistry;
+  private ComponentHandle indexComponent;
+
+  /** Called once during composition, before the sampler is attached. */
+  void setIndexComponent(EngineComponentRegistry registry, ComponentHandle handle) {
+    this.componentRegistry = java.util.Objects.requireNonNull(registry);
+    this.indexComponent = java.util.Objects.requireNonNull(handle);
+    if (!"index".equals(handle.spec().name())) {
+      throw new IllegalArgumentException("readiness requires the index component owner");
+    }
+  }
 
   /**
    * Tempdoc 333 §4 (deferred there, filled by 821 §3-C1): epoch-ms of the newest SUCCESSFUL Worker
@@ -127,6 +142,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   /** The sampler's last observation; {@code null} until the first one. */
   private volatile WorkerViewSample lastWorkerSample;
+  private final Object workerSamplingLock = new Object();
 
   /**
    * Wall clock for sample stamping and age. Injectable so the age-based staleness rule is testable:
@@ -412,7 +428,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // Tempdoc 885 item 6: the request thread reads the internal sampler's last snapshot. The one
     // debug escape hatch is ?fresh=true, which forces a synchronous sample.
     boolean fresh = "true".equalsIgnoreCase(ctx.queryParam("fresh"));
-    ctx.json(fresh ? buildStatusMap(true) : buildStatusMap(false));
+    ctx.json(fresh ? sampleAndBuildStatusSnapshot() : buildStatusMap(false));
   }
 
   @Override
@@ -428,7 +444,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * every health tap — the request thread reads what it left behind.
    */
   StatusResponse sampleAndBuildStatusSnapshot() {
-    return buildStatusMap(true);
+    synchronized (workerSamplingLock) {
+      return buildStatusMap(true);
+    }
   }
 
   /**
@@ -475,12 +493,13 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // Stamped BEFORE the call, not after it, so the age reported to consumers is never younger
     // than the observation actually is (the 821 §3-C1 convention, preserved).
     long sampledAtMs = clockMs.getAsLong();
-    if (!workerCapability.available()) {
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server == null || !server.hasClient()) {
       return new WorkerViewSample(
           WorkerOperationalView.fallback(workerCapability.health().name()), true, null, sampledAtMs);
     }
     try {
-      WorkerOperationalView view = knowledgeServer.client().getWorkerOperationalView(
+      WorkerOperationalView view = server.client().getWorkerOperationalView(
           io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
               io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
               io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
@@ -530,11 +549,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // when available.
     // Keep this field for UI backwards-compat, but treat it as "Worker-connected index available".
     // Tempdoc 885 item 6: the Worker observation is the sampler's, not this thread's.
-    WorkerViewSample sample = lastWorkerSample;
-    if (sampleWorker || sample == null) {
-      sample = observeWorker();
-      lastWorkerSample = sample;
-    }
+    WorkerViewSample sample = workerSample(sampleWorker);
 
     boolean indexAvailable = !sample.failed();
     String indexStatusReason = sample.failureReason();
@@ -592,6 +607,65 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         embeddingReady,
         workerRpcAtMs,
         workerRpcStale);
+  }
+
+  private WorkerViewSample workerSample(boolean fresh) {
+    WorkerViewSample cached = lastWorkerSample;
+    if (!fresh && cached != null) {
+      return acceptWorkerSample(componentSnapshot(), cached, false);
+    }
+    // Only fresh observations share RPC ownership. Cached HTTP reads never acquire this lock.
+    synchronized (workerSamplingLock) {
+      cached = lastWorkerSample;
+      if (!fresh && cached != null) {
+        return acceptWorkerSample(componentSnapshot(), cached, false);
+      }
+      EngineComponentSnapshot before = componentSnapshot();
+      return acceptWorkerSample(before, observeWorker(), true);
+    }
+  }
+
+  private EngineComponentSnapshot componentSnapshot() {
+    return componentRegistry == null ? null : componentRegistry.snapshot();
+  }
+
+  /** Serialize only cache/publication here; cached readers never wait for an RPC. */
+  private synchronized WorkerViewSample acceptWorkerSample(
+      EngineComponentSnapshot before, WorkerViewSample sampled, boolean fresh) {
+    WorkerViewSample sample = !fresh && lastWorkerSample != null ? lastWorkerSample : sampled;
+    boolean stale = sample.failed() || clockMs.getAsLong() - sample.sampledAtMs()
+        > (long) SAMPLE_STALE_PERIODS * samplingPeriodMs();
+    if (!publishIndexReadiness(before, sample, stale, fresh)) {
+      return new WorkerViewSample(WorkerOperationalView.fallback("UNAVAILABLE"), true,
+          "Component observation superseded during sampling", sample.sampledAtMs());
+    }
+    if (fresh) lastWorkerSample = sample;
+    return sample;
+  }
+
+  private boolean publishIndexReadiness(
+      EngineComponentSnapshot before, WorkerViewSample sample, boolean stale, boolean fresh) {
+    if (before == null) return true;
+    var index = before.components().stream()
+        .filter(component -> "index".equals(component.spec().name())).findFirst().orElseThrow();
+    boolean apiReady = before.components().stream()
+        .anyMatch(component -> "api".equals(component.spec().name())
+            && component.state() == ComponentState.READY);
+    boolean ready = apiReady && !sample.failed() && !stale
+        && sample.view().core() != null && sample.view().core().indexHealthy();
+    if (ready && fresh && index.state() != ComponentState.ABSENT
+        && index.state() != ComponentState.RELOADING) {
+      return indexComponent.transitionIfUnchanged(before, ComponentState.READY, null, null);
+    } else if (!ready && index.state() == ComponentState.READY) {
+      String reason = (sample.failed() || stale)
+          ? LifecycleReasonCode.WORKER_LOST.code() : LifecycleReasonCode.WORKER_UNAVAILABLE.code();
+      String evidence = sample.failureReason() != null ? sample.failureReason()
+          : "apiReady=" + apiReady + ", contactFresh=" + !stale
+              + ", indexHealthy=" + (sample.view().core() != null && sample.view().core().indexHealthy());
+      return indexComponent.transitionIfUnchanged(before, ComponentState.UNAVAILABLE,
+          reason, evidence);
+    }
+    return before.equals(componentRegistry.snapshot());
   }
 
   /**

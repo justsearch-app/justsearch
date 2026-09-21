@@ -109,6 +109,7 @@ final class StatusReadinessStalenessTest {
   void workerRpcFailureMarksWorkerDimensionsStale(@TempDir Path indexBase) {
     Instant headStart = Instant.now().minusSeconds(60);
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
+    when(ks.hasClient()).thenReturn(true);
     when(ks.client()).thenThrow(new IllegalStateException("worker gone"));
 
     StatusLifecycleHandler handler = newHandler(indexBase, headStart, true);
@@ -164,6 +165,7 @@ final class StatusReadinessStalenessTest {
     // the numbers below would be ~10 minutes, so this distinguishes the right reason.
     Instant headStart = Instant.now().minusSeconds(600);
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
+    when(ks.hasClient()).thenReturn(true);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(ks.client()).thenReturn(client);
@@ -267,6 +269,7 @@ final class StatusReadinessStalenessTest {
 
   private static StatusLifecycleHandler reachableHandler(Path indexBase, Instant headStart) {
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
+    when(ks.hasClient()).thenReturn(true);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(ks.client()).thenReturn(client);

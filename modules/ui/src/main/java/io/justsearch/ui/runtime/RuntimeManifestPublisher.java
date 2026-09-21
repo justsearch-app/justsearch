@@ -7,6 +7,9 @@ import io.justsearch.app.api.runtime.RuntimeManifest;
 import io.justsearch.app.api.runtime.RuntimeManifestBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestWorkerInfoBuilder;
+import io.justsearch.app.services.lifecycle.LifecycleProjection;
+import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.core.component.EngineComponentRegistry;
 // imports kept for builders; from() pattern not used (the @RecordBuilder generates with*()
 // methods on the record itself).
 import java.io.IOException;
@@ -83,6 +86,16 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   private final AtomicReference<RuntimeManifest> current = new AtomicReference<>();
   private final CopyOnWriteArrayList<Consumer<RuntimeManifest>> listeners =
       new CopyOnWriteArrayList<>();
+  private long highestObservedComponentRevision = -1;
+  private EngineComponentRegistry.Subscription componentSubscription;
+  private boolean closed;
+
+  /** Checked projection invoked from the same accepted component snapshot as lifecycle. */
+  @FunctionalInterface
+  public interface ComponentProjection {
+    void accept(EngineComponentSnapshot snapshot) throws IOException;
+  }
+
   /**
    * Tempdoc 501 Phase 35 (F1): late-bound transport registry. When set,
    * {@link #composeReachability} reads from it instead of building a
@@ -476,33 +489,42 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * (a Worker bootstrap exists and is connected). Tempdoc 501 §12.1 projection.
    *
    * @param indexBasePath the resolved index path (nullable if not yet known)
-   * @param lifecycle current overall lifecycle projection — from
-   *     {@code LifecycleProjection.derive(workerCap, inferenceCap)}
+   * @param readySince the component-owned READY epoch, unchanged by unrelated registry updates
    */
-  public synchronized RuntimeManifest publishWorkerReady(String indexBasePath, String lifecycle)
+  public synchronized RuntimeManifest publishWorkerReady(String indexBasePath, Instant readySince)
       throws IOException {
     RuntimeManifest previous = current.get();
     if (previous == null) {
       throw new IllegalStateException("publishWorkerReady called before publishHead");
     }
-    String readyAt = Instant.now().toString();
+    String readyAt = java.util.Objects.requireNonNull(readySince, "readySince").toString();
     RuntimeManifest.WorkerInfo workerInfo =
         RuntimeManifestWorkerInfoBuilder.builder()
             .state("ready")
             .indexBasePath(indexBasePath)
             .readyAt(readyAt)
             .build();
+    if (workerInfo.equals(previous.worker())) return previous;
     RuntimeManifest manifest =
         RuntimeManifestBuilder.builder(previous)
             .worker(workerInfo)
-            .lifecycle(lifecycle != null ? lifecycle : previous.lifecycle())
             .build();
-    log.info(
-        "Runtime manifest updated (worker-ready): indexBasePath={}, lifecycle={}",
-        indexBasePath,
-        lifecycle);
-    return commit(
-        manifest, "publishWorkerReady lifecycle=" + lifecycle);
+    log.info("Runtime manifest updated (worker-ready): indexBasePath={}", indexBasePath);
+    return commit(manifest, "publishWorkerReady");
+  }
+
+  /** Projects an index component that is still starting into the legacy worker surface. */
+  public synchronized RuntimeManifest publishWorkerPending() throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) {
+      throw new IllegalStateException("publishWorkerPending called before publishHead");
+    }
+    RuntimeManifest.WorkerInfo workerInfo =
+        RuntimeManifestWorkerInfoBuilder.builder().state("pending").build();
+    if (workerInfo.equals(previous.worker())) return previous;
+    RuntimeManifest manifest = RuntimeManifestBuilder.builder(previous).worker(workerInfo).build();
+    log.info("Runtime manifest updated (worker-pending)");
+    return commit(manifest, "publishWorkerPending");
   }
 
   /**
@@ -512,10 +534,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * {@code "failed"}; the {@code worker.spawnError} field carries the reason.
    *
    * @param reason the failure reason (non-null; "unknown" if no specific cause is known)
-   * @param lifecycle current overall lifecycle projection
    */
-  public synchronized RuntimeManifest publishWorkerFailed(
-      String reason, String lifecycle) throws IOException {
+  public synchronized RuntimeManifest publishWorkerFailed(String reason) throws IOException {
     RuntimeManifest previous = current.get();
     if (previous == null) {
       throw new IllegalStateException("publishWorkerFailed called before publishHead");
@@ -525,24 +545,18 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             .state("failed")
             .spawnError(reason != null && !reason.isBlank() ? reason : "unknown")
             .build();
+    if (workerInfo.equals(previous.worker())) return previous;
     RuntimeManifest manifest =
         RuntimeManifestBuilder.builder(previous)
             .worker(workerInfo)
-            .lifecycle(lifecycle != null ? lifecycle : previous.lifecycle())
             .build();
-    log.info(
-        "Runtime manifest updated (worker-failed): reason={}, lifecycle={}",
-        reason,
-        lifecycle);
-    return commit(
-        manifest, "publishWorkerFailed reason=" + reason + " lifecycle=" + lifecycle);
+    log.info("Runtime manifest updated (worker-failed): reason={}", reason);
+    return commit(manifest, "publishWorkerFailed reason=" + reason);
   }
 
   /**
-   * AI projection rewrite — call on each `InferenceCapability` transition. Tempdoc 501
-   * §12.1: projects from the capability's {@code health()} / {@code required()} /
-   * {@code pendingReason()} surface. The lifecycle field is recomputed by the caller via
-   * {@code LifecycleProjection.derive} (because inference health feeds the projection).
+   * AI projection from an accepted component-registry snapshot. Overall lifecycle is published
+   * independently from the same snapshot; readySince carries the component-owned READY epoch.
    *
    * <p>Tempdoc 682 Item 2: {@code serverBuildExpected} / {@code serverBuildActual} carry the
    * staged llama-server build pin vs the {@code /props}-reported running build; either may be
@@ -558,8 +572,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       String phase,
       boolean required,
       String pendingReason,
-      boolean readyNow,
-      String lifecycle,
+      Instant readySince,
       String serverBuildExpected,
       String serverBuildActual,
       String thinkingSupport,
@@ -570,8 +583,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       throw new IllegalStateException("publishAi called before publishHead");
     }
     String readyAt =
-        readyNow
-            ? Instant.now().toString()
+        readySince != null
+            ? readySince.toString()
             : previous.ai() == null ? null : previous.ai().readyAt();
     RuntimeManifest.AiInfo aiInfo =
         new RuntimeManifest.AiInfo(
@@ -583,19 +596,13 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             serverBuildActual,
             thinkingSupport,
             contextWindow);
+    if (aiInfo.equals(previous.ai())) return previous;
     RuntimeManifest manifest =
         RuntimeManifestBuilder.builder(previous)
             .ai(aiInfo)
-            .lifecycle(lifecycle != null ? lifecycle : previous.lifecycle())
             .build();
-    log.info(
-        "Runtime manifest updated (ai): phase={}, required={}, lifecycle={}",
-        phase,
-        required,
-        lifecycle);
-    return commit(
-        manifest,
-        "publishAi phase=" + phase + " required=" + required + " lifecycle=" + lifecycle);
+    log.info("Runtime manifest updated (ai): phase={}, required={}", phase, required);
+    return commit(manifest, "publishAi phase=" + phase + " required=" + required);
   }
 
   /**
@@ -657,19 +664,95 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   }
 
   /**
-   * Lifecycle refresh — call when the overall lifecycle projection changes (e.g., inference
-   * becomes ready) without a worker transition. Tempdoc 501 §12.1.
+   * Publishes the aggregate lifecycle derived from one immutable component-registry observation.
+   * Older observations cannot regress the manifest. An equal revision may retry because a failed
+   * disk write leaves {@link #current} unchanged; after success, lifecycle equality makes that same
+   * revision a no-op.
    */
-  public synchronized RuntimeManifest publishLifecycle(String lifecycle) throws IOException {
+  public synchronized RuntimeManifest publishLifecycle(EngineComponentSnapshot snapshot)
+      throws IOException {
+    return publishLifecycleSnapshot(snapshot).manifest();
+  }
+
+  private LifecyclePublication publishLifecycleSnapshot(EngineComponentSnapshot snapshot)
+      throws IOException {
+    java.util.Objects.requireNonNull(snapshot, "snapshot");
     RuntimeManifest previous = current.get();
     if (previous == null) {
       throw new IllegalStateException("publishLifecycle called before publishHead");
     }
-    if (lifecycle == null || lifecycle.isBlank()) return previous;
-    if (lifecycle.equals(previous.lifecycle())) return previous; // no-op
+    if (snapshot.revision() < highestObservedComponentRevision) {
+      return new LifecyclePublication(previous, false);
+    }
+
+    LifecycleProjection.Projection projection =
+        LifecycleProjection.project(snapshot, Instant.now());
+    highestObservedComponentRevision = snapshot.revision();
+    String lifecycle = projection.lifecycle().lifecycle().state().name();
+    if (lifecycle.equals(previous.lifecycle())) return new LifecyclePublication(previous, true);
+
     RuntimeManifest manifest = RuntimeManifestBuilder.from(previous).withLifecycle(lifecycle);
-    log.info("Runtime manifest updated (lifecycle): {}", lifecycle);
-    return commit(manifest, "publishLifecycle lifecycle=" + lifecycle);
+    log.info(
+        "Runtime manifest updated from component revision {} (lifecycle): {}",
+        snapshot.revision(),
+        lifecycle);
+    return new LifecyclePublication(
+        commit(
+            manifest,
+            "publishLifecycle componentRevision="
+                + snapshot.revision()
+                + " lifecycle="
+                + lifecycle),
+        true);
+  }
+
+  private record LifecyclePublication(RuntimeManifest manifest, boolean accepted) {}
+
+  /**
+   * Owns the one registry subscription used to publish lifecycle and sibling manifest projections.
+   * Registration precedes the initial snapshot read so a transition racing bootstrap cannot be
+   * lost; revision ordering in {@link #publishLifecycle(EngineComponentSnapshot)} rejects a late
+   * bootstrap observation.
+   */
+  public synchronized void observeComponents(
+      EngineComponentRegistry registry, ComponentProjection siblingProjection)
+      throws IOException {
+    java.util.Objects.requireNonNull(registry, "registry");
+    java.util.Objects.requireNonNull(siblingProjection, "siblingProjection");
+    if (closed) throw new IllegalStateException("Runtime manifest publisher is closed");
+    if (componentSubscription != null) {
+      throw new IllegalStateException("Engine component registry is already observed");
+    }
+
+    EngineComponentRegistry.Subscription subscription =
+        registry.subscribe(
+            snapshot -> {
+              try {
+                publishComponentSnapshot(snapshot, siblingProjection);
+              } catch (IOException | RuntimeException failure) {
+                log.warn("Runtime manifest component publish failed (non-fatal)", failure);
+              }
+            });
+    componentSubscription = subscription;
+    try {
+      publishComponentSnapshot(registry.snapshot(), siblingProjection);
+    } catch (IOException failure) {
+      // The subscription is already live. Retain it so the next component revision can retry the
+      // projection after a transient manifest write failure.
+      throw failure;
+    } catch (RuntimeException | Error failure) {
+      componentSubscription = null;
+      subscription.close();
+      throw failure;
+    }
+  }
+
+  private synchronized void publishComponentSnapshot(
+      EngineComponentSnapshot snapshot, ComponentProjection siblingProjection)
+      throws IOException {
+    if (closed) return;
+    LifecyclePublication publication = publishLifecycleSnapshot(snapshot);
+    if (publication.accepted()) siblingProjection.accept(snapshot);
   }
 
   private synchronized void publishChildren(List<ManagedChild> children) throws IOException {
@@ -747,6 +830,12 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   }
 
   private synchronized void closeLocked(List<ManagedChild> children) {
+    if (closed) return;
+    closed = true;
+    if (componentSubscription != null) {
+      componentSubscription.close();
+      componentSubscription = null;
+    }
     appendStartLog("publisher-close (clean shutdown)");
     RuntimeManifest manifest = current.get();
     if (closeDisposition == CloseDisposition.PENDING
