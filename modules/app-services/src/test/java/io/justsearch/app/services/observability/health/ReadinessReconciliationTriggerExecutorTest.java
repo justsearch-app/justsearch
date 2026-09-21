@@ -5,10 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSnapshot;
 import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.component.EngineComponentRegistry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -17,6 +22,22 @@ import org.junit.jupiter.api.Test;
 
 /** Wiring and ownership regression for the readiness sampler's bounded process executor. */
 final class ReadinessReconciliationTriggerExecutorTest {
+
+  @Test
+  void ownsOneComponentSubscriptionAndClosesItOnce() {
+    var components = mock(EngineComponentRegistry.class);
+    var subscription = mock(EngineComponentRegistry.Subscription.class);
+    when(components.subscribe(any())).thenReturn(subscription);
+    try (var executors = new CapturingRegistry(false);
+        var trigger = new ReadinessReconciliationTrigger(executors)) {
+      trigger.wireTo(components);
+      assertThrows(IllegalStateException.class, () -> trigger.wireTo(components));
+      trigger.close();
+      assertThrows(IllegalStateException.class, () -> trigger.wireTo(components));
+    }
+    verify(components).subscribe(any());
+    verify(subscription).close();
+  }
 
   @Test
   void registersPlatformBackgroundExecutorAndClosesOnlyItsRegistration() {

@@ -970,7 +970,6 @@ public final class HeadAssembly implements AutoCloseable {
                   this.substrateOut.operationHandlers(),
                   this.knowledgeServerBootstrap,
                   this.knowledgeClient,
-                  this.capabilities.worker(),
                   this.dataDir,
                   indexing,
                   this.services.inference().onlineAi(),
@@ -984,7 +983,7 @@ public final class HeadAssembly implements AutoCloseable {
     bootTraceBuilder.record(
         io.justsearch.app.services.bootstrap.PhaseRecord.lazyPending(
             "agent-tools-registration",
-            "deferred until connectKnowledgeServer; resolves once Worker is available"));
+            "deferred until connectKnowledgeServer binds the client and services"));
     // Tempdoc 541 §4.2: seal the boot trace at composition-root completion. Post-seal reads
     // see the final immutable snapshot.
     var sealedTrace = bootTraceBuilder.seal();
@@ -1487,16 +1486,6 @@ public final class HeadAssembly implements AutoCloseable {
         log.warn("RemoteIndexingJobsBridge.start failed at connectKnowledgeServer", e);
       }
     }
-    // Tempdoc 627 Deliverable 10: the Worker capability is now ONE shared instance — created before
-    // the async worker-start fork (HeadlessApp) and held by BOTH the KS bootstrap (the supervisor's
-    // writer) and this CapabilityGraph (the surfaces' reader). So the KS-capability ↔ HeadAssembly-
-    // capability mirror (tempdoc 521 T2.5) is GONE: the surfaces read the same instance the supervisor
-    // writes, eliminating the silent-drift bug class (Bug A) at its root. CapabilityHealthBridge.
-    // wireListeners seeds its first condition directly (replay-on-wire), replacing the mirror's
-    // synchronous initial-copy. (Non-shared construction — e.g. a test that mocks a separate KS
-    // capability — must pass that instance as the HeadAssembly sharedWorkerCapability so localCap
-    // == ks.workerCapability().)
-    var localCap = this.capabilities.worker();
     AutoCloseable bridgeHandle =
         this.substrateOut.indexingJobsBridge() == null ? null : (AutoCloseable) this.substrateOut.indexingJobsBridge()::stop;
     this.orchestration =
@@ -1511,30 +1500,10 @@ public final class HeadAssembly implements AutoCloseable {
             newSearch,
             newIndexing,
             newDocuments);
-    // 543-fwd root-cause fix (v2): trigger the Memoized agent-tool registration AFTER both
-    // (a) the capability bridge above transitioned localCap to the Worker's real state, AND
-    // (b) this.services was reassembled (just above) with the fresh worker services
-    // (newIndexing). The Memoized body reads this.services.worker().indexing() at resolve
-    // time; resolving it BEFORE the reassignment passed a NULL indexingService into
-    // registerLateBound, which NPE'd at boot (AgentToolHandlers builds FileOperationsTool from
-    // indexingService::getWatchedPaths) and crashed HeadlessApp. The ORIGINAL pre-fix code
-    // resolved the memo at the TOP of connectKnowledgeServer where registerLateBound SKIPPED
-    // (worker not yet available), caching a premature false so the agent's server-side tools
-    // were NEVER registered ("No handler registered for binding core.search-index"). Resolve
-    // only when the worker is available (caching success, never a premature false) and forward
-    // later transitions. registerLateBound is idempotent PER REF (tempdoc 876 §B.5): a ref the
-    // eager path already registered is left alone, so the two paths compose. It no longer
-    // short-circuits the whole call on SEARCH_INDEX standing proxy for the rest.
-    if (localCap != null && localCap.available()) {
-      this.agentToolsRegistration.get();
-    } else if (localCap != null) {
-      localCap.addListener(
-          (prev, next) -> {
-            if (localCap.available()) {
-              this.agentToolsRegistration.get();
-            }
-          });
-    }
+    // Bind tools after the client and service graph exist. Readiness is sampled from that client,
+    // so waiting for READY here would make composition depend on its own eventual result.
+    // Request admission remains governed by the capability/condition gates.
+    if (client != null) this.agentToolsRegistration.get();
     log.info(
         "Knowledge Server late-bound into HeadAssembly (capability health: {})",
         this.capabilities.worker().health());

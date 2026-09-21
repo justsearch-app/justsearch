@@ -15,7 +15,6 @@ import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.services.conversation.CoreWorkflowCatalog;
 import io.justsearch.app.services.conversation.WorkflowOperationProjection;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.app.services.mcphost.McpHostService;
 import io.justsearch.app.services.registry.emitter.AgentOperationEmitter;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
@@ -76,8 +75,6 @@ final class AgentOfferingIsExecutableTest {
   @DisplayName("every operation the agent offering surfaces is executable")
   void offeredOperationsAreAllExecutable(@TempDir Path dataDir) {
     KnowledgeClient client = mock(KnowledgeClient.class);
-    WorkerCapability capability = mock(WorkerCapability.class);
-    when(capability.available()).thenReturn(true);
 
     // ---- 1. Handler registry: both AgentToolHandlers paths, all prerequisites satisfied,
     // exactly as production runs them (SubstratePhase.run's eager call at construction time,
@@ -107,7 +104,6 @@ final class AgentOfferingIsExecutableTest {
             operationHandlers,
             mock(KnowledgeServerBootstrap.class),
             client,
-            capability,
             dataDir,
             client,
             OnlineAiService.unavailable(),

@@ -8,7 +8,6 @@ import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
@@ -142,14 +141,13 @@ public final class AgentToolHandlers {
    *
    * @return true if the prerequisite guards passed and registration was attempted (refs already
    *     present are left untouched, refs not yet present are newly registered); false if a
-   *     prerequisite (worker capability, knowledge server, or data dir) was missing.
+   *     prerequisite (knowledge client, knowledge server, or data dir) was missing.
    */
   public static boolean registerLateBound(
       io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       HandlerRegistry operationHandlers,
       KnowledgeServerBootstrap knowledgeServer,
       KnowledgeClient knowledgeClient,
-      WorkerCapability workerCapability,
       Path dataDir,
       IndexingService indexingService,
       OnlineAiService onlineAiService,
@@ -160,8 +158,8 @@ public final class AgentToolHandlers {
       DocumentService documentService,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
       java.util.function.Supplier<IndexingService> liveIndexing) {
-    if (knowledgeClient == null || !workerCapability.available()) {
-      log.warn("registerAgentToolHandlers skipped: knowledgeClient or worker capability unavailable");
+    if (knowledgeClient == null) {
+      log.warn("registerAgentToolHandlers skipped: knowledgeClient unavailable");
       return false;
     }
     if (knowledgeServer == null) {

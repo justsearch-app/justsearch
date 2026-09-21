@@ -3,6 +3,7 @@ package io.justsearch.app.services.observability.health;
 
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
 import java.util.Objects;
@@ -58,6 +59,8 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
 
   private final EngineExecutorRegistry.Registration executorRegistration;
   private final ExecutorService executor;
+  private volatile Thread reconciliationThread;
+  private EngineComponentRegistry.Subscription componentSubscription;
 
   public ReadinessReconciliationTrigger(EngineExecutorRegistry processExecutors) {
     Objects.requireNonNull(processExecutors, "processExecutors");
@@ -78,6 +81,7 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
               runnable -> {
                 Thread thread = new Thread(runnable, "readiness-reconcile");
                 thread.setDaemon(true);
+                reconciliationThread = thread;
                 return thread;
               });
       this.executorRegistration = registration;
@@ -126,12 +130,26 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
   }
 
   /**
+   * Observes all component owners directly. Registry callbacks run synchronously on the publishing
+   * thread, allowing self-publication to be suppressed without dropping concurrent external work.
+   * The trigger owns this subscription and releases it before its executor.
+   */
+  public synchronized void wireTo(EngineComponentRegistry components) {
+    Objects.requireNonNull(components, "components");
+    if (closed.get()) throw new IllegalStateException("Readiness trigger is closed");
+    if (componentSubscription != null) {
+      throw new IllegalStateException("Readiness trigger is already subscribed to components");
+    }
+    componentSubscription = components.subscribe(snapshot -> request());
+  }
+
+  /**
    * Requests one reconcile. No-op when no thunk is attached or after {@link #close()}. Coalescing:
    * if a reconcile is already queued this call adds nothing. The queued task clears the flag before
    * running the thunk, so a transition arriving mid-run schedules exactly one follow-up.
    */
   public void request() {
-    if (closed.get() || reconcile == null) {
+    if (closed.get() || reconcile == null || Thread.currentThread() == reconciliationThread) {
       return;
     }
     if (!pending.compareAndSet(false, true)) {
@@ -163,6 +181,12 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
   public void close() {
     if (!closed.compareAndSet(false, true)) {
       return;
+    }
+    synchronized (this) {
+      if (componentSubscription != null) {
+        componentSubscription.close();
+        componentSubscription = null;
+      }
     }
     executor.shutdownNow();
     executorRegistration.close();

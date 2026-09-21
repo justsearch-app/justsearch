@@ -294,28 +294,13 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         return;
       }
 
-      CapabilityHealth before = bootstrap.workerCapability().health();
+      // The bootstrap owns physical-health initialization. Sampled readiness is an output,
+      // not the trigger for catch-up work (an API restart must not reindex persisted roots).
       bootstrap.checkHealth();
-      CapabilityHealth after = bootstrap.workerCapability().health();
-      if (before != CapabilityHealth.READY && after == CapabilityHealth.READY) {
-        log.info(
-            "Knowledge Server recovered to READY ({}→{}); running deferred auxiliary"
-                + " initialization",
-            before,
-            after);
-        bootstrap.completeReadyInitializationFromMonitor();
-      }
     } catch (Exception e) {
       log.warn("Knowledge Server health monitor tick failed: {}", e.getMessage(), e);
-      WorkerCapability cap = bootstrap.workerCapability();
-      if (cap.health() == CapabilityHealth.READY) {
-        // Tempdoc 837 §3.1: guarded on READY — the worker was serving, so this is "lost", not
-        // "never started". The exception text is the detail behind the code.
-        cap.transition(
-            CapabilityHealth.DEGRADED,
-            LifecycleReasonCode.WORKER_LOST.code(),
-            "Health monitor tick exception: " + e.getMessage());
-      }
+      // checkHealth owns physical-loss reporting; setup/resume exceptions are not evidence
+      // that the index stopped serving. Leave pending initialization available for the next poll.
     }
     // Tempdoc 876 §C.8: the worker's operational view has just been refreshed, so this is the
     // moment the readiness snapshot can change WITHOUT a capability transition — INDEX_SERVING

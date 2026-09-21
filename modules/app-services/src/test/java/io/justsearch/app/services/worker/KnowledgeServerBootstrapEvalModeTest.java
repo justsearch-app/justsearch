@@ -116,10 +116,12 @@ final class KnowledgeServerBootstrapEvalModeTest {
       var clientField = KnowledgeServerBootstrap.class.getDeclaredField("client");
       clientField.setAccessible(true);
       clientField.set(bootstrap, client);
-      bootstrap.completeReadyInitializationFromMonitor();
-      bootstrap.completeReadyInitializationFromMonitor();
-      verify(client, times(isolated ? 0 : 2)).reindexPersistedRoots(any());
-      verify(client, times(isolated ? 0 : 2)).startPeriodicSync();
+      org.mockito.Mockito.when(client.isHealthy(any())).thenReturn(true);
+      bootstrap.checkHealth();
+      bootstrap.checkHealth();
+      verify(client, times(2)).isHealthy(any());
+      verify(client, times(isolated ? 0 : 1)).reindexPersistedRoots(any());
+      verify(client, times(isolated ? 0 : 1)).startPeriodicSync();
       org.mockito.Mockito.verifyNoMoreInteractions(client);
     }
   }

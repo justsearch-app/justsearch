@@ -26,7 +26,6 @@ import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.operations.RecordedIngestionService;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.services.TestEngineContexts;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
@@ -79,9 +78,7 @@ final class RecordedHandlerCompositionTest {
       AgentToolHandlers.registerEager(registry, tools);
       handler = registry.resolve(AgentToolsOperationCatalog.INGEST_FILES).orElseThrow();
     } else if (path.equals("late")) {
-      var capability = mock(WorkerCapability.class);
-      when(capability.available()).thenReturn(true);
-      assertTrue(AgentToolHandlers.registerLateBound(search, registry, server, first, capability,
+      assertTrue(AgentToolHandlers.registerLateBound(search, registry, server, first,
           directory, first, OnlineAiService.unavailable(), null, null, null, null,
           mock(DocumentService.class), ingestion, roots, current::get));
       handler = registry.resolve(AgentToolsOperationCatalog.INGEST_FILES).orElseThrow();

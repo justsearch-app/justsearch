@@ -13,7 +13,6 @@ import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.OnlineAiService;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
@@ -67,8 +66,6 @@ final class AgentToolFactoryCompositionTest {
   @DisplayName("both paths register the same operation set")
   void bothPathsRegisterTheSameOperations(@TempDir Path dataDir) {
     KnowledgeClient client = mock(KnowledgeClient.class);
-    WorkerCapability capability = mock(WorkerCapability.class);
-    when(capability.available()).thenReturn(true);
 
     HandlerRegistry eager = new HandlerRegistry();
     AgentToolFactory.Output eagerTools =
@@ -93,7 +90,6 @@ final class AgentToolFactoryCompositionTest {
             lateBound,
             mock(KnowledgeServerBootstrap.class),
             client,
-            capability,
             dataDir,
             client,
             OnlineAiService.unavailable(),
@@ -132,8 +128,6 @@ final class AgentToolFactoryCompositionTest {
   @DisplayName("eager then late-bound on the SAME registry registers all six handlers (fails on main)")
   void eagerThenLateBoundRegistersAllSixOnTheSameRegistry(@TempDir Path dataDir) {
     KnowledgeClient client = mock(KnowledgeClient.class);
-    WorkerCapability capability = mock(WorkerCapability.class);
-    when(capability.available()).thenReturn(true);
 
     HandlerRegistry registry = new HandlerRegistry();
 
@@ -166,7 +160,6 @@ final class AgentToolFactoryCompositionTest {
             registry,
             mock(KnowledgeServerBootstrap.class),
             client,
-            capability,
             dataDir,
             client,
             OnlineAiService.unavailable(),

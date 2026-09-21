@@ -60,13 +60,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private final Telemetry telemetry;
     private final WorkerCapability workerCapability;
     private final AtomicBoolean started = new AtomicBoolean(false);
-    /**
-     * Tempdoc 502 §4.4: generation counter replaces the never-reset boolean CAS.
-     * Generation 0 = never initialized. Generation 1 = first connect (full init).
-     * Generation 2+ = recovery (partial re-init: reindex + periodic sync only).
-     */
-    private final java.util.concurrent.atomic.AtomicLong initGeneration =
-        new java.util.concurrent.atomic.AtomicLong(0);
+    // Private initialization bookkeeping, never a readiness authority. Only direct health
+    // observations change these flags; API state and sampler staleness cannot re-run setup.
+    // All accesses are serialized with start/close by initLock.
+    private boolean physicalHealthy;
+    private boolean healthyInitializationComplete;
     private final java.util.concurrent.locks.ReentrantLock initLock =
         new java.util.concurrent.locks.ReentrantLock();
 
@@ -160,7 +158,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * The corruption axis has the identical hole; it escapes only when its first worker-down call
      * happens to land outside a suppressed arc.
      *
-     * <p>Cleared on READY (the worker opened the index, so no index verdict stands) — the same
+     * <p>Cleared on a direct healthy observation (the index opened, so no verdict stands) — the same
      * anti-staleness bound {@link io.justsearch.app.services.lifecycle.ReasonRetention} uses.
      */
     private volatile WorkerDown latchedIndexFatalVerdict;
@@ -224,16 +222,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.bootFaultsRemaining = new java.util.concurrent.atomic.AtomicInteger(config.bootFaultInjectAttempts());
         this.telemetry = telemetry != null ? telemetry : new NoopTelemetry();
         this.workerCapability = workerCapability != null ? workerCapability : new WorkerCapability();
-        // Tempdoc 915 R1: drop the fatal-index latch wherever READY comes from, rather than at the
-        // two sites that happen to write it today. READY means the worker opened the index and is
-        // serving, so no index verdict stands — the same anti-staleness bound ReasonRetention uses,
-        // and the reason it needs no timer. Placed here so a future READY path inherits it.
-        this.workerCapability.addListener(
-            (prev, next) -> {
-                if (next == CapabilityHealth.READY) {
-                    latchedIndexFatalVerdict = null;
-                }
-            });
+
     }
 
     /**
@@ -250,6 +239,15 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * @throws InterruptedException if startup is interrupted
      */
     public void start() throws IOException, InterruptedException {
+        initLock.lockInterruptibly();
+        try {
+            startLocked();
+        } finally {
+            initLock.unlock();
+        }
+    }
+
+    private void startLocked() throws IOException, InterruptedException {
         if (!started.compareAndSet(false, true)) {
             throw new IllegalStateException("KnowledgeServerBootstrap already started");
         }
@@ -341,22 +339,20 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private void awaitHealthyAndComplete() throws InterruptedException {
         long retryBudgetMs = config.healthCheckRetryBudgetMs();
         long healthCheckStartMs = System.currentTimeMillis();
-        boolean healthy = client.isHealthy(ENGINE_CONTEXT);
+        boolean healthy = checkHealth();
         while (!healthy && (System.currentTimeMillis() - healthCheckStartMs) < retryBudgetMs) {
             Thread.sleep(1000);
-            healthy = client.isHealthy(ENGINE_CONTEXT);
+            healthy = checkHealth();
         }
         long healthCheckElapsedMs = System.currentTimeMillis() - healthCheckStartMs;
 
         if (healthy) {
-            workerCapability.transition(CapabilityHealth.READY, null);
             if (healthCheckElapsedMs >= 1000) {
                 log.info("Knowledge Server became healthy after {}ms of warmup polling",
                         healthCheckElapsedMs);
             } else {
                 log.info("Knowledge Server is READY");
             }
-            completeReadyInitialization();
         } else {
             // Tempdoc 837 §3.1: the start-time health budget elapsed — the worker NEVER started.
             // Review F7: this site is reachable DURING a recovery arc — the attempt's worker
@@ -467,53 +463,21 @@ public final class KnowledgeServerBootstrap implements Closeable {
         return client != null;
     }
 
-    /**
-     * Tempdoc 502 §4.4: generation-based initialization. First call (generation 0→1)
-     * runs full initialization. Subsequent calls (recovery) re-run only catch-up steps
-     * (reindex + periodic sync). Called from both the bootstrap success path and the
-     * health-monitor recovery path.
-     */
-    private void completeReadyInitialization() {
-        if (!initLock.tryLock()) {
-            log.debug("completeReadyInitialization already running — skipping");
-            return;
+    /** Called only under initLock after a direct healthy observation. */
+    private void completeHealthyInitialization() {
+        if (healthyInitializationComplete) return;
+        if (automaticRootProducers) {
+            // Queue catch-up work once per physically healthy period. Help ingestion keeps its
+            // existing marker-idempotent, best-effort semantics on first start and recovery.
+            client.reindexPersistedRoots(ENGINE_CONTEXT);
+            tryIngestHelpFiles(client, config);
+            client.startPeriodicSync();
         }
-        try {
-            long prevGen = initGeneration.getAndIncrement();
-            if (!automaticRootProducers) {
-                log.info("Automatic root producers disabled by installed fault fixture composition");
-                return;
-            }
-            if (prevGen == 0) {
-                // Tempdoc 626 §Axis-A — the redundant Head-side file watcher was removed; the
-                // Worker-side watcher (registered via WatchRoot during the root walk) is the sole
-                // event source, and the periodic sync + reindexPersistedRoots are the reconcile
-                // backstop. File-event integration now lives entirely in the Worker process.
-                client.reindexPersistedRoots(ENGINE_CONTEXT);
-                tryIngestHelpFiles(client, config);
-                client.startPeriodicSync();
-            } else {
-                log.info("Worker recovery detected (generation {}); re-running catch-up initialization", prevGen + 1);
-                client.reindexPersistedRoots(ENGINE_CONTEXT);
-                client.startPeriodicSync();
-            }
-        } finally {
-            initLock.unlock();
-        }
+        // A thrown required setup call leaves this false so a later healthy poll retries it.
+        healthyInitializationComplete = true;
     }
 
     boolean automaticRootProducersSuppressed() { return !automaticRootProducers; }
-
-    /**
-     * Tempdoc 374 alpha.23 R13-A defect #2: package-private hook called by
-     * {@link KnowledgeServerHealthMonitor} when the worker recovers from
-     * non-READY to READY. Delegates to the same idempotent helper used by
-     * the bootstrap success path.
-     */
-    void completeReadyInitializationFromMonitor() {
-        completeReadyInitialization();
-        tryIngestHelpFiles(client, config);
-    }
 
     /**
      * Returns true if the Knowledge Server is ready.
@@ -710,28 +674,42 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     public boolean checkHealth() {
-        if (client == null) {
-            return false;
+        initLock.lock();
+        try {
+            if (client == null) return false;
+            boolean healthy;
+            try {
+                healthy = client.isHealthy(ENGINE_CONTEXT);
+            } catch (RuntimeException failure) {
+                observePhysicalLoss("Health check failed: " + failure.getMessage());
+                throw failure;
+            }
+            if (healthy) {
+                physicalHealthy = true;
+                latchedIndexFatalVerdict = null;
+                // Removed with the mutable-capability migration; auxiliary initialization no
+                // longer depends on this temporary compatibility publication.
+                if (workerCapability.health() != CapabilityHealth.READY) {
+                    workerCapability.transition(CapabilityHealth.READY, null);
+                }
+                completeHealthyInitialization();
+            } else {
+                observePhysicalLoss("Health check failed");
+            }
+            return healthy;
+        } finally {
+            initLock.unlock();
         }
-        boolean healthy = client.isHealthy(ENGINE_CONTEXT);
-        // Item A11: the poll used to feed the spawner's hang detector, whose escalation was a
-        // restart. There is no restart authority in stage A (§10) — a lost worker component reports
-        // itself lost and stays that way until the user restarts the Engine.
-        // Historical note kept because the streak threshold is stage B's input: a sustained streak on
-        // a still-alive worker (the "liveness" signal) triggers a budgeted graceful restart — closing
-        // the Worker's observation→actuation loop. This is the only wiring the health monitor needs.
+    }
 
-        CapabilityHealth current = workerCapability.health();
-        if (healthy && current != CapabilityHealth.READY) {
-            workerCapability.transition(CapabilityHealth.READY, null);
-            log.info("Knowledge Server recovered to READY state");
-        } else if (!healthy && current == CapabilityHealth.READY) {
-            // Tempdoc 837 §3.1: this branch is guarded on current == READY, so the worker WAS serving
-            // and stopped answering — worker.lost, never worker.spawn.failed.
-            transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+    private void observePhysicalLoss(String detail) {
+        boolean wasHealthy = physicalHealthy;
+        physicalHealthy = false;
+        healthyInitializationComplete = false;
+        if (wasHealthy) {
+            transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, detail);
             log.warn("Knowledge Server health check failed");
         }
-        return healthy;
     }
 
     @Override
@@ -741,6 +719,15 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     /** Ordered close that reports whether Worker process termination required force. */
     public ShutdownOutcome closeForUpgrade() {
+        initLock.lock();
+        try {
+            return closeLocked();
+        } finally {
+            initLock.unlock();
+        }
+    }
+
+    private ShutdownOutcome closeLocked() {
         log.info("Shutting down Knowledge Server integration...");
         ShutdownOutcome outcome = ShutdownOutcome.GRACEFUL;
 
@@ -798,14 +785,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // Must clear even if a capability listener throws: a stranded started=true would make
             // the next start() throw "already started" and replace the real cause in the log.
             started.set(false);
-            // Tempdoc 825 (charter item 4 / #439 review finding E): the generation counter outlived
-            // the teardown it describes. A later start() on this same instance — which is now the
-            // NORMAL path, not a hypothetical, because boot recovery re-starts this instance — would
-            // take the generation>=1 "recovery" branch of completeReadyInitialization and skip
-            // tryIngestHelpFiles for the whole process lifetime. close() drops the client, the
-            // spawner and the signal bus; the generation describes that same connection, so it is
-            // reset with them. Re-running help ingest is free: it is marker-file idempotent.
-            initGeneration.set(0);
+            physicalHealthy = false;
+            healthyInitializationComplete = false;
         }
         log.info("Knowledge Server integration shutdown complete");
         return outcome;

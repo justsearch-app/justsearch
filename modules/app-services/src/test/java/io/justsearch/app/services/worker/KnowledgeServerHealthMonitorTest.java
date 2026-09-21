@@ -33,89 +33,34 @@ final class KnowledgeServerHealthMonitorTest {
     processExecutors.close();
   }
 
-  @Test
-  void tickTriggersInitializationOnErrorToReadyTransition() {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void healthArmDelegatesPhysicalObservationAndInitializationToBootstrap(boolean healthy) {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.DEGRADED, "error");
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth())
-        .thenAnswer(
-            inv -> {
-              cap.transition(CapabilityHealth.READY, null);
-              return true;
-            });
-
+    when(bootstrap.checkHealth()).thenReturn(healthy);
     KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
+    var reconciles = new java.util.concurrent.atomic.AtomicInteger();
+    monitor.onTick(reconciles::incrementAndGet);
     monitor.tick();
-
-    verify(bootstrap).checkHealth();
-    verify(bootstrap, times(1)).completeReadyInitializationFromMonitor();
+    monitor.tick();
+    verify(bootstrap, times(2)).checkHealth();
+    verify(bootstrap, never()).workerCapability();
+    assertEquals(2, reconciles.get());
   }
 
   @Test
-  void tickTriggersInitializationOnPendingToReadyTransition() {
+  void tickSwallowsExceptionsAndStillRequestsReadinessReconciliation() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth())
-        .thenAnswer(
-            inv -> {
-              cap.transition(CapabilityHealth.READY, null);
-              return true;
-            });
-
+    doThrow(new RuntimeException("direct health failure")).when(bootstrap).checkHealth();
     KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
-    monitor.tick();
-
-    verify(bootstrap, times(1)).completeReadyInitializationFromMonitor();
-  }
-
-  @Test
-  void tickDoesNotTriggerInitializationWhenAlreadyReady() {
-    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.READY, null);
-    when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth()).thenReturn(true);
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
-    monitor.tick();
-
-    verify(bootstrap, never()).completeReadyInitializationFromMonitor();
-  }
-
-  @Test
-  void tickDoesNotTriggerInitializationWhenStillDegraded() {
-    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.DEGRADED, "error");
-    when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth()).thenReturn(false);
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
-    monitor.tick();
-
-    verify(bootstrap, never()).completeReadyInitializationFromMonitor();
-  }
-
-  @Test
-  void tickSwallowsExceptionsSoExecutorSurvives() {
-    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    doThrow(new RuntimeException("transient gRPC failure")).when(bootstrap).checkHealth();
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
-
+    var reconciles = new java.util.concurrent.atomic.AtomicInteger();
+    monitor.onTick(reconciles::incrementAndGet);
     assertDoesNotThrow(monitor::tick);
     verify(bootstrap).checkHealth();
-    verify(bootstrap, never()).completeReadyInitializationFromMonitor();
+    verify(bootstrap, never()).workerCapability();
+    assertEquals(1, reconciles.get());
   }
 
   // ---- Tempdoc 630: resume detection + eager re-validation -------------------------------------

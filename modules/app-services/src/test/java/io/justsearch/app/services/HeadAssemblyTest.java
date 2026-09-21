@@ -306,17 +306,13 @@ class HeadAssemblyTest {
     }
   }
 
-  /**
-   * Regression (543-fwd hotfix 299b2ba69 + ordering fix 0febc18fb): async-path
-   * connectKnowledgeServer must trigger agent-tool registration AFTER (a) the
-   * worker-capability bridge transitions the local capability to READY (else registerLateBound
-   * skips â†’ "No handler registered for binding core.search-index"), AND (b) this.services is
-   * reassembled with the fresh worker services (else this.services.worker().indexing() is null
-   * â†’ NPE in registerLateBound on indexingService::getWatchedPaths â†’ HeadlessApp boot crash).
-   * Asserts: connect does NOT throw (the boot NPE) AND the Memoized registration resolved true.
-   */
-  @Test
-  void connectKnowledgeServerRegistersAgentToolsWithoutBootNpe() throws Exception {
+  /** A bound client must complete tool composition even while sampled readiness is pending. */
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(
+      value = io.justsearch.app.api.lifecycle.CapabilityHealth.class,
+      names = {"PENDING", "READY"})
+  void connectKnowledgeServerRegistersAgentToolsWithoutBootNpe(
+      io.justsearch.app.api.lifecycle.CapabilityHealth health) throws Exception {
     Telemetry telemetry = new NoopTelemetry();
     // Tempdoc 627 Deliverable 10: share the capability the mocked KS reports, so the HeadAssembly's
     // localCap IS ks.workerCapability() (the production invariant) and no mirror is needed.
@@ -335,9 +331,9 @@ class HeadAssemblyTest {
               io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
       var client =
           org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
-      cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
+      cap.transition(health, null);
       org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
-      org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
+      org.mockito.Mockito.when(ks.isReady()).thenReturn(health == io.justsearch.app.api.lifecycle.CapabilityHealth.READY);
       org.mockito.Mockito.when(ks.client()).thenReturn(client);
 
       // Must NOT throw the boot NPE, and the agent-tool handlers must register.

@@ -48,8 +48,19 @@ publication and the stateless retention seam pass static2299 and focused2300
 (40 cases/4 suites, no failures/skips). Negative2301 proves the API-race guard;
 source is restored byte-exactly, and2302 reuses matching restored proof. See the
 [seam verification](evidence/D1/publication-seam-verification-2026-09-21.md).
+Publication seam and owner audits are pushed at `93e206213`. Schema projection,
+trigger feedback protection and client-bound tool composition pass focused2307
+(55 cases/12 suites, fresh, no failures/skips); negative2306 proves the feedback
+guard. See [schema/trigger proof](evidence/D1/schema-trigger-verification-2026-09-21.md).
+Physical-health bootstrap initialization now shares the existing lock with start
+and close, retiring the generation counter and capability-edge initialization.
+Combined2313 passes108 cases/21 suites, fresh, zero failures/skips, with full
+spotlessCheck/pmdAll green. Negative2311/2312 prove close contention and retry;
+all mutations are restored. See [bootstrap proof](evidence/D1/bootstrap-initialization-verification-2026-09-21.md).
 Runtime capability/schema/host migration remains open. No Gradle or stack is
-active; next run2303.
+active; next run2314. Temporary physical capability READY publication remains;
+replace it when the registry sampler owns READY. Continue with mutable-capability
+retirement and actual registry/status/manifest wiring; this is not a lane stop.
 D1 is not accepted.
 
 Workflow correction `b4d01c1cc` is pushed: collect independent static failures in

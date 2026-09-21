@@ -233,19 +233,13 @@ final class SchemaMismatchFatalArcTest {
 
   @Test
   @Timeout(180)
-  @DisplayName("an unrelated later death is NOT reported as the old refusal")
-  void theLatchIsClearedWhenTheWorkerServes(@TempDir Path tempDir) {
+  @DisplayName("projected READY cannot erase a physical fatal-index verdict")
+  void projectedReadyCannotClearThePhysicalLatch(@TempDir Path tempDir) {
     var bootstrap = refusedBoot(tempDir);
     assertEquals(MISMATCH, bootstrap.indexFatalCode().code());
-
-    // The one anti-staleness bound: the worker opened the index and is serving, so no index verdict
-    // stands. Without it, an OOM death an hour later would still be reported as a schema mismatch —
-    // the same "unrepeatable observation kept too long" failure in the other direction.
     bootstrap.workerCapability().transition(CapabilityHealth.READY, null);
-    assertNull(
-        bootstrap.indexFatalCode(),
-        "READY is where the latch is dropped; this assertion fails if only the capability's"
-            + " ReasonRetention clears and the bootstrap keeps its copy");
+    assertEquals(MISMATCH, bootstrap.indexFatalCode().code(),
+        "only a direct healthy client observation can establish that the index opened");
   }
 
   @Test

@@ -358,31 +358,6 @@ final class KnowledgeServerBootRecoveryTest {
     }
   }
 
-  @Test
-  @Timeout(180)
-  @DisplayName("close() resets initGeneration, so a recovered worker still gets its help files")
-  void closeResetsInitGeneration(@TempDir Path tempDir) throws Exception {
-    // #439 review finding E / charter item 4: initGeneration outlived the connection it described,
-    // so the first successful start AFTER any close() took the generation>=1 "recovery" branch of
-    // completeReadyInitialization and skipped tryIngestHelpFiles for the rest of the process. Latent
-    // before 825 (nothing re-started a closed bootstrap); LIVE the moment a recovery loop exists.
-    //
-    // Read reflectively because the counter has no consumer that would justify a public accessor,
-    // and asserting it through completeReadyInitialization would need a live gRPC client — the exact
-    // substrate this rung of the ladder is defined to exclude.
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
-    var field = KnowledgeServerBootstrap.class.getDeclaredField("initGeneration");
-    field.setAccessible(true);
-    var generation = (java.util.concurrent.atomic.AtomicLong) field.get(bootstrap);
-    generation.set(3); // as if three connections had completed initialization
-
-    bootstrap.closeForUpgrade();
-
-    assertEquals(
-        0L,
-        generation.get(),
-        "close() drops the client, spawner and signal bus; the generation describes that same"
-            + " connection and must go with them, or the next start() skips first-connect init");
-    assertFalse(bootstrap.hasClient());
-  }
+  // BootstrapPhysicalInitializationTest proves close/restart initialization through real
+  // bootstrap calls and client effects; the retired generation counter is not an authority.
 }
