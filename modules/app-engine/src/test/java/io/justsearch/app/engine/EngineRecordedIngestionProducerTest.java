@@ -63,6 +63,45 @@ final class EngineRecordedIngestionProducerTest {
   private static final String GENERATION = "serving-generation-37";
   private static final String RECORDED_PLAN_HASH = "b".repeat(64);
 
+  @ParameterizedTest
+  @ValueSource(strings = {"", "IO_ERROR", "CLIENT_CANCELLED"})
+  void capturedRootsShareOneEpochAndStopAfterAnUnsuccessfulRoot(String terminalReason,
+      @TempDir Path directory) throws Exception {
+    var first = new RecordedRootPlan.Root(directory.resolve("first"), "first", true, false, List.of("*.tmp"), List.of());
+    var second = new RecordedRootPlan.Root(directory.resolve("second"), "second", true, false, List.of(), List.of());
+    var plan = new RecordedRootPlan(GENERATION, List.of(first, second));
+    var observed = new java.util.concurrent.CopyOnWriteArrayList<WorkerIngestService.RecordedRootScan>();
+    var ingest = mock(WorkerIngestService.class);
+    doAnswer(call -> {
+      observed.add(call.getArgument(0));
+      call.<Consumer<ScanRootProgress>>getArgument(1).accept(ScanRootProgress.newBuilder()
+          .setComplete(true).setTerminalReasonCode(terminalReason).build());
+      return null;
+    }).when(ingest).scanRecordedRoot(any(), any(), any());
+    var admission = new EngineAdmissionController(8, 8, 1);
+    try (var registry = new DefaultEngineExecutorRegistry();
+        var client = client(registry, () -> services(ingest), admission, 5_000)) {
+      var result = client.enumerateCapturedRoots(plan, KEY, EPOCH, TestEngineContexts.FOREGROUND, new CancelToken())
+          .toCompletableFuture().get(5, TimeUnit.SECONDS);
+      var expected = terminalReason.isEmpty() ? JobQueue.WalkEnumerationOutcome.COMPLETE
+          : terminalReason.equals("CLIENT_CANCELLED") ? JobQueue.WalkEnumerationOutcome.CANCELLED
+              : JobQueue.WalkEnumerationOutcome.FAILED;
+      assertEquals(expected, result);
+      assertEquals(terminalReason.isEmpty() ? 2 : 1, observed.size());
+      for (int i = 0; i < observed.size(); i++) {
+        var scan = observed.get(i);
+        assertEquals(KEY, scan.operationKey());
+        assertEquals(EPOCH, scan.epoch());
+        assertEquals(GENERATION, scan.expectedGeneration());
+        assertEquals(WorkerIngestService.RecordedScanMode.CAPTURED, scan.mode());
+        assertEquals(plan.roots().get(i).path().toString(), scan.request().getRootPath());
+        assertEquals(plan.roots().get(i).collection(), scan.request().getCollection());
+        assertEquals(plan.roots().get(i).excludePatterns(), scan.request().getExcludeGlobsList());
+      }
+      assertEquals(0, admission.activeWorkCount(), "the complete multi-root producer releases its shared owner");
+    }
+  }
+
   @Test
   void completeRecordedRootPreservesFrozenIdentityPolicyAndCallerContext(@TempDir Path directory)
       throws Exception {

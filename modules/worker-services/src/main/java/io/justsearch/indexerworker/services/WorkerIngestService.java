@@ -1699,11 +1699,20 @@ public final class WorkerIngestService {
     scanRoot(request, sink, ctx, null);
   }
 
+  /** Captured bulk records all source identities before any member may be claimed. */
+  public enum RecordedScanMode { STREAMING, CAPTURED }
+
   /** Java-only projection of one accepted root; the wire schema never carries operation identity. */
   public record RecordedRootScan(io.justsearch.ipc.ScanRootRequest request,
-      String operationKey, long epoch, String expectedGeneration, boolean singleFile, List<Path> excludedSubtrees) {
+      String operationKey, long epoch, String expectedGeneration, boolean singleFile, List<Path> excludedSubtrees,
+      RecordedScanMode mode) {
     public RecordedRootScan {
       java.util.Objects.requireNonNull(request, "request");
+      java.util.Objects.requireNonNull(mode, "mode");
+      if (mode == RecordedScanMode.CAPTURED
+          && (singleFile || request.getMode() != io.justsearch.ipc.ScanMode.SCAN_MODE_FORCE_REINDEX)) {
+        throw new IllegalArgumentException("Captured bulk requires forced directory traversal");
+      }
       if (operationKey == null || operationKey.isBlank() || operationKey.length() > 256 || epoch < 1) {
         throw new IllegalArgumentException("Invalid recorded scan membership");
       }
@@ -1727,6 +1736,11 @@ public final class WorkerIngestService {
       for (String glob : request.getExcludeGlobsList()) {
         if (glob.isBlank() || glob.length() > 4096) throw new IllegalArgumentException("Invalid recorded root glob");
       }
+    }
+
+    public RecordedRootScan(io.justsearch.ipc.ScanRootRequest request, String operationKey, long epoch,
+        String expectedGeneration, boolean singleFile, List<Path> excludedSubtrees) {
+      this(request, operationKey, epoch, expectedGeneration, singleFile, excludedSubtrees, RecordedScanMode.STREAMING);
     }
   }
 
@@ -1773,7 +1787,9 @@ public final class WorkerIngestService {
   }
 
   private void validateRecordedGeneration(RecordedRootScan recorded, CallContext ctx) {
-    if (!recorded.expectedGeneration().equals(captureServingGeneration(ctx))) {
+    String source = recorded.mode() == RecordedScanMode.CAPTURED
+        ? captureRebuildGeneration(ctx) : captureServingGeneration(ctx);
+    if (!recorded.expectedGeneration().equals(source)) {
       throw WorkerServiceException.unavailable("RECORDED_GENERATION_CHANGED");
     }
   }
@@ -1808,7 +1824,8 @@ public final class WorkerIngestService {
           new WorkerScanOps.ScanRequest(
               root, request.getCollection(), mode, request.getExcludeGlobsList(), scanId, ctx.provenance(),
               recorded == null ? null : recorded.epoch(),
-              recorded == null ? List.of() : recorded.excludedSubtrees(), recorded != null && recorded.singleFile());
+              recorded == null ? List.of() : recorded.excludedSubtrees(), recorded != null && recorded.singleFile(),
+              recorded == null ? RecordedScanMode.STREAMING : recorded.mode());
       // Tempdoc 418 B-H.3 — Worker owns backpressure + cancellation. The call's cancellation
       // signal lets WorkerScanOps stop walking when the caller drops the stream (e.g.,
       // RootLifecycleOps removes the watched root mid-scan).

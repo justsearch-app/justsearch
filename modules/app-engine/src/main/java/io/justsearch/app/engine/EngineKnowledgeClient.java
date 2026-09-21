@@ -28,6 +28,7 @@ import java.util.concurrent.CompletionStage;
 import io.justsearch.ipc.ScanRootRequest;
 import io.justsearch.ipc.SubscribeIndexingJobsRequest;
 import java.util.Objects;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -962,6 +963,39 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   /** One accepted child on the existing bounded walker; completion means both owned tasks exited. */
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation) {
+    return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
+        WorkerIngestService.RecordedScanMode.STREAMING);
+  }
+
+  /** One captured epoch spans every frozen root; each stage waits for its actual walk and delivery exit. */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
+      String operationKey, long epoch, EngineContext context, CancelToken cancellation) {
+    Objects.requireNonNull(plan, "plan");
+    Objects.requireNonNull(cancellation, "cancellation");
+    var owner = admission.attach(context);
+    try {
+      CompletionStage<JobQueue.WalkEnumerationOutcome> result = CompletableFuture.completedFuture(
+          cancellation.isCancelled() ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.COMPLETE);
+      for (var root : plan.roots()) {
+        var singleRoot = new RecordedRootPlan(plan.generation(), List.of(root));
+        result = result.thenCompose(outcome -> {
+          if (outcome != JobQueue.WalkEnumerationOutcome.COMPLETE) return CompletableFuture.completedFuture(outcome);
+          if (cancellation.isCancelled()) return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
+          return enumerateRecordedRoot(singleRoot, operationKey, epoch, owner.context(), cancellation,
+              WorkerIngestService.RecordedScanMode.CAPTURED);
+        });
+      }
+      return result.whenComplete((ignored, failure) -> owner.close());
+    } catch (RuntimeException | Error failure) {
+      try { owner.close(); }
+      catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      throw failure;
+    }
+  }
+
+  private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
+      String childKey, long epoch, EngineContext context, CancelToken cancellation,
+      WorkerIngestService.RecordedScanMode mode) {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
     if (plan.roots().size() != 1) throw new IllegalArgumentException("Recorded producer requires one root");
@@ -972,7 +1006,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     if (root.collection() != null) builder.setCollection(root.collection());
     var request = builder.build();
     var recorded = new WorkerIngestService.RecordedRootScan(request, childKey, epoch,
-        plan.generation(), root.singleFile(), root.excludedSubtrees());
+        plan.generation(), root.singleFile(), root.excludedSubtrees(), mode);
     var delivery = new AtomicReference<CompletionStage<Void>>(CompletableFuture.completedFuture(null));
     var outcome = new AtomicReference<>(JobQueue.WalkEnumerationOutcome.FAILED);
     var walk = scheduleRootWalk(rootWalkExecutor(), ownedContext -> {
@@ -1248,7 +1282,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   protected void closeTransport() {
     Throwable failure = null;
-    for (var registration : java.util.List.of(foregroundStreamRegistration,
+    for (var registration : List.of(foregroundStreamRegistration,
         backgroundStreamRegistration, foregroundCallRegistration, backgroundCallRegistration,
         deadlineRegistration)) {
       try {

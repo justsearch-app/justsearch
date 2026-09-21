@@ -548,7 +548,9 @@ automatic replacement/enumeration starts. Exact recorded targets retain their
 owner and suppress mutable-root enumeration; a recorded-looking target with
 missing or conflicting authority is fenced without replacement. Ordinary
 automatic migrations retain their current behavior. Read-only Blue remains
-available while a recorded target is fenced.
+available while a recorded target is fenced, provided strict current state proves
+Blue's identity. If current state is missing or corrupt, pending/fenced recorded
+startup fails without restoring or reading authority from .prev.
 
 Immediately before promotion, the existing migration loop must obtain the sealed
 queue receipt, leave queue locking, and ask the Engine-owned runner to persist
@@ -623,3 +625,41 @@ existing skips. App-services executes afresh; unchanged app-api results reuse
 13 Java files and preserves the skip details; docs regeneration, canonical links
 and operation-surface checks pass. This closes the bounded continuation policy
 checkpoint, not the still-required bulk capture, boot and promotion consumer.
+
+Authorization checkpoint d69763186 is pushed; hosted CI 35572035546 is running.
+The next uncommitted traversal batch adds STREAMING/CAPTURED to the existing
+Java-only recorded scan projection. Captured mode hashes each eligible source
+with the existing SourceContentHash routine (narrowly exposed), keeps 2,000-entry
+batches, bypasses both depth waits because claims are withheld, and refuses cloud
+placeholders before ledger admission. It uses the strict read-only active witness;
+ordinary streaming still requires the writer. EngineKnowledgeClient sequences
+frozen roots under one retained admission owner and one caller-supplied epoch,
+waiting for each actual walk and progress-delivery exit. It stops after failure
+or cancellation; the outer consumer remains responsible for closing the epoch.
+Captured traversal verification is complete for this bounded checkpoint. Focused
+2174 represents 76 cases in six suites with no failures, errors or skips: 22 Engine
+cases execute and 54 unchanged scanner/admission cases reuse 2173. Full 2175
+executes 2,092 cases in 363 worker-services/indexer-worker suites with zero failures
+or errors and 17 existing model/filesystem skips. All five affected PMD and three
+format checks pass. Independent read-only review reports no actionable findings.
+Negative 2177 executes five cases and fails exactly the two intended guards:
+restoring queue-depth waiting prevents capture completion; releasing the retained
+owner early refuses the second root with WORK_FINISHED. Both production files are
+restored byte-for-byte. Logs, copied XML, source inventories and skip details live
+under tmp/2173-*, tmp/2174-*, tmp/2175-* and tmp/2177-*. Full Engine integration is
+still owed after the consumer is connected; this evidence does not claim it.
+
+Hosted continuation CI 35572035546 passes all jobs except platform-contracts,
+which fails during Gradle configuration on Maven Central HTTP 429 for Kotlin
+2.3.21 dependencies. No platform tests execute; WholeProgramDeadCodeTest hosted
+closure remains unproven. The failed job is retried after its logs are preserved.
+
+The reviewed boot design uses one early immutable ownership request, observed
+before IndexGenerationManager initialization, then reused for the fingerprint and
+Green fence. Pending/fenced recorded work requires strict current-state loading
+without normalization writes or fallback. Native bootstrap remains available
+without pending recorded work; unowned recorded building/fallback evidence is
+fenced. A valid current IDLE active recorded generation is not permanently fenced
+merely because its completed, ACKed operation row has expired. This distinction
+preserves normal startup after successful bulk work without authorizing a pending
+target from fallback state.

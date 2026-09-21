@@ -26,22 +26,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 @Timeout(15)
 final class EngineRecordedProducerExitTest {
   @TempDir Path directory;
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void walkSuccessOrFailureStillWaitsForDeliveryCleanup(boolean failWalk) throws Exception {
+  @org.junit.jupiter.params.provider.CsvSource({"false,false", "true,false", "false,true", "true,true"})
+  void walkSuccessOrFailureStillWaitsForDeliveryCleanup(boolean failWalk, boolean captured) throws Exception {
     var admission = spy(new EngineAdmissionController(8, 8, 1));
     var attachments = new AtomicInteger();
     var cleanupEntered = new CountDownLatch(1);
     var releaseCleanup = new CountDownLatch(1);
     doAnswer(call -> {
       EngineWorkHandle actual = (EngineWorkHandle) call.callRealMethod();
-      if (attachments.incrementAndGet() != 2) return actual;
+      if (attachments.incrementAndGet() != (captured ? 3 : 2)) return actual;
       var scanOwner = spy(actual);
       doAnswer(retain -> {
         EngineWorkHandle retained = (EngineWorkHandle) retain.callRealMethod();
@@ -56,7 +55,9 @@ final class EngineRecordedProducerExitTest {
       return scanOwner;
     }).when(admission).attach(any());
     var ingest = mock(WorkerIngestService.class);
+    var scans = new AtomicInteger();
     doAnswer(call -> {
+      scans.incrementAndGet();
       if (failWalk) throw new IllegalStateException("walk body failed");
       java.util.function.Consumer<ScanRootProgress> progress = call.getArgument(1);
       progress.accept(ScanRootProgress.newBuilder().setComplete(true).build());
@@ -69,14 +70,18 @@ final class EngineRecordedProducerExitTest {
             new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop(), () -> {},
             admission, OperationAuthority.inMemory().roots());
         var request = admission.admit(TestEngineContexts.FOREGROUND, false)) {
-      var result = client.enumerateRecordedRoot(new RecordedRootPlan("generation", List.of(
-          new RecordedRootPlan.Root(directory, null, false, false, List.of(), List.of()))),
-          "recorded-child", 1, request.context(), new CancelToken()).toCompletableFuture();
+      var first = new RecordedRootPlan.Root(directory, null, captured, false, List.of(), List.of());
+      var second = new RecordedRootPlan.Root(directory.resolve("second"), null, true, false, List.of(), List.of());
+      var plan = new RecordedRootPlan("generation", captured ? List.of(first, second) : List.of(first));
+      var result = (captured
+          ? client.enumerateCapturedRoots(plan, "recorded-child", 1, request.context(), new CancelToken())
+          : client.enumerateRecordedRoot(plan, "recorded-child", 1, request.context(), new CancelToken())).toCompletableFuture();
       assertTrue(cleanupEntered.await(3, TimeUnit.SECONDS));
       var field = KnowledgeClient.class.getDeclaredField("walkExecutor");
       field.setAccessible(true);
       ((ExecutorService) field.get(client)).submit(() -> {}).get(3, TimeUnit.SECONDS);
       assertFalse(result.isDone(), "the walk exited, but its delivery owner has not");
+      assertEquals(1, scans.get(), "another captured root cannot start before prior delivery cleanup exits");
       request.close();
       assertEquals(1, admission.activeWorkCount(), "held delivery must retain exact work");
       releaseCleanup.countDown();
@@ -84,6 +89,7 @@ final class EngineRecordedProducerExitTest {
           () -> result.get(3, TimeUnit.SECONDS));
       else assertEquals(io.justsearch.indexerworker.queue.JobQueue.WalkEnumerationOutcome.COMPLETE,
           result.get(3, TimeUnit.SECONDS));
+      assertEquals(captured && !failWalk ? 2 : 1, scans.get());
       assertEquals(0, admission.activeWorkCount());
     } finally { releaseCleanup.countDown(); }
   }

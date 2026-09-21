@@ -267,6 +267,9 @@ final class WorkerScanOps {
               return FileVisitResult.CONTINUE;
             }
             if (isCloudPlaceholder.test(file)) {
+              if (request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED) {
+                throw new IOException("Captured bulk member is a cloud placeholder");
+              }
               cloudPlaceholderRecorder.record(file, collection, request.provenance());
               counters[2]++;
               return FileVisitResult.CONTINUE;
@@ -276,9 +279,11 @@ final class WorkerScanOps {
               return FileVisitResult.CONTINUE;
             }
             // 813 Slice B: the walk already holds the size — no extra stat.
-            batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance()));
+            String sourceHash = request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED
+                ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(file) : null;
+            batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance(), sourceHash));
             if (batch.size() >= ENQUEUE_BATCH_SIZE) {
-              if (!awaitQueueBelowThreshold() || isCancelled.getAsBoolean()) {
+              if (!awaitAdmissionCapacity(request) || isCancelled.getAsBoolean()) {
                 cancelled[0] = true;
                 return FileVisitResult.TERMINATE;
               }
@@ -310,7 +315,7 @@ final class WorkerScanOps {
         });
 
     if (!batch.isEmpty() && !cancelled[0]) {
-      if (!awaitQueueBelowThreshold() || isCancelled.getAsBoolean()) {
+      if (!awaitAdmissionCapacity(request) || isCancelled.getAsBoolean()) {
         cancelled[0] = true;
       } else {
         flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), forceReindex, counters, bytes);
@@ -349,6 +354,13 @@ final class WorkerScanOps {
           batch.stream().map(e -> PathNormalizer.normalizeKey(e.path())).toList());
     }
     batch.clear();
+  }
+
+  private boolean awaitAdmissionCapacity(ScanRequest request) {
+    // Captured membership cannot drain until the whole manifest is COMPLETE. Waiting for queue
+    // depth here would deadlock any corpus above the watermark; batches remain bounded at 2,000.
+    return request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED
+        || awaitQueueBelowThreshold();
   }
 
   /**
@@ -480,10 +492,16 @@ final class WorkerScanOps {
    */
   record ScanRequest(
       Path root, String collection, ScanMode mode, List<String> excludeGlobs, String scanId,
-      JobQueue.EnqueueProvenance provenance, Long recordedEpoch, List<Path> excludedSubtrees, boolean singleFile) {
+      JobQueue.EnqueueProvenance provenance, Long recordedEpoch, List<Path> excludedSubtrees, boolean singleFile,
+      WorkerIngestService.RecordedScanMode captureMode) {
     public ScanRequest {
       Objects.requireNonNull(root, "root");
       Objects.requireNonNull(provenance, "provenance");
+      Objects.requireNonNull(captureMode, "captureMode");
+      if (captureMode == WorkerIngestService.RecordedScanMode.CAPTURED
+          && (recordedEpoch == null || singleFile || mode != ScanMode.FORCE_REINDEX)) {
+        throw new IllegalArgumentException("Captured bulk requires recorded forced directory traversal");
+      }
       excludeGlobs = excludeGlobs == null ? List.of() : List.copyOf(excludeGlobs);
       mode = mode == null ? ScanMode.INITIAL : mode;
       scanId = scanId == null ? "" : scanId;
@@ -498,6 +516,13 @@ final class WorkerScanOps {
           throw new IllegalArgumentException("Excluded subtree must be a normalized descendant");
         }
       }
+    }
+
+    public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs,
+        String scanId, JobQueue.EnqueueProvenance provenance, Long recordedEpoch, List<Path> excludedSubtrees,
+        boolean singleFile) {
+      this(root, collection, mode, excludeGlobs, scanId, provenance, recordedEpoch, excludedSubtrees, singleFile,
+          WorkerIngestService.RecordedScanMode.STREAMING);
     }
 
     public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs,

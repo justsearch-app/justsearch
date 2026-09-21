@@ -381,6 +381,14 @@ most 200 failed/superseded history entries with uncapped event counts. Readers r
 that projection from selected immutable ledger rows and refuse mismatched evidence.
 Exact acknowledgement precedes retention of those references being released. The
 queue capability is distinct from the bulk operation's application/restart integration.
+The existing recorded scanner exposes STREAMING and CAPTURED modes. CAPTURED
+requires forced directory traversal, uses the strict read-only serving witness,
+hashes eligible raw sources before admission, and keeps bounded 2,000-entry batches
+without waiting for claim-driven queue drainage. Cloud placeholders refuse capture
+before deferred-ledger admission. The Engine's capture producer sequences frozen
+roots with one supplied epoch and retains its admission owner until actual walk
+and progress-delivery exit; it stops on failure or cancellation. Its caller must
+still close the epoch and connect generation/restart settlement.
 Queue notifications deliver committed keys outside the lock. Existing age cleanup prunes old
 sealed exactly acknowledged progress only after all keyed jobs and ledger references are gone.
 The Engine's `RecordedIngestionCoordinator` owns outer acknowledgement and uses queue

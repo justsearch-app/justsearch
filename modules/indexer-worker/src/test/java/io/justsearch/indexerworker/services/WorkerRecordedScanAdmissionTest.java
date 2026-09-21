@@ -9,7 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
+import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -23,7 +25,9 @@ import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -39,7 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** The Java service boundary admits exact recorded membership into the real jobs database. */
-final class WorkerRecordedScanAdmissionTest {
+final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
   private static final String KEY = "01994180-0000-7000-8000-000000000911";
   private static final String PLAN = "a".repeat(64);
   @TempDir Path temp;
@@ -334,6 +338,83 @@ final class WorkerRecordedScanAdmissionTest {
     }
   }
 
+  @Test
+  void capturedDirectoryScansReadOnlyActiveGenerationAndFencesClaimsUntilComplete() throws Exception {
+    Path base = temp.resolve("index");
+    var layout = new IndexGenerationManager(base).initializeOrLoad();
+    generation = layout.activeGenerationId();
+    var schema = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forTesting(0));
+    try (var seed = schema.atPath(layout.activeGenerationPath())
+            .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      seed.commitOps().commitAndTrack();
+    }
+
+    Path source = Files.createDirectory(temp.resolve("source"));
+    Path file = Files.writeString(source.resolve("entry.txt"), "captured source");
+    try (var readOnly = schema.atPath(layout.activeGenerationPath())
+            .withExecutorRegistrations(testLuceneExecutors()).openReadOnly();
+        var queue = new SqliteJobQueue(
+            temp.resolve("jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE)) {
+      queue.open();
+      long epoch = queue.beginCapturedWalk(KEY, PLAN, true).enumerationEpoch();
+      var service = new WorkerIngestService(
+          queue, mock(IndexingLoop.class), null, IndexingPacing.unthrottled(), base,
+          layout.activeGenerationPath(), null, readOnly, null, 0L);
+      List<ScanRootProgress> frames = new ArrayList<>();
+
+      service.scanRecordedRoot(capturedRequest(source, epoch), frames::add, CallContext.none());
+
+      assertEquals(1, frames.stream().filter(ScanRootProgress::getComplete).count());
+      assertEquals("", frames.getLast().getTerminalReasonCode());
+      assertEquals(1, frames.getLast().getFilesAdmitted());
+      assertEquals(1, queue.queueDepth(), "captured membership is durably admitted during traversal");
+      assertTrue(queue.pollPending(10).isEmpty(),
+          "even ALLOW_FORCE cannot claim a member before captured enumeration is COMPLETE");
+      assertEquals(null, queue.recordedWalk(KEY).orElseThrow().manifestSha256(),
+          "the manifest is not published by traversal progress alone");
+
+      var completed = queue.closeRecordedWalkEnumeration(
+          KEY, epoch, JobQueue.WalkEnumerationOutcome.COMPLETE);
+      assertEquals(1L, completed.plannedUnits());
+      var claim = queue.pollPending(1).getFirst();
+      assertEquals(file, claim.path());
+      assertEquals(KEY, claim.scanId());
+      assertEquals(epoch, claim.walkEpoch());
+      assertTrue(claim.recordedForce());
+      String expectedH1 = HexFormat.of().formatHex(
+          MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+      assertEquals(expectedH1, claim.plannedSourceSha256(),
+          "the claim retains H1 captured from the real source bytes");
+    }
+  }
+
+  @Test
+  void capturedPreflightRefusesNonIdleGenerationWithoutAdmittingRowsOrProgress() throws Exception {
+    Path source = Files.createDirectory(temp.resolve("source"));
+    Files.writeString(source.resolve("entry.txt"), "source");
+    try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"))) {
+      queue.open();
+      long epoch = queue.beginCapturedWalk(KEY, PLAN, true).enumerationEpoch();
+      var service = service(queue, mock(IndexingLoop.class));
+      new IndexGenerationManager(temp.resolve("index"))
+          .updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING);
+      List<ScanRootProgress> frames = new ArrayList<>();
+
+      var failure = assertThrows(
+          WorkerServiceException.class,
+          () -> service.scanRecordedRoot(capturedRequest(source, epoch), frames::add, CallContext.none()));
+
+      assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
+      assertEquals(
+          "Recorded ingestion requires the current idle serving generation", failure.getMessage());
+      assertEquals(0, queue.queueDepth(), "preflight refusal must happen before queue admission");
+      assertTrue(frames.isEmpty(), "preflight refusal must happen before traversal progress");
+      var walk = queue.recordedWalk(KEY).orElseThrow();
+      assertEquals(null, walk.enumerationClosedAt(), "the outer coordinator still owns enumeration closure");
+      assertEquals(null, walk.manifestSha256(), "a refused capture cannot publish a manifest");
+    }
+  }
+
   private Future<?> submitScan(
       ExecutorService executor,
       CountDownLatch started,
@@ -465,5 +546,11 @@ final class WorkerRecordedScanAdmissionTest {
     return new WorkerIngestService.RecordedRootScan(ScanRootRequest.newBuilder()
         .setRootPath(root.toString()).setCollection("notes").setMode(ScanMode.SCAN_MODE_FORCE_REINDEX).build(),
         KEY, epoch, generation, singleFile, List.of());
+  }
+
+  private WorkerIngestService.RecordedRootScan capturedRequest(Path root, long epoch) {
+    return new WorkerIngestService.RecordedRootScan(ScanRootRequest.newBuilder()
+        .setRootPath(root.toString()).setCollection("notes").setMode(ScanMode.SCAN_MODE_FORCE_REINDEX).build(),
+        KEY, epoch, generation, false, List.of(), WorkerIngestService.RecordedScanMode.CAPTURED);
   }
 }

@@ -50,7 +50,7 @@ continuation design in the bulk owner document. Existing HIGH-risk capsule appro
 cannot survive the two required restarts; preserve ordinary capsule refusal and
 mint the new exact key/nonce basis only after successful prepared consent. The
 implementation and adversarial proof are still outstanding.
-Current uncommitted work implements the continuation locator, minting after prepared
+Pushed d69763186 implements the continuation locator, minting after prepared
 capsule consumption, exact accepted key/nonce resolution, and current bulk policy.
 Focused 2165 passes 92 cases, including the dead-code gate. Independent review's
 alternate-handler finding is fixed; negative 2166 fails all three intended guards
@@ -62,10 +62,20 @@ stopped the lane's orphaned 47 GB PowerShell evidence collector, restoring 26 Gi
 free physical memory, and fixed qualifiers. Full 2170 passes 3,240 tests with
 zero failures/errors and three existing skips; app-services executes and unchanged
 app-api results reuse 2168. All four PMD and both format checks pass. No build or stack is active.
-Both test workers are frozen; independent read-only boot design review continues.
-Next: finish batch verification, implement continuation authority plus one shared
-REINDEX recovery consumer, captured file traversal, manual REST dispatch and both
-restart boundaries, then installed bulk fault proof.
+Current captured traversal checkpoint adds Worker CAPTURED mode and sequential
+multi-root capture under one retained Engine admission owner. Focused 2174 has
+76 passing cases (22 Engine fresh, 54 unchanged worker/indexer reused); full 2175
+executes 2,092 cases, zero failures/errors, 17 existing skips. Five PMD and three
+format checks pass. Independent review is clean. Negative 2177 fails exactly both
+intended guards; the two production files are restored byte-for-byte. No build or
+stack is active. Hosted continuation CI 35572035546 passes every job except
+platform-contracts, which encounters Maven HTTP 429 before any test execution;
+that job is being retried, not counted as a test pass.
+Boot design review selected one early immutable request before generation
+initialization. Pending/fenced recorded startup must precede any .prev restoration;
+completed IDLE active generations remain usable after operation-row expiry.
+Next: connect the shared REINDEX consumer to captured traversal, strict boot,
+manual REST dispatch and both restart boundaries, then prove installed bulk faults.
 Then finish C2-12/full stress/hosted reconciliation and D1/D2/E/F. Full2064's known
 configuration-funnel failure is corrected, but no final full-stress green is claimed.
 Artifacts stay accessible in this worktree's tmp through lane acceptance plus30 days
