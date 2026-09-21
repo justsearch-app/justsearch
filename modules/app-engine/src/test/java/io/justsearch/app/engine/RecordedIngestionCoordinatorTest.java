@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import io.justsearch.app.api.operations.OperationRecord;
@@ -797,8 +798,9 @@ final class RecordedIngestionCoordinatorTest {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(boolean reindex) throws Exception {
+  @CsvSource({"false,false", "true,false", "false,true", "true,true"})
+  void bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(
+      boolean reindex, boolean changedGeneration) throws Exception {
     OperationRecord originalParent;
     OperationRecord originalChild;
     io.justsearch.app.api.operations.OperationStore.Preparation originalPreparation;
@@ -866,9 +868,54 @@ final class RecordedIngestionCoordinatorTest {
       try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
         queue.open();
         assertTrue(queue.pollPending(1).isEmpty(), "persisted rows alone grant no producer permission");
-        try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+        String servingGeneration = changedGeneration ? "replacement-generation" : GENERATION;
+        try (var attachment = recovered.attach(queue, () -> Optional.of(servingGeneration), () -> true)) {
           org.junit.jupiter.api.Assertions.assertNotNull(attachment);
           var resumed = new AtomicInteger();
+          if (changedGeneration) {
+            var successorProducers = new AtomicInteger();
+            recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+              successorProducers.incrementAndGet();
+              throw new AssertionError("changed-generation recovery must not invoke a successor producer");
+            });
+            recovered.maintain();
+            var parent = operations.find(originalParent.key()).orElseThrow();
+            var child = operations.find(originalChild.key()).orElseThrow();
+            assertEquals(OperationState.FAILED, parent.state());
+            assertEquals("RECOVERY_GENERATION_MISMATCH", parent.receipt().code());
+            assertEquals("ingest-refusal:1:RECOVERY_GENERATION_MISMATCH", parent.checkpointCursor());
+            assertEquals(originalParent.id(), parent.id());
+            assertEquals(originalChild.id(), child.id());
+            assertEquals(originalParent.context(), parent.context());
+            assertEquals(originalChild.context(), child.context());
+            assertEquals(originalPreparation, operations.acceptedPreparation(parent.id()).orElseThrow());
+            assertEquals(originalChildPreparation, operations.acceptedPreparation(child.id()).orElseThrow());
+            assertEquals(1, preparations.get(), "recovery must not resample either handler preparation");
+            assertEquals(0, successorProducers.get());
+            assertEquals(OperationState.FAILED, child.state());
+            assertEquals("INGEST_ENUMERATION_FAILED", child.receipt().code());
+            assertEquals(0, parent.unitsCompleted());
+            assertEquals(0, parent.unitsFailed());
+            assertEquals(0, child.unitsCompleted());
+            assertEquals(0, child.unitsFailed());
+            var jobCounts = queue.jobStateCounts();
+            assertEquals(0, jobCounts.pendingCount(), "refused recovery must not leave successor work pending");
+            assertEquals(0, jobCounts.processingCount(), "refused recovery must not leave an issued job in flight");
+            assertEquals(1, jobCounts.doneCount(), "the old enumerated member is retired without indexing it");
+            assertEquals(0, jobCounts.failedCount());
+            assertFalse(queue.hasIssuedRecordedClaims(child.key()), "refused recovery must not issue claims");
+            assertEquals(0, admission.activeWorkCount());
+            var progress = queue.recordedWalk(child.key()).orElseThrow();
+            assertEquals(JobQueue.WalkEnumerationOutcome.FAILED, progress.enumerationOutcome(),
+                "the cancelled old producer is closed as failed enumeration, not rewritten as complete");
+            var receipt = queue.sealedRecordedWalkReceipt(child.key()).orElseThrow();
+            assertEquals(JobQueue.WalkEnumerationOutcome.FAILED, receipt.enumerationOutcome());
+            assertEquals(0, receipt.completedUnits(), "enumeration refusal cannot claim indexed work");
+            assertEquals(0, receipt.failedUnits());
+            assertEquals(receipt.revision(), progress.acknowledgedRevision(),
+                "terminal child evidence is acknowledged only after the mismatch outcome is durable");
+            return;
+          }
           recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
             assertTrue(oldExited.get());
             assertEquals(1, resumed.incrementAndGet());

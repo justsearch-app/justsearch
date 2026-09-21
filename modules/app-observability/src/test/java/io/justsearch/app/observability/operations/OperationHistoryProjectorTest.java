@@ -90,6 +90,84 @@ final class OperationHistoryProjectorTest {
   }
 
   @Test
+  void publicSettingsApplyProjectsOneTypedHistoryIdentityAcrossLiveDeliveryAndReopen() throws Exception {
+    String key = OperationKeys.generate(clock);
+    var context = new EngineContext(EngineContext.ClientKind.INTERNAL, "settings-history",
+        Optional.of("settings-history-session"), Optional.empty(), "SYSTEM",
+        TransportTag.SYSTEM_INTERNAL.name(), EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
+    var provenance = InvocationProvenance.fromEngineContext(context, ExecutorTag.AGENT,
+        clock.instant(), Optional.empty());
+    var descriptor = OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+        "settings.apply-public", "{\"ui\":{\"highContrast\":true}}", false);
+    var live = new CopyOnWriteArrayList<OperationHistoryEntry>();
+    var timer = new Timer();
+    var ledger = new ActionLedgerChangeRegistry(ActionEventJournal.at(directory.resolve("audit")));
+    long operationId;
+
+    try (var store = open()) {
+      var history = new OperationHistoryStore(store);
+      history.addAppendListener(live::add);
+      var projector = new OperationHistoryProjector(store, history,
+          new OperationHistoryChangeRegistry(), ledger, timer.executors);
+      try (projector) {
+        var accepted = store.accept(key, descriptor, context, provenance, OperationHistoryMode.STANDARD);
+        assertTrue(accepted.created());
+        operationId = accepted.record().id();
+        var terminal = store.finish(operationId, OperationState.COMPLETE,
+            new OperationReceipt("SUCCESS", null)).orElseThrow();
+        assertEquals("settings.apply-public", terminal.descriptor().operationRef());
+
+        assertEquals(1, live.size(), "the completion listener receives the committed public settings row");
+        var liveEntry = live.getFirst();
+        assertEquals("core.apply-settings", liveEntry.operationId().value());
+        assertEquals(Optional.of(key), liveEntry.operationKey());
+        assertEquals(1, store.pendingHistoryProjection(10).size(),
+            "the live callback alone must not acknowledge durable delivery");
+
+        var retry = store.accept(key, descriptor, context, provenance, OperationHistoryMode.STANDARD);
+        assertFalse(retry.created());
+        assertEquals(operationId, retry.record().id());
+        assertEquals("settings.apply-public", retry.record().descriptor().operationRef(),
+            "history aliasing must not rewrite retry identity");
+
+        var invalid = new OperationHistoryRow(terminal.id(), terminal.key(), terminal.descriptor().kind(),
+            "settings.unapproved-public", terminal.context(), terminal.executor(), terminal.initiator(),
+            terminal.correlationId(), terminal.state(), terminal.historyMode(), terminal.acceptedAt(),
+            terminal.completedAt(), terminal.provenanceOccurredAt(), terminal.failureReason(), terminal.receipt());
+        assertThrows(IllegalArgumentException.class, () -> OperationHistoryProjection.entry(invalid),
+            "only the exact retained settings operation reference receives the catalog history alias");
+
+        timer.tick();
+        assertTrue(store.pendingHistoryProjection(10).isEmpty(), "journal acceptance must drain and ACK the source row");
+        var persisted = ledger.journal().tail(10);
+        assertEquals(1, persisted.size());
+        var event = assertInstanceOf(ActionEvent.Operation.class, persisted.getFirst());
+        assertEquals("operation:" + key, event.id());
+        assertEquals("core.apply-settings", event.operationId());
+        assertEquals(1, ledger.store().recent().size(), "live re-publication is idempotent by the same key");
+        assertEquals(1, live.size(), "same-key acceptance and journal delivery cannot republish history");
+      }
+    }
+
+    try (var reopened = open()) {
+      var history = new OperationHistoryStore(reopened);
+      var entry = history.recent(10).getFirst();
+      assertEquals("core.apply-settings", entry.operationId().value());
+      assertEquals(Optional.of(key), entry.operationKey());
+      var stored = reopened.find(key).orElseThrow();
+      assertEquals(operationId, stored.id());
+      assertEquals("settings.apply-public", stored.descriptor().operationRef(),
+          "reopening must preserve the raw public operation reference");
+      var retry = reopened.accept(key, descriptor, context, provenance, OperationHistoryMode.STANDARD);
+      assertFalse(retry.created());
+      assertEquals(operationId, retry.record().id());
+      assertEquals("settings.apply-public", retry.record().descriptor().operationRef());
+      assertTrue(reopened.pendingHistoryProjection(10).isEmpty());
+      assertEquals(List.of(entry), history.recent(10), "durable history retains the same typed projection");
+    }
+  }
+
+  @Test
   void disabledSinkStartupTraversesBeyondOneBatchWithoutCyclicReplayAndKeepsTheHook() throws Exception {
     try (var store = open()) {
       var runner = new OperationAttemptRunnerImpl(store, clock, Set.of());

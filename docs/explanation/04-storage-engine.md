@@ -359,6 +359,13 @@ on the producer thread. Memory and note rows remain visible on agent-loop transp
 generic agent-loop operation entries are explicitly excluded because the agent-run
 source owns their ledger projection.
 
+The public settings producer retains `settings.apply-public` as its persisted
+same-key invocation identity. Its SETTINGS_APPLY history row projects that exact
+identity as `core.apply-settings`, a history-facing name rather than an invokable
+catalog operation. Live, pending and reopened history share this projection;
+all other operation references retain normal namespace validation. The stored
+identity is not renamed, so retries of existing settings operations still match.
+
 The registered `head.operations-history` timer retries every second. Its durable arm
 reads at most256 oldest pending rows, forces journal acceptance, publishes live, then
 acknowledges; it stops at the first append or acknowledgement failure. Disabled or

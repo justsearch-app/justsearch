@@ -399,8 +399,11 @@ Endpoints:
   in completion order, and survive restart. The Resource declares durable30-day
   retention;200 is the display bound, not a second persistent store cap. Committed
   entries carry optional `operationKey` (the accepted invocation identity), while
-  `operationId` continues to name the operation declaration. Legacy/uncommitted live
-  failure observations have no committed key. No caller/preparation payload or
+  `operationId` continues to name the operation declaration.
+  Public SETTINGS_APPLY rows use the history-facing `operationId` `core.apply-settings`;
+  this names the public settings action and does not add an invokable catalog operation.
+  Their retained internal retry identity remains `settings.apply-public`.
+  Legacy/uncommitted live failure observations have no committed key. No caller/preparation payload or
   signed intent token is projected. SSE retains its bounded process-local frame
   window; durable completion catch-up and atomic reconnect remain C2-4 continuation.
 

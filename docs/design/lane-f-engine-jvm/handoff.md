@@ -25,7 +25,10 @@ The reviewed correction is committed and pushed in `1a94b5c0a`.
 The [installed fault batch](evidence/C2/installed-fault-plan-2026-09-21.md) passes
 all eight cases in2051, including six exact fault boundaries, real HTTP caller
 disconnect and the original baseline. Review, PMD/format and focused governance pass.
-Next: paired changed-input proof, the still-owed C2-10 bulk durable row/plan/resume,
+The [paired changed-input proof](evidence/C2/resume-dependency-pair.md) and its exposed
+public-settings history defect pass focused2057/2060 and all8 installed2061 cases.
+Next: integrated full stress, the still-owed
+[C2-10 bulk durable row/plan/resume](evidence/C2/bulk-reindex-connection.md),
 and C2-12 sweep/full verification. Streamed `core.reindex` proof does not discharge
 `core.bulk-reindex`; D1 retains journal/replay/live-activation/gap-refusal ownership.
 The [pause record](evidence/C2/pause-2026-09-21.md) is historical.

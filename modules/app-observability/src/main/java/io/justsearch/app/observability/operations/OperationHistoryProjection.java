@@ -3,6 +3,7 @@ package io.justsearch.app.observability.operations;
 
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.OperationRef;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.operations.OperationHistoryMode;
@@ -27,7 +28,11 @@ public final class OperationHistoryProjection {
     var provenance = new InvocationProvenance(TransportTag.valueOf(row.context().transport()),
         ExecutorTag.valueOf(row.executor()), Optional.ofNullable(row.initiator()), row.provenanceOccurredAt(),
         Optional.empty(), Optional.ofNullable(row.correlationId()));
-    return new OperationHistoryEntry(new OperationRef(row.operationRef()), "head",
+    // Public settings has a retained, noncatalog retry identity. Project its history name
+    // without rewriting that identity or relaxing validation for any other producer.
+    String historyRef = row.kind() == OperationKind.SETTINGS_APPLY && "settings.apply-public".equals(row.operationRef())
+        ? "core.apply-settings" : row.operationRef();
+    return new OperationHistoryEntry(new OperationRef(historyRef), "head",
         Instant.ofEpochMilli(row.acceptedAt()), Instant.ofEpochMilli(row.completedAt()), outcome,
         Optional.ofNullable(reason), provenance, executionId, Optional.of(row.key()));
   }

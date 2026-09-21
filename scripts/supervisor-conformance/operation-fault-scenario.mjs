@@ -193,6 +193,25 @@ export async function exerciseOperationFault(c) {
     return { reached, operation: completed.row, ...checked, released: released.row };
   }
 
+  let unrelatedSettings;
+  let unrelatedSettingsRequest;
+  if (selected.parentKind === 'ingest' && selected.phase === 'after-effect') {
+    const beforeResponse = await request(apiPort, SETTINGS_ROUTE);
+    requireThat(beforeResponse.status === 200, `unrelated settings read failed: ${beforeResponse.text}`);
+    const before = parseJson(beforeResponse, 'unrelated settings before restart');
+    const settingsKey = createOperationKey();
+    const input = { ui: { highContrast: !Boolean(before.ui?.highContrast) },
+      witness: before.witness, operationKey: settingsKey };
+    unrelatedSettingsRequest = startHeldPost(apiPort, SETTINGS_ROUTE, input, headers);
+    const persisted = await waitFor('unrelated settings commitment while ingest receipt is held', 30000, () => {
+      const row = operationRow(operationPath, settingsKey);
+      const disk = settingsWitnessOnDisk(data);
+      return row?.state === 'COMPLETE' && disk.witness.lastCommittedOperationKey === settingsKey ? disk : null;
+    });
+    requireCommittedSettings(persisted, before.witness, input, settingsKey, requireThat);
+    unrelatedSettings = { before: before.witness, input, persisted };
+    console.log('OPERATION_FAULT_UNRELATED_SETTINGS_CHANGED', JSON.stringify(unrelatedSettings));
+  }
   const afterDeath = await killOwnedEngineAndObserveCooldown({ record: originalIdentity, first, data, readJson,
     waitFor, requireThat });
   const effectKey = selected.phase === 'after-effect' && selected.parentKind === 'ingest'
@@ -210,8 +229,10 @@ export async function exerciseOperationFault(c) {
     supervisor: afterDeath, ...duringCooldown }));
 
   held.controller.abort(new Error('original Engine died at selected operation boundary'));
+  unrelatedSettingsRequest?.controller.abort(new Error('original Engine died after unrelated settings commitment'));
   releaseBarrier(releaseFile);
   await held.settled;
+  if (unrelatedSettingsRequest) await unrelatedSettingsRequest.settled;
 
   const successor = await waitFor('identity-matched successor Engine', 150000, async () => {
     const current = readJson(path.join(runtime, 'supervisor.v1.json'));
@@ -286,11 +307,28 @@ export async function exerciseOperationFault(c) {
         && walk.revision === duringCooldown.walk.revision
         && walk.receipt_json === duringCooldown.walk.receipt_json,
       `successor must acknowledge the same immutable sealed receipt: ${JSON.stringify(recoveredReceipt)}`);
+      requireThat(sameJson(settingsWitnessOnDisk(data), unrelatedSettings.persisted),
+        'ingest recovery must retain the unrelated committed settings revision and value');
+      const historyResponse = await request(successor.manifest.head.apiPort, '/api/operation-history');
+      requireThat(historyResponse.status === 200, `public settings history read failed: ${historyResponse.text}`);
+      const settingsHistory = parseJson(historyResponse, 'public settings history').entries
+        .filter(entry => entry.operationKey === unrelatedSettings.input.operationKey);
+      requireThat(settingsHistory.length === 1 && settingsHistory[0].operationId === 'core.apply-settings',
+        `public settings must project one typed history entry: ${JSON.stringify(settingsHistory)}`);
+      await waitFor('public settings history delivery acknowledgement', 30000, () => {
+        const database = new DatabaseSync(operationPath, { readOnly: true });
+        try {
+          const row = database.prepare('SELECT operation_ref, history_pending FROM operations WHERE operation_key = ?')
+            .get(unrelatedSettings.input.operationKey);
+          requireThat(row?.operation_ref === 'settings.apply-public', 'history must retain the original settings retry identity');
+          return row.history_pending === 0 ? row : null;
+        } finally { database.close(); }
+      });
     }
     console.log('OPERATION_FAULT_INGEST_PASS', JSON.stringify({ scenario, reached,
       duringCooldown, successor: successor.supervisor, operation: checked.operation,
       jobs: checked.jobs, matchingDocuments: checked.matchingDocuments,
-      indexedDocuments: checked.indexedDocuments, recoveredReceipt }));
+      indexedDocuments: checked.indexedDocuments, recoveredReceipt, unrelatedSettings }));
     return { reached, duringCooldown, successor, ...checked };
   }
 
