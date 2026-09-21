@@ -6,8 +6,8 @@ import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.lifecycle.RetentionClass;
 
 /**
- * Tempdoc 837 §D.1 — the ONE precedence rule for a capability's reason slot, shared by {@link
- * WorkerCapability} and {@link InferenceCapability} so the two cannot grow separate copies.
+ * The shared precedence rule for component-owned reason slots, applied by
+ * {@link ReasonRetainingComponentHandle} before registry publication.
  *
  * <p>The slot is last-writer-wins by default, and that loses causes in two measured ways:
  *

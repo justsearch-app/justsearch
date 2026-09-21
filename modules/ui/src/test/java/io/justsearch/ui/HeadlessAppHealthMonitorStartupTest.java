@@ -12,6 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.bootstrap.SubstrateGraph;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
@@ -53,9 +54,14 @@ final class HeadlessAppHealthMonitorStartupTest {
   }
 
   private static Object start(LocalApiServer api) throws Exception {
+    var bootstrap = mock(HeadAssembly.class);
+    var substrate = mock(SubstrateGraph.class);
+    var health = mock(SubstrateGraph.HealthSubstrate.class);
+    org.mockito.Mockito.when(bootstrap.substrate()).thenReturn(substrate);
+    org.mockito.Mockito.when(substrate.health()).thenReturn(health);
     var method = HeadlessApp.class.getDeclaredMethod("startHealthMonitor",
         HeadAssembly.class, LocalApiServer.class, KnowledgeServerBootstrap.class);
     method.setAccessible(true);
-    return method.invoke(null, mock(HeadAssembly.class), api, mock(KnowledgeServerBootstrap.class));
+    return method.invoke(null, bootstrap, api, mock(KnowledgeServerBootstrap.class));
   }
 }

@@ -143,7 +143,7 @@ final class SchemaControllerTest {
     assertTrue(names.contains("failed-indexing-jobs-response.v1.json"));
     // Tempdoc 899 D6: canonical public response schemas embedded into the generated runtime SDK.
     assertTrue(names.contains("api-error-response.v1.json"));
-    assertTrue(names.contains("lifecycle-snapshot.v1.json"));
+    assertTrue(names.contains("lifecycle-snapshot.v2.json"));
     assertTrue(names.contains("runtime-live-response.v1.json"));
     assertTrue(names.contains("runtime-manifest-public.v2.json"));
     assertTrue(names.contains("runtime-ready-response.v1.json"));

@@ -31,10 +31,19 @@ final class UpgradeLifecycleContractTest {
       throws Exception {
     var leases = new OperationLeaseServiceImpl();
     var shutdown = new CountDownLatch(1);
+    var components = new io.justsearch.core.component.TestEngineComponents();
+    try (var specs = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+      specs.snapshot().components().stream()
+          .filter(component -> !component.spec().name().equals("api"))
+          .forEach(component -> components.register(component.spec()));
+    }
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
+            .componentRegistry(components)
+            .indexComponent(components.handle("index"))
+            .generativeComponent(components.handle("generative"))
             .operationLeaseService(leases)
             .upgradeShutdownAction(shutdown::countDown)
             .build();
@@ -94,7 +103,11 @@ final class UpgradeLifecycleContractTest {
           JSON.readTree(committed.body()).get("shutdownNonce").asText());
       assertTrue(shutdown.await(2, TimeUnit.SECONDS));
     } finally {
-      server.stop();
+      try {
+        server.stop();
+      } finally {
+        components.close();
+      }
     }
   }
 

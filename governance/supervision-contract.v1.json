@@ -169,7 +169,7 @@
         "gracefulStopDeadlineMs": 15000,
         "hangPollIntervalMs": 10000,
         "hangUnhealthyThreshold": 3,
-        "note": "Stage B §2's re-cut of the 627 seeds, for one process instead of a child behind a live API. The cooldown FLOOR is not a number: it is the process handle closing, which the death path waits for anyway and which Windows makes load-bearing. Above that floor the ramp is LINEAR (+cooldownIncrementMs per attempt), not exponential, because with one process the cooldown is dead-API time and the restart COUNT is what bounds a crash loop. maxCooldownMs does not bind at maxRestartAttempts 3 (the ramp reaches 3000 ms on the last attempt); it bounds the ramp if the attempt budget is ever raised, and the conformance case cooldown-ceiling-binds-when-budget-raised is the only place it is exercised. stabilityWindowMs is counted from `ready`, not from spawn, because the Engine's boot carries the encoder load. hangPollIntervalMs and hangUnhealthyThreshold are PLACEHOLDERS set with the collector at stage E (design 7.1): health and indexing allocation share one heap, so interval x count must exceed the worst safepoint pause the soak observes. A test may assert the hang path fires; no test may assert it fires within a tuned budget."
+        "note": "Stage B §2's re-cut of the 627 seeds, for one process instead of a child behind a live API. The cooldown FLOOR is not a number: it is the process handle closing, which the death path waits for anyway and which Windows makes load-bearing. Above that floor the ramp is LINEAR (+cooldownIncrementMs per attempt), not exponential, because with one process the cooldown is dead-API time and the restart COUNT is what bounds a crash loop. maxCooldownMs does not bind at maxRestartAttempts 3 (the ramp reaches 3000 ms on the last attempt); it bounds the ramp if the attempt budget is ever raised, and the conformance case cooldown-ceiling-binds-when-budget-raised is the only place it is exercised. stabilityWindowMs is counted by the host monotonic clock across one continuous `readiness.engineComponents.index.state=READY` epoch, identified by `stateSince`, not from spawn. Missing/malformed state or epoch, a new epoch, or loss of liveness restarts the interval; optional AI does not gate it. hangPollIntervalMs and hangUnhealthyThreshold are PLACEHOLDERS set with the collector at stage E (design 7.1): health and indexing allocation share one heap, so interval x count must exceed the worst safepoint pause the soak observes. A test may assert the hang path fires; no test may assert it fires within a tuned budget."
       },
       "harnessOverrides": {
         "flag": "JUSTSEARCH_SUPERVISOR_HARNESS",
@@ -237,14 +237,14 @@
         },
         {
           "mode": "partial-boot",
-          "detection": "`starting` outlives startDeadlineMs without the essential components reaching `ready` (api and index). Hang detection is suspended in `starting`, so this deadline is the ONLY thing that ends the state.",
+          "detection": "`starting` outlives startDeadlineMs without an admitted current-incarnation manifest binding and a bounded valid HTTP response. Essential index readiness is a separate restart-budget stability gate; a responsive 503 is live. Hang detection is suspended in `starting`, so this deadline is the ONLY thing that ends the state.",
           "recovery": "the same graceful-then-forced stop as a hang (request file with reason `hang`, then the deadline kill), after which the death path classifies the exit and counts it.",
           "terminalState": "ENGINE_RESTART_EXHAUSTED once the budget is spent",
           "guards": [
             "scripts/supervisor-conformance/contract.mjs",
             "modules/shell/src-tauri/src/supervisor.rs"
           ],
-          "note": "The per-component start deadlines design 7.6 describes are D1's; this is the one number stage B needs for the `starting` -> `running` edge, and nothing here reads a component vector."
+          "note": "The host running edge records a responsive admitted binding. Budget reset separately reads only `readiness.engineComponents.index.state` and its `stateSince` epoch; the Engine owns the API/index/freshness conjunction. The host measures elapsed stability with its own monotonic clock."
         },
         {
           "mode": "external-adoption",

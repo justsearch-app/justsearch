@@ -10,6 +10,8 @@ import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.api.OpCriticality;
 import io.justsearch.app.engine.EngineAdmissionController;
 import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -39,10 +41,20 @@ final class EngineUpgradeLifecycleTest {
     var shutdown = new CountDownLatch(1);
     var shutdownPreparation = new AtomicReference<String>();
     var shutdownNonce = new AtomicReference<String>();
+    var components = new TestEngineComponents();
+    try (var specs = TestEngineComponents.fourComponents()) {
+      specs.snapshot().components().stream()
+          .filter(component -> !component.spec().name().equals("api"))
+          .forEach(component -> components.register(component.spec()));
+    }
+    components.handle("index").transition(ComponentState.READY, null, "Test Worker serving");
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 temporary.resolve("index"))
+            .componentRegistry(components)
+            .indexComponent(components.handle("index"))
+            .generativeComponent(components.handle("generative"))
             .operationLeaseService(admission)
             .engineAdmission(admission)
             .sessionToken(TOKEN)
@@ -134,6 +146,7 @@ final class EngineUpgradeLifecycleTest {
       assertEquals(secondPreparation.path("shutdownNonce").asText(), shutdownNonce.get());
     } finally {
       server.stop();
+      components.close();
     }
   }
 

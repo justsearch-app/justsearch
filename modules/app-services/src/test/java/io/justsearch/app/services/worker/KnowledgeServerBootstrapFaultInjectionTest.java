@@ -19,24 +19,25 @@ final class KnowledgeServerBootstrapFaultInjectionTest {
       throws Exception {
     WorkerHost host = mock(WorkerHost.class);
     when(host.start(any(), any())).thenThrow(new IOException("host reached"));
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config(dir, false), null, null, host);
-
-    assertThrows(IOException.class, () -> bootstrap.startWithRetry(3, 0));
-    verify(host, never()).start(any(), any());
-    IOException next = assertThrows(IOException.class, bootstrap::start);
-    assertEquals("host reached", next.getMessage());
-    verify(host).start(any(), any());
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(config(dir, false), host)) {
+      var bootstrap = fixture.bootstrap();
+      assertThrows(IOException.class, () -> bootstrap.startWithRetry(3, 0));
+      verify(host, never()).start(any(), any());
+      IOException next = assertThrows(IOException.class, bootstrap::start);
+      assertEquals("host reached", next.getMessage());
+      verify(host).start(any(), any());
+    }
   }
 
   @Test
   void productionCannotInjectAnIndexBootFailure(@TempDir Path dir) throws Exception {
     WorkerHost host = mock(WorkerHost.class);
     when(host.start(any(), any())).thenThrow(new IOException("host reached"));
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config(dir, true), null, null, host);
-
-    IOException failure = assertThrows(IOException.class, bootstrap::start);
-    assertEquals("host reached", failure.getMessage());
-    verify(host).start(any(), any());
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(config(dir, true), host)) {
+      IOException failure = assertThrows(IOException.class, fixture.bootstrap()::start);
+      assertEquals("host reached", failure.getMessage());
+      verify(host).start(any(), any());
+    }
   }
 
   private static KnowledgeServerConfig config(Path dir, boolean production) {

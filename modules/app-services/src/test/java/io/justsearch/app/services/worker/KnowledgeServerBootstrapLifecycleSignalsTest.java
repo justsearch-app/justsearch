@@ -29,22 +29,25 @@ final class KnowledgeServerBootstrapLifecycleSignalsTest {
   @Test
   @DisplayName("energyState() is UNKNOWN — not reduced, not null — before the first poll")
   void energyStateNullSafe(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
-    EnergyState e = bootstrap.energyState();
-    assertEquals(EnergyState.Intent.UNKNOWN, e.intent());
-    assertFalse(e.reduced());
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      EnergyState e = fixture.bootstrap().energyState();
+      assertEquals(EnergyState.Intent.UNKNOWN, e.intent());
+      assertFalse(e.reduced());
+    }
   }
 
   @Test
   @DisplayName("recentlyResumed is false until a resume is marked, true inside the window, then clears")
   void resumeWindow(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
-    long t0 = 1_000_000_000L;
-    assertFalse(bootstrap.recentlyResumed(t0), "no resume yet");
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
+      long t0 = 1_000_000_000L;
+      assertFalse(bootstrap.recentlyResumed(t0), "no resume yet");
 
-    bootstrap.markResumed(t0);
-    assertTrue(bootstrap.recentlyResumed(t0 + 5_000), "5s after resume ⇒ catching up");
-    assertTrue(bootstrap.recentlyResumed(t0 + 29_000), "just inside the 30s window");
-    assertFalse(bootstrap.recentlyResumed(t0 + 31_000), "past the window ⇒ auto-cleared");
+      bootstrap.markResumed(t0);
+      assertTrue(bootstrap.recentlyResumed(t0 + 5_000), "5s after resume ⇒ catching up");
+      assertTrue(bootstrap.recentlyResumed(t0 + 29_000), "just inside the 30s window");
+      assertFalse(bootstrap.recentlyResumed(t0 + 31_000), "past the window ⇒ auto-cleared");
+    }
   }
 }

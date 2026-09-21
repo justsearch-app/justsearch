@@ -18,7 +18,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tempdoc 374 alpha.18 Bug H + alpha.20 Bug M regression coverage for
- * {@link KnowledgeServer#resolveModelsDir(InstallContract, Path)}.
+ * {@link KnowledgeServer#resolveModelsDir(InstallContract, Path,
+ * io.justsearch.configuration.resolved.ResolvedConfig)}.
  *
  * <p>Three-tier resolution priority:
  *
@@ -79,7 +80,7 @@ class KnowledgeServerModelsDirTest {
   @DisplayName("contract.modelsDir() set → returns contract value (Bug M fix, primary)")
   void contractModelsDir_takesPriority() {
     System.clearProperty(KEY_MODELS_DIR);
-    TestResolvedConfigHelper.storeFromEnvironment();
+    var captured = TestResolvedConfigHelper.storeFromEnvironment().get();
 
     Path contractModels = tmp.resolve("contract-staged-models");
     InstallContract contract = new InstallContract(
@@ -87,7 +88,7 @@ class KnowledgeServerModelsDirTest {
         Map.of(), contractModels);
 
     Path aiHome = tmp.resolve("aihome");
-    Path resolved = KnowledgeServer.resolveModelsDir(contract, aiHome);
+    Path resolved = KnowledgeServer.resolveModelsDir(contract, aiHome, captured);
 
     assertEquals(
         contractModels,
@@ -103,14 +104,14 @@ class KnowledgeServerModelsDirTest {
   void contractModelsDir_winsOverEnvVar() {
     Path envModels = tmp.resolve("env-staged-models");
     System.setProperty(KEY_MODELS_DIR, envModels.toString());
-    TestResolvedConfigHelper.storeFromEnvironment();
+    var captured = TestResolvedConfigHelper.storeFromEnvironment().get();
 
     Path contractModels = tmp.resolve("contract-staged-models");
     InstallContract contract = new InstallContract(
         2, System.currentTimeMillis(), HardwareProfile.cpuOnly(), DownloadProfile.GPU_FULL,
         Map.of(), contractModels);
 
-    Path resolved = KnowledgeServer.resolveModelsDir(contract, tmp.resolve("aihome"));
+    Path resolved = KnowledgeServer.resolveModelsDir(contract, tmp.resolve("aihome"), captured);
 
     assertEquals(
         contractModels,
@@ -129,13 +130,14 @@ class KnowledgeServerModelsDirTest {
   void contractNullModelsDir_envVarSet() {
     Path envModels = tmp.resolve("env-staged-models");
     System.setProperty(KEY_MODELS_DIR, envModels.toString());
-    TestResolvedConfigHelper.storeFromEnvironment();
+    var captured = TestResolvedConfigHelper.storeFromEnvironment().get();
 
     InstallContract contractWithoutModelsDir = new InstallContract(
         2, System.currentTimeMillis(), HardwareProfile.cpuOnly(), DownloadProfile.GPU_FULL,
         Map.of()); // 5-arg constructor → modelsDir defaults to null
 
-    Path resolved = KnowledgeServer.resolveModelsDir(contractWithoutModelsDir, tmp.resolve("aihome"));
+    Path resolved = KnowledgeServer.resolveModelsDir(
+        contractWithoutModelsDir, tmp.resolve("aihome"), captured);
 
     assertEquals(
         envModels.toAbsolutePath().normalize(),
@@ -149,9 +151,9 @@ class KnowledgeServerModelsDirTest {
   void noContract_envVarSet() {
     Path envModels = tmp.resolve("env-staged-models");
     System.setProperty(KEY_MODELS_DIR, envModels.toString());
-    TestResolvedConfigHelper.storeFromEnvironment();
+    var captured = TestResolvedConfigHelper.storeFromEnvironment().get();
 
-    Path resolved = KnowledgeServer.resolveModelsDir(null, tmp.resolve("aihome"));
+    Path resolved = KnowledgeServer.resolveModelsDir(null, tmp.resolve("aihome"), captured);
 
     assertEquals(
         envModels.toAbsolutePath().normalize(),
@@ -162,10 +164,10 @@ class KnowledgeServerModelsDirTest {
   @DisplayName("null contract + env var unset + aiHome present → returns aiHome/models (default flow)")
   void noContract_envVarUnset() {
     System.clearProperty(KEY_MODELS_DIR);
-    TestResolvedConfigHelper.storeFromEnvironment();
+    var captured = TestResolvedConfigHelper.storeFromEnvironment().get();
 
     Path aiHome = tmp.resolve("aihome");
-    Path resolved = KnowledgeServer.resolveModelsDir(null, aiHome);
+    Path resolved = KnowledgeServer.resolveModelsDir(null, aiHome, captured);
 
     assertEquals(aiHome.resolve("models"), resolved);
   }
@@ -174,9 +176,9 @@ class KnowledgeServerModelsDirTest {
   @DisplayName("null contract + env var unset + aiHome null → returns null (dev mode)")
   void noContract_envVarUnset_aiHomeNull() {
     System.clearProperty(KEY_MODELS_DIR);
-    TestResolvedConfigHelper.storeFromEnvironment();
+    var captured = TestResolvedConfigHelper.storeFromEnvironment().get();
 
-    Path resolved = KnowledgeServer.resolveModelsDir(null, null);
+    Path resolved = KnowledgeServer.resolveModelsDir(null, null, captured);
 
     assertNull(resolved);
   }

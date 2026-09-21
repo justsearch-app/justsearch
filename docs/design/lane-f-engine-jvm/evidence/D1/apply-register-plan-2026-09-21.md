@@ -112,3 +112,66 @@ ratchet, preserving its semantic boundary: JUnit validates meaning; the gate
 ratchets the count. Update fixtures, governed baseline/change record and canonical
 configuration matrix as required. No declaration-count or proof-tier reduction
 is justified merely to make this batch pass.
+
+
+## Retirement and next executable batch decision, 2026-09-21
+
+A declaration without a reader is not automatically obsolete. The declared-key
+count must be recomputed after justified retirements; do not fabricate hot rows to
+retain the old291 total. The existing SettingsCommitCoordinator remains the sole
+accepted-settings transaction owner. D1-3 does not add a post-commit listener that
+pretends to perform D1-4 partition/lease/restart/generation dispatch.
+
+Root accepts the bounded next implementation batch: RAG_TOP_K and both citation
+threshold consumers read the installed ConfigStore through injected suppliers,
+capture once per request/operation, preserve explicit request overrides and
+normalization, and prove A-to-B store swaps without reconstructing services.
+ConversationApiAssembly and AgentLoopWiring capture the store authority once;
+consumers do not look up a global store independently during a request.
+
+Retire only declarations whose purpose is superseded or contradicts the actual
+owner: summary.pipeline (explicit conversation shapes now select summary behavior),
+embed.dimension (model output plus index.vector.dimension compatibility owns it),
+the six retired indexer transport/backpressure carriers, deprecated index.collection
+(replaced by index.collections), commit.debounce_ms (distinct commit timer/triggers
+own timing), and watcher.overflow.rescan_on_overflow (overflow reconcile is an
+unconditional safety behavior). This is11 candidate unique keys; recompute the
+normalized declaration union after editing instead of assuming a new total.
+
+Keep summary.max_tokens and path_resolution.retention_days as connection
+obligations. Canonical docs promise a summary-input guard and90-day deletion-history
+retention respectively; completion-token limits and unrelated job/ledger pruning
+are not substitutes. Search pipeline/profile need their intended default-selection
+semantics reconciled before classification; absence of a current reader alone is
+insufficient justification to delete the public surface. These decisions preserve
+work required by the design, rather than lowering scope to make the register green.
+
+Primary ownership anchors from the read-only audit: SettingsCommitCoordinator
+accepted-settings publication; ConfigStore.replace immutable snapshots;
+CoreConversationShapeCatalog and AiRoutes summary selection; EmbeddingService /
+OnnxEmbeddingEncoder output dimension; EngineRoot in-process composition;
+WorkerScanOps admission; config-lifecycle register's index.collections replacement;
+CommitOps timer; WorkerMethvinWatcher overflow reconcile; SqlitePathResolutionStore
+prune operation and KnowledgeServer sentinel. Reverify line numbers when editing.
+
+
+### Apply lease teardown obligation
+
+The process-resource review found no current production caller of `tryApply()`.
+When actual settings dispatch acquires that lease, prove it drains before all
+composition-root teardown or explicitly retain dependent config/instance locks
+on refusal. Current launcher cleanup aggregates process-resource failure before
+restoring config/releasing its lock; Headless fatal cleanup can propagate bundle
+close refusal before final manifest/lock cleanup. Those branches become reachable
+with a production apply owner. The low-level resource bundle already retains
+executors when component closure refuses; that alone does not prove whole-root
+teardown. Include normal, fatal-startup and library-launcher paths in D1-4 proof.
+
+
+Retirement scope check: `scripts/jseval/jseval/index_identity.py` still hashes
+JUSTSEARCH_EMBED_DIM despite no Engine reader. Its identity knob and matching
+fixture must retire with embed.dimension, not leave a false operational promise.
+Canonical SUMMARY_PIPELINE/INDEX_COLLECTION descriptions, obsolete lifecycle row,
+config schema/profile values and dead-config baseline also belong to the same
+retirement. Recompute the normalized union with the existing matrix parser;280
+is an expectation after11 removals, not a hard-coded acceptance replacement.

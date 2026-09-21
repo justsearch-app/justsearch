@@ -17,8 +17,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.api.lifecycle.Capability;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,7 +46,7 @@ final class BootstrapPhysicalInitializationTest {
       fixture.bootstrap.transitionWorkerDown(
           io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED, "refused");
       assertEquals("worker.index_schema_mismatch", fixture.bootstrap.indexFatalCode().code());
-      fixture.capability.transition(CapabilityHealth.READY, null);
+      fixture.publishSamplerReady();
       assertEquals("worker.index_schema_mismatch", fixture.bootstrap.indexFatalCode().code());
       fixture.healthy.set(true);
       assertTrue(fixture.bootstrap.checkHealth());
@@ -77,13 +80,13 @@ final class BootstrapPhysicalInitializationTest {
       fixture.healthy.set(true);
       fixture.bootstrap.start();
       assertTrue(fixture.bootstrap.checkHealth());
-      fixture.capability.transition(CapabilityHealth.PENDING, "worker.starting");
+      fixture.indexComponent.transition(ComponentState.STARTING, "worker.starting", null);
       assertTrue(fixture.bootstrap.checkHealth());
       verify(fixture.client).reindexPersistedRoots(any());
       verify(fixture.client).startPeriodicSync();
 
       // A physical loss is still a loss when sampled readiness was independently non-READY.
-      fixture.capability.transition(CapabilityHealth.PENDING, "worker.starting");
+      fixture.indexComponent.transition(ComponentState.STARTING, "worker.starting", null);
       fixture.healthy.set(false);
       assertFalse(fixture.bootstrap.checkHealth());
       assertEquals("worker.lost", fixture.capability.pendingReason());
@@ -220,9 +223,12 @@ final class BootstrapPhysicalInitializationTest {
   private static final class Fixture implements AutoCloseable {
     private final Path dir;
     private final TestEngineExecutors executors = new TestEngineExecutors();
+    private final TestEngineComponents components = TestEngineComponents.fourComponents();
+    private final ComponentHandle indexComponent =
+        new ReasonRetainingComponentHandle(components.handle("index"));
     private final AtomicBoolean healthy = new AtomicBoolean();
     private final KnowledgeClient client = mock(KnowledgeClient.class);
-    private final WorkerCapability capability = new WorkerCapability();
+    private final Capability capability;
     private final KnowledgeServerBootstrap bootstrap;
 
     private Fixture(Path dir) throws Exception {
@@ -232,7 +238,10 @@ final class BootstrapPhysicalInitializationTest {
       var host = mock(WorkerHost.class);
       when(host.start(any(), any())).thenReturn(client);
       when(client.isHealthy(any())).thenAnswer(invocation -> healthy.get());
-      bootstrap = new KnowledgeServerBootstrap(executors, config, null, capability, host);
+      bootstrap =
+          new KnowledgeServerBootstrap(
+              executors, config, null, components, indexComponent, host);
+      capability = bootstrap.workerCapability();
     }
 
     private void helpFile() throws Exception {
@@ -242,9 +251,21 @@ final class BootstrapPhysicalInitializationTest {
 
     private Path helpMarker() { return dir.resolve(".help-ingested-version"); }
 
+    private void publishSamplerReady() {
+      indexComponent.transition(ComponentState.READY, null, null);
+    }
+
     @Override
     public void close() {
-      try { bootstrap.close(); } finally { executors.close(); }
+      try {
+        bootstrap.close();
+      } finally {
+        try {
+          components.close();
+        } finally {
+          executors.close();
+        }
+      }
     }
   }
 }

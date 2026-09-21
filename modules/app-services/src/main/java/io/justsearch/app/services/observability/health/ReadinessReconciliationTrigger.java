@@ -4,8 +4,6 @@ package io.justsearch.app.services.observability.health;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.core.component.EngineComponentRegistry;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -41,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * rather than this trigger being a second way to reach what a request would have done.
  *
  * <p>The shape mirrors {@code CapabilityHealthBridge.wireListeners} one layer down: subscribe to
- * {@link WorkerCapability} / {@link InferenceCapability} transitions, and replay current state at
+ * component-registry transitions, and replay current state at
  * wire time so a transition that happened before the listener existed is not lost. Here the replay
  * is {@link #attach(Runnable)}'s self-seed — the ui side supplies its thunk late, well after the
  * capabilities have been driven.
@@ -114,19 +112,6 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
   public void attach(Runnable reconcile) {
     this.reconcile = reconcile;
     request();
-  }
-
-  /**
-   * Subscribes {@link #request()} to worker + inference capability transitions. Null-tolerant on
-   * either argument (test wiring supplies partial capability graphs).
-   */
-  public void wireTo(WorkerCapability worker, InferenceCapability inference) {
-    if (worker != null) {
-      worker.addListener((prev, next) -> request());
-    }
-    if (inference != null) {
-      inference.addListener((prev, next) -> request());
-    }
   }
 
   /**

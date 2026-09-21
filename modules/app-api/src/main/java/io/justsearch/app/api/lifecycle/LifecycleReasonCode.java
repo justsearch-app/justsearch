@@ -7,7 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Stable reason-code taxonomy for {@link LifecycleSnapshotV1} (schema v1).
+ * Stable reason-code taxonomy for {@link LifecycleSnapshotV2} (schema 2).
  *
  * <p>Reason codes must be low-cardinality, stable, and suitable for automation. They must not
  * include dynamic details like file paths, exception messages, or IDs.

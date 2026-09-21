@@ -208,6 +208,9 @@ function start() {
   let answering = true;
   let readingRequests = true;
 
+  let previousEssentialReady = false;
+  let previousEpochRequest = null;
+  let essentialEpoch = new Date().toISOString();
   const server = http.createServer((req, res) => {
     if (!answering) {
       // A hang is NOT a refusal: the socket is accepted and then nothing happens, which is what a
@@ -229,14 +232,24 @@ function start() {
     if (url === '/api/status') {
       res.writeHead(200, { 'content-type': 'application/json' });
       let indexHealthy = true;
+      let epochRequest = null;
       if (behaviour.controlEssentialReadiness) {
-        try { indexHealthy = JSON.parse(fs.readFileSync(path.join(dataDir, 'fake-essential-ready.json'), 'utf8')).ready === true; }
-        catch { indexHealthy = false; }
+        try {
+          const control = JSON.parse(fs.readFileSync(path.join(dataDir, 'fake-essential-ready.json'), 'utf8'));
+          indexHealthy = control.ready === true;
+          epochRequest = control.epoch ?? null;
+        } catch { indexHealthy = false; }
       }
-      res.end(JSON.stringify({ lifecycle: 'READY', instanceId, ready: true,
-        components: { head: { state: 'LIFECYCLE_STATE_READY' } }, indexAvailable: true,
-        worker: { core: { indexHealthy } },
-        readiness: { components: { indexServing: { state: 'DEGRADED', stale: false }, ai: { state: 'NOT_READY' } } },
+      if (indexHealthy && (!previousEssentialReady || epochRequest !== previousEpochRequest)) {
+        essentialEpoch = new Date(Math.max(Date.now(), Date.parse(essentialEpoch) + 1)).toISOString();
+      }
+      previousEssentialReady = indexHealthy;
+      previousEpochRequest = epochRequest;
+      res.end(JSON.stringify({ lifecycle: 'READY', instanceId,
+        readiness: { engineComponents: {
+          index: { state: indexHealthy ? 'READY' : 'UNAVAILABLE', stateSince: essentialEpoch },
+          generative: { state: 'UNAVAILABLE', stateSince: essentialEpoch },
+        } },
       }));
       return;
     }

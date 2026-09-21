@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import pytest
@@ -78,6 +79,43 @@ def test_affected_helper_defaults_match_single_shot_defaults(capture):
         "measure": True, "fixtures": False, "trace": False, "record": False,
     }
     assert capture.call_args_list == [call("health", **options), call("health-light", **options)]
+
+
+def test_named_fixture_variant_fails_before_server_start(monkeypatch):
+    monkeypatch.setattr(ui_shot.ui_check, "_build_steps", lambda *_args: [
+        SimpleNamespace(name="chat-chip-yield", fixtures_variant="degraded"),
+    ])
+    monkeypatch.setattr(ui_shot, "_resolve_ui_url", Mock(
+        side_effect=AssertionError("fixture validation must precede server startup"),
+    ))
+
+    result = CliRunner().invoke(main, ["ui-shot", "chat-chip-yield"])
+
+    assert result.exit_code == 1
+    assert "chat-chip-yield" in result.output
+    assert "requires --fixtures" in result.output
+    ui_shot._resolve_ui_url.assert_not_called()
+
+
+def test_affected_fixture_variant_fails_before_server_start(monkeypatch):
+    monkeypatch.setattr(ui_shot, "FILE_TO_STEPS", {
+        "ChatSurface.ts": ["chat-chip-yield"],
+    })
+    monkeypatch.setattr(ui_shot.ui_check, "_build_steps", lambda *_args: [
+        SimpleNamespace(name="chat-chip-yield", fixtures_variant="degraded"),
+    ])
+    monkeypatch.setattr(ui_shot, "_resolve_ui_url", Mock(
+        side_effect=AssertionError("fixture validation must precede server startup"),
+    ))
+
+    result = CliRunner().invoke(main, [
+        "ui-shot", "--affected", "shell-v0/views/ChatSurface.ts",
+    ])
+
+    assert result.exit_code == 1
+    assert "chat-chip-yield" in result.output
+    assert "requires --fixtures" in result.output
+    ui_shot._resolve_ui_url.assert_not_called()
 
 
 def test_single_failed_shot_prints_diagnostic_and_exits_nonzero(monkeypatch):

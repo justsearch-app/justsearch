@@ -59,12 +59,13 @@ public final class EngineRoot implements WorkerHost {
 
   /** Externally owned, shared by both halves; closed after the index half. */
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
-  private final EngineResourcePolicy resources = EngineResourcePolicy.load();
-  private final EngineAdmissionController admission = new EngineAdmissionController(resources);
+  private final DefaultEngineProcessResources processResources = new DefaultEngineProcessResources();
+  private final EngineResourcePolicy resources = processResources.policy();
+  private final EngineAdmissionController admission = processResources.admission();
   private final io.justsearch.core.execution.EngineExecutorRegistry executors =
-      new DefaultEngineExecutorRegistry(resources);
+      processResources.executors();
   private final io.justsearch.core.component.EngineComponentRegistry components =
-      new DefaultEngineComponentRegistry(resources.retained());
+      processResources.components();
   private final io.justsearch.core.component.ComponentHandle indexComponent =
       new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(components.register(
       new io.justsearch.core.component.ComponentSpec("index", true, KnowledgeServer.componentDependencies(),
@@ -78,6 +79,9 @@ public final class EngineRoot implements WorkerHost {
 
   /** Process lifetime, deliberately independent of the restartable index-half close. */
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
+
+  /** Final process teardown is separate from this host's restartable index close. */
+  public io.justsearch.app.api.EngineProcessResources processResources() { return processResources; }
 
   /** Process-owned observations shared by all four component owners and their projections. */
   public io.justsearch.core.component.EngineComponentRegistry components() { return components; }

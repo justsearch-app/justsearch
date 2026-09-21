@@ -6,9 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
+import io.justsearch.app.api.lifecycle.Capability;
 import io.justsearch.app.services.TestEngineContexts;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
+import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
@@ -20,39 +23,43 @@ final class WorkerStatusCacheContextTest {
 
   @Test
   void synchronousStatusMissForwardsTheSuppliedCallerContext() {
-    KnowledgeClient client = mock(KnowledgeClient.class);
-    KnowledgeServerBootstrap bootstrap = readyBootstrap(client);
-    when(client.getStatus(org.mockito.ArgumentMatchers.any()))
-        .thenReturn(StatusResponse.getDefaultInstance());
-    WorkerStatusCache cache = new WorkerStatusCache(bootstrap);
-    cache.setWorkerCapability(readyCapability());
-    EngineContext caller = TestEngineContexts.mcp();
+    try (var readyCapability = ReadyCapability.create()) {
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      KnowledgeServerBootstrap bootstrap = readyBootstrap(client);
+      when(client.getStatus(org.mockito.ArgumentMatchers.any()))
+          .thenReturn(StatusResponse.getDefaultInstance());
+      WorkerStatusCache cache = new WorkerStatusCache(bootstrap);
+      cache.setWorkerCapability(readyCapability.view());
+      EngineContext caller = TestEngineContexts.mcp();
 
-    cache.status(caller);
+      cache.status(caller);
 
-    ArgumentCaptor<EngineContext> context = ArgumentCaptor.forClass(EngineContext.class);
-    verify(client).getStatus(context.capture());
-    assertSame(caller, context.getValue());
+      ArgumentCaptor<EngineContext> context = ArgumentCaptor.forClass(EngineContext.class);
+      verify(client).getStatus(context.capture());
+      assertSame(caller, context.getValue());
+    }
   }
 
   @Test
   void synchronousFacetMissForwardsTheSuppliedCallerContext() {
-    KnowledgeClient client = mock(KnowledgeClient.class);
-    KnowledgeServerBootstrap bootstrap = readyBootstrap(client);
-    when(client.search(
-            org.mockito.ArgumentMatchers.any(SearchRequest.class),
-            org.mockito.ArgumentMatchers.any()))
-        .thenReturn(SearchResponse.getDefaultInstance());
-    WorkerStatusCache cache = new WorkerStatusCache(bootstrap);
-    cache.setWorkerCapability(readyCapability());
-    EngineContext caller = TestEngineContexts.ui();
+    try (var readyCapability = ReadyCapability.create()) {
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      KnowledgeServerBootstrap bootstrap = readyBootstrap(client);
+      when(client.search(
+              org.mockito.ArgumentMatchers.any(SearchRequest.class),
+              org.mockito.ArgumentMatchers.any()))
+          .thenReturn(SearchResponse.getDefaultInstance());
+      WorkerStatusCache cache = new WorkerStatusCache(bootstrap);
+      cache.setWorkerCapability(readyCapability.view());
+      EngineContext caller = TestEngineContexts.ui();
 
-    cache.refreshFacetSnapshotIfStale(caller);
+      cache.refreshFacetSnapshotIfStale(caller);
 
-    ArgumentCaptor<EngineContext> context = ArgumentCaptor.forClass(EngineContext.class);
-    verify(client)
-        .search(org.mockito.ArgumentMatchers.any(SearchRequest.class), context.capture());
-    assertSame(caller, context.getValue());
+      ArgumentCaptor<EngineContext> context = ArgumentCaptor.forClass(EngineContext.class);
+      verify(client)
+          .search(org.mockito.ArgumentMatchers.any(SearchRequest.class), context.capture());
+      assertSame(caller, context.getValue());
+    }
   }
 
   private static KnowledgeServerBootstrap readyBootstrap(KnowledgeClient client) {
@@ -61,9 +68,19 @@ final class WorkerStatusCacheContextTest {
     return bootstrap;
   }
 
-  private static WorkerCapability readyCapability() {
-    WorkerCapability capability = new WorkerCapability();
-    capability.transition(CapabilityHealth.READY, null);
-    return capability;
+  private record ReadyCapability(TestEngineComponents components, Capability view)
+      implements AutoCloseable {
+    private static ReadyCapability create() {
+      var components = TestEngineComponents.fourComponents();
+      var producer = new ReasonRetainingComponentHandle(components.handle("index"));
+      producer.transition(ComponentState.READY, null, null);
+      return new ReadyCapability(
+          components, new RegistryBackedCapability(components, "index", "worker"));
+    }
+
+    @Override
+    public void close() {
+      components.close();
+    }
   }
 }

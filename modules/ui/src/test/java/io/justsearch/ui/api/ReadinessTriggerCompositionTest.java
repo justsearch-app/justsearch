@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.status.CompatibilityStatusView;
 import io.justsearch.app.api.status.CoreIndexView;
 import io.justsearch.app.api.status.EnrichmentProgressView;
@@ -26,8 +25,9 @@ import io.justsearch.app.observability.health.ConditionStore;
 import io.justsearch.app.observability.health.HealthEvent;
 import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.Source;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.services.bootstrap.CapabilityGraph;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.app.services.observability.health.LifecycleSnapshotTap;
 import io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
@@ -53,7 +53,7 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p>So this test assembles the real pair: a real {@link StatusLifecycleHandler} with a real {@link
  * LifecycleSnapshotTap} over a real {@link ConditionStore} (mirroring {@code CoreApiAssembly}'s tap
- * wiring), a real {@link WorkerCapability}, a real {@link ReadinessReconciliationTrigger} wired the
+ * wiring), a real component registry, a real {@link ReadinessReconciliationTrigger} wired the
  * way {@code OrchestrationPhase} wires it, and the SAME {@code
  * statusLifecycleHandler::sampleAndBuildStatusSnapshot} thunk {@code CoreApiAssembly} attaches. There is no
  * Javalin {@code Context}, no HTTP server and no {@code /api/status} call anywhere in this file:
@@ -79,16 +79,17 @@ final class ReadinessTriggerCompositionTest {
         new LifecycleSnapshotTap(
             conditions, new HealthEventChangeRegistry(), HEAD_SRC, Clock.systemUTC());
 
-    // Real capabilities: the worker starts PENDING, exactly as it does before the Worker connects.
-    WorkerCapability worker = new WorkerCapability();
-    InferenceCapability inference = new InferenceCapability(false);
+    var components = TestEngineComponents.fourComponents();
+    components.handle("api").transition(ComponentState.STARTING, "api.starting", null);
+    components.handle("index").transition(ComponentState.STARTING, "worker.starting", null);
 
     KnowledgeServerBootstrap knowledgeServer = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(knowledgeServer.client()).thenReturn(client);
+    when(knowledgeServer.hasClient()).thenReturn(true);
 
-    StatusLifecycleHandler handler = newHandler(indexBase, worker, inference);
+    StatusLifecycleHandler handler = newHandler(indexBase, components);
     handler.setKnowledgeServer(knowledgeServer, null);
     // Mirrors CoreApiAssembly's tap wiring — the tap is the only writer of index.unavailable.
     handler.setLifecycleSnapshotTap(tap);
@@ -97,7 +98,7 @@ final class ReadinessTriggerCompositionTest {
         ReadinessReconciliationTrigger trigger =
             new ReadinessReconciliationTrigger(processExecutors)) {
       // OrchestrationPhase's wiring.
-      trigger.wireTo(worker, inference);
+      trigger.wireTo(components);
       // CoreApiAssembly's wiring — the production method reference, not a test lambda.
       trigger.attach(handler::sampleAndBuildStatusSnapshot);
 
@@ -112,8 +113,9 @@ final class ReadinessTriggerCompositionTest {
       assertEquals("worker", condition.subject());
       assertEquals(ConditionStatus.TRUE, condition.status(), "the condition must be ASSERTED");
 
-      // The Worker connects. Nothing calls /api/status — there is no request path in this graph.
-      worker.transition(CapabilityHealth.READY, null);
+      // API binding completes. The registry trigger can now establish sampled index READY.
+      // Nothing calls /api/status — there is no request path in this graph.
+      components.handle("api").transition(ComponentState.READY, null, null);
 
       awaitCondition(
           conditions,
@@ -152,8 +154,9 @@ final class ReadinessTriggerCompositionTest {
   // ---------------------------------------------------------------- helpers
 
   private static StatusLifecycleHandler newHandler(
-      Path indexBase, WorkerCapability worker, InferenceCapability inference) {
-    return new StatusLifecycleHandler(
+      Path indexBase, TestEngineComponents components) {
+    var capabilities = CapabilityGraph.fromRegistry(components);
+    var handler = new StatusLifecycleHandler(
         mock(io.justsearch.app.api.OnlineAiService.class),
         mock(io.justsearch.agent.api.AgentService.class),
         () -> null,
@@ -165,8 +168,10 @@ final class ReadinessTriggerCompositionTest {
         null,
         null,
         null,
-        worker,
-        inference);
+        capabilities.worker(),
+        capabilities.inference());
+    handler.setIndexComponent(components, components.handle("index"));
+    return handler;
   }
 
   private static WorkerOperationalView healthyWorkerView() {

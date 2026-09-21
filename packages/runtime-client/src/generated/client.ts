@@ -15,64 +15,87 @@ export interface ApiErrorResponse {
   retryable?: boolean;
 }
 
-export type LifecycleSnapshotComponentsHeadState = typeof LifecycleSnapshotComponentsHeadState[keyof typeof LifecycleSnapshotComponentsHeadState];
+export type LifecycleSnapshotComponentsApiState = typeof LifecycleSnapshotComponentsApiState[keyof typeof LifecycleSnapshotComponentsApiState];
 
 
-export const LifecycleSnapshotComponentsHeadState = {
-  LIFECYCLE_STATE_STARTING: 'LIFECYCLE_STATE_STARTING',
-  LIFECYCLE_STATE_READY: 'LIFECYCLE_STATE_READY',
-  LIFECYCLE_STATE_DEGRADED: 'LIFECYCLE_STATE_DEGRADED',
-  LIFECYCLE_STATE_ERROR: 'LIFECYCLE_STATE_ERROR',
-  LIFECYCLE_STATE_STOPPING: 'LIFECYCLE_STATE_STOPPING',
-  LIFECYCLE_STATE_STOPPED: 'LIFECYCLE_STATE_STOPPED',
+export const LifecycleSnapshotComponentsApiState = {
+  ABSENT: 'ABSENT',
+  STARTING: 'STARTING',
+  READY: 'READY',
+  RELOADING: 'RELOADING',
+  FAILED: 'FAILED',
+  UNAVAILABLE: 'UNAVAILABLE',
 } as const;
 
-export type LifecycleSnapshotComponentsHead = {
+export type LifecycleSnapshotComponentsApi = {
   /** @nullable */
-  reason_code?: string | null;
-  state: LifecycleSnapshotComponentsHeadState;
+  reason_code: string | null;
+  state: LifecycleSnapshotComponentsApiState;
+  state_since: string;
 };
 
-export type LifecycleSnapshotComponentsInferenceState = typeof LifecycleSnapshotComponentsInferenceState[keyof typeof LifecycleSnapshotComponentsInferenceState];
+export type LifecycleSnapshotComponentsEncodersState = typeof LifecycleSnapshotComponentsEncodersState[keyof typeof LifecycleSnapshotComponentsEncodersState];
 
 
-export const LifecycleSnapshotComponentsInferenceState = {
-  LIFECYCLE_STATE_STARTING: 'LIFECYCLE_STATE_STARTING',
-  LIFECYCLE_STATE_READY: 'LIFECYCLE_STATE_READY',
-  LIFECYCLE_STATE_DEGRADED: 'LIFECYCLE_STATE_DEGRADED',
-  LIFECYCLE_STATE_ERROR: 'LIFECYCLE_STATE_ERROR',
-  LIFECYCLE_STATE_STOPPING: 'LIFECYCLE_STATE_STOPPING',
-  LIFECYCLE_STATE_STOPPED: 'LIFECYCLE_STATE_STOPPED',
+export const LifecycleSnapshotComponentsEncodersState = {
+  ABSENT: 'ABSENT',
+  STARTING: 'STARTING',
+  READY: 'READY',
+  RELOADING: 'RELOADING',
+  FAILED: 'FAILED',
+  UNAVAILABLE: 'UNAVAILABLE',
 } as const;
 
-export type LifecycleSnapshotComponentsInference = {
+export type LifecycleSnapshotComponentsEncoders = {
   /** @nullable */
-  reason_code?: string | null;
-  state: LifecycleSnapshotComponentsInferenceState;
+  reason_code: string | null;
+  state: LifecycleSnapshotComponentsEncodersState;
+  state_since: string;
 };
 
-export type LifecycleSnapshotComponentsWorkerState = typeof LifecycleSnapshotComponentsWorkerState[keyof typeof LifecycleSnapshotComponentsWorkerState];
+export type LifecycleSnapshotComponentsGenerativeState = typeof LifecycleSnapshotComponentsGenerativeState[keyof typeof LifecycleSnapshotComponentsGenerativeState];
 
 
-export const LifecycleSnapshotComponentsWorkerState = {
-  LIFECYCLE_STATE_STARTING: 'LIFECYCLE_STATE_STARTING',
-  LIFECYCLE_STATE_READY: 'LIFECYCLE_STATE_READY',
-  LIFECYCLE_STATE_DEGRADED: 'LIFECYCLE_STATE_DEGRADED',
-  LIFECYCLE_STATE_ERROR: 'LIFECYCLE_STATE_ERROR',
-  LIFECYCLE_STATE_STOPPING: 'LIFECYCLE_STATE_STOPPING',
-  LIFECYCLE_STATE_STOPPED: 'LIFECYCLE_STATE_STOPPED',
+export const LifecycleSnapshotComponentsGenerativeState = {
+  ABSENT: 'ABSENT',
+  STARTING: 'STARTING',
+  READY: 'READY',
+  RELOADING: 'RELOADING',
+  FAILED: 'FAILED',
+  UNAVAILABLE: 'UNAVAILABLE',
 } as const;
 
-export type LifecycleSnapshotComponentsWorker = {
+export type LifecycleSnapshotComponentsGenerative = {
   /** @nullable */
-  reason_code?: string | null;
-  state: LifecycleSnapshotComponentsWorkerState;
+  reason_code: string | null;
+  state: LifecycleSnapshotComponentsGenerativeState;
+  state_since: string;
+};
+
+export type LifecycleSnapshotComponentsIndexState = typeof LifecycleSnapshotComponentsIndexState[keyof typeof LifecycleSnapshotComponentsIndexState];
+
+
+export const LifecycleSnapshotComponentsIndexState = {
+  ABSENT: 'ABSENT',
+  STARTING: 'STARTING',
+  READY: 'READY',
+  RELOADING: 'RELOADING',
+  FAILED: 'FAILED',
+  UNAVAILABLE: 'UNAVAILABLE',
+} as const;
+
+export type LifecycleSnapshotComponentsIndex = {
+  /** @nullable */
+  reason_code: string | null;
+  state: LifecycleSnapshotComponentsIndexState;
+  state_since: string;
 };
 
 export type LifecycleSnapshotComponents = {
-  head: LifecycleSnapshotComponentsHead;
-  inference: LifecycleSnapshotComponentsInference;
-  worker: LifecycleSnapshotComponentsWorker;
+  api: LifecycleSnapshotComponentsApi;
+  encoders: LifecycleSnapshotComponentsEncoders;
+  generative: LifecycleSnapshotComponentsGenerative;
+  index: LifecycleSnapshotComponentsIndex;
 };
 
 export type LifecycleSnapshotLifecycleState = typeof LifecycleSnapshotLifecycleState[keyof typeof LifecycleSnapshotLifecycleState];
@@ -99,7 +122,7 @@ export interface LifecycleSnapshot {
   components: LifecycleSnapshotComponents;
   lifecycle: LifecycleSnapshotLifecycle;
   observed_at: string;
-  schema_version: 1;
+  schema_version: 2;
   [key: string]: unknown;
  }
 

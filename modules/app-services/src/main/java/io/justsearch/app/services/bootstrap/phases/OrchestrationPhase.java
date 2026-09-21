@@ -114,15 +114,6 @@ public final class OrchestrationPhase {
    * private; the single entry point is {@link #runWithOutcome(Input)}.
    */
   private static Output runInternal(Input in) {
-    // CapabilityHealthBridge — push capability transitions to condition store.
-    CapabilityHealthBridge.wireListeners(
-        in.capabilities().worker(),
-        in.capabilities().inference(),
-        in.substrateOut().healthOut().conditionStore(),
-        in.substrateOut().healthOut().healthEventChangeRegistry(),
-        in.substrateOut().healthOut().headSource(),
-        in.substrateOut().healthOut().occurrenceLog());
-
     // Tempdoc 876 §B.2a: the same transitions also re-run the readiness snapshot, so the taps that
     // own index.unavailable et al. reconcile on an event rather than only on GET /api/status. The
     // thunk itself is attached later, by CoreApiAssembly; until then request() is a no-op and
@@ -130,9 +121,6 @@ public final class OrchestrationPhase {
     var readinessTrigger = in.substrateOut().healthOut().readinessReconciliationTrigger();
     if (in.components() != null) {
       readinessTrigger.wireTo(in.components());
-    } else {
-      // Isolated legacy constructors have no component registry; retired with capability migration.
-      readinessTrigger.wireTo(in.capabilities().worker(), in.capabilities().inference());
     }
 
     // Tempdoc 561 P-D: a read-only previewer over the ONE intent-gate authority — the backend

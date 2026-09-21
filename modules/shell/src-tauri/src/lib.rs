@@ -1173,10 +1173,10 @@ impl supervisor::Actuator for ShellActuator {
         }).is_some()
     }
 
-    fn probe_essential_ready(&mut self) -> bool {
-        self.state.host.observe_current_binding(|port| {
+    fn probe_essential_ready(&mut self) -> Option<engine_probe::ReadyEpoch> {
+        self.state.host.observe_current_value(|port| {
             engine_probe::essential_ready(port, Duration::from_millis(1500))
-        }).is_some()
+        }).map(|(_, epoch)| epoch)
     }
 
     fn observed_shutdown_reason(&mut self, current: &supervisor::Ready) -> Option<String> {

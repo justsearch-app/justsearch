@@ -153,9 +153,9 @@ impl Actuator for EngineHostActuator {
             engine_probe::responds(port, "/api/health", Duration::from_millis(700))).is_some()
     }
 
-    fn probe_essential_ready(&mut self) -> bool {
-        self.host.observe_current_binding(|port|
-            engine_probe::essential_ready(port, Duration::from_millis(700))).is_some()
+    fn probe_essential_ready(&mut self) -> Option<engine_probe::ReadyEpoch> {
+        self.host.observe_current_value(|port|
+            engine_probe::essential_ready(port, Duration::from_millis(700))).map(|(_, epoch)| epoch)
     }
 
     fn observed_shutdown_reason(&mut self, current: &Ready) -> Option<String> {

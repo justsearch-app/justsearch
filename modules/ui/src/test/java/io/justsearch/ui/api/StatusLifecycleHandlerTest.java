@@ -3,7 +3,7 @@ package io.justsearch.ui.api;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.services.lifecycle.LifecycleProjection;
 import io.justsearch.app.api.status.ChunkCoverageView;
 import io.justsearch.app.api.status.CompatibilityStatusView;
 import io.justsearch.app.api.status.CoreIndexView;
@@ -22,6 +22,7 @@ import io.justsearch.app.api.status.VectorFormatView;
 import io.justsearch.app.api.status.VisualExtractionView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.contract.wire.LifecycleState;
+import io.justsearch.core.component.ComponentState;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -110,7 +111,7 @@ final class StatusLifecycleHandlerTest {
         compatWorkerView(
             new CompatibilityStatusView(
                 "BLOCKED_LEGACY", "LEGACY_INDEX_NO_FINGERPRINT", "", "", "", "", "COMPATIBLE", true, "embedding_legacy"));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     // The INDEX_SERVING component is DEGRADED with the specific compat reason...
     assertEquals("DEGRADED", env.components().get("indexServing").state());
@@ -129,11 +130,34 @@ final class StatusLifecycleHandlerTest {
   void compatibleWorkerViewLeavesIndexServingReady() {
     StatusLifecycleHandler handler = newHandler();
     WorkerOperationalView view = compatWorkerView(CompatibilityStatusView.empty());
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("READY", env.components().get("indexServing").state());
     String reason = env.components().get("indexServing").reasonCode();
     assertFalse(reason != null && reason.startsWith("index."), "no compat reason when COMPATIBLE");
+  }
+
+  @ParameterizedTest
+  @EnumSource(ComponentState.class)
+  void aiDiagnosticPreservesOptionalIntentAndFailureClasses(ComponentState state) {
+    StatusLifecycleHandler handler = newHandler();
+    readyProjection();
+    String reason = state == ComponentState.READY ? null : "inference." + state.name().toLowerCase();
+    COMPONENTS.transition("generative", state, reason, "captured generative state");
+
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(
+        compatWorkerView(CompatibilityStatusView.empty()),
+        COMPONENTS.projection(),
+        freshContact());
+
+    String expected = switch (state) {
+      case READY -> "READY";
+      case ABSENT -> "NOT_CONFIGURED";
+      case STARTING -> "NOT_READY";
+      case RELOADING, FAILED, UNAVAILABLE -> "DEGRADED";
+    };
+    assertEquals(expected, env.components().get("ai").state());
+    assertEquals(reason, env.components().get("ai").reasonCode());
   }
 
   @Test
@@ -148,7 +172,7 @@ final class StatusLifecycleHandlerTest {
             compatWorkerView(CompatibilityStatusView.empty()),
             /* indexedDocuments= */ 0,
             ChunkCoverageView.empty());
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("READY", env.components().get("lambdamartModel").state());
     assertEquals(
@@ -216,7 +240,7 @@ final class StatusLifecycleHandlerTest {
     WorkerOperationalView view =
         compatWorkerView(
             new CompatibilityStatusView("UNAVAILABLE", "NO_EMBEDDING_MODEL", "", "", "", "", "COMPATIBLE", false, ""));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("DEGRADED", env.components().get("indexServing").state());
     assertEquals("index.dense_unavailable", env.components().get("indexServing").reasonCode());
@@ -231,7 +255,7 @@ final class StatusLifecycleHandlerTest {
         compatWorkerView(
             new CompatibilityStatusView("COMPATIBLE", "FINGERPRINT_MATCH", "", "", "", "", "COMPATIBLE", false, ""),
             false);
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("DEGRADED", env.components().get("indexServing").state());
     assertEquals("index.dense_unavailable", env.components().get("indexServing").reasonCode());
@@ -283,7 +307,7 @@ final class StatusLifecycleHandlerTest {
                 true),
             /* indexedDocuments= */ 0,
             ChunkCoverageView.empty());
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("DEGRADED", env.components().get("indexServing").state());
     assertEquals(
@@ -316,7 +340,7 @@ final class StatusLifecycleHandlerTest {
             compatWorkerView(CompatibilityStatusView.empty()),
             /* indexedDocuments= */ 0,
             ChunkCoverageView.empty());
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("READY", env.components().get("chunkEmbedding").state());
     assertNull(env.components().get("chunkEmbedding").reasonCode());
@@ -335,7 +359,7 @@ final class StatusLifecycleHandlerTest {
             compatWorkerView(CompatibilityStatusView.empty()),
             /* indexedDocuments= */ 42,
             new ChunkCoverageView(0, 0, 0, 0, 0.0, false, false, 0, 0, 0.0));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("DEGRADED", env.components().get("chunkEmbedding").state());
     assertEquals("chunk_embedding.not_ready", env.components().get("chunkEmbedding").reasonCode());
@@ -352,7 +376,7 @@ final class StatusLifecycleHandlerTest {
             compatWorkerView(CompatibilityStatusView.empty()),
             /* indexedDocuments= */ 0,
             new ChunkCoverageView(7, 0, 7, 0, 0.0, false, false, 0, 0, 0.0));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("DEGRADED", env.components().get("chunkEmbedding").state());
     assertEquals("chunk_embedding.not_ready", env.components().get("chunkEmbedding").reasonCode());
@@ -366,7 +390,7 @@ final class StatusLifecycleHandlerTest {
         withVisualExtraction(
             compatWorkerView(CompatibilityStatusView.empty()),
             new VisualExtractionView(true, false, "tesseract", "ocr.engine_missing", 2L, 0L, null, false));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("DEGRADED", env.components().get("visualTextExtraction").state());
     assertEquals("ocr.engine_missing", env.components().get("visualTextExtraction").reasonCode());
@@ -381,7 +405,7 @@ final class StatusLifecycleHandlerTest {
         withVisualExtraction(
             compatWorkerView(CompatibilityStatusView.empty()),
             new VisualExtractionView(true, false, "tesseract", "ocr.engine_missing", 0L, 0L, null, false));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("READY", env.components().get("visualTextExtraction").state());
     assertFalse(env.composites().get("retrieval").reasonCodes().contains("ocr.engine_missing"));
@@ -395,7 +419,7 @@ final class StatusLifecycleHandlerTest {
         withVisualExtraction(
             compatWorkerView(CompatibilityStatusView.empty()),
             new VisualExtractionView(true, true, "tesseract", null, 2L, 0L, "vdu.circuit_open", false));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("DEGRADED", env.components().get("visualTextExtraction").state());
     assertEquals("vdu.circuit_open", env.components().get("visualTextExtraction").reasonCode());
@@ -410,7 +434,7 @@ final class StatusLifecycleHandlerTest {
         withVisualExtraction(
             compatWorkerView(CompatibilityStatusView.empty()),
             new VisualExtractionView(true, true, "tesseract", null, 0L, 4L, "vdu.missing_mmproj", false));
-    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readySnapshot(), freshContact());
+    ReadinessEnvelopeView env = handler.buildReadinessEnvelope(view, readyProjection(), freshContact());
 
     assertEquals("READY", env.components().get("visualTextExtraction").state());
     assertEquals("DEGRADED", env.components().get("visualDocumentUnderstanding").state());
@@ -424,20 +448,14 @@ final class StatusLifecycleHandlerTest {
   @DisplayName("tempdoc 837: an orderly shutdown reaches INDEX_SERVING as NOT_CONFIGURED, not an error")
   void workerShutDownIsANotConfiguredVerdictNotAnError() {
     StatusLifecycleHandler handler = newHandler();
-    LifecycleSnapshotV1.Component ready =
-        new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY);
-    // The worker component as the OFFLINE arm now publishes it after an orderly teardown.
-    LifecycleSnapshotV1.Component shutDown =
-        new LifecycleSnapshotV1.Component(
-            LifecycleState.LIFECYCLE_STATE_DEGRADED, "worker.shut_down");
-    LifecycleSnapshotV1 snapshot =
-        LifecycleSnapshotV1.now(
-            new LifecycleSnapshotV1.Lifecycle(LifecycleState.LIFECYCLE_STATE_DEGRADED),
-            new LifecycleSnapshotV1.Components(ready, shutDown, ready));
+    COMPONENTS.transition(
+        "index", ComponentState.ABSENT, "worker.shut_down", "orderly shutdown");
 
     ReadinessEnvelopeView env =
         handler.buildReadinessEnvelope(
-            compatWorkerView(CompatibilityStatusView.empty()), snapshot, freshContact());
+            compatWorkerView(CompatibilityStatusView.empty()),
+            COMPONENTS.projection(),
+            freshContact());
 
     // The branch that used to key on worker.not_configured alone: without shut_down joining it, an
     // orderly teardown would fall through to the ERROR-shaped branches and the tap row for
@@ -451,18 +469,20 @@ final class StatusLifecycleHandlerTest {
     return StatusLifecycleHandler.WorkerContact.observed(System.currentTimeMillis());
   }
 
-  /** A lifecycle snapshot with all components READY (so INDEX_SERVING is not gated by worker state). */
-  private static LifecycleSnapshotV1 readySnapshot() {
-    LifecycleSnapshotV1.Component ready =
-        new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY);
-    return LifecycleSnapshotV1.now(
-        new LifecycleSnapshotV1.Lifecycle(LifecycleState.LIFECYCLE_STATE_READY),
-        new LifecycleSnapshotV1.Components(ready, ready, ready));
+  private static final StatusComponentFixture COMPONENTS = new StatusComponentFixture();
+
+  /** A real four-component READY projection (so INDEX_SERVING is not gated by index state). */
+  private static LifecycleProjection.Projection readyProjection() {
+    for (String name : java.util.List.of("api", "index", "encoders", "generative")) {
+      COMPONENTS.transition(name, ComponentState.READY, null, name + " ready");
+    }
+    return COMPONENTS.projection();
   }
 
   /** Minimal handler — buildReadinessEnvelope null-guards every non-retrieval dimension's suppliers. */
   private static StatusLifecycleHandler newHandler() {
-    return new StatusLifecycleHandler(
+    var graph = COMPONENTS.capabilities();
+    StatusLifecycleHandler handler = new StatusLifecycleHandler(
         mock(io.justsearch.app.api.OnlineAiService.class),
         mock(io.justsearch.agent.api.AgentService.class),
         () -> null,
@@ -474,8 +494,10 @@ final class StatusLifecycleHandlerTest {
         null,
         null,
         null,
-        mock(io.justsearch.app.services.lifecycle.WorkerCapability.class),
-        mock(io.justsearch.app.services.lifecycle.InferenceCapability.class));
+        graph.worker(),
+        graph.inference());
+    COMPONENTS.attach(handler);
+    return handler;
   }
 
   private static WorkerOperationalView compatWorkerView(CompatibilityStatusView compat) {

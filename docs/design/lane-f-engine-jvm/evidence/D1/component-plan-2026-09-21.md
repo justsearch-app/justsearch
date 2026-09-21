@@ -121,3 +121,38 @@ The general principle is one resource owner publishing multiple diagnostic proje
 It earns its keep when envelope, manifest and host readiness agree under fault/recovery;
 retire an adapter or abstraction when it adds an independent authority or has no real
 consumer. This batch does not generalize the registry to arbitrary plugins or jobs.
+
+
+## Launcher process-resource ownership correction (2026-09-21)
+
+Review of78f58bd6c plus D1 WIP found that the shipped CLI still constructs a live
+Head inference manager without a registry. Separate ServiceLoader admission and
+executor instances cannot supply EngineRoot's shared retained budget. Suppressing
+inference would conceal the missing connection; a standalone registry would add
+another authority.
+
+Use one narrow `EngineProcessResources` contract in app-api, implemented by
+`DefaultEngineProcessResources` in app-engine. It owns one EngineResourcePolicy and
+constructs admission/leases, executors and the component registry from that policy.
+LauncherEnvironment loads this single SPI; EngineRoot delegates its same existing
+resources to the implementation. Remove the two superseded SPI descriptors and
+launcher loaders. No new module dependency is needed: app-api exports core types;
+app-launcher keeps app-engine runtime-only. The bundle registers no components:
+physical composition owners still register their handles. The launcher explicitly
+registers its absent index owner; HeadAssembly registers generative as usual.
+
+Close Head before its process substrate. Within the substrate close component
+subscriptions/apply admission before executors, preserving failure propagation.
+EngineRoot's restartable index close does not close process resources. The process
+composition performs final resource close after its users have drained.
+
+Rejected alternatives: putting admission in EngineExecutorRegistry violates its
+core dependency direction and hides unrelated ownership; exposing all EngineRoot
+index composition solely for these resources conflates the existing standalone
+CLI with D2's profile-aware library facade. This correction does not discharge
+D2 profiles, embedded consumers, or the library acceptance tests.
+
+Required proof: single provider and shared policy/retained budget, truthful
+launcher generative projection and absent index, construction-failure cleanup,
+ordered/idempotent final close, EngineRoot restart preserving process resources,
+and unchanged architecture boundary checks. Implementation and proof pending.

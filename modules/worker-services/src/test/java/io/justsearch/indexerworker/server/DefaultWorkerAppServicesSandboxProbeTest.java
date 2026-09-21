@@ -145,7 +145,8 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
             null,
             catalog,
             OcrMetricCatalog.noop(),
-            io.justsearch.app.api.runtime.ManagedChildRegistry.noop())) {
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            captureExtractionConfiguration())) {
       assertTrue(warnedAboutTheProbe(), "a failed probe must be visible in the log");
       assertEquals(1L, probeFailures(), "a failed probe must be recorded as probe_failed");
 
@@ -185,7 +186,8 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
             null,
             catalog,
             OcrMetricCatalog.noop(),
-            io.justsearch.app.api.runtime.ManagedChildRegistry.noop())) {
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            captureExtractionConfiguration())) {
       assertEquals("no child process here", extractor.extract(file).content().trim());
       assertEquals(0L, probeFailures(), "in_process spawns nothing, so nothing can fail a probe");
       assertTrue(logs.list.stream().noneMatch(e -> e.getFormattedMessage().contains("startup probe")));
@@ -251,6 +253,15 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
       Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
     }
     return target;
+  }
+
+  private ExtractionConfiguration captureExtractionConfiguration() {
+    ResolvedConfig snapshot =
+        new ResolvedConfigBuilder().contributeEnvRegistry().build();
+    return ExtractionConfiguration.capture(
+        snapshot,
+        executors.pdfOcr().spec().threadCount(),
+        DefaultWorkerAppServices.buildSkipPolicy(snapshot));
   }
 
   private Path write(String name, String content) throws IOException {

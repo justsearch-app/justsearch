@@ -54,9 +54,10 @@ final class LauncherEnvironmentCloseTest {
     var liveStore = new java.util.concurrent.atomic.AtomicReference<io.justsearch.app.api.operations.OperationStore>();
     LauncherEnvironment.installFactories(
         () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+        null,
         (executors, dataDir, profile) -> new LocalTelemetry(executors, dataDir, 1_000, "launcher-test", profile,
             "metrics.ndjson", List.of(io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher"))),
-        (executors, telemetry, config, operations) -> {
+        (resources, telemetry, config, operations) -> {
           var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
               operations, clock, java.util.Set.of());
           if (calls.incrementAndGet() == 1) {
@@ -98,10 +99,38 @@ final class LauncherEnvironmentCloseTest {
   @Test
   void defaultLauncherFacadeBootsWithoutIngestionOwnersAndSkipsReindex() throws Exception {
     System.setProperty("justsearch.data.dir", tempDir.resolve("launcher-data").toString());
+    var owner = new java.util.concurrent.atomic.AtomicReference<
+        io.justsearch.app.api.EngineProcessResources>();
+    LauncherEnvironment.installFactories(null, () -> {
+      var resources = LauncherEnvironment.loadProcessResources(java.util.ServiceLoader.load(
+          io.justsearch.app.api.EngineProcessResources.class).stream().toList());
+      owner.set(resources);
+      return resources;
+    }, null, null);
 
     try (var environment = LauncherEnvironment.create("smoke")) {
       var head = environment.HeadAssembly();
       assertNotNull(head, "the production launcher facade should still boot");
+      var componentSnapshot = owner.get().components().snapshot();
+      var index = componentSnapshot.components().stream()
+          .filter(component -> component.spec().name().equals("index")).findFirst().orElseThrow();
+      var generative = componentSnapshot.components().stream()
+          .filter(component -> component.spec().name().equals("generative")).findFirst()
+          .orElseThrow();
+      assertEquals(io.justsearch.core.component.ComponentState.ABSENT, index.state(),
+          "this launcher composition intentionally owns no physical index");
+      assertEquals(
+          io.justsearch.app.services.lifecycle.RegistryBackedCapability.healthOf(generative.state()),
+          head.capabilities().inference().health(),
+          "the facade must project the generative handle from its process registry");
+      head.generativeComponent().transition(
+          io.justsearch.core.component.ComponentState.READY, null, "test owner publication");
+      assertTrue(head.capabilities().inference().available(),
+          "an immutable unavailable fallback cannot observe a real owner publication");
+      assertEquals(io.justsearch.core.component.ComponentState.READY,
+          owner.get().components().snapshot().components().stream()
+              .filter(component -> component.spec().name().equals("generative"))
+              .findFirst().orElseThrow().state());
       assertThrows(
           IllegalArgumentException.class,
           () -> head.operationAttempts().requireRecoveryOwner(OperationKind.INGEST),
@@ -130,9 +159,9 @@ final class LauncherEnvironmentCloseTest {
     System.setProperty("justsearch.config", "previous-config");
     System.setProperty("egress.block_all", "false");
     var failure = new java.io.IOException("config failure");
-    LauncherEnvironment.installFactories(() -> { throw failure; },
+    LauncherEnvironment.installFactories(() -> { throw failure; }, null,
         (executors, dataDir, profile) -> { throw new AssertionError("telemetry must not start"); },
-        (executors, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
+        (resources, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
     try {
       assertSame(failure,
           assertThrows(java.io.IOException.class,
@@ -148,16 +177,21 @@ final class LauncherEnvironmentCloseTest {
   void failedAssemblyConstructionReleasesItsInstanceLock() throws Exception {
     System.setProperty("justsearch.data.dir", tempDir.toString());
     var failure = new IllegalStateException("assembly failed");
+    var resources = Mockito.mock(io.justsearch.app.api.EngineProcessResources.class);
+    Mockito.when(resources.executors())
+        .thenReturn(new io.justsearch.core.execution.TestEngineExecutors());
     LauncherEnvironment.installFactories(
         () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+        () -> resources,
         (executors, dataDir, profile) -> new LocalTelemetry(executors, dataDir, 1_000, "launcher-test", profile,
             "metrics.ndjson", List.of(io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher"))),
-        (executors, telemetry, config, operations) -> {
+        (processOwner, telemetry, config, operations) -> {
           assertTrue(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir));
           throw failure;
         });
     assertSame(failure,
         assertThrows(IllegalStateException.class, () -> LauncherEnvironment.create("smoke")));
+    Mockito.verify(resources).close();
     try (var reacquired = new io.justsearch.app.util.AppInstanceLock(tempDir)) {
       reacquired.acquire();
       assertTrue(reacquired.isHeld());
@@ -187,11 +221,11 @@ final class LauncherEnvironmentCloseTest {
     var environment = allocateEnvironment(telemetry, "previous-config", "false", tempDir.resolve("cleanup"));
     var head = Mockito.mock(io.justsearch.app.services.HeadAssembly.class);
     var operations = Mockito.mock(io.justsearch.app.api.operations.OperationStore.class);
-    var executors = Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    var resources = Mockito.mock(io.justsearch.app.api.EngineProcessResources.class);
     var lock = Mockito.mock(io.justsearch.app.util.AppInstanceLock.class);
     setField(environment, "HeadAssembly", head);
     setField(environment, "operations", operations);
-    setField(environment, "executors", executors);
+    setField(environment, "processResources", resources);
     setField(environment, "instanceLock", lock);
     Mockito.when(head.isDependencyTeardownStarted()).thenReturn(true);
     var headFailure = new IllegalStateException("head cleanup failed after drain");
@@ -201,7 +235,7 @@ final class LauncherEnvironmentCloseTest {
     var failure = assertThrows(IllegalStateException.class, environment::close);
     Mockito.verify(operations).close();
     Mockito.verify(telemetry).close();
-    Mockito.verify(executors).close();
+    Mockito.verify(resources).close();
     Mockito.verify(lock).close();
     assertSame(headFailure, failure);
     assertArrayEquals(new Throwable[] {telemetryFailure}, failure.getSuppressed());
@@ -216,23 +250,26 @@ final class LauncherEnvironmentCloseTest {
     var environment = allocateEnvironment(telemetry, "previous-config", "false", tempDir.resolve("retry"));
     var head = Mockito.mock(io.justsearch.app.services.HeadAssembly.class);
     var operations = Mockito.mock(io.justsearch.app.api.operations.OperationStore.class);
-    var executors = Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    var resources = Mockito.mock(io.justsearch.app.api.EngineProcessResources.class);
+    var lock = Mockito.mock(io.justsearch.app.util.AppInstanceLock.class);
     setField(environment, "HeadAssembly", head);
     setField(environment, "operations", operations);
-    setField(environment, "executors", executors);
+    setField(environment, "processResources", resources);
+    setField(environment, "instanceLock", lock);
     var failure = new IllegalStateException("procedure still running");
     Mockito.doThrow(failure).doNothing().when(head).close();
     assertSame(failure,
         assertThrows(IllegalStateException.class, environment::close));
-    Mockito.verifyNoInteractions(operations, telemetry, executors);
+    Mockito.verifyNoInteractions(operations, telemetry, resources, lock);
     assertEquals("active-config", System.getProperty("justsearch.config"));
     assertEquals("true", System.getProperty("egress.block_all"));
     environment.close();
-    var order = Mockito.inOrder(head, operations, telemetry, executors);
+    var order = Mockito.inOrder(head, operations, telemetry, resources, lock);
     order.verify(head, Mockito.times(2)).close();
     order.verify(operations).close();
     order.verify(telemetry).close();
-    order.verify(executors).close();
+    order.verify(resources).close();
+    order.verify(lock).close();
     assertEquals("previous-config", System.getProperty("justsearch.config"));
     assertEquals("false", System.getProperty("egress.block_all"));
   }
@@ -265,6 +302,7 @@ final class LauncherEnvironmentCloseTest {
         var failure = new IllegalStateException("telemetry construction failed after publication");
         LauncherEnvironment.installFactories(
             () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+            null,
             (executors, dataDir, profile) -> {
               assertNotNull(
                   io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
@@ -272,7 +310,7 @@ final class LauncherEnvironmentCloseTest {
                   io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
               throw failure;
             },
-            (executors, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
+            (resources, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
         assertSame(failure,
             assertThrows(IllegalStateException.class,
                 () -> LauncherEnvironment.create("smoke")));
@@ -310,6 +348,7 @@ final class LauncherEnvironmentCloseTest {
     var failure = new IllegalStateException("stop before telemetry creates files");
     LauncherEnvironment.installFactories(
         () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+        null,
         (executors, dataDir, profile) -> {
           assertEquals(expected, dataDir);
           assertEquals(expected, io.justsearch.configuration.resolved.ConfigStore.global().get().paths().dataDir());
@@ -350,7 +389,9 @@ final class LauncherEnvironmentCloseTest {
     setField(environment, "previousEgressProperty", previousEgress);
     setField(environment, "configManager", null);
     setField(environment, "telemetry", telemetry);
-    setField(environment, "executors", new io.justsearch.core.execution.TestEngineExecutors());
+    var resources = Mockito.mock(io.justsearch.app.api.EngineProcessResources.class);
+    Mockito.when(resources.executors()).thenReturn(new io.justsearch.core.execution.TestEngineExecutors());
+    setField(environment, "processResources", resources);
     setField(environment, "HeadAssembly", null);
     setField(environment, "operations", Mockito.mock(io.justsearch.app.api.operations.OperationStore.class));
     return environment;

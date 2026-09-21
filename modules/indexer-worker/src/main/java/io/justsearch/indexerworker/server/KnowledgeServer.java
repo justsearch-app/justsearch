@@ -3130,10 +3130,10 @@ public final class KnowledgeServer implements Closeable {
    *       path at install time. Survives cold restart because the contract is persisted to
    *       disk; doesn't depend on env-var inheritance across GUI launches. This is the
    *       primary source for users who pre-stage models via {@code JUSTSEARCH_MODELS_DIR}.
-   *   <li>{@code ConfigStore.global().get().paths().modelsDir()} — alpha.18: bridges
-   *       {@code JUSTSEARCH_MODELS_DIR} env var via {@code EnvRegistry.MODELS_DIR ↔
-   *       justsearch.models.dir}. Works at first launch when the env var is set in the
-   *       launching shell, and pre-alpha.20 contracts that don't have the field.
+   *   <li>{@code config.paths().modelsDir()} — alpha.18: the supplied boot snapshot bridges
+   *       {@code JUSTSEARCH_MODELS_DIR} via {@code EnvRegistry.MODELS_DIR ↔
+   *       justsearch.models.dir}. Works at first launch when the env var is set in the launching
+   *       shell, and pre-alpha.20 contracts that don't have the field.
    *   <li>{@code aiHome.resolve("models")} — the default-flow fallback when neither
    *       contract nor env var is set (Install AI downloaded to {@code %APPDATA%\models\}).
    * </ol>
@@ -3143,14 +3143,9 @@ public final class KnowledgeServer implements Closeable {
    * {@code "Model file missing from disk: ..."} for every installed package after a cold
    * restart (round-10 sandbox finding).
    *
-   * <p>Package-private so {@code KnowledgeServerModelsDirTest} can exercise it without
-   * spinning up a real {@code KnowledgeServer}.
+   * <p>Package-private so {@code KnowledgeServerModelsDirTest} can exercise the captured-config
+   * resolution without spinning up a real {@code KnowledgeServer}.
    */
-  static Path resolveModelsDir(InstallContract contract, Path aiHome) {
-    if (contract != null && contract.modelsDir() != null) return contract.modelsDir();
-    return resolveModelsDir(contract, aiHome, ConfigStore.global().get());
-  }
-
   static Path resolveModelsDir(InstallContract contract, Path aiHome, ResolvedConfig config) {
     if (contract != null && contract.modelsDir() != null) {
       return contract.modelsDir();

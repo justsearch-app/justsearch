@@ -93,12 +93,31 @@ but may not promote a newly STARTING owner from an older cached sample. Successf
 fresh sampling can establish initial readiness; failure must preserve physical
 STARTING/RELOADING/FAILED/ABSENT as specified above.
 
-RecoveryContext currently relies on synchronous WorkerCapability callbacks. The
-monitor must emit/pass attempt/fault/backoff evidence at its recovery decision,
-not read a parked context from a coalescing adapter callback. The unused production
-generation/isFirstConnect counters need no replacement. Listener owners must close
-their subscriptions; CoreApiAssembly/CapabilityGraph test fallbacks must cease
-constructing independent mutable capabilities when the migration is complete.
+Recovery decisions emit immutable `RecoveryOccurrence(kind, context)` directly
+from the monitor. Its nullable episode-local context correlates events; it is not
+a readiness authority. Update that context on each admitted attempt after the
+final close gate; emit ATTEMPTED only when opening an episode. Keep it across
+failed cycles, clear it on terminal give-up, and let an operator reopening emit a
+new ATTEMPTED. RECOVERED carries the latest attempt's attributes and clears the
+episode. No parked context or generation counter remains on a capability adapter.
+
+The 2026-09-21 producer audit found that `startForRecovery()` can return with a
+bound but unhealthy client after exhausting its health wait. Therefore connection
+alone cannot emit RECOVERED. Return physical-health plus completed-initialization
+success under the existing bootstrap lock; a later successful monitor health tick
+also closes a still-open episode. This event reports physical recovery, while
+index READY additionally requires API and fresh sampler evidence. Preserve the
+old once-per-episode event policy and all attempt/fault/backoff attributes, while
+removing events manufactured by unrelated readiness transitions.
+
+Condition subscriptions use the registry adapter's ordered current-state replay,
+so a separate initial read cannot overwrite a newer callback. HeadAssembly owns
+and closes the subscriptions, including constructor failure. The index condition
+now reflects an actual registered STARTING observation on initial replay; the old
+silent unobserved WorkerCapability default is superseded. The unused production
+generation/isFirstConnect counters need no replacement. CoreApiAssembly and
+CapabilityGraph test fallbacks must cease constructing independent mutable
+capabilities when the migration is complete.
 
 The production-registration regression now passes in2296 through HeadlessApp.buildApi
 with the real shared EngineRoot registry and real API bind. It enforces floor4 and

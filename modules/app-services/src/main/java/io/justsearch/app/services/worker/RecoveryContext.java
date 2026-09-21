@@ -18,9 +18,8 @@ package io.justsearch.app.services.worker;
  *   <li>{@code backoffMs} — the cooldown slept before the retry.
  * </ul>
  *
- * <p>The most-recent value is parked on {@link io.justsearch.app.services.lifecycle.WorkerCapability}
- * so the capability-health bridge — which observes the RECOVERING/READY transition the recovery
- * callback drives — can read it when it emits the occurrence (the transition fires listeners
- * synchronously, so the parked context is the fresh one).
+ * <p>The monitor carries this value directly in {@link RecoveryOccurrence}. Its episode-local
+ * context is cleared after physical recovery or terminal give-up; readiness projections never
+ * retain event history.
  */
 public record RecoveryContext(int attempt, String faultKind, long backoffMs) {}

@@ -31,6 +31,56 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 final class RegistryBackedCapabilityTest {
 
+  @Test
+  void currentSubscriptionSeedsOnceAndOrdersReentrantPublications() {
+    var registry = new ManualRegistry(
+        snapshot(1, ComponentState.STARTING, true, "starting", null, null));
+    var capability = new RegistryBackedCapability(registry, "generative", "inference");
+    var observations = new ArrayList<RegistryBackedCapability.Observation>();
+    try (var ignored = capability.subscribeCurrent(observation -> {
+      observations.add(observation);
+      if (observation.revision() == 1) {
+        registry.deliver(snapshot(2, ComponentState.READY, true, null, null, null));
+        registry.deliver(snapshot(3, ComponentState.FAILED, true, "failed", null, null));
+      }
+    })) {
+      assertEquals(List.of(1L, 3L),
+          observations.stream().map(RegistryBackedCapability.Observation::revision).toList());
+      registry.deliver(snapshot(4, ComponentState.FAILED, true, "failed", null, "version"));
+      assertEquals(2, observations.size(), "metadata-only revisions do not repeat the seed");
+    }
+    registry.deliver(snapshot(5, ComponentState.READY, true, null, null, null));
+    assertEquals(2, observations.size(), "closed current-state subscription has no late delivery");
+  }
+
+  @Test
+  void currentSubscriptionNeverReplaysOldSeedAfterBootstrapRace() {
+    var registry = new ManualRegistry(
+        snapshot(1, ComponentState.STARTING, true, "starting", null, null));
+    var capability = new RegistryBackedCapability(registry, "generative", "inference");
+    var observations = new ArrayList<RegistryBackedCapability.Observation>();
+    registry.onNextSnapshot(() -> registry.deliver(
+        snapshot(3, ComponentState.READY, true, null, null, null)));
+    try (var ignored = capability.subscribeCurrent(observations::add)) {
+      assertEquals(List.of(3L),
+          observations.stream().map(RegistryBackedCapability.Observation::revision).toList());
+    }
+  }
+
+  @Test
+  void currentSubscriptionDoesNotLoseSeedWhenNewerBootstrapCallbackHasSameState() {
+    var registry = new ManualRegistry(
+        snapshot(1, ComponentState.READY, true, null, null, null));
+    var capability = new RegistryBackedCapability(registry, "generative", "inference");
+    var observations = new ArrayList<RegistryBackedCapability.Observation>();
+    registry.onNextSnapshot(() -> registry.deliver(
+        snapshot(3, ComponentState.READY, true, null, null, "version")));
+    try (var ignored = capability.subscribeCurrent(observations::add)) {
+      assertEquals(List.of(3L),
+          observations.stream().map(RegistryBackedCapability.Observation::revision).toList());
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("stateMappings")
   void projectsAllComponentStates(ComponentState state, CapabilityHealth health) {

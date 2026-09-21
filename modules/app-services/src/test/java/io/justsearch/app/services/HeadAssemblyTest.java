@@ -265,14 +265,18 @@ class HeadAssemblyTest {
   }
 
   @Test
-  void lateConstructorFailureClosesTheAlreadyWiredReadinessSubscription() throws Exception {
+  void lateConstructorFailureClosesEveryAlreadyWiredComponentSubscription() throws Exception {
     var failure = new IllegalStateException("history attachment failed");
-    var subscribed = new java.util.concurrent.atomic.AtomicBoolean();
-    var released = new java.util.concurrent.atomic.AtomicBoolean();
+    var subscriptionCloses = new java.util.ArrayList<java.util.concurrent.atomic.AtomicInteger>();
     var readinessOwners = new java.util.ArrayList<io.justsearch.core.execution.EngineExecutorRegistry.Registration>();
     try (var components = org.mockito.Mockito.spy(
             new io.justsearch.core.component.TestEngineComponents());
         var executors = org.mockito.Mockito.spy(new io.justsearch.core.execution.TestEngineExecutors())) {
+      try (var fixture = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+        fixture.snapshot().components().stream()
+            .filter(component -> !component.spec().name().equals("generative"))
+            .forEach(component -> components.register(component.spec()));
+      }
       org.mockito.Mockito.doAnswer(invocation -> {
         var owner = (io.justsearch.core.execution.EngineExecutorRegistry.Registration)
             invocation.callRealMethod();
@@ -287,16 +291,17 @@ class HeadAssemblyTest {
       org.mockito.Mockito.doAnswer(invocation -> {
         var subscription = (io.justsearch.core.component.EngineComponentRegistry.Subscription)
             invocation.callRealMethod();
-        subscribed.set(true);
+        var closedCount = new java.util.concurrent.atomic.AtomicInteger();
+        subscriptionCloses.add(closedCount);
         return (io.justsearch.core.component.EngineComponentRegistry.Subscription) () -> {
           subscription.close();
-          released.set(true);
+          closedCount.incrementAndGet();
         };
       }).when(components).subscribe(org.mockito.ArgumentMatchers.any());
       var operations = mockOperationStore();
       org.mockito.Mockito.when(operations.subscribeCompletions(org.mockito.ArgumentMatchers.any()))
           .thenAnswer(invocation -> {
-            assertTrue(subscribed.get(), "the injected failure must follow actual subscription wiring");
+            assertEquals(3, subscriptionCloses.size(), "failure follows both condition subscriptions and readiness trigger wiring");
             throw failure;
           });
       assertSame(failure, assertThrows(IllegalStateException.class, () -> new HeadAssembly(
@@ -304,13 +309,15 @@ class HeadAssemblyTest {
           executors, new NoopTelemetry(), new ConfigManagerBootstrap(), null,
           new io.justsearch.app.services.settings.UiSettingsStore(
               io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
-          new io.justsearch.app.services.lifecycle.WorkerCapability(),
           io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
           new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
           org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class),
           io.justsearch.app.services.bootstrap.OperationAuthority.load(tempDir),
           io.justsearch.app.api.operations.RecordedIngestionService.unavailable(), components)));
-      assertTrue(released.get(), "constructor failure must release its registry subscription");
+      assertEquals(3, subscriptionCloses.size());
+      for (var closedCount : subscriptionCloses) {
+        assertEquals(1, closedCount.get(), "every acquired subscription closes exactly once");
+      }
       assertEquals(1, readinessOwners.size());
       org.mockito.Mockito.verify(readinessOwners.getFirst()).close();
       org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
@@ -322,7 +329,7 @@ class HeadAssemblyTest {
     Telemetry telemetry = new NoopTelemetry();
     var operations = mockOperationStore();
 
-    try (HeadAssembly bootstrap = new HeadAssembly(operations, org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+    try (HeadAssembly bootstrap = new HeadAssembly(operations, org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       assertSame(operations, bootstrap.operations());
@@ -344,7 +351,7 @@ class HeadAssemblyTest {
             null,
             new io.justsearch.app.services.settings.UiSettingsStore(
                 io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
-            null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       Field field = HeadAssembly.class.getDeclaredField("inferenceManager");
@@ -367,16 +374,20 @@ class HeadAssemblyTest {
   void connectKnowledgeServerRegistersAgentToolsWithoutBootNpe(
       io.justsearch.app.api.lifecycle.CapabilityHealth health) throws Exception {
     Telemetry telemetry = new NoopTelemetry();
-    // Tempdoc 627 Deliverable 10: share the capability the mocked KS reports, so the HeadAssembly's
-    // localCap IS ks.workerCapability() (the production invariant) and no mirror is needed.
-    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
-    try (HeadAssembly bootstrap =
+    var components = io.justsearch.core.component.TestEngineComponents.fourComponents();
+    var indexOwner = new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(
+        components.handle("index"));
+    var cap = new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "index", "worker");
+    try (components;
+        HeadAssembly bootstrap =
         new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(),
             telemetry,
             new ConfigManagerBootstrap(),
             null,
             new io.justsearch.app.services.settings.UiSettingsStore(
-                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), cap, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       var ks =
@@ -384,7 +395,12 @@ class HeadAssemblyTest {
               io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
       var client =
           org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
-      cap.transition(health, null);
+      indexOwner.transition(
+          health == io.justsearch.app.api.lifecycle.CapabilityHealth.READY
+              ? io.justsearch.core.component.ComponentState.READY
+              : io.justsearch.core.component.ComponentState.STARTING,
+          null,
+          null);
       org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
       org.mockito.Mockito.when(ks.isReady()).thenReturn(health == io.justsearch.app.api.lifecycle.CapabilityHealth.READY);
       org.mockito.Mockito.when(ks.client()).thenReturn(client);
@@ -416,7 +432,11 @@ class HeadAssemblyTest {
   @Test
   void offlineCoordinatorBuildsAtBootstrapAndResolvesClientAfterConnect() throws Exception {
     Telemetry telemetry = new NoopTelemetry();
-    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
+    var components = io.justsearch.core.component.TestEngineComponents.fourComponents();
+    var indexOwner = new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(
+        components.handle("index"));
+    var cap = new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "index", "worker");
     var context = TestEngineContexts.durableInternal();
     var admission = org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class);
     var work = org.mockito.Mockito.mock(io.justsearch.app.api.EngineWorkHandle.class);
@@ -424,14 +444,15 @@ class HeadAssemblyTest {
     org.mockito.Mockito.when(work.context()).thenReturn(context);
     org.mockito.Mockito.when(work.cancellationReason()).thenReturn(java.util.Optional.empty());
     org.mockito.Mockito.when(work.onCancel(org.mockito.ArgumentMatchers.any())).thenReturn(() -> {});
-    try (HeadAssembly bootstrap =
+    try (components;
+        HeadAssembly bootstrap =
         new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), io.justsearch.core.execution.TestEngineExecutors.awaitingTermination(),
             telemetry,
             new ConfigManagerBootstrap(),
             null,
             new io.justsearch.app.services.settings.UiSettingsStore(
                 io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
-            cap, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         admission)) {
 
@@ -451,7 +472,7 @@ class HeadAssemblyTest {
       org.mockito.Mockito.when(client.recoverVduProcessing(org.mockito.ArgumentMatchers.any())).thenReturn(0);
       org.mockito.Mockito.when(client.countPendingVdu(org.mockito.ArgumentMatchers.any())).thenReturn(0);
       org.mockito.Mockito.when(client.countPendingEmbeddings(org.mockito.ArgumentMatchers.any())).thenReturn(0);
-      cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
+      indexOwner.transition(io.justsearch.core.component.ComponentState.READY, null, null);
       org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
       org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
       org.mockito.Mockito.when(ks.client()).thenReturn(client);
@@ -524,7 +545,6 @@ class HeadAssemblyTest {
       // rather than the developer's real data directory.
       TestResolvedConfigHelper.storeFromEnvironment();
 
-      var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
       try (HeadAssembly bootstrap =
           new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(),
               new NoopTelemetry(),
@@ -532,7 +552,7 @@ class HeadAssemblyTest {
               null,
               new io.justsearch.app.services.settings.UiSettingsStore(
                   io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
-              cap, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+              io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
 
@@ -574,7 +594,7 @@ class HeadAssemblyTest {
     Files.writeString(payload, "{\"features\":[\"one\"]}", StandardCharsets.UTF_8);
     System.setProperty("app.api.fake_capabilities", payload.toString());
 
-    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       FakeHttpExchange exchange = fakeExchange("GET", URI.create("http://localhost/infra/capabilities"));
@@ -593,7 +613,7 @@ class HeadAssemblyTest {
     System.setProperty("justsearch.prod", "true");
     TestResolvedConfigHelper.storeFromEnvironment();
 
-    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       FakeHttpExchange exchange = fakeExchange("GET", URI.create("http://localhost/infra/capabilities"));
@@ -608,7 +628,7 @@ class HeadAssemblyTest {
     Path missing = tempDir.resolve("missing.json");
     System.setProperty("app.api.fake_capabilities", missing.toString());
 
-    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       FakeHttpExchange exchange = fakeExchange("GET", URI.create("http://localhost/infra/capabilities"));
@@ -624,7 +644,7 @@ class HeadAssemblyTest {
     Files.writeString(payload, "{\"features\":[]}", StandardCharsets.UTF_8);
     System.setProperty("app.api.fake_capabilities", payload.toString());
 
-    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+    try (HeadAssembly bootstrap = new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       FakeHttpExchange exchange = fakeExchange("POST", URI.create("http://localhost/infra/capabilities"));
@@ -654,7 +674,7 @@ class HeadAssemblyTest {
   void connectKnowledgeServerLateBindDoesNotThrowOnNullCtor() throws Exception {
     // Construct with knowledgeServer=null (the round-15 cold-start sequence).
     try (HeadAssembly bootstrap =
-        new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+        new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
 

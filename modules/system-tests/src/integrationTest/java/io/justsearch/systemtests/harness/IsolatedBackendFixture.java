@@ -193,7 +193,7 @@ public final class IsolatedBackendFixture {
               + " elapsedMs=" + ((System.nanoTime() - t0) / 1_000_000));
       // /api/health=200 only proves Javalin bound. Lite mode reports DEGRADED while the
       // Worker subprocess is still connecting; ingest accepts the request but the index
-      // never receives the doc until worker.state=READY. Block on that explicitly so
+      // never receives the doc until index.state=READY. Block on that explicitly so
       // tests don't have to.
       awaitWorkerReady(observedPort);
       System.err.println(
@@ -388,32 +388,25 @@ public final class IsolatedBackendFixture {
     while (System.currentTimeMillis() < deadline) {
       if (process != null && !process.isAlive()) {
         throw new IllegalStateException(
-            "Backend process exited while waiting for worker.state=READY (exit code "
+            "Backend process exited while waiting for index.state=READY (exit code "
                 + process.exitValue() + ")");
       }
       try {
         HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
         lastBody = resp.body();
-        // The response shape (LifecycleSnapshotV1) serialises components in declaration
-        // order — head, worker, inference — and Jackson omits null fields, so the worker
-        // component always begins with "worker":{"state":"<STATE>". We avoid pulling
-        // Jackson into the fixture for a single readiness probe. Tempdoc 548 (§4.1) collapsed
-        // LifecycleState onto the proto enum, so the wire value is now the prefixed
-        // "LIFECYCLE_STATE_READY"; accept both the prefixed and the legacy short form so the
-        // probe is robust across that serialization change.
+        // Schema 2 uses the component vocabulary directly; legacy enum prefixes are not READY.
         if (resp.statusCode() == 200
-            && (lastBody.contains("\"worker\":{\"state\":\"LIFECYCLE_STATE_READY\"")
-                || lastBody.contains("\"worker\":{\"state\":\"READY\""))) {
+            && lastBody.contains("\"index\":{\"state\":\"READY\"")) {
           return;
         }
-        failFastOnTerminalWorkerReason(lastBody, "worker.state=READY");
+        failFastOnTerminalWorkerReason(lastBody, "index.state=READY");
       } catch (IOException ioe) {
         // keep polling
       }
       Thread.sleep(POLL_INTERVAL_MS);
     }
     throw new IllegalStateException(
-        "components.worker.state did not reach READY within " + WORKER_READY_TIMEOUT_MS
+        "components.index.state did not reach READY within " + WORKER_READY_TIMEOUT_MS
             + "ms. Last /api/health body: " + lastBody);
   }
 
@@ -439,8 +432,8 @@ public final class IsolatedBackendFixture {
         // Lite mode reports DEGRADED with status 503; that's fine for tests that only need
         // diagnostics + ingestion endpoints. We accept any 2xx as ready, but per the spike
         // /api/health returns 200 in lite mode (DEGRADED is reported in the body).
-        // The non-200 body carries the LifecycleSnapshotV1 that says WHY (lifecycle.reason_code
-        // and components.worker.reason_code), so keep the most recent one for the timeout
+        // The non-200 body carries the LifecycleSnapshotV2 that says WHY (lifecycle.reason_code
+        // and components.index.reason_code), so keep the most recent one for the timeout
         // message — without it the failure reads as a bare timeout with no cause.
         lastStatus = resp.statusCode();
         lastBody = resp.body();

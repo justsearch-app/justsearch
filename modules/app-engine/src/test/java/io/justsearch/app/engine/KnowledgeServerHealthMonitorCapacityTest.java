@@ -10,7 +10,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.EngineAdmissionException;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
 import io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict;
@@ -232,7 +231,10 @@ final class KnowledgeServerHealthMonitorCapacityTest {
   private static KnowledgeServerBootstrap bootstrap(boolean hasClient) {
     var bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.hasClient()).thenReturn(hasClient);
-    when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
+    var components = io.justsearch.core.component.TestEngineComponents.fourComponents();
+    when(bootstrap.indexComponent()).thenReturn(components.handle("index"));
+    when(bootstrap.workerCapability()).thenReturn(
+        new io.justsearch.app.services.lifecycle.RegistryBackedCapability(components, "index", "worker"));
     return bootstrap;
   }
 

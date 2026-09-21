@@ -14,7 +14,6 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.status.CoreIndexView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
@@ -309,7 +308,7 @@ final class IndexReadinessPublicationTest {
     var handler = new StatusLifecycleHandler(
         mock(OnlineAiService.class), mock(io.justsearch.agent.api.AgentService.class), () -> null,
         server, null, indexBase, Instant.now(), () -> "OK", null, null, null,
-        capability, new InferenceCapability(false));
+        capability, new RegistryBackedCapability(components, "generative", "inference"));
     handler.setIndexComponent(components, components.handle("index"));
     var clock = new AtomicLong(System.currentTimeMillis());
     handler.setClockForTesting(clock::get);

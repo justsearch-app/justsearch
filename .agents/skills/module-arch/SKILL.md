@@ -166,7 +166,19 @@ The Head and Body are one **Engine** JVM ([ADR-0049](../decisions/0049-one-engin
 catalogued in-process **ports** — plain Java interfaces in contract modules — bound by the single
 composition root `EngineRoot` (`modules/app-engine`). The catalogue is
 `governance/engine-ports.v1.json`; ArchUnit rule 6b plus the `engine-port` gate pin it, so only the
-composition root binds an implementation:
+composition root binds an implementation.
+
+Process resources use the `EngineProcessResources` contract in `app-api`.
+Its `app-engine` implementation constructs admission/leases, executors and the
+component registry from one resource policy and retained-state budget. `EngineRoot`
+uses that owner directly; the standalone launcher loads the same implementation
+through one ServiceLoader provider, retaining its runtime-only dependency on
+`app-engine`. Component owners register their actual components; the process
+resource bundle does not invent registrations. Restarting the index leaves this
+process owner alive. Final shutdown drains its users, then closes component
+observations before executors.
+
+The port bindings remain:
 
 ```text
 ENGINE JVM

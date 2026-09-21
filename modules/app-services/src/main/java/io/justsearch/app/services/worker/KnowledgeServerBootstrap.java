@@ -3,9 +3,12 @@ package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.api.lifecycle.Capability;
+import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.app.util.AppInstanceLock;
 import io.justsearch.app.util.EnergyState;
 import io.justsearch.configuration.EnvRegistry;
@@ -58,7 +61,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     private final KnowledgeServerConfig config;
     private final Telemetry telemetry;
-    private final WorkerCapability workerCapability;
+    private final Capability workerCapability;
+    private final ComponentHandle indexComponent;
     private final AtomicBoolean started = new AtomicBoolean(false);
     // Private initialization bookkeeping, never a readiness authority. Only direct health
     // observations change these flags; API state and sampler staleness cannot re-run setup.
@@ -167,53 +171,19 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private IpcTelemetry ipcTelemetry;
     private final boolean automaticRootProducers;
 
-    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors) {
-        this(executors, KnowledgeServerConfig.load(), new NoopTelemetry());
-    }
-
-    /** Tempdoc 627 Deliverable 10: production async-start ctor — loaded config + the injected shared capability. */
-    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerCapability workerCapability) {
-        this(executors, KnowledgeServerConfig.load(), new NoopTelemetry(), workerCapability);
-    }
-
-    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors, KnowledgeServerConfig config) {
-        this(executors, config, new NoopTelemetry());
-    }
-
-    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors, KnowledgeServerConfig config, Telemetry telemetry) {
-        this(executors, config, telemetry, new WorkerCapability());
-    }
-
-    /**
-     * Tempdoc 627 Deliverable 10: inject a shared {@link WorkerCapability} so the Head's
-     * {@code CapabilityGraph} and this supervisor drive ONE instance — eliminating the
-     * {@code HeadAssembly.connectKnowledgeServer} mirror and its silent-drift bug class. The
-     * no-arg / 2-arg ctors keep their own instance for tests and isolated launchers.
-     */
+    /** Uses the Engine's existing index owner and registry for every publication and gate. */
     public KnowledgeServerBootstrap(
         io.justsearch.core.execution.EngineExecutorRegistry executors,
-        KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability) {
-        this(executors, config, telemetry, workerCapability, WorkerHost.unavailable());
-    }
-
-    /**
-     * Lane F item A6: the production ctor. {@code workerHost} decides where the index half lives —
-     * {@code io.justsearch.app.engine.EngineRoot} for the Engine JVM. Required since item A11: the
-     * spawn-a-Worker-process alternative is gone, so a null host is a construction error rather
-     * than a fallback.
-     */
-    public KnowledgeServerBootstrap(
-        io.justsearch.core.execution.EngineExecutorRegistry executors,
-        KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability,
-        WorkerHost workerHost) {
-        this(executors, config, telemetry, workerCapability, workerHost, true);
+        KnowledgeServerConfig config, Telemetry telemetry, EngineComponentRegistry components,
+        ComponentHandle indexComponent, WorkerHost workerHost) {
+        this(executors, config, telemetry, components, indexComponent, workerHost, true);
     }
 
     /** Installed fault fixtures isolate explicit operations from automatic root scans and watchers. */
     public KnowledgeServerBootstrap(
         io.justsearch.core.execution.EngineExecutorRegistry executors,
-        KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability,
-        WorkerHost workerHost, boolean automaticRootProducers) {
+        KnowledgeServerConfig config, Telemetry telemetry, EngineComponentRegistry components,
+        ComponentHandle indexComponent, WorkerHost workerHost, boolean automaticRootProducers) {
         this.automaticRootProducers = automaticRootProducers;
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
@@ -221,7 +191,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.config = config;
         this.bootFaultsRemaining = new java.util.concurrent.atomic.AtomicInteger(config.bootFaultInjectAttempts());
         this.telemetry = telemetry != null ? telemetry : new NoopTelemetry();
-        this.workerCapability = workerCapability != null ? workerCapability : new WorkerCapability();
+        this.indexComponent = java.util.Objects.requireNonNull(indexComponent, "indexComponent");
+        if (!"index".equals(indexComponent.spec().name())) {
+            throw new IllegalArgumentException("Bootstrap requires the index component owner");
+        }
+        this.workerCapability = new RegistryBackedCapability(components, "index", "worker");
 
     }
 
@@ -256,8 +230,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
         // owns the narration; dropping back to PENDING here would re-enter RECOVERING on the next
         // attempt and emit a worker.restart-attempted occurrence per cycle.
         if (!bootRecoveryInFlight) {
-            workerCapability.transition(
-                CapabilityHealth.PENDING, LifecycleReasonCode.WORKER_STARTING.code(), "Worker starting");
+            indexComponent.transition(
+                ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(), "Worker starting");
         }
         log.info("Starting Knowledge Server integration...");
 
@@ -439,12 +413,15 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * <p>The flag is set and cleared around the single call, so a throwing attempt cannot leave the
      * bootstrap permanently unable to narrate.
      */
-    public void startForRecovery() throws IOException, InterruptedException {
-        bootRecoveryInFlight = true;
+    public boolean startForRecovery() throws IOException, InterruptedException {
+        initLock.lockInterruptibly();
         try {
+            bootRecoveryInFlight = true;
             startWithRetry(1, 0);
+            return physicalHealthy && healthyInitializationComplete;
         } finally {
             bootRecoveryInFlight = false;
+            initLock.unlock();
         }
     }
 
@@ -481,15 +458,21 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     /**
      * Returns true if the Knowledge Server is ready.
-     * Delegates to {@link WorkerCapability#available()}.
+     * Delegates to {@link io.justsearch.app.api.lifecycle.Capability#available()}.
      */
     public boolean isReady() {
         return workerCapability.available();
     }
 
-    public WorkerCapability workerCapability() {
+    public Capability workerCapability() {
         return workerCapability;
     }
+
+    /** The existing physical owner, shared with recovery supervision and the readiness sampler. */
+    public ComponentHandle indexComponent() {
+        return indexComponent;
+    }
+
 
     /**
      * Returns the client for Knowledge Server operations.
@@ -604,7 +587,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * the reason slot stays a code.
      *
      * <p>{@code readAndClear} deletes the marker, so this observation is unrepeatable — see
-     * {@link io.justsearch.app.services.lifecycle.WorkerCapability#transition} for the latch that keeps
+     * {@link io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle} for the latch that keeps
      * a later generic transition from destroying it.
      */
     private WorkerDown workerDownCode(LifecycleReasonCode generic, String detail) {
@@ -669,8 +652,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 down.code().code());
             return;
         }
-        workerCapability.transition(
-            CapabilityHealth.DEGRADED, down.code().code(), down.detail());
+        indexComponent.transition(
+            ComponentState.FAILED, down.code().code(), down.detail());
     }
 
     public boolean checkHealth() {
@@ -687,11 +670,6 @@ public final class KnowledgeServerBootstrap implements Closeable {
             if (healthy) {
                 physicalHealthy = true;
                 latchedIndexFatalVerdict = null;
-                // Removed with the mutable-capability migration; auxiliary initialization no
-                // longer depends on this temporary compatibility publication.
-                if (workerCapability.health() != CapabilityHealth.READY) {
-                    workerCapability.transition(CapabilityHealth.READY, null);
-                }
                 completeHealthyInitialization();
             } else {
                 observePhysicalLoss("Health check failed");
@@ -776,8 +754,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // would immediately re-enter PENDING, and the OFFLINE flap in between is narration of a
             // state the Head was never actually in.
             if (!narrationSuppressed()) {
-                workerCapability.transition(
-                    CapabilityHealth.OFFLINE,
+                indexComponent.transition(
+                    ComponentState.ABSENT,
                     LifecycleReasonCode.WORKER_SHUT_DOWN.code(),
                     "Worker shut down");
             }

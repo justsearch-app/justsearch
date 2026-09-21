@@ -11,7 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.status.CompatibilityStatusView;
 import io.justsearch.app.api.status.CoreIndexView;
 import io.justsearch.app.api.status.EnrichmentProgressView;
@@ -33,9 +32,11 @@ import io.justsearch.app.observability.health.Source;
 import io.justsearch.app.services.observability.health.LifecycleSnapshotTap;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.component.ComponentState;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,16 +54,20 @@ import org.junit.jupiter.api.io.TempDir;
 final class WorkerStatusSamplerTest {
 
   private static final Source HEAD_SRC = Source.forProcess("head", "instance-1", "1.0");
+  private final StatusComponentFixture components = new StatusComponentFixture();
+
+  @AfterEach
+  void closeComponents() {
+    components.close();
+  }
 
   @Test
   @DisplayName("a sampler tick feeds the health taps with no status request anywhere")
   void samplerTickFeedsTapsWithoutAnyStatusRequest(@TempDir Path indexBase) {
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
-    // A real capability, starting PENDING exactly as it is before the Worker connects.
-    var worker = new io.justsearch.app.services.lifecycle.WorkerCapability();
     var attached = new java.util.concurrent.atomic.AtomicBoolean();
-    StatusLifecycleHandler handler = handlerWith(indexBase, client, worker, attached::get);
+    StatusLifecycleHandler handler = handlerWith(indexBase, client, attached::get);
 
     ConditionStore conditions = new ConditionStore();
     handler.setLifecycleSnapshotTap(
@@ -79,7 +84,7 @@ final class WorkerStatusSamplerTest {
 
     // Now the worker is reachable and READY; the next tick must CLEAR it. Only a tap that really
     // ran on both ticks can produce the transition.
-    worker.transition(CapabilityHealth.READY, null);
+    components.transition("index", ComponentState.READY, null, "Worker serving");
     attached.set(true);
     StatusResponse sampled = handler.sampleAndBuildStatusSnapshot();
 
@@ -301,36 +306,27 @@ final class WorkerStatusSamplerTest {
 
   // ---------------------------------------------------------------- helpers
 
-  private static StatusLifecycleHandler reachableHandler(
+  private StatusLifecycleHandler reachableHandler(
       Path indexBase, KnowledgeClient client) {
-    io.justsearch.app.services.lifecycle.WorkerCapability worker =
-        mock(io.justsearch.app.services.lifecycle.WorkerCapability.class);
-    when(worker.available()).thenReturn(true);
-    when(worker.health()).thenReturn(CapabilityHealth.READY);
-    return handlerWith(indexBase, client, worker);
+    return handlerWith(indexBase, client, () -> true);
   }
 
-  /** Variant over a REAL {@link io.justsearch.app.services.lifecycle.WorkerCapability}, so a test
-   * can drive an actual capability transition rather than restub a mock. */
-  private static StatusLifecycleHandler handlerWith(
-      Path indexBase,
-      KnowledgeClient client,
-      io.justsearch.app.services.lifecycle.WorkerCapability worker) {
-    return handlerWith(indexBase, client, worker, () -> true);
-  }
-
-  private static StatusLifecycleHandler handlerWith(
+  private StatusLifecycleHandler handlerWith(
       Path indexBase, KnowledgeClient client,
-      io.justsearch.app.services.lifecycle.WorkerCapability worker,
       java.util.function.BooleanSupplier attached) {
+    for (String name : java.util.List.of("api", "encoders", "generative")) {
+      components.transition(name, ComponentState.READY, null, name + " ready");
+    }
+    components.transition(
+        "index",
+        attached.getAsBoolean() ? ComponentState.READY : ComponentState.STARTING,
+        attached.getAsBoolean() ? null : "worker.starting",
+        attached.getAsBoolean() ? "Worker serving" : "Worker starting");
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     when(ks.client()).thenReturn(client);
     when(ks.hasClient()).thenAnswer(invocation -> attached.getAsBoolean());
 
-    io.justsearch.app.services.lifecycle.InferenceCapability inference =
-        mock(io.justsearch.app.services.lifecycle.InferenceCapability.class);
-    when(inference.health()).thenReturn(CapabilityHealth.READY);
-
+    var graph = components.capabilities();
     StatusLifecycleHandler handler =
         new StatusLifecycleHandler(
             mock(io.justsearch.app.api.OnlineAiService.class),
@@ -344,8 +340,9 @@ final class WorkerStatusSamplerTest {
             null,
             null,
             null,
-            worker,
-            inference);
+            graph.worker(),
+            graph.inference());
+    components.attach(handler);
     handler.setKnowledgeServer(ks, null);
     return handler;
   }

@@ -18,9 +18,7 @@ import io.justsearch.app.api.OpLeaseOutcome;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.inference.EncoderRuntimeView;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.observability.EncoderRuntimeCache;
 import io.justsearch.app.services.observability.EncoderRuntimeExplainer;
 import io.justsearch.ort.EncoderRole;
@@ -31,6 +29,8 @@ import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
@@ -131,7 +131,7 @@ public final class RuntimeActivationService
   private final GpuCapabilitiesService gpuCapabilitiesService;
   private final EnterprisePolicyService policyService;
   private final WorkerFeatureCache workerFeatureCache; // nullable
-  private final InferenceCapability inferenceCapability; // nullable — tempdoc 656 Task 2
+  private final ComponentHandle generativeComponent; // nullable for compositions without a registry
   private final AiInstallService aiInstallService; // nullable — tempdoc 727 F-3
   // Tempdoc 737 fix pack (fix 2): the single-writer runtime authority. When present, runActivate
   // brackets the engine-online + desired-state-write window in an ACTIVATION procedure so the
@@ -155,6 +155,23 @@ public final class RuntimeActivationService
 
   private final Object lock = new Object();
   private final AtomicBoolean running = new AtomicBoolean(false);
+
+  /** Settings identity accepted when one activation attempt starts, advanced only by its writes. */
+  private static final class AttemptPublication {
+    private SettingsWitness expectedSettings;
+
+    private AttemptPublication(SettingsWitness expectedSettings) {
+      this.expectedSettings = Objects.requireNonNull(expectedSettings, "expectedSettings");
+    }
+
+    private SettingsWitness expectedSettings() {
+      return expectedSettings;
+    }
+
+    private void advancedTo(SettingsWitness witness) {
+      expectedSettings = Objects.requireNonNull(witness, "witness");
+    }
+  }
 
   /**
    * Op-lease SPI (tempdoc 617). Activation/deactivation rewrite the GPU runtime under
@@ -338,11 +355,10 @@ public final class RuntimeActivationService
   }
 
   /**
-   * Tempdoc 656 Task 2: {@code inferenceCapability} lets this service's already-precise failure
-   * detection (see {@link #fail}) reach {@link InferenceCapability#pendingReason()} — and therefore
-   * the runtime manifest's {@code ai.pendingReason} — instead of staying scoped to the immediate
-   * {@code ai_activate} RPC response. Nullable for graceful degradation and existing test
-   * compatibility, matching {@code workerFeatureCache}.
+   * The {@code generativeComponent} lets this service's already-precise failure
+   * detection (see {@link #fail}) reach the Engine's generative component instead of staying scoped
+   * to the immediate {@code ai_activate} RPC response. Nullable for compositions without a process
+   * component registry, matching {@code workerFeatureCache}.
    */
   public RuntimeActivationService(
       EngineExecutorRegistry processExecutors,
@@ -351,7 +367,7 @@ public final class RuntimeActivationService
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache,
-      InferenceCapability inferenceCapability) {
+      ComponentHandle generativeComponent) {
     this(
         processExecutors,
         onlineAi,
@@ -359,7 +375,7 @@ public final class RuntimeActivationService
         gpuCapabilitiesService,
         policyService,
         workerFeatureCache,
-        inferenceCapability,
+        generativeComponent,
         null);
   }
 
@@ -377,7 +393,7 @@ public final class RuntimeActivationService
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       AiInstallService aiInstallService) {
     this(
         processExecutors,
@@ -386,7 +402,7 @@ public final class RuntimeActivationService
         gpuCapabilitiesService,
         policyService,
         workerFeatureCache,
-        inferenceCapability,
+        generativeComponent,
         aiInstallService,
         null);
   }
@@ -395,7 +411,7 @@ public final class RuntimeActivationService
    * Tempdoc 737 fix pack (fix 2): adds the nullable {@link RuntimeReconciler} so {@link
    * #runActivate} can bracket the engine-online + intent-write window in an {@code ACTIVATION}
    * procedure and nudge {@code specChanged()}. Nullable for graceful degradation / existing test
-   * compatibility, matching {@code workerFeatureCache}/{@code inferenceCapability}.
+   * compatibility, matching {@code workerFeatureCache}/{@code generativeComponent}.
    */
   public RuntimeActivationService(
       EngineExecutorRegistry processExecutors,
@@ -404,11 +420,11 @@ public final class RuntimeActivationService
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       AiInstallService aiInstallService,
       RuntimeReconciler runtimeReconciler) {
     this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService,
-        workerFeatureCache, inferenceCapability, aiInstallService, runtimeReconciler, null);
+        workerFeatureCache, generativeComponent, aiInstallService, runtimeReconciler, null);
   }
 
   public RuntimeActivationService(
@@ -418,7 +434,7 @@ public final class RuntimeActivationService
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       AiInstallService aiInstallService,
       RuntimeReconciler runtimeReconciler,
       SettingsService settingsService) {
@@ -428,7 +444,7 @@ public final class RuntimeActivationService
     this.gpuCapabilitiesService = gpuCapabilitiesService == null ? new GpuCapabilitiesService() : gpuCapabilitiesService;
     this.policyService = policyService; // may be null (best-effort)
     this.workerFeatureCache = workerFeatureCache; // may be null (graceful degradation)
-    this.inferenceCapability = inferenceCapability; // may be null (graceful degradation)
+    this.generativeComponent = generativeComponent; // may be null (no process registry)
     this.aiInstallService = aiInstallService; // may be null (graceful degradation)
     this.runtimeReconciler = runtimeReconciler; // may be null (graceful degradation)
     this.settingsService = settingsService;
@@ -786,10 +802,12 @@ public final class RuntimeActivationService
     }
     String profileRaw = chatProfile == null || chatProfile.isBlank() ? null : chatProfile.trim();
     AiRuntimeActivationStatus started;
+    AttemptPublication publication;
     synchronized (lock) {
       if (running.get()) {
         throw new IllegalStateException("Runtime activation already running");
       }
+      publication = new AttemptPublication(settingsStore.inspect().witness());
       running.set(true);
       status.startedAtEpochMs = System.currentTimeMillis();
       updateState("running", "validate", "Starting runtime activation…", null);
@@ -802,16 +820,24 @@ public final class RuntimeActivationService
       touch();
       started = copyStatus(status);
     }
+    try {
+      publishStarting(publication);
+    } catch (RuntimeException | Error failure) {
+      startFailed(failure);
+      throw failure;
+    }
     return new Attempt(started, startLeasedThread(
-        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(v, profileRaw)));
+        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(v, profileRaw, publication)));
   }
 
   public Attempt startDeactivate() {
     AiRuntimeActivationStatus started;
+    AttemptPublication publication;
     synchronized (lock) {
       if (running.get()) {
         throw new IllegalStateException("Runtime activation already running");
       }
+      publication = new AttemptPublication(settingsStore.inspect().witness());
       running.set(true);
       status.startedAtEpochMs = System.currentTimeMillis();
       updateState("running", "apply", "Deactivating GPU runtime…", null);
@@ -821,7 +847,8 @@ public final class RuntimeActivationService
       started = copyStatus(status);
     }
     return new Attempt(started,
-        startLeasedThread("ai.runtime-deactivate", "ai-runtime-deactivate", this::runDeactivate));
+        startLeasedThread("ai.runtime-deactivate", "ai-runtime-deactivate",
+            () -> runDeactivate(publication)));
   }
 
   // -------------------- Implementation --------------------
@@ -858,13 +885,14 @@ public final class RuntimeActivationService
     // snapshot() already bridged policy sysprops to app-services enforcement points.
   }
 
-  private void runActivate(String variantId, String chatProfileRaw) {
+  private void runActivate(
+      String variantId, String chatProfileRaw, AttemptPublication publication) {
     try {
       enforceActivationPolicy();
     } catch (IllegalStateException e) {
       String msg = e.getMessage() == null ? "" : e.getMessage();
       String code = msg.contains("GPU acceleration") ? "POLICY_GPU_DISABLED" : "POLICY_ONLINE_AI_DISABLED";
-      fail(code, msg, null);
+      fail(code, msg, null, publication);
       return;
     }
 
@@ -881,7 +909,8 @@ public final class RuntimeActivationService
         }
       }
       if (!Files.isRegularFile(exe)) {
-        fail("RUNTIME_VARIANT_NOT_INSTALLED", "Variant not installed: " + variantId, null);
+        fail("RUNTIME_VARIANT_NOT_INSTALLED", "Variant not installed: " + variantId, null,
+            publication);
         return;
       }
     }
@@ -900,7 +929,7 @@ public final class RuntimeActivationService
     if (profile != null) {
       Path resolved = resolveProfileModelPath(profile);
       if (!Files.isRegularFile(resolved)) {
-        fail("MODEL_NOT_FOUND", missingProfileModelMessage(profile, resolved), null);
+        fail("MODEL_NOT_FOUND", missingProfileModelMessage(profile, resolved), null, publication);
         return;
       }
       model = resolved;
@@ -914,12 +943,13 @@ public final class RuntimeActivationService
         fail(
             "MODEL_PATH_REQUIRED",
             "No chat model configured. Run Install AI to download one, or import a models pack.",
-            null);
+            null,
+            publication);
         return;
       }
       model = Path.of(modelPath.trim());
       if (!Files.isRegularFile(model)) {
-        fail("MODEL_NOT_FOUND", "Configured model does not exist: " + model, null);
+        fail("MODEL_NOT_FOUND", "Configured model does not exist: " + model, null, publication);
         return;
       }
     }
@@ -927,7 +957,7 @@ public final class RuntimeActivationService
     updateState("running", "self_test", "Running GPU self-test…", null);
     SelfTestResult selfTest = runSelfTest(exe, model, current);
     if (selfTest == null) {
-      fail("SELF_TEST_FAILED", "Self-test failed.", null);
+      fail("SELF_TEST_FAILED", "Self-test failed.", null, publication);
       return;
     }
 
@@ -957,26 +987,27 @@ public final class RuntimeActivationService
     if (next.getGpuLayers() <= 0) next.setGpuLayers(99);
     if (modelPathFromContract) next.setLlmModelPath(model.toAbsolutePath().toString());
     next.setChatEnabled(true);
-    applyCandidate(base, next, profile, true);
+    applyCandidate(base, next, profile, true, publication);
   }
 
-  private void runDeactivate() {
+  private void runDeactivate(AttemptPublication publication) {
     UiSettingsStore.Snapshot base = settingsStore.inspect();
     requireMutableServerExecutable();
     Path baselineExe = resolveCpuBaselineExe(aiHome);
     if (baselineExe == null || !Files.isRegularFile(baselineExe)) {
-      fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null);
+      fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null,
+          publication);
       return;
     }
     UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(base.settings()), UiSettings.class);
     // A blank value would expose the remembered CUDA auto-detection source again.
     next.setServerExecutablePath(baselineExe.toAbsolutePath().toString());
     next.setGpuLayers(0);
-    applyCandidate(base, next, null, false);
+    applyCandidate(base, next, null, false, publication);
   }
 
   private void applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
-      ChatModelProfile profile, boolean activating) {
+      ChatModelProfile profile, boolean activating, AttemptPublication publication) {
     SettingsWitness committed = null;
     boolean procedureBegun = false;
     try {
@@ -986,6 +1017,7 @@ public final class RuntimeActivationService
         procedureBegun = true;
       }
       committed = commitCandidate(next, base.witness(), "runtime-variant-apply");
+      publication.advancedTo(committed);
       // The settings owner has already published the candidate ConfigStore. Inference does
       // one transition; its lifecycle manager owns restoration of the previous runtime on failure.
       if (profile != null) applyChatProfileOrThrow(profile, next);
@@ -994,16 +1026,18 @@ public final class RuntimeActivationService
       if (committed != null) {
         updateState("running", "rollback", "Runtime apply failed; restoring settings…", null);
         try {
-          commitCandidate(base.settings(), committed, "runtime-variant-compensation");
+          SettingsWitness restored =
+              commitCandidate(base.settings(), committed, "runtime-variant-compensation");
+          publication.advancedTo(restored);
         } catch (Exception compensationFailure) {
           failure.addSuppressed(compensationFailure);
           fail("RUNTIME_ROLLBACK_FAILED", "Settings restoration refused after runtime error: "
-              + safeMsg(failure), failure);
+              + safeMsg(failure), failure, publication);
           return;
         }
       }
       fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
-          "Runtime apply failed: " + safeMsg(failure), failure);
+          "Runtime apply failed: " + safeMsg(failure), failure, publication);
       return;
     } finally {
       if (procedureBegun) runtimeReconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
@@ -1370,7 +1404,8 @@ public final class RuntimeActivationService
     }
   }
 
-  private void fail(String errorCode, String message, Exception e) {
+  private void fail(
+      String errorCode, String message, Exception e, AttemptPublication publication) {
     if (e != null) {
       log.warn("Runtime activation failed: {} {}", errorCode, message, e);
     } else {
@@ -1384,27 +1419,71 @@ public final class RuntimeActivationService
       status.updatedAtEpochMs = System.currentTimeMillis();
       touch();
     }
-    reportToCapability(errorCode);
+    reportToComponent(errorCode, publication);
   }
 
   /**
-   * Tempdoc 656 Task 2: project this failure onto {@link InferenceCapability} so the runtime
-   * manifest's {@code ai.pendingReason} carries the same precise cause this class already computed,
-   * instead of the generic default reason. Deliberately does NOT force the capability OFFLINE when
-   * it is currently READY — {@code runActivate}/{@code runDeactivate} can be invoked while a
-   * *different*, already-working variant is online (e.g. an attempted variant switch), and a naive
-   * wire-through would incorrectly regress a working capability's reported state for an unrelated
-   * attempt's failure.
+   * Projects this attempt's precise failure only while its accepted settings identity is still
+   * current. The revision plus operation key fences same-value disable/re-enable ABA, and the
+   * component CAS prevents an older attempt from overwriting a newer physical observation.
    */
-  private void reportToCapability(String errorCode) {
-    if (inferenceCapability == null) {
+  private void reportToComponent(String errorCode, AttemptPublication publication) {
+    if (generativeComponent == null || publication == null) {
       return;
     }
-    if (inferenceCapability.health() == CapabilityHealth.READY) {
+    while (true) {
+      var expected = generativeComponent.snapshot();
+      UiSettingsStore.Snapshot settings = settingsStore.inspect();
+      if (!publication.expectedSettings().equals(settings.witness())
+          || !Boolean.TRUE.equals(settings.settings().getChatEnabled())
+          || expected.state() == ComponentState.ABSENT
+          || expected.state() == ComponentState.READY) {
+        return;
+      }
+      LifecycleReasonCode reason = mapToLifecycleReason(errorCode);
+      ComponentState state = prerequisiteFailure(errorCode)
+          ? ComponentState.UNAVAILABLE : ComponentState.FAILED;
+      if (generativeComponent.transitionIfUnchanged(
+          expected, state, reason.code(), "runtime activation failed: " + errorCode)) {
+        return;
+      }
+    }
+  }
+
+  private void publishStarting(AttemptPublication publication) {
+    if (generativeComponent == null) {
       return;
     }
-    LifecycleReasonCode reason = mapToLifecycleReason(errorCode);
-    inferenceCapability.transition(CapabilityHealth.OFFLINE, reason.code());
+    while (true) {
+      var expected = generativeComponent.snapshot();
+      UiSettingsStore.Snapshot settings = settingsStore.inspect();
+      if (!publication.expectedSettings().equals(settings.witness())
+          || !Boolean.TRUE.equals(settings.settings().getChatEnabled())
+          || expected.state() == ComponentState.READY
+          || expected.state() == ComponentState.STARTING
+          || expected.state() == ComponentState.RELOADING) {
+        return;
+      }
+      if (generativeComponent.transitionIfUnchanged(
+          expected,
+          ComponentState.STARTING,
+          LifecycleReasonCode.INFERENCE_STARTING.code(),
+          "runtime activation attempt accepted")) {
+        return;
+      }
+    }
+  }
+
+  private static boolean prerequisiteFailure(String errorCode) {
+    return switch (errorCode) {
+      case "MODEL_PATH_REQUIRED",
+          "MODEL_NOT_FOUND",
+          "RUNTIME_VARIANT_NOT_INSTALLED",
+          "RUNTIME_BASELINE_NOT_FOUND",
+          "POLICY_ONLINE_AI_DISABLED",
+          "POLICY_GPU_DISABLED" -> true;
+      default -> false;
+    };
   }
 
   /** Tempdoc 656 Task 2: maps this service's existing activation error codes onto the closed,

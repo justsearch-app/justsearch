@@ -2,9 +2,8 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
 import java.io.Closeable;
@@ -104,6 +103,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   private volatile Consumer<KnowledgeServerBootstrap> onRecoveryConnected;
 
   private volatile Runnable onTick = () -> {};
+  private volatile Consumer<RecoveryOccurrence> onRecoveryOccurrence = occurrence -> {};
+  // Correlates an episode's events only; never gates lifecycle or readiness.
+  private RecoveryContext activeRecoveryContext;
 
   // --- boot-recovery arm state. Mutated only by the single executor thread (the CAS below admits
   // one attempt at a time), but READ by requestRecoveryNow on the caller's thread, so volatile. ---
@@ -274,6 +276,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   void tick() {
+    if (closed) return;
     try {
       // Tempdoc 630: detect an OS suspend/resume by the inter-tick wall-clock gap and eagerly
       // re-validate BEFORE the health check. Item A11 removed the channel half of that
@@ -296,7 +299,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
       // The bootstrap owns physical-health initialization. Sampled readiness is an output,
       // not the trigger for catch-up work (an API restart must not reindex persisted roots).
-      bootstrap.checkHealth();
+      if (bootstrap.checkHealth()) completeRecoveryEpisode();
     } catch (Exception e) {
       log.warn("Knowledge Server health monitor tick failed: {}", e.getMessage(), e);
       // checkHealth owns physical-loss reporting; setup/resume exceptions are not evidence
@@ -311,7 +314,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     // failed check is precisely when the snapshot most needs re-deriving. Fail-soft — the trigger
     // coalesces and swallows, but a broken callback must never stop the monitor.
     try {
-      onTick.run();
+      if (!closed) onTick.run();
     } catch (RuntimeException e) {
       log.debug("Readiness reconcile request from monitor tick failed: {}", e.getMessage());
     }
@@ -330,6 +333,26 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * Tempdoc 825: install the handover the composition root performs once a recovery attempt has
    * bound a client. Called before {@link #start()} by {@code HeadlessApp}.
    */
+  public void onRecoveryOccurrence(Consumer<RecoveryOccurrence> observer) {
+    this.onRecoveryOccurrence = Objects.requireNonNull(observer, "observer");
+  }
+
+  private void emitRecoveryOccurrence(RecoveryOccurrence occurrence) {
+    if (closed) return;
+    try { onRecoveryOccurrence.accept(occurrence); }
+    catch (RuntimeException failure) {
+      log.warn("Recovery occurrence delivery failed: {}", occurrence.kind(), failure);
+    }
+  }
+
+  private void completeRecoveryEpisode() {
+    RecoveryContext completed = activeRecoveryContext;
+    activeRecoveryContext = null;
+    if (completed != null) {
+      emitRecoveryOccurrence(new RecoveryOccurrence(RecoveryOccurrence.Kind.RECOVERED, completed));
+    }
+  }
+
   public void onRecoveryConnected(Consumer<KnowledgeServerBootstrap> handover) {
     this.onRecoveryConnected = handover;
   }
@@ -439,20 +462,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       gaveUpVeto = null;
       recoveryAttemptsMade = recoveryAttemptsMade + 1;
       lastRecoveryAttemptMs = nowMs.getAsLong();
-      WorkerCapability cap = bootstrap.workerCapability();
-      // Park the forensic context first: the capability-health bridge reads it synchronously from
-      // inside the transition below, to attach attempt/kind attributes to the occurrence.
-      cap.setRecoveryContext(
-          new RecoveryContext(
-              attemptNo, "boot", BootRecoveryDecision.backoffMs(attemptNo, recoveryPolicy)));
-      cap.transition(
-          CapabilityHealth.RECOVERING,
+      bootstrap.indexComponent().transition(
+          ComponentState.STARTING,
           LifecycleReasonCode.WORKER_RECOVERING.code(),
-          "Retrying knowledge server start (attempt "
-              + attemptNo
-              + " of "
-              + recoveryPolicy.maxAttempts()
-              + ")");
+          "Retrying knowledge server start (attempt " + attemptNo
+              + " of " + recoveryPolicy.maxAttempts() + ")");
       log.info(
           "Boot recovery: re-attempting Knowledge Server start ({}/{})",
           attemptNo,
@@ -461,17 +475,29 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         // Last gate before the spawn: close() may have landed while we narrated.
         return;
       }
+      RecoveryContext context = new RecoveryContext(
+          attemptNo, "boot", BootRecoveryDecision.backoffMs(attemptNo, recoveryPolicy));
+      boolean firstAttemptInEpisode = activeRecoveryContext == null;
+      activeRecoveryContext = context;
+      if (firstAttemptInEpisode) {
+        emitRecoveryOccurrence(new RecoveryOccurrence(RecoveryOccurrence.Kind.ATTEMPTED, context));
+      }
+      boolean physicallyHealthy;
       try {
-        bootstrap.startForRecovery();
+        physicallyHealthy = bootstrap.startForRecovery();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         log.warn("Boot recovery attempt {} interrupted", attemptNo);
         return;
       } catch (Exception e) {
         log.warn("Boot recovery attempt {} failed: {}", attemptNo, e.toString());
-        settleAfterFailedAttempt();
+        if (!closed) settleAfterFailedAttempt();
         return;
       }
+      // A host may finish after the bounded shutdown wait, even if it ignored interruption.
+      // Its client is still owned by the bootstrap; Head callbacks are no longer available.
+      if (closed) return;
+      if (physicallyHealthy) completeRecoveryEpisode();
       if (bootstrap.hasClient()) {
         // The bootstrap is up. Hand it to the surfaces that were late-bound with null at boot, then
         // reset the budget: the arc is over, and any LATER fault is supervision's (the spawner now
@@ -486,10 +512,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   private void handOverRecoveredWorker(int attemptNo) {
+    if (closed) return;
     log.info(
         "Boot recovery succeeded on attempt {} — knowledge server is bound (health: {})",
         attemptNo,
-        bootstrap.workerCapability().health());
+        bootstrap.indexComponent().snapshot().state());
     Consumer<KnowledgeServerBootstrap> handover = this.onRecoveryConnected;
     if (handover == null) {
       return;
@@ -532,11 +559,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
           // the RECOVERING this arm had set before the spawn. The reason was right and the state was
           // a lie: readinessNotice.ts renders it as "recovering" for a condition that never recovers
           // on its own, which live R2 watched sit there for two minutes. This cannot double-narrate:
-          // WorkerCapability.transition fires listeners only when the health OR the effective reason
+          // RegistryBackedCapability notifies consumers only when projected health OR effective reason
           // changes, and the sticky reason is retained, so the already-terminal case is a no-op.
           bootstrap
-              .workerCapability()
-              .transition(CapabilityHealth.DEGRADED, cause.code(), bootstrap.indexFatalDetail());
+              .indexComponent()
+              .transition(ComponentState.FAILED, cause.code(), bootstrap.indexFatalDetail());
         }
       }
       case NONE -> {
@@ -546,9 +573,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
                 + " again in this process",
             recoveryAttemptsMade);
         bootstrap
-            .workerCapability()
+            .indexComponent()
             .transition(
-                CapabilityHealth.DEGRADED,
+                ComponentState.FAILED,
                 LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
                 "Knowledge server failed to start and "
                     + recoveryAttemptsMade
@@ -593,6 +620,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   /** Records the terminal state AND which veto produced it, so the two can never disagree. */
   private void latchGaveUp(BootRecoveryDecision.Veto veto) {
+    activeRecoveryContext = null;
     gaveUpVeto = veto;
     recoveryGaveUp = true;
   }
@@ -607,7 +635,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    */
   @Override
   public Verdict requestRecoveryNow() {
-    if (bootstrap.hasClient()) {
+    if (closed || bootstrap.hasClient()) {
       return Verdict.NOT_APPLICABLE;
     }
     // Reserve the single attempt slot on the CALLER's thread and hand it to the runnable. Checking a
@@ -698,12 +726,10 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   /**
-   * Review F4: close is now ORDERED, not just requested. The flag stops an attempt that has not
-   * spawned yet; the bounded await makes the return value mean "no recovery is in flight any more",
-   * which is what {@code performOrderedShutdown} needs before it closes the bootstrap underneath us.
-   * Bounded at {@value #CLOSE_AWAIT_MS}ms so a wedged attempt delays shutdown rather than blocking
-   * it; {@code shutdownNow} has already interrupted it, and the Worker's own Job Object / heartbeat
-   * suicide-pact is the backstop for a process that still slips through.
+   * Stop new recovery work and wait up to {@value #CLOSE_AWAIT_MS}ms for an admitted attempt.
+   * An attempt that ignores interruption can still be unwinding after this returns; it must not
+   * deliver recovery or readiness callbacks to the Head owners that shutdown closes next.
+   * The bootstrap retains ownership of any late client and serializes its own teardown with start.
    */
   @Override
   public void close() {

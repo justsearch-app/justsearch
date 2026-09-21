@@ -9,11 +9,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.ipc.WorkerFatalReasonMarker;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -34,11 +38,16 @@ import org.junit.jupiter.api.io.TempDir;
  * two narration guards decide whether the verdict is applied, so every suppressed start attempt
  * destroyed the evidence and the one call allowed to narrate found nothing. {@link
  * KnowledgeServerWorkerDownCodeTest} pins the mapping; this pins the arc, which is what actually
- * broke. Fixture shape (empty temp dir ⇒ the spawned worker JVM cannot find its main class and dies
- * before publishing a port) is borrowed from {@link KnowledgeServerBootRecoveryTest}.
+ * broke. The fixture uses the explicit unavailable {@link WorkerHost}, so failed composition is
+ * deterministic and does not manufacture a second lifecycle authority.
  */
 @DisplayName("915 R1: the schema-mismatch refusal survives the whole supervision ladder")
 final class SchemaMismatchFatalArcTest {
+
+  private final List<KnowledgeServerBootstrapTestFixture> fixtures = new ArrayList<>();
+  private final List<AutoCloseable> recoveryResources = new ArrayList<>();
+  private final Map<KnowledgeServerBootstrap, KnowledgeServerBootstrapTestFixture> fixtureByBootstrap =
+      new IdentityHashMap<>();
 
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
@@ -58,19 +67,42 @@ final class SchemaMismatchFatalArcTest {
    * startWithRetry(3, ...)} runs its attempts with per-attempt narration SUPPRESSED — the arc where
    * the marker is consumed by a call that is not allowed to speak.
    */
-  private static KnowledgeServerBootstrap refusedBoot(Path tempDir) {
+  private KnowledgeServerBootstrap newBootstrap(Path tempDir) {
+    var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir));
+    fixtures.add(fixture);
+    fixtureByBootstrap.put(fixture.bootstrap(), fixture);
+    return fixture.bootstrap();
+  }
+
+  private KnowledgeServerBootstrap refusedBoot(Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    var bootstrap = newBootstrap(tempDir);
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
     assertFalse(bootstrap.hasClient(), "the fixture must leave no client bound");
     return bootstrap;
   }
 
-  private static List<String> recordTransitions(KnowledgeServerBootstrap bootstrap) {
-    WorkerCapability cap = bootstrap.workerCapability();
-    List<String> seen = new ArrayList<>();
-    cap.addListener((prev, next) -> seen.add(next + "/" + cap.pendingReason()));
-    return seen;
+  private List<String> recordTransitions(KnowledgeServerBootstrap bootstrap) {
+    return fixtureByBootstrap.get(bootstrap).recordIndexTransitions();
+  }
+
+  private KnowledgeServerHealthMonitor newMonitor(KnowledgeServerBootstrap bootstrap) {
+    var executors = new io.justsearch.core.execution.TestEngineExecutors();
+    var monitor =
+        new KnowledgeServerHealthMonitor(
+            executors, bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    recoveryResources.add(executors);
+    recoveryResources.add(monitor);
+    return monitor;
+  }
+
+  @AfterEach
+  void closeFixtures() throws Exception {
+    for (int i = recoveryResources.size() - 1; i >= 0; i--) recoveryResources.get(i).close();
+    recoveryResources.clear();
+    for (int i = fixtures.size() - 1; i >= 0; i--) fixtures.get(i).close();
+    fixtures.clear();
+    fixtureByBootstrap.clear();
   }
 
   @Test
@@ -79,7 +111,7 @@ final class SchemaMismatchFatalArcTest {
   void bootNarratesTheRefusalAcrossSuppressedAttempts(@TempDir Path tempDir) {
     var bootstrap = refusedBoot(tempDir);
 
-    WorkerCapability cap = bootstrap.workerCapability();
+    var cap = bootstrap.workerCapability();
     assertEquals(
         MISMATCH,
         cap.pendingReason(),
@@ -100,8 +132,7 @@ final class SchemaMismatchFatalArcTest {
   @DisplayName("the ladder declines to respawn a worker that refused deterministically")
   void theLadderShortCircuitsInsteadOfSpendingTheBudget(@TempDir Path tempDir) {
     var bootstrap = refusedBoot(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
     List<String> seen = recordTransitions(bootstrap);
 
     // More ticks than the budget: a ladder that ran would have narrated worker.recovering per
@@ -126,15 +157,22 @@ final class SchemaMismatchFatalArcTest {
   @DisplayName("a ladder that DOES run cannot overwrite the refusal with its own terminal code")
   void theStickyVerdictOutlivesRecoveringAndExhausted(@TempDir Path tempDir) {
     var bootstrap = refusedBoot(tempDir);
-    WorkerCapability cap = bootstrap.workerCapability();
+    var cap = bootstrap.workerCapability();
 
     // The ladder's own writes, verbatim, in the order the validator observed them. Even with the
     // short-circuit above these must not be able to erase the cause: the veto reads the bootstrap
     // latch, and a future caller that clears the latch (an operator hatch, a handover) would put
     // this sequence back in play.
-    cap.transition(
-        CapabilityHealth.RECOVERING, LifecycleReasonCode.WORKER_RECOVERING.code(), "attempt 1");
-    cap.transition(CapabilityHealth.DEGRADED, RECOVERY_EXHAUSTED, "2 attempts did not bring it up");
+    bootstrap
+        .indexComponent()
+        .transition(
+            ComponentState.STARTING,
+            LifecycleReasonCode.WORKER_RECOVERING.code(),
+            "attempt 1");
+    bootstrap
+        .indexComponent()
+        .transition(
+            ComponentState.FAILED, RECOVERY_EXHAUSTED, "2 attempts did not bring it up");
 
     assertEquals(
         MISMATCH,
@@ -148,12 +186,12 @@ final class SchemaMismatchFatalArcTest {
   @DisplayName("the specific refusal supersedes a generic local-recovery failure")
   void theRefusalOutranksGenericRecoveryFailure(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    var bootstrap = newBootstrap(tempDir);
     // A generic failure cannot hide the more specific cause discovered on the next attempt.
     bootstrap
-        .workerCapability()
+        .indexComponent()
         .transition(
-            CapabilityHealth.DEGRADED,
+            ComponentState.FAILED,
             LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
             "local recovery budget exhausted");
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
@@ -169,7 +207,7 @@ final class SchemaMismatchFatalArcTest {
   @DisplayName("a refusal nobody was allowed to narrate is still narrated by the ladder's give-up")
   void theGiveUpNarratesACauseTheBootArcSwallowed(@TempDir Path tempDir) throws Exception {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    var bootstrap = newBootstrap(tempDir);
     // startForRecovery suppresses EVERY transition for the whole arc, so this is the shape where the
     // cause is known to the Head and has never been said out loud. Nothing else will say it.
     assertThrows(Exception.class, bootstrap::startForRecovery);
@@ -179,8 +217,7 @@ final class SchemaMismatchFatalArcTest {
         MISMATCH.equals(bootstrap.workerCapability().pendingReason()),
         "precondition: the suppressed arc narrated nothing, so the wire does not have it yet");
 
-    var monitor =
-        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
     monitor.tick();
 
     assertEquals(MISMATCH, bootstrap.workerCapability().pendingReason());
@@ -193,8 +230,7 @@ final class SchemaMismatchFatalArcTest {
   @DisplayName("an operator retry that re-refuses re-latches the cause, not a stuck 'recovering'")
   void anOperatorRetryThatReRefusesReLatchesTheVerdict(@TempDir Path tempDir) throws Exception {
     var bootstrap = refusedBoot(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
     monitor.tick();
     assertEquals(MISMATCH, bootstrap.workerCapability().pendingReason(), "precondition: latched");
 
@@ -219,6 +255,39 @@ final class SchemaMismatchFatalArcTest {
     assertEquals(CapabilityHealth.DEGRADED, bootstrap.workerCapability().health());
   }
 
+  @Test
+  @Timeout(180)
+  @DisplayName("each operator reopen after an index-fatal terminal starts a new recovery episode")
+  void operatorReopenEmitsANewAttemptedOccurrence(@TempDir Path tempDir) throws Exception {
+    var bootstrap = refusedBoot(tempDir);
+    var monitor = newMonitor(bootstrap);
+    var occurrences = new CopyOnWriteArrayList<RecoveryOccurrence>();
+    monitor.onRecoveryOccurrence(occurrences::add);
+    monitor.tick(); // INDEX_FATAL terminal; no physical attempt was admitted.
+
+    assertEquals(WorkerRecoveryAuthority.Verdict.ACCEPTED, monitor.requestRecoveryNow());
+    awaitOccurrences(occurrences, 1);
+    assertEquals(RecoveryOccurrence.Kind.ATTEMPTED, occurrences.get(0).kind());
+    assertEquals(1, occurrences.get(0).context().attempt());
+    awaitAttemptSettled(monitor);
+
+    assertEquals(WorkerRecoveryAuthority.Verdict.ACCEPTED, monitor.requestRecoveryNow());
+    awaitOccurrences(occurrences, 2);
+    assertEquals(RecoveryOccurrence.Kind.ATTEMPTED, occurrences.get(1).kind());
+    assertEquals(2, occurrences.get(1).context().attempt());
+  }
+
+  private static void awaitOccurrences(
+      List<RecoveryOccurrence> occurrences, int expectedCount) throws Exception {
+    long deadline = System.currentTimeMillis() + 120_000;
+    while (System.currentTimeMillis() < deadline) {
+      if (occurrences.size() >= expectedCount) return;
+      Thread.sleep(10);
+    }
+    throw new AssertionError(
+        "expected " + expectedCount + " recovery occurrence(s), got " + occurrences);
+  }
+
   /** Bounded poll: requestRecoveryNow schedules the attempt on the arm's own executor. */
   private static void awaitAttemptSettled(KnowledgeServerHealthMonitor monitor) throws Exception {
     long deadline = System.currentTimeMillis() + 120_000;
@@ -237,7 +306,7 @@ final class SchemaMismatchFatalArcTest {
   void projectedReadyCannotClearThePhysicalLatch(@TempDir Path tempDir) {
     var bootstrap = refusedBoot(tempDir);
     assertEquals(MISMATCH, bootstrap.indexFatalCode().code());
-    bootstrap.workerCapability().transition(CapabilityHealth.READY, null);
+    fixtureByBootstrap.get(bootstrap).publishSamplerReady();
     assertEquals(MISMATCH, bootstrap.indexFatalCode().code(),
         "only a direct healthy client observation can establish that the index opened");
   }
@@ -246,7 +315,7 @@ final class SchemaMismatchFatalArcTest {
   @Timeout(180)
   @DisplayName("a boot with no marker is unaffected — the generic code still means what it says")
   void aPlainSpawnFailureStillNarratesSpawnFailed(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    var bootstrap = newBootstrap(tempDir);
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
     assertEquals(SPAWN_FAILED, bootstrap.workerCapability().pendingReason());

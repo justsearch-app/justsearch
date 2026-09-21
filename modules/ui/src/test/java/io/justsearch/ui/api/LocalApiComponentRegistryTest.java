@@ -14,7 +14,9 @@ import io.justsearch.configuration.AppliedConfigurationVersion;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.context.RetainedStateBudget;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -50,6 +52,7 @@ final class LocalApiComponentRegistryTest {
     var retained = new RetainedStateBudget();
     retained.declare("attempted-configurations", 1, "D1");
     try (var registry = new DefaultEngineComponentRegistry(retained)) {
+      var components = registerNonApiComponents(registry);
       var observedStates = new CopyOnWriteArrayList<ComponentState>();
       var subscription = registry.subscribe(snapshot -> snapshot.components().stream()
           .filter(row -> row.spec().name().equals("api"))
@@ -62,6 +65,8 @@ final class LocalApiComponentRegistryTest {
                   UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings.json")),
               tempDir.resolve("index"))
             .componentRegistry(registry)
+            .indexComponent(components.index())
+            .generativeComponent(components.generative())
             .build();
         try {
           var api = registry.snapshot().components().stream()
@@ -103,12 +108,15 @@ final class LocalApiComponentRegistryTest {
       var retained = new RetainedStateBudget();
       retained.declare("attempted-configurations", 1, "D1");
       try (var registry = new DefaultEngineComponentRegistry(retained)) {
+        var components = registerNonApiComponents(registry);
         var server = LocalApiServer.builder(
                 new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(
                     UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings.json")),
                 tempDir.resolve("index"))
             .componentRegistry(registry)
+            .indexComponent(components.index())
+            .generativeComponent(components.generative())
             .build();
         try {
           var api = registry.snapshot().components().getFirst();
@@ -141,12 +149,15 @@ final class LocalApiComponentRegistryTest {
     var retained = new RetainedStateBudget();
     retained.declare("attempted-configurations", 1, "D1");
     try (var registry = new DefaultEngineComponentRegistry(retained)) {
+      var components = registerNonApiComponents(registry);
       var builder = LocalApiServer.builder(
               new io.justsearch.core.execution.TestEngineExecutors(),
               new UiSettingsStore(
                   UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings.json")),
               tempDir.resolve("index"))
-          .componentRegistry(registry);
+          .componentRegistry(registry)
+          .indexComponent(components.index())
+          .generativeComponent(components.generative());
 
       assertThrows(IllegalStateException.class, builder::build);
       var api = registry.snapshot().components().getFirst();
@@ -154,4 +165,18 @@ final class LocalApiComponentRegistryTest {
       assertEquals("api.compose_failed", api.reasonCode());
     }
   }
+
+  private static NonApiComponents registerNonApiComponents(
+      DefaultEngineComponentRegistry registry) {
+    var handles = new java.util.HashMap<String, ComponentHandle>();
+    try (var specs = TestEngineComponents.fourComponents()) {
+      specs.snapshot().components().stream()
+          .filter(component -> !component.spec().name().equals("api"))
+          .forEach(component -> handles.put(
+              component.spec().name(), registry.register(component.spec())));
+    }
+    return new NonApiComponents(handles.get("index"), handles.get("generative"));
+  }
+
+  private record NonApiComponents(ComponentHandle index, ComponentHandle generative) {}
 }

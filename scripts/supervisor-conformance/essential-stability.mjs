@@ -7,7 +7,12 @@ export async function proveEssentialStability({ dataDir, statePath, policy, io }
   const current = () => io.readJsonIfPresent(statePath);
   await io.waitFor(() => current()?.state === 'running' && current()?.incarnation === 2,
     { timeoutMs: 15000, what: '503-responsive second incarnation' });
-  const control = (ready) => fs.writeFileSync(path.join(dataDir, 'fake-essential-ready.json'), JSON.stringify({ ready }));
+  const control = (ready, epoch = 0) => {
+    const target = path.join(dataDir, 'fake-essential-ready.json');
+    const temporary = `${target}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify({ ready, epoch }));
+    fs.renameSync(temporary, target);
+  };
   const requireCount = (expected, phase) => {
     const state = current();
     if (state?.state !== 'running' || state?.incarnation !== 2 || state?.restartCount !== expected) {
@@ -23,8 +28,11 @@ export async function proveEssentialStability({ dataDir, statePath, policy, io }
   await io.sleep(3 * policy.hangPollIntervalMs);
   requireCount(1, 'loss of index readiness interrupts the window');
   control(true);
-  await io.sleep(policy.stabilityWindowMs / 2);
+  await io.sleep(policy.stabilityWindowMs * 0.7);
   requireCount(1, 'the new ready window must start over');
+  control(true, 1);
+  await io.sleep(policy.stabilityWindowMs * 0.7);
+  requireCount(1, 'READY with a different epoch restarts the stability window');
   await io.waitFor(() => current()?.restartCount === 0,
     { timeoutMs: policy.stabilityWindowMs + 4 * policy.hangPollIntervalMs, what: 'continuous essential readiness budget reset' });
   requireCount(0, 'essential readiness resets despite optional AI being unavailable');

@@ -13,13 +13,14 @@ import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.ModeTransitionOutcome;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.status.InferenceGpuView;
 import io.justsearch.app.api.status.InferenceStatusResponseBuilder;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.RestartRequiredException;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.app.api.EnterprisePolicyService;
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ final class InferenceHandlers {
   // Tempdoc 656 O2: nullable — lets a failed online-mode transition project a SPECIFIC reason onto
   // the runtime manifest's ai.pendingReason (the mode-transition path otherwise shows generic
   // "Inference offline"; Tasks 0-5 wired only the RuntimeActivationService path).
-  private final InferenceCapability inferenceCapability;
+  private final ComponentHandle generativeComponent;
   // Tempdoc 737 fix pack (fix 4): the ONE runtime-intent authority for the /api/inference/mode
   // route. When present, handleSetInferenceMode records the chat-enabled intent through it (spec
   // write + reconciler nudge) instead of a raw onlineAi.switchTo* — removing the second dispatch
@@ -66,7 +67,7 @@ final class InferenceHandlers {
       EnterprisePolicyService enterprisePolicyService,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
       Telemetry telemetry,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       BrainRuntimeService brainRuntimeService) {
     this.onlineAiService = onlineAiService;
     this.knowledgeServer = knowledgeServer;
@@ -74,7 +75,7 @@ final class InferenceHandlers {
     this.enterprisePolicyService = enterprisePolicyService;
     this.settingsStore = settingsStore;
     this.telemetry = telemetry;
-    this.inferenceCapability = inferenceCapability;
+    this.generativeComponent = generativeComponent;
     this.brainRuntimeService = brainRuntimeService;
   }
 
@@ -438,6 +439,10 @@ final class InferenceHandlers {
     }
 
     // Legacy/test seam (no BrainRuntimeService wired): retain the raw path + rich failure mapping.
+    // The accepted settings identity fences a delayed failure from an intervening disable/re-enable
+    // pair whose final field values happen to equal the values at request start.
+    SettingsWitness requestWitness =
+        settingsStore == null ? null : settingsStore.inspect().witness();
     try {
       if ("online".equalsIgnoreCase(mode)) {
         try {
@@ -466,15 +471,8 @@ final class InferenceHandlers {
       // Check cause chain for typed ModeTransitionException (wrapped by OnlineAiServiceImpl)
       ModeTransitionException mte = findCause(e, ModeTransitionException.class);
 
-      // Tempdoc 656 O2: project the SPECIFIC failure cause onto the runtime manifest. The rollback's
-      // mode-change listener already fired a generic OFFLINE→"Inference offline"; this runs after
-      // switchToOnlineMode returned, so it is the last write and wins. Only meaningful for an
-      // online-mode failure (indexing failures don't change the AI-availability reason). Skips when
-      // the capability is currently READY (an unrelated failure must not regress a working runtime).
-      if (inferenceCapability != null
-          && "online".equalsIgnoreCase(mode)
-          && inferenceCapability.health() != CapabilityHealth.READY) {
-        inferenceCapability.transition(CapabilityHealth.OFFLINE, mapModeReason(mte).code());
+      if ("online".equalsIgnoreCase(mode)) {
+        reportModeFailure(requestWitness, mte);
       }
       if (mte != null
           && mte.reason() == ModeTransitionException.Reason.EXTERNAL_SERVER_POLICY_BLOCKED) {
@@ -570,6 +568,44 @@ final class InferenceHandlers {
       // user's purposes (the doctor's next remedy is the same: provision the runtime).
       case INVALID_CONFIG, CONFIG_REQUIRED -> LifecycleReasonCode.INFERENCE_RUNTIME_NOT_INSTALLED;
       default -> LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED;
+    };
+  }
+
+  private void reportModeFailure(SettingsWitness requestWitness, ModeTransitionException failure) {
+    if (generativeComponent == null || settingsStore == null || requestWitness == null) {
+      return;
+    }
+    while (true) {
+      var expected = generativeComponent.snapshot();
+      var settings = settingsStore.inspect();
+      if (!requestWitness.equals(settings.witness())
+          || !Boolean.TRUE.equals(settings.settings().getChatEnabled())
+          || expected.state() == ComponentState.ABSENT
+          || expected.state() == ComponentState.READY) {
+        return;
+      }
+      LifecycleReasonCode reason = mapModeReason(failure);
+      ComponentState state = modePrerequisiteFailure(failure)
+          ? ComponentState.UNAVAILABLE : ComponentState.FAILED;
+      if (generativeComponent.transitionIfUnchanged(
+          expected, state, reason.code(), "inference mode transition failed")) {
+        return;
+      }
+    }
+  }
+
+  private static boolean modePrerequisiteFailure(ModeTransitionException failure) {
+    if (failure == null) {
+      return false;
+    }
+    return switch (failure.reason()) {
+      case EXECUTABLE_NOT_FOUND,
+          MISSING_DLL,
+          INVALID_CONFIG,
+          CONFIG_REQUIRED,
+          INSUFFICIENT_VRAM,
+          EXTERNAL_SERVER_POLICY_BLOCKED -> true;
+      default -> false;
     };
   }
 

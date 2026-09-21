@@ -45,8 +45,7 @@ public record RuntimeManifest(
     String startedAt,
     String dataDir,
     /**
-     * Tempdoc 501 §12.1 projection from {@code LifecycleProjection.derive(WorkerCapability,
-     * InferenceCapability)}. Single string discriminator over the canonical
+     * Projection from {@code LifecycleProjection.project} over one component registry snapshot. Single string discriminator over the canonical
      * {@code LifecycleState} enum ({@code STARTING} | {@code READY} | {@code DEGRADED} |
      * {@code ERROR}). Consumers get the overall state without composing sub-records.
      * Null only during the head-only initial publish before the head is fully bound;
@@ -74,7 +73,7 @@ public record RuntimeManifest(
      * Install/runtime mode (tempdoc 657). {@code intent} is the configured product shape
      * ({@code full-desktop} | {@code headless} | {@code mcp-lite}, from {@code -Djustsearch.mode});
      * {@code realized} is the coarse capability actually up ({@code full} | {@code retrieval-only} |
-     * {@code degraded}), projected from {@code WorkerCapability} + {@code InferenceCapability}. So the
+     * {@code degraded}), projected from registry-backed index and generative capability views. So the
      * advertised mode never outruns what is actually loaded. Nullable — a manifest written before the
      * first mode publish omits it; {@code @JsonInclude(NON_NULL)} keeps it optional and the schema
      * version stays 1 (older readers unaffected).
@@ -194,9 +193,8 @@ public record RuntimeManifest(
   }
 
   /**
-   * Inference (AI) runtime surface — nullable until the producer first observes the
-   * {@code InferenceCapability}. Projects from
-   * {@code io.justsearch.app.services.lifecycle.InferenceCapability} (tempdoc 501 §12.1).
+   * Inference (AI) runtime surface, projected from the generative component's read-only
+   * capability view. Nullable before the component is registered.
    *
    * <p>The {@code phase} discriminator carries the upstream {@code CapabilityHealth} name
    * ({@code PENDING}, {@code READY}, {@code DEGRADED}, {@code OFFLINE}, {@code RECOVERING}).
@@ -263,7 +261,7 @@ public record RuntimeManifest(
    * {@code -Djustsearch.mode} ({@code full-desktop} | {@code headless} | {@code mcp-lite}; defaults to
    * {@code full-desktop}). {@code realized} is a coarse projection of what is actually up —
    * {@code full} (retrieval + LLM ready), {@code retrieval-only} (retrieval up, LLM not required/offline),
-   * or {@code degraded} — derived from {@code WorkerCapability} + {@code InferenceCapability}. Consumers
+   * or {@code degraded} — derived from registry-backed index and generative capability views. Consumers
    * branch on {@code realized}; when it diverges from {@code intent} the manifest tells the honest truth.
    */
   @RecordBuilder

@@ -209,15 +209,15 @@ final class RouteContractPolicy {
               Stability.PUBLIC_CONTRACT,
               "getLifecycleHealth",
               Map.of(
-                  200, "lifecycle-snapshot.v1.json",
+                  200, "lifecycle-snapshot.v2.json",
                   403, "api-error-response.v1.json",
-                  503, "lifecycle-snapshot.v1.json")),
+                  503, "lifecycle-snapshot.v2.json")),
           contract(
               "GET",
               "/api/status",
               Stability.PUBLIC_CONTRACT,
               "getLifecycleStatus",
-              Map.of(200, "lifecycle-snapshot.v1.json", 403, "api-error-response.v1.json")));
+              Map.of(200, "lifecycle-snapshot.v2.json", 403, "api-error-response.v1.json")));
 
   private static final Map<String, Contract> BY_KEY = index(CONTRACTS);
 

@@ -1369,12 +1369,14 @@ function fetchJsonHttp(url, timeoutMs) {
   });
 }
 
-// Projection of existing status fields; indexServing can be DEGRADED for optional AI.
-function essentialStatusReady(status) {
-  return status?.components?.head?.state === 'LIFECYCLE_STATE_READY'
-    && status?.indexAvailable === true
-    && status?.worker?.core?.indexHealthy === true
-    && status?.readiness?.components?.indexServing?.stale === false;
+// The Engine owns essential readiness; the timestamp identifies a continuous READY epoch.
+function essentialReadyEpoch(status) {
+  const index = status?.readiness?.engineComponents?.index;
+  const epoch = index?.stateSince;
+  return index?.state === 'READY' && typeof epoch === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(epoch)
+    && Number.isFinite(Date.parse(epoch))
+    && new Date(epoch).toISOString().slice(0, 19) === epoch.slice(0, 19) ? epoch : null;
 }
 
 // Tempdoc 819 §D: mirrors the shell's kill_child() ordered-shutdown request
@@ -2588,6 +2590,7 @@ async function cmdStart(opts) {
   let restartCount = 0;
   let readyAt = null;
   let essentialReadySince = null;
+  let essentialEpoch = null;
   let hangTimer = null;
   let handoffWatchTimer = null;
   let requestDeadlineTimer = null;
@@ -2623,6 +2626,7 @@ async function cmdStart(opts) {
       clearInterval(timer);
     }
     essentialReadySince = null;
+    essentialEpoch = null;
     hangTimer = null;
     handoffWatchTimer = null;
     requestDeadlineTimer = null;
@@ -2724,9 +2728,13 @@ async function cmdStart(opts) {
           consecutiveHealthMisses = 0;
           const status = await fetchJsonHttp(`http://127.0.0.1:${probedPort}/api/status`, 1000);
           if (!stillCurrent()) return;
-          if (!essentialStatusReady(status)) { essentialReadySince = null; return; }
+          const epoch = essentialReadyEpoch(status);
+          if (epoch === null) { essentialReadySince = null; essentialEpoch = null; return; }
           const observedAt = performance.now();
-          essentialReadySince ??= observedAt;
+          if (epoch !== essentialEpoch) {
+            essentialEpoch = epoch;
+            essentialReadySince = observedAt;
+          }
           if (observedAt - essentialReadySince >= supervisionPolicy.stabilityWindowMs && restartCount > 0) {
             const action = engineSupervisor.decide(
               { event: 'stability-elapsed', restartCount, state: supervisorState }, supervisionPolicy);
@@ -2738,6 +2746,7 @@ async function cmdStart(opts) {
           return;
         }
         essentialReadySince = null;
+        essentialEpoch = null;
         consecutiveHealthMisses += 1;
         const action = engineSupervisor.decide(
           {
@@ -2804,6 +2813,7 @@ async function cmdStart(opts) {
     consecutiveHealthMisses = 0;
     await publishSupervisorState(STATES.RUNNING);
     essentialReadySince = null;
+    essentialEpoch = null;
     armHangDetection();
     armHandoffWatch();
   };
@@ -3387,7 +3397,7 @@ if (require.main === module) {
       // scripts/dev/lib/engine-supervisor.cjs owns it and the Rust half reads the same register.
       checkHttp200,
       fetchJsonHttp,
-      essentialStatusReady,
+      essentialReadyEpoch,
       buildSupervisorState,
       writeJsonAtomic,
       writeSupervisorState,

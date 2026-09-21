@@ -102,7 +102,7 @@ public final class OperationSubstrateInit {
    * @param operationCatalog admin-seed operation catalog (already assembled).
    * @param agentToolsCatalog agent-tool operation catalog (already assembled).
    * @param capabilityResolver resolves {@link RequiredCapability} → available boolean — typically
-   *     reads from {@code WorkerCapability} + {@code InferenceCapability}.
+   *     reads from registry-backed index and generative capability projections.
    * @return bundled substrate values for the caller to assign into bootstrap state.
    */
   public static Output run(io.justsearch.app.api.operations.OperationStore operations,

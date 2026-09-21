@@ -3,38 +3,15 @@ package io.justsearch.app.services.bootstrap.phases;
 
 import io.justsearch.app.services.bootstrap.CapabilityGraph;
 import io.justsearch.app.services.bootstrap.PhaseOutcome;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Tempdoc 519 §4 Phase 2 — capability resolution. Runs BEFORE {@link ServicePhase} (F3
- * reorder): takes a pre-computed {@code inferenceConfigured} flag rather than an already-built
- * {@code InferenceLifecycleManager}. ServicePhase later constructs the manager and calls
- * {@link InferenceCapabilityWiring#attachInferenceModeListener} to drive transitions.
- *
- * <p>Worker capability is sourced from the supplied {@link KnowledgeServerBootstrap} when
- * present (so worker health transitions flow into head-side capability state) or constructed
- * standalone when null.
- *
- * <p>Output: {@link CapabilityGraph} — the §10 phase-chain output type for Phase 2.
- *
- * <p>Tempdoc 541 §5.3 — first phase migrated to sealed-sum {@link PhaseOutcome}. Outcomes:
- *
- * <ul>
- *   <li>{@link PhaseOutcome.Ready} — Worker bootstrap present AND inference configured.
- *   <li>{@link PhaseOutcome.Degraded} — Worker bootstrap absent OR inference not configured;
- *       capability graph constructed standalone with non-empty reason codes
- *       ({@code "worker.not_connected"}, {@code "inference.not_configured"}).
- *   <li>{@link PhaseOutcome.Failed} — InferenceCapabilityWiring throws on construction
- *       (currently unreachable; placeholder for future failure modes).
- * </ul>
- *
- * <p>Tempdoc 541 fix-pass E.4: the legacy {@code run()} entry point has been deleted. All
- * production callers and tests use {@link #runWithOutcome}. Callers that want the legacy
- * "throw on non-Ready" semantics chain {@code .orThrow()} explicitly — this is rare in
- * production because Degraded outcomes are observable signals, not error states.
+ * Classifies boot availability around an already-owned read-only capability graph.
+ * ServicePhase later connects inference producers to the generative component handle.
+ * A missing bootstrap or unconfigured inference yields a degraded phase outcome;
+ * this classification never creates another lifecycle authority.
  */
 public final class CapabilityPhase {
 
@@ -54,13 +31,9 @@ public final class CapabilityPhase {
   public static PhaseOutcome<CapabilityGraph> runWithOutcome(
       KnowledgeServerBootstrap knowledgeServer,
       boolean inferenceConfigured,
-      WorkerCapability sharedWorkerCapability) {
+      CapabilityGraph graph) {
     try {
-      InferenceCapabilityWiring.Output out =
-          InferenceCapabilityWiring.wire(
-              knowledgeServer, inferenceConfigured, sharedWorkerCapability);
-      CapabilityGraph graph =
-          new CapabilityGraph(out.workerCapability(), out.inferenceCapability());
+      java.util.Objects.requireNonNull(graph, "graph");
       Set<String> reasons = new LinkedHashSet<>();
       if (knowledgeServer == null) {
         reasons.add(REASON_WORKER_NOT_CONNECTED);

@@ -75,7 +75,7 @@ final class DefaultWorkerAppServicesSkipPolicyTest {
 
   @Test
   void buildSkipPolicyUsesDefaultsWhenNoSyspropsSet() {
-    IngestionSkipPolicy policy = DefaultWorkerAppServices.buildSkipPolicy();
+    IngestionSkipPolicy policy = buildSkipPolicyFromEnvironment();
     // Default skip-extension set includes "pyc"; default skip-directory-name set includes
     // "node_modules" (verified in IngestionSkipPolicyTest).
     assertTrue(
@@ -89,7 +89,7 @@ final class DefaultWorkerAppServicesSkipPolicyTest {
   @Test
   void buildSkipPolicyHonorsSyspropOverrideForExtensions() {
     System.setProperty(EXTENSIONS_PROP, "foo,bar");
-    IngestionSkipPolicy policy = DefaultWorkerAppServices.buildSkipPolicy();
+    IngestionSkipPolicy policy = buildSkipPolicyFromEnvironment();
     assertEquals(Set.of("foo", "bar"), policy.skipExtensions(),
         "Sysprop override must replace the default extension set wholesale");
     assertTrue(
@@ -100,7 +100,7 @@ final class DefaultWorkerAppServicesSkipPolicyTest {
   @Test
   void buildSkipPolicyHonorsSyspropOverrideForDirectoryNames() {
     System.setProperty(DIRECTORIES_PROP, "vendor,third_party");
-    IngestionSkipPolicy policy = DefaultWorkerAppServices.buildSkipPolicy();
+    IngestionSkipPolicy policy = buildSkipPolicyFromEnvironment();
     assertEquals(Set.of("vendor", "third_party"), policy.skipDirectoryNames());
     assertTrue(
         policy.skipExtensions().contains("pyc"),
@@ -110,14 +110,14 @@ final class DefaultWorkerAppServicesSkipPolicyTest {
   @Test
   void buildSkipPolicyHonorsSyspropOverrideForPatterns() {
     System.setProperty(PATTERNS_PROP, "secret-marker");
-    IngestionSkipPolicy policy = DefaultWorkerAppServices.buildSkipPolicy();
+    IngestionSkipPolicy policy = buildSkipPolicyFromEnvironment();
     assertEquals(Set.of("secret-marker"), policy.skipPatterns());
   }
 
   @Test
   void buildSkipPolicyTrimsAndLowercasesSyspropTokens() {
     System.setProperty(EXTENSIONS_PROP, "  FOO , Bar , BAZ  ");
-    IngestionSkipPolicy policy = DefaultWorkerAppServices.buildSkipPolicy();
+    IngestionSkipPolicy policy = buildSkipPolicyFromEnvironment();
     // Both parseCsvSet and IngestionSkipPolicy.normalise lowercase + trim; the chain produces
     // a case-folded set.
     assertEquals(Set.of("foo", "bar", "baz"), policy.skipExtensions());
@@ -133,5 +133,11 @@ final class DefaultWorkerAppServicesSkipPolicyTest {
     IngestionSkipPolicy policy = DefaultWorkerAppServices.buildSkipPolicy(captured);
 
     assertEquals(Set.of("captured"), policy.skipExtensions());
+  }
+
+  private static IngestionSkipPolicy buildSkipPolicyFromEnvironment() {
+    ResolvedConfig captured =
+        new ResolvedConfigBuilder().contributeEnvRegistry().build();
+    return DefaultWorkerAppServices.buildSkipPolicy(captured);
   }
 }

@@ -89,6 +89,7 @@ public final class HeadAssembly implements AutoCloseable {
   private io.justsearch.app.services.bootstrap.SubstrateGraph substrateGraph;
   private final InferenceLifecycleManager inferenceManager;
   private final io.justsearch.core.component.ComponentHandle generativeComponent;
+  private final AutoCloseable capabilityConditions;
   // Tempdoc 518 Wave A-E defect Fix-3 (ported from main commits 17545ad2a + 3a5355216) —
   // async transition-log decorator. Kept off the TransitionRunner's transition lock so
   // sidecar I/O does not add user-visible transition latency. Closed during teardown.
@@ -343,12 +344,11 @@ public final class HeadAssembly implements AutoCloseable {
       ConfigManagerBootstrap configManager,
       KnowledgeServerBootstrap knowledgeServer,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
-        sharedWorkerCapability, managedChildRegistry, operationLeases, engineAdmission,
+        managedChildRegistry, operationLeases, engineAdmission,
         io.justsearch.app.services.bootstrap.OperationAuthority.load(PlatformPaths.resolveDataDir()));
   }
 
@@ -360,13 +360,12 @@ public final class HeadAssembly implements AutoCloseable {
       ConfigManagerBootstrap configManager,
       KnowledgeServerBootstrap knowledgeServer,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission,
       io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
-        sharedWorkerCapability, managedChildRegistry, operationLeases, engineAdmission, authority,
+        managedChildRegistry, operationLeases, engineAdmission, authority,
         io.justsearch.app.api.operations.RecordedIngestionService.unavailable());
   }
 
@@ -378,14 +377,13 @@ public final class HeadAssembly implements AutoCloseable {
       ConfigManagerBootstrap configManager,
       KnowledgeServerBootstrap knowledgeServer,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission,
       io.justsearch.app.services.bootstrap.OperationAuthority authority,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion) {
     this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
-        sharedWorkerCapability, managedChildRegistry, operationLeases, engineAdmission, authority,
+        managedChildRegistry, operationLeases, engineAdmission, authority,
         recordedIngestion, null);
   }
 
@@ -398,7 +396,6 @@ public final class HeadAssembly implements AutoCloseable {
       ConfigManagerBootstrap configManager,
       KnowledgeServerBootstrap knowledgeServer,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission,
@@ -485,8 +482,13 @@ public final class HeadAssembly implements AutoCloseable {
     // call site stays concise.
     final KnowledgeServerBootstrap knowledgeServerForCapability = knowledgeServer;
     final boolean inferenceConfiguredFinal = inferenceConfigured;
-    final io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapabilityFinal =
-        sharedWorkerCapability;
+    if (componentRegistry != null) {
+      generativeObservation = new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(
+          componentRegistry.register(generativeSpec()));
+    }
+    final var capabilityGraph = componentRegistry == null
+        ? io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable()
+        : io.justsearch.app.services.bootstrap.CapabilityGraph.fromRegistry(componentRegistry);
     this.capabilities =
         tracedPhase(
                 "capability",
@@ -494,12 +496,8 @@ public final class HeadAssembly implements AutoCloseable {
                     io.justsearch.app.services.bootstrap.phases.CapabilityPhase.runWithOutcome(
                         knowledgeServerForCapability,
                         inferenceConfiguredFinal,
-                        sharedWorkerCapabilityFinal))
+                        capabilityGraph))
             .orThrow();
-
-    if (componentRegistry != null) {
-      generativeObservation = componentRegistry.register(generativeSpec());
-    }
 
     // §4 Phase 3 — ServicePhase.
     InferenceLifecycleManager manager =
@@ -514,7 +512,6 @@ public final class HeadAssembly implements AutoCloseable {
         generativeObservation.setDesiredVersion(version);
         generativeObservation.setAppliedVersion(version);
       }
-      observeGenerativeCapability(generativeObservation, this.capabilities.inference());
     }
     // Tempdoc 518 Wave B + Slice 2 (ported from main 17545ad2a + 3a5355216) — install the
     // persistent transition sidecar at the composition root. Wrap NdjsonInferenceTransitionLog
@@ -536,6 +533,7 @@ public final class HeadAssembly implements AutoCloseable {
     final DocumentService documentServiceFinal = documentService;
     final InferenceLifecycleManager managerFinal = manager;
     final io.justsearch.app.services.settings.UiSettingsStore settingsStoreFinal = settingsStore;
+    final var generativeForService = generativeObservation;
     // Tempdoc 541 §5.1: capture the service-phase window so BrainAssembly can project
     // ILM-construction timestamps without re-running anything.
     long t_service_0 = System.currentTimeMillis();
@@ -557,7 +555,7 @@ public final class HeadAssembly implements AutoCloseable {
                             telemetry,
                             dataDir,
                             managerFinal,
-                            this.capabilities.inference(),
+                            generativeForService,
                             settingsStoreFinal,
                             attempts,
                             this.lateBindings,
@@ -706,6 +704,13 @@ public final class HeadAssembly implements AutoCloseable {
     // Later composition can fail after the trigger acquires its registry subscription.
     // Constructor failure cannot use normal close(), so enroll this owner immediately.
     acquiredOwners.add(this.substrateOut.healthOut().readinessReconciliationTrigger());
+    this.capabilityConditions = componentRegistry == null ? null
+        : io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridge.wireListeners(
+            componentRegistry, this.substrateOut.healthOut().conditionStore(),
+            this.substrateOut.healthOut().healthEventChangeRegistry(),
+            this.substrateOut.healthOut().headSource());
+    if (capabilityConditions != null) acquiredOwners.add(capabilityConditions);
+
 
     // Tempdoc 560 Phase 1 — wire the host LLM as the MCP sampling answerer (an external MCP server
     // may ask the host to run a completion). Set post-substrate now that OnlineAiService is in hand.
@@ -1168,6 +1173,7 @@ public final class HeadAssembly implements AutoCloseable {
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
             operations, executors, this.substrateOut.operationOut());
     this.generativeComponent = null;
+    this.capabilityConditions = null;
     } catch (RuntimeException | Error failure) {
       closeFailedOwners(acquiredOwners, failure);
       throw failure;
@@ -1594,6 +1600,10 @@ public final class HeadAssembly implements AutoCloseable {
   private void closeOwnedResources() {
     // Repeatable termination barrier: an unfinished procedure must leave a later close able to
     // finish dependency teardown. Never claim the one-shot closed state before this succeeds.
+    if (capabilityConditions != null) {
+      try { capabilityConditions.close(); }
+      catch (Exception failure) { log.warn("Failed to close capability condition subscriptions", failure); }
+    }
     if (offlineCoordinator != null) offlineCoordinator.close();
     if (!closed.get() && operationsHistoryProjector != null) {
       try { operationsHistoryProjector.close(); }
@@ -1682,30 +1692,6 @@ public final class HeadAssembly implements AutoCloseable {
 
   private static String normalized(Path path) {
     return path == null ? null : path.toAbsolutePath().normalize().toString();
-  }
-
-  static void observeGenerativeCapability(
-      io.justsearch.core.component.ComponentHandle component,
-      io.justsearch.app.services.lifecycle.InferenceCapability capability) {
-    Objects.requireNonNull(component, "component");
-    Objects.requireNonNull(capability, "capability");
-    publishGenerativeCapability(component, capability);
-    capability.addListener((previous, current) ->
-        publishGenerativeCapability(component, capability));
-  }
-
-  private static void publishGenerativeCapability(
-      io.justsearch.core.component.ComponentHandle component,
-      io.justsearch.app.services.lifecycle.InferenceCapability capability) {
-    io.justsearch.core.component.ComponentState state = !capability.required()
-        ? io.justsearch.core.component.ComponentState.ABSENT : switch (capability.health()) {
-      case PENDING -> io.justsearch.core.component.ComponentState.STARTING;
-      case READY -> io.justsearch.core.component.ComponentState.READY;
-      case RECOVERING -> io.justsearch.core.component.ComponentState.RELOADING;
-      case DEGRADED -> io.justsearch.core.component.ComponentState.FAILED;
-      case OFFLINE -> io.justsearch.core.component.ComponentState.UNAVAILABLE;
-    };
-    component.transition(state, capability.pendingReason(), capability.pendingDetail());
   }
 
   private static void closeFailedOwners(List<AutoCloseable> owners, Throwable failure) {
@@ -1852,6 +1838,11 @@ public final class HeadAssembly implements AutoCloseable {
   }
 
   /** §4 Phase 2 typed output. */
+  /** The same generative owner used by mode and activation producers. */
+  public io.justsearch.core.component.ComponentHandle generativeComponent() {
+    return generativeComponent;
+  }
+
   public io.justsearch.app.services.bootstrap.CapabilityGraph capabilities() {
     return this.capabilities;
   }

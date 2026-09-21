@@ -15,6 +15,7 @@ import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
+import io.justsearch.indexerworker.server.DefaultWorkerAppServices;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.indexerworker.util.IndexRootLock;
 import java.io.IOException;
@@ -40,6 +41,7 @@ final class EngineRootTerminalWriterFailureTest {
   void activeReloadPreventsTeardownAndRetryClosesItsPublishedGeneration(@TempDir Path tempDir)
       throws Exception {
     Started started = start(tempDir, ignored -> {});
+    started.useCheapReplacementServices();
     var field = KnowledgeServer.class.getDeclaredField("ingestLifecycle");
     field.setAccessible(true);
     var old = (RunningRuntime) field.get(started.server());
@@ -82,6 +84,7 @@ final class EngineRootTerminalWriterFailureTest {
       assertFalse(swap.isAlive());
       assertNull(swapFailure.get());
       assertSame(fresh.get(), field.get(started.server()));
+      assertSame(started.replacementServices().get(), started.server().appServices());
     } finally {
       releaseOpener.countDown();
       swap.join(5_000);
@@ -184,19 +187,31 @@ final class EngineRootTerminalWriterFailureTest {
     Path dataDir = tempDir.resolve("data");
     EngineTestHarness.publishConfig(dataDir, dataDir.resolve("index"), Map.of());
     KnowledgeServer[] server = new KnowledgeServer[1];
+    var replacementServices = new AtomicReference<DefaultWorkerAppServices>();
     EngineRoot root =
         new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
             (gauge, executors, ingestion, indexComponent, encoderComponent) -> {
-              server[0] =
-                  new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(gauge),
-                      io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
+              var real =
+                  new KnowledgeServer(executors, WorkerConfig.load(),
+                      new InProcessWorkerSignalBus(gauge),
+                      io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion,
+                      indexComponent, encoderComponent);
+              server[0] = org.mockito.Mockito.mock(
+                  KnowledgeServer.class,
+                  org.mockito.Mockito.withSettings().spiedInstance(real).defaultAnswer(invocation -> {
+                    if (invocation.getMethod().getName().equals("newAppServices")
+                        && replacementServices.get() != null) {
+                      return replacementServices.get();
+                    }
+                    return invocation.callRealMethod();
+                  }));
               return server[0];
             },
             30_000L,
             5_000,
             exitAction);
     root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
-    return new Started(root, server);
+    return new Started(root, server, replacementServices);
   }
 
   private static Consumer<Throwable> terminalWriterForwarder(KnowledgeServer server)
@@ -214,9 +229,29 @@ final class EngineRootTerminalWriterFailureTest {
     };
   }
 
-  private record Started(EngineRoot root, KnowledgeServer[] servers) {
+  private record Started(
+      EngineRoot root,
+      KnowledgeServer[] servers,
+      AtomicReference<DefaultWorkerAppServices> replacementServices) {
     KnowledgeServer server() {
       return servers[0];
+    }
+
+    void useCheapReplacementServices() {
+      var incumbent = (DefaultWorkerAppServices) server().appServices();
+      var replacement = org.mockito.Mockito.mock(
+          DefaultWorkerAppServices.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+      org.mockito.Mockito.when(replacement.extractionConfiguration())
+          .thenReturn(incumbent.extractionConfiguration());
+      org.mockito.Mockito.when(replacement.chunkRerankerConfig())
+          .thenReturn(incumbent.chunkRerankerConfig());
+      org.mockito.Mockito.when(replacement.citationScorerConfig())
+          .thenReturn(incumbent.citationScorerConfig());
+      org.mockito.Mockito.when(replacement.detailedTracing())
+          .thenReturn(incumbent.detailedTracing());
+      org.mockito.Mockito.when(replacement.healthService())
+          .thenReturn(incumbent.healthService());
+      replacementServices.set(replacement);
     }
   }
 }

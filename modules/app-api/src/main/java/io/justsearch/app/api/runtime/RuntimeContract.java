@@ -2,7 +2,7 @@
 package io.justsearch.app.api.runtime;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 import io.justsearch.app.api.mcp.McpContractVersions;
 import io.soabase.recordbuilder.core.RecordBuilder;
 
@@ -18,7 +18,7 @@ import io.soabase.recordbuilder.core.RecordBuilder;
  *
  * <p><b>Projection, not fork.</b> {@link #current()} reads each constituent version from its
  * existing single source ({@link RuntimeManifest#CURRENT_SCHEMA_VERSION},
- * {@link LifecycleSnapshotV1#SCHEMA_VERSION}, {@link McpContractVersions}); it invents no version
+ * {@link LifecycleSnapshotV2#SCHEMA_VERSION}, {@link McpContractVersions}); it invents no version
  * of its own except {@link #CURRENT_VERSION}, the coarse umbrella. So the manifest and the MCP
  * {@code initialize} response report the same numbers by construction.
  *
@@ -40,7 +40,7 @@ public record RuntimeContract(String version, Constituents constituents) {
    * public-contract constituent — where {@code 0.2.0}-{@code 0.4.0} had been purely additive.
    * See the changelog in {@code docs/reference/runtime-contract.md}.
    */
-  public static final String CURRENT_VERSION = "0.3.0";
+  public static final String CURRENT_VERSION = "0.4.0";
 
   public RuntimeContract {
     if (version == null || version.isBlank()) {
@@ -57,7 +57,7 @@ public record RuntimeContract(String version, Constituents constituents) {
         CURRENT_VERSION,
         new Constituents(
             RuntimeManifest.CURRENT_SCHEMA_VERSION,
-            LifecycleSnapshotV1.SCHEMA_VERSION,
+            LifecycleSnapshotV2.SCHEMA_VERSION,
             McpContractVersions.PROTOCOL_VERSION,
             McpContractVersions.TOOL_SURFACE_VERSION));
   }

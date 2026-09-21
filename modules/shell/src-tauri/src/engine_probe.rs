@@ -58,24 +58,53 @@ pub(crate) fn responds(port: u16, path: &str, timeout: Duration) -> bool {
     observe(port, path, timeout, false).is_some()
 }
 
-pub(crate) fn essential_ready(port: u16, timeout: Duration) -> bool {
-    observe(port, "/api/status", timeout, true).is_some_and(|status| essential_status(&status))
+/// Component-owned READY epoch; elapsed time is measured by the host's monotonic clock.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ReadyEpoch(String);
+
+impl ReadyEpoch {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        // Engine Instant serialization is UTC, with up to nanosecond precision.
+        let bytes = value.as_bytes();
+        if !(20..=30).contains(&bytes.len()) || !value.is_ascii()
+            || bytes[4] != b'-' || bytes[7] != b'-' || bytes[10] != b'T'
+            || bytes[13] != b':' || bytes[16] != b':' || bytes.last() != Some(&b'Z') {
+            return None;
+        }
+        if bytes.len() > 20 && (bytes[19] != b'.' || bytes.len() < 22
+            || !bytes[20..bytes.len()-1].iter().all(u8::is_ascii_digit)) {
+            return None;
+        }
+        let number = |start: usize, end: usize| -> Option<u32> {
+            let text = &value[start..end];
+            text.bytes().all(|b| b.is_ascii_digit()).then(|| text.parse().ok()).flatten()
+        };
+        let year = number(0, 4)?;
+        let month = number(5, 7)?;
+        let day = number(8, 10)?;
+        let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        let days = match month {
+            2 => if leap { 29 } else { 28 },
+            4 | 6 | 9 | 11 => 30,
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            _ => return None,
+        };
+        if !(1..=days).contains(&day) || number(11, 13)? > 23
+            || number(14, 16)? > 59 || number(17, 19)? > 59 {
+            return None;
+        }
+        Some(Self(value.into()))
+    }
 }
 
-fn essential_status(status: &serde_json::Value) -> bool {
-    status
-        .pointer("/components/head/state")
-        .and_then(|v| v.as_str())
-        == Some("LIFECYCLE_STATE_READY")
-        && status.get("indexAvailable").and_then(|v| v.as_bool()) == Some(true)
-        && status
-            .pointer("/worker/core/indexHealthy")
-            .and_then(|v| v.as_bool())
-            == Some(true)
-        && status
-            .pointer("/readiness/components/indexServing/stale")
-            .and_then(|v| v.as_bool())
-            == Some(false)
+pub(crate) fn essential_ready(port: u16, timeout: Duration) -> Option<ReadyEpoch> {
+    essential_status(&observe(port, "/api/status", timeout, true)?)
+}
+
+fn essential_status(status: &serde_json::Value) -> Option<ReadyEpoch> {
+    let index = status.pointer("/readiness/engineComponents/index")?;
+    if index.get("state")?.as_str()? != "READY" { return None; }
+    ReadyEpoch::parse(index.get("stateSince")?.as_str()?)
 }
 
 #[cfg(test)]
@@ -121,26 +150,22 @@ mod tests {
     }
 
     #[test]
-    fn essential_readiness_ignores_optional_ai_but_requires_live_index_and_api() {
-        let mut status = serde_json::json!({
-            "components": {"head": {"state": "LIFECYCLE_STATE_READY"}},
-            "indexAvailable": true, "worker": {"core": {"indexHealthy": true}},
-            "readiness": {"components": {
-                "indexServing": {"state": "DEGRADED", "stale": false},
-                "ai": {"state": "NOT_READY"}
-            }}
-        });
-        assert!(essential_status(&status));
-        for path in ["/indexAvailable", "/worker/core/indexHealthy"] {
-            *status.pointer_mut(path).unwrap() = serde_json::json!(false);
-            assert!(!essential_status(&status));
-            *status.pointer_mut(path).unwrap() = serde_json::json!(true);
+    fn essential_readiness_requires_the_engine_ready_epoch() {
+        let epoch = "2026-09-21T12:00:00.123456789Z";
+        let mut status = serde_json::json!({"readiness": {"engineComponents": {
+            "index": {"state": "READY", "stateSince": epoch}
+        }}});
+        assert_eq!(essential_status(&status), ReadyEpoch::parse(epoch));
+        for state in ["ABSENT", "STARTING", "RELOADING", "FAILED", "UNAVAILABLE", "UNKNOWN"] {
+            status["readiness"]["engineComponents"]["index"]["state"] = serde_json::json!(state);
+            assert_eq!(essential_status(&status), None);
         }
-        status["readiness"]["components"]["indexServing"]["stale"] = serde_json::json!(true);
-        assert!(!essential_status(&status));
-        status["readiness"]["components"]["indexServing"]["stale"] = serde_json::json!(false);
-        status["components"]["head"]["state"] = serde_json::json!("LIFECYCLE_STATE_STOPPING");
-        assert!(!essential_status(&status));
-        assert!(!essential_status(&serde_json::json!({})));
+        status["readiness"]["engineComponents"]["index"]["state"] = serde_json::json!("READY");
+        for invalid in ["", "yesterday", "2026-02-30T12:00:00Z", "2026-09-21T24:00:00Z", "2026-09-21", "2026-09-21T12:00:00.Z"] {
+            status["readiness"]["engineComponents"]["index"]["stateSince"] = serde_json::json!(invalid);
+            assert_eq!(essential_status(&status), None, "{invalid}");
+        }
+        assert_eq!(essential_status(&serde_json::json!({})), None);
+        assert_ne!(ReadyEpoch::parse(epoch), ReadyEpoch::parse("2026-09-21T12:01:00Z"));
     }
 }

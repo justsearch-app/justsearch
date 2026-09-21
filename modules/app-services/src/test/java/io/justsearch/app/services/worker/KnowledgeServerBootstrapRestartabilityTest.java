@@ -43,37 +43,45 @@ final class KnowledgeServerBootstrapRestartabilityTest {
   @Timeout(90)
   @DisplayName("a second start() reaches the spawn step instead of the already-started guard")
   void secondStartIsNotBlockedByTheStartedGuard(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
 
-    Exception first = failingStart(bootstrap);
-    Exception second = failingStart(bootstrap);
+      Exception first = failingStart(bootstrap);
+      Exception second = failingStart(bootstrap);
 
-    assertNotNull(first.getMessage());
-    String secondMessage = String.valueOf(second.getMessage());
-    assertFalse(
-        secondMessage.contains("already started"),
-        "close() must reset the started guard so a retry can respawn; got: " + secondMessage);
-    // Same failure shape both times ⇒ the second attempt really re-ran the spawn path.
-    assertTrue(
-        second.getClass().equals(first.getClass()),
-        "expected the retry to fail the same way (" + first.getClass().getSimpleName()
-            + "), got " + second.getClass().getSimpleName() + ": " + secondMessage);
+      assertNotNull(first.getMessage());
+      String secondMessage = String.valueOf(second.getMessage());
+      assertFalse(
+          secondMessage.contains("already started"),
+          "close() must reset the started guard so a retry can respawn; got: " + secondMessage);
+      // Same failure shape both times ⇒ the second attempt really re-ran the spawn path.
+      assertTrue(
+          second.getClass().equals(first.getClass()),
+          "expected the retry to fail the same way ("
+              + first.getClass().getSimpleName()
+              + "), got "
+              + second.getClass().getSimpleName()
+              + ": "
+              + secondMessage);
+    }
   }
 
   @Test
   @Timeout(90)
   @DisplayName("startWithRetry on a non-transient failure runs once and lands DEGRADED")
   void nonTransientFailureIsNotRetriedAndNarratesOnce(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
 
-    assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
+      assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
-    // A worker that dies before publishing a port is not a PID-validation timeout, so the retry
-    // must not engage — and the final verdict must still be narrated exactly once.
-    assertFalse(bootstrap.isReady());
-    assertTrue(
-        bootstrap.workerCapability().health() == CapabilityHealth.DEGRADED,
-        "expected DEGRADED after an exhausted start, got "
-            + bootstrap.workerCapability().health());
+      // A worker that dies before publishing a port is not a PID-validation timeout, so the retry
+      // must not engage — and the final verdict must still be narrated exactly once.
+      assertFalse(bootstrap.isReady());
+      assertTrue(
+          bootstrap.workerCapability().health() == CapabilityHealth.DEGRADED,
+          "expected DEGRADED after an exhausted start, got "
+              + bootstrap.workerCapability().health());
+    }
   }
 }

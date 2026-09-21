@@ -598,26 +598,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * unreachable, and the command is now built in-process by {@link ExtractionSandboxCommand}.
    * {@link EnvRegistry#EXTRACTION_SANDBOX_COMMAND} remains as an operator override.
    */
-  // Package-private for DefaultWorkerAppServicesSandboxProbeTest, like parseCsvSet above: the
-  // env-to-extractor chain has no other seam, and the probe-failure branch decides whether
-  // process-routed families are available for the session.
-  static TimeboxedContentExtractor buildContentExtractor(
-      WorkerExecutorRegistrations executors,
-      @SuppressWarnings("unused") InfraContext ctx,
-      ExtractionMetricCatalog catalog,
-      OcrMetricCatalog ocrCatalog,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
-    ResolvedConfig snapshot = captureResolvedConfig();
-    return buildContentExtractor(
-        executors,
-        ctx,
-        catalog,
-        ocrCatalog,
-        childRegistry,
-        ExtractionConfiguration.capture(
-            snapshot, executors.pdfOcr().spec().threadCount(), buildSkipPolicy(snapshot)));
-  }
-
   static TimeboxedContentExtractor buildContentExtractor(
       WorkerExecutorRegistrations executors,
       @SuppressWarnings("unused") InfraContext ctx,
@@ -704,10 +684,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * wholesale for that field. Package-private since Slice G.3 so the env-to-policy chain is
    * directly testable.
    */
-  static io.justsearch.indexerworker.ingest.IngestionSkipPolicy buildSkipPolicy() {
-    return buildSkipPolicy(captureResolvedConfig());
-  }
-
   static io.justsearch.indexerworker.ingest.IngestionSkipPolicy buildSkipPolicy(
       ResolvedConfig snapshot) {
     ResolvedConfig.Extraction extraction = snapshot.extraction();

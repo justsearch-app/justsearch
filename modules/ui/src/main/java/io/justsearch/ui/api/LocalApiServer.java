@@ -1104,7 +1104,8 @@ public class LocalApiServer {
     // getters that LocalApiServer reads to wire RegistryController + SSE.
     // Tempdoc 583 Stage 2: package-private (ConversationApiAssembly reads it).
     io.justsearch.app.services.HeadAssembly HeadAssembly;
-    io.justsearch.app.services.lifecycle.InferenceCapability inferenceCapability;
+    io.justsearch.app.api.lifecycle.Capability inferenceCapability;
+    ComponentHandle generativeComponent;
     // Tempdoc 519 §5 endpoint: per-service overrides for test paths that don't have a full
     // HeadAssembly. Production passes the bootstrap; tests override individual services
     // here. Each is read with fallback to the bootstrap's typed-record accessor in build().
@@ -1253,7 +1254,12 @@ public class LocalApiServer {
       return this;
     }
 
-    public Builder inferenceCapability(io.justsearch.app.services.lifecycle.InferenceCapability cap) {
+    public Builder generativeComponent(ComponentHandle component) {
+      this.generativeComponent = java.util.Objects.requireNonNull(component);
+      return this;
+    }
+
+    public Builder inferenceCapability(io.justsearch.app.api.lifecycle.Capability cap) {
       this.inferenceCapability = cap;
       return this;
     }

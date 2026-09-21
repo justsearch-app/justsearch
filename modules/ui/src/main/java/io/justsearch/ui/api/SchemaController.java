@@ -87,7 +87,7 @@ public final class SchemaController {
           "runtime-manifest-public.v2.json",
           "runtime-ready-response.v1.json",
           "runtime-live-response.v1.json",
-          "lifecycle-snapshot.v1.json",
+          "lifecycle-snapshot.v2.json",
           "api-error-response.v1.json");
 
   private final Telemetry telemetry;

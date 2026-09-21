@@ -11,8 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.core.execution.TestEngineExecutors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -70,7 +68,6 @@ final class KnowledgeServerHealthMonitorTest {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
 
     long[] clock = {1_000_000L};
@@ -87,7 +84,6 @@ final class KnowledgeServerHealthMonitorTest {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
 
     long[] clock = {1_000_000L};
@@ -120,7 +116,6 @@ final class KnowledgeServerHealthMonitorTest {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
     when(bootstrap.client()).thenReturn(client);
     when(bootstrap.automaticRootProducersSuppressed()).thenReturn(isolated);
@@ -144,10 +139,7 @@ final class KnowledgeServerHealthMonitorTest {
     // closeForUpgrade can null it between them. The steady "no client at all" state is the
     // boot-recovery arm's, tested over a real bootstrap.
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.READY, null);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
     when(bootstrap.checkHealth()).thenReturn(true);
     when(bootstrap.client()).thenThrow(new IllegalStateException("Knowledge Server not started"));
 

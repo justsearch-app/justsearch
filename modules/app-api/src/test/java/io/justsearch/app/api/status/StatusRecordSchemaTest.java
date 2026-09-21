@@ -3,6 +3,7 @@ package io.justsearch.app.api.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tools.jackson.databind.JsonNode;
@@ -21,6 +22,7 @@ import io.justsearch.app.api.status.EnrichmentProgressViewBuilder;
 import io.justsearch.app.api.status.MigrationGenerationViewBuilder;
 import io.justsearch.app.api.status.WorkerDebugViewBuilder;
 import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
+import io.justsearch.core.component.ComponentState;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -144,17 +146,10 @@ final class StatusRecordSchemaTest {
       // by absence rather than always emitting agentSessions.activeCount = 0.
       var withNull =
           new StatusResponse(
-              1,
+              2,
               "2025-01-01T00:00:00Z",
-              new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Lifecycle(
-                  io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-              new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Components(
-                  new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                      io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-                  new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                      io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-                  new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                      io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY)),
+              readyLifecycle(),
+              readyEngineComponents(),
               "ok",
               "JustSearch",
               "C:/data",
@@ -214,10 +209,12 @@ final class StatusRecordSchemaTest {
       // Head-level fields
       assertEquals("ok", serialized.get("status").asText());
       assertEquals("JustSearch", serialized.get("service").asText());
-      assertEquals(1, serialized.get("schema_version").asInt());
+      assertEquals(2, serialized.get("schema_version").asInt());
       assertNotNull(serialized.get("observed_at"));
       assertNotNull(serialized.get("lifecycle"));
       assertNotNull(serialized.get("components"));
+      assertEquals("READY", serialized.get("components").get("api").get("state").asText());
+      assertEquals("READY", serialized.get("components").get("index").get("state").asText());
       assertTrue(serialized.get("uptimeMs").asLong() > 0);
 
       // Memory and resource fields (M10: expand coverage)
@@ -243,6 +240,15 @@ final class StatusRecordSchemaTest {
       // Nested sub-views — Tempdoc 412 Phase 3: `llm` + `onlineAi` replaced by `inference`.
       assertNotNull(serialized.get("inference"));
       assertNotNull(serialized.get("readiness"));
+      assertEquals(2, serialized.get("readiness").get("schemaVersion").asInt());
+      assertEquals(
+          "READY",
+          serialized
+              .get("readiness")
+              .get("engineComponents")
+              .get("index")
+              .get("state")
+              .asText());
 
       // 330 §4: Grouped sub-objects
       assertNotNull(serialized.get("embedding"), "grouped embedding sub-object missing");
@@ -250,6 +256,22 @@ final class StatusRecordSchemaTest {
       assertNotNull(serialized.get("chunkCoverage"), "grouped chunkCoverage sub-object missing");
       assertNotNull(serialized.get("queueHealth"), "grouped queueHealth sub-object missing");
       assertNotNull(serialized.get("migration"), "grouped migration sub-object missing");
+    }
+
+    @Test
+    @DisplayName("readiness engine component observations are immutable")
+    void readinessEngineComponentsAreImmutable() {
+      var mutable = new java.util.HashMap<>(readyEngineComponentViews());
+      var envelope =
+          new ReadinessEnvelopeView(
+              2, "2025-01-01T00:00:00Z", mutable, Map.of(), Map.of());
+
+      mutable.clear();
+
+      assertEquals(Set.of("api", "index", "encoders", "generative"), envelope.engineComponents().keySet());
+      assertThrows(
+          UnsupportedOperationException.class,
+          () -> envelope.engineComponents().put("extra", readyEngineComponentView()));
     }
 
     @Test
@@ -285,17 +307,10 @@ final class StatusRecordSchemaTest {
           .build();
       StatusResponse sample =
           new StatusResponse(
-              1,
+              2,
               "2025-01-01T00:00:00Z",
-              new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Lifecycle(
-                  io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-              new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Components(
-                  new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                      io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-                  new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                      io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-                  new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                      io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY)),
+              readyLifecycle(),
+              readyEngineComponents(),
               "ok",
               "JustSearch",
               "C:/data/index",
@@ -322,8 +337,9 @@ final class StatusRecordSchemaTest {
                   "",
                   "CHAT"),
               new ReadinessEnvelopeView(
-                  1,
+                  2,
                   "2025-01-01T00:00:00Z",
+                  readyEngineComponentViews(),
                   Map.of(),
                   Map.of()),
               true,
@@ -384,16 +400,9 @@ final class StatusRecordSchemaTest {
           .build();
 
       var sample = new StatusResponse(
-          1, "2025-01-01T00:00:00Z",
-          new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Lifecycle(
-              io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-          new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Components(
-              new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                  io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-              new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                  io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-              new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                  io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY)),
+          2, "2025-01-01T00:00:00Z",
+          readyLifecycle(),
+          readyEngineComponents(),
           "ok", "JustSearch", "C:/data", 60000, 1024000, 2048000, 4096000, null,
           worker, true, null, null,
           null, false,
@@ -745,6 +754,41 @@ final class StatusRecordSchemaTest {
 
   // ---- Helpers ----
 
+  private static io.justsearch.app.api.lifecycle.LifecycleSnapshotV2.Lifecycle readyLifecycle() {
+    return new io.justsearch.app.api.lifecycle.LifecycleSnapshotV2.Lifecycle(
+        io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY, null, null);
+  }
+
+  private static io.justsearch.app.api.lifecycle.LifecycleSnapshotV2.Components
+      readyEngineComponents() {
+    var ready =
+        new io.justsearch.app.api.lifecycle.LifecycleSnapshotV2.Component(
+            ComponentState.READY, null, "2025-01-01T00:00:00Z");
+    return new io.justsearch.app.api.lifecycle.LifecycleSnapshotV2.Components(
+        ready, ready, ready, ready);
+  }
+
+  private static Map<String, EngineComponentView> readyEngineComponentViews() {
+    return Map.of(
+        "api", readyEngineComponentView(),
+        "index", readyEngineComponentView(),
+        "encoders", readyEngineComponentView(),
+        "generative", readyEngineComponentView());
+  }
+
+  private static EngineComponentView readyEngineComponentView() {
+    return new EngineComponentView(
+        ComponentState.READY,
+        null,
+        "2025-01-01T00:00:00Z",
+        "applied-v1",
+        "desired-v1",
+        null,
+        0,
+        0,
+        null);
+  }
+
   private static JsonNode loadResource(String path) throws IOException {
     try (InputStream is = StatusRecordSchemaTest.class.getResourceAsStream(path)) {
       if (is == null) {
@@ -756,17 +800,10 @@ final class StatusRecordSchemaTest {
 
   static StatusResponse sampleStatusResponse() {
     return new StatusResponse(
-        1,
+        2,
         "2025-01-01T00:00:00Z",
-        new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Lifecycle(
-            io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-        new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Components(
-            new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-            new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY),
-            new io.justsearch.app.api.lifecycle.LifecycleSnapshotV1.Component(
-                io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_READY)),
+        readyLifecycle(),
+        readyEngineComponents(),
         "ok",
         "JustSearch",
         "C:/data/index",
@@ -793,8 +830,9 @@ final class StatusRecordSchemaTest {
             "",
             "CHAT"),
         new ReadinessEnvelopeView(
-            1,
+            2,
             "2025-01-01T00:00:00Z",
+            readyEngineComponentViews(),
             Map.of(
                 "workerControlPlane",
                 new ReadinessComponentView("READY", null, "worker", "2025-01-01T00:00:00Z", false, 0),

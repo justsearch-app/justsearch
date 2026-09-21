@@ -21,7 +21,7 @@ import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.ShutdownOutcome;
 import io.justsearch.core.context.EngineContext;
-import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.app.api.EngineProcessResources;
 import io.justsearch.ui.runtime.RuntimeManifestPublisher;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -70,7 +70,7 @@ final class HeadlessAppOperationsCheckpointTest {
       });
       var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, manifest,
           null, null, null, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-          mock(EngineExecutorRegistry.class), () -> null, store);
+          mock(EngineProcessResources.class), () -> null, store);
       var names = steps.stream().map(EngineShutdownSequence.Step::name).toList();
       assertEquals(names.indexOf(EngineShutdownSequence.INDEX_HALF_STEP) - 1,
           names.indexOf("durable-operations-checkpoint"));
@@ -111,7 +111,7 @@ final class HeadlessAppOperationsCheckpointTest {
     when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
     var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null, null,
         mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-        mock(EngineExecutorRegistry.class), () -> null, store);
+        mock(EngineProcessResources.class), () -> null, store);
     var result = new EngineShutdownSequence(temp, steps, ignored -> {}).run(Reason.QUIT);
     assertFalse(result.clean());
     assertEquals("GRACEFUL", result.workerOutcome());

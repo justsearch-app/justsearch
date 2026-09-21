@@ -1,24 +1,38 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.bootstrap;
 
-import io.justsearch.app.services.lifecycle.InferenceCapability;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.api.lifecycle.Capability;
+import io.justsearch.app.api.lifecycle.CapabilityHealth;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
+import io.justsearch.core.component.EngineComponentRegistry;
+import java.util.Objects;
 
-/**
- * Tempdoc 519 §7 / Step 7: typed phase output for the capability phase. Holds the bootstrap's
- * two capability handles — {@link WorkerCapability} (Worker process readiness + health) and
- * {@link InferenceCapability} (LLM runtime readiness).
- *
- * <p>Produced by CapabilityPhase.run() in the final phase chain; consumed by ServicePhase /
- * ApiPhase / status controllers that need to render capability state without coupling to the
- * bootstrap as a locator.
- *
- * <p>Step 8 will populate this on the bootstrap and route status controllers through it.
- */
-public record CapabilityGraph(WorkerCapability worker, InferenceCapability inference) {
+/** Read-only gate projections; the Engine component registry owns lifecycle state. */
+public record CapabilityGraph(Capability worker, Capability inference) {
+  public CapabilityGraph {
+    Objects.requireNonNull(worker, "worker");
+    Objects.requireNonNull(inference, "inference");
+  }
 
-  /** Returns a "neither available" capability graph for the test-only / SearchPort-only path. */
+  public static CapabilityGraph fromRegistry(EngineComponentRegistry registry) {
+    return new CapabilityGraph(
+        new RegistryBackedCapability(registry, "index", "worker"),
+        new RegistryBackedCapability(registry, "generative", "inference"));
+  }
+
+  /** Explicit immutable unavailable graph for an isolated SearchPort-only composition. */
   public static CapabilityGraph unavailable() {
-    return new CapabilityGraph(new WorkerCapability(), new InferenceCapability(false));
+    return new CapabilityGraph(
+        new Unavailable("worker", true, LifecycleReasonCode.WORKER_NOT_CONNECTED.code()),
+        new Unavailable("inference", false, LifecycleReasonCode.INFERENCE_MODEL_NOT_CONFIGURED.code()));
+  }
+
+  private record Unavailable(String name, boolean required, String pendingReason)
+      implements Capability {
+    @Override
+    public CapabilityHealth health() {
+      return CapabilityHealth.OFFLINE;
+    }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "schema_version" : 1,
+  "schema_version" : 2,
   "observed_at" : "2025-01-01T00:00:00Z",
   "lifecycle" : {
     "state" : "LIFECYCLE_STATE_READY",
@@ -7,17 +7,25 @@
     "message" : null
   },
   "components" : {
-    "head" : {
-      "state" : "LIFECYCLE_STATE_READY",
-      "reason_code" : null
+    "api" : {
+      "state" : "READY",
+      "reason_code" : null,
+      "state_since" : "2025-01-01T00:00:00Z"
     },
-    "worker" : {
-      "state" : "LIFECYCLE_STATE_READY",
-      "reason_code" : null
+    "index" : {
+      "state" : "READY",
+      "reason_code" : null,
+      "state_since" : "2025-01-01T00:00:00Z"
     },
-    "inference" : {
-      "state" : "LIFECYCLE_STATE_READY",
-      "reason_code" : null
+    "encoders" : {
+      "state" : "READY",
+      "reason_code" : null,
+      "state_since" : "2025-01-01T00:00:00Z"
+    },
+    "generative" : {
+      "state" : "READY",
+      "reason_code" : null,
+      "state_since" : "2025-01-01T00:00:00Z"
     }
   },
   "status" : "ok",
@@ -266,8 +274,42 @@
     "leaseHolder" : "CHAT"
   },
   "readiness" : {
-    "schemaVersion" : 1,
+    "schemaVersion" : 2,
     "observedAt" : "2025-01-01T00:00:00Z",
+    "engineComponents" : {
+      "api" : {
+        "state" : "READY",
+        "stateSince" : "2025-01-01T00:00:00Z",
+        "appliedVersion" : "applied-v1",
+        "desiredVersion" : "desired-v1",
+        "deadlineMs" : 0,
+        "recoveryAttempts" : 0
+      },
+      "encoders" : {
+        "state" : "READY",
+        "stateSince" : "2025-01-01T00:00:00Z",
+        "appliedVersion" : "applied-v1",
+        "desiredVersion" : "desired-v1",
+        "deadlineMs" : 0,
+        "recoveryAttempts" : 0
+      },
+      "generative" : {
+        "state" : "READY",
+        "stateSince" : "2025-01-01T00:00:00Z",
+        "appliedVersion" : "applied-v1",
+        "desiredVersion" : "desired-v1",
+        "deadlineMs" : 0,
+        "recoveryAttempts" : 0
+      },
+      "index" : {
+        "state" : "READY",
+        "stateSince" : "2025-01-01T00:00:00Z",
+        "appliedVersion" : "applied-v1",
+        "desiredVersion" : "desired-v1",
+        "deadlineMs" : 0,
+        "recoveryAttempts" : 0
+      }
+    },
     "components" : {
       "ai" : {
         "state" : "READY",

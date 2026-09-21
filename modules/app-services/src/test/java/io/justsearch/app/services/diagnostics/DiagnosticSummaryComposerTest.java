@@ -6,7 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.app.api.runtime.RuntimeContract;
 import io.justsearch.app.api.status.GpuStatusView;
 import io.justsearch.contract.wire.LifecycleState;
@@ -29,14 +30,13 @@ final class DiagnosticSummaryComposerTest {
   void composesAllowlistedFieldsInDeterministicOrder() {
     var lifecycle =
         new DiagnosticSummaryComposer.LifecycleMetadata(
-            new LifecycleSnapshotV1.Lifecycle(
+            new LifecycleSnapshotV2.Lifecycle(
                 LifecycleState.LIFECYCLE_STATE_DEGRADED, "worker.lost", "excluded message"),
-            new LifecycleSnapshotV1.Components(
-                new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY),
-                new LifecycleSnapshotV1.Component(
-                    LifecycleState.LIFECYCLE_STATE_DEGRADED, "worker.lost"),
-                new LifecycleSnapshotV1.Component(
-                    LifecycleState.LIFECYCLE_STATE_STOPPED, "inference.deactivated")));
+            new LifecycleSnapshotV2.Components(
+                component(ComponentState.READY, null),
+                component(ComponentState.UNAVAILABLE, "worker.lost"),
+                component(ComponentState.ABSENT, null),
+                component(ComponentState.ABSENT, "inference.deactivated")));
     var inputs =
         new DiagnosticSummaryComposer.Inputs(
             "1.2.3",
@@ -60,9 +60,10 @@ final class DiagnosticSummaryComposerTest {
         "runtime-contract.version: ",
         "platform.os-family: WINDOWS",
         "lifecycle.overall.state: LIFECYCLE_STATE_DEGRADED",
-        "lifecycle.head.state: LIFECYCLE_STATE_READY",
-        "lifecycle.worker.state: LIFECYCLE_STATE_DEGRADED",
-        "lifecycle.inference.state: LIFECYCLE_STATE_STOPPED",
+        "lifecycle.api.state: READY",
+        "lifecycle.index.state: UNAVAILABLE",
+        "lifecycle.encoders.state: ABSENT",
+        "lifecycle.generative.state: ABSENT",
         "gpu.vendor: NVIDIA",
         "latest-crash.timestamp: 2026-09-04T06:00:00Z",
         "note: " + DiagnosticSummaryComposer.LOCAL_ONLY_NOTE);
@@ -73,14 +74,15 @@ final class DiagnosticSummaryComposerTest {
   void unknownFreeFormLifecycleReasonsAreOmitted() {
     var lifecycle =
         new DiagnosticSummaryComposer.LifecycleMetadata(
-            new LifecycleSnapshotV1.Lifecycle(
+            new LifecycleSnapshotV2.Lifecycle(
                 LifecycleState.LIFECYCLE_STATE_DEGRADED,
                 "C:\\Users\\Alice\\token=must-not-escape",
                 null),
-            new LifecycleSnapshotV1.Components(
-                new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY),
-                new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_DEGRADED),
-                new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_STOPPED)));
+            new LifecycleSnapshotV2.Components(
+                component(ComponentState.READY, null),
+                component(ComponentState.UNAVAILABLE, null),
+                component(ComponentState.ABSENT, null),
+                component(ComponentState.ABSENT, null)));
 
     String summary =
         composer.compose(
@@ -263,4 +265,8 @@ final class DiagnosticSummaryComposerTest {
       previous = current;
     }
   }
+  private static LifecycleSnapshotV2.Component component(ComponentState state, String reason) {
+    return new LifecycleSnapshotV2.Component(state, reason, Instant.EPOCH.toString());
+  }
+
 }

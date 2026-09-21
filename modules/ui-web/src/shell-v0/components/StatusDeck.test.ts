@@ -76,12 +76,12 @@ describe('StatusDeck (slice 461)', () => {
     expect(dot?.classList.contains('muted')).toBe(true);
   });
 
-  it('connection dot turns healthy when head + worker READY', async () => {
+  it('connection dot turns healthy when api + index READY', async () => {
     const el = make();
     // B2: status now comes from the ONE observed-state authority (aiState.status).
     el.aiState = makeAiState({
       status: {
-        components: { head: { state: 'LIFECYCLE_STATE_READY' }, worker: { state: 'LIFECYCLE_STATE_READY' } },
+        readiness: { engineComponents: { api: { state: 'READY' }, index: { state: 'READY' } } },
       } as unknown as AiState['status'],
     });
     await el.updateComplete;
@@ -90,12 +90,12 @@ describe('StatusDeck (slice 461)', () => {
   });
 
   // Tempdoc 807 A.3 (round-13 R13-F2) — the CONN dot reflects REACHABILITY, not the last good poll.
-  // `components.head/worker.state` are fields off the retained snapshot: they said READY/READY forever
+  // `readiness.engineComponents.api/index.state` are fields off the retained snapshot: they said READY/READY forever
   // after both java processes died, so the dot stayed green beside a "Backend disconnected." banner.
   it('807: the connection dot goes red when the snapshot is no longer live — READY/READY notwithstanding', async () => {
     const el = make();
     const READY_SNAPSHOT = {
-      components: { head: { state: 'LIFECYCLE_STATE_READY' }, worker: { state: 'LIFECYCLE_STATE_READY' } },
+      readiness: { engineComponents: { api: { state: 'READY' }, index: { state: 'READY' } } },
     } as unknown as AiState['status'];
     // The exact round-13 state: a fully-healthy retained snapshot + contact aged out mid-session
     // (verdict `transitioning`/`channel-stale`, NOT `unreachable` — the poll had succeeded once).
@@ -124,13 +124,45 @@ describe('StatusDeck (slice 461)', () => {
     const el = make();
     el.aiState = makeAiState({
       status: {
-        components: { head: { state: 'LIFECYCLE_STATE_READY' }, worker: { state: 'LIFECYCLE_STATE_READY' } },
+        readiness: { engineComponents: { api: { state: 'READY' }, index: { state: 'READY' } } },
       } as unknown as AiState['status'],
       connection: { reachable: false, lastSuccessMs: null, lastContactMs: null, consecutiveFailures: 1 },
       verdict: { kind: 'unreachable', severity: 'error', reasons: ['binding.unreachable'] },
     });
     await el.updateComplete;
     expect(el.shadowRoot?.querySelector('.dot')?.classList.contains('error')).toBe(true);
+  });
+
+  it.each(['api', 'index'])('connection dot fails closed for invalid %s states', async (component) => {
+    for (const state of ['ABSENT', 'RELOADING', 'FAILED', 'UNAVAILABLE', 'UNKNOWN', undefined]) {
+      const el = make();
+      el.aiState = makeAiState({ status: {
+        readiness: { engineComponents: { api: { state: 'READY' }, index: { state: 'READY' },
+          [component]: { state } } },
+      } as unknown as AiState['status'] });
+      await el.updateComplete;
+      expect(el.shadowRoot?.querySelector('.dot')?.classList.contains('error')).toBe(true);
+      el.remove();
+    }
+  });
+
+  it.each([{}, { readiness: {} }, { readiness: { engineComponents: {} } }])(
+    'connection dot fails closed for missing component data %j', async (status) => {
+      const el = make();
+      el.aiState = makeAiState({ status: status as unknown as AiState['status'] });
+      await el.updateComplete;
+      expect(el.shadowRoot?.querySelector('.dot')?.classList.contains('error')).toBe(true);
+    },
+  );
+
+  it.each(['api', 'index'])('connection dot shows starting for %s', async (component) => {
+    const el = make();
+    el.aiState = makeAiState({ status: {
+      readiness: { engineComponents: { api: { state: 'READY' }, index: { state: 'READY' },
+        [component]: { state: 'STARTING' } } },
+    } as unknown as AiState['status'] });
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector('.dot')?.classList.contains('warn')).toBe(true);
   });
 
   it('memory dot turns warn at >80% utilization', async () => {

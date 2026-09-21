@@ -8,7 +8,7 @@
 // camelCase fields use [json_name = "camelCase"] to be explicit.
 //
 // All sub-records populated 2026-05-06 per proto-correctness pass against
-// modules/app-api/.../status/*.java + lifecycle/LifecycleSnapshotV1.java.
+// modules/app-api/.../status/*.java + lifecycle/LifecycleSnapshotV2.java.
 
 syntax = "proto3";
 
@@ -22,7 +22,8 @@ message StatusResponse {
   int32 schema_version = 1 [json_name = "schema_version"];
   string observed_at = 2 [json_name = "observed_at"];
   Lifecycle lifecycle = 3;
-  Components components = 4;
+  reserved 4;
+  reserved "components";
 
   // Head-level fields
   string status = 5;
@@ -69,6 +70,7 @@ message StatusResponse {
   PowerStatusView power = 33 [json_name = "power"];
   // Tempdoc 630: post-restart reconcile ("catching up") flag.
   bool catching_up = 34 [json_name = "catchingUp"];
+  EngineComponents engine_components = 35 [json_name = "components"];
 }
 
 // Tempdoc 630 — OS energy-intent snapshot (PowerStatusView record).
@@ -77,7 +79,7 @@ message PowerStatusView {
   string source = 2 [json_name = "source"];
 }
 
-// === Lifecycle envelope (LifecycleSnapshotV1.{Lifecycle,Components,Component}) ===
+// === Lifecycle envelope (LifecycleSnapshotV2) ===
 
 message Lifecycle {
   LifecycleState state = 1;
@@ -85,15 +87,29 @@ message Lifecycle {
   string message = 3;
 }
 
-message Components {
-  Component head = 1;
-  Component worker = 2;
-  Component inference = 3;
+message EngineComponents {
+  EngineComponent api = 1;
+  EngineComponent index = 2;
+  EngineComponent encoders = 3;
+  EngineComponent generative = 4;
 }
 
-message Component {
-  LifecycleState state = 1;
+message EngineComponent {
+  EngineComponentState state = 1;
   string reason_code = 2 [json_name = "reason_code"];
+  string state_since = 3 [json_name = "state_since"];
+}
+
+// Separate from the aggregate LifecycleState. Unknown numeric values remain preserved by protobuf
+// as UNRECOGNIZED and must never be interpreted as one of the six known component states.
+enum EngineComponentState {
+  ENGINE_COMPONENT_STATE_UNSPECIFIED = 0;
+  ABSENT = 1;
+  STARTING = 2;
+  READY = 3;
+  RELOADING = 4;
+  FAILED = 5;
+  UNAVAILABLE = 6;
 }
 
 // LifecycleState carries no enum.defined_only constraint per ADR-09a's
@@ -410,6 +426,19 @@ message ReadinessEnvelopeView {
   string observed_at = 2 [json_name = "observedAt"];
   map<string, ReadinessComponentView> components = 3;
   map<string, ReadinessCompositeView> composites = 4;
+  map<string, EngineComponentView> engine_components = 5 [json_name = "engineComponents"];
+}
+
+message EngineComponentView {
+  EngineComponentState state = 1;
+  string reason_code = 2 [json_name = "reasonCode"];
+  string state_since = 3 [json_name = "stateSince"];
+  string applied_version = 4 [json_name = "appliedVersion"];
+  string desired_version = 5 [json_name = "desiredVersion"];
+  string mode = 6;
+  int64 deadline_ms = 7 [json_name = "deadlineMs"];
+  int32 recovery_attempts = 8 [json_name = "recoveryAttempts"];
+  string evidence = 9;
 }
 
 message ReadinessComponentView {

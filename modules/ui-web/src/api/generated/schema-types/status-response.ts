@@ -10,16 +10,18 @@
 
 import { z } from 'zod';
 
-export type LifecycleStateNullable = "LIFECYCLE_STATE_UNSPECIFIED" | "LIFECYCLE_STATE_STARTING" | "LIFECYCLE_STATE_READY" | "LIFECYCLE_STATE_DEGRADED" | "LIFECYCLE_STATE_ERROR" | "LIFECYCLE_STATE_STOPPING" | "LIFECYCLE_STATE_STOPPED" | "UNRECOGNIZED" | null;
-export const lifecycleStateNullableSchema = z.enum(["LIFECYCLE_STATE_UNSPECIFIED", "LIFECYCLE_STATE_STARTING", "LIFECYCLE_STATE_READY", "LIFECYCLE_STATE_DEGRADED", "LIFECYCLE_STATE_ERROR", "LIFECYCLE_STATE_STOPPING", "LIFECYCLE_STATE_STOPPED", "UNRECOGNIZED"]).nullable();
+export type ComponentState = "ABSENT" | "STARTING" | "READY" | "RELOADING" | "FAILED" | "UNAVAILABLE";
+export const componentStateSchema = z.enum(["ABSENT", "STARTING", "READY", "RELOADING", "FAILED", "UNAVAILABLE"]);
 
 export type ComponentNullable = {
   reason_code?: string | null;
-  state?: LifecycleStateNullable;
+  state?: ComponentState | null;
+  state_since?: string | null;
 } | null;
 export const componentNullableSchema = z.strictObject({
   "reason_code": z.string().nullable().optional(),
-  "state": lifecycleStateNullableSchema.optional(),
+  "state": componentStateSchema.nullable().optional(),
+  "state_since": z.string().nullable().optional(),
 }).nullable();
 
 export type MigrationEnumeratorViewNullable = {
@@ -86,9 +88,10 @@ export interface StatusResponse {
     ready?: boolean;
   };
   components?: {
-    head?: ComponentNullable;
-    inference?: ComponentNullable;
-    worker?: ComponentNullable;
+    api?: ComponentNullable;
+    encoders?: ComponentNullable;
+    generative?: ComponentNullable;
+    index?: ComponentNullable;
   };
   conversationProtection?: {
     state?: string;
@@ -154,7 +157,7 @@ export interface StatusResponse {
   lifecycle?: {
     message?: string | null;
     reason_code?: string | null;
-    state?: LifecycleStateNullable;
+    state?: "LIFECYCLE_STATE_UNSPECIFIED" | "LIFECYCLE_STATE_STARTING" | "LIFECYCLE_STATE_READY" | "LIFECYCLE_STATE_DEGRADED" | "LIFECYCLE_STATE_ERROR" | "LIFECYCLE_STATE_STOPPING" | "LIFECYCLE_STATE_STOPPED" | "UNRECOGNIZED" | null;
   };
   memoryMaxBytes?: number;
   memoryTotalBytes?: number;
@@ -215,6 +218,17 @@ export interface StatusResponse {
       reasonCodes?: string[] | null;
       stale?: boolean;
       state?: string | null;
+    }> | null;
+    engineComponents?: Record<string, {
+      appliedVersion?: string;
+      deadlineMs?: number;
+      desiredVersion?: string;
+      evidence?: string;
+      mode?: "BESIDE" | "IN_PLACE";
+      reasonCode?: string;
+      recoveryAttempts?: number;
+      state?: ComponentState;
+      stateSince?: string;
     }> | null;
     observedAt?: string | null;
     schemaVersion?: number;
@@ -434,9 +448,10 @@ export const statusResponseSchema = z.strictObject({
     "ready": z.boolean().optional(),
   }).optional(),
   "components": z.strictObject({
-    "head": componentNullableSchema.optional(),
-    "inference": componentNullableSchema.optional(),
-    "worker": componentNullableSchema.optional(),
+    "api": componentNullableSchema.optional(),
+    "encoders": componentNullableSchema.optional(),
+    "generative": componentNullableSchema.optional(),
+    "index": componentNullableSchema.optional(),
   }).optional(),
   "conversationProtection": z.strictObject({
     "state": z.string().optional(),
@@ -502,7 +517,7 @@ export const statusResponseSchema = z.strictObject({
   "lifecycle": z.strictObject({
     "message": z.string().nullable().optional(),
     "reason_code": z.string().nullable().optional(),
-    "state": lifecycleStateNullableSchema.optional(),
+    "state": z.enum(["LIFECYCLE_STATE_UNSPECIFIED", "LIFECYCLE_STATE_STARTING", "LIFECYCLE_STATE_READY", "LIFECYCLE_STATE_DEGRADED", "LIFECYCLE_STATE_ERROR", "LIFECYCLE_STATE_STOPPING", "LIFECYCLE_STATE_STOPPED", "UNRECOGNIZED"]).nullable().optional(),
   }).optional(),
   "memoryMaxBytes": z.number().int().optional(),
   "memoryTotalBytes": z.number().int().optional(),
@@ -563,6 +578,17 @@ export const statusResponseSchema = z.strictObject({
       "reasonCodes": z.array(z.string()).nullable().optional(),
       "stale": z.boolean().optional(),
       "state": z.string().nullable().optional(),
+    })).nullable().optional(),
+    "engineComponents": z.record(z.string(), z.strictObject({
+      "appliedVersion": z.string().optional(),
+      "deadlineMs": z.number().int().optional(),
+      "desiredVersion": z.string().optional(),
+      "evidence": z.string().optional(),
+      "mode": z.enum(["BESIDE", "IN_PLACE"]).optional(),
+      "reasonCode": z.string().optional(),
+      "recoveryAttempts": z.number().int().optional(),
+      "state": componentStateSchema.optional(),
+      "stateSince": z.string().optional(),
     })).nullable().optional(),
     "observedAt": z.string().nullable().optional(),
     "schemaVersion": z.number().int().optional(),

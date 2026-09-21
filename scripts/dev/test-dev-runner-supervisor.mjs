@@ -42,7 +42,7 @@ const {
   cleanupRegisteredChildrenForTerminal,
   checkHttp200,
   fetchJsonHttp,
-  essentialStatusReady,
+  essentialReadyEpoch,
 } = require(path.join(__dirname, 'dev-runner.cjs')).__test;
 const engineSupervisor = require(path.join(__dirname, 'lib', 'engine-supervisor.cjs'));
 
@@ -526,21 +526,24 @@ async function main() {
     for (const socket of sockets) socket.destroy();
     await new Promise((resolve) => silent.close(resolve));
   }
-  const status = {
-    components: { head: { state: 'LIFECYCLE_STATE_READY' } }, indexAvailable: true,
-    worker: { core: { indexHealthy: true } },
-    readiness: { components: { indexServing: { state: 'DEGRADED', stale: false }, ai: { state: 'NOT_READY' } } },
-  };
-  assert.equal(essentialStatusReady(status), true, 'optional AI does not prevent stability');
-  status.worker.core.indexHealthy = false;
-  assert.equal(essentialStatusReady(status), false);
-  status.worker.core.indexHealthy = true;
-  status.readiness.components.indexServing.stale = true;
-  assert.equal(essentialStatusReady(status), false);
-  status.readiness.components.indexServing.stale = false;
-  status.components.head.state = 'LIFECYCLE_STATE_STOPPING';
-  assert.equal(essentialStatusReady(status), false);
-  assert.equal(essentialStatusReady(null), false);
+  const epoch = '2026-09-21T12:00:00.123456789Z';
+  const status = { readiness: { engineComponents: { index: { state: 'READY', stateSince: epoch } } } };
+  assert.equal(essentialReadyEpoch(status), epoch, 'only the Engine index component gates stability');
+  for (const state of ['ABSENT', 'STARTING', 'RELOADING', 'FAILED', 'UNAVAILABLE', 'UNKNOWN', undefined]) {
+    status.readiness.engineComponents.index.state = state;
+    assert.equal(essentialReadyEpoch(status), null, `reject ${state}`);
+  }
+  status.readiness.engineComponents.index.state = 'READY';
+  for (const invalid of [undefined, null, '', 123, 'yesterday', '2026-99-21T12:00:00Z', '2026-02-30T12:00:00Z', '2026-09-21']) {
+    status.readiness.engineComponents.index.stateSince = invalid;
+    assert.equal(essentialReadyEpoch(status), null, `reject epoch ${invalid}`);
+  }
+  const nextEpoch = '2026-09-21T12:01:00Z';
+  status.readiness.engineComponents.index.stateSince = nextEpoch;
+  assert.equal(essentialReadyEpoch(status), nextEpoch, 'READY with a new epoch remains distinguishable');
+  for (const missing of [null, {}, { readiness: {} }, { readiness: { engineComponents: {} } }]) {
+    assert.equal(essentialReadyEpoch(missing), null);
+  }
   console.log('test-dev-runner-supervisor: bounded liveness and essential readiness — PASS');
   testStateRecordsWhichPolicyItRanUnder();
   await testOverlappingStatePublicationsStayInTransitionOrder();

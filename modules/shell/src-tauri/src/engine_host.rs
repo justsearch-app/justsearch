@@ -221,6 +221,10 @@ impl EngineHost {
 
     /// Attribute an HTTP observation only to the same admitted child and binding throughout it.
     pub(crate) fn observe_current_binding(&self, probe: impl FnOnce(u16) -> bool) -> Option<Binding> {
+        self.observe_current_value(|port| probe(port).then_some(())).map(|(binding, ())| binding)
+    }
+
+    pub(crate) fn observe_current_value<T>(&self, probe: impl FnOnce(u16) -> Option<T>) -> Option<(Binding, T)> {
         let (generation, binding) = {
             let inner = self.inner.lock().expect("engine host mutex poisoned");
             let child = inner.child.as_ref()?;
@@ -230,12 +234,10 @@ impl EngineHost {
             }
             (child.generation, inner.binding.clone())
         };
-        if !probe(binding.port?) {
-            return None;
-        }
+        let value = probe(binding.port?)?;
         let inner = self.inner.lock().expect("engine host mutex poisoned");
         (!inner.closing && inner.child.as_ref()?.generation == generation && inner.binding == binding)
-            .then_some(binding)
+            .then_some((binding, value))
     }
     /// Admit local shutdown intent only from this host's current child and manifest binding.
     pub(crate) fn observed_shutdown_reason(
@@ -653,6 +655,66 @@ mod tests {
     }
 
     #[test]
+    fn current_value_retains_probe_result_for_the_unchanged_admitted_binding() {
+        let host = EngineHost::default();
+        let child = host.admit(sleeper()).unwrap();
+        host.observe_manifest(&manifest("current", child.pid, 40404));
+
+        let observed = host
+            .observe_current_value(|port| (port == 40404).then_some("ready-epoch-a"))
+            .expect("an unchanged admitted binding retains the probed value");
+
+        assert_eq!(observed.0, host.binding_snapshot());
+        assert_eq!(observed.1, "ready-epoch-a");
+        host.kill_and_reap();
+    }
+
+    #[test]
+    fn current_value_discards_probe_result_when_the_binding_changes_during_the_probe() {
+        let host = EngineHost::default();
+        let child = host.admit(sleeper()).unwrap();
+        let mut incomplete = manifest("current", child.pid, 40404);
+        incomplete.session_token = None;
+        host.observe_manifest(&incomplete);
+        assert_eq!(host.binding_snapshot().token, None);
+
+        let observed = host.observe_current_value(|port| {
+            assert_eq!(port, 40404);
+            let change = host
+                .observe_manifest(&manifest("current", child.pid, 40404))
+                .expect("the current instance may fill a missing token");
+            assert!(change.token_available, "the probe must actually mutate the binding");
+            Some("stale-ready-epoch")
+        });
+
+        assert!(observed.is_none());
+        assert_eq!(host.binding_snapshot().token.as_deref(), Some("token-current"));
+        host.kill_and_reap();
+    }
+
+    #[test]
+    fn current_value_discards_probe_result_when_the_child_incarnation_changes() {
+        let host = EngineHost::default();
+        let first = host.admit(sleeper()).unwrap();
+        host.observe_manifest(&manifest("first", first.pid, 40404));
+
+        let observed = host.observe_current_value(|port| {
+            assert_eq!(port, 40404);
+            let mut child = host.take_child().unwrap();
+            child.kill().unwrap();
+            child.wait().unwrap();
+            host.reset_for_successor().unwrap();
+            let second = host.admit(sleeper()).unwrap();
+            host.observe_manifest(&manifest("second", second.pid, 50505));
+            Some("stale-ready-epoch")
+        });
+
+        assert!(observed.is_none());
+        assert_eq!(host.binding_snapshot().instance_id.as_deref(), Some("second"));
+        host.kill_and_reap();
+    }
+
+    #[test]
     fn incarnation_reset_never_reopens_a_closed_host() {
         let host = EngineHost::default();
         host.begin_close();
@@ -879,8 +941,8 @@ mod tests {
         fn probe_health(&mut self) -> bool {
             true
         }
-        fn probe_essential_ready(&mut self) -> bool {
-            true
+        fn probe_essential_ready(&mut self) -> Option<crate::engine_probe::ReadyEpoch> {
+            crate::engine_probe::ReadyEpoch::parse("2026-09-21T12:00:00Z")
         }
         fn observed_shutdown_reason(&mut self, _current: &supervisor::Ready) -> Option<String> {
             None
@@ -905,6 +967,115 @@ mod tests {
                     events.push(record.clone())
                 });
         }
+    }
+
+    struct EpochContinuityActuator {
+        now: u64,
+        ready_calls: usize,
+        exit_pending: bool,
+        epoch_probes: usize,
+        counted_restart_seen: bool,
+        reset_at: Option<u64>,
+    }
+
+    impl supervisor::Actuator for EpochContinuityActuator {
+        fn spawn_engine(&mut self) -> Result<u32, String> {
+            Ok(43)
+        }
+
+        fn await_ready(&mut self, _deadline_ms: u64) -> Result<supervisor::Ready, String> {
+            self.ready_calls += 1;
+            Ok(supervisor::Ready {
+                pid: Some(if self.ready_calls == 1 { 42 } else { 43 }),
+                api_port: Some(40404),
+                instance_id: Some(format!("incarnation-{}", self.ready_calls)),
+            })
+        }
+
+        fn poll_exit(&mut self) -> Option<i32> {
+            self.exit_pending.then(|| {
+                self.exit_pending = false;
+                1
+            })
+        }
+
+        fn probe_health(&mut self) -> bool {
+            true
+        }
+
+        fn probe_essential_ready(&mut self) -> Option<crate::engine_probe::ReadyEpoch> {
+            let epoch = if self.epoch_probes == 0 {
+                "2026-09-21T12:00:00Z"
+            } else {
+                "2026-09-21T12:01:00Z"
+            };
+            self.epoch_probes += 1;
+            crate::engine_probe::ReadyEpoch::parse(epoch)
+        }
+
+        fn observed_shutdown_reason(&mut self, _current: &supervisor::Ready) -> Option<String> {
+            None
+        }
+
+        fn write_shutdown_request(&mut self, _reason: &str, _deadline: u64) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn force_kill(&mut self) {}
+
+        fn wait_for_handle_release(&mut self) -> bool {
+            true
+        }
+
+        fn sleep(&mut self, ms: u64) {
+            self.now += ms;
+        }
+
+        fn now_ms(&mut self) -> u64 {
+            self.now
+        }
+
+        fn publish_state(&mut self, record: &StateRecord) {
+            if record.restart_count == 1 {
+                self.counted_restart_seen = true;
+            } else if self.counted_restart_seen && record.restart_count == 0 {
+                self.reset_at = Some(self.now);
+            }
+        }
+
+        fn should_continue(&mut self) -> bool {
+            self.reset_at.is_none() && self.now <= 500
+        }
+    }
+
+    #[test]
+    fn a_new_ready_epoch_must_span_the_full_stability_window_before_budget_reset() {
+        let mut policy = supervisor::load_policy();
+        policy.cooldown_increment_ms = 0;
+        policy.max_cooldown_ms = 0;
+        policy.hang_poll_interval_ms = 50;
+        policy.stability_window_ms = 100;
+        let mut supervisor = supervisor::Supervisor::new(policy);
+        let mut actuator = EpochContinuityActuator {
+            now: 0,
+            ready_calls: 0,
+            exit_pending: true,
+            epoch_probes: 0,
+            counted_restart_seen: false,
+            reset_at: None,
+        };
+
+        let outcome = supervisor::run_supervision(&mut supervisor, &mut actuator);
+
+        assert!(matches!(outcome, supervisor::Outcome::Cancelled));
+        assert!(actuator.counted_restart_seen, "the loop must first spend one restart");
+        assert_eq!(actuator.epoch_probes, 4, "A, B, B, B are the required observations");
+        assert_eq!(
+            actuator.reset_at,
+            Some(200),
+            "epoch B starts a fresh monotonic stability window instead of inheriting A's time"
+        );
+        assert_eq!(supervisor.restart_count, 0);
     }
 
     #[test]

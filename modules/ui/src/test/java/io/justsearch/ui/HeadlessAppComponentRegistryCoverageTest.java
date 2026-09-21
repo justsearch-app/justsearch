@@ -3,14 +3,14 @@ package io.justsearch.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.engine.EngineRoot;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -85,14 +85,12 @@ final class HeadlessAppComponentRegistryCoverageTest {
       manifest = new RuntimeManifestPublisher(dataDir);
       root = new EngineRoot(operations, mock(OperationAttemptRunner.class), 30_000L, 100);
 
-      var workerCapability = new WorkerCapability();
       apiPhase =
           buildApi(
               infraPhase,
               settings,
               manifest,
               io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
-              workerCapability,
               new UpgradeShutdownBridge(),
               new LifecycleShutdownBridge(),
               root);
@@ -129,7 +127,9 @@ final class HeadlessAppComponentRegistryCoverageTest {
 
       var generative = component(components, "generative");
       assertEquals(ComponentState.ABSENT, generative.state());
-      assertEquals(LifecycleReasonCode.INFERENCE_OFFLINE.code(), generative.reasonCode());
+      assertNull(
+          generative.reasonCode(),
+          "disabled optional inference is absent intent, not an observed runtime failure");
       assertEquals(ComponentState.ABSENT, component(components, "index").state());
       assertEquals(ComponentState.ABSENT, component(components, "encoders").state());
 
@@ -151,12 +151,13 @@ final class HeadlessAppComponentRegistryCoverageTest {
             return io.justsearch.app.api.status.WorkerOperationalView.fallback("READY");
           });
       var knowledgeServer = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      var workerCapability = new RegistryBackedCapability(root.components(), "index", "worker");
       org.mockito.Mockito.when(knowledgeServer.client()).thenReturn(client);
       org.mockito.Mockito.when(knowledgeServer.hasClient()).thenReturn(true);
       org.mockito.Mockito.when(knowledgeServer.workerCapability()).thenReturn(workerCapability);
       org.mockito.Mockito.when(knowledgeServer.gpuScheduling())
           .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
-      workerCapability.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
+      root.indexComponent().transition(ComponentState.READY, null, null);
       drainSampler(samplerExecutor); // A legacy capability event cannot satisfy the bind assertion.
       assertEquals(0, calls.get());
       var connect = HeadlessApp.class.getDeclaredMethod("connectAndBind",
@@ -218,7 +219,6 @@ final class HeadlessAppComponentRegistryCoverageTest {
       UiSettingsStore settings,
       RuntimeManifestPublisher manifest,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
-      WorkerCapability workerCapability,
       UpgradeShutdownBridge upgradeShutdown,
       LifecycleShutdownBridge lifecycleShutdown,
       EngineRoot root)
@@ -230,7 +230,6 @@ final class HeadlessAppComponentRegistryCoverageTest {
             UiSettingsStore.class,
             RuntimeManifestPublisher.class,
             io.justsearch.app.api.runtime.ManagedChildRegistry.class,
-            WorkerCapability.class,
             UpgradeShutdownBridge.class,
             LifecycleShutdownBridge.class,
             EngineRoot.class);
@@ -243,7 +242,6 @@ final class HeadlessAppComponentRegistryCoverageTest {
               settings,
               manifest,
               childRegistry,
-              workerCapability,
               upgradeShutdown,
               lifecycleShutdown,
               root);

@@ -151,7 +151,7 @@ final class CoreApiAssembly {
             enterprisePolicyService,
             b.settingsStore,
             telemetry,
-            resolveInferenceCapability(b.HeadAssembly, b.inferenceCapability),
+            b.HeadAssembly != null ? b.HeadAssembly.generativeComponent() : b.generativeComponent,
             // Tempdoc 737 fix pack (fix 4): the ONE runtime-intent authority for /api/inference/mode.
             // Null for legacy test seams (HeadAssembly absent) — those keep the raw fallback path.
             b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
@@ -184,8 +184,8 @@ final class CoreApiAssembly {
             b.lambdaMartReranker != null ? () -> b.lambdaMartReranker : null,
             b.gplJobCoordinator != null ? () -> b.gplJobCoordinator : null,
             () -> gpuCapabilitiesService,
-            resolveWorkerCapability(headAssemblyRef, b.knowledgeServer, b.knowledgeServerStartError),
-            resolveInferenceCapability(headAssemblyRef, b.inferenceCapability));
+            resolveWorkerCapability(headAssemblyRef, b.knowledgeServer, b.componentRegistry),
+            resolveInferenceCapability(headAssemblyRef, b.inferenceCapability, b.componentRegistry));
     if (b.indexComponent != null) {
       statusLifecycleHandler.setIndexComponent(b.componentRegistry, b.indexComponent);
     }
@@ -197,9 +197,6 @@ final class CoreApiAssembly {
     // Tempdoc 501 Phase 26 (§13.7 Q5): thread the runtime manifest publisher
     // into the status handler so it reads the overall lifecycle projection
     // from one canonical source instead of re-deriving on every request.
-    if (b.runtimeManifestPublisher != null) {
-      statusLifecycleHandler.setRuntimeManifestPublisher(b.runtimeManifestPublisher);
-    }
     if (b.HeadAssembly != null) {
       var coordinator = b.HeadAssembly.headInfraRegistry().offlineCoordinator();
       if (coordinator != null) {
@@ -407,7 +404,7 @@ final class CoreApiAssembly {
               gpuCapabilitiesService,
               enterprisePolicyService,
               b.workerFeatureCache,
-              resolveInferenceCapability(b.HeadAssembly, b.inferenceCapability),
+              b.HeadAssembly != null ? b.HeadAssembly.generativeComponent() : b.generativeComponent,
               aiInstallHelper,
               null,
               b.settingsService);
@@ -558,39 +555,25 @@ final class CoreApiAssembly {
         perSourceSearch);
   }
 
-  private static io.justsearch.app.services.lifecycle.WorkerCapability resolveWorkerCapability(
+  private static io.justsearch.app.api.lifecycle.Capability resolveWorkerCapability(
       HeadAssembly bootstrap,
       KnowledgeServerBootstrap ks,
-      String startError) {
+      io.justsearch.core.component.EngineComponentRegistry components) {
     if (bootstrap != null) return bootstrap.capabilities().worker();
+    if (components != null) return new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "index", "worker");
     if (ks != null) return ks.workerCapability();
-    if (startError != null && !startError.isBlank()) return createFailedWorkerCapability(startError);
-    return createOfflineWorkerCapability();
+    return io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().worker();
   }
 
-  private static io.justsearch.app.services.lifecycle.WorkerCapability createOfflineWorkerCapability() {
-    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
-    cap.transition(
-        io.justsearch.app.api.lifecycle.CapabilityHealth.OFFLINE,
-        io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_NOT_CONFIGURED.code(),
-        "Worker not configured");
-    return cap;
-  }
-
-  private static io.justsearch.app.services.lifecycle.WorkerCapability createFailedWorkerCapability(String error) {
-    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
-    cap.transition(
-        io.justsearch.app.api.lifecycle.CapabilityHealth.DEGRADED,
-        io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
-        "Worker spawn failed: " + error);
-    return cap;
-  }
-
-  private static io.justsearch.app.services.lifecycle.InferenceCapability resolveInferenceCapability(
+  private static io.justsearch.app.api.lifecycle.Capability resolveInferenceCapability(
       HeadAssembly bootstrap,
-      io.justsearch.app.services.lifecycle.InferenceCapability explicit) {
+      io.justsearch.app.api.lifecycle.Capability explicit,
+      io.justsearch.core.component.EngineComponentRegistry components) {
     if (bootstrap != null) return bootstrap.capabilities().inference();
+    if (components != null) return new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "generative", "inference");
     if (explicit != null) return explicit;
-    return new io.justsearch.app.services.lifecycle.InferenceCapability(false);
+    return io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().inference();
   }
 }

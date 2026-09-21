@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -26,7 +28,11 @@ import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.app.services.ai.runtime.RuntimeActivationService;
 import io.justsearch.app.api.EnterprisePolicyService;
+import io.justsearch.app.api.EffectivePolicy;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.app.services.policy.EnterprisePolicyServiceImpl;
+import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.settings.SettingsServiceImpl;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.DownloadProfile;
@@ -37,6 +43,8 @@ import io.justsearch.configuration.model.ModelRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.execution.TestEngineExecutors;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,6 +52,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -168,6 +178,130 @@ class RuntimeActivationServiceTest {
     AiRuntimeActivationStatus st = awaitDone(svc);
     assertEquals("failed", st.state);
     assertEquals("POLICY_ONLINE_AI_DISABLED", st.errorCode);
+  }
+
+  @Test
+  void unsetChatIntentAllowsActivationAttemptWithoutInventingAComponentFailure() throws Exception {
+    setHome(tmp);
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY);
+    assertNull(settings.inspect().settings().getChatEnabled());
+    try (var components = TestEngineComponents.fourComponents()) {
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          settings, null, policy, null, handle);
+      service.startActivate("cuda12");
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+      assertEquals(ComponentState.ABSENT, handle.snapshot().state());
+      // Completion releases the single-flight guard even with unspecified intent.
+      service.startActivate("cuda12");
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+    }
+  }
+
+  @Test
+  void startingPublicationFailureReleasesTheActivationGuardBeforeAnyOwnerThread() throws Exception {
+    setHome(tmp);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("publication-failure"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = org.mockito.Mockito.spy(
+          new ReasonRetainingComponentHandle(components.handle("generative")));
+      var failure = new IllegalStateException("component publication unavailable");
+      org.mockito.Mockito.doThrow(failure).doCallRealMethod().when(handle).snapshot();
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          intent.settings(), null, policy, null, handle);
+      org.junit.jupiter.api.Assertions.assertSame(failure,
+          org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+              () -> service.startActivate("cuda12")));
+      assertEquals("failed", service.getActivationStatus().state);
+      service.startActivate("cuda12");
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+      assertEquals(ComponentState.UNAVAILABLE, handle.snapshot().state());
+    }
+  }
+
+  @Test
+  void policyRefusalPublishesPreciseUnavailableObservation() throws Exception {
+    setHome(tmp);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("policy-observation"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(effective.gpuAccelerationEnabled()).thenReturn(true);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(
+          processExecutors,
+          OnlineAiService.unavailable(),
+          intent.settings(),
+          null,
+          policy,
+          null,
+          handle);
+
+      service.startActivate("cuda-12.4");
+      awaitDone(service);
+
+      assertEquals(ComponentState.UNAVAILABLE, handle.snapshot().state());
+      assertEquals(LifecycleReasonCode.INFERENCE_POLICY_ONLINE_AI_DISABLED.code(),
+          handle.snapshot().reasonCode());
+    }
+  }
+
+  @Test
+  void olderActivationFailureCannotOverwriteDisableReenableObservation() throws Exception {
+    setHome(tmp);
+    CountDownLatch policyEntered = new CountDownLatch(1);
+    CountDownLatch releasePolicy = new CountDownLatch(1);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("activation-aba"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(true);
+      when(effective.gpuAccelerationEnabled()).thenReturn(true);
+      when(policy.snapshot()).thenAnswer(ignored -> {
+        policyEntered.countDown();
+        if (!releasePolicy.await(5, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("Timed out waiting for settings ABA");
+        }
+        return effective;
+      });
+      var service = new RuntimeActivationService(
+          processExecutors,
+          OnlineAiService.unavailable(),
+          intent.settings(),
+          null,
+          policy,
+          null,
+          handle);
+
+      service.startActivate("missing-variant");
+      assertTrue(policyEntered.await(5, TimeUnit.SECONDS), "activation reached policy owner");
+      intent.spec().setChatEnabled(false);
+      handle.transition(ComponentState.ABSENT,
+          LifecycleReasonCode.INFERENCE_DEACTIVATED.code(), "newer disabled intent");
+      intent.spec().setChatEnabled(true);
+      handle.transition(ComponentState.STARTING,
+          LifecycleReasonCode.INFERENCE_STARTING.code(), "newer activation intent");
+      assertEquals(2L, intent.settings().inspect().witness().acceptedRevision(),
+          "real accepted writes distinguish same-value ABA");
+      releasePolicy.countDown();
+
+      AiRuntimeActivationStatus status = awaitDone(service);
+      assertEquals("RUNTIME_VARIANT_NOT_INSTALLED", status.errorCode);
+      assertEquals(ComponentState.STARTING, handle.snapshot().state());
+      assertEquals(LifecycleReasonCode.INFERENCE_STARTING.code(),
+          handle.snapshot().reasonCode(), "old failure is fenced by the settings witness");
+    }
   }
 
   // --------------- ONNX feature status tests (D-4, tempdoc 215) ---------------
@@ -693,7 +827,7 @@ class RuntimeActivationServiceTest {
     ConfigStore config = new ConfigStore(ConfigStoreRebuilder.prepare(initial));
     ConfigStore.setGlobal(config);
     try (var fixture =
-        new io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture(
+        new RuntimeIntentTestFixture(
             tmp.resolve("deactivate-intent"), settings, config)) {
       RecordingRuntimeControl control = new RecordingRuntimeControl(settings);
       RuntimeActivationService service =

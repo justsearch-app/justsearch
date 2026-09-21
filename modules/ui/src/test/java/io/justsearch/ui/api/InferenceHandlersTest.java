@@ -8,15 +8,34 @@ import static org.mockito.Mockito.when;
 
 import io.javalin.http.Context;
 import io.justsearch.app.api.BrainRuntimeService;
+import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.ModeTransitionOutcome;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
+import io.justsearch.app.observability.operations.SqliteOperationStore;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
+import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
+import io.justsearch.app.services.settings.SettingsCommitCoordinator;
+import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
+import java.nio.file.Path;
+import java.time.Clock;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 @DisplayName("InferenceHandlers unit tests")
 final class InferenceHandlersTest {
+
+  @TempDir Path temp;
 
   @Nested
   @DisplayName("computeHardwareTier")
@@ -143,7 +162,7 @@ final class InferenceHandlersTest {
     var context = io.justsearch.app.services.intent.EngineProvenance.internal("mode-wire-test",
         io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
         io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
-    var key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
     var service = mock(BrainRuntimeService.class);
     when(service.switchInferenceMode("online", context, key))
         .thenReturn(ModeTransitionOutcome.of("online", "indexing").withReceipt(key, 7L));
@@ -170,7 +189,7 @@ final class InferenceHandlersTest {
 
   @Test
   void acceptedRefusalPreservesQueryIdentityOnTheWire() throws Exception {
-    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
     var failure = new io.justsearch.agent.api.registry.OperationResult(false, "Settings changed",
         java.util.Optional.empty(), Map.of("operationKey", key, "operationRecordId", 23L),
         java.util.Optional.of("VERSION_CONFLICT"), Map.of(), java.util.Optional.of(false));
@@ -197,6 +216,87 @@ final class InferenceHandlersTest {
           capacity ? 503 : storage ? 500 : invalid ? 400 : 409,
           publicCode,
           capacity ? "TRANSIENT" : storage ? "PERMANENT" : "VALIDATION", capacity);
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void rawModeFailureWithUnsetIntentKeepsTheOriginalWireError() {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY);
+    assertNull(settings.inspect().settings().getChatEnabled());
+    try (var components = TestEngineComponents.fourComponents()) {
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      var online = mock(io.justsearch.app.api.OnlineAiService.class);
+      org.mockito.Mockito.doThrow(new IllegalStateException(new ModeTransitionException(
+          ModeTransitionException.Reason.EXECUTABLE_NOT_FOUND, "missing runtime")))
+          .when(online).switchToOnlineMode();
+      Context ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/api/inference/mode");
+      when(ctx.status(any(int.class))).thenReturn(ctx);
+      when(ctx.json(any())).thenReturn(ctx);
+      when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online"));
+      new InferenceHandlers(online, null, null, null, settings, null, handle, null)
+          .handleSetInferenceMode(ctx);
+      verify(ctx).status(500);
+      var payload = ArgumentCaptor.forClass(Map.class);
+      verify(ctx).json(payload.capture());
+      assertEquals("MODE_SWITCH_FAILED", payload.getValue().get("errorCode"));
+      assertEquals(ComponentState.ABSENT, handle.snapshot().state());
+    }
+  }
+
+  @Test
+  void rawModeFailureCannotOverwriteAcceptedDisableReenableIntent() throws Exception {
+    UiSettingsStore settings = new UiSettingsStore(
+        UiSettingsStore.PersistenceMode.READ_WRITE, temp.resolve("settings.json"));
+    UiSettings initial = new UiSettings();
+    initial.setChatEnabled(true);
+    settings.replacePrepared(settings.prepare(
+        initial, new io.justsearch.app.api.settings.SettingsWitness(0, null)));
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(initial));
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"));
+        var components = TestEngineComponents.fourComponents()) {
+      var owner = new SettingsCommitCoordinator(
+          settings,
+          config,
+          () -> { throw new AssertionError("Unexpected settings restart"); },
+          candidate -> io.justsearch.agent.api.registry.OperationResult.success("committed"));
+      var runner = new OperationAttemptRunnerImpl(
+          operations,
+          Clock.systemUTC(),
+          Set.of(
+              io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+              io.justsearch.agent.api.registry.OperationKind.RECONFIGURE),
+          owner);
+      var spec = new RuntimeSpecStore(settings, runner);
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      handle.transition(ComponentState.STARTING,
+          LifecycleReasonCode.INFERENCE_STARTING.code(), "request in flight");
+      var online = mock(io.justsearch.app.api.OnlineAiService.class);
+      when(online.getCurrentMode()).thenReturn("offline");
+      org.mockito.Mockito.doAnswer(ignored -> {
+        spec.setChatEnabled(false);
+        handle.transition(ComponentState.ABSENT,
+            LifecycleReasonCode.INFERENCE_DEACTIVATED.code(), "newer disabled intent");
+        spec.setChatEnabled(true);
+        handle.transition(ComponentState.STARTING,
+            LifecycleReasonCode.INFERENCE_STARTING.code(), "newer activation intent");
+        throw new IllegalStateException(new ModeTransitionException(
+            ModeTransitionException.Reason.EXECUTABLE_NOT_FOUND, "missing runtime"));
+      }).when(online).switchToOnlineMode();
+      Context ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/api/inference/mode");
+      when(ctx.status(any(int.class))).thenReturn(ctx);
+      when(ctx.json(any())).thenReturn(ctx);
+      when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online"));
+
+      new InferenceHandlers(
+          online, null, null, null, settings, null, handle, null).handleSetInferenceMode(ctx);
+
+      assertEquals(2L, settings.inspect().witness().acceptedRevision());
+      assertEquals(ComponentState.STARTING, handle.snapshot().state());
+      assertEquals(LifecycleReasonCode.INFERENCE_STARTING.code(),
+          handle.snapshot().reasonCode(), "old request failure is fenced by accepted settings ABA");
     }
   }
 

@@ -99,15 +99,16 @@ final class SchemaMismatchStatusContractTest {
     // written since A11 deleted the Worker child — a failure tail read from it was empty.
     engineLogPath = config.dataDir().resolve("logs").resolve("engine.log");
 
-    bootstrap =
-        new KnowledgeServerBootstrap(executors,
-            config,
-            null,
-            new io.justsearch.app.services.lifecycle.WorkerCapability(),
-            new io.justsearch.app.engine.EngineRoot(
-                org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
-                org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
-                config.deadlineMs(), config.batchSize()));
+    var engine = new io.justsearch.app.engine.EngineRoot(
+        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+        config.deadlineMs(), config.batchSize());
+    // This API-only contract fixture has no inference manager; declare intentional absence.
+    try (var fixture = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+      engine.components().register(fixture.handle("generative").spec());
+    }
+    bootstrap = new KnowledgeServerBootstrap(executors, config, null,
+        engine.components(), engine.indexComponent(), engine);
     try {
       // Same bounded retry the Head uses: on a loaded dev machine a transient PID-validation
       // timeout must not read as a schema-contract failure. (This test never runs in CI — see the
@@ -125,6 +126,8 @@ final class SchemaMismatchStatusContractTest {
     Files.createDirectories(indexBase);
     server = LocalApiServer.builder(executors, settingsStore, indexBase)
         .knowledgeServer(bootstrap)
+        .componentRegistry(engine.components())
+        .indexComponent(engine.indexComponent())
         .perSourceSearch(org.mockito.Mockito.mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
         .build();
   }

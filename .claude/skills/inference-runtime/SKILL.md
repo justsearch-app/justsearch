@@ -485,8 +485,9 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   `endProcedure` returns the engine to spec. User semantics: soft-off —
   `chatEnabled=false` disables the chat service; procedures may run the
   engine with reason `engine-up-for-background-processing`, and
-  `InferenceCapability` composes spec so chat is never offered during
-  soft-off background work.
+  the generative component publisher composes spec with live mode so chat
+  remains ABSENT during soft-off background work. Capability consumers read
+  that registry state; they do not own another mutable inference state.
 - **Consequences for runtime agents:** never call `switchTo*` directly
   (build fails); request engine state via spec writes
   (`core.set-chat-enabled` operation / `POST /api/settings/v2`) or a

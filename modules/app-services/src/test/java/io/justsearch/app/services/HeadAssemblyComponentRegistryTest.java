@@ -4,19 +4,17 @@ package io.justsearch.app.services;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.inference.InferenceConfig;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
+import io.justsearch.app.services.bootstrap.CapabilityGraph;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.configuration.EnvRegistry;
-import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentSpec.ComposeCapability;
 import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Set;
@@ -60,34 +58,28 @@ final class HeadAssemblyComponentRegistryTest {
   }
 
   @Test
-  void capabilityBridgePublishesOptionalAbsenceAndPreservesHeldFaultReason() {
-    ComponentHandle absentHandle = mock(ComponentHandle.class);
-    HeadAssembly.observeGenerativeCapability(absentHandle, new InferenceCapability(false));
-    verify(absentHandle).transition(
-        ComponentState.ABSENT,
-        LifecycleReasonCode.INFERENCE_OFFLINE.code(),
-        "Inference not configured");
+  void capabilityGraphReadsOptionalAbsenceAndDecoratedHandleRetainsHeldFault() {
+    try (var components = TestEngineComponents.fourComponents()) {
+      var capability = CapabilityGraph.fromRegistry(components).inference();
+      assertEquals(CapabilityHealth.OFFLINE, capability.health());
+      assertFalse(capability.required(), "an optional ABSENT component is not requested");
 
-    ComponentHandle configuredHandle = mock(ComponentHandle.class);
-    var capability = new InferenceCapability(true);
-    HeadAssembly.observeGenerativeCapability(configuredHandle, capability);
-    capability.transition(
-        CapabilityHealth.OFFLINE,
-        LifecycleReasonCode.INFERENCE_MODEL_NOT_FOUND.code(),
-        "model unavailable");
-    capability.transition(
-        CapabilityHealth.OFFLINE,
-        LifecycleReasonCode.INFERENCE_OFFLINE.code(),
-        "generic overwrite");
+      var producer = new ReasonRetainingComponentHandle(components.handle("generative"));
+      producer.transition(
+          ComponentState.UNAVAILABLE,
+          LifecycleReasonCode.INFERENCE_MODEL_NOT_FOUND.code(),
+          "model unavailable");
+      producer.transition(
+          ComponentState.UNAVAILABLE,
+          LifecycleReasonCode.INFERENCE_OFFLINE.code(),
+          "generic overwrite");
 
-    verify(configuredHandle, times(1)).transition(
-        ComponentState.UNAVAILABLE,
-        LifecycleReasonCode.INFERENCE_MODEL_NOT_FOUND.code(),
-        "model unavailable");
-    verify(configuredHandle, never()).transition(
-        ComponentState.UNAVAILABLE,
-        LifecycleReasonCode.INFERENCE_OFFLINE.code(),
-        "generic overwrite");
+      assertEquals(CapabilityHealth.OFFLINE, capability.health());
+      assertEquals(LifecycleReasonCode.INFERENCE_MODEL_NOT_FOUND.code(),
+          capability.pendingReason());
+      assertEquals("model unavailable", capability.pendingDetail());
+      assertTrue(capability.required(), "requested unavailable inference is required");
+    }
   }
 
   private InferenceConfig config(int contextSize, boolean vduMode) {

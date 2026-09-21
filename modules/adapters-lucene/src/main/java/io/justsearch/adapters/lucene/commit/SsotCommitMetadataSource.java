@@ -189,10 +189,6 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
    * exclusion is what the old {@code index_schema_fp} lacked, and why three annotation-only catalog
    * edits each falsely demanded a reindex (tempdoc 804).
    */
-  IndexFingerprint.Inputs fingerprintInputs() throws IOException {
-    return fingerprintInputs(configForCallOrNull());
-  }
-
   private IndexFingerprint.Inputs fingerprintInputs(ResolvedConfig resolved) throws IOException {
     JsonNode catalog = M.readTree(file("SSOT/catalogs/fields.v1.json"));
 

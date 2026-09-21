@@ -129,3 +129,28 @@ explicit decision rather than an incidental parser rewrite.
 
 No JavaScript, Java, Rust, schema, register, or runtime behavior is changed by this
 audit.
+
+
+## Implementation update, 2026-09-21
+
+The readiness envelope uses camel-case `stateSince`; schema-2 lifecycle components
+retain `state_since`. Both derive from the same component snapshot. The development
+and native hosts now accept only index READY with a valid UTC epoch and carry that
+epoch through the existing host-monotonic stability interval. Native binding
+observation preserves the probe value only after revalidating the child generation
+and complete admitted binding. No second readiness authority or wall-clock elapsed
+time policy was introduced.
+
+The supervision register now distinguishes startup admission/liveness from budget
+reset: entering host `running` requires an admitted responsive binding, including a
+valid 503 response. It does not claim the index is already ready. This corrects the
+old register's conflation; essential readiness remains the separate stability gate.
+
+The first cross-host control fixture used a non-atomic overwrite. Independent
+review identified that a parse failure could inject UNAVAILABLE and make an
+epoch-blind implementation pass. The fixture now atomically replaces its control
+file and widens the timing margin. Corrected dev proof2337 passes; negative2338
+removes only epoch-change handling and fails specifically at the READY/new-epoch
+budget assertion, then restores source byte-exactly. Rust host tests2339 pass,
+including deterministic common-loop epoch continuity and real binding-change
+revalidation. Full adapter matrix and current live Engine proof remain required.

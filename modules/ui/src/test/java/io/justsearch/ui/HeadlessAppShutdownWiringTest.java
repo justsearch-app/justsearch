@@ -52,14 +52,16 @@ final class HeadlessAppShutdownWiringTest {
   @Test
   void failedIndexDrainRetainsOperationsUntilSuccessfulRetry() throws Exception {
     var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
     var index = mock(KnowledgeServerBootstrap.class);
     var instanceLock = mock(AppInstanceLock.class);
     when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.FAILED, ShutdownOutcome.GRACEFUL);
     var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null, instanceLock,
         mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-        mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null, operations);
+        resources, () -> null, operations);
     var indexStep = steps.stream().filter(step -> EngineShutdownSequence.INDEX_HALF_STEP.equals(step.name())).findFirst().orElseThrow();
     var storeStep = steps.stream().filter(step -> "operations-store".equals(step.name())).findFirst().orElseThrow();
+    var resourceStep = steps.stream().filter(step -> "process-resources".equals(step.name())).findFirst().orElseThrow();
     var lockStep = steps.stream().filter(step -> "app-instance-lock".equals(step.name())).findFirst().orElseThrow();
     steps.stream().filter(step -> "head-assembly".equals(step.name())).findFirst().orElseThrow()
         .action().run(Reason.QUIT);
@@ -67,18 +69,23 @@ final class HeadlessAppShutdownWiringTest {
     lockStep.action().run(Reason.QUIT);
     org.mockito.Mockito.verifyNoInteractions(instanceLock);
     assertThrows(IllegalStateException.class, () -> storeStep.action().run(Reason.QUIT));
+    assertThrows(IllegalStateException.class, () -> resourceStep.action().run(Reason.QUIT));
+    org.mockito.Mockito.verifyNoInteractions(resources);
     org.mockito.Mockito.verifyNoInteractions(operations);
     assertEquals("GRACEFUL", indexStep.action().run(Reason.QUIT));
     storeStep.action().run(Reason.QUIT);
+    resourceStep.action().run(Reason.QUIT);
     lockStep.action().run(Reason.QUIT);
-    var order = inOrder(index, operations, instanceLock);
+    var order = inOrder(index, operations, resources, instanceLock);
     order.verify(index, org.mockito.Mockito.times(2)).closeForUpgrade();
     order.verify(operations).close();
+    order.verify(resources).close();
     order.verify(instanceLock).close();
   }
 
   @Test
   void failedHeadDrainRetainsDependenciesAndProducesUncleanExit(@TempDir Path tempDir) throws Exception {
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
     var head = mock(HeadAssembly.class);
     org.mockito.Mockito.doThrow(new IllegalStateException("procedure still running")).when(head).close();
     var index = mock(KnowledgeServerBootstrap.class);
@@ -89,7 +96,7 @@ final class HeadlessAppShutdownWiringTest {
     var exitCode = new AtomicInteger(-1);
     var steps = HeadlessApp.orderedShutdownSteps(null, head, null, index, null, tracing, telemetry,
         instanceLock, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-        mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null, operations);
+        resources, () -> null, operations);
     var sequence = new EngineShutdownSequence(tempDir, steps, exitCode::set);
     sequence.runAndExit(Reason.QUIT);
     var result = sequence.run(Reason.QUIT);
@@ -99,7 +106,7 @@ final class HeadlessAppShutdownWiringTest {
     assertTrue(result.errors().stream().anyMatch(error -> error.contains("operations-store")));
     org.mockito.Mockito.verify(operations).checkpointDurableOperations();
     org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
-    org.mockito.Mockito.verifyNoInteractions(index, tracing, telemetry, instanceLock);
+    org.mockito.Mockito.verifyNoInteractions(index, tracing, telemetry, resources, instanceLock);
   }
 
   @Test
@@ -119,7 +126,7 @@ final class HeadlessAppShutdownWiringTest {
     KnowledgeServerBootstrap knowledge = mock(KnowledgeServerBootstrap.class);
     var tracing = mock(io.justsearch.telemetry.TracingBootstrap.class);
     Telemetry telemetry = mock(Telemetry.class);
-    var executors = mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    var processResources = mock(io.justsearch.app.api.EngineProcessResources.class);
     AppInstanceLock instanceLock = mock(AppInstanceLock.class);
     when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
     Thread faultThread =
@@ -141,7 +148,7 @@ final class HeadlessAppShutdownWiringTest {
                 instanceLock,
                 leases,
                 admission,
-                executors,
+                processResources,
                 () -> watcher, operations),
             code -> {
               assertTrue(manifestCompleted.get(), "manifest completion precedes process exit");
@@ -169,14 +176,14 @@ final class HeadlessAppShutdownWiringTest {
             operations,
             tracing,
             telemetry,
-            executors,
+            processResources,
             instanceLock);
     order.verify(manifest).markShutdownPending(Reason.RESTART.wire());
     order.verify(leases).freezeAdmission(Reason.RESTART.wire());
     order.verify(admission).cancelInteractive(Reason.RESTART.wire());
     order.verify(watcher).close();
-    order.verify(api).stop();
     order.verify(health).close();
+    order.verify(api).stop();
     order.verify(assembly).setStopGenerativeBackendOnClose(false);
     order.verify(assembly).close();
     order.verify(operations).checkpointDurableOperations();
@@ -184,9 +191,77 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(operations).close();
     order.verify(tracing).close();
     order.verify(telemetry).close();
-    order.verify(executors).close();
+    order.verify(processResources).close();
     order.verify(instanceLock).close();
     order.verify(manifest).completeShutdown(Reason.RESTART.wire(), true, "GRACEFUL");
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  @org.junit.jupiter.api.Timeout(20)
+  void recoveryIsRevokedBeforeApiTeardownEvenWhenStartOutlivesMonitorClose(boolean fatalCleanup)
+      throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var bound = new java.util.concurrent.atomic.AtomicBoolean();
+    var handedOver = new java.util.concurrent.atomic.AtomicBoolean();
+    var occurrences = new java.util.concurrent.CopyOnWriteArrayList<
+        io.justsearch.app.services.worker.RecoveryOccurrence>();
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var components = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+      var knowledge = mock(KnowledgeServerBootstrap.class);
+      when(knowledge.indexComponent()).thenReturn(components.handle("index"));
+      when(knowledge.hasClient()).thenAnswer(ignored -> bound.get());
+      when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
+      when(knowledge.startForRecovery()).thenAnswer(ignored -> {
+        entered.countDown();
+        boolean released = false;
+        while (!released) {
+          try {
+            released = release.await(15, TimeUnit.SECONDS);
+            assertTrue(released, "test must release recovery");
+          } catch (InterruptedException expected) {
+            // Model physical work that cannot complete until after the bounded close.
+          }
+        }
+        bound.set(true);
+        return true;
+      });
+      var health = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
+          executors, knowledge);
+      health.onRecoveryOccurrence(occurrences::add);
+      health.onRecoveryConnected(ignored -> handedOver.set(true));
+      var api = mock(LocalApiServer.class);
+      doAnswer(ignored -> {
+        assertEquals(io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict.NOT_APPLICABLE,
+            health.requestRecoveryNow(), "recovery must already be revoked when API teardown starts");
+        release.countDown();
+        health.close(); // Join the late task before checking its external effects.
+        assertTrue(bound.get(), "the physical start really finished after shutdown began");
+        assertFalse(handedOver.get());
+        assertEquals(java.util.List.of(
+            io.justsearch.app.services.worker.RecoveryOccurrence.Kind.ATTEMPTED),
+            occurrences.stream().map(io.justsearch.app.services.worker.RecoveryOccurrence::kind).toList());
+        return null;
+      }).when(api).stop();
+      try {
+        assertEquals(io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict.ACCEPTED,
+            health.requestRecoveryNow());
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        if (fatalCleanup) {
+          HeadlessApp.stopRecoveryAndApi(health, api);
+        } else {
+          var steps = HeadlessApp.orderedShutdownSteps(api, null, health, knowledge, null,
+              null, null, null, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+              mock(io.justsearch.app.api.EngineProcessResources.class), () -> null,
+              mock(io.justsearch.app.api.operations.OperationStore.class));
+          for (var step : steps) step.action().run(Reason.QUIT);
+        }
+      } finally {
+        release.countDown();
+        health.close();
+      }
+    }
   }
 
   @Test
@@ -201,7 +276,7 @@ final class HeadlessAppShutdownWiringTest {
           new EngineShutdownSequence(
               Path.of("build", "shutdown-wiring", reason.wire()),
               HeadlessApp.orderedShutdownSteps(
-                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
+                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.app.api.EngineProcessResources.class), () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
               code -> {});
 
       sequence.run(reason);
@@ -245,7 +320,7 @@ final class HeadlessAppShutdownWiringTest {
                   null,
                   admission,
                   admission,
-                  mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
+                  mock(io.justsearch.app.api.EngineProcessResources.class),
                   () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
               ignored -> {});
 
@@ -276,7 +351,7 @@ final class HeadlessAppShutdownWiringTest {
                 null,
                 OperationLeaseService.noOp(),
                 null,
-                mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
+                mock(io.justsearch.app.api.EngineProcessResources.class),
                 () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
             ignored -> {});
 
@@ -387,7 +462,7 @@ final class HeadlessAppShutdownWiringTest {
                 instanceLock,
                 OperationLeaseService.noOp(),
                 null,
-                mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
+                mock(io.justsearch.app.api.EngineProcessResources.class),
                 watcherRef::get, mock(io.justsearch.app.api.operations.OperationStore.class)),
             ignored -> {});
 

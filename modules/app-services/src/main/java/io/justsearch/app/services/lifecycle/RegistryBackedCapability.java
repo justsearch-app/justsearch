@@ -73,7 +73,22 @@ public final class RegistryBackedCapability implements Capability {
    * projection-bookkeeping locks.
    */
   public Subscription subscribe(Consumer<Change> listener) {
-    SubscriptionState state = new SubscriptionState(Objects.requireNonNull(listener, "listener"));
+    return subscribe(listener, false);
+  }
+
+  /**
+   * Observes current state, including an initial observation, through the same ordered drain as
+   * subsequent changes. A concurrent newer publication can replace the bootstrap observation;
+   * callers never need a separate seed read that could overwrite a newer callback.
+   */
+  public Subscription subscribeCurrent(Consumer<Observation> listener) {
+    Objects.requireNonNull(listener, "listener");
+    return subscribe(change -> listener.accept(change.current()), true);
+  }
+
+  private Subscription subscribe(Consumer<Change> listener, boolean replayCurrent) {
+    SubscriptionState state = new SubscriptionState(
+        Objects.requireNonNull(listener, "listener"), replayCurrent);
     EngineComponentRegistry.Subscription upstream = registry.subscribe(state::accept);
     state.attach(upstream);
     try {
@@ -173,9 +188,11 @@ public final class RegistryBackedCapability implements Capability {
     private boolean bootstrapped;
     private boolean draining;
     private boolean closed;
+    private boolean hasDelivered;
 
-    private SubscriptionState(Consumer<Change> listener) {
+    private SubscriptionState(Consumer<Change> listener, boolean replayCurrent) {
       this.listener = listener;
+      this.hasDelivered = !replayCurrent;
     }
 
     private void attach(EngineComponentRegistry.Subscription upstream) {
@@ -190,6 +207,7 @@ public final class RegistryBackedCapability implements Capability {
         if (closed) return;
         delivered = project(initial, false);
         lastRevision = initial.revision();
+        if (!hasDelivered) pending = delivered;
         bootstrapped = true;
         if (bootCallback != null) {
           processLocked(bootCallback);
@@ -221,7 +239,8 @@ public final class RegistryBackedCapability implements Capability {
       Observation next = project(snapshot, false);
       lastRevision = snapshot.revision();
       Observation deliveryBase = inFlight != null ? inFlight : delivered;
-      pending = sameProjection(deliveryBase, next) ? null : next;
+      pending = (hasDelivered || inFlight != null) && sameProjection(deliveryBase, next)
+          ? null : next;
     }
 
     private boolean startDrainLocked() {
@@ -263,6 +282,7 @@ public final class RegistryBackedCapability implements Capability {
         }
         synchronized (monitor) {
           delivered = inFlight;
+          hasDelivered = true;
           inFlight = null;
         }
       }

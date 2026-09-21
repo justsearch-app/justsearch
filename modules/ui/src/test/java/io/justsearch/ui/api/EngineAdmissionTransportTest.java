@@ -220,7 +220,7 @@ final class EngineAdmissionTransportTest {
       }).when(registry).register(org.mockito.ArgumentMatchers.any());
       var bootstrap = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
       org.mockito.Mockito.when(bootstrap.workerCapability())
-          .thenReturn(new io.justsearch.app.services.lifecycle.WorkerCapability());
+          .thenReturn(io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().worker());
       try (var monitor = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
           registry, bootstrap, 60_000)) {
         monitor.start();

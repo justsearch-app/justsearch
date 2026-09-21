@@ -33,7 +33,7 @@ import io.justsearch.app.services.brainruntime.BrainRuntimeServiceImpl;
 import io.justsearch.app.services.diagnostics.DiagnosticsServiceImpl;
 import io.justsearch.app.services.excludes.ExcludesServiceImpl;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
+import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.app.services.packimport.PackImportServiceImpl;
 import io.justsearch.app.services.policy.EnterprisePolicyServiceImpl;
 import io.justsearch.app.services.policy.PolicyServiceImpl;
@@ -85,7 +85,7 @@ public final class ServicePhase {
       Telemetry telemetry,
       java.nio.file.Path dataDir,
       InferenceLifecycleManager inferenceManager,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       UiSettingsStore settingsStore,
       io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       BootstrapLateBindings lateBindings,
@@ -238,7 +238,7 @@ public final class ServicePhase {
               in.telemetry(),
               shouldInterruptVduBatch);
       InferenceCapabilityWiring.attachInferenceModeListener(
-          in.inferenceManager(), in.inferenceCapability(), runtimeSpecStore, runtimeReconciler);
+          in.inferenceManager(), in.generativeComponent(), runtimeSpecStore, runtimeReconciler);
 
       runtimeReconciler.start();
       InferenceWiring.seedAutostartSpec(runtimeSpecStore);
@@ -304,7 +304,7 @@ public final class ServicePhase {
             gpuCapabilitiesService,
             enterprisePolicy,
             workerFeatureCache,
-            in.inferenceCapability(),
+            in.generativeComponent(),
             aiInstallHelper,
             // Tempdoc 737 fix pack (fix 2): brackets the activation engine-online + intent-write
             // window in an ACTIVATION procedure and nudges specChanged (null in the no-inference

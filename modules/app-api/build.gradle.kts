@@ -13,7 +13,7 @@ dependencies {
   // Added as part of tempdoc 519 §9 Block B2. configuration is a leaf module, no cycle.
   api(project(":modules:configuration"))
   // 548 §4.1 (tier-1 collapse): the generated proto LifecycleState enum is the SINGLE
-  // authority for the lifecycle vocabulary. The hand-written enum is deleted; LifecycleSnapshotV1
+  // authority for the lifecycle vocabulary. The hand-written enum is deleted; LifecycleSnapshotV2
   // records carry the proto enum directly, so it is part of app-api's public surface → `api`.
   api(project(":modules:api-contract-projection-java"))
   api(libs.jackson.databind)

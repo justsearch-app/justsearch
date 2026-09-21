@@ -13,8 +13,6 @@ import com.networknt.schema.SpecificationVersion;
 import io.javalin.Javalin;
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.api.indexing.IndexingJobView;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -149,9 +147,10 @@ class IndexingControllerFailedJobsWireContractTest {
             null,
             null,
             null);
-    WorkerCapability worker = new WorkerCapability();
-    worker.transition(CapabilityHealth.READY, null);
-    controller.setWorkerCapability(worker);
+    var components = io.justsearch.core.component.TestEngineComponents.fourComponents();
+    components.handle("index").transition(io.justsearch.core.component.ComponentState.READY, null, null);
+    controller.setWorkerCapability(new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "index", "worker"));
 
     app =
         Javalin.create(

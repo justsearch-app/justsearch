@@ -531,7 +531,7 @@ pub trait Actuator {
     /// A cheap liveness probe (design 7.1: the hang path reads only this). `false` is one miss.
     fn probe_health(&mut self) -> bool;
     /// API and index readiness; optional AI readiness does not own the restart budget.
-    fn probe_essential_ready(&mut self) -> bool;
+    fn probe_essential_ready(&mut self) -> Option<crate::engine_probe::ReadyEpoch>;
     /// Current admitted Engine's shutdown handoff. It bounds close but never grants a free restart.
     fn observed_shutdown_reason(&mut self, current: &Ready) -> Option<String>;
     /// A host command delivered to this loop; fixture actuators use the same owned write path.
@@ -563,6 +563,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
     const TICK_MS: u64 = 50;
 
     let mut ready_at: Option<u64> = None;
+    let mut ready_epoch = None;
     let mut request_deadline: Option<u64> = None;
     let mut next_health_poll: u64 = 0;
     let mut current = Ready::default();
@@ -596,6 +597,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
             current = ready;
             supervisor.observe(Event::Ready, None);
             ready_at = None;
+            ready_epoch = None;
             next_health_poll = actuator.now_ms() + supervisor.policy.hang_poll_interval_ms;
             publish!(None);
         }
@@ -648,6 +650,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                     supervisor.entered_starting();
                     current = Ready::default();
                     ready_at = None;
+                    ready_epoch = None;
                     publish!(None);
                     match actuator.spawn_engine() {
                         Ok(pid) => current.pid = Some(pid),
@@ -671,6 +674,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                             }
                             supervisor.observe(Event::Ready, None);
                             ready_at = None;
+                            ready_epoch = None;
                             next_health_poll =
                                 actuator.now_ms() + supervisor.policy.hang_poll_interval_ms;
                             publish!(None);
@@ -744,8 +748,12 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 next_health_poll = now + supervisor.policy.hang_poll_interval_ms;
                 if actuator.probe_health() {
                     supervisor.consecutive_misses = 0;
-                    if actuator.probe_essential_ready() {
+                    if let Some(epoch) = actuator.probe_essential_ready() {
                         let observed_at = actuator.now_ms();
+                        if ready_epoch.as_ref() != Some(&epoch) {
+                            ready_epoch = Some(epoch);
+                            ready_at = Some(observed_at);
+                        }
                         let at = *ready_at.get_or_insert(observed_at);
                         if observed_at.saturating_sub(at) >= supervisor.policy.stability_window_ms
                             && supervisor.restart_count > 0
@@ -755,9 +763,11 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                         }
                     } else {
                         ready_at = None;
+                        ready_epoch = None;
                     }
                 } else {
                     ready_at = None;
+                    ready_epoch = None;
                     supervisor.consecutive_misses += 1;
                     let decision = supervisor.observe(Event::HealthMiss, None);
                     if decision.action == Action::RequestShutdown {

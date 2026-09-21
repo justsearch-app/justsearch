@@ -6,9 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,9 +22,11 @@ final class ReadinessReconciliationTriggerTest {
 
   private ReadinessReconciliationTrigger trigger;
   private TestEngineExecutors processExecutors;
+  private TestEngineComponents components;
 
   @BeforeEach
   void setUp() {
+    components = TestEngineComponents.fourComponents();
     processExecutors = new TestEngineExecutors();
     trigger = new ReadinessReconciliationTrigger(processExecutors);
   }
@@ -34,6 +35,7 @@ final class ReadinessReconciliationTriggerTest {
   void tearDown() {
     trigger.close();
     processExecutors.close();
+    components.close();
   }
 
   @Test
@@ -57,8 +59,8 @@ final class ReadinessReconciliationTriggerTest {
   @Test
   @DisplayName("a worker capability transition after attach runs the thunk")
   void workerTransitionRunsThunk() throws InterruptedException {
-    WorkerCapability worker = new WorkerCapability();
-    trigger.wireTo(worker, null);
+    var worker = components.handle("index");
+    trigger.wireTo(components);
 
     CountDownLatch seeded = new CountDownLatch(1);
     CountDownLatch seedPlusTransition = new CountDownLatch(2);
@@ -72,7 +74,7 @@ final class ReadinessReconciliationTriggerTest {
     // legitimately coalesce into one.
     assertTrue(seeded.await(5, SECONDS), "self-seed did not run");
 
-    worker.transition(CapabilityHealth.READY, "worker.ready");
+    worker.transition(ComponentState.READY, null, null);
 
     assertTrue(
         seedPlusTransition.await(5, SECONDS),
@@ -82,8 +84,8 @@ final class ReadinessReconciliationTriggerTest {
   @Test
   @DisplayName("an inference capability transition after attach runs the thunk")
   void inferenceTransitionRunsThunk() throws InterruptedException {
-    InferenceCapability inference = new InferenceCapability(true);
-    trigger.wireTo(null, inference);
+    var inference = components.handle("generative");
+    trigger.wireTo(components);
 
     CountDownLatch seeded = new CountDownLatch(1);
     CountDownLatch seedPlusTransition = new CountDownLatch(2);
@@ -94,15 +96,15 @@ final class ReadinessReconciliationTriggerTest {
         });
     assertTrue(seeded.await(5, SECONDS), "self-seed did not run");
 
-    inference.transition(CapabilityHealth.READY, "inference.ready");
+    inference.transition(ComponentState.READY, null, null);
 
     assertTrue(seedPlusTransition.await(5, SECONDS), "an inference transition must reconcile");
   }
 
   @Test
-  @DisplayName("wireTo tolerates null capabilities")
-  void wireToToleratesNulls() throws InterruptedException {
-    trigger.wireTo(null, null);
+  @DisplayName("subscribing before any observations still permits the self-seed")
+  void unobservedRegistryStillPermitsSelfSeed() throws InterruptedException {
+    trigger.wireTo(components);
     CountDownLatch ran = new CountDownLatch(1);
     trigger.attach(ran::countDown);
     assertTrue(ran.await(5, SECONDS));
@@ -147,8 +149,8 @@ final class ReadinessReconciliationTriggerTest {
   @Test
   @DisplayName("a throwing thunk neither propagates into a capability transition nor wedges it")
   void throwingThunkDoesNotWedge() throws InterruptedException {
-    WorkerCapability worker = new WorkerCapability();
-    trigger.wireTo(worker, null);
+    var worker = components.handle("index");
+    trigger.wireTo(components);
 
     AtomicInteger attempts = new AtomicInteger();
     CountDownLatch firstAttempt = new CountDownLatch(1);
@@ -165,7 +167,7 @@ final class ReadinessReconciliationTriggerTest {
 
     // The transition must return normally even though the thunk it triggers throws, and the
     // trigger must still be live afterwards (the coalescing flag was released before the throw).
-    worker.transition(CapabilityHealth.READY, "worker.ready");
+    worker.transition(ComponentState.READY, null, null);
 
     assertTrue(
         secondAttempt.await(5, SECONDS),
@@ -175,8 +177,8 @@ final class ReadinessReconciliationTriggerTest {
   @Test
   @DisplayName("close() is idempotent and stops further reconciles, including from a transition")
   void closeIsIdempotentAndStopsReconciles() throws InterruptedException {
-    WorkerCapability worker = new WorkerCapability();
-    trigger.wireTo(worker, null);
+    var worker = components.handle("index");
+    trigger.wireTo(components);
 
     AtomicInteger runs = new AtomicInteger();
     CountDownLatch seeded = new CountDownLatch(1);
@@ -195,8 +197,8 @@ final class ReadinessReconciliationTriggerTest {
     int afterClose = runs.get();
     trigger.request();
     trigger.request();
-    // The listener is still registered; the trigger itself must swallow the request.
-    worker.transition(CapabilityHealth.READY, "worker.ready");
+    // The owned registry subscription is closed; direct requests also remain harmless.
+    worker.transition(ComponentState.READY, null, null);
 
     assertFalse(
         anySecondRun.await(300, MILLISECONDS),
