@@ -43,6 +43,13 @@ import org.slf4j.LoggerFactory;
 // PERMANENT COMPAT - DO NOT REMOVE (generation layout is an on-disk contract)
 public final class IndexGenerationManager {
   private static final Logger log = LoggerFactory.getLogger(IndexGenerationManager.class);
+  // Several manager instances share one Engine's generation pointers. Serialize control and
+  // fallback repair without a persistent lock or an alias-sensitive/unbounded path registry.
+  private static final Object STATE_CONTROL = new Object();
+  private static final ObjectMapper RECORDED_JSON = JsonMapper.builder()
+      .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+      .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+      .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
   private static final ObjectMapper JSON =
       JsonMapper.builder()
           .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -54,6 +61,7 @@ public final class IndexGenerationManager {
 
   private static final int STATE_FORMAT_VERSION = 2;
   private static final int MANIFEST_FORMAT_VERSION = 1;
+  private static final int RECORDED_MANIFEST_FORMAT_VERSION = 2;
 
   private static final String STATE_FILE = "state.json";
   private static final String STATE_TMP_FILE = "state.json.tmp";
@@ -110,7 +118,12 @@ public final class IndexGenerationManager {
       int format_version,
       String generation_id,
       String source,
-      long created_at_ms) {}
+      long created_at_ms,
+      String target_index_fingerprint) {
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs) {
+      this(formatVersion, generationId, source, createdAtMs, null);
+    }
+  }
 
   private final Path basePath;
   private final Path indicesDir;
@@ -181,24 +194,26 @@ public final class IndexGenerationManager {
    * </ul>
    */
   public IndexLayout initializeOrLoad() throws IOException {
-    Files.createDirectories(basePath);
+    synchronized (STATE_CONTROL) {
+      Files.createDirectories(basePath);
 
-    State state = loadStateBestEffort();
-    if (state != null) {
-      return resolveFromState(state);
+      State state = loadStateBestEffort();
+      if (state != null) {
+        return resolveFromState(state);
+      }
+
+      // No state.json: decide between legacy import, adoption, or new generation.
+      if (looksLikeLegacyIndexInBasePath(basePath)) {
+        return importLegacyIndex();
+      }
+
+      IndexLayout adopted = tryAdoptSingleExistingGeneration();
+      if (adopted != null) {
+        return adopted;
+      }
+
+      return createFreshGeneration("new");
     }
-
-    // No state.json: decide between legacy import, adoption, or new generation.
-    if (looksLikeLegacyIndexInBasePath(basePath)) {
-      return importLegacyIndex();
-    }
-
-    IndexLayout adopted = tryAdoptSingleExistingGeneration();
-    if (adopted != null) {
-      return adopted;
-    }
-
-    return createFreshGeneration("new");
   }
 
   /**
@@ -242,43 +257,167 @@ public final class IndexGenerationManager {
    * @return the updated normalized state (format_version=2)
    */
   public State startMigration(String source) throws IOException {
-    IndexLayout layout = initializeOrLoad();
-    State current = layout.state();
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    MigrationState ms = parseMigrationStateOrDefault(normalized.migration_state(), MigrationState.IDLE);
-    if (ms == MigrationState.MIGRATING || ms == MigrationState.SWITCHING) {
-      return normalized;
-    }
-    // If a prior migration failed but a building generation exists, don't create a new one implicitly.
-    // This avoids generation churn; operators can decide whether to retry or discard the failed build.
-    if (ms == MigrationState.FAILED
-        && normalized.building_generation() != null
-        && !normalized.building_generation().isBlank()) {
-      return normalized;
-    }
+    synchronized (STATE_CONTROL) {
+      IndexLayout layout = initializeOrLoad();
+      State current = layout.state();
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      MigrationState ms = parseMigrationStateOrDefault(normalized.migration_state(), MigrationState.IDLE);
+      if (ms == MigrationState.MIGRATING || ms == MigrationState.SWITCHING) {
+        return normalized;
+      }
+      // If a prior migration failed but a building generation exists, don't create a new one implicitly.
+      // This avoids generation churn; operators can decide whether to retry or discard the failed build.
+      if (ms == MigrationState.FAILED
+          && normalized.building_generation() != null
+          && !normalized.building_generation().isBlank()) {
+        return normalized;
+      }
 
-    String active = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
-    String genId = newUniqueGenerationId();
-    Path genPath = resolveGenerationPath(genId);
-    Files.createDirectories(genPath);
-    writeGenerationFiles(genPath, genId, source == null || source.isBlank() ? "migration" : source.trim());
+      String active = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
+      String genId = newUniqueGenerationId();
+      Path genPath = resolveGenerationPath(genId);
+      Files.createDirectories(genPath);
+      writeGenerationFiles(genPath, genId, source == null || source.isBlank() ? "migration" : source.trim());
 
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            active,
-            genId,
-            active,
-            MigrationState.MIGRATING.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    return next;
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              active,
+              genId,
+              active,
+              MigrationState.MIGRATING.name(),
+              false,
+              null,
+              null,
+              System.currentTimeMillis(),
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
+    }
+  }
+
+  /**
+   * Starts the one generation derived from an already accepted operation. The current pointer
+   * and recorded metadata must be authoritative; this path never allocates a fallback identity.
+   * The caller persists its response witness before requesting the first Engine restart.
+   */
+  public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint)
+      throws IOException {
+    synchronized (STATE_CONTROL) {
+      String target = recordedGenerationId(operationKey);
+      if (source == null || source.isBlank() || source.length() > 256
+          || source.chars().anyMatch(Character::isISOControl)
+          || targetIndexFingerprint == null || !targetIndexFingerprint.matches("[0-9a-f]{64}")) {
+        throw new IOException("Recorded generation source or target fingerprint is invalid");
+      }
+      final State raw;
+      try {
+        raw = RECORDED_JSON.readValue(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath), State.class);
+      } catch (tools.jackson.core.JacksonException malformed) {
+        throw new IOException("Authoritative generation state is invalid", malformed);
+      }
+      if (raw == null || raw.migration_state() == null || raw.migration_state().isBlank()) {
+        throw new IOException("Authoritative generation state is unavailable");
+      }
+      State current = normalizeAndUpgradeStateIfNeeded(raw);
+      String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
+      if (!Files.isDirectory(resolveGenerationPathReadOnly(active), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Active generation directory is unavailable");
+      }
+      MigrationState phase = parseMigrationStateOrDefault(current.migration_state(), MigrationState.FAILED);
+      String building = current.building_generation();
+      if (active.equals(building)) {
+        throw new IOException("Serving and building generation identities must be distinct");
+      }
+      Path targetPath = resolveGenerationPathReadOnly(target);
+      if (phase == MigrationState.IDLE && target.equals(active) && (building == null || building.isBlank())) {
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false);
+        return current;
+      }
+      if ((phase == MigrationState.MIGRATING || phase == MigrationState.SWITCHING) && target.equals(building)) {
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false);
+        return current;
+      }
+      if (phase != MigrationState.IDLE || building != null && !building.isBlank()) {
+        throw new IOException("Recorded generation conflicts with the current migration state");
+      }
+      if (Files.exists(targetPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, true);
+      } else {
+        Files.createDirectories(indicesDir);
+        Files.createDirectory(targetPath);
+        long created = System.currentTimeMillis();
+        var manifest = new GenerationManifest(RECORDED_MANIFEST_FORMAT_VERSION, target, source, created, targetIndexFingerprint);
+        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+            targetPath.resolve(GENERATION_SENTINEL), recordedSentinel(target, created).getBytes(StandardCharsets.UTF_8));
+        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+            targetPath.resolve(GENERATION_MANIFEST), RECORDED_JSON.writeValueAsBytes(manifest));
+      }
+      State next = new State(STATE_FORMAT_VERSION, active, target, active, MigrationState.MIGRATING.name(),
+          false, null, null, System.currentTimeMillis(), current.auto_rebuild_key(),
+          current.auto_rebuild_count(), current.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
+    }
+  }
+
+  /** Stable target identity; only canonical accepted UUIDv7 keys belong to this namespace. */
+  public static String recordedGenerationId(String operationKey) throws IOException {
+    try {
+      var key = java.util.UUID.fromString(operationKey);
+      if (key.version() != 7 || key.variant() != 2 || !key.toString().equals(operationKey)) {
+        throw new IllegalArgumentException("Noncanonical operation key");
+      }
+      return "g-" + operationKey;
+    } catch (IllegalArgumentException | NullPointerException invalid) {
+      throw new IOException("Recorded generation requires a canonical UUIDv7 operation key", invalid);
+    }
+  }
+
+  private static String recordedSentinel(String target, long created) {
+    return "justsearch_generation_sentinel_v1\ngeneration_id=" + target + "\ncreated_at_ms=" + created + "\n";
+  }
+
+  private static void requireRecordedGeneration(Path directory, String target, String source,
+      String targetFingerprint, boolean pristine) throws IOException {
+    if (!Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Recorded generation directory is not an owned regular directory");
+    }
+    Path manifestPath = directory.resolve(GENERATION_MANIFEST);
+    Path sentinelPath = directory.resolve(GENERATION_SENTINEL);
+    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || !Files.isRegularFile(sentinelPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(manifestPath) > 16_384 || Files.size(sentinelPath) > 1_024) {
+      throw new IOException("Recorded generation ownership metadata is unavailable");
+    }
+    final GenerationManifest manifest;
+    try {
+      manifest = RECORDED_JSON.readValue(
+          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath), GenerationManifest.class);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Recorded generation manifest is invalid", malformed);
+    }
+    if (manifest == null || manifest.format_version() != RECORDED_MANIFEST_FORMAT_VERSION || !target.equals(manifest.generation_id())
+        || !source.equals(manifest.source()) || !targetFingerprint.equals(manifest.target_index_fingerprint())
+        || manifest.created_at_ms() <= 0) {
+      throw new IOException("Recorded generation metadata does not match its accepted target");
+    }
+    String sentinel = new String(
+        io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinelPath), StandardCharsets.UTF_8);
+    if (!recordedSentinel(target, manifest.created_at_ms()).equals(sentinel)) {
+      throw new IOException("Recorded generation sentinel does not match its manifest");
+    }
+    if (pristine) {
+      try (var entries = Files.list(directory)) {
+        if (entries.anyMatch(path -> !Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST)
+            .contains(path.getFileName().toString()))) {
+          throw new IOException("Unbound recorded generation is not pristine");
+        }
+      }
+    }
   }
 
   /**
@@ -300,78 +439,82 @@ public final class IndexGenerationManager {
    *     generation to abandon
    */
   public State abandonBuildingGeneration(String reason) throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      return null;
+    synchronized (STATE_CONTROL) {
+      State current = readStateBestEffort();
+      if (current == null) {
+        return null;
+      }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      String building = normalized.building_generation();
+      if (building == null || building.isBlank()) {
+        return normalized;
+      }
+      String safeBuilding = requireSafeGenerationId(building, "state.json building_generation");
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              null,
+              normalized.previous_generation(),
+              MigrationState.IDLE.name(),
+              false,
+              null,
+              null,
+              System.currentTimeMillis(),
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+      log.warn(
+          "Abandoned building generation {} (reason={}); migration_state reset to IDLE",
+          safeBuilding,
+          reason == null || reason.isBlank() ? "unspecified" : reason.trim());
+      // Marked AFTER the pointer is gone, and best-effort: a crash between the two leaves an orphan
+      // directory the GC reaps, whereas marking first would leave state.json pointing at a directory
+      // already being deleted.
+      try {
+        SafeIndexPathOps.markForDeletion(resolveGenerationPath(safeBuilding), indicesDir);
+      } catch (Exception e) {
+        log.debug("Failed to mark abandoned generation {} for deletion: {}", safeBuilding, e.getMessage());
+      }
+      return next;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String building = normalized.building_generation();
-    if (building == null || building.isBlank()) {
-      return normalized;
-    }
-    String safeBuilding = requireSafeGenerationId(building, "state.json building_generation");
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            null,
-            normalized.previous_generation(),
-            MigrationState.IDLE.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    log.warn(
-        "Abandoned building generation {} (reason={}); migration_state reset to IDLE",
-        safeBuilding,
-        reason == null || reason.isBlank() ? "unspecified" : reason.trim());
-    // Marked AFTER the pointer is gone, and best-effort: a crash between the two leaves an orphan
-    // directory the GC reaps, whereas marking first would leave state.json pointing at a directory
-    // already being deleted.
-    try {
-      SafeIndexPathOps.markForDeletion(resolveGenerationPath(safeBuilding), indicesDir);
-    } catch (Exception e) {
-      log.debug("Failed to mark abandoned generation {} for deletion: {}", safeBuilding, e.getMessage());
-    }
-    return next;
   }
 
   /** Sets operator pause intent for migration orchestration (best-effort). */
   public State setMigrationPaused(boolean paused, String reason) throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      // Ensure layout exists
-      initializeOrLoad();
-      current = readStateBestEffort();
+    synchronized (STATE_CONTROL) {
+      State current = readStateBestEffort();
       if (current == null) {
-        return null;
+        // Ensure layout exists
+        initializeOrLoad();
+        current = readStateBestEffort();
+        if (current == null) {
+          return null;
+        }
       }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      long now = System.currentTimeMillis();
+      Boolean nextPaused = paused;
+      String nextReason = paused ? (reason == null || reason.isBlank() ? "operator" : reason.trim()) : null;
+      Long nextPausedAt = paused ? now : null;
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              normalized.building_generation(),
+              normalized.previous_generation(),
+              normalized.migration_state(),
+              nextPaused,
+              nextReason,
+              nextPausedAt,
+              now,
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    long now = System.currentTimeMillis();
-    Boolean nextPaused = paused;
-    String nextReason = paused ? (reason == null || reason.isBlank() ? "operator" : reason.trim()) : null;
-    Long nextPausedAt = paused ? now : null;
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            normalized.building_generation(),
-            normalized.previous_generation(),
-            normalized.migration_state(),
-            nextPaused,
-            nextReason,
-            nextPausedAt,
-            now,
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    return next;
   }
 
   /**
@@ -386,44 +529,46 @@ public final class IndexGenerationManager {
    * Amendment B (Worker-side registration via Head SPI callback) should be implemented.
    */
   public void updateMigrationState(MigrationState state) throws IOException {
-    Objects.requireNonNull(state, "state");
-    State current = readStateBestEffort();
-    if (current == null) {
-      // Nothing to update; ensure layout exists.
-      initializeOrLoad();
-      current = readStateBestEffort();
-      if (current == null) return;
-    }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    // Tempdoc 542 Phase 4: audit Worker-autonomous state transitions. SWITCHING + FAILED are
-    // the long-op-relevant transitions; the log carries a stable marker string the future
-    // Amendment-B work can grep for.
-    if (state == MigrationState.SWITCHING || state == MigrationState.FAILED) {
-      log.info(
-          "tempdoc-542 phase-4 audit: Worker-autonomous migration state transition: "
-              + "{} -> {} (active_generation={}, building_generation={}). "
-              + "If this fires in production, consider implementing Amendment B "
-              + "(Worker-side op-lease registration via Head SPI callback).",
-          normalized.migration_state(),
-          state.name(),
-          normalized.active_generation(),
-          normalized.building_generation());
-    }
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            normalized.building_generation(),
-            normalized.previous_generation(),
+    synchronized (STATE_CONTROL) {
+      Objects.requireNonNull(state, "state");
+      State current = readStateBestEffort();
+      if (current == null) {
+        // Nothing to update; ensure layout exists.
+        initializeOrLoad();
+        current = readStateBestEffort();
+        if (current == null) return;
+      }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      // Tempdoc 542 Phase 4: audit Worker-autonomous state transitions. SWITCHING + FAILED are
+      // the long-op-relevant transitions; the log carries a stable marker string the future
+      // Amendment-B work can grep for.
+      if (state == MigrationState.SWITCHING || state == MigrationState.FAILED) {
+        log.info(
+            "tempdoc-542 phase-4 audit: Worker-autonomous migration state transition: "
+                + "{} -> {} (active_generation={}, building_generation={}). "
+                + "If this fires in production, consider implementing Amendment B "
+                + "(Worker-side op-lease registration via Head SPI callback).",
+            normalized.migration_state(),
             state.name(),
-            normalized.migration_paused(),
-            normalized.pause_reason(),
-            normalized.paused_at_ms(),
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
+            normalized.active_generation(),
+            normalized.building_generation());
+      }
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              normalized.building_generation(),
+              normalized.previous_generation(),
+              state.name(),
+              normalized.migration_paused(),
+              normalized.pause_reason(),
+              normalized.paused_at_ms(),
+              System.currentTimeMillis(),
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+    }
   }
 
   /**
@@ -446,41 +591,43 @@ public final class IndexGenerationManager {
    * @return the 1-based attempt number for this key
    */
   public int recordAutoRebuildAttempt(String targetKey) throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      initializeOrLoad();
-      current = readStateBestEffort();
+    synchronized (STATE_CONTROL) {
+      State current = readStateBestEffort();
       if (current == null) {
-        return 1;
+        initializeOrLoad();
+        current = readStateBestEffort();
+        if (current == null) {
+          return 1;
+        }
       }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
+      boolean sameTarget = key.equals(normalized.auto_rebuild_key());
+      int nextCount =
+          sameTarget && normalized.auto_rebuild_count() != null
+              ? normalized.auto_rebuild_count() + 1
+              : 1;
+      long now = System.currentTimeMillis();
+      Long firstMs =
+          sameTarget && normalized.auto_rebuild_first_ms() != null
+              ? normalized.auto_rebuild_first_ms()
+              : now;
+      writeState(
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              normalized.building_generation(),
+              normalized.previous_generation(),
+              normalized.migration_state(),
+              normalized.migration_paused(),
+              normalized.pause_reason(),
+              normalized.paused_at_ms(),
+              now,
+              key,
+              nextCount,
+              firstMs));
+      return nextCount;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
-    boolean sameTarget = key.equals(normalized.auto_rebuild_key());
-    int nextCount =
-        sameTarget && normalized.auto_rebuild_count() != null
-            ? normalized.auto_rebuild_count() + 1
-            : 1;
-    long now = System.currentTimeMillis();
-    Long firstMs =
-        sameTarget && normalized.auto_rebuild_first_ms() != null
-            ? normalized.auto_rebuild_first_ms()
-            : now;
-    writeState(
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            normalized.building_generation(),
-            normalized.previous_generation(),
-            normalized.migration_state(),
-            normalized.migration_paused(),
-            normalized.pause_reason(),
-            normalized.paused_at_ms(),
-            now,
-            key,
-            nextCount,
-            firstMs));
-    return nextCount;
   }
 
   /**
@@ -506,35 +653,37 @@ public final class IndexGenerationManager {
    * @return the updated normalized state, or null if no state exists
    */
   public State promoteBuildingGenerationToActive() throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      return null;
+    synchronized (STATE_CONTROL) {
+      State current = readStateBestEffort();
+      if (current == null) {
+        return null;
+      }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      String building = normalized.building_generation();
+      if (building == null || building.isBlank()) {
+        return normalized;
+      }
+      String nextActive = requireSafeGenerationId(building, "state.json building_generation");
+      String prevActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              nextActive,
+              null,
+              prevActive,
+              MigrationState.IDLE.name(),
+              false,
+              null,
+              null,
+              System.currentTimeMillis(),
+              // A completed cutover is the proof the rebuild converged: release the brake so a
+              // future, unrelated upgrade starts with a full budget.
+              null,
+              null,
+              null);
+      writeState(next);
+      return next;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String building = normalized.building_generation();
-    if (building == null || building.isBlank()) {
-      return normalized;
-    }
-    String nextActive = requireSafeGenerationId(building, "state.json building_generation");
-    String prevActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            nextActive,
-            null,
-            prevActive,
-            MigrationState.IDLE.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            // A completed cutover is the proof the rebuild converged: release the brake so a
-            // future, unrelated upgrade starts with a full budget.
-            null,
-            null,
-            null);
-    writeState(next);
-    return next;
   }
 
   /**
@@ -549,33 +698,35 @@ public final class IndexGenerationManager {
    * @return the updated normalized state, or null if no state exists
    */
   public State rollbackToPreviousGeneration() throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      return null;
+    synchronized (STATE_CONTROL) {
+      State current = readStateBestEffort();
+      if (current == null) {
+        return null;
+      }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      String prev = normalized.previous_generation();
+      if (prev == null || prev.isBlank()) {
+        return normalized;
+      }
+      String nextActive = requireSafeGenerationId(prev, "state.json previous_generation");
+      String curActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              nextActive,
+              null, // clear building on rollback (operators can start a new migration explicitly)
+              curActive,
+              MigrationState.IDLE.name(),
+              false,
+              null,
+              null,
+              System.currentTimeMillis(),
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String prev = normalized.previous_generation();
-    if (prev == null || prev.isBlank()) {
-      return normalized;
-    }
-    String nextActive = requireSafeGenerationId(prev, "state.json previous_generation");
-    String curActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            nextActive,
-            null, // clear building on rollback (operators can start a new migration explicitly)
-            curActive,
-            MigrationState.IDLE.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    return next;
   }
 
   private IndexLayout resolveFromState(State state) throws IOException {
@@ -712,46 +863,48 @@ public final class IndexGenerationManager {
    * never observes a torn version/state pair (tempdoc 589).
    */
   public State readStateBestEffort() {
-    String stamp = contentStampBestEffort();
-    CachedState cached = cache; // single volatile read — the whole entry is atomic
-    // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
-    // writeState replaces state.json by renaming (state.json -> state.json.prev, then tmp ->
-    // state.json), and on Windows a file being renamed over is briefly unopenable. Treating that
-    // window as "re-read" rather than "unchanged" would trade the stale read this stamp exists to
-    // fix for a transient NULL — which is worse, because every caller projects null as an empty
-    // migration state. A permanently missing state.json serves the last parse, which is exactly
-    // what the pre-stamp cache did.
-    if (cached != null && (stamp == null || stamp.equals(cached.contentHash()))) {
-      return cached.value();
-    }
-    try {
-      State s = loadStateBestEffort();
-      if (s == null) {
-        // Absent state.json is NOT cached (matches prior behavior: re-read on the next call).
+    synchronized (STATE_CONTROL) {
+      String stamp = contentStampBestEffort();
+      CachedState cached = cache; // single volatile read — the whole entry is atomic
+      // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
+      // writeState replaces state.json by renaming (state.json -> state.json.prev, then tmp ->
+      // state.json), and on Windows a file being renamed over is briefly unopenable. Treating that
+      // window as "re-read" rather than "unchanged" would trade the stale read this stamp exists to
+      // fix for a transient NULL — which is worse, because every caller projects null as an empty
+      // migration state. A permanently missing state.json serves the last parse, which is exactly
+      // what the pre-stamp cache did.
+      if (cached != null && (stamp == null || stamp.equals(cached.contentHash()))) {
+        return cached.value();
+      }
+      try {
+        State s = loadStateBestEffort();
+        if (s == null) {
+          // Absent state.json is NOT cached (matches prior behavior: re-read on the next call).
+          return null;
+        }
+        State normalized = normalizeAndUpgradeStateIfNeeded(s);
+        // Stamp from BEFORE the read — the one taken at the top of this method — and not a fresh one
+        // taken after the parse. The two orders fail in opposite directions and only this one fails
+        // safe:
+        //
+        //   after-parse:  read stamp S1, parse V from revision R1, ANOTHER MANAGER WRITES (file
+        //                 becomes R2), stamp S2 = R2, cache (V-from-R1, stamp-of-R2). The next
+        //                 caller's stamp is R2, which MATCHES, so it is served R1's value — and goes
+        //                 on being served it until some later write moves the stamp again. That is
+        //                 the exact stale-read this stamp was added to prevent, reintroduced in a
+        //                 narrower window.
+        //   before-read:  cache (V, S1). If the file changed at any point during the read, the next
+        //                 caller's stamp is S2 != S1, so it misses and re-parses. The cost is one
+        //                 extra parse; there is no order in which a stale value can be served.
+        //
+        // The window is small either way. It is also exactly the window this whole change exists for
+        // — concurrent writes through a DIFFERENT manager instance over the same file — so sizing the
+        // fix to the common case rather than the racing one would have missed the point.
+        cache = new CachedState(normalized, stamp);
+        return normalized;
+      } catch (Exception e) {
         return null;
       }
-      State normalized = normalizeAndUpgradeStateIfNeeded(s);
-      // Stamp from BEFORE the read — the one taken at the top of this method — and not a fresh one
-      // taken after the parse. The two orders fail in opposite directions and only this one fails
-      // safe:
-      //
-      //   after-parse:  read stamp S1, parse V from revision R1, ANOTHER MANAGER WRITES (file
-      //                 becomes R2), stamp S2 = R2, cache (V-from-R1, stamp-of-R2). The next
-      //                 caller's stamp is R2, which MATCHES, so it is served R1's value — and goes
-      //                 on being served it until some later write moves the stamp again. That is
-      //                 the exact stale-read this stamp was added to prevent, reintroduced in a
-      //                 narrower window.
-      //   before-read:  cache (V, S1). If the file changed at any point during the read, the next
-      //                 caller's stamp is S2 != S1, so it misses and re-parses. The cost is one
-      //                 extra parse; there is no order in which a stale value can be served.
-      //
-      // The window is small either way. It is also exactly the window this whole change exists for
-      // — concurrent writes through a DIFFERENT manager instance over the same file — so sizing the
-      // fix to the common case rather than the racing one would have missed the point.
-      cache = new CachedState(normalized, stamp);
-      return normalized;
-    } catch (Exception e) {
-      return null;
     }
   }
 
@@ -1034,40 +1187,42 @@ public final class IndexGenerationManager {
    * a DELETEME marker). Not currently invoked by default; provided for future GC policies.
    */
   public void pruneMarkedForDeletionBestEffort() {
-    if (!Files.isDirectory(indicesDir)) {
-      return;
-    }
-    State state = readStateBestEffort();
-    if (state == null) {
-      // Safer to skip deletion when we don't know what's active/previous/building.
-      return;
-    }
-    Set<String> protectedIds = protectedGenerationIds(state);
-    try (var stream = Files.list(indicesDir)) {
-      stream
-          .filter(Files::isDirectory)
-          .filter(
-              p -> {
-                String name = p.getFileName().toString();
-                if (protectedIds.contains(name)) {
-                  return false;
-                }
-                boolean marked = name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER));
-                if (!marked) return false;
-                // Defense-in-depth: only delete dirs that look like JustSearch generations.
-                return Files.exists(p.resolve(GENERATION_SENTINEL));
-              })
-          .sorted(Comparator.comparing(Path::toString))
-          .forEach(
-              p -> {
-                try {
-                  io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(p, log);
-                } catch (Exception e) {
-                  log.debug("Failed to delete marked directory {}: {}", p, e.getMessage());
-                }
-              });
-    } catch (Exception e) {
-      log.debug("Error while pruning marked-for-deletion directories: {}", e.getMessage());
+    synchronized (STATE_CONTROL) {
+      if (!Files.isDirectory(indicesDir)) {
+        return;
+      }
+      State state = readStateBestEffort();
+      if (state == null) {
+        // Safer to skip deletion when we don't know what's active/previous/building.
+        return;
+      }
+      Set<String> protectedIds = protectedGenerationIds(state);
+      try (var stream = Files.list(indicesDir)) {
+        stream
+            .filter(Files::isDirectory)
+            .filter(
+                p -> {
+                  String name = p.getFileName().toString();
+                  if (protectedIds.contains(name)) {
+                    return false;
+                  }
+                  boolean marked = name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER));
+                  if (!marked) return false;
+                  // Defense-in-depth: only delete dirs that look like JustSearch generations.
+                  return Files.exists(p.resolve(GENERATION_SENTINEL));
+                })
+            .sorted(Comparator.comparing(Path::toString))
+            .forEach(
+                p -> {
+                  try {
+                    io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(p, log);
+                  } catch (Exception e) {
+                    log.debug("Failed to delete marked directory {}: {}", p, e.getMessage());
+                  }
+                });
+      } catch (Exception e) {
+        log.debug("Error while pruning marked-for-deletion directories: {}", e.getMessage());
+      }
     }
   }
 
@@ -1079,57 +1234,59 @@ public final class IndexGenerationManager {
    * <p>This method is intended to be called via an explicit operator control, not automatically.
    */
   public GcResult gcBestEffort(int keepLatest, boolean pruneMarkedOnly) {
-    try {
-      if (!Files.isDirectory(indicesDir)) {
-        return new GcResult(0, 0);
-      }
-      State state = readStateBestEffort();
-      if (state == null) {
-        return new GcResult(0, 0);
-      }
-      Set<String> protectedIds = protectedGenerationIds(state);
-
-      int marked = 0;
-      if (!pruneMarkedOnly) {
-        List<Path> candidates = new ArrayList<>();
-        try (var stream = Files.list(indicesDir)) {
-          stream
-              .filter(Files::isDirectory)
-              .filter(p -> Files.exists(p.resolve(GENERATION_SENTINEL)))
-              .filter(
-                  p -> {
-                    String name = p.getFileName().toString();
-                    if (protectedIds.contains(name)) return false;
-                    // Never "mark" already-marked dirs; prune step handles them.
-                    if (name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER))) {
-                      return false;
-                    }
-                    return true;
-                  })
-              .forEach(candidates::add);
+    synchronized (STATE_CONTROL) {
+      try {
+        if (!Files.isDirectory(indicesDir)) {
+          return new GcResult(0, 0);
         }
-        candidates.sort(Comparator.comparing(p -> p.getFileName().toString()));
-        int keep = Math.max(0, keepLatest);
-        int cutoff = Math.max(0, candidates.size() - keep);
-        for (int i = 0; i < cutoff; i++) {
-          Path p = candidates.get(i);
-          try {
-            SafeIndexPathOps.markForDeletion(p, indicesDir);
-            marked++;
-          } catch (Exception e) {
-            log.debug("Failed to mark {} for deletion: {}", p, e.getMessage());
+        State state = readStateBestEffort();
+        if (state == null) {
+          return new GcResult(0, 0);
+        }
+        Set<String> protectedIds = protectedGenerationIds(state);
+
+        int marked = 0;
+        if (!pruneMarkedOnly) {
+          List<Path> candidates = new ArrayList<>();
+          try (var stream = Files.list(indicesDir)) {
+            stream
+                .filter(Files::isDirectory)
+                .filter(p -> Files.exists(p.resolve(GENERATION_SENTINEL)))
+                .filter(
+                    p -> {
+                      String name = p.getFileName().toString();
+                      if (protectedIds.contains(name)) return false;
+                      // Never "mark" already-marked dirs; prune step handles them.
+                      if (name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER))) {
+                        return false;
+                      }
+                      return true;
+                    })
+                .forEach(candidates::add);
+          }
+          candidates.sort(Comparator.comparing(p -> p.getFileName().toString()));
+          int keep = Math.max(0, keepLatest);
+          int cutoff = Math.max(0, candidates.size() - keep);
+          for (int i = 0; i < cutoff; i++) {
+            Path p = candidates.get(i);
+            try {
+              SafeIndexPathOps.markForDeletion(p, indicesDir);
+              marked++;
+            } catch (Exception e) {
+              log.debug("Failed to mark {} for deletion: {}", p, e.getMessage());
+            }
           }
         }
-      }
 
-      // Always try to prune already-marked directories (best-effort).
-      int before = countMarkedDeletableDirsBestEffort(state);
-      pruneMarkedForDeletionBestEffort();
-      int after = countMarkedDeletableDirsBestEffort(state);
-      int pruned = Math.max(0, before - after);
-      return new GcResult(marked, pruned);
-    } catch (Exception e) {
-      return new GcResult(0, 0);
+        // Always try to prune already-marked directories (best-effort).
+        int before = countMarkedDeletableDirsBestEffort(state);
+        pruneMarkedForDeletionBestEffort();
+        int after = countMarkedDeletableDirsBestEffort(state);
+        int pruned = Math.max(0, before - after);
+        return new GcResult(marked, pruned);
+      } catch (Exception e) {
+        return new GcResult(0, 0);
+      }
     }
   }
 

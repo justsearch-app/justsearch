@@ -685,7 +685,7 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "Lucene generations plus state v2 and generation manifest v1",
+      "format": "Lucene generations plus state v2, automatic generation manifest v1, recorded generation manifest v2",
       "currentVersion": 2,
       "readableLegacyVersions": [
         1
@@ -708,7 +708,8 @@
         "modules/configuration/src/main/java/io/justsearch/configuration/FileOps.java"
       ],
       "tests": [
-        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java"
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java",
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/RecordedGenerationStartTest.java"
       ],
       "fixtures": []
     },

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,6 +11,7 @@ import io.justsearch.ipc.MigrationRollbackRequest;
 import io.justsearch.ipc.MigrationRollbackResponse;
 import io.justsearch.ipc.MigrationStartRequest;
 import io.justsearch.ipc.MigrationStartResponse;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +38,8 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("migration responses — restart_required (stage-A checkpoint blocker 1)")
 final class MigrationRestartRequiredTest {
+  private static final String OPERATION_KEY = "01994180-0000-7000-8000-000000000121";
+  private static final String TARGET_FINGERPRINT = "a".repeat(64);
 
   private static MigrationControlOps opsOver(Path indexBase) {
     return new MigrationControlOps(new IndexGenerationManager(indexBase));
@@ -124,5 +128,77 @@ final class MigrationRestartRequiredTest {
     assertTrue(response.getAccepted(), "fixture has a real previous generation to roll back to");
     assertTrue(response.getRestartRequired(),
         "an accepted rollback that was asked to restart must report restart_required");
+  }
+
+  @Test
+  @DisplayName("recorded start keeps its exact target through retry and promotion")
+  void recordedStartIsIdempotentAndAlreadyPromotedNeedsNoRestart(@TempDir Path tempDir)
+      throws Exception {
+    Path indexBase = tempDir.resolve("recorded-index");
+    IndexGenerationManager seed = new IndexGenerationManager(indexBase);
+    var initial = seed.initializeOrLoad().state();
+    MigrationStartRequest request = MigrationStartRequest.newBuilder()
+        .setReason("bulk_reindex")
+        .setRestartWorker(true)
+        .setRecordedOperationKey(OPERATION_KEY)
+        .setTargetIndexFingerprint(TARGET_FINGERPRINT)
+        .build();
+
+    MigrationStartResponse first = opsOver(indexBase).startMigration(request);
+    MigrationStartResponse retry = opsOver(indexBase).startMigration(request);
+    String target = "g-" + OPERATION_KEY;
+    assertTrue(first.getAccepted(), first.getError());
+    assertTrue(first.getRestartRequired());
+    assertEquals(initial.active_generation(), first.getActiveGenerationId());
+    assertEquals(target, first.getBuildingGenerationId());
+    assertEquals("MIGRATING", first.getMigrationState());
+    assertTrue(retry.getAccepted(), retry.getError());
+    assertEquals(target, retry.getBuildingGenerationId(), "retry must reuse the exact generation id");
+    assertEquals(first.getMigrationState(), retry.getMigrationState());
+    try (var generations = Files.list(indexBase.resolve("indices"))) {
+      assertEquals(2L, generations.count(), "exact retry must not allocate a suffixed generation");
+    }
+
+    IndexGenerationManager promoter = new IndexGenerationManager(indexBase);
+    assertEquals(target, promoter.promoteBuildingGenerationToActive().active_generation());
+    MigrationStartResponse afterPromotion = opsOver(indexBase).startMigration(request);
+    assertTrue(afterPromotion.getAccepted(), afterPromotion.getError());
+    assertFalse(afterPromotion.getRestartRequired(), "an already active target has no start restart");
+    assertEquals(target, afterPromotion.getActiveGenerationId());
+    assertEquals("", afterPromotion.getBuildingGenerationId());
+    assertEquals("IDLE", afterPromotion.getMigrationState());
+
+    String manifest = Files.readString(
+        indexBase.resolve("indices").resolve(target).resolve(".justsearch-index-generation.json"));
+    assertTrue(
+        manifest.contains(TARGET_FINGERPRINT),
+        "the exact target fingerprint is bound to its generation");
+  }
+
+  @Test
+  @DisplayName("partial recorded identity refuses without creating a legacy generation")
+  void partialRecordedInputsDoNotFallBackToLegacyStart(@TempDir Path tempDir) throws Exception {
+    Path indexBase = tempDir.resolve("partial-recorded-index");
+    IndexGenerationManager seed = new IndexGenerationManager(indexBase);
+    var initial = seed.initializeOrLoad().state();
+    MigrationControlOps ops = opsOver(indexBase);
+
+    MigrationStartResponse keyOnly = ops.startMigration(MigrationStartRequest.newBuilder()
+        .setReason("bulk_reindex").setRestartWorker(true)
+        .setRecordedOperationKey(OPERATION_KEY).build());
+    MigrationStartResponse fingerprintOnly = ops.startMigration(MigrationStartRequest.newBuilder()
+        .setReason("bulk_reindex").setRestartWorker(true)
+        .setTargetIndexFingerprint(TARGET_FINGERPRINT).build());
+
+    assertFalse(keyOnly.getAccepted());
+    assertFalse(fingerprintOnly.getAccepted());
+    var unchanged = new IndexGenerationManager(indexBase).readStateBestEffort();
+    assertEquals(initial.active_generation(), unchanged.active_generation());
+    assertEquals(initial.building_generation(), unchanged.building_generation());
+    assertEquals("IDLE", unchanged.migration_state());
+    try (var generations = Files.list(indexBase.resolve("indices"))) {
+      assertEquals(1L, generations.count(),
+          "neither incomplete request may fall back to time-based legacy allocation");
+    }
   }
 }

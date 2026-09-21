@@ -283,3 +283,98 @@ Sequence1's queue capability is implemented and locally verified. It is not the
 application bulk consumer or installed bulk restart proof. Next is exact generation
 start and response witness, then prepared bulk/rebuild/REST routing and the existing
 runner's recovery/cutover connection. D1/D2/E/F remain unchanged obligations.
+
+### Exact-generation target contract selected after queue checkpoint
+
+Queue checkpoint3caf90cbc is pushed. The exact-start compatibility witness is the
+existing IndexFingerprint canonical physical-index inputs and digest, including
+stored-output model identities, rather than a second full ResolvedConfig/UI-settings
+projection. The accepted target_settings_json will retain those canonical inputs;
+the generation manifest retains only their digest. Indeterminate fingerprint inputs
+cannot be represented as a known compatible target. Roots/exclusions/public profile
+remain separate frozen prepared fields. Query-only settings do not invalidate a
+physical generation. The recorded manifest becomes version2 with target_index_fingerprint;
+ordinary automatic manifests remain version1 and their source display stays unchanged.
+
+Exact start takes the canonical accepted UUIDv7 key, derives g-<key>, and requires
+a valid existing current state.json. It never reconstructs a serving state from an
+absent/corrupt pointer. Same-target building or already-active IDLE state must retain
+matching strict metadata; FAILED or foreign ownership refuses. An orphan may be
+adopted only with both matching regular metadata files, no other entries, matching
+source/fingerprint and exact target identity. Partial/foreign/non-pristine or symlink
+targets refuse; no suffix allocation or destructive cleanup hides that refusal.
+
+Multiple manager instances currently mutate the same pointers; atomic replacement
+alone does not serialize read/modify/write or protect orphan creation from GC. Root
+selects one process-wide generation-state monitor covering pointer mutation, fallback
+repair and GC. Generation control is infrequent and one Engine owns the index tree.
+This avoids a persistent lock file, path-alias-sensitive lock registry, lifecycle of
+registry entries, or broad constructor/composition rewrite to force one manager.
+It conservatively serializes control across collections; it does not guard indexing
+or model work. The best-effort state read also takes this monitor because it can
+restore/upgrade the authoritative pointer. Existing strict observation remains an
+observation, not a lease across future transitions. No cross-process guarantee is
+added; the existing Engine/index-root ownership remains required.
+
+The recorded start response propagates exact active/building/state witnesses through
+the existing migration projection. Recorded start defers restart; the runner's
+composition-owned restart callback executes only after durable metadata binding.
+Ordinary automatic/manual legacy start behavior remains until the recorded producer
+bridge replaces the designated manual paths. State-written-before-witness recovery
+continues to derive and verify the same target across the two stores.
+
+### Sequence2 verification and sequence3 entry
+
+Focused2137 compiles the changed API, protocol, generation and client paths and
+represents42 cases across10 suites with no failures/errors. One new symlink case
+is skipped because this Windows account lacks the required privilege; Linux hosted
+execution remains required for that predicate. Negative2139 removes fingerprint
+comparison, pristine-orphan enforcement and response witness projection. Its11
+represented cases produce exactly three intended assertion failures. The script
+restores both production files byte-for-byte. Evidence lives under
+tmp/2137-recorded-generation* and tmp/2139-recorded-generation-negative*; retain
+through acceptance plus30 days and export before releasing the worktree.
+
+The consolidated independent review found one semantic state-table omission:
+active and building could name the same valid recorded target. Root now refuses
+that equality before same-target acceptance, with MIGRATING and SWITCHING regressions
+that preserve the pointer and manifest bytes. Strict recorded current-state parsing
+also rejects missing phase, duplicate/unknown fields and trailing JSON. Full affected
+module verification2141 passes5,280 cases across881 suites, zero failures/errors,
+12 skips, in9m27s. All five test tasks execute; app-api236, app-services2,964,
+worker-services1,392, worker-core364 and app-engine324. All ten main/test PMD tasks
+and six modules' format checks pass. Skips are six unavailable model checks, one
+external crash-corpus/model fixture, two filesystem/privilege checks and three
+previously deferred composition guardrails. The new recorded symlink case remains
+an explicit local platform gap until hosted Linux execution. Logs, copied XML,
+counts, exact changed-source hashes and skip inventory are tmp/2141-recorded-generation-full*.
+Store-recoverability, generated docs/skills and canonical links pass. The batch proves
+the exact-start API capability; installed bulk consumer/restart proof remains open.
+Commit preflight2143 classified three synthetic UUID literals as generic API keys.
+Root replaced only those test constants with the existing clearly synthetic canonical
+UUIDv7 fixture; the unchanged secret scanner passes. Focused2144 reruns all three
+affected classes and their format checks successfully. Full2141 still proves the
+unchanged production sources;2144 carries the exact final fixture revision.
+Queue checkpoint3caf90cbc's hosted CI35563199072 completed all jobs successfully;
+tmp/2138-queue-hosted-snapshot.json records the revision and job verdicts. That run
+does not prove the current uncommitted generation changes.
+
+Read-only sequence3 exploration confirms the narrow target snapshot owner:
+SsotCommitMetadataSource.fingerprintInputs() assembles the same inputs used by
+commit metadata, boot compatibility and Green verification. KnowledgeServer installs
+Worker model digest and effective-dimension providers before those reads. Add the
+read-only snapshot through this authority; do not recreate its input extraction in
+the application. Indeterminate configured-model fingerprints must refuse preparation.
+The existing captureServingGeneration API returns only the idle active ID and cannot
+stand in for this snapshot.
+
+ReindexHandler.prepare and OperationHandlerRegistrations already capture normalized
+roots, exclusions and serving generation. OperationExecutorImpl.planInvocation and
+PreparedInvocationCodec bind and save their preparation before acceptance.
+RecordedIngestPlanResolver validates the accepted context/provenance/descriptor;
+OperationAuthority re-resolves grants, policy scope, gate and dependencies. Extend
+these existing owners for bulk/rebuild profiles. Route their operation references in
+RecordedIngestionCoordinator's one REINDEX recovery pass. Existing operations columns
+already hold target generation/settings, gaps and processing history, but their typed
+read/write ports do not exist yet. Add runner-owned metadata access there, preserving
+terminal immutability and keeping queue and operations transactions disjoint.

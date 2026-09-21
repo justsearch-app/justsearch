@@ -37,6 +37,20 @@ The index root is **generation-scoped** (managed by `IndexGenerationManager`):
 
 This layout enables safe schema migration (build a new generation alongside the active one) and crash-safe pointer updates.
 
+Generation pointer mutations, fallback repair and GC are serialized across manager
+instances within the Engine. This process-local control monitor does not replace
+index-root process ownership or hold a lease across later indexing work.
+
+The recorded migration start API derives exactly `g-<accepted UUIDv7 operation key>`.
+It requires the current pointer and matching source/physical `IndexFingerprint`
+metadata; conflicts and failed migrations refuse without allocating another target.
+Recorded manifests use version2 with `target_index_fingerprint`; ordinary automatic
+manifests retain version1. An unbound target is adoptable only when its matching
+manifest and sentinel are regular files and are its only directory entries.
+Partial, foreign, non-pristine or symlink targets refuse. Recorded start returns
+active/building/state witnesses and leaves restart dispatch to its operation owner
+after durable binding. The bulk operation consumer is not yet connected to this API.
+
 Generation-state and watched-root authority reads distinguish unavailable bytes from
 malformed content. They acquire a shared file lock on the channel being read, retry
 contention for at most two seconds, and close the channel before parsing. Interruption

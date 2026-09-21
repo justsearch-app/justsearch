@@ -33,12 +33,29 @@ final class MigrationOps {
     }
 
     MigrationOutcome startMigration(String reason, EngineContext engineContext) {
-        try {
-            MigrationStartRequest req =
+        return startMigration(
                     MigrationStartRequest.newBuilder()
                             .setReason(reason == null ? "" : reason)
                             .setRestartWorker(true)
-                            .build();
+                            .build(), engineContext);
+    }
+
+    MigrationOutcome startRecordedMigration(String operationKey, String reason,
+            String targetIndexFingerprint, EngineContext engineContext) {
+        if (operationKey == null || operationKey.isEmpty()
+                || targetIndexFingerprint == null || targetIndexFingerprint.isEmpty()) {
+            return new MigrationOutcome(false, false);
+        }
+        return startMigration(MigrationStartRequest.newBuilder()
+                .setReason(reason == null ? "" : reason)
+                .setRestartWorker(true)
+                .setRecordedOperationKey(operationKey)
+                .setTargetIndexFingerprint(targetIndexFingerprint)
+                .build(), engineContext);
+    }
+
+    private MigrationOutcome startMigration(MigrationStartRequest req, EngineContext engineContext) {
+        try {
             var resp =
                     rpc.execute(
                             "startMigration",
@@ -55,7 +72,8 @@ final class MigrationOps {
                         resp.getBuildingGenerationId(),
                         resp.getRestartRequired());
             }
-            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired());
+            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired(),
+                    resp.getActiveGenerationId(), resp.getBuildingGenerationId(), resp.getMigrationState());
         } catch (CircuitBreakerOpenException e) {
             log.debug("startMigration rejected by circuit breaker");
             return new MigrationOutcome(false, false);

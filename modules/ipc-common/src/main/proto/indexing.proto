@@ -1164,8 +1164,12 @@ message RecoverVduProcessingResponse {
 message MigrationStartRequest {
   // Optional human-readable reason/source (e.g., "manual", "test", "schema_mismatch").
   string reason = 1;
-  // When true, the worker will restart itself after persisting state to apply the change.
+  // Requests an Engine restart requirement in the response; the caller owns dispatch.
   bool restart_worker = 2;
+  // Accepted UUIDv7 operation identity. Both recorded fields must be supplied together.
+  string recorded_operation_key = 3;
+  // Authoritative physical index fingerprint captured during operation preparation.
+  string target_index_fingerprint = 4;
 }
 
 message MigrationStartResponse {

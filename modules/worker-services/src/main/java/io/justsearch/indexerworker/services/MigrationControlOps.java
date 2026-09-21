@@ -44,8 +44,16 @@ final class MigrationControlOps {
             .setError("Index generation manager not available")
             .build();
       }
-      IndexGenerationManager.State next =
-          indexGenerationManager.startMigration(reason.isBlank() ? "manual" : reason.trim());
+      boolean recorded = !request.getRecordedOperationKey().isEmpty();
+      if (recorded != !request.getTargetIndexFingerprint().isEmpty()) {
+        return MigrationStartResponse.newBuilder().setAccepted(false)
+            .setError("Recorded operation key and target fingerprint must be supplied together")
+            .build();
+      }
+      IndexGenerationManager.State next = recorded
+          ? indexGenerationManager.startRecordedMigration(request.getRecordedOperationKey(), reason,
+              request.getTargetIndexFingerprint())
+          : indexGenerationManager.startMigration(reason.isBlank() ? "manual" : reason.trim());
       String active =
           next == null || next.active_generation() == null ? "" : next.active_generation();
       String building =
@@ -59,7 +67,7 @@ final class MigrationControlOps {
               .setMigrationState(ms)
               .setActiveGenerationId(active)
               .setBuildingGenerationId(building)
-              .setRestartRequired(restart)
+              .setRestartRequired(restart && (!recorded || !building.isEmpty()))
               .build();
 
       return response;

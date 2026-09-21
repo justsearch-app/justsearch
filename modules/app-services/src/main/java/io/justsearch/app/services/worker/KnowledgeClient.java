@@ -1041,6 +1041,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
+    public IndexingService.MigrationOutcome startRecordedMigration(String operationKey, String reason,
+            String targetIndexFingerprint, EngineContext engineContext) {
+        return migrationOps.startRecordedMigration(operationKey, reason, targetIndexFingerprint, engineContext);
+    }
+
+    @Override
     public IndexingService.MigrationOutcome requestCutover(boolean forceSwitching, EngineContext engineContext) {
         return migrationOps.requestCutover(forceSwitching, engineContext);
     }

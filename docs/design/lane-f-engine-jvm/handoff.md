@@ -17,19 +17,23 @@ storage, all13 local installed scenarios and fresh hosted CI35561341238 at job a
 XML level, including4 Windows storage cases and13 installed recovery cases.
 [Exact proof and historical failure limits](evidence/C2/hostile-lock-acceptance.md).
 
-Current compiling batch: C2-10 queue capture and immutable settlement, schema19.
+Pushed3caf90cbc: C2-10 queue capture and immutable settlement, schema19.
 Final2133 represents1,036 cases, zero failures/errors,21 existing model/filesystem
 skips;690 indexer cases execute,346 unchanged worker-core results reuse2129.
 PMD/format, canonical checks and store gate pass. One consolidated review is fixed;
-negative2131 fails all3 intended predicates and restores production bytes. No build
-or dev stack is active. [Design, current implementation and exact evidence](evidence/C2/bulk-reindex-connection.md).
+negative2131 fails all3 intended predicates and restores production bytes. Hosted
+CI35563199072 passes all jobs. [Design, current implementation and exact evidence](evidence/C2/bulk-reindex-connection.md).
 
-Next: commit/push that queue batch, then exact generation start/witness, prepared
-bulk/rebuild/manual REST dispatch, runner-owned metadata and recovery across both
-restarts, and installed bulk fault proof. Generation inspection found existing
-manifests lack target-settings compatibility and managers lack shared mutation
-serialization; resolve these under the existing generation owner, recording the
-smallest justified contract. The application bulk consumer is still unimplemented.
+Current batch: exact generation start and response witness, strict v2 recorded
+manifest with physical IndexFingerprint digest, and process-local serialization of
+generation control. Focused2137 has42 cases/zero failures/one Windows symlink privilege
+skip. Negative2139 fails all3 intended predicates. Review's equal-active/building
+finding is fixed with two regressions. Full2141 executes5,280 cases/881 suites,
+zero failures/errors and12 qualified skips; PMD/format pass. Hosted Linux must cover
+the new locally skipped symlink case. No build or dev stack is active.
+Next: checkpoint this batch, then prepared bulk/rebuild/
+manual REST dispatch, runner-owned metadata and recovery across both restarts, and
+installed bulk fault proof. The application bulk consumer is still unimplemented.
 Then finish C2-12/full stress/hosted reconciliation and D1/D2/E/F. Full2064's known
 configuration-funnel failure is corrected, but no final full-stress green is claimed.
 Artifacts stay accessible in this worktree's tmp through lane acceptance plus30 days

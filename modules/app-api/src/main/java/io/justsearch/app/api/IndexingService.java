@@ -233,10 +233,23 @@ public interface IndexingService {
   // =========================================================================
 
   /** Projection of the migration response; the protocol response remains the result authority. */
-  record MigrationOutcome(boolean accepted, boolean restartRequired) {}
+  record MigrationOutcome(boolean accepted, boolean restartRequired,
+      String activeGenerationId, String buildingGenerationId, String migrationState) {
+    public MigrationOutcome(boolean accepted, boolean restartRequired) {
+      this(accepted, restartRequired, "", "", "");
+    }
+  }
 
   /** Starts a Blue/Green migration and reports whether an Engine restart is required. */
   default MigrationOutcome startMigration(String reason, EngineContext engineContext) {
+    throw new UnsupportedOperationException("Indexing service unavailable");
+  }
+
+  /** Starts or resumes an accepted operation's exact generation without dispatching its restart.
+   * The operation owner must durably bind the returned witness before requesting that restart.
+   */
+  default MigrationOutcome startRecordedMigration(String operationKey, String reason,
+      String targetIndexFingerprint, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
