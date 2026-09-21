@@ -21,9 +21,13 @@ Installed processing/retry baseline2022/2027 passes after persisting its watched
 scope. Baseline2020 also exposed a real closed-enumeration refusal defect; the
 [active correction](evidence/C2/closed-enumeration-refusal.md) persists the refusal
 before retiring unfinished units and preserves receipt settlement at the attempt limit.
-Next: commit the reviewed correction, then all six installed fault scenarios.
-Live forced-disconnect proof is
-still distinct from the controlled frontend detachment tests.
+The reviewed correction is committed and pushed in `1a94b5c0a`.
+The [installed fault batch](evidence/C2/installed-fault-plan-2026-09-21.md) passes
+all eight cases in2051, including six exact fault boundaries, real HTTP caller
+disconnect and the original baseline. Review, PMD/format and focused governance pass.
+Next: paired changed-input proof, the still-owed C2-10 bulk durable row/plan/resume,
+and C2-12 sweep/full verification. Streamed `core.reindex` proof does not discharge
+`core.bulk-reindex`; D1 retains journal/replay/live-activation/gap-refusal ownership.
 The [pause record](evidence/C2/pause-2026-09-21.md) is historical.
 A/B/C1 are complete; C2 and D1/D2/E/F remain. Merge stays at F.
 

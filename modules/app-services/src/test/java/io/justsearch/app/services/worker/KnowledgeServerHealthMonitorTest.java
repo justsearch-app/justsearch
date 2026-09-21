@@ -169,14 +169,16 @@ final class KnowledgeServerHealthMonitorTest {
    * over the whole client surface rather than one method of it, so "a resume must do the reconcile
    * and nothing else" survives the deletion in a stronger form than it had.
    */
-  @Test
-  void largeGapTriggersReconcileAndNoReconnect() {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void largeGapTriggersReconcileAndNoReconnectUnlessFaultFixtureIsolated(boolean isolated) {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
     when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
     when(bootstrap.client()).thenReturn(client);
+    when(bootstrap.automaticRootProducersSuppressed()).thenReturn(isolated);
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
@@ -185,7 +187,7 @@ final class KnowledgeServerHealthMonitorTest {
     clock[0] += 3_600_000L; // a 1-hour gap → suspend/resume
     monitor.tick();
 
-    verify(client, times(1)).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
+    verify(client, times(isolated ? 0 : 1)).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
     verifyNoMoreInteractions(client);
   }
 

@@ -102,6 +102,28 @@ final class KnowledgeServerBootstrapEvalModeTest {
     verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), any());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void onlyExplicitFaultFixtureCompositionSuppressesAutomaticRootProducers(boolean isolated) throws Exception {
+    System.setProperty(EVAL_MODE_PROP, "true");
+    var config = configFor(tempDir.resolve("data"), tempDir.resolve("working"));
+    var client = mock(KnowledgeClient.class);
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      var bootstrap = isolated
+          ? new KnowledgeServerBootstrap(executors, config, null,
+              new io.justsearch.app.services.lifecycle.WorkerCapability(), WorkerHost.unavailable(), false)
+          : new KnowledgeServerBootstrap(executors, config);
+      var clientField = KnowledgeServerBootstrap.class.getDeclaredField("client");
+      clientField.setAccessible(true);
+      clientField.set(bootstrap, client);
+      bootstrap.completeReadyInitializationFromMonitor();
+      bootstrap.completeReadyInitializationFromMonitor();
+      verify(client, times(isolated ? 0 : 2)).reindexPersistedRoots(any());
+      verify(client, times(isolated ? 0 : 2)).startPeriodicSync();
+      org.mockito.Mockito.verifyNoMoreInteractions(client);
+    }
+  }
+
   /** Build a minimal KnowledgeServerConfig pointing at the temp directories. */
   private static KnowledgeServerConfig configFor(Path dataDir, Path workingDir) {
     return new KnowledgeServerConfig(

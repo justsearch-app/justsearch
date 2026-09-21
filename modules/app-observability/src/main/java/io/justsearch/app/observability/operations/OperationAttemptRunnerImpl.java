@@ -40,6 +40,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   private final Clock clock;
   private final SettingsCommitOwner settingsOwner;
   private final IngestPlanResolver ingestPlanResolver;
+  private final java.util.function.Consumer<FaultBoundary> faultHook;
+  /** Immutable observation for an explicitly composed installed-test barrier; never a writer. */
+  public record FaultBoundary(String phase, OperationKind parentKind, String parentKey,
+      String operationKey, long operationRecordId, String cursor, long completed, long failed) {}
+  public static final java.util.function.Consumer<FaultBoundary> NO_FAULT_HOOK = ignored -> {};
   private final Set<OperationKind> ownedKinds;
   private final List<OperationRecord> interrupted;
   private final Map<Long, Control> active = new ConcurrentHashMap<>();
@@ -64,6 +69,14 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   /** Ingestion preparation decoding is fixed by the process root before any parent can execute. */
   public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds,
       SettingsCommitOwner settingsOwner, IngestPlanResolver ingestPlanResolver) {
+    this(store, clock, ownedKinds, settingsOwner, ingestPlanResolver, NO_FAULT_HOOK);
+  }
+
+  /** Only the process composition root selects an installed-test barrier. */
+  public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds,
+      SettingsCommitOwner settingsOwner, IngestPlanResolver ingestPlanResolver,
+      java.util.function.Consumer<FaultBoundary> faultHook) {
+    this.faultHook = Objects.requireNonNull(faultHook, "faultHook");
     this.ingestPlanResolver = ingestPlanResolver;
     if (ingestPlanResolver != null && !ownedKinds.contains(OperationKind.INGEST)) {
       throw new IllegalArgumentException("Ingest resolver requires ingestion ownership");
@@ -150,10 +163,12 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
             throw new IllegalStateException("Accept exactly once within the owning callback");
           }
           Objects.requireNonNull(context, "context");
+          beforeAcceptance(stable);
           accepted = preparationNonce == null
               ? store.accept(stable.key(), stable.descriptor(), context, stable.provenance(), stable.historyMode())
               : store.acceptPrepared(stable.key(), stable.descriptor(), context, stable.provenance(),
                   preparationNonce, stable.historyMode());
+          afterAcceptance(accepted);
         }
       }
       var scope = new Scope();
@@ -178,15 +193,38 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   @Override
   public PreparedAttempt accept(Request request) {
     requireOutsidePreparation(request);
-    return prepared(withKey(request, stable -> store.accept(stable.key(), stable.descriptor(),
-        stable.context(), stable.provenance(), stable.historyMode())));
+    return prepared(withKey(request, stable -> {
+      beforeAcceptance(stable);
+      var accepted = store.accept(stable.key(), stable.descriptor(),
+          stable.context(), stable.provenance(), stable.historyMode());
+      afterAcceptance(accepted);
+      return accepted;
+    }));
   }
 
   @Override
   public PreparedAttempt acceptPrepared(Request request, java.util.UUID nonce) {
     requireOutsidePreparation(request);
-    return prepared(withKey(request, stable -> store.acceptPrepared(stable.key(), stable.descriptor(),
-        stable.context(), stable.provenance(), nonce, stable.historyMode())));
+    return prepared(withKey(request, stable -> {
+      beforeAcceptance(stable);
+      var accepted = store.acceptPrepared(stable.key(), stable.descriptor(),
+          stable.context(), stable.provenance(), nonce, stable.historyMode());
+      afterAcceptance(accepted);
+      return accepted;
+    }));
+  }
+
+  private void beforeAcceptance(Request request) {
+    if (faultHook != NO_FAULT_HOOK) faultHook.accept(new FaultBoundary("before-accept", request.descriptor().kind(),
+        request.key(), request.key(), -1, null, 0, 0));
+  }
+
+  private void afterAcceptance(OperationStore.Acceptance accepted) {
+    if (faultHook != NO_FAULT_HOOK && accepted.created()) {
+      var row = accepted.record();
+      faultHook.accept(new FaultBoundary("after-accept", row.descriptor().kind(), row.key(), row.key(),
+          row.id(), row.checkpointCursor(), row.unitsCompleted(), row.unitsFailed()));
+    }
   }
 
   @Override
@@ -439,6 +477,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         control.settingsUncertain = true;
         throw new IllegalStateException("Settings owner returned without a receipt");
       }
+      if (faultHook != NO_FAULT_HOOK) faultHook.accept(new FaultBoundary("after-effect", control.kind,
+          control.key, control.key, control.id, null, 0, 0));
       return settingsResponse(control.settingsReceipt);
     } catch (RuntimeException failure) {
       control.settingsFailure = failure;
@@ -677,6 +717,14 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     @Override public long id() { return id; }
     @Override public String key() { return key; }
     @Override public void checkpoint(String cursor, long completed, long failed) {
+      if (faultHook != NO_FAULT_HOOK && kind == OperationKind.INGEST && completed > 0
+          && cursor != null && cursor.startsWith("ingest-receipt:")) {
+        var row = current(this);
+        String parentKey = io.justsearch.app.api.operations.RecordedIngestChild.parentKey(row.descriptor());
+        var parent = store.find(parentKey).orElseThrow();
+        faultHook.accept(new FaultBoundary("after-effect", parent.descriptor().kind(), parentKey,
+            key, id, cursor, completed, failed));
+      }
       if (!store.checkpoint(id, cursor, completed, failed)) {
         throw new IllegalStateException("Checkpoint refused for a terminal, unstarted or newer operation");
       }

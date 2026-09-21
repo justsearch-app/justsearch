@@ -182,6 +182,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/operation-resume-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/operation-fault-scenario.mjs"))
 
   // Tempdoc 419 / T6.2 wired :modules:indexer-worker:installDist here because
   // IsolatedBackendFixture spawned a HeadlessApp that in turn spawned a Worker subprocess from

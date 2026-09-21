@@ -1,0 +1,82 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.ui;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+
+import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.json.JsonMapper;
+
+final class OperationFaultBarrierTest {
+  private static final String KEY = "01994180-0000-7000-8000-000000000001";
+  @TempDir Path data;
+
+  @Test
+  void absentSelectionUsesTheExactNoopAndAnySelectionRequiresHarnessMode() {
+    assertSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK, OperationFaultBarrier.fromEnvironment(data, Map.of()));
+    var env = new HashMap<>(selection());
+    env.remove("JUSTSEARCH_SUPERVISOR_HARNESS");
+    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env));
+    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data,
+        Map.of("JUSTSEARCH_OPERATION_FAULT_KEY", KEY)));
+  }
+
+  @Test
+  void incompleteOrUnknownSelectionIsRejectedBeforeAnyObservation() {
+    for (String field : selection().keySet()) {
+      var env = new HashMap<>(selection());
+      env.remove(field);
+      assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env));
+    }
+    var env = new HashMap<>(selection());
+    env.put("JUSTSEARCH_OPERATION_FAULT_POINT", "arbitrary-write");
+    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(data, env));
+  }
+
+  @Test
+  void exactBoundaryPublishesEvidenceAndSuccessorDoesNotRetrigger() throws Exception {
+    var hook = OperationFaultBarrier.fromEnvironment(data, selection());
+    var boundary = new OperationAttemptRunnerImpl.FaultBoundary("after-effect", OperationKind.INGEST,
+        KEY, "01994180-0000-7000-8000-000000000002", 17, "ingest-receipt:1:9:hash", 1, 0);
+    hook.accept(new OperationAttemptRunnerImpl.FaultBoundary("before-accept", OperationKind.INGEST,
+        KEY, KEY, -1, null, 0, 0));
+    hook.accept(new OperationAttemptRunnerImpl.FaultBoundary("after-effect", OperationKind.SETTINGS_APPLY,
+        KEY, KEY, 16, null, 0, 0));
+    hook.accept(new OperationAttemptRunnerImpl.FaultBoundary("after-effect", OperationKind.INGEST,
+        "01994180-0000-7000-8000-000000000003", KEY, 16, null, 1, 0));
+    Path reached = data.resolve("runtime/operation-fault-reached.json");
+    assertFalse(Files.exists(reached));
+    Files.createDirectories(reached.getParent());
+    Path release = data.resolve("runtime/operation-fault-release");
+    Files.writeString(release, "release");
+    hook.accept(boundary);
+    String evidence = Files.readString(reached);
+    var json = JsonMapper.builder().build().readTree(evidence);
+    assertEquals("ingest", json.path("parentKind").asText());
+    assertEquals(KEY, json.path("parentKey").asText());
+    assertEquals(boundary.operationKey(), json.path("operationKey").asText());
+    assertEquals(17, json.path("operationRecordId").asLong());
+    assertEquals(1, json.path("completed").asLong());
+    assertEquals(ProcessHandle.current().pid(), json.path("pid").asLong());
+    Files.delete(release);
+    var successor = OperationFaultBarrier.fromEnvironment(data, selection());
+    assertTimeoutPreemptively(Duration.ofSeconds(1), () -> successor.accept(boundary));
+    assertEquals(evidence, Files.readString(reached));
+  }
+
+  private static Map<String, String> selection() {
+    return Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1", "JUSTSEARCH_OPERATION_FAULT_POINT", "after-effect",
+        "JUSTSEARCH_OPERATION_FAULT_KEY", KEY, "JUSTSEARCH_OPERATION_FAULT_KIND", "ingest");
+  }
+}

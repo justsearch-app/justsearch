@@ -1074,6 +1074,7 @@ public class HeadlessApp {
                 "ui", response.ui(), "llm", response.llm(), "indexPaths", response.indexPaths(),
                 "settingsMode", response.settingsMode()));
           });
+      var operationFaultHook = OperationFaultBarrier.fromEnvironment(configPhase.dataDir(), System.getenv());
       var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
           operations, java.time.Clock.systemUTC(), java.util.Set.of(
               io.justsearch.agent.api.registry.OperationKind.INGEST,
@@ -1082,7 +1083,8 @@ public class HeadlessApp {
               io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
               io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
               io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN), settingsOwner,
-          new io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver());
+          new io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver(),
+          operationFaultHook);
       var operationAuthority = io.justsearch.app.services.bootstrap.OperationAuthority.load(configPhase.dataDir());
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
@@ -1126,7 +1128,8 @@ public class HeadlessApp {
               },
               () ->
                   tryStartKnowledgeServer(
-                      sharedWorkerCapability, ksConfig, engineRoot));
+                      sharedWorkerCapability, ksConfig, engineRoot,
+                      operationFaultHook == io.justsearch.app.observability.operations.OperationAttemptRunnerImpl.NO_FAULT_HOOK));
       // Graceful retirement from the completing task cannot interrupt its own completion path.
       // The process registry continues accounting the concrete instance until it actually exits.
       pendingIndexStartup = workerFuture;
@@ -1577,7 +1580,7 @@ public class HeadlessApp {
   private static KnowledgeServerStartResult tryStartKnowledgeServer(
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       io.justsearch.app.services.worker.KnowledgeServerConfig ksConfig,
-      io.justsearch.app.engine.EngineRoot engineRoot) {
+      io.justsearch.app.engine.EngineRoot engineRoot, boolean automaticRootProducers) {
     // Tempdoc 825: held outside the try so a failed start still RETURNS the instance. The pre-825
     // code manufactured the null that connectWorker then turned into a permanent DEGRADED pin with
     // no monitor — the "boot brick" of 821 §O.4. The instance is restartable by construction
@@ -1595,7 +1598,7 @@ public class HeadlessApp {
               ksConfig,
               null,
               sharedWorkerCapability,
-              engineRoot);
+              engineRoot, automaticRootProducers);
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.

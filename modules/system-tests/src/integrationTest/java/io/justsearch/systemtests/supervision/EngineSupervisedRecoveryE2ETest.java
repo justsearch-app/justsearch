@@ -34,11 +34,12 @@ final class EngineSupervisedRecoveryE2ETest {
 
   static void runScenario(String scenario) throws Exception {
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
+    boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-");
     if ("lock-boot".equals(scenario)) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");
     }
-    if (processingFamily) {
+    if (processingFamily || operationFault) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "the repository's process identity collector currently supports Windows only");
     }
@@ -147,6 +148,17 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(output.contains("fatal_or_uncaught"), output);
     } else if ("migration".equals(scenario)) {
       assertTrue(output.contains("MIGRATION_PASS"), output);
+    } else if (operationFault) {
+      assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);
+      if ("ingest-client-disconnect".equals(scenario)) {
+        assertTrue(output.contains("OPERATION_FAULT_DISCONNECT_PASS"), output);
+      } else {
+        assertTrue(output.contains("OPERATION_FAULT_COOLDOWN_SNAPSHOT"), output);
+        String marker = "settings-after-accept-before-effect".equals(scenario)
+            ? "OPERATION_FAULT_SETTINGS_PRE_EFFECT_PASS"
+            : scenario.startsWith("settings-") ? "OPERATION_FAULT_SETTINGS_PASS" : "OPERATION_FAULT_INGEST_PASS";
+        assertTrue(output.contains(marker), output);
+      }
     } else if (processingFamily) {
       assertTrue(output.contains("PROCESSING_AFTER_DEATH"), output);
       assertTrue(output.contains("PROCESSING_REPLAY_PASS"), output);

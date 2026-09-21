@@ -7,9 +7,16 @@ import { exerciseMigrationRestart } from './migration-restart-scenario.mjs';
 import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
 import { exerciseOperationResume } from './operation-resume-scenario.mjs';
+import { exerciseOperationFault } from './operation-fault-scenario.mjs';
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 
 const repo = process.cwd();
+const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
+const operationFault = new Set(['ingest-before-accept', 'settings-before-accept',
+  'ingest-after-accept-before-effect', 'settings-after-accept-before-effect',
+  'ingest-after-effect-before-checkpoint', 'settings-after-effect-before-checkpoint',
+  'ingest-client-disconnect']).has(scenario);
+const operationKey = operationFault ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
   : path.join(repo, 'tmp', 'lane-f-takeover', `writer-live-${Date.now()}`);
@@ -52,8 +59,11 @@ const env = {
   AI_OFFLINE: 'true',
   CI: '',
 };
+delete env.JUSTSEARCH_OPERATION_FAULT_KEY;
+delete env.JUSTSEARCH_OPERATION_FAULT_KIND;
+delete env.JUSTSEARCH_OPERATION_FAULT_POINT;
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
-if (['processing', 'operation'].includes(process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO)) {
+if (['processing', 'operation'].includes(scenario) || operationFault) {
   // Recovery revalidates persisted scope. Keep the successful replay corpus under a
   // real watched root; fresh out-of-root authority intentionally cannot survive restart.
   const corpus = path.join(work, 'corpus');
@@ -64,6 +74,12 @@ if (['processing', 'operation'].includes(process.env.JUSTSEARCH_REAL_RECOVERY_SC
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
+}
+if (operationFault) {
+  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = scenario.startsWith('settings-') ? 'settings-apply' : 'ingest';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = scenario.endsWith('before-accept') ? 'before-accept'
+    : scenario.endsWith('before-checkpoint') ? 'after-effect' : 'after-accept';
 }
 delete env.JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND;
 if (aiEnabled) {
@@ -202,7 +218,11 @@ try {
       return response.status === 200 ? response : null;
     } catch { return null; }
   });
-  if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'operation') {
+  if (operationFault) {
+    await exerciseOperationFault({ work, data, first, manifest, apiPort, readJson, waitFor,
+      request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor,
+      scenario, operationKey });
+  } else if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'operation') {
     await exerciseOperationResume({ work, data, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor });
   } else if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {

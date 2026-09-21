@@ -687,6 +687,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * <p>Item A11 removed the second actuator, a channel reconnect: there is no channel.
    */
   private void eagerlyRevalidateAfterResume(long gapMs) {
+    if (bootstrap.automaticRootProducersSuppressed()) return;
     log.info(
         "Resume detected (process frozen ~{}ms); re-registering watchers and reconciling", gapMs);
     // Tempdoc 630: stamp the resume so /api/status can surface a brief "Catching up after sleep"

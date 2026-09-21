@@ -129,6 +129,90 @@ final class BackgroundWorkLifetimeTest {
   }
 
   @Test
+  void fireTimeRefusalSurvivesStoreReopenAndSameKeyRetryWithoutAnAgentRun() throws Exception {
+    var runRoot = operationDirectory.resolve("agent-runs");
+    java.nio.file.Files.createDirectories(runRoot);
+    var runStore = new io.justsearch.agent.AgentRunStore(runRoot);
+    var agent = mock(AgentService.class);
+    var admission = mock(io.justsearch.app.api.EngineAdmissionService.class);
+    var admissionStarted = new CountDownLatch(1);
+    var finishAdmission = new CountDownLatch(1);
+    when(admission.admit(any(), eq(false))).thenAnswer(call -> {
+      admissionStarted.countDown();
+      if (!finishAdmission.await(3, TimeUnit.SECONDS)) {
+        throw new IllegalStateException("test did not release fire-time admission");
+      }
+      throw new io.justsearch.app.api.EngineAdmissionException(
+          io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN, 1);
+    });
+    var request = AgentRequest.singleTurn(List.of(Map.of("role", "user", "content", "scheduled refusal")));
+    var context = TestRequestContexts.browser().withUrgency(EngineContext.Urgency.BACKGROUND);
+    var key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    long acceptedId;
+    io.justsearch.app.api.operations.OperationRecord firstTerminal;
+
+    try (var executors = new DefaultEngineExecutorRegistry()) {
+      var background = new BackgroundRunService(attempts, agent, executors, admission);
+      try {
+        var scheduled = background.schedule(key, request, Duration.ZERO, context);
+        acceptedId = scheduled.accepted().id();
+        assertTrue(admissionStarted.await(3, TimeUnit.SECONDS), "scheduled timer must reach fire-time admission");
+        assertEquals(key, scheduled.accepted().key());
+        assertEquals(io.justsearch.app.api.operations.OperationState.ACCEPTED,
+            operationStore.find(key).orElseThrow().state(), "acceptance must be durable before admission returns");
+        assertTrue(runStore.listSessions(100).isEmpty(), "refusal must precede any AgentRunStore row");
+
+        finishAdmission.countDown();
+        firstTerminal = scheduled.completion().toCompletableFuture().get(3, TimeUnit.SECONDS);
+        assertEquals(io.justsearch.app.api.operations.OperationState.FAILED, firstTerminal.state());
+        assertEquals("ADMISSION_FROZEN", firstTerminal.failureReason());
+        assertEquals(new io.justsearch.app.api.operations.OperationReceipt("ADMISSION_FROZEN", null),
+            firstTerminal.receipt());
+        assertNull(firstTerminal.startedAt());
+        assertEquals(acceptedId, operationStore.find(key).orElseThrow().id());
+        assertTrue(runStore.listSessions(100).isEmpty(), "admission refusal must leave no agent run");
+        verifyNoInteractions(agent);
+      } finally {
+        finishAdmission.countDown();
+        background.shutdown();
+      }
+    }
+
+    operationStore.close();
+    operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(
+        operationDirectory.resolve("operations.db"));
+    attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operationStore,
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
+    var reopenedOutcome = operationStore.find(key).orElseThrow();
+    assertEquals(acceptedId, reopenedOutcome.id());
+    assertEquals(io.justsearch.app.api.operations.OperationState.FAILED, reopenedOutcome.state());
+    assertEquals(firstTerminal.failureReason(), reopenedOutcome.failureReason());
+    assertEquals(firstTerminal.receipt(), reopenedOutcome.receipt(),
+        "operation history must resolve the typed refusal after close and reopen");
+    var reopenedRunStore = new io.justsearch.agent.AgentRunStore(runRoot);
+    assertTrue(reopenedRunStore.listSessions(100).isEmpty(), "reopened AgentRunStore must still be empty");
+
+    try (var executors = new DefaultEngineExecutorRegistry()) {
+      var background = new BackgroundRunService(attempts, agent, executors, admission);
+      try {
+        var retry = background.schedule(key, request, Duration.ZERO, context);
+        assertTrue(retry.existing(), "same-key retry must attach to the recorded terminal acceptance");
+        assertEquals(acceptedId, retry.accepted().id());
+        var replayed = retry.completion().toCompletableFuture().get(3, TimeUnit.SECONDS);
+        assertEquals(firstTerminal.id(), replayed.id());
+        assertEquals(io.justsearch.app.api.operations.OperationState.FAILED, replayed.state());
+        assertEquals(firstTerminal.failureReason(), replayed.failureReason());
+        assertEquals(firstTerminal.receipt(), replayed.receipt(), "typed terminal receipt must survive reopen");
+        assertEquals(acceptedId, operationStore.find(key).orElseThrow().id());
+        assertEquals(firstTerminal.receipt(), operationStore.find(key).orElseThrow().receipt());
+        assertTrue(reopenedRunStore.listSessions(100).isEmpty(), "retry must not create a new agent run");
+        verify(admission, times(1)).admit(any(), eq(false));
+        verifyNoInteractions(agent);
+      } finally { background.shutdown(); }
+    }
+  }
+
+  @Test
   void agentReturnCannotReplaceTheDurableFailedRun() throws Exception {
     var agent = mock(AgentService.class);
     doAnswer(call -> {

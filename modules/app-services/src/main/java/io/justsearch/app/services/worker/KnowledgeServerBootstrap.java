@@ -167,6 +167,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     private AppInstanceLock appLock;
     private IpcTelemetry ipcTelemetry;
+    private final boolean automaticRootProducers;
 
     public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors) {
         this(executors, KnowledgeServerConfig.load(), new NoopTelemetry());
@@ -207,6 +208,15 @@ public final class KnowledgeServerBootstrap implements Closeable {
         io.justsearch.core.execution.EngineExecutorRegistry executors,
         KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability,
         WorkerHost workerHost) {
+        this(executors, config, telemetry, workerCapability, workerHost, true);
+    }
+
+    /** Installed fault fixtures isolate explicit operations from automatic root scans and watchers. */
+    public KnowledgeServerBootstrap(
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
+        KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability,
+        WorkerHost workerHost, boolean automaticRootProducers) {
+        this.automaticRootProducers = automaticRootProducers;
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
         this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
@@ -470,6 +480,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
         try {
             long prevGen = initGeneration.getAndIncrement();
+            if (!automaticRootProducers) {
+                log.info("Automatic root producers disabled by installed fault fixture composition");
+                return;
+            }
             if (prevGen == 0) {
                 // Tempdoc 626 §Axis-A — the redundant Head-side file watcher was removed; the
                 // Worker-side watcher (registered via WatchRoot during the root walk) is the sole
@@ -487,6 +501,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             initLock.unlock();
         }
     }
+
+    boolean automaticRootProducersSuppressed() { return !automaticRootProducers; }
 
     /**
      * Tempdoc 374 alpha.23 R13-A defect #2: package-private hook called by
