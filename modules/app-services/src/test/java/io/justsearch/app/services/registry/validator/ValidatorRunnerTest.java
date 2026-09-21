@@ -58,20 +58,20 @@ final class ValidatorRunnerTest {
   static void loadFixture() {
     HandlerRegistry handlers = new HandlerRegistry();
     handlers.register(CoreOperationCatalog.RESTART_WORKER, new RestartWorkerHandler());
-    // Slice 429 follow-up: BulkReindex now requires an IndexingService supplier.
-    // For validator tests (structural checks of the catalog), pass an unavailable
-    // service — the validator doesn't invoke handlers.
+    // Validator tests inspect registrations without invoking them; both durable bulk profiles
+    // share the prepared recorded handler.
     handlers.register(
         CoreOperationCatalog.BULK_REINDEX,
         new BulkReindexHandler(
-            io.justsearch.app.api.IndexingService::unavailable,
-            io.justsearch.app.api.OperationLeaseService.noOp()));
-    // Slice 447-followup §X.11.5 Phase 7: rebuild-index parameterless wrapper handler.
+            io.justsearch.app.api.operations.RecordedBulkPlan.Profile.USER_BULK,
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            ignored -> List.of(), io.justsearch.app.api.IndexingService::unavailable, List::of));
     handlers.register(
         CoreOperationCatalog.REBUILD_INDEX,
-        new io.justsearch.app.services.registry.operations.handlers.RebuildIndexHandler(
-            io.justsearch.app.api.IndexingService::unavailable,
-            io.justsearch.app.api.OperationLeaseService.noOp()));
+        new BulkReindexHandler(
+            io.justsearch.app.api.operations.RecordedBulkPlan.Profile.RECOVERY_REBUILD,
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            ignored -> List.of(), io.justsearch.app.api.IndexingService::unavailable, List::of));
     handlers.register(CoreOperationCatalog.PING_BACKEND, new PingBackendHandler());
     // Slice 3a-2-c precondition: ClearFailedJobs handler. Same supplier pattern as
     // BulkReindex.

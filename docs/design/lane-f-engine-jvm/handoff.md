@@ -24,16 +24,35 @@ PMD/format, canonical checks and store gate pass. One consolidated review is fix
 negative2131 fails all3 intended predicates and restores production bytes. Hosted
 CI35563199072 passes all jobs. [Design, current implementation and exact evidence](evidence/C2/bulk-reindex-connection.md).
 
-Current batch: exact generation start and response witness, strict v2 recorded
+Pushed29071724c: exact generation start and response witness, strict v2 recorded
 manifest with physical IndexFingerprint digest, and process-local serialization of
 generation control. Focused2137 has42 cases/zero failures/one Windows symlink privilege
 skip. Negative2139 fails all3 intended predicates. Review's equal-active/building
 finding is fixed with two regressions. Full2141 executes5,280 cases/881 suites,
-zero failures/errors and12 qualified skips; PMD/format pass. Hosted Linux must cover
-the new locally skipped symlink case. No build or dev stack is active.
-Next: checkpoint this batch, then prepared bulk/rebuild/
-manual REST dispatch, runner-owned metadata and recovery across both restarts, and
-installed bulk fault proof. The application bulk consumer is still unimplemented.
+zero failures/errors and12 qualified skips; PMD/format pass. Final fixture2144 has19
+passing cases without skips. Hosted CI35565311927 passes;2145 preserves Linux XML with all18 exact-generation
+cases passing without skips, including the locally skipped symlink regression.
+
+Current uncommitted sequence3 batch: physical target snapshot, immutable runner-owned
+bulk progress in existing operation columns, accepted bulk plan resolver, and shared
+prepared bulk/rebuild handler/catalog profiles. Focused2149 passes96 cases; negative2152 fails all three intended guards.
+Full2153 executes5,538 cases with only the deliberate wire-golden mismatch;
+PMD/format pass. Regenerated golden2155 passes31 focused cases. Review identified
+read-only rebuild-brake preparation and missing policy assertions; corrections and
+real braked Engine tests pass in 2158: 97 cases across 14 suites, no failures,
+errors or skips. The Engine suite executes; three unchanged suites reuse 2157.
+The seven affected PMD and six format checks pass in 2159; engine-port,
+store-recoverability and generated documentation checks also pass. No build or
+dev stack is active. Application bulk consumer remains unimplemented;
+these preparation changes must not be called complete until connected.
+Independent security review approved the narrowly scoped prepared-operation
+continuation design in the bulk owner document. Existing HIGH-risk capsule approval
+cannot survive the two required restarts; preserve ordinary capsule refusal and
+mint the new exact key/nonce basis only after successful prepared consent. The
+implementation and adversarial proof are still outstanding.
+Next: finish batch verification, implement continuation authority plus one shared
+REINDEX recovery consumer, captured file traversal, manual REST dispatch and both
+restart boundaries, then installed bulk fault proof.
 Then finish C2-12/full stress/hosted reconciliation and D1/D2/E/F. Full2064's known
 configuration-funnel failure is corrected, but no final full-stress green is claimed.
 Artifacts stay accessible in this worktree's tmp through lane acceptance plus30 days

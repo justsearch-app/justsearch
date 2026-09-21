@@ -2,6 +2,8 @@
 package io.justsearch.app.observability.operations;
 
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.BulkReindexProgress;
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.RecordedIngestChild;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.api.operations.OperationHistoryMode;
@@ -45,6 +47,11 @@ import org.slf4j.LoggerFactory;
 public final class SqliteOperationStore implements OperationStore {
   private static final ObjectMapper JSON = JsonMapper.builder()
       .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
+  private static final ObjectMapper BULK_JSON = JsonMapper.builder()
+      .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+      .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+      .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
+      .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
   private static final Logger LOG = LoggerFactory.getLogger(SqliteOperationStore.class);
   private static final long FUTURE_SKEW_MS = Duration.ofMinutes(5).toMillis();
   private static final long RETENTION_MS = HISTORY_RETENTION.toMillis();
@@ -793,6 +800,121 @@ public final class SqliteOperationStore implements OperationStore {
         return update.executeUpdate() == 1;
       }
     });
+  }
+
+  @Override
+  public boolean checkpointBulkReindex(long id, BulkReindexProgress progress) {
+    Objects.requireNonNull(progress, "progress");
+    return locked(() -> transaction(() -> {
+      OperationRecord row = rowById(id);
+      if (!bulkRow(row) || row.state() != OperationState.RUNNING
+          || !progress.generationId().equals("g-" + row.key())
+          || row.unitsCompleted() > progress.unitsCompleted()
+          || row.unitsFailed() > progress.unitsFailed()) return false;
+      var previous = bulkProgressRow(id);
+      if (previous.isEmpty()) {
+        if (progress.phase() != BulkReindexProgress.Phase.CAPTURING) return false;
+      } else {
+        var bound = previous.orElseThrow();
+        if (!bound.generationId().equals(progress.generationId()) || !bound.target().equals(progress.target())) return false;
+        if (bound.phase() == progress.phase()) {
+          // Repeated checkpoints cannot replace the sealed projection, captured plan or target.
+          return bound.equals(progress);
+        }
+        if (progress.phase().ordinal() != bound.phase().ordinal() + 1
+            || bound.capture() != null && !bound.capture().equals(progress.capture())) return false;
+      }
+      var settlement = progress.settlement();
+      var evidence = new BulkEvidence(1, progress.target().fingerprint(), progress.capture(),
+          settlement == null ? null : settlement.revision(),
+          settlement == null ? null : settlement.sha256(),
+          settlement == null ? 0 : settlement.failedEvents(),
+          settlement == null ? 0 : settlement.supersededEvents());
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET phase = ?, building_generation_id = ?, target_settings_json = ?,
+            gaps_json = ?, processing_history_json = ?, processing_history_counts_json = ?,
+            checkpoint_cursor = ?, units_completed = ?, units_failed = ?, updated_at = MAX(updated_at, ?)
+          WHERE id = ? AND state = 'RUNNING'
+          """)) {
+        update.setString(1, progress.phase().wire());
+        update.setString(2, progress.generationId());
+        update.setString(3, progress.target().canonicalInputsJson());
+        update.setString(4, BULK_JSON.writeValueAsString(settlement == null ? List.of() : settlement.gaps()));
+        update.setString(5, BULK_JSON.writeValueAsString(settlement == null ? List.of() : settlement.processingHistory()));
+        update.setString(6, BULK_JSON.writeValueAsString(evidence));
+        update.setString(7, progress.cursor());
+        update.setLong(8, progress.unitsCompleted());
+        update.setLong(9, progress.unitsFailed());
+        update.setLong(10, clock.millis());
+        update.setLong(11, id);
+        return update.executeUpdate() == 1;
+      }
+    }));
+  }
+
+  @Override
+  public java.util.Optional<BulkReindexProgress> bulkReindexProgress(long id) {
+    return locked(() -> bulkProgressRow(id));
+  }
+
+  private static boolean bulkRow(OperationRecord row) {
+    return row.descriptor().kind() == OperationKind.REINDEX
+        && row.context().survival() == EngineContext.Survival.DURABLE
+        && ("core.bulk-reindex".equals(row.descriptor().operationRef())
+            || "core.rebuild-index".equals(row.descriptor().operationRef()));
+  }
+
+  /** Versioned projection in the existing counts column; the queue retains the underlying ledger. */
+  private record BulkEvidence(int version, String targetFingerprint, BulkReindexProgress.Capture capture,
+      Long sealedRevision, String settlementSha256, long failedEvents, long supersededEvents) {}
+
+  private java.util.Optional<BulkReindexProgress> bulkProgressRow(long id) throws SQLException {
+    try (var query = connection.prepareStatement("SELECT * FROM operations WHERE id = ?")) {
+      query.setLong(1, id);
+      try (var result = query.executeQuery()) {
+        if (!result.next()) return java.util.Optional.empty();
+        String phase = result.getString("phase");
+        String generation = result.getString("building_generation_id");
+        String settings = result.getString("target_settings_json");
+        String gaps = result.getString("gaps_json");
+        String history = result.getString("processing_history_json");
+        String counts = result.getString("processing_history_counts_json");
+        if (phase == null && generation == null && settings == null
+            && gaps == null && history == null && counts == null) return java.util.Optional.empty();
+        try {
+          OperationRecord row = readRecord(result);
+          if (!bulkRow(row) || !Objects.equals(generation, "g-" + row.key())
+              || phase == null || settings == null || gaps == null || history == null || counts == null) {
+            throw new IllegalArgumentException("Invalid bulk progress ownership or partial projection");
+          }
+          var evidence = BULK_JSON.readValue(counts, BulkEvidence.class);
+          if (evidence == null || evidence.version() != 1
+              || (evidence.sealedRevision() == null) != (evidence.settlementSha256() == null)
+              || evidence.sealedRevision() == null && (evidence.failedEvents() != 0 || evidence.supersededEvents() != 0)) {
+            throw new IllegalArgumentException("Invalid bulk evidence version or settlement binding");
+          }
+          var parsedPhase = java.util.Arrays.stream(BulkReindexProgress.Phase.values())
+              .filter(candidate -> candidate.wire().equals(phase)).findFirst().orElseThrow();
+          var parsedGaps = List.of(BULK_JSON.readValue(gaps, OperationOutcomeView.Gap[].class));
+          var parsedHistory = List.of(BULK_JSON.readValue(history, BulkReindexProgress.ProcessingEvent[].class));
+          if (evidence.sealedRevision() == null && (!parsedGaps.isEmpty() || !parsedHistory.isEmpty())) {
+            throw new IllegalArgumentException("Unsealed bulk progress cannot contain terminal evidence");
+          }
+          var settlement = evidence.sealedRevision() == null ? null : new BulkReindexProgress.Settlement(
+              evidence.sealedRevision(), evidence.settlementSha256(), evidence.failedEvents(),
+              evidence.supersededEvents(), parsedGaps, parsedHistory);
+          var progress = new BulkReindexProgress(generation,
+              new IndexTargetSnapshot(evidence.targetFingerprint(), settings), parsedPhase, evidence.capture(), settlement);
+          if (row.unitsCompleted() != progress.unitsCompleted() || row.unitsFailed() != progress.unitsFailed()
+              || !Objects.equals(row.checkpointCursor(), progress.cursor())) {
+            throw new IllegalArgumentException("Bulk evidence and operation checkpoint disagree");
+          }
+          return java.util.Optional.of(progress);
+        } catch (RuntimeException malformed) {
+          throw new SQLException("Stored bulk progress is inconsistent", malformed);
+        }
+      }
+    }
   }
 
   @Override

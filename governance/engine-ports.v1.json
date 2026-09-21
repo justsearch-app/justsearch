@@ -97,7 +97,6 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/CancelIndexingJobHandler.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ClearFailedJobsHandler.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/IndexGcHandler.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RebuildIndexHandler.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ReconcileRootHandler.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ReindexHandler.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RemoveWatchedRootHandler.java",

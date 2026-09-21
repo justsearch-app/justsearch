@@ -49,11 +49,18 @@
   "intf" : {
     "inputs" : {
       "type" : "object",
+      "additionalProperties" : false,
       "properties" : {
+        "source" : {
+          "type" : "string",
+          "enum" : [ "corrupt_index_rebuild", "embedding_model_change", "schema_mismatch", "user_requested_rebuild", "user_requested_bulk_reindex", "manual" ]
+        },
         "corpusIds" : {
           "type" : "array",
           "items" : {
-            "type" : "string"
+            "type" : "string",
+            "minLength" : 1,
+            "maxLength" : 256
           }
         }
       },
@@ -94,7 +101,14 @@
   },
   "intf" : {
     "inputs" : {
-      "type" : "object"
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "source" : {
+          "type" : "string",
+          "enum" : [ "corrupt_index_rebuild", "embedding_model_change", "schema_mismatch", "user_requested_rebuild", "user_requested_bulk_reindex", "manual" ]
+        }
+      }
     },
     "result" : { },
     "errors" : [ ],

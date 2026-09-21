@@ -3,8 +3,11 @@ package io.justsearch.indexerworker.services;
 
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
+import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.SwapReason;
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.ipc.logging.MdcContext;
 import io.justsearch.ipc.BatchRequest;
 import io.justsearch.ipc.BatchResponse;
@@ -117,6 +120,7 @@ public final class WorkerIngestService {
   private final io.justsearch.adapters.lucene.runtime.RunningRuntime ingestLifecycle;
   private final IndexGenerationManager indexGenerationManager;
   private final boolean ingestIsServing;
+  private final boolean hasServingRuntime;
   private final Path capturedServingPath;
   private final OperationalMetrics metrics = OperationalMetrics.getInstance();
   private final IndexStatusOps statusOps;
@@ -168,6 +172,7 @@ public final class WorkerIngestService {
         java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     this.ingestLifecycle = ingestLifecycle;
     this.ingestIsServing = ingestLifecycle != null && ingestLifecycle == searchLifecycle;
+    this.hasServingRuntime = searchLifecycle != null;
     this.capturedServingPath = indexPath;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
@@ -681,11 +686,21 @@ public final class WorkerIngestService {
 
   /** Strict read for recorded ingestion preparation; this observation is not a generation lease. */
   public String captureServingGeneration(CallContext ctx) {
+    return captureActiveGeneration(ctx, true);
+  }
+
+  /** Read-only active witness for the recovery rebuild; this never grants ordinary ingestion. */
+  public String captureRebuildGeneration(CallContext ctx) {
+    return captureActiveGeneration(ctx, false);
+  }
+
+  private String captureActiveGeneration(CallContext ctx, boolean requireWriter) {
     try (var ignored = openRequestMdc(ctx)) {
       if (ctx.cancelled()) {
         throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
       }
-      if (!ingestIsServing || ingestLifecycle == null || indexGenerationManager == null || capturedServingPath == null) {
+      if ((requireWriter ? !ingestIsServing || ingestLifecycle == null : !hasServingRuntime)
+          || indexGenerationManager == null || capturedServingPath == null) {
         throw WorkerServiceException.unavailable("Serving generation authority is unavailable");
       }
       java.util.Optional<String> generation;
@@ -700,6 +715,58 @@ public final class WorkerIngestService {
       }
       return generation.orElseThrow(() -> WorkerServiceException.unavailable(
           "Recorded ingestion requires the current idle serving generation"));
+    }
+  }
+
+  /** Captures the Worker-computed physical index target, independently of Blue/Green serving state. */
+  public IndexTargetSnapshot captureIndexTarget(CallContext ctx) {
+    try (var ignored = openRequestMdc(ctx)) {
+      if (ctx.cancelled()) {
+        throw WorkerServiceException.cancelled("Index target capture cancelled");
+      }
+      if (!hasServingRuntime || indexGenerationManager == null || capturedServingPath == null) {
+        throw WorkerServiceException.unavailable("Index target authority is unavailable");
+      }
+
+      Map<String, Object> metadata = null;
+      RuntimeException metadataFailure = null;
+      try {
+        metadata = new SsotCommitMetadataSource().build();
+      } catch (RuntimeException failure) {
+        metadataFailure = failure;
+      }
+      if (ctx.cancelled()) {
+        throw WorkerServiceException.cancelled("Index target capture cancelled");
+      }
+      if (metadataFailure != null) {
+        throw new WorkerServiceException(
+            WorkerServiceException.Status.UNAVAILABLE,
+            "Physical index target could not be established",
+            metadataFailure);
+      }
+      if (metadata == null) {
+        throw WorkerServiceException.unavailable("Physical index target metadata is unavailable");
+      }
+
+      Object fingerprint = metadata.get(IndexFingerprint.COMMIT_META_KEY);
+      Object inputs = metadata.get(IndexFingerprint.COMMIT_META_INPUTS_KEY);
+      if (!(fingerprint instanceof String fingerprintText)
+          || !(inputs instanceof String inputsJson)) {
+        throw WorkerServiceException.unavailable("Physical index target is indeterminate");
+      }
+      final IndexTargetSnapshot snapshot;
+      try {
+        snapshot = new IndexTargetSnapshot(fingerprintText, inputsJson);
+      } catch (IllegalArgumentException invalid) {
+        throw new WorkerServiceException(
+            WorkerServiceException.Status.UNAVAILABLE,
+            "Physical index target evidence is invalid",
+            invalid);
+      }
+      if (ctx.cancelled()) {
+        throw WorkerServiceException.cancelled("Index target capture cancelled");
+      }
+      return snapshot;
     }
   }
 

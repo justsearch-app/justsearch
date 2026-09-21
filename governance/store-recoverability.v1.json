@@ -1567,6 +1567,8 @@
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreStartupContentionTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreAcceptanceContentionTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTransactionFailureTest.java",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/BulkReindexProgressPersistenceTest.java",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/BulkReindexCheckpointCapabilityTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPendingTest.java"
       ],

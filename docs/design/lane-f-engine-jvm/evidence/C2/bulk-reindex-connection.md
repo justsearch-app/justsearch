@@ -10,9 +10,10 @@ plan, resume or processing-history/gaps obligations to D1.
 `core.reindex` now uses the C2-8d streaming recorded-root path. Its both-store
 reopen test preserves parent/child identity and advances the stored operation.
 Do not restore the old full document/hash pre-walk on that path. `core.bulk-reindex`
-is different: CoreOperationCatalog.bulkReindex has no durable record kind, and
-BulkReindexHandler returns after startMigration and a dispatch lease. The default
-recorded adapter would terminalize that response immediately. C2-10 still requires
+is different: its former immediate startMigration response and dispatch lease have
+been replaced in the current sequence3 worktree by a shared prepared bulk/rebuild
+handler and REINDEX/DURABLE catalog profiles. The application continuation consumer
+is still unconnected and this work is not complete. C2-10 still requires
 the bulk row, frozen plan, resume and bounded history/full gaps; D1 owns journal,
 replay, live activation and gap refusal.
 
@@ -27,14 +28,14 @@ shared kind recovery pass; a second competing REINDEX reconciler is incorrect.
 
 | Owner | Current behavior / required seam |
 | --- | --- |
-| app-services `CoreOperationCatalog.bulkReindex`, `BulkReindexHandler` | Ordinary dispatch, short lease, immediate started response; needs prepared/durable owner connection |
+| app-services `CoreOperationCatalog.bulkReindex`, `BulkReindexHandler` | Sequence3 freezes bulk/rebuild scope and target before approval; durable consumer connection remains open |
 | app-engine `EngineKnowledgeClient.startMigration` | Requests restart on accepted + restartRequired, before asynchronous rebuild |
-| app-services `worker/MigrationOps`, app-api `IndexingService.MigrationOutcome` | Drops the building generation id from the start response |
+| app-services `worker/MigrationOps`, app-api `IndexingService.MigrationOutcome` | Pushed29071724c preserves active/building/state witnesses and provides deferred recorded start |
 | worker-services `services/MigrationControlOps` | Start response already exposes building generation id |
 | worker-core `index/IndexGenerationManager` | Persists active/building/previous and lifecycle; start creates Green/MIGRATING; promotion sets active=Green, clears building and returns IDLE |
 | indexer-worker `server/ops/KnowledgeServerMigrationOps` | Promotion precedes a second restart request; boot enumeration reloads current roots and streams path/size, not an acceptance-frozen hash plan |
 | app-observability `operations/OperationSchema` | Existing building_generation_id, target_settings_json, gaps_json and processing_history columns |
-| app-api `operations/OperationRecord`, `OperationStore` | Do not yet expose typed bulk metadata or writes; generic checkpoint/finish cannot truthfully imply that connection |
+| app-api `operations/OperationStore`, `OperationAttemptRunner` | Sequence3 adds typed immutable bulk projection and issued-handle checkpoint; ordinary row reads avoid large evidence payloads |
 | app-engine `RecordedIngestionCoordinator.pump` | Shared REINDEX pass must preserve root-plan ownership and route bulk explicitly |
 
 The building id must be durable before the first restart; successor comparison must
@@ -46,13 +47,14 @@ EngineMigrationLifecycleTest are component evidence, not the bulk operation proo
 ## Preparation size and source-revision constraints
 
 The full per-file plan cannot be an unbounded prepared JSON value: the existing
-envelope limit is524,288 bytes and stored payload limit750,000 bytes. Arbitrarily
+replay JSON limit is200,000 bytes, envelope limit524,288 bytes and stored payload
+limit750,000 bytes. Arbitrarily
 refusing larger corpora solely to fit that representation is not the selected scope.
 The serving index alone is insufficient: content_sha256 hashes extracted stored
 content, not source-file bytes, and excludes unindexed/new files under captured roots.
 Migration currently enqueues path/size only, without operation membership. The closest
-existing durable substrate is jobs/recorded-walk/ingestion-ledger membership, but its
-content hash is currently written at terminal effect, not frozen at plan capture.
+existing durable substrate is jobs/recorded-walk/ingestion-ledger membership, and pushed3caf90cbc adds frozen H1, captured manifest and immutable settlement.
+The application still must connect that substrate to actual capture and migration.
 Using it requires an explicit capture-before-claim contract and preserved H1 evidence;
 the current root-plan digest must not be relabeled as a captured-document manifest.
 
@@ -86,6 +88,31 @@ atomic filesystem snapshot. A restarted open enumeration preserves each previous
 captured H1, adds newly seen files, and retains disappeared members as gaps. Partial
 or inaccessible root coverage cannot close COMPLETE or create Green; a genuinely
 empty captured scope can. There is no corpus-size cap imposed by prepared JSON.
+
+Recovery rebuild preparation uses a separate strict read-only idle-active witness.
+The advertised rebuild-brake remedy has searchable Blue but no ingest runtime;
+requiring the ordinary writable-serving witness would make its remedy unreachable.
+USER_BULK retains the ordinary preparation requirement; RECOVERY_REBUILD uses
+captureRebuildGeneration before and after target capture. Both read current state
+without fallback or repair and require the captured serving path to remain active
+in IDLE with no building generation. Physical-target metadata is configuration
+owned and can be read with a serving runtime even when the ingest runtime is absent.
+This does not authorize normal writes. Captured traversal/boot capability checks
+must likewise distinguish readable rebuild-source readiness from writable Green.
+
+Traversal remains WorkerScanOps, extended with a closed captured-plan mode carried
+through the Java-only RecordedRootScan/ScanRequest. Reuse SourceContentHash through
+a narrow visibility change. Captured mode hashes admitted regular files and keeps
+2,000-entry enqueue batches, but bypasses both queue-depth waits: claims cannot
+reduce the 90,000-job high watermark before COMPLETE, so ordinary backpressure would
+deadlock large captures. Other scan modes retain their current pacing. One bulk
+parent key/epoch spans sequential roots; only completion of every root and actual
+producer/progress exit closes the capture. A captured cloud-only placeholder is
+incomplete source coverage: refuse COMPLETE/Green creation without hydrating it.
+Preserve unreadable-member refusal, current-generation checks before traversal and
+each batch, and a final IDLE/source-generation check before exact Green creation.
+A physical restart cancels and drains the producer but leaves interrupted capture
+recoverable with first H1 retained; actual operation cancellation remains terminal.
 
 Add raw-source `planned_source_sha256` H1 to live jobs and append-only ingestion
 ledger evidence. Make the existing SourceContentHash authority reusable. H2 already
@@ -165,6 +192,17 @@ UUIDv7 key when absent and returns it in its 202 response. Automatic boot schema
 embedding migrations remain worker-native. Retire the two short dispatch leases,
 ordinary immediate-completion bulk adapter, and stale Worker/gRPC comments when
 their replacements are connected; preserve real trust-boundary validation.
+
+REST bridging should extend OperationsController's existing closed alias forms and
+admissionOperation route classification, alongside INGEST/REINDEX. Map migration/start
+to RECOVERY_REBUILD with normalized reason carried as source, retain the alias's
+idempotencyKey/confirmationToken/preparationNonce handling, and register it beside
+the other operation aliases in ResourceApiModule. Retire IndexingRoutes' old raw
+handler route and IndexingController's immediate-start lease path. This reuses the
+existing prepared confirmation/pending-authorization handling instead of injecting
+a second dispatcher flow into IndexingController. A request without required consent
+must return the existing confirmation response; the mutation token alone is not a
+HIGH-risk capsule. Successful accepted pending work returns202 with the stable key.
 
 The captured plan covers regular source files. Buffered deletes, SYNC_ROOT, VDU
 updates and synthetic non-file mutations remain D1 journal/replay/live-activation
@@ -378,3 +416,145 @@ RecordedIngestionCoordinator's one REINDEX recovery pass. Existing operations co
 already hold target generation/settings, gaps and processing history, but their typed
 read/write ports do not exist yet. Add runner-owned metadata access there, preserving
 terminal immutability and keeping queue and operations transactions disjoint.
+
+### Sequence3 implementation contract at29071724c
+
+Generation checkpoint29071724c is committed and pushed; final fixture2144 has19
+cases with no failures/errors/skips. Preparation will call a narrow captureIndexTarget
+read through the existing in-JVM IngestServiceCalls path. Worker obtains the digest
+and exact canonical input bytes from one existing public SsotCommitMetadataSource.build()
+result. This reuses the existing assembly without adding another fingerprint factory.
+The application carries an opaque IndexTargetSnapshot and verifies digest/byte binding;
+it does not extract or reinterpret model/field configuration. Indeterminate Worker
+output refuses. Serving generation capture remains its separate strict observation.
+
+BulkReindexProgress is a typed projection into the already-declared operations
+columns, not a new journal: target generation plus IndexTargetSnapshot, the C2 phase,
+optional captured manifest/count, and optional immutable settlement. Capturing has
+no capture/settlement; building requires capture; settled requires both. Settlement
+contains revision/hash, uncapped failed/superseded event counts, full stable-unit gaps
+and a maximum200 processing-event sample. The queue remains the evidence authority;
+the Engine explicitly maps its immutable settlement to this operation projection.
+
+The runner validates its issued asynchronous handle before checkpointBulkReindex;
+the store atomically writes phase, target/settings, gaps/history/counts and terminal-
+effect counters under its existing writer transaction. The target must equal g-<row key>,
+the row must be RUNNING/DURABLE REINDEX from a designated bulk/rebuild operation,
+and existing target/settings/capture/settlement are immutable once bound. Phases move
+capturing -> building -> settled without regression; exact repeats are idempotent.
+No arbitrary metadata writer or generic callback under a store lock is introduced.
+Recovery reads the typed projection separately from ordinary OperationRecord so
+unrelated row consumers do not acquire large gap/history payloads.
+
+### Authorization conflict discovered while connecting the real consumer
+
+The existing HIGH-risk bulk/rebuild catalog policies require one-time capsule
+confirmation. DurableGrantStore deliberately refuses HIGH-risk allow-always grants;
+OperationAuthority deliberately refuses EphemeralCapsule recovery after restart.
+Blindly applying the streaming-ingest recovery policy would therefore fail every
+ordinary approved bulk operation at its required first restart. Lowering its risk,
+permitting HIGH-risk blanket grants, or silently accepting old capsule markers would
+weaken the trust boundary and is not selected.
+
+Root is evaluating a separate, narrowly scoped server-built acceptance basis for
+the one prepared bulk operation: only after valid prepared capsule consumption,
+bind the approval to that operation key and preparation nonce in the existing
+grant_ref representation. Recovery must validate the same accepted envelope,
+operation profile and frozen arguments, current gate/scope, target fingerprint and
+generation evidence. It cannot authorize another key, nonce, changed plan, general
+grant, or terminal attempt. Keep ordinary EphemeralCapsule refusal unchanged.
+This would intentionally supersede the earlier blanket restart-refusal rule only
+for explicitly declared restart-spanning bulk/rebuild profiles; it needs an
+independent security review and adversarial regression coverage before adoption.
+No authorization production code has been changed for this candidate yet.
+
+Independent reviewer accepted the narrowly scoped PreparedContinuation design with
+strict conditions. Adopt it only for the closed HIGH-risk, Inline-confirmed,
+DURABLE REINDEX bulk/rebuild profiles and recorded-bulk-reindex-v1 preparation,
+minted after successful prepared capsule consumption. The basis binds canonical
+operation key and preparation nonce; accepted envelope remains the plan authority.
+Recovery permits only ACCEPTED/RUNNING, validates the exact envelope and current
+catalog/source tier/scope/gate, and checks physical target/generation witnesses at
+the relevant lifecycle stage. Terminal rows and unrelated ingestion/settings
+recovery refuse this basis. Approval preview explicitly names continuation across
+restarts until completion or cancellation. Required adversarial tests cover copied
+markers, changed key/nonce/profile/schema/arguments, forged caller grant headers,
+invalid capsules, changed authority and cancellation races. No HIGH-risk durable
+grant or general accepted-row authorization is introduced. This decision supersedes
+the candidate status above; implementation and runnable proof remain outstanding.
+
+Hosted2145 confirms CI35565311927 at29071724c is successful. Downloaded Linux
+search-worker artifact10623677211 contains the actual RecordedGenerationStartTest
+XML:18 tests, zero failures/errors/skips; symlinkedOwnershipMetadataIsNotAnAdoptableOrphan
+executes and passes. This closes the local Windows privilege gap for that checkpoint.
+Accessible raw XML, run snapshot and concise evidence are tmp/2145-generation-hosted/.
+
+### Sequence3 preparation and metadata proof in progress
+
+Focused2149 passes96 cases across18 suites, no failures/errors/skips. Production
+compiled through the actual Engine projection. Initial2147 found three invalid
+Mockito mocks of the sealed LuceneRuntime interface; the corrected fixtures use
+its permitted concrete RunningRuntime, as nearby tests do.2148 found only an
+existing decoder refusal-message contract changed by extraction; the shared helper
+now preserves it. No assertion or guard was weakened.
+
+Negative2152 restores all three production files byte-for-byte and fails the three
+intended predicates: preparation across a changed generation, a foreign runner's
+handle, and absent event counts defaulted to zero.2150/2151 removed only one of
+Jackson's two relevant safeguards and the count test correctly remained green;
+2152 disables both missing-creator and primitive-null refusal for that mutation.
+This establishes the reason for that earlier negative-control pass. All logs/XML
+are retained; the full affected-module/PMD/format run is2153. Its catalog wire golden
+needs regeneration for the deliberate two-profile source/argument schema change;
+the conformance assertion itself remains unchanged. End-to-end bulk recovery,
+continuation authority and installed fault proof remain open.
+
+Full2153 executes5,538 cases/893 suites with one failure (the intentional catalog
+wire change), zero errors and five existing skips; all ten PMD and five format
+checks pass.2154 recaptures the golden through its existing capture mode and
+intentionally fails once; inspected diff changes only the two input schemas.
+2155 then passes31 cases/seven suites without skips. Independent review identified
+the braked read-only recovery precondition and missing catalog policy assertions;
+root accepted both. The read-only witness/target correction and real brake tests
+are underway and are newer than2153/2155. The metadata/codec proof remains valid;
+no full green is claimed for the corrected preparation until its checks run.
+
+The read-only recovery correction now has focused proof: 2158 covers 97 cases in
+14 suites, with no failures, errors or skips. The Engine suite executes afresh;
+the three unchanged selected suites reuse the successful tests from 2157. The
+real Engine fixture enters BLOCKED_REBUILD_BRAKE, rejects ordinary writer-based
+generation capture, and prepares the recovery profile against read-only Blue
+without changing generation state, queue depth or migration counters. Both
+catalog profiles are asserted to be durable REINDEX operations. The initial
+2157 run failed only to compile the new fixture's int queue-depth variable;
+using the API's long type fixes that error without changing an assertion.
+Logs, copied XML, counts and the 33-file source inventory are retained under
+tmp/2158-bulk-recovery-focused*. This is composed proof with 2153 and 2155,
+not a claim that a fresh full suite ran after the correction.
+
+Static run 2159 passes seven affected PMD checks and six format checks. The
+engine-port gate passes in 2160, as do store-recoverability, llmstxt and generated
+skill checks. The preparation/storage checkpoint is ready; the end-to-end bulk
+consumer and authorization work remain required before claiming bulk completion.
+
+### Boot and promotion ownership decision
+
+Read-only investigation confirms that native migration enumeration and cutover
+start before recorded lifecycle attachment. Compatibility handling can also
+abandon an existing Green. Therefore the existing RecordedIngestionLifecycle
+port needs an early immutable boot decision after strict generation state and
+effective fingerprint providers are available, before Green opens or any
+automatic replacement/enumeration starts. Exact recorded targets retain their
+owner and suppress mutable-root enumeration; a recorded-looking target with
+missing or conflicting authority is fenced without replacement. Ordinary
+automatic migrations retain their current behavior. Read-only Blue remains
+available while a recorded target is fenced.
+
+Immediately before promotion, the existing migration loop must obtain the sealed
+queue receipt, leave queue locking, and ask the Engine-owned runner to persist
+SETTLED. Promotion waits if this checkpoint is temporarily unavailable; permanent
+authority refusal terminates the operation and prevents promotion. No callback
+may read operations or jobs from the queue's claim-permission lock. ACK remains
+after durable terminalization. These changes belong to the single existing
+REINDEX reconciliation owner, not a second reconciler or journal. This decision
+is source-reviewed but not yet implemented or verified.

@@ -29,7 +29,6 @@ import io.justsearch.app.services.registry.operations.handlers.IndexGcHandler;
 import io.justsearch.app.services.registry.operations.handlers.PingBackendHandler;
 import io.justsearch.app.services.registry.operations.handlers.PreflightAiPackHandler;
 import io.justsearch.app.services.registry.operations.handlers.PreviewExcludesHandler;
-import io.justsearch.app.services.registry.operations.handlers.RebuildIndexHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReconcileRootHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReindexHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReloadInferenceHandler;
@@ -90,10 +89,14 @@ public final class OperationHandlerRegistrations {
         CoreOperationCatalog.RESTART_WORKER, new RestartWorkerHandler(() -> workerService));
     handlers.register(
         CoreOperationCatalog.BULK_REINDEX,
-        new BulkReindexHandler(indexingServiceSupplier, operationLeaseService));
+        new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.USER_BULK,
+            recordedIngestion, context -> recordedRoots.snapshotBindings(), indexingServiceSupplier,
+            io.justsearch.app.services.worker.KnowledgeClient::captureRecordedExcludePatterns));
     handlers.register(
         CoreOperationCatalog.REBUILD_INDEX,
-        new RebuildIndexHandler(indexingServiceSupplier, operationLeaseService));
+        new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.RECOVERY_REBUILD,
+            recordedIngestion, context -> recordedRoots.snapshotBindings(), indexingServiceSupplier,
+            io.justsearch.app.services.worker.KnowledgeClient::captureRecordedExcludePatterns));
     handlers.register(CoreOperationCatalog.PING_BACKEND, new PingBackendHandler());
     handlers.register(
         CoreOperationCatalog.CLEAR_FAILED_JOBS, new ClearFailedJobsHandler(indexingServiceSupplier));

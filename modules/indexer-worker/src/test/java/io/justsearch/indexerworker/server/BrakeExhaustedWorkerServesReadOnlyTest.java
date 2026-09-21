@@ -151,14 +151,22 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
                 SearchRequest.newBuilder().setQuery("*").setLimit(10).build(), CallContext.none());
     assertNotNull(search, "search must answer while the brake is exhausted");
 
-    // (d) the recovery path out of the state, driven through the Worker's own ingest service
-    //     rather than by calling the generation manager directly. core.rebuild-index
-    //     (RebuildIndexHandler) resolves to IndexingService.startMigration(USER_REQUESTED_REBUILD)
-    //     → MigrationOps → this exact call, so this is the Worker half of the chain the readiness
-    //     notice's remedy promises. The Head half (handler → op-lease → the knowledge client) is
-    //     app-services' and is covered there; what could not be asserted from a fixture call is
-    //     that the operation is even reachable in the braked state, which is where appServices is
-    //     built from a read-only runtime.
+    // Recovery preparation must remain available from real braked, read-only Blue.
+    // These reads cannot create Green or rewrite its authoritative state.
+    byte[] beforePreparation = Files.readAllBytes(layout.indexBase().resolve("state.json"));
+    var ingestService = server.appServices().ingestService();
+    assertEquals(layout.genManager().readStateBestEffort().active_generation(),
+        ingestService.captureRebuildGeneration(CallContext.none()));
+    org.junit.jupiter.api.Assertions.assertThrows(
+        io.justsearch.indexerworker.services.WorkerServiceException.class,
+        () -> ingestService.captureServingGeneration(CallContext.none()));
+    assertNotNull(ingestService.captureIndexTarget(CallContext.none()));
+    org.junit.jupiter.api.Assertions.assertArrayEquals(beforePreparation,
+        Files.readAllBytes(layout.indexBase().resolve("state.json")));
+
+    // (d) Native migration control remains reachable from this read-only service.
+    // The prepared recovery handler/client composition is covered in app-engine;
+    // this existing automatic-migration control proof does not stand in for it.
     MigrationStartResponse rebuild =
         server
             .appServices()

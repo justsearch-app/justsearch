@@ -132,6 +132,16 @@ public interface OperationStore extends AutoCloseable {
   /** A checkpoint describes already committed effects; counts cannot go backwards. */
   boolean checkpoint(long id, String cursor, long unitsCompleted, long unitsFailed);
 
+  /** Runner-only atomic projection of committed bulk progress; bound evidence cannot be replaced. */
+  default boolean checkpointBulkReindex(long id, BulkReindexProgress progress) {
+    throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
+  }
+
+  /** Private recovery observation; full gaps/history are not loaded by ordinary row lookups. */
+  default java.util.Optional<BulkReindexProgress> bulkReindexProgress(long id) {
+    throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
+  }
+
   /**
    * Re-checkpoint each running durable row's current committed cursor and counts atomically.
    * The store clock stamps the checkpoint; no snapshot can overwrite newer unit progress.

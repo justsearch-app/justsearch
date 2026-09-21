@@ -58,6 +58,12 @@ public interface IngestServiceCalls {
   /** Strict current serving-generation observation for a frozen ingestion plan; never a lease. */
   String captureServingGeneration();
 
+  /** Strict active identity for a read-only recovery rebuild. */
+  String captureRebuildGeneration();
+
+  /** Captures the current physical index target's opaque canonical fingerprint and inputs. */
+  io.justsearch.app.api.operations.IndexTargetSnapshot captureIndexTarget();
+
   /** {@code IngestService/MarkVduProcessing}. */
   io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request);
 

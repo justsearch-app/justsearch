@@ -88,6 +88,11 @@ public interface OperationAttemptRunner {
   PreparedAttempt acceptPrepared(Request request, java.util.UUID nonce);
   java.util.Optional<OperationStore.Preparation> acceptedPreparation(long id);
 
+  /** Persist committed bulk evidence through this runner's live asynchronous attempt capability. */
+  default void checkpointBulkReindex(OperationRecordHandle handle, BulkReindexProgress progress) {
+    throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
+  }
+
   /** Root-composed decoder of the actual accepted parent preparation, never supplied by a handler. */
   @FunctionalInterface
   interface IngestPlanResolver {

@@ -274,6 +274,23 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   @Override
+  public void checkpointBulkReindex(OperationRecordHandle handle,
+      io.justsearch.app.api.operations.BulkReindexProgress progress) {
+    if (!(handle instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
+        || control.kind != OperationKind.REINDEX || !control.started.get() || control.done.isDone()) {
+      throw new IllegalArgumentException("Bulk progress requires this runner's live reindex capability");
+    }
+    try {
+      if (!store.checkpointBulkReindex(control.id, Objects.requireNonNull(progress, "progress"))) {
+        throw new IllegalStateException("Bulk checkpoint refused for a terminal, unstarted or conflicting operation");
+      }
+    } catch (RuntimeException | Error failure) {
+      persistenceFailed(control, OperationState.RUNNING, failure);
+      throw failure;
+    }
+  }
+
+  @Override
   public Optional<PreparedAttempt> lookup(Request request) {
     requireOutsidePreparation(request);
     return store.lookup(request.key(), request.descriptor())

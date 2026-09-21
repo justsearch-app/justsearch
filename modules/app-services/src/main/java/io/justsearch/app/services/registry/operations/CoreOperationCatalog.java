@@ -400,20 +400,30 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Audience.OPERATOR);
   }
 
+  private static String bulkArgumentsSchema(boolean corpusLabels) {
+    var sources = java.util.Arrays.stream(io.justsearch.app.api.status.MigrationSource.values())
+        .filter(source -> source != io.justsearch.app.api.status.MigrationSource.UNKNOWN)
+        .map(source -> "\"" + source.wire() + "\"")
+        .collect(java.util.stream.Collectors.joining(","));
+    return "{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{"
+        + "\"source\":{\"type\":\"string\",\"enum\":[" + sources + "]}"
+        + (corpusLabels ? ",\"corpusIds\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":256}}" : "")
+        + "}" + (corpusLabels ? ",\"required\":[\"corpusIds\"]" : "") + "}";
+  }
+
   private static Operation bulkReindex() {
     return new Operation(
         BULK_REINDEX,
         Presentation.forId(BULK_REINDEX),
-        Interface.inputsOnly(
-            "{\"type\":\"object\",\"properties\":{\"corpusIds\":{\"type\":\"array\","
-                + "\"items\":{\"type\":\"string\"}}},\"required\":[\"corpusIds\"]}"),
+        Interface.inputsOnly(bulkArgumentsSchema(true)),
         new OperationPolicy(
             RiskTier.HIGH,
             ConfirmStrategy.Inline.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(BULK_REINDEX),
@@ -425,23 +435,23 @@ public final class CoreOperationCatalog implements OperationCatalog {
 
   /**
    * Slice 447-followup-bulk-reindex-recovery (Option A) + §X.11.5 Phase 7:
-   * parameterless full-corpus rebuild wrapper. Same backend behavior as
-   * {@link #bulkReindex} (delegates to {@code IndexingService.startMigration}) but
-   * declares zero arguments — usable as the static recovery target for
+   * full-corpus rebuild using the same recorded lifecycle as {@link #bulkReindex},
+   * with no required arguments — usable as the static recovery target for
    * {@code index.unavailable + index.not_healthy} via {@link OperationInvocation}.
    */
   private static Operation rebuildIndex() {
     return new Operation(
         REBUILD_INDEX,
         Presentation.forId(REBUILD_INDEX),
-        Interface.inputsOnly("{\"type\":\"object\"}"),
+        Interface.inputsOnly(bulkArgumentsSchema(false)),
         new OperationPolicy(
             RiskTier.HIGH,
             ConfirmStrategy.Inline.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         // Slice 447-followup-live-wiring §X.12.8 Item 2.1: a full rebuild affects the
         // three indexing-related Resources (clears the indexing-jobs queue, restarts

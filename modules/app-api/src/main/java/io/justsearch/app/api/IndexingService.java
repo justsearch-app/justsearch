@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.core.context.EngineContext;
 
 import java.nio.file.Path;
@@ -209,6 +210,16 @@ public interface IndexingService {
    */
   default String captureServingGeneration(EngineContext engineContext) {
     throw new UnsupportedOperationException("Serving generation capture unavailable");
+  }
+
+  /** Strict idle active witness for rebuilding a searchable read-only index; grants no write permission. */
+  default String captureRebuildGeneration(EngineContext engineContext) {
+    throw new UnsupportedOperationException("Read-only rebuild generation capture is unavailable");
+  }
+
+  /** Captures the current physical index target without requiring an idle serving generation. */
+  default IndexTargetSnapshot captureIndexTarget(EngineContext engineContext) {
+    throw new UnsupportedOperationException("Index target capture unavailable");
   }
 
   /**

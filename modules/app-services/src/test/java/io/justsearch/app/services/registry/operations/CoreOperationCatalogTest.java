@@ -10,6 +10,7 @@ import io.justsearch.agent.api.registry.AuditPolicy;
 import io.justsearch.agent.api.registry.ConfirmStrategy;
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.TrustTier;
 import io.justsearch.core.context.EngineContext;
@@ -111,6 +112,16 @@ final class CoreOperationCatalogTest {
     assertEquals(AuditPolicy.METADATA_ONLY, op.policy().audit());
     assertEquals(Set.of(ExecutorTag.UI, ExecutorTag.AGENT), op.executors());
     assertFalse(op.policy().undoSupported());
+  }
+
+  @Test
+  void bulkReindexAndRecoveryRebuildDeclareDurableReindexOwnership() {
+    for (var reference : Set.of(CoreOperationCatalog.BULK_REINDEX, CoreOperationCatalog.REBUILD_INDEX)) {
+      Operation op = catalog.findById(reference).orElseThrow();
+      assertEquals(OperationKind.REINDEX, op.policy().recordKind(), reference.value());
+      assertEquals(EngineContext.Survival.DURABLE,
+          op.policy().declaredSurvival().orElseThrow(), reference.value());
+    }
   }
 
   @Test

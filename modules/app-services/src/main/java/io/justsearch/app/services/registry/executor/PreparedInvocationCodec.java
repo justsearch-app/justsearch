@@ -120,6 +120,27 @@ public final class PreparedInvocationCodec {
         .preparation();
   }
 
+  /** Validate the accepted attribution transition once for all metadata-only recorded producers. */
+  static OperationPreparation decodeAcceptedMetadata(io.justsearch.app.api.operations.OperationRecord row,
+      io.justsearch.app.api.operations.OperationStore.Preparation stored) {
+    if (stored.payload().sealed()) throw new IllegalArgumentException("Recorded metadata cannot be sealed");
+    var envelope = new PreparedInvocationCodec(StoreCipher.disabled()).decode(
+        stored.payload(), row.key(), stored.nonce(), row.descriptor());
+    var acceptedContext = envelope.context().withGrantReference(row.context().grantReference());
+    var preparation = envelope.preparation();
+    var provenance = envelope.provenance();
+    if (preparation.content() != OperationPreparation.Content.METADATA
+        || !acceptedContext.equals(row.context())
+        || !envelope.executor().name().equals(row.executor())
+        || !Objects.equals(provenance.initiator().orElse(null), row.initiator())
+        || !Objects.equals(provenance.correlationId().orElse(null), row.correlationId())
+        || !envelope.occurredAt().equals(row.provenanceOccurredAt())) {
+      throw new IllegalArgumentException("Recorded ingestion preparation binding mismatch");
+    }
+    io.justsearch.app.api.operations.OperationAuthorizationBasis.decode(row.context().grantReference().orElse(null));
+    return preparation;
+  }
+
   private void requireKey() {
     if (!cipher.enabled() || cipher.locked()) throw new KeyLockedException();
   }

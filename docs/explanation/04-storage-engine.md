@@ -547,6 +547,31 @@ The public REST ingestion alias enters the same operation dispatcher and prepare
 Its response supplies the durable operation key; the keyed operation-history read projects
 committed progress and the terminal outcome from the operations store.
 
+Bulk/rebuild preparation uses `RecordedBulkPlan` to freeze all watched roots and
+exclusions, the idle serving generation and an opaque `IndexTargetSnapshot` before
+approval. Recovery rebuild can capture the idle active source from a searchable
+read-only runtime, preserving the rebuild-brake remedy; ordinary ingestion still
+requires its writable serving runtime. The Worker captures the fingerprint and exact canonical inputs from one
+`SsotCommitMetadataSource.build()` result; the application verifies their digest
+binding without rebuilding physical settings. Indeterminate targets and a serving
+generation change during capture refuse preparation. The shared handler preserves
+legacy bulk corpus labels in public identity while its approval preview explicitly
+states that all captured watched locations are rebuilt. Both profiles declare
+REINDEX/DURABLE and forward only accepted prepared handles to the recorded owner.
+The bulk restart consumer and authorization continuation are not yet connected.
+
+`BulkReindexProgress` projects owner evidence into the existing operation columns;
+it adds no journal or schema version. Only the issuing runner's live asynchronous
+handle can request a checkpoint. The store requires a RUNNING/DURABLE bulk/rebuild
+REINDEX row and its exact `g-<operation-key>` target. One writer transaction binds
+the target, capture manifest/count and later sealed settlement. Phases advance
+capturing -> building -> settled; exact repeats are idempotent and existing evidence
+cannot be rebound. The settled projection retains every current gap, uncapped
+failure/supersession counts and at most 200 history entries. Separate typed reads
+avoid loading these payloads for ordinary operation queries and refuse partial,
+malformed or inconsistent evidence. Queue settlement remains the underlying evidence
+authority; this storage capability alone does not prove the bulk restart lifecycle.
+
 The architecture gate forbids producers from calling the store's lifecycle methods
 directly. `governance/engine-ports.v1.json` catalogs the store and runner interfaces,
 their outer process bindings and consumers. The operation-surface register separately

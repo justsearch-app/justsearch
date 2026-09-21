@@ -44,6 +44,7 @@ import io.justsearch.core.search.SearchPort;
 import io.justsearch.core.dto.Query;
 import io.justsearch.core.dto.Result;
 import io.justsearch.app.api.IndexingService;
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import java.io.Closeable;
 import java.io.File;
 import java.nio.file.Path;
@@ -1001,6 +1002,18 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     public String captureServingGeneration(EngineContext engineContext) {
         return executeIngestRpc("captureServingGeneration", RpcDeadlineCategory.STANDARD,
             IngestServiceCalls::captureServingGeneration, engineContext);
+    }
+
+    @Override
+    public String captureRebuildGeneration(EngineContext engineContext) {
+        return executeIngestRpc("captureRebuildGeneration", RpcDeadlineCategory.STANDARD,
+            IngestServiceCalls::captureRebuildGeneration, engineContext);
+    }
+
+    @Override
+    public IndexTargetSnapshot captureIndexTarget(EngineContext engineContext) {
+        return executeIngestRpc("captureIndexTarget", RpcDeadlineCategory.STANDARD,
+            IngestServiceCalls::captureIndexTarget, engineContext);
     }
 
     @Override

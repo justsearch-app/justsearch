@@ -241,7 +241,7 @@ public final class RuntimeActivationService
    *
    * <p>The lease is registered on the CALLING thread, before {@code start()}: registering inside
    * the thread leaves a window in which upgrade prepare observes no blocker while the work is about
-   * to write. Same race-window closure as {@code BulkReindexHandler}.
+   * to write. Registration must precede asynchronous work publication.
    */
   private CompletionStage<AiRuntimeActivationStatus> startLeasedThread(
       String opClass, String threadName, Runnable body) {

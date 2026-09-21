@@ -4,12 +4,15 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
+import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.app.api.EngineWorkCancelledException;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
@@ -32,6 +35,20 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Real generation authority and Engine call boundary, including replacement of the composed service. */
 final class EngineGenerationCaptureTest {
   @TempDir Path directory;
+
+  @Test
+  void capturesTheWorkerPhysicalTargetThroughTheInProcessClient() throws Exception {
+    try (var harness = EngineTestHarness.start(directory)) {
+      var metadata = new SsotCommitMetadataSource().build();
+      var expected = new IndexTargetSnapshot(
+          (String) metadata.get(IndexFingerprint.COMMIT_META_KEY),
+          (String) metadata.get(IndexFingerprint.COMMIT_META_INPUTS_KEY));
+
+      assertEquals(
+          expected,
+          harness.client().captureIndexTarget(TestEngineContexts.FOREGROUND));
+    }
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"missing-manager", "missing-runtime", "different-runtime", "missing-state",
