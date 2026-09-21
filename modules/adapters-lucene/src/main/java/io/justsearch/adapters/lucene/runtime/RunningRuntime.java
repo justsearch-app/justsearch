@@ -38,6 +38,11 @@ public final class RunningRuntime implements LuceneRuntime {
   // Phase-specific ops (write side) — only on RunningRuntime
   // ==========================================================================
 
+  /** Current admission observation; draining or closing runtimes never become writable again. */
+  public boolean isAcceptingWrites() {
+    return !session.draining && !session.isClosing();
+  }
+
   public IndexingCoordinator indexingCoordinator() {
     return session.indexingCoordinator;
   }

@@ -92,6 +92,7 @@ final class DevReloadManagerTriggerTest {
     assertTrue(manager.isReloadRequested(), "the sentinel must retry without another compile");
     assertSame(incumbent, server.appServices);
     verify(server, never()).newAppServices();
+    verify(server, never()).notifyRecordedServicesPublished();
     verify(incumbent, never()).startIndexingLoop();
 
     manager.performReload();
@@ -102,6 +103,7 @@ final class DevReloadManagerTriggerTest {
     order.verify(incumbent, times(2)).close();
     order.verify(server).newAppServices();
     order.verify(replacement).startIndexingLoop();
+    order.verify(server).notifyRecordedServicesPublished();
   }
 
   @Test

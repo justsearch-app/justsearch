@@ -34,26 +34,63 @@ migration fixture wait for setup owner seal/ACK. Focused2229 passes11 producer c
 negative2230 catches swallowed Error; byte-restored2231 reuses matching2229 proof.
 Corrected installed migration and hosted proof remain open; do not credit aggregate CI.
 
-All three bulk crash cuts are implemented using the existing fault hook. Installed2225
-found fresh Blue lacked a durable empty index; writable bootstrap now commits an empty
-index before publishing readers. Full adapter2228 passes729 cases/102 suites, no skips;
-negative2227 proves the new guard. Installed2232 now resumes capture, but incarnation2
-terminalizes BULK_GENERATION_REFUSED 62ms after creating Green and before requested
-exit. Incarnation3 correctly fences the refused operation. Root is investigating
-the CAPTURING boot witness being reused after local generation creation. Both failed
-runs stopped their owned stack; latest health is ABSENT with no foreign/orphan process.
-The retained `tmp/2232-installed-bulk-partial/bulk-cut.json` proves the intended crash
-boundary; it is not successful recovery. Full service batch2233 passes2241 cases/
+Checkpoint `cfd83ca07` is pushed with three bulk fault cuts, producer failure handling
+and empty-index durability. Full adapter2228 passes729 cases/102 suites, no skips;
+negative2227 proves the new guard. Installed2232 then exposed the old CAPTURING boot
+witness being reused after local generation creation, refusing its pending restart.
+The current correction uses existing started/restartRequested state until physical
+replacement, with cancellation/refusal checked first; checkpoint uncertainty remains
+unresolved, while a failed restart callback can retry. Production is installed2237;
+deterministic coordinator fixture/regressions are being finalized. Full service
+batch2233 (before this final handoff correction) passes2241 cases/
 347 suites (Engine343, observability600, UI1298), zero failures/errors and one
 existing optional McpEntityCarriageMetric dataset skip. All six PMD tasks and
 installed-test compilation pass. Governance2234 passes engine-port (one note),
 operation-surface and store recoverability. Hosted35586999590 at9598 also reports
 overall success with all three migration retries failed; log retained2235.
 
-Next: correct the proven post-capture refusal, then pass all three installed bulk
-cuts and corrected migration, reconcile hosted test-level evidence and run final
-full stress. Full2064 had a later-fixed SystemAccessFunnel failure; focused2075
-does not replace final full-stress proof. C2 acceptance audit remains active.
+Installed2238/2239/2240 pass all three bulk crash cuts with retained cut/final/retry
+snapshots, unchanged preparation/key, two searchable target members, zero failures,
+exact sealed ACK and unchanged retry. Corrected migration2241 passes, including
+rollback. Standard-model query2245 answers the onramp question correctly using
+Qwen3.5-9B; one-query functionality proof only. Its owned stack stopped2246 and
+health is ABSENT. Installed JUnit matrix2247 completes11 cases with one failure:
+ingest-before-accept's successor accepts its retry while deferred-writer upgrade
+still publishes old appServices, then fails enumeration with serving generation
+authority unavailable. The other10 cases, including all three bulk cuts, pass.
+Runtime evidence is `tmp/lane-f-takeover/writer-junit-809eab78-655e-4ae0-9e41-98fc33fbf54a`;
+copied matrix XML/counts/log are `tmp/2247-installed-junit-matrix*`. Investigation
+is confined to the real deferred-runtime/service handoff, not a fixture timing waiver.
+Focused handoff2252 passes11 cases/2 suites. Restart dispatch now runs once after
+maintenance settles; failure retries only dispatch, without repeating migration or
+checkpoint. Publication correction gates serving-generation readiness on the
+published service's writer loop and notifies the current attachment after publication.
+New regressions2253 found two fixture errors, corrected.2254 passes88 cases; review
+also found running-swap and dev-reload publication gaps, now corrected with existing
+swap/draining/closing state.2256 passes101 cases/9 suites and eight PMD tasks, no skips.
+All six2257 negative guards fail correctly and restore byte-exact. Restored2258
+reuses identical101 passing cases and installs stamp e98118e565edd1b9; governance2259
+passes. Full installed matrix, stress/dead-code and hosted reproof remain open.
+Agent instruction update2248 promotes path discovery/owner reuse to AGENTS and its
+generated CLAUDE projection; projection check passes, no new hook is introduced.
+
+Independent final review matches all14 sources and finds no remaining defect in
+this bounded correction. Installed matrix2260 is running on2258. Next: preserve the
+checkpoint, reconcile2260, then final full stress/dead-code and corrected hosted
+test-level evidence.
+Full2064 had a later-fixed SystemAccessFunnel failure; focused2075 does not replace
+final full-stress proof. Reconcile C2 before starting D1/D2/E/F.
+
+### D1 preparation after C2 reconciliation
+
+Read-only audit confirms the first slice is D1-1 through D1-3: component registry,
+readiness projections and config-apply register; these remain unimplemented.
+D1's source anchors predate current C2 and must be re-grounded. Before Flow A,
+reconcile streaming core.reindex versus captured core.bulk-reindex: D1 abandonment
+cannot delete C2 evidence before terminal ownership and exact queue ACK, and its
+COMPLETE_WITH_GAPS/accept-gaps/live activation supersedes current promoted-with-gaps
+failure/replacement behavior only through an explicit design and proof. Start with
+EngineRoot, EngineExecutorRegistry, StatusLifecycleHandler and EnvRegistry owners.
 
 ### Owner and evidence map
 

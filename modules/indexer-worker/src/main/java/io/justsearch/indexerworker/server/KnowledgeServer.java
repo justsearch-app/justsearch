@@ -1104,6 +1104,8 @@ public final class KnowledgeServer implements Closeable {
         appServices.startIndexingLoop();
       }
 
+      notifyRecordedServicesPublished();
+
       // 7. Start sentinel thread for liveness monitoring
       startSentinelThread();
 
@@ -1174,7 +1176,9 @@ public final class KnowledgeServer implements Closeable {
     } catch (tools.jackson.core.JacksonException malformed) {
       throw new IOException("Malformed authoritative index state", malformed);
     }
-    if (initializedServices == null || !(ingest instanceof RunningRuntime) || ingest != search
+    if (runtimeSwapLock.isLocked() || initializedServices == null
+        || !initializedServices.recordedWriterReady() || !(ingest instanceof RunningRuntime running)
+        || !running.isAcceptingWrites() || ingest != search
         || rebuildBrakeExhausted) {
       return java.util.Optional.empty();
     }
@@ -1421,6 +1425,15 @@ public final class KnowledgeServer implements Closeable {
       if (failure instanceof Error fatal) throw fatal;
       throw new IllegalStateException("Application-service replacement failed; owners retained", failure);
     }
+    notifyRecordedServicesPublished();
+  }
+
+  /** Called only after the replacement service has started and is published to Engine callers. */
+  void notifyRecordedServicesPublished() {
+    // Runtime replacement notifies after releasing its existing transition lock.
+    if (runtimeSwapLock.isLocked()) return;
+    var attachment = recordedIngestionAttachment;
+    if (attachment != null) attachment.servicesPublished();
   }
 
   private void closePendingAppServices() {
@@ -1458,6 +1471,7 @@ public final class KnowledgeServer implements Closeable {
     Objects.requireNonNull(reason, "reason");
     if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
     runtimeSwapLock.lock();
+    final long elapsed;
     try {
       if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
       long startNanos = System.nanoTime();
@@ -1475,10 +1489,12 @@ public final class KnowledgeServer implements Closeable {
       publishIngestLifecycle(fresh);
       this.searchLifecycle = fresh;
       reconstructAppServicesAfterDeferredUpgrade();
-      return (System.nanoTime() - startNanos) / 1_000_000L;
+      elapsed = (System.nanoTime() - startNanos) / 1_000_000L;
     } finally {
       runtimeSwapLock.unlock();
     }
+    notifyRecordedServicesPublished();
+    return elapsed;
   }
 
   /**

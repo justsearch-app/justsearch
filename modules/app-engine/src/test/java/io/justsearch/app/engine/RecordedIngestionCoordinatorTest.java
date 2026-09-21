@@ -64,6 +64,53 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @Test
+  void servicePublicationResumesAcceptedParentOnceWithoutSpendingAnotherAttempt() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var writerReady = new AtomicBoolean();
+      f.attachment.close();
+      f.attachment = f.coordinator.attach(f.queue,
+          () -> writerReady.get() ? Optional.of(GENERATION) : Optional.empty(), () -> true);
+      var producerCalls = new AtomicInteger();
+      var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      var childKey = new AtomicReference<String>();
+      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        producerCalls.incrementAndGet();
+        childKey.set(key);
+        assertEquals(1L, epoch, "publication starts the first enumeration epoch");
+        return producerExit;
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.attachment.servicesPublished();
+        assertEquals(0, producerCalls.get());
+        assertEquals(OperationState.RUNNING, f.operations.find(request.key()).orElseThrow().state());
+        var pendingChild = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
+        assertEquals(OperationState.RUNNING, pendingChild.state());
+        assertTrue(f.queue.recordedWalk(pendingChild.key()).isEmpty(),
+            "the accepted child waits without beginning a physical walk");
+        writerReady.set(true);
+        f.attachment.servicesPublished();
+        assertEquals(1, producerCalls.get(), "publication re-drives the accepted owner immediately");
+        var child = f.operations.findIngestChild(request.key(), f.plan).orElseThrow();
+        assertEquals(pendingChild.key(), child.key(), "publication resumes the same durable child");
+        assertEquals(child.key(), childKey.get());
+        assertEquals(1, child.attempts());
+        assertEquals(1, f.operations.find(request.key()).orElseThrow().attempts());
+        f.attachment.servicesPublished();
+        assertEquals(1, producerCalls.get(), "duplicate publication does not replay enumeration");
+        producerExit.complete(JobQueue.WalkEnumerationOutcome.COMPLETE);
+        f.coordinator.maintain();
+        assertEquals(OperationState.COMPLETE, f.operations.find(request.key()).orElseThrow().state());
+        var receipt = f.queue.recordedWalk(child.key()).orElseThrow();
+        assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+        assertEquals(1L, receipt.enumerationEpoch());
+      }
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void acceptedForegroundParentRequiresLiveOwnerProofForBackgroundInvocation(boolean detached) throws Exception {

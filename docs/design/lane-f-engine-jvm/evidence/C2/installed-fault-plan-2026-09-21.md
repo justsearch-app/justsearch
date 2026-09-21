@@ -1,5 +1,10 @@
 # Remaining installed C2 fault points
 
+Current continuation is owned by the [handoff](../../handoff.md) and
+[bulk connection](bulk-reindex-connection.md). The INGEST/SETTINGS matrix below
+passed in2061; its earlier implementation notes are retained history. The separate
+bulk crash matrix is specified and evidenced in the bulk connection record.
+
 Design selected 2026-09-21 after transcript-guided resumption. This refines C2-11,
 it does not replace its six-case requirement. Use the existing installed
 OperationResumeE2ETest -> EngineSupervisedRecoveryE2ETest.runScenario ->
@@ -134,16 +139,18 @@ All eight fixtures record owned stop with closed ports. Export before worktree r
 
 - Scheduled admission refusal before an agent-run row, followed by operations-store
   reopen and same-key outcome/retry: new BackgroundWorkLifetimeTest regression passes2042.
-- Pair a declared generation change with an unrelated settings change through actual
-  durable resumption; map the current typed refusal to the original inputs-changed intent.
+- The paired declared-generation and unrelated-settings recovery controls are closed
+  by [2057 and installed2061](resume-dependency-pair.md). Changed declared generation
+  refuses; unrelated settings do not invalidate the frozen ingestion dependencies.
 - The existing both-store reopen proof covers streamed `core.reindex` row advancement,
-  not bulk migration. Current C2-8d freezes root bindings/target generation and streams
-  work; do not resurrect a full pre-walk on that path. C2-10 still owes
+  not bulk migration. C2-8d freezes root bindings/target generation and streams work;
+  do not resurrect a full pre-walk on that path. C2-10 now connects
   `core.bulk-reindex`'s durable row, prepared plan, resume and processing-history/gaps
-  connection. No later amendment moves those obligations to D1. The bulk catalog
-  currently lacks a durable record kind and its handler returns immediately after
-  migration dispatch. Add the connection and captured H1-to-H2 `superseded` proof;
-  preserve D1's separate journal/replay/live-activation/gap-refusal ownership.
+  through its recorded consumer. Captured H1-to-H2 supersession and full gaps/bounded
+  history have queue and store coverage; current implementation and remaining
+  integrated/hosted proof live in the [bulk connection](bulk-reindex-connection.md).
+  No amendment moves those obligations to D1; preserve D1's separate
+  journal/replay/live-activation/gap-refusal ownership.
 - C2-12: remove current BulkReindexHandler ownership prose residue, reconcile jobs-db
   register source/classification/version references, scope the self-matching historical
   grep, and run final dead-code/full stress proof. Do not edit historical tempdocs merely

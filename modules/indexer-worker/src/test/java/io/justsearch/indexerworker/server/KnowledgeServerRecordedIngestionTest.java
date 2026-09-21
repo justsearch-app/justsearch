@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -164,7 +166,9 @@ final class KnowledgeServerRecordedIngestionTest {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);
     KnowledgeServer server = helperServer(layout);
     RunningRuntime running = org.mockito.Mockito.mock(RunningRuntime.class);
+    org.mockito.Mockito.when(running.isAcceptingWrites()).thenReturn(true);
     server.appServices = org.mockito.Mockito.mock(WorkerAppServices.class);
+    org.mockito.Mockito.when(server.appServices.recordedWriterReady()).thenReturn(true);
     setField(server, "ingestLifecycle", running);
     setField(server, "searchLifecycle", running);
     setField(server, "indexGenerationManager", layout.genManager());
@@ -199,7 +203,9 @@ final class KnowledgeServerRecordedIngestionTest {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);
     KnowledgeServer server = helperServer(layout);
     server.appServices = org.mockito.Mockito.mock(WorkerAppServices.class);
+    org.mockito.Mockito.when(server.appServices.recordedWriterReady()).thenReturn(true);
     RunningRuntime running = org.mockito.Mockito.mock(RunningRuntime.class);
+    org.mockito.Mockito.when(running.isAcceptingWrites()).thenReturn(true);
     setField(server, "ingestLifecycle", running);
     setField(server, "searchLifecycle", running);
     setField(server, "indexGenerationManager", layout.genManager());
@@ -209,6 +215,7 @@ final class KnowledgeServerRecordedIngestionTest {
       assertTrue(server.currentRecordedServingGeneration().isEmpty(),
           "unpublished services must fence an otherwise writable idle runtime");
       server.appServices = org.mockito.Mockito.mock(WorkerAppServices.class);
+      org.mockito.Mockito.when(server.appServices.recordedWriterReady()).thenReturn(true);
       setField(server, "searchLifecycle", org.mockito.Mockito.mock(RunningRuntime.class));
       assertTrue(server.currentRecordedServingGeneration().isEmpty(),
           "different writable ingest and search owners must remain fenced");
@@ -232,6 +239,242 @@ final class KnowledgeServerRecordedIngestionTest {
       setField(server, "rebuildBrakeExhausted", true);
       assertTrue(server.currentRecordedServingGeneration().isEmpty(),
           "an exhausted rebuild brake must fence recorded serving");
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
+  @DisplayName("recorded generation waits for the replacement writer and resumes after publication")
+  void deferredReplacementPublishesWriterBeforeNotifyingRecordedOwner(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    ReplacementLifecycle lifecycle = new ReplacementLifecycle();
+    KnowledgeServer server = org.mockito.Mockito.spy(new KnowledgeServer(
+        new TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle));
+    lifecycle.server.set(server);
+
+    WorkerAppServices deferred = org.mockito.Mockito.mock(WorkerAppServices.class);
+    DefaultWorkerAppServices replacement = org.mockito.Mockito.mock(
+        DefaultWorkerAppServices.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    CountDownLatch incumbentCloseEntered = new CountDownLatch(1);
+    CountDownLatch releaseIncumbent = new CountDownLatch(1);
+    AtomicBoolean replacementRunning = new AtomicBoolean();
+    org.mockito.Mockito.when(deferred.recordedWriterReady()).thenReturn(false);
+    org.mockito.Mockito.when(replacement.recordedWriterReady())
+        .thenAnswer(ignored -> replacementRunning.get());
+    org.mockito.Mockito.doAnswer(ignored -> {
+      incumbentCloseEntered.countDown();
+      assertTrue(releaseIncumbent.await(5, TimeUnit.SECONDS),
+          "the test must release the blocked incumbent close");
+      return null;
+    }).when(deferred).close();
+    org.mockito.Mockito.doAnswer(ignored -> {
+      replacementRunning.set(true);
+      return null;
+    }).when(replacement).startIndexingLoop();
+    org.mockito.Mockito.doReturn(replacement).when(server).newAppServices();
+
+    RunningRuntime running = org.mockito.Mockito.mock(RunningRuntime.class);
+    org.mockito.Mockito.when(running.isAcceptingWrites()).thenReturn(true);
+    server.appServices = deferred;
+    setField(server, "ingestLifecycle", running);
+    setField(server, "searchLifecycle", running);
+    setField(server, "indexGenerationManager", layout.genManager());
+    setField(server, "activeIndexPath", layout.activePath());
+    setField(server, "jobQueue", org.mockito.Mockito.mock(JobQueue.class));
+    server.attachRecordedIngestion();
+
+    var reconstruct = KnowledgeServer.class.getDeclaredMethod(
+        "reconstructAppServicesAfterDeferredUpgrade");
+    reconstruct.setAccessible(true);
+    AtomicReference<Throwable> replacementFailure = new AtomicReference<>();
+    Thread replacementThread = Thread.ofVirtual().start(() -> {
+      try {
+        reconstruct.invoke(server);
+      } catch (Throwable failure) {
+        replacementFailure.set(failure);
+      }
+    });
+    try {
+      assertTrue(incumbentCloseEntered.await(5, TimeUnit.SECONDS),
+          () -> "replacement must reach the incumbent close; failure=" + replacementFailure.get());
+      assertSame(deferred, server.appServices(),
+          "the incumbent remains published while its close is in progress");
+      assertTrue(server.currentRecordedServingGeneration().isEmpty(),
+          "new RunningRuntime globals cannot authorize a stale deferred service");
+      assertEquals(0, lifecycle.publications.get(),
+          "the recorded owner cannot resume before the replacement is published");
+
+      releaseIncumbent.countDown();
+      replacementThread.join(5_000L);
+      assertFalse(replacementThread.isAlive(), "replacement must finish after close is released");
+      assertTrue(replacementFailure.get() == null, String.valueOf(replacementFailure.get()));
+      assertSame(replacement, server.appServices());
+      assertEquals(Optional.of(layout.genManager().initializeOrLoad().activeGenerationId()),
+          server.currentRecordedServingGeneration(),
+          "the published started replacement restores recorded writer authority");
+      assertEquals(1, lifecycle.publications.get(),
+          "successful publication must notify the same recorded attachment exactly once");
+      assertTrue(lifecycle.publicationFailure.get() == null,
+          String.valueOf(lifecycle.publicationFailure.get()));
+      assertSame(replacement, lifecycle.publishedServices.get(),
+          "the notification must observe the replacement, not the closed incumbent");
+      assertEquals(server.currentRecordedServingGeneration(), lifecycle.publishedGeneration.get(),
+          "the notification must observe the newly available generation");
+      var order = org.mockito.Mockito.inOrder(deferred, replacement);
+      order.verify(deferred).close();
+      order.verify(replacement).startIndexingLoop();
+    } finally {
+      releaseIncumbent.countDown();
+      replacementThread.join(5_000L);
+      server.close();
+    }
+  }
+
+  @Test
+  @DisplayName("running runtime swap fences generation until unlock and replacement publication")
+  void runningSwapNotifiesRecordedOwnerOnlyAfterUnlock(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    ReplacementLifecycle lifecycle = new ReplacementLifecycle();
+    KnowledgeServer server = org.mockito.Mockito.spy(new KnowledgeServer(
+        new TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle));
+    lifecycle.server.set(server);
+
+    WorkerAppServices incumbent = org.mockito.Mockito.mock(WorkerAppServices.class);
+    DefaultWorkerAppServices replacement = org.mockito.Mockito.mock(
+        DefaultWorkerAppServices.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    RunningRuntime oldRuntime = org.mockito.Mockito.mock(RunningRuntime.class);
+    RunningRuntime freshRuntime = org.mockito.Mockito.mock(RunningRuntime.class);
+    CountDownLatch drainEntered = new CountDownLatch(1);
+    CountDownLatch releaseDrain = new CountDownLatch(1);
+    AtomicBoolean replacementRunning = new AtomicBoolean();
+    org.mockito.Mockito.when(oldRuntime.isAcceptingWrites()).thenReturn(true);
+    org.mockito.Mockito.when(freshRuntime.isAcceptingWrites()).thenReturn(true);
+    org.mockito.Mockito.when(incumbent.recordedWriterReady()).thenReturn(true);
+    org.mockito.Mockito.when(replacement.recordedWriterReady())
+        .thenAnswer(ignored -> replacementRunning.get());
+    org.mockito.Mockito.doAnswer(ignored -> {
+      drainEntered.countDown();
+      assertTrue(releaseDrain.await(5, TimeUnit.SECONDS),
+          "the test must release the blocked runtime drain");
+      return null;
+    }).when(oldRuntime).drainAndClose(
+        org.mockito.ArgumentMatchers.any(java.time.Duration.class),
+        org.mockito.ArgumentMatchers.eq(
+            io.justsearch.adapters.lucene.runtime.SwapReason.CONFIG_RELOAD));
+    org.mockito.Mockito.doAnswer(ignored -> {
+      replacementRunning.set(true);
+      return null;
+    }).when(replacement).startIndexingLoop();
+    org.mockito.Mockito.doReturn(replacement).when(server).newAppServices();
+
+    server.appServices = incumbent;
+    setField(server, "ingestLifecycle", oldRuntime);
+    setField(server, "searchLifecycle", oldRuntime);
+    setField(server, "indexGenerationManager", layout.genManager());
+    setField(server, "activeIndexPath", layout.activePath());
+    setField(server, "jobQueue", org.mockito.Mockito.mock(JobQueue.class));
+    server.attachRecordedIngestion();
+    assertTrue(server.currentRecordedServingGeneration().isPresent(),
+        "the incumbent is the ready positive control before swap ownership begins");
+
+    AtomicReference<Throwable> swapFailure = new AtomicReference<>();
+    Thread swapThread = Thread.ofVirtual().start(() -> {
+      try {
+        server.swapRuntime(() -> freshRuntime, java.time.Duration.ofSeconds(5),
+            io.justsearch.adapters.lucene.runtime.SwapReason.CONFIG_RELOAD);
+      } catch (Throwable failure) {
+        swapFailure.set(failure);
+      }
+    });
+    try {
+      assertTrue(drainEntered.await(5, TimeUnit.SECONDS),
+          () -> "swap must reach the incumbent drain; failure=" + swapFailure.get());
+      assertSame(incumbent, server.appServices(),
+          "the incumbent services remain published while their runtime drains");
+      assertTrue(server.currentRecordedServingGeneration().isEmpty(),
+          "the swap lock must fence generation while the writable incumbent drains");
+      assertEquals(0, lifecycle.publications.get(),
+          "the recorded owner cannot be notified while swap ownership is held");
+
+      releaseDrain.countDown();
+      swapThread.join(5_000L);
+      assertFalse(swapThread.isAlive(), "runtime swap must finish after drain is released");
+      assertTrue(swapFailure.get() == null, String.valueOf(swapFailure.get()));
+      assertSame(replacement, server.appServices());
+      assertEquals(Optional.of(layout.genManager().initializeOrLoad().activeGenerationId()),
+          server.currentRecordedServingGeneration());
+      assertEquals(1, lifecycle.publications.get(),
+          "the unlocked successful swap must notify its attachment once");
+      assertTrue(lifecycle.publicationFailure.get() == null,
+          String.valueOf(lifecycle.publicationFailure.get()));
+      assertSame(replacement, lifecycle.publishedServices.get());
+      assertEquals(server.currentRecordedServingGeneration(), lifecycle.publishedGeneration.get(),
+          "the notification must run after unlock and observe available generation");
+      var order = org.mockito.Mockito.inOrder(oldRuntime, incumbent, replacement);
+      order.verify(oldRuntime).drainAndClose(
+          org.mockito.ArgumentMatchers.any(java.time.Duration.class),
+          org.mockito.ArgumentMatchers.eq(
+              io.justsearch.adapters.lucene.runtime.SwapReason.CONFIG_RELOAD));
+      order.verify(incumbent).close();
+      order.verify(replacement).startIndexingLoop();
+    } finally {
+      releaseDrain.countDown();
+      swapThread.join(5_000L);
+      server.close();
+    }
+  }
+
+  @Test
+  @DisplayName("failed runtime drain cannot restore recorded authority after unlock")
+  void failedRunningDrainLeavesRecordedGenerationFenced(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    ReplacementLifecycle lifecycle = new ReplacementLifecycle();
+    KnowledgeServer server = new KnowledgeServer(
+        new TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
+    lifecycle.server.set(server);
+
+    WorkerAppServices incumbent = org.mockito.Mockito.mock(WorkerAppServices.class);
+    RunningRuntime oldRuntime = org.mockito.Mockito.mock(RunningRuntime.class);
+    AtomicBoolean acceptingWrites = new AtomicBoolean(true);
+    IllegalStateException drainFailure = new IllegalStateException("incumbent drain failed after close");
+    org.mockito.Mockito.when(incumbent.recordedWriterReady()).thenReturn(true);
+    org.mockito.Mockito.when(oldRuntime.isAcceptingWrites())
+        .thenAnswer(ignored -> acceptingWrites.get());
+    org.mockito.Mockito.doAnswer(ignored -> {
+      acceptingWrites.set(false);
+      throw drainFailure;
+    }).when(oldRuntime).drainAndClose(
+        org.mockito.ArgumentMatchers.any(java.time.Duration.class),
+        org.mockito.ArgumentMatchers.eq(
+            io.justsearch.adapters.lucene.runtime.SwapReason.CONFIG_RELOAD));
+
+    server.appServices = incumbent;
+    setField(server, "ingestLifecycle", oldRuntime);
+    setField(server, "searchLifecycle", oldRuntime);
+    setField(server, "indexGenerationManager", layout.genManager());
+    setField(server, "activeIndexPath", layout.activePath());
+    setField(server, "jobQueue", org.mockito.Mockito.mock(JobQueue.class));
+    server.attachRecordedIngestion();
+    try {
+      assertTrue(server.currentRecordedServingGeneration().isPresent(),
+          "the incumbent is writable before its failed drain starts");
+      assertSame(drainFailure, assertThrows(IllegalStateException.class,
+          () -> server.swapRuntime(
+              () -> org.mockito.Mockito.mock(RunningRuntime.class),
+              java.time.Duration.ofSeconds(5),
+              io.justsearch.adapters.lucene.runtime.SwapReason.CONFIG_RELOAD)));
+      assertFalse(acceptingWrites.get(), "the failed drain reached its non-writable state");
+      assertSame(incumbent, server.appServices(),
+          "failed replacement retains the incumbent composed services");
+      assertTrue(server.currentRecordedServingGeneration().isEmpty(),
+          "unlock cannot re-authorize an incumbent that stopped accepting writes");
+      assertEquals(0, lifecycle.publications.get(),
+          "a failed swap cannot announce a successful service publication");
     } finally {
       server.close();
     }
@@ -525,6 +768,39 @@ final class KnowledgeServerRecordedIngestionTest {
         java.util.function.BooleanSupplier workerOnline) {
       return () -> {
         if (closeCalls.incrementAndGet() == 1) throw closeFailure;
+      };
+    }
+  }
+
+  private static final class ReplacementLifecycle implements RecordedIngestionLifecycle {
+    private final AtomicReference<KnowledgeServer> server = new AtomicReference<>();
+    private final AtomicInteger publications = new AtomicInteger();
+    private final AtomicReference<WorkerAppServices> publishedServices = new AtomicReference<>();
+    private final AtomicReference<Optional<String>> publishedGeneration = new AtomicReference<>();
+    private final AtomicReference<Throwable> publicationFailure = new AtomicReference<>();
+
+    @Override
+    public JobQueue.RecordedClaimDecision recordedClaimDecision(String operationKey) {
+      return JobQueue.RecordedClaimDecision.DENY;
+    }
+
+    @Override
+    public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
+        java.util.function.BooleanSupplier workerOnline) {
+      return new Attachment() {
+        @Override
+        public void servicesPublished() {
+          publications.incrementAndGet();
+          publishedServices.set(server.get().appServices());
+          try {
+            publishedGeneration.set(generation.current());
+          } catch (IOException failure) {
+            publicationFailure.set(failure);
+          }
+        }
+
+        @Override
+        public void close() {}
       };
     }
   }

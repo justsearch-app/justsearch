@@ -323,6 +323,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           pump(attached);
         } while (advanced);
         // Retry a failed restart on the next maintenance call, not each internal progress pass.
+        restartAfterBulkStart(attached);
         restartAfterBulkRefusal(attached);
       } finally {
         pumping = false;
@@ -1142,6 +1143,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         refuseBulk(bulk, physical, refusal);
         return;
       }
+      // An accepted local start is waiting for a different physical attachment. This process's
+      // CAPTURING boot witness cannot authorize the Green it just created, so re-observing that
+      // witness would turn our own asynchronous restart into a durable generation refusal.
+      if (bulk.started) return;
       var runtime = physical.bulkRuntime.current();
       if (progress.phase() == BulkReindexProgress.Phase.SETTLED && promotedTarget(row.key(), runtime)) {
         requireBulkSettlement(row, bulk.plan, physical, progress);
@@ -1161,10 +1166,6 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
       if (runtime.isPresent() && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.FENCED) {
         refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
-        return;
-      }
-      if (bulk.started && runtime.isEmpty()) {
-        finishBulkStart(bulk, physical, bulkWalk(bulk, physical));
         return;
       }
       if (progress.phase() == BulkReindexProgress.Phase.CAPTURING) {
@@ -1263,12 +1264,29 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return;
     }
     bulk.started = true;
+    // Arm before persistence/observers. A checkpoint failure invalidates the runner capability;
+    // leave this handoff unresolved for recovery instead of retrying through that dead handle.
+    bulk.restartRequested = true;
     attempts.checkpointBulkReindex(bulk.handle, new BulkReindexProgress(target, bulk.plan.target(),
         BulkReindexProgress.Phase.BUILDING, capture(walk), null));
-    if (!bulkAuthorized(bulk)) { refuseBulk(bulk, physical, "RECOVERY_AUTHORIZATION_REFUSED"); return; }
-    bulk.restartRequested = true;
-    try { physical.bulkRestart.run(); }
-    catch (RuntimeException unavailable) { bulk.restartRequested = false; throw unavailable; }
+    // Dispatch once after this maintenance pass settles, not once per internal progress pass.
+    bulk.restartRequested = false;
+  }
+
+  private void restartAfterBulkStart(Attached physical) {
+    if (physical.stopping || physical.bulkRestart == null) return;
+    for (Bulk bulk : List.copyOf(bulks.values())) {
+      if (bulk.physical != physical || !bulk.started || bulk.restartRequested
+          || bulk.completion.isDone() || bulk.refusalCode != null || bulkRefusalReason(bulk) != null) continue;
+      bulk.restartRequested = true;
+      try { physical.bulkRestart.run(); }
+      catch (RuntimeException unavailable) {
+        bulk.restartRequested = false;
+        // BUILDING is durable. Retry dispatch on the next maintenance call without repeating
+        // physical migration or checkpointing through the accepted runner capability.
+        log.error("Recorded bulk restart dispatch awaits maintenance", unavailable);
+      }
+    }
   }
 
   private void flushBulkEnumeration(Bulk bulk, Attached physical) {
@@ -1538,6 +1556,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       try { return generation.current(); }
       catch (IOException unavailable) { throw new UncheckedIOException(unavailable); }
     }
+    @Override public void servicesPublished() {
+      synchronized (lock) {
+        if (attached == this && !stopping) maintain();
+      }
+    }
+
     @Override public void close() throws IOException {
       synchronized (lock) {
         if (attached != this) return;

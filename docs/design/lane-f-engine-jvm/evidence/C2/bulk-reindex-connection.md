@@ -115,6 +115,127 @@ again reports aggregate success while migration fails all three integration retr
 `tmp/2235-hosted-checkpoint-failed.txt` retains the job output. This checkpoint
 is verified infrastructure and two corrected defects, not completed bulk recovery.
 
+### Accepted-start handoff correction and installed proof
+
+Checkpoint `cfd83ca07` preserves the preceding verified batch and failed2232.
+The correction stays in RecordedIngestionCoordinator: after cancellation and
+authority refusal checks, existing started/restartRequested flags represent an
+accepted local start awaiting physical replacement. Do not reinterpret the old
+CAPTURING boot witness as current generation authority. Prearm the restart flag
+before BUILDING persistence; a thrown checkpoint has invalidated its runner handle
+and must remain unresolved. After a successful checkpoint, dispatch the restart
+at the maintenance-call epilogue, once rather than once per internal progress pass.
+A failed callback resets only dispatch state for the next maintenance call; it does
+not repeat physical migration or checkpoint through the accepted runner handle.
+Attachment replacement resets both flags and re-enters strict boot/runtime checks.
+No boot fence, durable state representation or recovery authority is weakened.
+
+Installed build2237 has stamp `21fe2a307f658204`; its source inventory is
+`tmp/2237-bulk-handoff-installed-sources.json`. The three direct Windows scenarios
+all pass against that distribution, with real embedding and identity-verified kill:
+
+| Run | Key | Final physical incarnation / attempts | Sealed and ACK revision |
+| --- | --- | --- | --- |
+| 2238 partial capture | `01a0c397-23d7-75a7-bdc7-b00ced74de2d` | 4 / 3 | 9 |
+| 2239 state before binding | `01a0c398-1860-7c8d-b73c-c88831eec037` | 3 / 2 | 7 |
+| 2240 promotion before terminal | `01a0c398-f2ae-7285-87cc-2c546a03ba21` | 3 / 2 | 7 |
+
+Each passes original row/preparation identity, exact target, both searchable members,
+zero failed units and unchanged retry row/queue. Each spends exactly one crash
+restart; requested restarts remain free. Partial capture retains the original first
+member revision/H1 while extending enumeration from epoch1 to2. Before-binding
+retains its closed manifest; after-promotion retains its sealed settlement. Raw
+output/runtime and cut/final/retry JSON are under `tmp/2238-installed-bulk-partial*`,
+`tmp/2239-installed-bulk-before-binding*`, `tmp/2240-installed-bulk-after-promotion*`;
+compact extracted summaries are adjacent. All report owned STOP/portsClosed:true,
+with no foreign/orphan process at subsequent quick_health. These are direct driver
+executions. JUnit matrix2247 subsequently executes11 cases: all three bulk cuts
+and seven other cases pass; ingest-before-accept fails through the deferred-service
+race below. Its wrapper explicitly checks BULK_FAULT_PASS and all three retained
+snapshot files for bulk cases.
+
+Corrected migration2241 also passes actual prepared REST dispatch, both promotion
+restarts, target search, SUCCESS with one unit/zero failed, revision6 sealed/ACK and
+rollback. Key `01a0c399-fa6e-76c4-8653-d7ce3a80958e`, run
+`61dd5a5f-eb02-4d6a-b457-8562974c97a9`; evidence `tmp/2241-installed-migration-corrected*`.
+This validates the setup-owner wait locally; corrected hosted proof remains required.
+
+Live2243-2246 reopens the retained onramp corpus with the same installed distribution.
+Health reports Head/Worker/inference READY. jseval tier2-eval2245 asks the existing
+one-question fixture and standard Qwen_Qwen3.5-9B-Q4_K_M.gguf answers Captain Mortimer
+Flux, zero errors/exact accuracy1.0. This is functionality, not a quality benchmark.
+Commands: `python -m jseval --json tier2-eval --queries ../../tmp/1925-live-query.json
+--base-url http://127.0.0.1:58136 --llm-url http://127.0.0.1:8082 --max-queries 1
+--output-dir ../../tmp/2245-model-query` from scripts/jseval. Start/health/stop JSON
+and model output are retained2243-2246; owned stop closes ports. The first MCP start
+2242 duplicated the worktree prefix in an absolute dataDir and was stopped before
+querying; worktree-relative dataDir corrected it. The main-checkout MCP preflight
+still probes the retired Worker distribution, while the selected lane's dev runner
+successfully starts its sole Engine; do not claim that obsolete preflight passed.
+
+### Deferred-service publication defect and correction
+
+Installed matrix2247 exposes a valid successor race, not a bad fault cut. Before
+acceptance the original process has no operation/jobs/ledger. Its successor durably
+accepts parent `01a0c39f-32d8-7596-9682-ad36a54c22d0` and child
+`01a0c39f-7676-73fc-aa07-054648061de1`, then both fail INGEST_ENUMERATION_FAILED
+before traversal. Runtime `tmp/lane-f-takeover/writer-junit-809eab78-655e-4ae0-9e41-98fc33fbf54a`
+retains engine.log: reconstruction starts at1991, API readiness precedes producer
+failure at2062, and the replacement loop starts only at2069. Copied logs/XML/counts
+are `tmp/2247-installed-junit-matrix*`.
+
+DeferredRuntime upgrade publishes RunningRuntime while old deferred-backed
+appServices remains visible during incumbent close. Recorded generation observation
+combined new runtime globals with that old service, so EngineKnowledgeClient resolved
+an immutable service lacking a serving writer. Empty bootstrap durability made this
+existing-index boot path reproducible; bypassing deferred mode for empty indexes
+would leave the same populated-index race.
+
+KnowledgeServer now requires the currently published WorkerAppServices to report its
+started writer loop before returning a serving-generation witness. This is a typed
+projection of existing loop ownership, not another lifecycle state machine. Read-only
+worker availability remains independent because bulk CAPTURING requires it. After
+initial service startup or replacement publication, the current attachment receives
+servicesPublished and re-drives coordinator maintenance. An accepted child waits
+without beginning its physical walk, then resumes the same child/attempt on publication.
+Stale/stopping attachment notifications are ignored. No producer replay or extra
+retry timer is introduced. Independent review also found the existing running-runtime
+swap and development reload publication paths. The existing runtimeSwapLock fences
+serving-generation observations during drain/reconstruction; successful swap notifies
+after unlock. RunningRuntime projects its existing draining/closing state so failed
+drain or failed replacement cannot become writable merely because the lock releases.
+This avoids a duplicate transition flag and preserves failed owners for cleanup.
+Development reload notifies after its replacement loop starts. Generation remains
+an observation, not a newly invented lease across future runtime changes.
+
+Focused2252 passes11 bulk cases/2 suites, including callback failure under an old
+FENCED witness and H1/H2 supersession retained in persisted settlement without a
+current gap. New publication batch2253 executes88 cases with two test-fixture failures:
+a parent already creates its durable child before physical readiness (the assertion
+incorrectly expected no child), and a shallow replacement mock failed wiring before
+the intended blocked close. Both fixtures were corrected to preserve the required
+same-child/no-walk and publication-order assertions.2254 passes88 cases/6 suites
+and six PMD tasks. Review then identified running-swap/reload publication gaps,
+corrected as above.2256 passes101 cases/9 suites with zero skips/failures and eight
+PMD tasks.2257 removes six guards independently; every negative fails its intended
+assertion (old bulk witness terminalizes, stale service grants generation, missing
+publication notification, missing owner maintenance, swap grant during drain, failed
+drain grant after unlock). Sources restore byte-exact in finally; outputs/XML and
+summary are `tmp/2257-negative-*`.
+
+Restored2258 represents the identical101 passing cases (Engine/indexer FROM-CACHE,
+adapter UP-TO-DATE from2256), builds the installed distribution with stamp
+`e98118e565edd1b9`, compiles installed tests and passes formatting. Source inventory
+is `tmp/2258-publication-restored-install-sources.json`; test artifacts are adjacent.
+Governance2259 passes engine-port (one informational finding), operation-surface and
+store recoverability (6 catalog stores/46 authorities/27 policies). Agent projection
+and canonical link/index/skill checks pass. Full installed matrix, full stress/dead-code
+and corrected hosted test-level success remain required; these focused results do
+not close C2. The independent final reread matches all14 current source hashes to2256
+and2258, confirms the six intended negative assertions, and reports no remaining
+actionable defect within the reviewed publication/restart scope. Installed matrix2260
+is running against2258.
+
 ## Scope and existing owners
 
 `core.reindex` now uses the C2-8d streaming recorded-root path. Its both-store

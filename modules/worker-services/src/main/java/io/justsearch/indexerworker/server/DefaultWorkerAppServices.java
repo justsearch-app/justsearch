@@ -341,6 +341,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   }
 
   @Override
+  public boolean recordedWriterReady() {
+    return indexingLoop != null && indexingLoop.isRunning();
+  }
+
+  @Override
   public IndexingPacing indexingPacing() {
     return indexingPacing;
   }

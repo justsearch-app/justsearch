@@ -44,6 +44,7 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
             .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
+    assertTrue(runtime.isAcceptingWrites());
     // Index 5 docs without committing (so they're pending).
     for (int i = 0; i < 5; i++) {
       runtime
@@ -60,6 +61,7 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
     long before = runtime.indexCountOps().docCount();
 
     runtime.drainAndClose(Duration.ofSeconds(5));
+    assertFalse(runtime.isAcceptingWrites(), "closed runtime must remain unavailable after the swap lock releases");
 
     // Reopen and verify the 5 docs are committed (final drain commit ran).
     var reopened =
@@ -95,6 +97,7 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
       // IndexRuntimeIOException(DRAINING) so the IndexingLoop can defer the path with
       // WRITE_UNAVAILABLE_DRAINING instead of failing it.
       runtime.session().draining = true;
+      assertFalse(runtime.isAcceptingWrites(), "draining fences new work even before close completes");
       IndexRuntimeIOException ex =
           assertThrows(
               IndexRuntimeIOException.class,
@@ -114,6 +117,7 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
     } finally {
       runtime.session().draining = false; // reset so close path doesn't re-trigger
       runtime.close();
+      assertFalse(runtime.isAcceptingWrites(), "ordinary close also fences writes without a drain flag");
     }
   }
 
@@ -279,6 +283,7 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
         "drainAndClose should return promptly after timeout, took: " + elapsedMs + "ms");
     assertSame(snapshot, runtime.session().snapshot);
     assertTrue(snapshot.writer().isOpen(), "the in-flight write still owns the writer");
+    assertFalse(runtime.isAcceptingWrites(), "failed drain retains resources without accepting new work");
     assertEquals(1, starts.get());
     assertEquals(1, completions.get(), "a failed drain still terminates its telemetry attempt");
     assertEquals(1, timeouts.get());

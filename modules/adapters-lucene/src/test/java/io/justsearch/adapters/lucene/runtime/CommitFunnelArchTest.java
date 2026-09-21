@@ -18,10 +18,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The census enumerated every path that reaches {@link CommitOps#commitAndTrack(CommitReason)}
  * — the funnel that increments the per-reason counter, resets {@code pendingDocs}, fires
- * {@code TelemetryEvents.onCommit} and notifies the {@code CommitCompletedListener} — and found
- * exactly four durable commits that bypass it. A census is a hypothesis about a moment; this rule
- * is what keeps it true, so a fifth bypass fails the build instead of silently making the
- * attribution wrong (`audit-without-test`).
+ * {@code TelemetryEvents.onCommit} and notifies the {@code CommitCompletedListener}. The lifecycle
+ * exceptions are documented below; this rule rejects commit owners outside that explicit set
+ * instead of silently making the attribution wrong (`audit-without-test`).
  *
  * <p>Scope limit, stated rather than implied: ArchUnit sees this module's classes, and
  * {@code IndexWriter} write access is confined to this module. The one bypass that used to live

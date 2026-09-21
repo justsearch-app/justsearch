@@ -100,6 +100,7 @@ final class DevReloadManager {
 
       // 8. Start new indexing loop
       newServices.startIndexingLoop();
+      server.notifyRecordedServicesPublished();
 
       // 9. 371: Update build stamp from reload-build-stamp.txt (written by MCP reload tool).
       //    This prevents false-positive "stale JVM" warnings from jseval after a successful reload.

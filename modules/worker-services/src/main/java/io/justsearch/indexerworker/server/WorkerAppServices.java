@@ -45,6 +45,9 @@ public interface WorkerAppServices extends Closeable {
 
   String indexingLoopState();
 
+  /** This composed service owns a started writer loop; deferred/read-only services return false. */
+  boolean recordedWriterReady();
+
   // --- Foreground-contention pacing (tempdoc 885 item 3) ---
 
   /**

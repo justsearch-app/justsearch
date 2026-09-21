@@ -149,6 +149,12 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(output.contains("fatal_or_uncaught"), output);
     } else if ("migration".equals(scenario)) {
       assertTrue(output.contains("MIGRATION_PASS"), output);
+    } else if (scenario.startsWith("bulk-")) {
+      assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);
+      assertTrue(output.contains("BULK_FAULT_PASS"), output);
+      assertTrue(Files.isRegularFile(work.resolve("bulk-cut.json")), "Missing crash-cut evidence");
+      assertTrue(Files.isRegularFile(work.resolve("bulk-final.json")), "Missing successor evidence");
+      assertTrue(Files.isRegularFile(work.resolve("bulk-after-retry.json")), "Missing retry evidence");
     } else if (operationFault) {
       assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);
       if ("ingest-client-disconnect".equals(scenario)) {

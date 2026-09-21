@@ -67,6 +67,9 @@ public interface RecordedIngestionLifecycle {
   }
 
   interface Attachment extends Closeable {
+    /** Re-observe readiness after the server publishes initialized services for this attachment. */
+    default void servicesPublished() {}
+
     /** Flush final receipts after index drain, then revoke. Failure must remain retryable. */
     @Override void close() throws IOException;
   }

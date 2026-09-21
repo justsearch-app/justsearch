@@ -66,6 +66,16 @@ Cancellation waits for the actual producer exit and yields CANCELLED, including 
 deadline that expires before service entry. Malformed, changed or non-IDLE generation
 state refuses immediately, and validation after traversal begins does not replay batches.
 
+During deferred writer activation, recorded generation readiness comes from the
+currently published application services and their started writer loop. New runtime
+fields alone cannot authorize ingestion through an old deferred service. Publication
+notifies the existing recorded attachment to resume its pending child without spending
+another attempt or replaying enumeration. Runtime replacement fences readiness with
+its existing swap lock and notifies after unlock; a draining or closed runtime stays
+unavailable after a failed swap. Development reload also notifies after starting its
+replacement. Read-only bulk capture remains available
+independently of ordinary serving-writer readiness.
+
 On Windows, even an ordinary open reader can temporarily deny atomic replacement.
 `AtomicFileWrites` retains the completed temporary file and retries only an atomic
 rename's `AccessDeniedException`, for at most two seconds. It never converts that

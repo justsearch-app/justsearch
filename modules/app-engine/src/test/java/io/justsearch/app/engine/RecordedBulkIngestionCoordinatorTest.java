@@ -77,6 +77,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Exercises the captured bulk lifecycle through the real SQLite owner and queue. */
 final class RecordedBulkIngestionCoordinatorTest {
@@ -86,8 +88,10 @@ final class RecordedBulkIngestionCoordinatorTest {
 
   @TempDir Path temp;
 
-  @Test
-  void preparedBulkWaitsForPromotedBootAndRepairsTerminalAcknowledgementFromQueueInventory() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void preparedBulkWaitsForPromotedBootAndRepairsTerminalAcknowledgementFromQueueInventory(
+      boolean sourceChangedAfterCapture) throws Exception {
     Path watchedRoot = Files.createDirectory(temp.resolve("watched"));
     Path member = Files.writeString(watchedRoot.resolve("one.txt"), "captured source bytes");
     String sourceHash = sha256(Files.readAllBytes(member));
@@ -131,7 +135,7 @@ final class RecordedBulkIngestionCoordinatorTest {
         () -> Optional.of(runtime.get()));
     AtomicReference<JobQueue.IndexJob> unfinishedClaim = new AtomicReference<>();
     try {
-    coordinator.bindBulkProducer((scope, key, epoch, context, cancellation) -> {
+    RecordedIngestionCoordinator.Producer producer = (scope, key, epoch, context, cancellation) -> {
       producerStarts.incrementAndGet();
       acceptedKey.set(key);
       assertEquals(SERVING_GENERATION, scope.generation());
@@ -140,7 +144,8 @@ final class RecordedBulkIngestionCoordinatorTest {
       queue.enqueueRecordedEntries(key, epoch, List.of(new JobQueue.EnqueueEntry(member,
           memberSize, new JobQueue.EnqueueProvenance("user", TransportTag.BUTTON.name()), sourceHash)), null);
       return java.util.concurrent.CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
-    }, indexing, () -> {
+    };
+    Runnable restart = () -> {
       String key = acceptedKey.get();
       assertNotNull(key, "Restart must follow a completed captured walk");
       OperationRecord row = operations.find(key).orElseThrow();
@@ -156,8 +161,8 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertEquals(0, walk.acknowledgedRevision());
       assertTrue(queue.pollPending(1).isEmpty(), "No captured member may be claimed before the restart boundary");
       restartObserved.set(true);
-      runtime.set(buildingRuntime(key));
-    });
+    };
+    coordinator.bindBulkProducer(producer, indexing, restart);
 
     doAnswer(call -> {
       migrationStarts.incrementAndGet();
@@ -207,6 +212,13 @@ final class RecordedBulkIngestionCoordinatorTest {
     assertEquals(1, migrationStarts.get());
     assertTrue(restartObserved.get());
 
+    // A successful restart request does not change the attachment's boot witness. Simulate the
+    // replacement lifecycle explicitly before the new physical binding can authorize claims.
+    attachment.close();
+    runtime.set(buildingRuntime(key));
+    attachment = coordinator.attach(queue, () -> Optional.of(SERVING_GENERATION), () -> true,
+        () -> Optional.of(runtime.get()));
+    coordinator.bindBulkProducer(producer, indexing, restart);
     coordinator.maintain();
     assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, coordinator.recordedClaimDecision(key));
     var claim = queue.pollPending(1).getFirst();
@@ -214,7 +226,9 @@ final class RecordedBulkIngestionCoordinatorTest {
     assertEquals(key, acceptedKey.get());
     assertEquals(sourceHash, claim.plannedSourceSha256());
     assertTrue(claim.recordedForce());
-    queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, sourceHash)),
+    if (sourceChangedAfterCapture) Files.writeString(member, "source changed after frozen capture");
+    String committedHash = sha256(Files.readAllBytes(member));
+    queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, committedHash)),
         IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE));
     unfinishedClaim.set(null);
 
@@ -236,9 +250,17 @@ final class RecordedBulkIngestionCoordinatorTest {
     assertEquals(1, operations.find(key).orElseThrow().unitsCompleted());
     assertTrue(settled.settlement().gaps().isEmpty());
     assertEquals(0, settled.settlement().failedEvents());
-    assertEquals(0, settled.settlement().supersededEvents());
-    assertTrue(settled.settlement().processingHistory().isEmpty(),
-        "The bounded history sample contains failed/superseded events, not successful current coverage");
+    assertEquals(sourceChangedAfterCapture ? 1 : 0, settled.settlement().supersededEvents());
+    if (sourceChangedAfterCapture) {
+      assertEquals(1, settled.settlement().processingHistory().size());
+      var history = settled.settlement().processingHistory().getFirst();
+      assertEquals("INDEXED", history.coverage());
+      assertEquals(sourceHash, history.plannedSourceSha256());
+      assertEquals(committedHash, history.contentHash());
+    } else {
+      assertTrue(settled.settlement().processingHistory().isEmpty(),
+          "Stable successful coverage does not add a superseded history event");
+    }
     assertEquals(OperationState.RUNNING, operations.find(key).orElseThrow().state(),
         "A durable settlement is still not a terminal operation receipt");
 
@@ -321,8 +343,53 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void acceptedBulkWaitsForReplacementWhenOldBootIsFencedAndRetriesFailedRestartCallback() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("accepted-start-handoff"), true)) {
+      assertEquals(1, harness.initialRestartFailures.get());
+      assertEquals(1, harness.restartCalls.get());
+      assertEquals(1, harness.migrationStarts.get());
+
+      // The accepted process still owns the old attachment, whose live state can report FENCED
+      // after it wrote the requested target. That observation cannot refuse the accepted start.
+      harness.runtime.set(new RecordedIngestionLifecycle.BulkRuntime(IndexGenerationManager.BootDisposition.FENCED,
+          SERVING_GENERATION, null, "IDLE", null, false));
+      JobQueue.WalkProgress beforeRetry = harness.queue.recordedWalk(harness.key).orElseThrow();
+      assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE, beforeRetry.enumerationOutcome());
+      assertEquals(1L, beforeRetry.plannedUnits());
+      assertNull(beforeRetry.sealedAt());
+
+      harness.coordinator.maintain();
+      assertEquals(2, harness.restartCalls.get(), "maintenance retries the failed accepted restart callback");
+      assertEquals(1, harness.migrationStarts.get(), "dispatch retry does not repeat the accepted migration");
+      assertEquals(OperationState.RUNNING, harness.operations.find(harness.key).orElseThrow().state());
+      assertEquals(BulkReindexProgress.Phase.BUILDING, harness.progress().phase());
+      assertEquals("g-" + harness.key, harness.progress().generationId());
+      assertNull(harness.progress().refusalCode(), "the old physical FENCED witness is not a start refusal");
+      assertEquals(JobQueue.RecordedClaimDecision.DENY,
+          harness.coordinator.recordedClaimDecision(harness.key), "the old physical binding cannot claim Green");
+      assertTrue(harness.queue.pollPending(1).isEmpty());
+
+      harness.coordinator.maintain();
+      assertEquals(2, harness.restartCalls.get(), "an armed handoff waits without repeating its callback");
+      assertEquals(1, harness.migrationStarts.get());
+      assertEquals(OperationState.RUNNING, harness.operations.find(harness.key).orElseThrow().state());
+      assertNull(harness.progress().refusalCode());
+      assertNull(harness.queue.recordedWalk(harness.key).orElseThrow().sealedAt());
+
+      harness.replacePhysical(buildingRuntime(harness.key));
+      assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE,
+          harness.coordinator.recordedClaimDecision(harness.key), "the replacement BUILDING binding can claim");
+      JobQueue.IndexJob claim = harness.queue.pollPending(1).getFirst();
+      assertEquals(harness.sourceHash, claim.plannedSourceSha256());
+      harness.queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, harness.sourceHash)),
+          IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE));
+    }
+  }
+
+  @Test
   void acknowledgementRepairCrossesFullPageOfRetainedContradictionsToLaterValidTerminalRow() throws Exception {
     try (var harness = new BulkHarness(temp.resolve("ack-inventory-pages"))) {
+      harness.replacePhysical(buildingRuntime(harness.key));
       harness.coordinator.maintain();
       assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE,
           harness.coordinator.recordedClaimDecision(harness.key));
@@ -503,6 +570,8 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertEquals(1, harness.refusalRestartSuccesses.get());
       harness.coordinator.maintain();
       assertEquals(3, harness.restartCalls.get(), "one successful refusal restart is not repeated");
+      harness.replacePhysical(new RecordedIngestionLifecycle.BulkRuntime(IndexGenerationManager.BootDisposition.FENCED,
+          SERVING_GENERATION, null, "IDLE", null, false));
       assertEquals(IndexGenerationManager.BootDisposition.FENCED, harness.runtime.get().disposition());
       assertEquals(1, harness.producerStarts.get());
       assertEquals(1, harness.migrationStarts.get());
@@ -626,11 +695,14 @@ final class RecordedBulkIngestionCoordinatorTest {
     final AtomicBoolean rejectAcknowledgement = new AtomicBoolean();
     final AtomicBoolean failFinishAfterRefusal = new AtomicBoolean();
     final AtomicBoolean failRefusalRestartOnce = new AtomicBoolean();
+    final AtomicBoolean failInitialRestartOnce = new AtomicBoolean();
+    final AtomicBoolean initialRestartPending = new AtomicBoolean(true);
     final AtomicBoolean suppressWalkNotifications = new AtomicBoolean();
     final AtomicInteger producerStarts = new AtomicInteger();
     final AtomicInteger migrationStarts = new AtomicInteger();
     final AtomicInteger restartCalls = new AtomicInteger();
     final AtomicInteger refusalRestartSuccesses = new AtomicInteger();
+    final AtomicInteger initialRestartFailures = new AtomicInteger();
     final AtomicInteger promotions = new AtomicInteger();
     SqliteOperationStore operations;
     OperationStore operationOwner;
@@ -643,9 +715,16 @@ final class RecordedBulkIngestionCoordinatorTest {
     IndexingService indexing;
     RecordedIngestionLifecycle.Attachment attachment;
     String key;
+    private final boolean expectInitialRestartFailure;
 
     BulkHarness(Path directory) throws Exception {
+      this(directory, false);
+    }
+
+    BulkHarness(Path directory, boolean failInitialRestartOnce) throws Exception {
       this.directory = Files.createDirectories(directory);
+      this.expectInitialRestartFailure = failInitialRestartOnce;
+      this.failInitialRestartOnce.set(failInitialRestartOnce);
       watchedRoot = Files.createDirectory(directory.resolve("watched"));
       member = Files.writeString(watchedRoot.resolve("one.txt"), "captured cancellation source");
       memberSize = Files.size(member);
@@ -658,7 +737,12 @@ final class RecordedBulkIngestionCoordinatorTest {
       runtime.set(new RecordedIngestionLifecycle.BulkRuntime(IndexGenerationManager.BootDisposition.CAPTURING,
           SERVING_GENERATION, null, "IDLE", null, false));
       openOwner(false);
-      acceptPreparedBulk();
+      try { acceptPreparedBulk(); }
+      catch (Exception | Error failure) {
+        try { closeOwner(); }
+        catch (Exception | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        throw failure;
+      }
     }
 
     private void openOwner(boolean recovered) throws Exception {
@@ -702,26 +786,38 @@ final class RecordedBulkIngestionCoordinatorTest {
       doAnswer(call -> {
         migrationStarts.incrementAndGet();
         String operationKey = call.getArgument(0);
+        assertEquals(key, operationKey);
+        assertEquals(RecordedBulkPlan.Profile.USER_BULK.defaultSource(), call.getArgument(1));
+        assertEquals(target.fingerprint(), call.getArgument(2));
+        assertEquals(SERVING_GENERATION, call.getArgument(3));
         return new IndexingService.MigrationOutcome(true, true, SERVING_GENERATION,
             "g-" + operationKey, "MIGRATING");
       }).when(indexing).startRecordedMigration(anyString(), anyString(), anyString(), anyString(), any());
+      bindBulkProducer();
+    }
+
+    private void bindBulkProducer() {
       coordinator.bindBulkProducer((scope, operationKey, epoch, context, cancellation) -> {
         producerStarts.incrementAndGet();
         queue.enqueueRecordedEntries(operationKey, epoch, List.of(new JobQueue.EnqueueEntry(member,
             memberSize, new JobQueue.EnqueueProvenance("user", TransportTag.BUTTON.name()), sourceHash)), null);
         return java.util.concurrent.CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
       }, indexing, () -> {
-        int invocation = restartCalls.incrementAndGet();
-        if (invocation == 1) {
-          runtime.set(buildingRuntime(key));
+        restartCalls.incrementAndGet();
+        if (initialRestartPending.get()) {
+          if (failInitialRestartOnce.compareAndSet(true, false)) {
+            runtime.set(new RecordedIngestionLifecycle.BulkRuntime(IndexGenerationManager.BootDisposition.FENCED,
+                SERVING_GENERATION, null, "IDLE", null, false));
+            initialRestartFailures.incrementAndGet();
+            throw new IllegalStateException("injected initial bulk restart callback failure");
+          }
+          initialRestartPending.set(false);
           return;
         }
         if (failRefusalRestartOnce.compareAndSet(true, false)) {
           throw new IllegalStateException("injected refusal restart cut");
         }
         refusalRestartSuccesses.incrementAndGet();
-        runtime.set(new RecordedIngestionLifecycle.BulkRuntime(IndexGenerationManager.BootDisposition.FENCED,
-            SERVING_GENERATION, null, "IDLE", null, false));
       });
     }
 
@@ -790,6 +886,7 @@ final class RecordedBulkIngestionCoordinatorTest {
       OperationResult accepted = executor.dispatch(operation, arguments, provenance, Optional.of(approval),
           origin, key, prepared.preparationNonce());
       assertTrue(accepted.success());
+      if (expectInitialRestartFailure) assertEquals(1, initialRestartFailures.get());
       assertEquals(OperationState.RUNNING, operations.find(key).orElseThrow().state());
       assertNotNull(cancellableWork.get());
       assertEquals(1, producerStarts.get());
@@ -799,7 +896,10 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertEquals(BulkReindexProgress.Phase.BUILDING, progress().phase());
     }
 
-    JobQueue.IndexJob completeOneCapturedClaim() {
+    JobQueue.IndexJob completeOneCapturedClaim() throws Exception {
+      if (runtime.get().disposition() != IndexGenerationManager.BootDisposition.BUILDING) {
+        replacePhysical(buildingRuntime(key));
+      }
       coordinator.maintain();
       assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, coordinator.recordedClaimDecision(key));
       JobQueue.IndexJob claim = queue.pollPending(1).getFirst();
@@ -808,6 +908,14 @@ final class RecordedBulkIngestionCoordinatorTest {
           IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE));
       assertTrue(coordinator.beforeRecordedPromotion(key, queue));
       return claim;
+    }
+
+    void replacePhysical(RecordedIngestionLifecycle.BulkRuntime replacementRuntime) throws Exception {
+      attachment.close();
+      runtime.set(replacementRuntime);
+      attachment = coordinator.attach(queue, () -> Optional.of(SERVING_GENERATION), () -> true,
+          () -> Optional.of(runtime.get()));
+      bindBulkProducer();
     }
 
     BulkReindexProgress progress() {
