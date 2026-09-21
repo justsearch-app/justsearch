@@ -24,15 +24,36 @@ and dev-reload retry. All four negative2213 controls fail as intended and restor
 sources byte-exact. Whole compile/static2214 passes; restored2215 represents702
 cases, zero failures/errors,15 existing skips (full indexer fresh, worker regression
 reused from2211). [Shutdown evidence](evidence/C2/cooperative-shutdown.md) owns details.
-Hosted35583668414 reports overall success but its integration job fails all three
-migration retries at the connected checkpoint: incarnation1 exits1 instead of4.
-Downloaded test/runtime artifacts are under `tmp/2216-hosted-connected*`; root-cause
-diagnosis and corrected hosted proof remain open. Do not credit the aggregate.
+Pushed `9598c7e15` owns that shutdown correction and persistent workflow changes:
+checkpoint coherent acceptance slices, discover/reuse owner paths, and keep current
+handoff state compact. Installed2219 migration also passes on that checkpoint.
+Hosted35583668414's three failed migration retries exposed a setup walk collision
+escaping its producer Future into the fatal process handler. Current corrections
+keep ordinary failures in the Future, preserve fatal cleanup Errors, and make the
+migration fixture wait for setup owner seal/ACK. Focused2229 passes11 producer cases;
+negative2230 catches swallowed Error; byte-restored2231 reuses matching2229 proof.
+Corrected installed migration and hosted proof remain open; do not credit aggregate CI.
 
-Next: diagnose hosted migration exit and obtain corrected proof; then implement and run the three installed bulk crash cuts (partial capture, generation
-state before BUILDING checkpoint, promotion before terminal receipt), reconcile
-hosted test-level evidence and run final full stress. Full2064 had a later-fixed
-SystemAccessFunnel failure; focused2075 does not replace final full-stress proof.
+All three bulk crash cuts are implemented using the existing fault hook. Installed2225
+found fresh Blue lacked a durable empty index; writable bootstrap now commits an empty
+index before publishing readers. Full adapter2228 passes729 cases/102 suites, no skips;
+negative2227 proves the new guard. Installed2232 now resumes capture, but incarnation2
+terminalizes BULK_GENERATION_REFUSED 62ms after creating Green and before requested
+exit. Incarnation3 correctly fences the refused operation. Root is investigating
+the CAPTURING boot witness being reused after local generation creation. Both failed
+runs stopped their owned stack; latest health is ABSENT with no foreign/orphan process.
+The retained `tmp/2232-installed-bulk-partial/bulk-cut.json` proves the intended crash
+boundary; it is not successful recovery. Full service batch2233 passes2241 cases/
+347 suites (Engine343, observability600, UI1298), zero failures/errors and one
+existing optional McpEntityCarriageMetric dataset skip. All six PMD tasks and
+installed-test compilation pass. Governance2234 passes engine-port (one note),
+operation-surface and store recoverability. Hosted35586999590 at9598 also reports
+overall success with all three migration retries failed; log retained2235.
+
+Next: correct the proven post-capture refusal, then pass all three installed bulk
+cuts and corrected migration, reconcile hosted test-level evidence and run final
+full stress. Full2064 had a later-fixed SystemAccessFunnel failure; focused2075
+does not replace final full-stress proof. C2 acceptance audit remains active.
 
 ### Owner and evidence map
 
@@ -45,10 +66,12 @@ guessing a neighboring module; ignored `tmp`/`build` evidence needs `--no-ignore
 | Bulk acceptance and design | [bulk connection](evidence/C2/bulk-reindex-connection.md); [prior checkpoint detail](evidence/C2/connected-bulk-checkpoint-2026-09-21.md) |
 | Earlier lock/replay acceptance | [hostile-lock acceptance](evidence/C2/hostile-lock-acceptance.md) |
 | Bulk composition | `modules/app-engine/src/main/java/io/justsearch/app/engine/RecordedIngestionCoordinator.java`, adjacent `EngineKnowledgeClient.java` |
+| Recorded boot/live witness | `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java`; `modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java` |
+| Fresh empty index durability | `modules/adapters-lucene/src/{main,test}/java/io/justsearch/adapters/lucene/runtime/ComponentsFactory{,Test}.java`; `tmp/2226*` through `tmp/2228*` |
 | Attempt runner / port | `modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java`; `modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java` |
 | Indexing close / tests | `modules/worker-services/src/{main,test}/java/io/justsearch/indexerworker/loop/IndexingLoop{,RestartTest}.java` |
 | Reload owner / trigger tests | `modules/indexer-worker/src/{main,test}/java/io/justsearch/indexerworker/server/DevReloadManager{,TriggerTest}.java`; adjacent `KnowledgeServer.java` |
-| Installed harness | `scripts/supervisor-conformance/real-writer-recovery.mjs`, `migration-restart-scenario.mjs`, `operation-fault-scenario.mjs`; `modules/ui/src/main/java/io/justsearch/ui/OperationFaultBarrier.java` |
+| Installed harness | `scripts/supervisor-conformance/real-writer-recovery.mjs`, `migration-restart-scenario.mjs`, `operation-fault-scenario.mjs`, `bulk-fault-scenario.mjs`; `modules/ui/src/main/java/io/justsearch/ui/OperationFaultBarrier.java` |
 | Verification artifacts | `tmp/2201-installed-bulk-migration*`, `tmp/2203-bulk-engine-full*`, `tmp/2208-engine-cooperative-close-full*`, `tmp/2210-worker-cooperative-close*`, `tmp/2211-cooperative-reload-focused*` |
 
 Raw logs/XML are local-only, retained through lane acceptance plus30days; export

@@ -18,7 +18,8 @@ final class OperationResumeE2ETest {
   @ValueSource(strings = {"ingest-before-accept", "settings-before-accept",
       "ingest-after-accept-before-effect", "settings-after-accept-before-effect",
       "ingest-after-effect-before-checkpoint", "settings-after-effect-before-checkpoint",
-      "ingest-client-disconnect"})
+      "ingest-client-disconnect", "bulk-partial-capture", "bulk-state-before-binding",
+      "bulk-promotion-before-terminal"})
   void installedOperationSurvivesItsExactFaultBoundary(String scenario) throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario(scenario);
   }

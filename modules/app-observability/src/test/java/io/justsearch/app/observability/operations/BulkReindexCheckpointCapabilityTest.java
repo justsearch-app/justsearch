@@ -3,6 +3,7 @@ package io.justsearch.app.observability.operations;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -90,6 +91,134 @@ final class BulkReindexCheckpointCapabilityTest {
   }
 
   @Test
+  void bulkBoundaryObservationsAreReadOnlyAndRequireOwnLiveReindexControl() throws Exception {
+    try (var store = new SqliteOperationStore(temp.resolve("observation-capabilities.db"), clock, ignored -> {})) {
+      var emittedBoundaries = new java.util.ArrayList<OperationAttemptRunnerImpl.FaultBoundary>();
+      var owner = new OperationAttemptRunnerImpl(store, clock,
+          Set.of(OperationKind.REINDEX, OperationKind.INGEST), null, null, emittedBoundaries::add);
+      var otherRunner = new OperationAttemptRunnerImpl(store, clock, Set.of(OperationKind.REINDEX));
+      var ownerAttempt = owner.accept(request());
+      var otherAttempt = otherRunner.accept(request());
+      var ingestAttempt = owner.accept(request(OperationKind.INGEST, "core.ingest"));
+      var ownerHandleRef = new AtomicReference<OperationRecordHandle>();
+      var otherHandleRef = new AtomicReference<OperationRecordHandle>();
+      var ingestHandleRef = new AtomicReference<OperationRecordHandle>();
+      var ownerEffect = new CompletableFuture<OperationResult>();
+      var otherEffect = new CompletableFuture<OperationResult>();
+      var ingestEffect = new CompletableFuture<OperationResult>();
+      var ownerRun = owner.start(ownerAttempt, handle -> {
+        ownerHandleRef.set(handle);
+        return new OperationExecution(OperationResult.success("started"), ownerEffect);
+      });
+      var otherRun = otherRunner.start(otherAttempt, handle -> {
+        otherHandleRef.set(handle);
+        return new OperationExecution(OperationResult.success("started"), otherEffect);
+      });
+      var ingestRun = owner.start(ingestAttempt, handle -> {
+        ingestHandleRef.set(handle);
+        return new OperationExecution(OperationResult.success("started"), ingestEffect);
+      });
+      OperationRecordHandle ownerHandle = ownerHandleRef.get();
+      OperationRecordHandle otherHandle = otherHandleRef.get();
+      OperationRecordHandle ingestHandle = ingestHandleRef.get();
+      var target = target("{\"index\":\"observed\"}");
+      var progress = capturing(ownerHandle.key(), target);
+      owner.checkpointBulkReindex(ownerHandle, progress);
+      var runningBefore = store.find(ownerHandle.key()).orElseThrow();
+
+      owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.PARTIAL_CAPTURE);
+      owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.AFTER_PROMOTION);
+
+      assertEquals(java.util.List.of("bulk-partial-capture", "bulk-after-promotion"),
+          emittedBoundaries.stream()
+              .map(OperationAttemptRunnerImpl.FaultBoundary::phase)
+              .filter(phase -> phase.startsWith("bulk-"))
+              .toList());
+      assertEquals(runningBefore, store.find(ownerHandle.key()).orElseThrow());
+      assertEquals(Optional.of(progress), store.bulkReindexProgress(ownerHandle.id()));
+      assertFalse(ownerRun.completion().toCompletableFuture().isDone(),
+          "observations do not terminalize the live operation");
+      assertThrows(IllegalArgumentException.class, () ->
+          owner.observeBulkBoundary(otherHandle, OperationAttemptRunner.BulkBoundary.PARTIAL_CAPTURE));
+      assertThrows(IllegalArgumentException.class, () ->
+          owner.observeBulkBoundary(ingestHandle, OperationAttemptRunner.BulkBoundary.PARTIAL_CAPTURE));
+      assertFalse(owner.persistenceFailure().toCompletableFuture().isDone(),
+          "capability refusals are not persistence failures");
+
+      ownerEffect.complete(OperationResult.success("complete"));
+      assertEquals(OperationState.COMPLETE, ownerRun.completion().toCompletableFuture().join().state());
+      var terminal = store.find(ownerHandle.key()).orElseThrow();
+      assertThrows(IllegalArgumentException.class, () ->
+          owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.AFTER_PROMOTION));
+      assertEquals(terminal, store.find(ownerHandle.key()).orElseThrow());
+      assertEquals(Optional.of(progress), store.bulkReindexProgress(ownerHandle.id()));
+
+      otherEffect.complete(OperationResult.success("complete"));
+      ingestEffect.complete(OperationResult.success("complete"));
+      assertEquals(OperationState.COMPLETE, otherRun.completion().toCompletableFuture().join().state());
+      assertEquals(OperationState.COMPLETE, ingestRun.completion().toCompletableFuture().join().state());
+    }
+  }
+
+  @Test
+  void buildingCheckpointFaultBoundaryObservesDurableCapturingStateBeforeWrite() throws Exception {
+    try (var store = new SqliteOperationStore(temp.resolve("before-building-boundary.db"), clock, ignored -> {})) {
+      var boundaries = new java.util.ArrayList<OperationAttemptRunnerImpl.FaultBoundary>();
+      var progressAtBoundary = new AtomicReference<Optional<BulkReindexProgress>>();
+      var stateAtBoundary = new AtomicReference<OperationState>();
+      var cursorAtBoundary = new AtomicReference<String>();
+      var runner = new OperationAttemptRunnerImpl(store, clock, Set.of(OperationKind.REINDEX), null, null,
+          boundary -> {
+            boundaries.add(boundary);
+            if (boundary.phase().equals("bulk-before-building-checkpoint")) {
+              progressAtBoundary.set(store.bulkReindexProgress(boundary.operationRecordId()));
+              var row = store.find(boundary.parentKey()).orElseThrow();
+              stateAtBoundary.set(row.state());
+              cursorAtBoundary.set(row.checkpointCursor());
+            }
+          });
+      var attempt = runner.accept(request());
+      var handleRef = new AtomicReference<OperationRecordHandle>();
+      var effect = new CompletableFuture<OperationResult>();
+      var running = runner.start(attempt, handle -> {
+        handleRef.set(handle);
+        return new OperationExecution(OperationResult.success("started"), effect);
+      });
+      OperationRecordHandle handle = handleRef.get();
+      var target = target("{\"index\":\"before-building\"}");
+      var capturing = capturing(handle.key(), target);
+      runner.checkpointBulkReindex(handle, capturing);
+      var capturingRow = store.find(handle.key()).orElseThrow();
+      var building = new BulkReindexProgress(capturing.generationId(), target,
+          BulkReindexProgress.Phase.BUILDING, new BulkReindexProgress.Capture("4".repeat(64), 2), null);
+
+      runner.checkpointBulkReindex(handle, building);
+
+      var checkpointBoundary = boundaries.stream()
+          .filter(boundary -> boundary.phase().equals("bulk-before-building-checkpoint"))
+          .toList();
+      assertEquals(1, checkpointBoundary.size());
+      var observed = checkpointBoundary.getFirst();
+      assertEquals(OperationKind.REINDEX, observed.parentKind());
+      assertEquals(handle.key(), observed.parentKey());
+      assertEquals(handle.key(), observed.operationKey());
+      assertEquals(handle.id(), observed.operationRecordId());
+      assertNull(observed.cursor());
+      assertEquals(0, observed.completed());
+      assertEquals(0, observed.failed());
+      assertEquals(Optional.of(capturing), progressAtBoundary.get(),
+          "the injected cut runs immediately before the BUILDING metadata write");
+      assertEquals(capturingRow.checkpointCursor(), cursorAtBoundary.get());
+      assertEquals(OperationState.RUNNING, stateAtBoundary.get());
+      assertEquals(OperationState.RUNNING, store.find(handle.key()).orElseThrow().state());
+      assertEquals(building, store.bulkReindexProgress(handle.id()).orElseThrow());
+
+      effect.complete(OperationResult.success("complete"));
+      assertEquals(OperationState.COMPLETE, running.completion().toCompletableFuture().join().state());
+    }
+  }
+
+  @Test
   void recoveredBulkCheckpointAtAttemptLimitDoesNotResumeAndRemainsEligible() throws Exception {
     try (var store = new SqliteOperationStore(temp.resolve("recovery-limit.db"), clock, ignored -> {})) {
       var request = request();
@@ -165,8 +294,12 @@ final class BulkReindexCheckpointCapabilityTest {
   }
 
   private OperationAttemptRunner.Request request() {
+    return request(OperationKind.REINDEX, "core.bulk-reindex");
+  }
+
+  private OperationAttemptRunner.Request request(OperationKind kind, String executor) {
     return new OperationAttemptRunner.Request(OperationKeys.generate(clock),
-        OperationDescriptor.invocation(OperationKind.REINDEX, "core.bulk-reindex", "{}", false),
+        OperationDescriptor.invocation(kind, executor, "{}", false),
         new EngineContext(EngineContext.ClientKind.INTERNAL, "bulk-capability-test", Optional.empty(),
             Optional.empty(), "system", "SYSTEM_INTERNAL", EngineContext.Survival.DURABLE,
             EngineContext.Urgency.BACKGROUND), null);

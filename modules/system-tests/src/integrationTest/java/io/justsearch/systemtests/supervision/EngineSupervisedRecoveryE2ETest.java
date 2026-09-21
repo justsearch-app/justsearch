@@ -34,7 +34,8 @@ final class EngineSupervisedRecoveryE2ETest {
 
   static void runScenario(String scenario) throws Exception {
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
-    boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-");
+    boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-")
+        || scenario.startsWith("bulk-");
     if ("lock-boot".equals(scenario)) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");

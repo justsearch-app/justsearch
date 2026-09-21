@@ -8,6 +8,7 @@ import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
 import { exerciseOperationResume } from './operation-resume-scenario.mjs';
 import { exerciseOperationFault } from './operation-fault-scenario.mjs';
+import { exerciseBulkFault, BULK_FAULT_CASES } from './bulk-fault-scenario.mjs';
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 
 const repo = process.cwd();
@@ -16,7 +17,8 @@ const operationFault = new Set(['ingest-before-accept', 'settings-before-accept'
   'ingest-after-accept-before-effect', 'settings-after-accept-before-effect',
   'ingest-after-effect-before-checkpoint', 'settings-after-effect-before-checkpoint',
   'ingest-client-disconnect']).has(scenario);
-const operationKey = operationFault ? createOperationKey() : null;
+const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
+const operationKey = operationFault || bulkFault ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
   : path.join(repo, 'tmp', 'lane-f-takeover', `writer-live-${Date.now()}`);
@@ -73,7 +75,7 @@ if (['writer', 'processing', 'operation'].includes(scenario) || scenario === und
     schemaVersion: 1, roots: [{ path: corpus }],
   }));
 }
-if (['processing', 'operation'].includes(scenario) || operationFault) {
+if (['processing', 'operation'].includes(scenario) || operationFault || bulkFault) {
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
@@ -83,6 +85,16 @@ if (operationFault) {
   env.JUSTSEARCH_OPERATION_FAULT_KIND = scenario.startsWith('settings-') ? 'settings-apply' : 'ingest';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = scenario.endsWith('before-accept') ? 'before-accept'
     : scenario.endsWith('before-checkpoint') ? 'after-effect' : 'after-accept';
+}
+if (bulkFault) {
+  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = BULK_FAULT_CASES[scenario].phase;
+  const roots = ['bulk-root-a', 'bulk-root-b'].map(name => ({ path: path.join(work, name) }));
+  for (const root of roots) fs.mkdirSync(root.path, { recursive: true });
+  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({ schemaVersion: 1, roots }));
+  delete env.JUSTSEARCH_AI_EMBED_ENABLED;
+  delete env.AI_OFFLINE;
 }
 delete env.JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND;
 if (aiEnabled) {
@@ -226,7 +238,11 @@ try {
       return response.status === 200 ? response : null;
     } catch { return null; }
   });
-  if (operationFault) {
+  if (bulkFault) {
+    await exerciseBulkFault({ work, data, indexBase, first, manifest, apiPort, readJson, waitFor,
+      request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit,
+      scenario, operationKey, output: () => output });
+  } else if (operationFault) {
     await exerciseOperationFault({ work, data, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor,
       scenario, operationKey });

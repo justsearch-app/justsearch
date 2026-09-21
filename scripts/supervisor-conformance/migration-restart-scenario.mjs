@@ -33,7 +33,7 @@ export async function exerciseMigrationRestart(c) {
       ? dispatched.catch(error => ({ deliveryUnknown: String(error) })) : dispatched;
   };
   const ingest = await approvedPost('/api/knowledge/ingest', {
-    paths: [a, b], idempotencyKey: operationKey,
+    paths: [b], idempotencyKey: operationKey,
   }, 'migration ingest');
   const receipt = requireOperationSuccess(ingest, 'migration ingest');
   requireThat(receipt.operationKey === operationKey,
@@ -46,6 +46,26 @@ export async function exerciseMigrationRestart(c) {
       return matchingHit(await search(apiPort, 'migrationretainedmarker'), a, 'migrationretainedmarker')
         && matchingHit(await search(apiPort, 'migrationblueonlymarker'), b, 'migrationblueonlymarker');
     } catch { return false; }
+  });
+  // Search visibility can precede the recorded setup owner's settlement. Bulk capture
+  // must begin after that owner releases these paths, not race the fixture's own setup.
+  await waitFor('Blue setup owners sealed and acknowledged', 60000, () => {
+    const jobs = new DatabaseSync(path.join(data, 'jobs.db'), { readOnly: true });
+    const operations = new DatabaseSync(path.join(data, 'operations.db'), { readOnly: true });
+    try {
+      const setup = operations.prepare('SELECT state, result_json FROM operations WHERE operation_key = ?')
+        .get(operationKey);
+      if (setup?.state !== 'COMPLETE' || JSON.parse(setup.result_json).code !== 'SUCCESS') return false;
+      const paths = new Set([a, b].map(file => path.resolve(file).toLowerCase()));
+      const units = jobs.prepare('SELECT path, scan_id, walk_seen_epoch FROM jobs').all()
+        .filter(row => paths.has(path.resolve(row.path).toLowerCase()));
+      return units.length === 2 && units.every(unit => {
+        if (unit.walk_seen_epoch == null) return true;
+        const walk = jobs.prepare('SELECT sealed_at, revision, acknowledged_revision '
+          + 'FROM ingestion_walk_progress WHERE operation_key = ?').get(unit.scan_id);
+        return walk?.sealed_at != null && walk.acknowledged_revision === walk.revision;
+      });
+    } finally { operations.close(); jobs.close(); }
   });
   const generationFile = path.join(indexBase, 'state.json');
   const blue = readJson(generationFile).active_generation;

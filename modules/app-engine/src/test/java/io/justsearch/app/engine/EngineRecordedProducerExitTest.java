@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -30,6 +31,136 @@ import org.junit.jupiter.params.ParameterizedTest;
 @Timeout(15)
 final class EngineRecordedProducerExitTest {
   @TempDir Path directory;
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void recordedProducerFailureSettlesStageAndOnlyFatalErrorEscapesWorker(boolean fatal) throws Exception {
+    Throwable producerFailure = fatal
+        ? new AssertionError("recorded producer fatal failure")
+        : new IllegalStateException("Path belongs to another active recorded walk");
+    var uncaught = new java.util.concurrent.CompletableFuture<Throwable>();
+    var firstWalkThread = new AtomicReference<Thread>();
+    var admission = new EngineAdmissionController(8, 8, 1);
+    var ingest = mock(WorkerIngestService.class);
+    doAnswer(call -> { throw producerFailure; }).when(ingest).scanRecordedRoot(any(), any(), any());
+    var services = mock(WorkerAppServices.class);
+    when(services.ingestService()).thenReturn(ingest);
+
+    try (var registry = spy(new DefaultEngineExecutorRegistry())) {
+      doAnswer(invocation -> {
+        var registration = (io.justsearch.core.execution.EngineExecutorRegistry.Registration)
+            invocation.callRealMethod();
+        if (!registration.spec().name().equals("knowledge-client-root-walk")) return registration;
+        var observed = spy(registration);
+        doAnswer(open -> {
+          java.util.concurrent.ThreadFactory factory = open.getArgument(0);
+          return registration.open(task -> {
+            Thread thread = factory.newThread(task);
+            firstWalkThread.compareAndSet(null, thread);
+            thread.setUncaughtExceptionHandler((owner, failure) -> uncaught.complete(failure));
+            return thread;
+          });
+        }).when(observed).open(any(java.util.concurrent.ThreadFactory.class));
+        doAnswer(close -> { registration.close(); return null; }).when(observed).close();
+        return observed;
+      }).when(registry).register(any());
+
+      try (var client = new EngineKnowledgeClient(registry, () -> services,
+          new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop(), () -> {},
+          admission, OperationAuthority.inMemory().roots());
+          var request = admission.admit(TestEngineContexts.FOREGROUND, false)) {
+        var plan = new RecordedRootPlan("generation", List.of(
+            new RecordedRootPlan.Root(directory, null, true, false, List.of(), List.of())));
+        var result = client.enumerateRecordedRoot(
+            plan, "recorded-child", 1, request.context(), new CancelToken()).toCompletableFuture();
+
+        var observed = assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> result.get(3, TimeUnit.SECONDS));
+        var producerStage = assertInstanceOf(java.util.concurrent.CompletionException.class, observed.getCause());
+        assertSame(producerFailure, producerStage.getCause(), "the producer's exact causal failure must survive");
+        request.close();
+        assertEquals(0, admission.activeWorkCount(), "failed producer must release its actual work owner");
+
+        var field = KnowledgeClient.class.getDeclaredField("walkExecutor");
+        field.setAccessible(true);
+        var executor = (ExecutorService) field.get(client);
+        if (fatal) {
+          assertSame(producerFailure, uncaught.get(3, TimeUnit.SECONDS),
+              "fatal Error must remain visible to the worker's uncaught handler");
+          assertNotSame(firstWalkThread.get(), executor.submit(Thread::currentThread).get(3, TimeUnit.SECONDS),
+              "the executor must replace the worker terminated by a fatal Error");
+        } else {
+          assertSame(firstWalkThread.get(), executor.submit(Thread::currentThread).get(3, TimeUnit.SECONDS),
+              "a handled producer refusal must leave its worker usable");
+          assertFalse(uncaught.isDone(), "a nonfatal producer failure must not reach the uncaught handler");
+        }
+      }
+    }
+  }
+
+  @Test
+  void cleanupErrorSupersedesBodyRuntimeFailureAndReleasesOwner() throws Exception {
+    var bodyFailure = new IllegalStateException("recorded producer body failed");
+    var cleanupFailure = new AssertionError("recorded producer owner close failed");
+    var uncaught = new java.util.concurrent.CompletableFuture<Throwable>();
+    var attaches = new AtomicInteger();
+    var taskOwner = new AtomicReference<EngineWorkHandle>();
+    var admission = spy(new EngineAdmissionController(8, 8, 1));
+    doAnswer(call -> {
+      EngineWorkHandle actual = (EngineWorkHandle) call.callRealMethod();
+      if (attaches.incrementAndGet() != 1) return actual;
+      var observed = spy(actual);
+      taskOwner.set(observed);
+      doAnswer(close -> { close.callRealMethod(); throw cleanupFailure; }).when(observed).close();
+      return observed;
+    }).when(admission).attach(any());
+
+    var ingest = mock(WorkerIngestService.class);
+    doAnswer(call -> { throw bodyFailure; }).when(ingest).scanRecordedRoot(any(), any(), any());
+    var services = mock(WorkerAppServices.class);
+    when(services.ingestService()).thenReturn(ingest);
+
+    try (var registry = spy(new DefaultEngineExecutorRegistry())) {
+      doAnswer(invocation -> {
+        var registration = (io.justsearch.core.execution.EngineExecutorRegistry.Registration)
+            invocation.callRealMethod();
+        if (!registration.spec().name().equals("knowledge-client-root-walk")) return registration;
+        var observed = spy(registration);
+        doAnswer(open -> {
+          java.util.concurrent.ThreadFactory factory = open.getArgument(0);
+          return registration.open(task -> {
+            Thread thread = factory.newThread(task);
+            thread.setUncaughtExceptionHandler((owner, failure) -> uncaught.complete(failure));
+            return thread;
+          });
+        }).when(observed).open(any(java.util.concurrent.ThreadFactory.class));
+        doAnswer(close -> { registration.close(); return null; }).when(observed).close();
+        return observed;
+      }).when(registry).register(any());
+
+      try (var client = new EngineKnowledgeClient(registry, () -> services,
+          new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop(), () -> {},
+          admission, OperationAuthority.inMemory().roots());
+          var request = admission.admit(TestEngineContexts.FOREGROUND, false)) {
+        var plan = new RecordedRootPlan("generation", List.of(
+            new RecordedRootPlan.Root(directory, null, true, false, List.of(), List.of())));
+        var result = client.enumerateRecordedRoot(
+            plan, "recorded-child", 1, request.context(), new CancelToken()).toCompletableFuture();
+
+        var observed = assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> result.get(3, TimeUnit.SECONDS));
+        var producerStage = assertInstanceOf(java.util.concurrent.CompletionException.class, observed.getCause());
+        assertSame(cleanupFailure, producerStage.getCause(), "cleanup Error must become the fatal stage cause");
+        assertArrayEquals(new Throwable[] {bodyFailure}, cleanupFailure.getSuppressed(),
+            "the earlier body failure must remain attached to the promoted fatal Error");
+        assertSame(cleanupFailure, uncaught.get(3, TimeUnit.SECONDS),
+            "cleanup Error must reach the worker's uncaught handler");
+        verify(taskOwner.get()).close();
+        request.close();
+        assertEquals(0, admission.activeWorkCount(), "the task owner must release its admission reference");
+      }
+    }
+  }
 
   @ParameterizedTest
   @org.junit.jupiter.params.provider.CsvSource({"false,false", "true,false", "false,true", "true,true"})
@@ -181,7 +312,7 @@ final class EngineRecordedProducerExitTest {
     var admission = spy(new EngineAdmissionController(8, 8, 1));
     var retains = new AtomicInteger();
     var deliveryExited = new CountDownLatch(1);
-    var pool = new java.util.concurrent.atomic.AtomicReference<ExecutorService>();
+    var pool = new AtomicReference<ExecutorService>();
     var cleanupFailure = new IllegalStateException("producer release reported failure");
     doAnswer(call -> {
       EngineWorkHandle actual = (EngineWorkHandle) call.callRealMethod();

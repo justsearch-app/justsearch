@@ -26,7 +26,7 @@ const SETTINGS_ROUTE = '/api/settings/v2';
 const RECEIPT_CURSOR = /^ingest-receipt:1:[1-9][0-9]*:[0-9a-f]{64}$/;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-/** The only C2 installed recovery fault runner; it deliberately uses the real HTTP producers. */
+/** Installed ingestion/settings fault runner using the real HTTP producers. */
 export async function exerciseOperationFault(c) {
   const { work, data, first, manifest, apiPort, readJson, waitFor, request, post,
     requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor,

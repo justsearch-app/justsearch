@@ -1,13 +1,119 @@
 # C2-10 bulk reindex connection
 
 2026-09-21 current state: the prepared bulk/rebuild consumer and manual REST alias
-are connected in the worktree after `de1d25201`. Real Engine two-restart proof,
-controlled crash/cancellation cases and broad storage/index/API suites pass locally;
-installed bulk fault cuts, negative guards and final integrated/hosted proof remain
-open. See the dated evidence below for exact runs. The design originated against
-`0a23b0a4f`; earlier implementation entries are historical, not current blockers.
-Installed INGEST/SETTINGS proof does not discharge bulk acceptance. No amendment
-transfers C2's row, plan, resume or processing-history/gaps obligations to D1.
+are connected in pushed `0f1bec7e3`; cooperative shutdown/reload correction is
+pushed `9598c7e15`. Real Engine two-restart, controlled refusal/cancellation,
+MAX-attempt, ACK paging and negative guard proofs pass. Installed requested-restart
+migration2201 and corrected shutdown2219 pass. Hosted35583668414 instead exposes a
+setup-walk ownership collision escaping the producer future to the fatal handler;
+that separate correction and the three installed crash cuts are in progress.
+Final integrated stress and corrected hosted proof remain open. Earlier entries
+below are historical evidence, not the current execution queue; the
+[handoff](../../handoff.md) owns current next actions. Installed INGEST/SETTINGS
+proof does not discharge bulk acceptance. No amendment transfers C2's row, plan,
+resume or processing-history/gaps obligations to D1.
+
+## Installed bulk crash cuts: selected ownership and proof
+
+Use the existing runner fault hook and selected UI OperationFaultBarrier; no new
+journal, marker format, scheduler or authority channel. The runner validates its
+live REINDEX capability before observing the two physical boundaries. Its existing
+checkpoint method owns the third boundary immediately before BUILDING persistence.
+Normal composition uses the exact no-op hook. Only the installed supervisor harness
+can select the closed REINDEX fault phases.
+
+For partial capture, reuse committed keyed queue notifications rather than widen
+the capture producer API. SqliteJobQueue delivers them synchronously after its
+outermost unlock; the captured scanner cannot finish its current root until
+`enqueueRecordedEntries` returns. The coordinator observes the live attachment,
+unfinished producer future and not-yet-started generation. Initial begin-walk
+notification has no producer future and cannot stop the test. The cooldown database
+snapshot must prove first-member durability and second-root absence; event timing
+alone is not proof. This avoids another callback threaded through scan contracts.
+
+| Cut | Authoritative state after identity-verified death, before successor | Required recovery |
+| --- | --- | --- |
+| `bulk-partial-capture` | RUNNING/CAPTURING, open capture epoch, first root member/H1 retained, second absent, no Green | Same accepted preparation/key; re-enumerate remaining scope and finish exact target. One counted crash plus two requested restarts, final incarnation4. |
+| `bulk-before-building-checkpoint` | RUNNING/CAPTURING, COMPLETE closed manifest, exact g-key generation already MIGRATING | Bind existing Green without another allocation. One counted crash plus one requested promotion restart, final incarnation3. |
+| `bulk-after-promotion` | RUNNING/SETTLED, exact target active/IDLE, sealed but unacknowledged queue | Actual target successor boot before SUCCESS and ACK. First requested restart plus one counted crash, final incarnation3. |
+
+All three require one operation identity/preparation, exact g-key, actual target
+search for both captured members, zero failed units, sealed exact acknowledgement,
+and unchanged same-key retry. Restart accounting must recognize that a crash can
+supply the replacement otherwise requested by the current process. The selected
+harness disables automatic root producers using the existing isolation hook; real
+embedding remains enabled when its model is locally resolvable. Windows-only
+identity verification is explicit in installed test selection. Implementation and
+syntax checks are not executed proof; successful runs are still owed.
+
+The preceding requested-restart scenario keeps its actual watcher. Its Blue-only
+setup uses an explicitly approved out-of-root document. It must wait for recorded
+setup owners to seal/ACK before bulk capture: search visibility alone is not that
+barrier. Producer futures retain nonfatal task/cleanup failures, while Error remains
+fatal; no queue collision check is removed and no failed operation becomes success.
+
+### Empty-generation crash recovery and producer failure ownership
+
+Installed2225 reached the exact partial-capture cut and killed its admitted Engine,
+but successor incarnation2 could not reopen native Blue read-only: the fresh writer
+had never committed a Lucene index. The run is failed evidence, not a timing waiver.
+The fix belongs in ComponentsFactory's writable bootstrap: after acquiring the
+writer and consuming the clean marker, commit a neutral empty index only if none
+exists, before publishing readers. Seeding the fixture would hide the valid empty
+source case. A capture-port commit would add cross-module policy and could sweep
+unrelated writes; creating an index during strict read-only open would weaken the
+recorded ownership fence. Existing zero-doc parity rules permit this bare structural
+commit; the first real CommitOps commit owns model/build metadata.
+
+Focused2226 passes27 adapter cases and PMD; negative2227 removes only the initial
+commit and fails the live durable-index assertion, then restores original bytes.
+Full adapter2228 passes729 cases/102 suites with no failures/errors/skips. The
+regression also adds an uncommitted document, rolls the writer back and reopens
+strictly read-only with zero documents. Missing-index read-only refusal remains.
+
+Hosted35583668414's separate setup collision escaped OwnedStreamTask's exceptional
+future into the fatal process handler. Ordinary producer/cleanup exceptions now
+remain with that future; Error still escapes. Review caught a later cleanup Error
+being suppressed beneath an earlier RuntimeException: failure combination now
+promotes that Error and retains the earlier exception as suppressed. Focused2229
+passes11 producer cases plus PMD/format; negative2230 disables only Error promotion
+and fails the exact fatal-cause assertion, then restores bytes. Restored2231 reuses
+2229's matching test result and rebuilds the installed distribution. Full Engine
+and corrected hosted integration proof remain required.
+
+Raw commands/output and copied XML/counts are retained under `tmp/2225*` through
+`tmp/2231*`, with Java/proto source inventory in `tmp/2231-bulk-fixes-restored-build-sources.json`.
+Installed fault runs now save `bulk-cut.json` before successor assertions and
+`bulk-final.json`/`bulk-after-retry.json` before their respective assertions; these
+preserve predecessor evidence that the live databases later replace.
+
+Installed2232 passes the former empty-index failure but remains red. Incarnation2
+re-enumerates the open captured walk and starts exact Green at engine.log:2034.
+Its operations row terminalizes `BULK_GENERATION_REFUSED` 62ms after state creation,
+before its asynchronous shutdown: the process reuses its initial CAPTURING boot
+witness after writing MIGRATING and sees FENCED. Both captured members are wrongly
+retired as RECOVERY_REFUSED; incarnation3 correctly honors that durable refusal.
+The fix must preserve strict boot capture validation and instead use the existing
+accepted local start/restart handoff state until the physical attachment changes.
+Cancellation and authority refusal still precede waiting for replacement. A failed
+restart callback may retry; a failed durable checkpoint invalidates its runner
+capability and must remain unresolved rather than becoming generation refusal.
+Run `9de2983c-9234-41c3-aad4-98d2cdba6487`, key
+`01a0c389-b585-792b-a0dc-6131615856ac`; output and complete retained runtime are under
+`tmp/2232-installed-bulk-partial*`. Owned STOP reports portsClosed:true, and subsequent
+quick_health is ABSENT without foreign runs or inference orphan. The driver now
+fails promptly and saves `bulk-failed.json` on terminal failure during successor
+waiting; the earlier timeout remains retained as failed evidence.
+
+Full2233 executes2241 cases/347 suites: Engine343, observability600 and UI1298,
+zero failures/errors, one existing optional McpEntityCarriageMetric dataset skip.
+All six PMD tasks and installed-test compilation pass. Full XML/counts/source and
+skip inventories are retained under `tmp/2233-bulk-fault-full*`. Governance2234
+passes engine-port (one informational finding), operation-surface and store
+recoverability (six stores,46 authorities,27 policies). Hosted35586999590 at9598
+again reports aggregate success while migration fails all three integration retries;
+`tmp/2235-hosted-checkpoint-failed.txt` retains the job output. This checkpoint
+is verified infrastructure and two corrected defects, not completed bulk recovery.
 
 ## Scope and existing owners
 

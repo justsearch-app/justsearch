@@ -36,8 +36,12 @@ final class OperationFaultBarrier {
     if (!"1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
       throw new IllegalArgumentException("Operation fault selection requires supervisor harness mode");
     }
-    if (phase == null || !Set.of("before-accept", "after-accept", "after-effect").contains(phase)
-        || key == null || kind == null || !Set.of("ingest", "settings-apply").contains(kind)) {
+    boolean bulk = "reindex".equals(kind);
+    Set<String> phases = bulk
+        ? Set.of("bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion")
+        : Set.of("before-accept", "after-accept", "after-effect");
+    if (phase == null || !phases.contains(phase)
+        || key == null || kind == null || !Set.of("ingest", "settings-apply", "reindex").contains(kind)) {
       throw new IllegalArgumentException("Invalid operation fault selection");
     }
     OperationKeys.timestampMillis(key);

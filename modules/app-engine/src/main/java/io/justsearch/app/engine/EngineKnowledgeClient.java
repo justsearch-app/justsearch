@@ -884,9 +884,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         completion.complete(null);
       } else {
         completion.completeExceptionally(failure);
-        if (failure instanceof RuntimeException runtime) throw runtime;
         if (failure instanceof Error error) throw error;
-        throw new IllegalStateException(failure);
+        // This Future owns task failure and cleanup. Re-throwing an operation-level failure
+        // would also reach the process-wide uncaught handler and kill unrelated Engine work.
+        log.error("Owned Engine task failed; its completion retains the failure", failure);
       }
     }
 
@@ -895,15 +896,24 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       try {
         if (registration != null) registration.close();
       } catch (Throwable cause) {
-        if (failure == null) failure = cause;
-        else if (failure != cause) failure.addSuppressed(cause);
+        failure = combineCleanupFailure(failure, cause);
       }
       try {
         owner.close();
       } catch (Throwable cause) {
-        if (failure == null) failure = cause;
-        else if (failure != cause) failure.addSuppressed(cause);
+        failure = combineCleanupFailure(failure, cause);
       }
+      return failure;
+    }
+
+    private Throwable combineCleanupFailure(Throwable failure, Throwable cause) {
+      if (failure == null) return cause;
+      if (failure == cause) return failure;
+      if (cause instanceof Error && !(failure instanceof Error)) {
+        cause.addSuppressed(failure);
+        return cause;
+      }
+      failure.addSuppressed(cause);
       return failure;
     }
 

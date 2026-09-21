@@ -220,7 +220,19 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       Attached physical = new Attached(queue, generation, online, bulkRuntime);
       attached = physical;
       try {
-        physical.queueSubscription = queue.subscribeRecordedWalks(ignored -> maintain());
+        physical.queueSubscription = queue.subscribeRecordedWalks(key -> {
+          synchronized (lock) {
+            Bulk bulk = bulks.get(key);
+            // Queue delivery follows the committed enqueue and runs before the captured
+            // producer can finish this root. Initial begin-walk delivery has no exit future.
+            if (attached == physical && bulk != null && bulk.physical == physical
+                && !bulk.started && bulk.exit != null && !bulk.exit.isDone()) {
+              attempts.observeBulkBoundary(bulk.handle,
+                  OperationAttemptRunner.BulkBoundary.PARTIAL_CAPTURE);
+            }
+            maintain();
+          }
+        });
         physical.operationSubscription = operations.subscribeCompletions(row -> {
           synchronized (lock) {
             if (row.descriptor().kind() == OperationKind.INGEST || row.descriptor().kind() == OperationKind.REINDEX) advanced = true;
@@ -984,7 +996,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       JobQueue queue, CheckedPromotion promotion) throws IOException {
     synchronized (lock) {
       if (!beforeRecordedPromotion(operationKey, queue)) return null;
-      return promotion.promote();
+      var promoted = promotion.promote();
+      if (promoted != null) attempts.observeBulkBoundary(bulks.get(operationKey).handle,
+          OperationAttemptRunner.BulkBoundary.AFTER_PROMOTION);
+      return promoted;
     }
   }
 

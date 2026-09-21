@@ -48,8 +48,8 @@ Recorded manifests use version2 with `target_index_fingerprint`; ordinary automa
 manifests retain version1. An unbound target is adoptable only when its matching
 manifest and sentinel are regular files and are its only directory entries.
 Partial, foreign, non-pristine or symlink targets refuse. Recorded start returns
-active/building/state witnesses and leaves restart dispatch to its operation owner
-after durable binding. The bulk operation consumer is not yet connected to this API.
+active/building/state witnesses. The bulk operation consumer persists BUILDING
+through its attempt runner before requesting restart.
 
 Generation-state and watched-root authority reads distinguish unavailable bytes from
 malformed content. They acquire a shared file lock on the channel being read, retry
@@ -396,6 +396,9 @@ without waiting for claim-driven queue drainage. Cloud placeholders refuse captu
 before deferred-ledger admission. The Engine's capture producer sequences frozen
 roots with one supplied epoch and retains its admission owner until actual walk
 and progress-delivery exit; it stops on failure or cancellation. The shared
+task future retains an operation-level producer or cleanup exception without
+rethrowing it to the process-wide uncaught handler; fatal JVM Errors still propagate.
+The shared
 RecordedIngestionCoordinator closes the epoch only after that exit, validates the
 accepted source/physical target, starts exact `g-<operation key>` under the generation
 control lock, and checkpoints BUILDING before requesting restart. Bulk work uses
@@ -409,6 +412,12 @@ Recorded opens disable ordinary Lucene recovery so a failed open cannot move or
 replace ownership evidence. Missing/corrupt current state cannot borrow authority
 from `.prev`. An unowned recorded building target remains fenced; completed recorded
 active generations may later participate in normal native migration.
+
+Fresh writable Lucene component startup creates a durable empty commit before
+publishing its readers when the directory has no committed index. This structural
+commit makes an empty active generation reopenable read-only after a crash without
+persisting later uncommitted documents or claiming completed model/build metadata.
+Strict read-only startup still refuses a missing index; it never creates one.
 
 Bulk operation progress uses existing operation columns, with immutable target,
 CAPTURING/BUILDING/SETTLED phases and sealed capture/settlement evidence. Version-2
@@ -614,8 +623,9 @@ transport-derived source tier, gate and root scope; only ACCEPTED/RUNNING rows m
 continue. Ordinary ingestion refuses this locator in both fresh and restart
 policy, and ordinary capsule recovery remains refused. Empty bulk scope is valid
 only with an available current roots view. The Engine must still prove the target,
-runtime and queue state, and check cancellation before effects. The bulk restart
-consumer remains unconnected; policy authorization alone cannot execute it.
+runtime and queue state, and check cancellation before effects. The recorded bulk
+consumer performs those checks before capture, generation start and promotion;
+policy authorization alone does not establish physical readiness.
 
 `BulkReindexProgress` projects owner evidence into the existing operation columns;
 it adds no journal or schema version. Only the issuing runner's live asynchronous

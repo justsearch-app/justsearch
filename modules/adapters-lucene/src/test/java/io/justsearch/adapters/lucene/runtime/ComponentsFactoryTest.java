@@ -17,6 +17,7 @@ import org.apache.lucene.codecs.lucene104.Lucene104HnswScalarQuantizedVectorsFor
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
@@ -191,6 +192,40 @@ class ComponentsFactoryTest {
       assertNotNull(c.searcherManager(), "searcherManager should exist in read-only mode");
     } finally {
       closeComponents(c);
+    }
+  }
+
+  @Test
+  void freshWritableIndexCommitsEmptyBootstrapBeforePublication() throws Exception {
+    String yaml = "index:\n  directory: {}";
+    Path idx = tempDir.resolve("durable-empty-idx");
+    Components writable = buildComponents(yaml, idx, false, null);
+    try {
+      assertTrue(
+          DirectoryReader.indexExists(writable.directory()),
+          "a live fresh writer must already have a durable commit");
+      try (DirectoryReader reader = DirectoryReader.open(writable.directory())) {
+        assertEquals(0, reader.numDocs(), "the bootstrap commit must be empty");
+      }
+
+      writable.writer().addDocument(new Document());
+      writable.crtrt().close();
+      writable.searcherManager().close();
+      writable.writer().rollback();
+      writable.directory().close();
+      writable = null;
+
+      Components readOnly = buildComponents(yaml, idx, true, null);
+      try {
+        assertNull(readOnly.writer(), "strict read-only reopen must not create a writer");
+        try (DirectoryReader reader = DirectoryReader.open(readOnly.directory())) {
+          assertEquals(0, reader.numDocs(), "rollback must not promote the uncommitted document");
+        }
+      } finally {
+        closeComponents(readOnly);
+      }
+    } finally {
+      closeComponents(writable);
     }
   }
 

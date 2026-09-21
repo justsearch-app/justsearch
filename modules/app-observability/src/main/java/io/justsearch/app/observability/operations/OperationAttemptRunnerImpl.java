@@ -281,6 +281,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       throw new IllegalArgumentException("Bulk progress requires this runner's live reindex capability");
     }
     try {
+      if (faultHook != NO_FAULT_HOOK
+          && progress.phase() == io.justsearch.app.api.operations.BulkReindexProgress.Phase.BUILDING) {
+        faultHook.accept(new FaultBoundary("bulk-before-building-checkpoint", control.kind,
+            control.key, control.key, control.id, null, 0, 0));
+      }
       if (!store.checkpointBulkReindex(control.id, Objects.requireNonNull(progress, "progress"))) {
         throw new IllegalStateException("Bulk checkpoint refused for a terminal, unstarted or conflicting operation");
       }
@@ -288,6 +293,22 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       persistenceFailed(control, OperationState.RUNNING, failure);
       throw failure;
     }
+  }
+
+  @Override
+  public void observeBulkBoundary(OperationRecordHandle handle, BulkBoundary boundary) {
+    Objects.requireNonNull(boundary, "boundary");
+    if (!(handle instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
+        || control.kind != OperationKind.REINDEX || !control.started.get() || control.done.isDone()) {
+      throw new IllegalArgumentException("Bulk observation requires this runner's live reindex capability");
+    }
+    if (faultHook == NO_FAULT_HOOK) return;
+    String phase = switch (boundary) {
+      case PARTIAL_CAPTURE -> "bulk-partial-capture";
+      case AFTER_PROMOTION -> "bulk-after-promotion";
+    };
+    faultHook.accept(new FaultBoundary(phase, control.kind, control.key, control.key,
+        control.id, null, 0, 0));
   }
 
   @Override

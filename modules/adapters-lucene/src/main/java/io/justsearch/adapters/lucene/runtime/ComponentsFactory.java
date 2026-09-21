@@ -338,6 +338,12 @@ final class ComponentsFactory {
       // outside the integrity-tier block above — whether the next boot scans is a separate question
       // from whether this session could dirty the index.
       CleanShutdownMarker.consume(resolvedPath);
+      // A fresh writer has no durable index until its first commit. Publish only after creating a
+      // neutral empty commit so crash recovery can reopen this generation read-only. The first real
+      // CommitOps commit replaces its metadata; zero-doc parity deliberately ignores that metadata.
+      if (!DirectoryReader.indexExists(dir)) {
+        w.commit();
+      }
       softDeletesReader =
           new SoftDeletesDirectoryReaderWrapper(
               DirectoryReader.open(w, /*applyAllDeletes=*/ true, /*writeAllDeletes=*/ true),

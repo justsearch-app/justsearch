@@ -3,6 +3,7 @@ package io.justsearch.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
@@ -78,6 +79,32 @@ final class OperationFaultBarrierTest {
   }
 
   @Test
+  void phaseFamiliesAreAcceptedOnlyForTheirOperationKinds() {
+    var bulkPhases = java.util.List.of(
+        "bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion");
+    var ordinaryPhases = java.util.List.of("before-accept", "after-accept", "after-effect");
+    for (String phase : bulkPhases) {
+      assertNotSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK,
+          OperationFaultBarrier.fromEnvironment(data.resolve(phase), selection(phase, "reindex")::get));
+      for (String ordinaryKind : java.util.List.of("ingest", "settings-apply")) {
+        assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(
+            data.resolve(phase + "-" + ordinaryKind), selection(phase, ordinaryKind)::get));
+      }
+    }
+    for (String phase : ordinaryPhases) {
+      for (String ordinaryKind : java.util.List.of("ingest", "settings-apply")) {
+        assertNotSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK,
+            OperationFaultBarrier.fromEnvironment(data.resolve(phase + "-" + ordinaryKind),
+                selection(phase, ordinaryKind)::get));
+      }
+      assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(
+          data.resolve(phase + "-reindex"), selection(phase, "reindex")::get));
+    }
+    assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(
+        data.resolve("unknown-kind"), selection("bulk-partial-capture", "reindexing")::get));
+  }
+
+  @Test
   void exactBoundaryPublishesEvidenceAndSuccessorDoesNotRetrigger() throws Exception {
     var hook = OperationFaultBarrier.fromEnvironment(data, selection()::get);
     var boundary = new OperationAttemptRunnerImpl.FaultBoundary("after-effect", OperationKind.INGEST,
@@ -108,8 +135,52 @@ final class OperationFaultBarrierTest {
     assertEquals(evidence, Files.readString(reached));
   }
 
+  @Test
+  void eachBulkBoundaryPublishesExactEvidenceOnceAcrossSuccessorHook() throws Exception {
+    for (String phase : java.util.List.of(
+        "bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion")) {
+      Path scenarioData = data.resolve(phase);
+      var selector = selection(phase, "reindex");
+      var hook = OperationFaultBarrier.fromEnvironment(scenarioData, selector::get);
+      Path runtime = scenarioData.resolve("runtime");
+      Path reached = runtime.resolve("operation-fault-reached.json");
+      Path release = runtime.resolve("operation-fault-release");
+      Files.createDirectories(runtime);
+      Files.writeString(release, "release");
+      var exact = new OperationAttemptRunnerImpl.FaultBoundary(
+          phase, OperationKind.REINDEX, KEY, KEY, 17, null, 0, 0);
+
+      hook.accept(new OperationAttemptRunnerImpl.FaultBoundary(
+          "not-the-selected-phase", OperationKind.REINDEX, KEY, KEY, 17, null, 0, 0));
+      hook.accept(new OperationAttemptRunnerImpl.FaultBoundary(
+          phase, OperationKind.INGEST, KEY, KEY, 17, null, 0, 0));
+      hook.accept(new OperationAttemptRunnerImpl.FaultBoundary(
+          phase, OperationKind.REINDEX, "01994180-0000-7000-8000-000000000002", KEY, 17, null, 0, 0));
+      assertFalse(Files.exists(reached), "only exact phase, kind and parent key may trigger " + phase);
+
+      hook.accept(exact);
+      String evidence = Files.readString(reached);
+      var json = JsonMapper.builder().build().readTree(evidence);
+      assertEquals(phase, json.path("phase").asText());
+      assertEquals("reindex", json.path("parentKind").asText());
+      assertEquals(KEY, json.path("parentKey").asText());
+      assertEquals(KEY, json.path("operationKey").asText());
+      assertEquals(17, json.path("operationRecordId").asLong());
+      assertEquals(ProcessHandle.current().pid(), json.path("pid").asLong());
+
+      Files.delete(release);
+      var successor = OperationFaultBarrier.fromEnvironment(scenarioData, selector::get);
+      assertTimeoutPreemptively(Duration.ofSeconds(1), () -> successor.accept(exact));
+      assertEquals(evidence, Files.readString(reached), "successor cannot retrigger " + phase);
+    }
+  }
+
   private static Map<String, String> selection() {
-    return Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1", "JUSTSEARCH_OPERATION_FAULT_POINT", "after-effect",
-        "JUSTSEARCH_OPERATION_FAULT_KEY", KEY, "JUSTSEARCH_OPERATION_FAULT_KIND", "ingest");
+    return selection("after-effect", "ingest");
+  }
+
+  private static Map<String, String> selection(String phase, String kind) {
+    return Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1", "JUSTSEARCH_OPERATION_FAULT_POINT", phase,
+        "JUSTSEARCH_OPERATION_FAULT_KEY", KEY, "JUSTSEARCH_OPERATION_FAULT_KIND", kind);
   }
 }

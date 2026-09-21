@@ -50,8 +50,9 @@ class CommitFunnelArchTest {
    *       an empty index so the Head can report {@code indexAvailable}) and the session-teardown
    *       {@code writer().close()}, which commits implicitly because Lucene's {@code
    *       commitOnClose} defaults to true.
-   *   <li>{@code ComponentsFactory} — the open-failure cleanup {@code close()}, same implicit
-   *       commit-on-close, on a path where no session exists to count against.
+   *   <li>{@code ComponentsFactory} — the fresh-writable bootstrap {@code commit()}, which makes a
+   *       neutral zero-doc index durable before a session exists, plus the open-failure cleanup
+   *       {@code close()}, whose implicit commit likewise occurs before a session can count it.
    * </ul>
    */
   private static final String[] ALLOWED = {"CommitOps", "RuntimeSession", "ComponentsFactory"};

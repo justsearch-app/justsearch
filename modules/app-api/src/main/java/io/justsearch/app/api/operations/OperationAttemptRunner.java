@@ -93,6 +93,12 @@ public interface OperationAttemptRunner {
     throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
   }
 
+  /** Physical bulk boundaries observed by the existing installed recovery harness. */
+  enum BulkBoundary { PARTIAL_CAPTURE, AFTER_PROMOTION }
+
+  /** Observe an already committed effect; this does not persist progress or grant authority. */
+  default void observeBulkBoundary(OperationRecordHandle handle, BulkBoundary boundary) {}
+
   /** Root-composed decoder of the actual accepted parent preparation, never supplied by a handler. */
   @FunctionalInterface
   interface IngestPlanResolver {
