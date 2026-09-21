@@ -144,3 +144,23 @@ undeclared consumer. Registering StatusDeck under StatusResponse fixes that omis
 without changing the schema or gate. Contract-projection passes with zero findings;
 all11 hermetic gates pass locally (tmp/2394-hermetic-gates.txt). Other hosted jobs
 are still running; their results are not inferred from local proof.
+
+## Schema2 wire version correction2398/2399
+
+CI35663491274 advanced past the corrected consumer gate, then failed wire evolution.
+Local pinned Buf reproduction confirms three structural findings: removed Component
+and Components messages, and removed StatusResponse field4. The previous minor enum
+declaration misclassified this intentional D1 replacement. The merge-base wire
+version is2.0.0; Runtime Contract0.4.0 is a different version authority.
+
+Wire VERSION now3.0.0, with a remove changeset naming reserved field4/name and the
+field35 replacement, plus an Unreleased wire changelog entry. The earlier additive
+enum declaration states its minor requirement is covered by the major bump. CI's
+existing artifact upload also retains wire-gate.sarif. No Buf rule was loosened.
+
+Initial local2398 lacked pinned Buf; npm ci in scripts/wire-contract installed the
+lockfile's tool. Produced2398 and staged2399 still report misclassification because
+the changeset parser intentionally discovers committed PR changes via
+baseline...HEAD (git-utils.mjs:263-268), excluding uncommitted additions even when
+staged. The correction must be committed locally before its actual gate proof can
+run. Logs and SARIF are preserved; no successful wire proof is claimed yet.
