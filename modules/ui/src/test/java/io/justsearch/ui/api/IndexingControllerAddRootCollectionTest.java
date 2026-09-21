@@ -49,8 +49,7 @@ final class IndexingControllerAddRootCollectionTest {
             () -> indexing,
             new io.justsearch.app.services.excludes.ExcludesServiceImpl(() -> indexing),
             null,
-            null,
-            io.justsearch.app.api.OperationLeaseService.noOp());
+            null);
     app =
         Javalin.create(
                 cfg -> {

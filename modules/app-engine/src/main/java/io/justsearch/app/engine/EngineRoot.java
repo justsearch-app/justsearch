@@ -301,6 +301,7 @@ public final class EngineRoot implements WorkerHost {
     this.client = built;
     try {
       recordedIngestion.bindProducer(built::enumerateRecordedRoot);
+      recordedIngestion.bindBulkProducer(built::enumerateCapturedRoots, built, () -> requestRestart(started));
       clientReady = true;
     } catch (RuntimeException | Error failure) {
       try { close(); }

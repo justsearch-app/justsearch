@@ -77,7 +77,22 @@ public final class KnowledgeServerMigrationOps {
       Runnable flushTelemetryAction,
       Runnable requestedRestartAction,
       Path dataDir,
-      Logger log) {}
+      Logger log,
+      io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion) {
+    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
+        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
+        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
+        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
+        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
+        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
+        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log) {
+      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
+          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
+          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
+          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
+          flushTelemetryAction, requestedRestartAction, dataDir, log, indexGenerationManager::promoteBuildingGenerationToActive);
+    }
+  }
 
   public record DrainSwitchBufferContext(
       JobQueue jobQueue,
@@ -277,8 +292,11 @@ public final class KnowledgeServerMigrationOps {
           return;
         }
 
-        IndexGenerationManager.State promoted =
-            context.indexGenerationManager().promoteBuildingGenerationToActive();
+        IndexGenerationManager.State promoted = context.promotion().promote();
+        if (promoted == null) {
+          Thread.sleep(250);
+          continue;
+        }
         try { Files.deleteIfExists(context.dataDir().resolve(".help-ingested-version")); }
         catch (IOException ignored) {
           // Best-effort cleanup of stale marker; failure is non-fatal to cutover.

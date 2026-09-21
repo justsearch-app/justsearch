@@ -10,13 +10,31 @@ import java.util.Set;
 
 /** Typed, immutable projection of one accepted bulk-reindex operation's owner evidence. */
 public record BulkReindexProgress(String generationId, IndexTargetSnapshot target, Phase phase,
-    Capture capture, Settlement settlement) {
+    Capture capture, Settlement settlement, String refusalCode) {
   public static final int MAX_PROCESSING_HISTORY = 200;
+  private static final Set<String> REFUSALS = Set.of("cancelled", "RECOVERY_AUTHORIZATION_REFUSED",
+      "RECOVERY_SCOPE_REFUSED", "RECOVERY_BINDING_INVALID", "BULK_GENERATION_REFUSED",
+      "BULK_CAPTURE_FAILED", "INGEST_RECOVERY_ATTEMPTS_EXHAUSTED");
+
+  public BulkReindexProgress(String generationId, IndexTargetSnapshot target, Phase phase,
+      Capture capture, Settlement settlement) {
+    this(generationId, target, phase, capture, settlement, null);
+  }
+
+  /** First durable refusal wins; it survives settlement and forbids renewed claims/promotion. */
+  public BulkReindexProgress withRefusal(String code) {
+    Objects.requireNonNull(code, "refusalCode");
+    if (refusalCode != null && !refusalCode.equals(code)) {
+      throw new IllegalArgumentException("Bulk refusal cannot be replaced");
+    }
+    return new BulkReindexProgress(generationId, target, phase, capture, settlement, code);
+  }
 
   public BulkReindexProgress {
     validateGenerationId(generationId);
     Objects.requireNonNull(target, "target");
     Objects.requireNonNull(phase, "phase");
+    if (refusalCode != null && !REFUSALS.contains(refusalCode)) throw new IllegalArgumentException("Unknown bulk refusal");
     switch (phase) {
       case CAPTURING -> {
         if (capture != null || settlement != null) {

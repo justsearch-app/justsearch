@@ -12,364 +12,88 @@ context-reset entry point. Do not reread historical amendments to reconstruct th
 current task. Root owns production lifecycle, shared Gradle and the dev stack;
 subagents may own bounded tests or read-only investigation/review.
 
-The prior recovery/lock correction is pushed as85154fed1. It passes full operations
-storage, all13 local installed scenarios and fresh hosted CI35561341238 at job and
-XML level, including4 Windows storage cases and13 installed recovery cases.
-[Exact proof and historical failure limits](evidence/C2/hostile-lock-acceptance.md).
+The connected bulk checkpoint carries this current-state record. Its pushed
+predecessor is `de1d2520143456aa149c75d6266cb4c70fac25a6`, captured traversal under
+retained admission. Local focused 2174 passes
+76 cases; full worker/indexer 2175 passes 2,092 cases with 17 existing skips;
+negative 2177 fails both intended guards and restores production bytes.
+Hosted CI 35573710291 fails only the app-ui unreferenced-code predicate because
+`EngineKnowledgeClient.enumerateCapturedRoots` had no consumer. This is a real
+connection gap, not a baseline exception. Evidence is in `tmp/2180-captured-hosted`.
+Other hosted jobs pass; 84 relevant captured/foundation cases execute successfully.
+Five downstream app-services suites did not run after the launcher failure.
 
-Pushed3caf90cbc: C2-10 queue capture and immutable settlement, schema19.
-Final2133 represents1,036 cases, zero failures/errors,21 existing model/filesystem
-skips;690 indexer cases execute,346 unchanged worker-core results reuse2129.
-PMD/format, canonical checks and store gate pass. One consolidated review is fixed;
-negative2131 fails all3 intended predicates and restores production bytes. Hosted
-CI35563199072 passes all jobs. [Design, current implementation and exact evidence](evidence/C2/bulk-reindex-connection.md).
+The connected checkpoint connects strict recorded boot ownership, recovery-disabled
+Lucene opens, cutover owner hooks, the prepared REST migration alias, and the bulk
+consumer within RecordedIngestionCoordinator. Boot/REST focused 2182 passes all
+168 cases across 13 suites with no failures/errors/skips, all five test tasks fresh.
+That result predates the bulk consumer and expected-source control-port changes.
+Main compilation 2183 passes for app-engine and ui (including dependencies). One
+new precedence warning is corrected afterward; inherited warnings remain visible
+in its log. Later consumer verification is recorded below.
 
-Pushed29071724c: exact generation start and response witness, strict v2 recorded
-manifest with physical IndexFingerprint digest, and process-local serialization of
-generation control. Focused2137 has42 cases/zero failures/one Windows symlink privilege
-skip. Negative2139 fails all3 intended predicates. Review's equal-active/building
-finding is fixed with two regressions. Full2141 executes5,280 cases/881 suites,
-zero failures/errors and12 qualified skips; PMD/format pass. Final fixture2144 has19
-passing cases without skips. Hosted CI35565311927 passes;2145 preserves Linux XML with all18 exact-generation
-cases passing without skips, including the locally skipped symlink regression.
+The consumer captures and closes the frozen walk before exact source-bound start,
+checkpoints BUILDING before restart, authorizes claims only for the actual matching
+Green writer, checkpoints immutable SETTLED before promotion, and requires a
+post-promotion boot/writer witness before terminal completion and exact queue ACK.
+The consolidated consumer review is implemented: durable first-wins refusal before
+queue retirement, typed existing-attempt recovery checkpoint, cancellation/promotion
+barrier, exact target promotion, paged ACK completion, exact terminal/refusal matrix,
+and one retryable post-terminal refusal restart per attachment. Refused targets stay
+fenced as designed; no generation abandonment or additional journal. Final reviewer
+messages used an older snapshot for live refusal/restart findings; current
+bulkRefusalReason reads cancellationReason and typed policy receipts, and
+restartAfterBulkRefusal owns the requested restart. Adversarial proof remains owed.
 
-Pushed 65afa81fc, sequence3 preparation batch: physical target snapshot, immutable runner-owned
-bulk progress in existing operation columns, accepted bulk plan resolver, and shared
-prepared bulk/rebuild handler/catalog profiles. Focused2149 passes96 cases; negative2152 fails all three intended guards.
-Full2153 executes5,538 cases with only the deliberate wire-golden mismatch;
-PMD/format pass. Regenerated golden2155 passes31 focused cases. Review identified
-read-only rebuild-brake preparation and missing policy assertions; corrections and
-real braked Engine tests pass in 2158: 97 cases across 14 suites, no failures,
-errors or skips. The Engine suite executes; three unchanged suites reuse 2157.
-The seven affected PMD and six format checks pass in 2159; engine-port,
-store-recoverability and generated documentation checks also pass. No build or
-dev stack is active. Application bulk consumer remains unimplemented;
-these preparation changes must not be called complete until connected.
-Independent security review approved the narrowly scoped prepared-operation
-continuation design in the bulk owner document. Existing HIGH-risk capsule approval
-cannot survive the two required restarts; preserve ordinary capsule refusal and
-mint the new exact key/nonce basis only after successful prepared consent. The
-implementation and adversarial proof are still outstanding.
-Pushed d69763186 implements the continuation locator, minting after prepared
-capsule consumption, exact accepted key/nonce resolution, and current bulk policy.
-Focused 2165 passes 92 cases, including the dead-code gate. Independent review's
-alternate-handler finding is fixed; negative 2166 fails all three intended guards
-and production bytes are restored. Hosted 35569918097 exposed missing resolver
-surface registration and its then-missing caller; both are corrected locally,
-with operation-surface 2167 passing. Full 2168 has one Windows resource-exhaustion
-cleanup failure and four test qualifier PMD violations. Root identified and
-stopped the lane's orphaned 47 GB PowerShell evidence collector, restoring 26 GiB
-free physical memory, and fixed qualifiers. Full 2170 passes 3,240 tests with
-zero failures/errors and three existing skips; app-services executes and unchanged
-app-api results reuse 2168. All four PMD and both format checks pass. No build or stack is active.
-Current captured traversal checkpoint adds Worker CAPTURED mode and sequential
-multi-root capture under one retained Engine admission owner. Focused 2174 has
-76 passing cases (22 Engine fresh, 54 unchanged worker/indexer reused); full 2175
-executes 2,092 cases, zero failures/errors, 17 existing skips. Five PMD and three
-format checks pass. Independent review is clean. Negative 2177 fails exactly both
-intended guards; the two production files are restored byte-for-byte. No build or
-stack is active. Hosted continuation CI 35572035546 passes every job except
-platform-contracts, which encounters Maven HTTP 429 before any test execution;
-that job is being retried, not counted as a test pass.
-Boot design review selected one early immutable request before generation
-initialization. Pending/fenced recorded startup must precede any .prev restoration;
-completed IDLE active generations remain usable after operation-row expiry.
-Next: connect the shared REINDEX consumer to captured traversal, strict boot,
-manual REST dispatch and both restart boundaries, then prove installed bulk faults.
-Then finish C2-12/full stress/hosted reconciliation and D1/D2/E/F. Full2064's known
-configuration-funnel failure is corrected, but no final full-stress green is claimed.
-Artifacts stay accessible in this worktree's tmp through lane acceptance plus30 days
-and must be exported before releasing the worktree.
+2186 executes 85 storage/queue/boot cases with zero failures/errors and one existing
+Windows symlink skip; app-engine test compilation failed on two new fixture mistakes.
+2187/2188 each run 52 Engine cases with one new-fixture failure (missing rebuild
+mock source, then a successful unit incorrectly expected in the failed/superseded
+history sample). These are corrected without changing existing production contracts.
+2189 passes 71 cases across four suites, zero failures/errors, one existing Windows
+symlink skip: real SQLite operation+queue coordinator happy lifecycle/ACK repair,
+ordinary coordinator controls, restart dispatch, and exact generation promotion.
+Both test tasks execute fresh. Full storage 2190 passes 1,238 cases/227 suites,
+zero failures/errors, seven existing skips (vocab 1, late-chunking model 5,
+Windows symlink privilege 1); all six PMD tasks pass. Full worker-services,
+indexer-worker and adapters-lucene 2191 passes 2,823 cases/465 suites with zero
+failures/errors and 17 existing skips. Its one PMD failure was an unnecessary
+ArrayList qualifier; the correction passes indexer-worker pmdMain in 2193.
+The other five PMD tasks pass in 2191. No dev stack or Gradle build is active.
+Root exclusively owns Gradle. 2196 passes 58 Engine cases including actual
+EngineRoot/KnowledgeServer two-restart and five crash/cancellation cases. It fixes
+refusal restart retry to occur after the finite pump loop, once per maintain call.
+Test-only PMD qualifiers are corrected and pass 2197. Full service/API 2198 passes
+4,285 cases/636 suites, zero failures/errors, four existing skips, all four PMD tasks.
+2200 rebuilds ui:installDist and passes 38 launcher cases including the previously
+failing unreferenced-code predicates. Installed 2201 passes prepared REST migration,
+both restarts, exact promoted serving, COMPLETE/SUCCESS and sealed revision-6 ACK,
+then rollback; actual GPU embedding runs. Owned stop closes ports and post-run health
+is ABSENT. This is not chat-model proof. MAX-attempt and 257-entry inventory tests
+pass in full Engine 2203. That run has 340 cases/59 suites and one existing pacing
+teardown failure: IndexingLoop.close interrupts active extraction, then final commit
+can invalidate Lucene's native write-lock channel. Root is fixing that proven
+shutdown defect; a passing focused 2204 rerun (ten cases) does not waive it.
+All four negative guards fail as intended in 2199 and sources restore byte-exact.
+Whole build/static 2206 passes after indexer-worker formatting; no active stack or
+Gradle process. A frozen read-only map locates the three installed kill seams:
+durable partial captured progress, before BUILDING checkpoint after exact start,
+and after promotion before terminal receipt. They are not implemented proof yet.
+Canonical storage/REST docs are updated; regeneration
+and canonical link validation pass. No claim of complete C2 acceptance.
 
-The following entries preserve earlier implementation history and its evidence.
+Next: correct cooperative indexing shutdown with deterministic regression and
+unchanged pacing/real-runtime proof; preserve the connected checkpoint and hosted
+XML evidence; implement/run the three installed bulk fault cuts and
+required final full stress. C2, D1/D2/E/F remain open. Full 2064 stress had a
+subsequently fixed SystemAccessFunnel failure; focused 2075 is not full-stress proof.
 
-Prepared-handler checkpoint132b25ec1 is pushed;
-origin/main was already included at resumption. [Pause state and ordered remaining work](evidence/C2/session-2026-09-15-closeout.md).
-Prepared-handler review corrections and retired agent scan wiring pass full1854:
-5,128 cases/725 suites, zero failures/errors, six skips; all eight PMD tasks pass.
-1856 architecture executes37 passing cases and reuses restored app-agent results.
-Negative controls distinguish snapshot coherence, current-client lookup, collection refusal
-and file/directory shape. Canonical docs are updated. Hosted CI35533098123 and
-CLA35533095933 pass at132b25ec1; all11 Linux boundary cases execute without skips.
-[Resumption evidence](evidence/C2/resume-2026-09-20.md).
-
-Pushed0431bbe74 completes the bounded Engine producer item: full1826 executes3,240 cases/490
-suites with three existing skips and zero failures/errors; independent source/evidence review,
-PMD/format and docs/governance pass. Focused1831 clears the unreferenced-method check. All13
-hosted CI34900811163 jobs and CLA34900809246 pass. [Producer proof](evidence/C2/recorded-engine-producer.md).
-
-REST backend checkpoint093ef4166 and nullable-schema correction7143d6dfc are committed;
-the caller item follows as its own commit. Full1878 passes app-agent692/UI1251 cases
-(three existing skips), PMD and format. Three negative controls fail as intended;
-restored1884 passes17 HTTP/context cases and1885 passes10 Node caller tests. Python's
-eight ui_perf cases and shell syntax pass. Independent review finds no remaining
-implementation defect in this cut. Fixture correctionce1e813cd passes full1893 build
-and all nine UI integration cases without skips. Final1900 UI1,251 and1901 frontend6,589
-cases pass; live1902-1904 prove the server/bridge confirmation and outcome contracts.
-Live1896 regenerates245 routes and removes scan progress. Final hosted proof remains
-pending; the complete Java producer proof stays .3c.
-
-Current item [.3c production composition](evidence/C2/recorded-production-composition.md)
-has exposed and corrected missing INGEST/REINDEX kinds in the production catalogs.
-Live1909 and all four new registered-handler cases in1912 fail at the strict resolver;
-1914 passes all30 coordinator cases after the catalog fix. Full1917 Engine299 cases
-pass; restored1922 tests/lint and1923 architecture37 cases pass after review fixes.
-Actual live success/recovery and .3c.2 remain in progress. Hosted CI35536949678
-at30792f547 fails app-ui catalog projections and system integration; CLA35536948211
-passes. Original failures are retained and are not treated as completed hosted proof.
-
-Pushed3898195ab passes live1924 ingestion/search (five documents),1925 one real
-standard-model query, and1931 retained outcome/retry/conflict checks. Live1929 also
-shows INTERACTIVE survival in those rows. Root is closing the already owed
-[declared survival admission](evidence/C2/declared-survival-admission.md) before
-crash-survival proof. The owned live stack is stopped with data retained. Component
-refusal matrix1935 passes34 cases and PMD; full1936 passes304 cases, no skips/failures.
-Negative1939 removes both generation guards and fails both stale cases; restored1940
-passes34 coordinator cases and PMD. None of that substitutes
-for the front admission/cancellation fix or .3c.2b both-store recovery proof.
-
-The [selected connection plan](evidence/C2/recorded-handler-connection.md) splits .3a
-handlers, .3b REST dispatcher/consumer retirement, then .3c real vertical integration/proof.
-Root/policy snapshots and root-owned wiring are installed and verified. The current
-[REST bridge item](evidence/C2/rest-ingestion-connection.md) implements the alias, consumer
-migration and scan-observer retirement; its prepared HTTP/store proof and live route
-projections are recorded. Final hosted reconciliation follows .3c. Root owns shared lifecycle,
-source integration, builds and publication. C2 remains open; merge stays at F.
-
-The active root/child contract is [C2-8d-vertical-plan.md](evidence/C2/C2-8d-vertical-plan.md)
-and [recorded-ingest-binding.md](evidence/C2/recorded-ingest-binding.md). Historical
-recorded-root-preparation.md is superseded where it conflicts. Prerequisite recovery routing
-is pushed1a75eb891 with final6,589 frontend cases, typecheck/focused checks and62 represented
-Java cases (17 new,45 cached); source/evidence review and fixture UI checks pass.
-[Recovery proof](evidence/C2/recovery-routing.md). Its earlier hosted guard failure is resolved
-by0431bbe74. Earlier40a9a14b9/d23f1136e force/legacy prerequisites retain
-[their evidence](evidence/C2/recorded-force-compatibility.md).
-
-Recorded scan admission is pushed17d56daf0 with52 final1769 cases and independent negative proofs.
-Its hosted CI34887604012 passes12/13 jobs; app-ui fails only the still-unbound producer method on three attempts, while
-CLA34887601017 passes. [Scan evidence](evidence/C2/recorded-scan-admission.md).
-
-Prior pushed checkpoint064adc779 fixes coordinator startup cancellation and
-synchronous producer rejection. Hosted CI34878848566 passes12/13 jobs; its sole app-ui finding
-is the still-unbound producer. CLA34878843824 passes. The obsolete maintenance helper is removed.
-[Coordinator proof](evidence/C2/ingestion-coordinator.md) preserves full1735 and corrective
-focused/negative-control evidence without treating the partial hosted run as green.
-
-Force-at-claim checkpoint0aa0575b4 is pushed and locally verified: full1757 executes2,626
-cases/493 suites,23 existing skips and no failures/errors, plus eight PMD tasks and format.
-Independent review and all seven negative controls pass. Hosted CI34882097481 passes12/13,
-failing only the unbound producer method; CLA34882092528 passes.
-[Owning implementation, evidence and limits](evidence/C2/recorded-force-claims.md).
-Next is actual Java-only recorded admission/adapter and prepared-handler wiring. indexing.proto
-stays unchanged under C2-2. Frozen subtree pruning, cancellation after backpressure and force
-compatibility ordering must be proven before producer activation.
-C2 remains open; merge remains at F.
-
-C2-9b.3b.3 receipt-only settlement now passes integrated1718:1,069 cases/186 suites,
-zero skips/failures/errors, six PMD tasks and format. Focused15 cases, seven discriminating
-negative controls and independent review are preserved in the
-[settlement proof](evidence/C2/ingestion-receipt-settlement.md). Next is the stable
-parent/child coordinator and actual bounded producer binding. Foundation13dd53189 hosted
-CI34868482004 has12 passing jobs and one app-ui failure: the unreferenced-code guard
-correctly detects the still-unconnected projection. Complete production wiring; do not
-exempt the code. C2 remains open and merge remains at F.
-
-C2-9b.3b.3 observation foundations now pass integrated1709:1,218 cases/234 suites,
-21 existing skips and no failures, plus PMD/format. API/store1703 separately passed814
-cases. Exact child lookup, compact receipt matching and locked issued-owner observation
-are implemented; independent review and lock/acceptance negative controls pass.
-[Proof and limits](evidence/C2/ingestion-coordinator-foundations.md). Next is receipt-only
-runner settlement, then the stable parent/child coordinator and actual producer binding.
-No live recorded producer is bound yet. C2 remains open; merge at F.
-
-C2-9b.3b.2 startup/drain attachment is committed1ced178d9 and locally/hosted
-verified through ae486f3e4 (separate pacing observation correction). Integrated1688
-passes1,190 cases/231 suites,21 existing skips, zero failures/errors, plus PMD/format.
-All13 hosted CI34859997847 jobs and CLA34859994378 pass at ae486f3e4.
-Focused1686 also proves actual SQLite corruption/restore fencing. Earlier1685
-failures and their corrections remain preserved in the owning evidence.
-[Current proof and limits](evidence/C2/ingestion-authorization-recovery.md#c2-9b3b2-startup-and-close-attachment-2026-09-14).
-
-C2-8d.3a strict sealed receipt projection is implemented and locally verified:
-final indexer1698 passes625 cases/15 existing skips; unchanged Worker-core1692 passes
-342/six skips. Independent review and corruption/retention/rollback negative controls
-pass. All13 CI34863470535 jobs and CLA34863468188 pass at759775f6f.
-[Receipt proof](evidence/C2/sealed-receipt-validation.md).
-Next: stable activation/admission coordinator .3b.3, then actual bounded producer
-adapters d.3b. No live recorded producer is bound yet; constructor defaults to denial.
-Root owns lifecycle/SQL/builds; C2 remains open.
-Pure fresh policy2bfd30b08 also passed all13 CI34853428167 jobs and CLA34853425540.
-
-C2-9b.3a queue fencing now passes the full indexer suite:598 cases,15 existing skips,
-no failures, plus focused and discriminating negative controls. Constructor default
-denies recorded execution; stopped-orphan administrative closure remains possible.
-[Queue proof and remaining attachment](evidence/C2/recorded-queue-authority.md).
-A separate inherited real-model test-budget failure was reproduced and corrected;
-focused1667 and full Worker-core1668 pass (342 cases, six existing skips, no failures). The source
-and failed proof are preserved in [the correction record](evidence/C2/long-doc-test-budget.md).
-Next is C2-9b.3b startup/reconciliation/lifecycle, then .3c actual producer. The
-selected fresh/restart/admission design is pushed9dfaf9ee4; pure decision449f56a06
-passed all13 hosted CI34846902769 jobs plus CLA. C2 remains open.
-
-**Resumed after the user's reboot.** Checkpoint13207a960 passed all13 hosted CI34830819900 jobs; exact Linux filesystem XML
-confirms all three Windows-skipped cases executed successfully. Evidence commit a822dff0f is pushed. Resource
-preflight1611 reports no stack/foreign run/inference orphan. The preserved sealing draft is
-implemented and C2-8d.2b.2 closure/seal is locally verified:1613 full affected suites report
-915 cases/21 skips/no failures;1614 corrected focused tests and1615 guard negative controls
-establish the reviewed claims. [Evidence](evidence/C2/walk-closure-sealing.md). Next is
-C2-8d.3 producer activation and outer receipt/cadence integration. The queue-only C2-8d.2c
-notification/retention attachment now passes integrated1624 (929 cases/21 skips/no failures),
-with failure-path and discriminating negative proofs. [Evidence](evidence/C2/walk-notifications-retention.md).
-The overall .2c acceptance still requires the actual outer owner and cadence/shutdown wiring.
-Root owns SQL/lifecycle changes; independent test and read-only review work are bounded. The prior [pause summary](evidence/C2/session-2026-09-14-closeout.md)
-remains historical. Existing autonomous authorization and merge-at-F placement remain in force.
-
-C2-9a.1 authorization basis/selection/binding is now locally verified: full1631
-app-api/services has3,122 cases, three existing skips and no failures; negative1632
-and restored1633 pin the new guards. [Owning evidence](evidence/C2/ingestion-authorization-recovery.md).
-C2-9a.1 is pushed as43fa7b3ac. The C2-9a.2 grant persistence-before-publication
-correction now passes full1636 (2,901 services cases, three existing skips,
-zero failures), negative1635 and independent review; pushed27246acd6.
-C2-9b.1 now preloads one shared OperationAuthority and the existing WatchedRootsState
-before the async fork, with identical state used by the client and Head. Full1642
-services/Engine:3,145 cases, three existing skips, zero failures;143 focused cases,
-three discriminating negative controls, UI compilation/PMD/format and independent
-call-path review also pass. C2-9b.2 scope/decision is verified below; next is C2-9b.3 fencing and C2-8d.3 actual producer. Recovery activation remains open.
-Hosted27246acd6 exposed the old UI assertion that omitted the server-selected basis;
-[the correction record](evidence/C2/hosted-authorization-context.md) preserves the
-exact failure. This is separate from the shared-authority implementation.
-Notification checkpoint7777be3fd passed all13 hosted jobs in CI34835832804.
-
-C2-9b.1 is pushed as9a3aa8bb0 and passed all13 CI34842534126 jobs plus CLA,
-including the separately committed288113a2b UI context assertion correction.
-C2-9b.2a strict frozen-root scope is pushed48b38b4ea and passed all13 hosted
-CI34844688686 jobs plus CLA. C2-9b.2b pure typed decision now passes full1657
-services:2,934 cases, three existing skips, no failures; focused Engine/UI and
-negative controls pass. [Owning decision and proof](evidence/C2/ingestion-authorization-recovery.md).
-Next is C2-9b.3 startup/per-claim fencing and C2-8d.3 actual producer, including
-immediate stuck-job recovery after later Wait-to-Authorized reconciliation.
-No queue permission or real recovery activation is claimed by the pure decision.
-
-A/B/C1 are complete. C2 remains open; do not merge before stage F.
-The public settings producer/controller is implemented and locally verified:
-final1452 represents4,859 cases, four existing skips and zero failures/errors,
-with PMD/format and UI integration compilation passing.
-[Owning mechanism, review corrections and proof](evidence/C2/public-settings-producer.md).
-
-All eight frontend callers now use the shared witnessed attempt helper. Final1485
-passes6,573 tests across489 suites; typecheck/lint and independent reviews pass.
-[Retained-base proof and negative controls](evidence/C2/frontend-settings-derived.md).
-Hosted frontend CI34800723187 and CLA34800721640 pass at e135acb0b after the
-consumer-registration correction ([evidence](evidence/C2/hosted-frontend-contract-correction.md)).
-The raw save API is retired and the physical/config caller guard passes integrated1500:
-4,187 represented cases, four existing skips, zero failures/errors, PMD/format and
-UI integration compilation ([evidence](evidence/C2/settings-writer-retirement.md)).
-The repaired harness now proves20 mapped Settings/Library/Brain captures with zero
-axe/console/overflow findings; Python UI/CLI1508 passes218 tests. [Browser proof](evidence/C2/frontend-settings-browser.md)
-records earlier failures and fixture limitations. Both owned Vite helpers5185/5186
-were identity-verified and closed by sweep1509. No Gradle/dev stack is running.
-C2-7 checkpoint cadence/shutdown is implemented and locally verified: final1514 represents
-4,964 cases/769 suites, four existing skips, no failures/errors; PMD/format/UI integration
-compilation pass. Negative1512 proves both callbacks matter. [Checkpoint evidence](evidence/C2/checkpoint-cadence.md).
-Hosted CI34801903519/CLA34801900544 pass at writer-retirement dc06b4be4;
-CI34802770723(all13 jobs)/CLA34802769444 pass at browser347187073. PR727's managed
-review record is verified through those checkpoints. C2-7 CI34804384959 and CLA34804383862
-pass at5a4d1dde3. C2-8a scheduled key delivery is locally verified: 1,936 Java cases
-(one existing skip), 6,577 frontend cases, PMD/format/typecheck/lint and negative controls.
-[Scope and evidence](evidence/C2/scheduled-key.md); CI34805930681(all13 jobs) and
-CLA34805928429 pass at2ab49abc4. PR727 review record is verified through the scheduled
-key checkpoint (its CI was still running when the record was updated).
-C2-8b committed content hash and idle/shutdown outcome retry are locally verified:
-integrated1525 executes2,179 cases/423 suites, 20 existing skips, zero failures/errors;
-PMD/format pass. Combined and isolated shutdown negatives are preserved; final1527
-restores the exact production source and passes65 cases. [Proof and limits](evidence/C2/committed-content-hash.md).
-Hosted CI34807238861 (all13 jobs) and CLA34807236808 pass at07813a14a.
-C2-8c admission revisions and reenqueue ownership preservation are locally verified:
-final1533 represents2,186 cases/424 suites,20 existing skips, zero failures/errors;
-PMD/format pass. Focused1530, discriminating negative1531 and the corrected version-pin
-failure1532 are preserved. [Proof and limitations](evidence/C2/admission-revision.md).
-Hosted CI34809851127 (all13 jobs) and CLA34809849392 pass at128a0c945.
-C2-8d.1 frozen roots and child acceptance are implemented as a WIP primitive: integrated1537
-executes5,013 cases/774 suites, four existing skips, zero failures/errors; ten PMD and
-whole Spotless pass. Negative1536 discriminates stale preparation and retention defects;
-independent review's COMPLETE_WITH_GAPS correction is included. [Evidence](evidence/C2/recorded-ingest-binding.md).
-C2-8d.2a adds WIP schema/epoch and actual batch-exit ownership primitives.
-[Proof, failures/corrections and remaining cuts](evidence/C2/walk-claims.md).
-Hosted0123adb1f fixes the missing resolver declaration but failed a Windows parser recycle
-fixture before its native-child handshake. The test-only startup correction passes the
-exact Windows CI module selection locally (113 cases, no skips/failures), with deterministic
-budget and containment negative controls. [Proof and pending hosted run](evidence/C2/parser-containment-startup.md).
-Actual producer/queue/recovery activation remains open in the [per-item vertical plan](evidence/C2/C2-8d-vertical-plan.md).
-C2-9's [authorization recovery contract](evidence/C2/ingestion-authorization-recovery.md)
-requires a server-built basis, exact grant re-resolution and sole preloaded roots/evaluator.
-PR727 managed review record is verified through112d2e05d. Hosted d892321c6 passes
-Windows-native tests and twelve jobs, but its advisory integration job fails; recovery
-failures are being diagnosed and remain required lane work despite overall green CI.
-C2-8d.2b.1 admission/terminal accounting passes final1567:2,225 represented cases,
-20 existing skips, no failures/errors, PMD/format pass. [Proof and review corrections](evidence/C2/walk-terminal-accounting.md).
-Next cut is administrative closure/seal, then notification/ack retention and real producer/recovery.
-Installed1568 fixes a stale positive-count recovery log assertion and passes writer, lock-boot,
-processing and operation-resume. Migration (Green fingerprint missing) and lock-ingest
-(SQLITE_BUSY admission) fail and are under active repair. Hosted initial-discovery failure
-is still unproven locally. [Owning evidence and next repairs](evidence/C2/hosted-recovery-correction.md).
-The queue upgrade defect is locally corrected:mutation transactions reserve write access before
-preservation reads. Full1572 passes524 queue cases,12 existing skips, PMD/Spotless, with a
-deterministic competing-writer negative and no-phantom-delta proof. [Details](evidence/C2/queue-write-reservation.md).
-The migration barrier now reconciles existing backfill success and requires a current-model
-stamp before the final commit, including fresh COMPATIBLE Green. Its old-code negative
-fails in all three intended cases; final1576 represents870 cases/174 suites with18 existing
-skips and no test failures/errors, PMD/Spotless pass. Final review1579 adds exact-model binding and successful REBUILDING coverage (40 executed
-cases, no failures/skips). Installed1578 passes five of six, including real-model migration
-and lock-ingest; lock-boot reproduces initial Engine exit before discovery. The inherited resumed-empty corruption-recovery waiver is now corrected with exact
-persisted provenance, opened-generation binding and a trustworthy zero count; full1583
-indexer/core and PMD/Spotless pass. [Proof](evidence/C2/corruption-resume-attestation.md).
-Initial-discovery diagnostics now preserve the actual exit and causal stderr. Installed1589
-passes five of six; targeted1591 proves WAL setup returns SQLITE_BUSY despite its busy timeout.
-The BUSY-only initializer retry passes integrated1596 (3,453 cases, three existing skips)
-and all six installed recovery cases1598, plus independent review, PMD/format and governance.
-[Startup retry proof](evidence/C2/operations-startup-busy.md). Quick1599 confirms clean fixture
-shutdown. Startup checkpoint518f13d62 CI34827632310 passes all13 jobs and CLA34827630282
-passes. The preceding Maven HTTP403 rerun was cancelled by this newer push, not passed.
-Zero-root and partial migration enumeration are now corrected: only complete declared coverage
-sets done, failures block promotion and the existing monitor retries FAILED persistence, with
-one shared watched-roots format authority. Integrated1604 executes4,050 cases/638 suites,
-24 skips (21 existing plus three Windows filesystem limitations), zero failures/errors;
-PMD/format and all six installed recovery cases1605 pass. [Mechanism and proof](evidence/C2/migration-enumeration-completeness.md).
-Final review also closes a transient-null-state early exit: failure consumption now precedes
-state classification. Negative1607 fails exactly that branch; final1608 executes561 indexer
-cases with15 skips/no failures, PMD/format pass. Combined with unchanged1604 modules,4,051
-cases/638 suites are represented with24 skips; installed1605 covers the unchanged normal
-success path before this final failure-order correction. Linux permission/symlink tests
-remain required hosted proof. Quick1606 confirms fixture cleanup. Next implementation is the settled queue-owned administrative closure/seal cut. The [recovery record](evidence/C2/hosted-recovery-correction.md) retains exact evidence. [Attestation proof](evidence/C2/migration-cutover-attestation.md).
-The [ingestion ownership plan](evidence/C2/C2-8-ingestion-plan.md) selects a queue-owned
-walk receipt, existing ledger and current membership after independent review. Next is
-C2-8d recorded walks/C2-9 scoped recovery, C2-10 reindex, then
-required integrated/live/model/installed/final-head proofs and D1/D2/E/F. Root makes
-remaining mechanism/merge decisions; no owner reply is pending.
-
-Pushed prerequisites: installer/import09f91917e, atomic read/wire1e49d18a5,
-system-access residue3d842f496, durable replay witness7f665a33d.
-[Installer proof](evidence/C2/installer-model-producers.md),
-[wire/replay proof](evidence/C2/public-settings-wire.md),
-[activation proof](evidence/C2/activation-settings-producer.md).
-Hosted CI34797375495 and CLA34797373680 pass at public producer c8aa61591; this
-does not prove subsequent frontend work. Prior stale-allowlist failure and exact nine-line
-retirement are [recorded](evidence/C2/hosted-system-access-correction.md).
-
-Active worktree: F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify,
-branch codex/lane-f-pr1, draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
-Merge stays at F. Original lane-F-A is held through2026-09-20 for PR718/evidence/
-foreign helpers; do not build/edit/kill there. Main remains foreign dirty work.
-
-Root alone runs Gradle; no compiled-source edits during builds. Push every per-item
-commit, with scope and exact proof in its body; WIP at least hourly. Reassess workers
-after two correction rounds and take their diff by three. Continue after checkpoints.
-Use revision-local MCP configuration for live work; attached tooling still references
-main's retired stack. Keep the client alive through start/capture/owned stop.
-Set JUSTSEARCH_AGENT_SESSION_ID from CODEX_SESSION_ID. Raw evidence lives in active
-tmp (older bundles in lane-F-A/tmp); retain through lane acceptance plus30 days and
-export before worktree release. Final acceptance must distinguish local, hosted,
-live/model and installed proof; none substitutes for another.
+Prior checkpoint evidence remains in the owning documents rather than needing
+historical transcript replay: [lock/recovery acceptance](evidence/C2/hostile-lock-acceptance.md)
+and [bulk design/evidence](evidence/C2/bulk-reindex-connection.md). Pushed sequence:
+85154fed1 (lock/recovery), 3caf90cbc (queue capture/settlement), 29071724c
+(exact generation), 65afa81fc (preparation/progress), d69763186 (prepared continuation),
+de1d25201 (captured producer). All acceptance gaps remain part of this lane.
 
 ## Historical handoff record (preserved)
 

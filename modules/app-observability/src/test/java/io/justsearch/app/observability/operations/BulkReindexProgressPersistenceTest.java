@@ -84,6 +84,102 @@ final class BulkReindexProgressPersistenceTest {
   }
 
   @Test
+  void recoveryRefusalSurvivesReopenAndCannotBeClearedChangedOrRebound() throws Exception {
+    Path path = temp.resolve("recovery-refusal.db");
+    OperationRecord row;
+    try (var store = store(path)) {
+      row = acceptAndStart(store, OperationKeys.generate(clock), "core.bulk-reindex", DURABLE_CONTEXT);
+    }
+    var target = target("{\"index\":\"refusal\"}");
+    var capture = new BulkReindexProgress.Capture(hash("refusal-manifest"), 2);
+    var capturing = capturing(row.key(), target);
+    try (var store = store(path)) {
+      assertTrue(store.checkpointBulkReindex(row.id(), capturing));
+      assertEquals(2, scalar(path,
+          "SELECT json_extract(processing_history_counts_json, '$.version') FROM operations WHERE id=" + row.id()));
+      assertEquals("null", stringScalar(path,
+          "SELECT json_type(processing_history_counts_json, '$.refusalCode') FROM operations WHERE id=" + row.id()));
+
+      var building = new BulkReindexProgress(capturing.generationId(), target,
+          BulkReindexProgress.Phase.BUILDING, capture, null)
+          .withRefusal("RECOVERY_AUTHORIZATION_REFUSED");
+      assertTrue(store.checkpointBulkReindex(row.id(), building));
+      assertTrue(store.checkpointBulkReindex(row.id(), building), "an exact refused checkpoint is idempotent");
+      assertEquals("RECOVERY_AUTHORIZATION_REFUSED", stringScalar(path,
+          "SELECT json_extract(processing_history_counts_json, '$.refusalCode') FROM operations WHERE id=" + row.id()));
+      assertFalse(store.checkpointBulkReindex(row.id(),
+          new BulkReindexProgress(capturing.generationId(), target,
+              BulkReindexProgress.Phase.BUILDING, capture, null)), "a durable refusal cannot be cleared");
+      assertFalse(store.checkpointBulkReindex(row.id(),
+          new BulkReindexProgress(capturing.generationId(), target,
+              BulkReindexProgress.Phase.BUILDING, capture, null, "RECOVERY_SCOPE_REFUSED")),
+          "a durable refusal cannot be replaced");
+      assertFalse(store.checkpointBulkReindex(row.id(),
+          new BulkReindexProgress(capturing.generationId(), target,
+              BulkReindexProgress.Phase.BUILDING,
+              new BulkReindexProgress.Capture(hash("replacement-manifest"), 2), null,
+              "RECOVERY_AUTHORIZATION_REFUSED")), "refusal cannot rebind the captured plan");
+    }
+
+    var settlement = new BulkReindexProgress.Settlement(1, hash("refusal-receipt"), 1, 0,
+        List.of(new OperationOutcomeView.Gap("unit:failed", "EXTRACTION_FAILED")), List.of());
+    var settledWithRefusal = new BulkReindexProgress("g-" + row.key(), target,
+        BulkReindexProgress.Phase.SETTLED, capture, settlement, "RECOVERY_AUTHORIZATION_REFUSED");
+    try (var reopened = store(path)) {
+      var persistedBuilding = new BulkReindexProgress("g-" + row.key(), target,
+          BulkReindexProgress.Phase.BUILDING, capture, null, "RECOVERY_AUTHORIZATION_REFUSED");
+      assertEquals(Optional.of(persistedBuilding), reopened.bulkReindexProgress(row.id()));
+      assertTrue(reopened.checkpointBulkReindex(row.id(), settledWithRefusal),
+          "settlement must retain the durable refusal");
+      assertTrue(reopened.checkpointBulkReindex(row.id(), settledWithRefusal),
+          "an exact settled checkpoint is idempotent");
+      assertFalse(reopened.checkpointBulkReindex(row.id(),
+          new BulkReindexProgress("g-" + row.key(), target,
+              BulkReindexProgress.Phase.SETTLED, capture, settlement)),
+          "settlement cannot clear the durable refusal");
+    }
+    try (var reopened = store(path)) {
+      assertEquals(Optional.of(settledWithRefusal), reopened.bulkReindexProgress(row.id()));
+      assertFalse(reopened.checkpointBulkReindex(row.id(), settled(row.key(), target, capture,
+          new BulkReindexProgress.Settlement(2, hash("replacement-receipt"), 1, 0,
+              List.of(new OperationOutcomeView.Gap("unit:failed", "EXTRACTION_FAILED")), List.of()))
+          .withRefusal("RECOVERY_AUTHORIZATION_REFUSED")),
+          "refusal does not make settlement evidence mutable");
+    }
+  }
+
+  @Test
+  void readsLegacyVersionOneBulkEvidenceWithoutRewritingIt() throws Exception {
+    Path path = temp.resolve("legacy-bulk-evidence.db");
+    String key = OperationKeys.generate(clock);
+    var target = target("{\"legacy\":true}");
+    var capturing = capturing(key, target);
+    OperationRecord row;
+    try (var store = store(path)) {
+      row = acceptAndStart(store, key, "core.bulk-reindex", DURABLE_CONTEXT);
+      assertTrue(store.checkpointBulkReindex(row.id(), capturing));
+    }
+
+    String legacyEvidence = "{\"version\":1,\"targetFingerprint\":\"" + target.fingerprint()
+        + "\",\"capture\":null,\"sealedRevision\":null,\"settlementSha256\":null"
+        + ",\"failedEvents\":0,\"supersededEvents\":0}";
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + path);
+        var update = connection.prepareStatement(
+            "UPDATE operations SET processing_history_counts_json = ? WHERE id = ?")) {
+      update.setString(1, legacyEvidence);
+      update.setLong(2, row.id());
+      assertEquals(1, update.executeUpdate());
+    }
+
+    try (var reopened = store(path)) {
+      assertEquals(Optional.of(capturing), reopened.bulkReindexProgress(row.id()));
+    }
+    assertEquals(legacyEvidence, stringScalar(path,
+        "SELECT processing_history_counts_json FROM operations WHERE id=" + row.id()),
+        "reading legacy evidence must not silently rewrite it");
+  }
+
+  @Test
   void refusesWrongGenerationProducerSurvivalAndNonRunningRows() throws Exception {
     Path path = temp.resolve("refusals.db");
     try (var store = store(path)) {

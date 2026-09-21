@@ -2,6 +2,7 @@
 package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,11 +12,13 @@ import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.engine.EngineAdmissionController;
+import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.core.context.EngineContext;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -46,19 +49,25 @@ final class DeclaredSurvivalHttpAdmissionTest {
   private static final String OPERATION_ID = AgentToolsOperationCatalog.INGEST_FILES.value();
 
   private enum OperationRoute {
-    INGEST_ALIAS(OperationsController.INGEST_PATH, "{\"paths\":[\"F:/docs\"]}", false),
+    INGEST_ALIAS(OperationsController.INGEST_PATH, "{\"paths\":[\"F:/docs\"]}", OPERATION_ID, false, 200),
     GENERIC_INVOKE("/api/operations/" + OPERATION_ID + "/invoke",
-        "{\"args\":{\"paths\":[\"F:/docs\"]}}", false),
-    UNDO("/api/undo/" + OPERATION_ID, "{\"executionId\":\"prior-execution\"}", true);
+        "{\"args\":{\"paths\":[\"F:/docs\"]}}", OPERATION_ID, false, 200),
+    MIGRATION_ALIAS(OperationsController.MIGRATION_START_PATH, "{\"reason\":\"manual\"}",
+        CoreOperationCatalog.REBUILD_INDEX.value(), false, 202),
+    UNDO("/api/undo/" + OPERATION_ID, "{\"executionId\":\"prior-execution\"}", OPERATION_ID, true, 200);
 
     final String path;
     final String body;
+    final String operationId;
     final boolean undo;
+    final int acceptedStatus;
 
-    OperationRoute(String path, String body, boolean undo) {
+    OperationRoute(String path, String body, String operationId, boolean undo, int acceptedStatus) {
       this.path = path;
       this.body = body;
+      this.operationId = operationId;
       this.undo = undo;
+      this.acceptedStatus = acceptedStatus;
     }
   }
 
@@ -69,12 +78,18 @@ final class DeclaredSurvivalHttpAdmissionTest {
     try (var fixture = new Fixture()) {
       HttpResponse<String> response = fixture.post(route.path, route.body, TOKEN, "tauri://localhost");
 
-      assertEquals(200, response.statusCode());
+      assertEquals(route.acceptedStatus, response.statusCode());
       assertEquals(1, fixture.dispatcher.calls.get());
       assertEquals(route.undo, fixture.dispatcher.undo.get());
-      assertEquals(OPERATION_ID, fixture.dispatcher.operation.get().id().value());
+      assertEquals(route.operationId, fixture.dispatcher.operation.get().id().value());
       assertEquals(Optional.of(EngineContext.Survival.DURABLE),
           fixture.dispatcher.operation.get().policy().declaredSurvival());
+      if (route == OperationRoute.MIGRATION_ALIAS) {
+        assertEquals(RiskTier.HIGH, fixture.dispatcher.operation.get().policy().risk());
+        assertTrue(response.body().contains("\"success\":true"));
+        assertFalse(response.body().contains("restartRequired"),
+            "the alias exposes the operation response, not a synthetic migration receipt");
+      }
       EngineContext dispatched = fixture.dispatcher.context.get();
       InvocationProvenance provenance = fixture.dispatcher.provenance.get();
       EngineWorkHandle retained = fixture.dispatcher.retained.get();
@@ -146,15 +161,15 @@ final class DeclaredSurvivalHttpAdmissionTest {
   void actualSecurityFiltersStillGuardDeclaredSurvivalRoutes() throws Exception {
     try (var fixture = new Fixture()) {
       HttpResponse<String> missingToken = fixture.post(
-          "/api/operations/" + OPERATION_ID + "/invoke", "{\"args\":{}}", null,
+          OperationsController.MIGRATION_START_PATH, "{\"reason\":\"manual\"}", null,
           "tauri://localhost");
       assertEquals(401, missingToken.statusCode());
       assertTrue(missingToken.body().contains("UI_TOKEN_REQUIRED"));
 
-      HttpResponse<String> foreignOrigin = fixture.options(
-          "/api/operations/" + OPERATION_ID + "/invoke", "https://example.invalid");
+      HttpResponse<String> foreignOrigin = fixture.options(OperationsController.MIGRATION_START_PATH, "https://example.invalid");
       assertEquals(403, foreignOrigin.statusCode());
-      assertEquals(403, fixture.postWithRawHost("example.invalid"));
+      assertEquals(403, fixture.postWithRawHost(OperationsController.MIGRATION_START_PATH,
+          "{\"reason\":\"manual\"}", "example.invalid"));
       assertEquals(0, fixture.dispatcher.calls.get());
       assertEquals(0, fixture.admission.activeWorkCount());
     }
@@ -176,7 +191,7 @@ final class DeclaredSurvivalHttpAdmissionTest {
 
     Fixture() {
       var controller = new OperationsController(
-          List.of(new AgentToolsOperationCatalog()), dispatcher, Clock.systemUTC());
+          List.of(new AgentToolsOperationCatalog(), new CoreOperationCatalog()), dispatcher, Clock.systemUTC());
       app = Javalin.create(config -> {
         config.showJavalinBanner = false;
         config.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper());
@@ -193,6 +208,7 @@ final class DeclaredSurvivalHttpAdmissionTest {
             EngineContext.Survival.DURABLE, incoming.urgency()));
       });
       app.post(OperationsController.INGEST_PATH, controller::handleIngest);
+      app.post(OperationsController.MIGRATION_START_PATH, controller::handleMigrationStart);
       app.post(OperationsController.INVOKE_PATH, controller::handleInvoke);
       app.post(OperationsController.UNDO_PATH, controller::handleUndo);
       app.get("/fixture/events", context -> {
@@ -234,14 +250,13 @@ final class DeclaredSurvivalHttpAdmissionTest {
           HttpResponse.BodyHandlers.ofString());
     }
 
-    int postWithRawHost(String host) throws Exception {
+    int postWithRawHost(String path, String body, String host) throws Exception {
       try (var socket = new Socket("127.0.0.1", app.port());
           var writer = new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.US_ASCII);
           var reader = new BufferedReader(
               new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII))) {
         socket.setSoTimeout(5_000);
-        String body = "{\"args\":{}}";
-        writer.write("POST /api/operations/" + OPERATION_ID + "/invoke HTTP/1.1\r\n");
+        writer.write("POST " + path + " HTTP/1.1\r\n");
         writer.write("Host: " + host + "\r\n");
         writer.write("Origin: tauri://localhost\r\n");
         writer.write(LocalApiServer.SESSION_TOKEN_HEADER + ": " + TOKEN + "\r\n");

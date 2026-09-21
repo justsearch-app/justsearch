@@ -45,14 +45,15 @@ final class MigrationControlOps {
             .build();
       }
       boolean recorded = !request.getRecordedOperationKey().isEmpty();
-      if (recorded != !request.getTargetIndexFingerprint().isEmpty()) {
+      if (recorded != !request.getTargetIndexFingerprint().isEmpty()
+          || recorded != !request.getExpectedSourceGeneration().isEmpty()) {
         return MigrationStartResponse.newBuilder().setAccepted(false)
-            .setError("Recorded operation key and target fingerprint must be supplied together")
+            .setError("Recorded operation key, target fingerprint and source generation must be supplied together")
             .build();
       }
       IndexGenerationManager.State next = recorded
           ? indexGenerationManager.startRecordedMigration(request.getRecordedOperationKey(), reason,
-              request.getTargetIndexFingerprint())
+              request.getTargetIndexFingerprint(), request.getExpectedSourceGeneration())
           : indexGenerationManager.startMigration(reason.isBlank() ? "manual" : reason.trim());
       String active =
           next == null || next.active_generation() == null ? "" : next.active_generation();

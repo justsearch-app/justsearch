@@ -34,6 +34,7 @@ public final class LuceneRuntimeBuilder {
   private SoftDeletesMetrics softDeletesMetrics;
   private IndexOpenGuard indexOpenGuardOverride;
   private BuildState initialBuildState = BuildState.COMPLETE;
+  private boolean recoveryAllowed = true;
   private Components prebuiltComponentsForTests; // package-private test injection
   private LuceneExecutorRegistrations executorRegistrations;
 
@@ -90,6 +91,8 @@ public final class LuceneRuntimeBuilder {
     return initialBuildState;
   }
 
+  boolean recoveryAllowed() { return recoveryAllowed; }
+
   Components prebuiltComponentsForTests() {
     return prebuiltComponentsForTests;
   }
@@ -112,6 +115,12 @@ public final class LuceneRuntimeBuilder {
 
   public LuceneRuntimeBuilder withFallbackIndexPath(Path fallbackIndexPath) {
     this.fallbackIndexPath = fallbackIndexPath;
+    return this;
+  }
+
+  /** Preserve an externally owned generation: opening failure must never replace its contents. */
+  public LuceneRuntimeBuilder withoutRecovery() {
+    this.recoveryAllowed = false;
     return this;
   }
 

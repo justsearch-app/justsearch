@@ -216,6 +216,167 @@ public final class IndexGenerationManager {
     }
   }
 
+  /** One application-owned boot observation, projected before any generation repair or allocation. */
+  public sealed interface BootOwnership {
+    record Native() implements BootOwnership {}
+    record Fenced() implements BootOwnership {}
+    record Recorded(String operationKey, String sourceGeneration, String source,
+        String targetFingerprint, boolean captureComplete) implements BootOwnership {
+      public Recorded {
+        Objects.requireNonNull(operationKey, "operationKey");
+        Objects.requireNonNull(sourceGeneration, "sourceGeneration");
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(targetFingerprint, "targetFingerprint");
+      }
+    }
+  }
+
+  public enum BootDisposition { NATIVE, CAPTURING, BUILDING, PROMOTED, FENCED }
+
+  /** Runtime observation only; no second persisted generation state. */
+  public record BootLayout(IndexLayout layout, BootDisposition disposition) {}
+
+  /**
+   * Resolve boot ownership before native fallback, import, adoption or normalization can write.
+   * Recorded/fenced layouts are read-only observations; callers must honor their disposition.
+   */
+  public BootLayout initializeForBoot(BootOwnership ownership, String effectiveFingerprint) throws IOException {
+    Objects.requireNonNull(ownership, "ownership");
+    synchronized (STATE_CONTROL) {
+      if (ownership instanceof BootOwnership.Native) {
+        State observed = null;
+        try { observed = readRecordedState(); }
+        catch (IOException unreadable) {
+          if (hasRecordedFallbackEvidence()) throw unreadable;
+        }
+        if (observed != null && isRecordedIdentity(observed.active_generation())) {
+          boolean noBuilding = observed.building_generation() == null || observed.building_generation().isBlank();
+          boolean nativeMigration = !noBuilding && !isRecordedIdentity(observed.building_generation())
+              && observed.migration_state() != null && Set.of("MIGRATING", "SWITCHING", "FAILED").contains(observed.migration_state());
+          boolean completed = noBuilding && MigrationState.IDLE.name().equals(observed.migration_state());
+          if (observed.format_version() != STATE_FORMAT_VERSION || !completed && !nativeMigration) {
+            return new BootLayout(strictBootLayout(observed), BootDisposition.FENCED);
+          }
+        }
+        if (observed == null || !isRecordedIdentity(observed.building_generation())
+            && !hasPristineRecordedOrphan(observed)) {
+          return new BootLayout(initializeOrLoad(), BootDisposition.NATIVE);
+        }
+        return new BootLayout(strictBootLayout(observed), BootDisposition.FENCED);
+      }
+      IndexLayout layout = strictBootLayout(readRecordedState());
+      if (ownership instanceof BootOwnership.Fenced) {
+        return new BootLayout(layout, BootDisposition.FENCED);
+      }
+      var recorded = (BootOwnership.Recorded) ownership;
+      String target = recordedGenerationId(recorded.operationKey());
+      State state = layout.state();
+      String building = state.building_generation();
+      boolean idle = MigrationState.IDLE.name().equals(state.migration_state())
+          && (building == null || building.isBlank());
+      if (!recorded.targetFingerprint().matches("[0-9a-f]{64}")
+          || !recorded.targetFingerprint().equals(effectiveFingerprint)) {
+        return new BootLayout(layout, BootDisposition.FENCED);
+      }
+      if (idle && target.equals(layout.activeGenerationId())) {
+        requireRecordedGeneration(layout.activeGenerationPath(), target, recorded.source(),
+            recorded.targetFingerprint(), false);
+        return new BootLayout(layout, recorded.captureComplete()
+            && recorded.sourceGeneration().equals(state.previous_generation())
+            ? BootDisposition.PROMOTED : BootDisposition.FENCED);
+      }
+      if (!recorded.sourceGeneration().equals(layout.activeGenerationId())) {
+        return new BootLayout(layout, BootDisposition.FENCED);
+      }
+      if (idle) return new BootLayout(layout, BootDisposition.CAPTURING);
+      if (target.equals(building) && recorded.captureComplete()
+          && (MigrationState.MIGRATING.name().equals(state.migration_state())
+              || MigrationState.SWITCHING.name().equals(state.migration_state()))) {
+        requireRecordedGeneration(resolveGenerationPathReadOnly(target), target, recorded.source(),
+            recorded.targetFingerprint(), false);
+        return new BootLayout(layout, BootDisposition.BUILDING);
+      }
+      return new BootLayout(layout, BootDisposition.FENCED);
+    }
+  }
+
+  private State readRecordedState() throws IOException {
+    try {
+      State state = RECORDED_JSON.readValue(
+          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath), State.class);
+      if (state == null) throw new IOException("Authoritative generation state is empty");
+      return state;
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Authoritative generation state is invalid", malformed);
+    }
+  }
+
+  private IndexLayout strictBootLayout(State state) throws IOException {
+    if (state.format_version() != STATE_FORMAT_VERSION) {
+      throw new IOException("Recorded boot requires current generation state format");
+    }
+    String active = requireSafeGenerationId(state.active_generation(), "state.json active_generation");
+    try { MigrationState.valueOf(state.migration_state()); }
+    catch (IllegalArgumentException | NullPointerException invalid) {
+      throw new IOException("Authoritative generation phase is invalid", invalid);
+    }
+    if (active.equals(state.building_generation())) {
+      throw new IOException("Serving and building generation identities must be distinct");
+    }
+    Path activePath = resolveGenerationPathReadOnly(active);
+    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || !Files.isDirectory(activePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Authoritative active generation directory is unavailable");
+    }
+    return new IndexLayout(basePath, indicesDir, statePath, state, active, activePath);
+  }
+
+  private static boolean isRecordedIdentity(String generation) {
+    if (generation == null || !generation.startsWith("g-")) return false;
+    try { return generation.equals(recordedGenerationId(generation.substring(2))); }
+    catch (IOException invalid) { return false; }
+  }
+
+  private boolean hasPristineRecordedOrphan(State state) throws IOException {
+    if (!Files.isDirectory(indicesDir)) return false;
+    try (var entries = Files.list(indicesDir)) {
+      for (Path directory : entries.toList()) {
+        String identity = directory.getFileName().toString();
+        if (!isRecordedIdentity(identity) || identity.equals(state.active_generation())
+            || identity.equals(state.previous_generation())
+            || !Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+        try (var contents = Files.list(directory)) {
+          // A crash-created target can have either metadata file missing. Completed empty
+          // generations have Lucene commit files; GC-retained archives must not fence native boot.
+          if (contents.allMatch(path -> Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST)
+              .contains(path.getFileName().toString()))) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Evidence may fence fallback; it never supplies a serving or writable identity. */
+  private boolean hasRecordedFallbackEvidence() throws IOException {
+    if (Files.isDirectory(indicesDir)) {
+      try (var entries = Files.list(indicesDir)) {
+        if (entries.anyMatch(path -> isRecordedIdentity(path.getFileName().toString()))) return true;
+      }
+    }
+    if (Files.isRegularFile(statePrevPath)) {
+      try {
+        State previous = RECORDED_JSON.readValue(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePrevPath), State.class);
+        return previous != null && (isRecordedIdentity(previous.active_generation())
+            || isRecordedIdentity(previous.building_generation()));
+      } catch (tools.jackson.core.JacksonException malformed) {
+        // An undecodable backup cannot establish either kind of generation authority.
+        return false;
+      }
+    }
+    return false;
+  }
+
   /**
    * Resolves a generation directory path by generation id (validated).
    *
@@ -305,6 +466,12 @@ public final class IndexGenerationManager {
    */
   public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint)
       throws IOException {
+    return startRecordedMigration(operationKey, source, targetIndexFingerprint, null);
+  }
+
+  /** Bind source comparison and generation creation under the same control lock. */
+  public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint,
+      String expectedSourceGeneration) throws IOException {
     synchronized (STATE_CONTROL) {
       String target = recordedGenerationId(operationKey);
       if (source == null || source.isBlank() || source.length() > 256
@@ -322,8 +489,16 @@ public final class IndexGenerationManager {
       if (raw == null || raw.migration_state() == null || raw.migration_state().isBlank()) {
         throw new IOException("Authoritative generation state is unavailable");
       }
-      State current = normalizeAndUpgradeStateIfNeeded(raw);
+      State current = expectedSourceGeneration == null ? normalizeAndUpgradeStateIfNeeded(raw)
+          : strictBootLayout(raw).state();
       String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
+      if (expectedSourceGeneration != null) {
+        String expected = requireSafeGenerationId(expectedSourceGeneration, "accepted source generation");
+        String observedSource = target.equals(active) ? current.previous_generation() : active;
+        if (!expected.equals(expectedSourceGeneration) || !expected.equals(observedSource)) {
+          throw new IOException("Recorded generation source differs from the accepted preparation");
+        }
+      }
       if (!Files.isDirectory(resolveGenerationPathReadOnly(active), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         throw new IOException("Active generation directory is unavailable");
       }
@@ -642,6 +817,20 @@ public final class IndexGenerationManager {
     }
     String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
     return key.equals(current.auto_rebuild_key()) ? current.auto_rebuild_count() : 0;
+  }
+
+  /** Promote only the strict target/source binding validated by the recorded owner. */
+  public State promoteRecordedGenerationToActive(String operationKey, String source,
+      String targetIndexFingerprint, String expectedSourceGeneration) throws IOException {
+    synchronized (STATE_CONTROL) {
+      var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
+          expectedSourceGeneration, source, targetIndexFingerprint, true), targetIndexFingerprint);
+      if (observed.disposition() == BootDisposition.PROMOTED) return observed.layout().state();
+      if (observed.disposition() != BootDisposition.BUILDING) {
+        throw new IOException("Recorded generation binding changed before promotion");
+      }
+      return promoteBuildingGenerationToActive();
+    }
   }
 
   /**

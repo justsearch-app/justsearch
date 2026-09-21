@@ -3,6 +3,7 @@ package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.services.worker.IpcTelemetry;
@@ -45,14 +46,19 @@ final class EngineMigrationRestartDispatchTest {
             code -> { throw new AssertionError("unexpected fatal exit " + code); },
             restarts::incrementAndGet)) {
       var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+      var before = new IndexGenerationManager(indexBase).readStateBestEffort();
+      assertNotNull(before);
+      assertFalse(before.active_generation().isBlank());
       var outcome =
           client.startRecordedMigration(
-              OPERATION_KEY, "bulk_reindex", TARGET_FINGERPRINT, TestEngineContexts.FOREGROUND);
+              OPERATION_KEY, "bulk_reindex", TARGET_FINGERPRINT, before.active_generation(),
+              TestEngineContexts.FOREGROUND);
 
       assertTrue(outcome.accepted());
       assertTrue(
           outcome.restartRequired(), "the operation owner receives the required restart witness");
       assertEquals("g-" + OPERATION_KEY, outcome.buildingGenerationId());
+      assertEquals(before.active_generation(), outcome.activeGenerationId());
       assertEquals("MIGRATING", outcome.migrationState());
       assertEquals(
           0,

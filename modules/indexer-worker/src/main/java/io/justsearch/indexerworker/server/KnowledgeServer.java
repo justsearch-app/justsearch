@@ -130,6 +130,8 @@ public final class KnowledgeServer implements Closeable {
   private Path activeIndexPath;
   private Path buildingIndexPath;
   private IndexGenerationManager indexGenerationManager;
+  private IndexGenerationManager.BootOwnership generationBootOwnership;
+  private IndexGenerationManager.BootDisposition generationBootDisposition;
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
   private WorkerAppServices pendingAppServices;
@@ -644,19 +646,7 @@ public final class KnowledgeServer implements Closeable {
       this.indexRootLock = new IndexRootLock(effectiveIndexBasePath);
       this.indexRootLock.acquire();
 
-      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
-      IndexGenerationManager.IndexLayout layout = genManager.initializeOrLoad();
-      this.indexGenerationManager = genManager;
-      this.indexBasePath = layout.basePath();
-      this.activeIndexPath = layout.activeGenerationPath();
-      this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
-      this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
-      IndexGenerationManager.State state = layout.state();
-      this.buildingIndexPath = null;
-      this.migrationEnumeratorDone = false;
-      this.migrationEnumeratorFailure = null;
-
-      logConfiguration();
+      var bootOwnership = recordedIngestionLifecycle.bootOwnership(jobQueue);
 
       // The embedding and SPLADE model digests are index_fingerprint inputs, but they are only
       // knowable in the Worker's model modules. Install them process-wide BEFORE the first commit
@@ -680,6 +670,24 @@ public final class KnowledgeServer implements Closeable {
       // expected fingerprint before any runtime is built, and a dimension installed later would make
       // the boot-time comparison disagree with every later one under BGE-M3.
       IndexFingerprint.installEffectiveVectorDimension(effectiveVectorDimensionSupplier());
+
+      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
+      var boot = genManager.initializeForBoot(bootOwnership, expectedIndexFingerprintOrNull());
+      IndexGenerationManager.IndexLayout layout = boot.layout();
+      this.generationBootOwnership = bootOwnership;
+      this.generationBootDisposition = boot.disposition();
+      this.indexGenerationManager = genManager;
+      this.indexBasePath = layout.basePath();
+      this.activeIndexPath = layout.activeGenerationPath();
+      this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
+      this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
+      IndexGenerationManager.State state = layout.state();
+      this.buildingIndexPath = null;
+      this.migrationEnumeratorDone = false;
+      this.migrationEnumeratorFailure = null;
+
+      logConfiguration();
+
 
       // 4. Initialize Lucene runtimes.
       // - searchLifecycle serves queries (Blue during migration)
@@ -717,7 +725,7 @@ public final class KnowledgeServer implements Closeable {
       // legacy-blank rule, the empty-index exclusion and the model tri-state therefore apply
       // identically at both sites, by construction rather than by agreement.
       boolean preOpenMismatch = false;
-      if (!inProgress) {
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE && !inProgress) {
         var preOpenDiffs =
             IndexMetadataParityGuard.inspectCommittedParity(
                 activeIndexPath, () -> expectedCommitMetadata(fpSupplier));
@@ -736,6 +744,23 @@ public final class KnowledgeServer implements Closeable {
       // lifetime — in the exhausted-brake state, which is precisely the state that keeps running
       // (tempdoc 915 B5 ride-along).
       LuceneRuntime blueReadOnly = null;
+      if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) {
+        if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
+          publishIngestLifecycle(buildIndexRuntime(activeIndexPath, fpSupplier).withoutRecovery()
+              .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
+          this.searchLifecycle = this.ingestLifecycle;
+        } else {
+          this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery().openReadOnly();
+          if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+            this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
+            publishIngestLifecycle(buildIndexRuntime(buildingIndexPath, fpSupplier).withoutRecovery()
+                .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open());
+            this.migrationEnumeratorDone = true;
+          } else {
+            publishIngestLifecycle(this.searchLifecycle);
+          }
+        }
+      } else {
       try {
       if (inProgress) {
         // Serve search from active generation (Blue) while writing to building generation (Green).
@@ -947,10 +972,16 @@ public final class KnowledgeServer implements Closeable {
         }
       }
 
+      }
+
       // If a migration is in progress (Blue/Green), ensure the enumerator + cutover monitor are running.
       if (buildingIndexPath != null && searchLifecycle != null && ingestLifecycle != null && searchLifecycle != ingestLifecycle) {
-        startMigrationEnumeratorBestEffort(rc);
-        startMigrationCutoverMonitorBestEffort();
+        if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
+          startMigrationEnumeratorBestEffort(rc);
+        }
+        if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
+          startMigrationCutoverMonitorBestEffort();
+        }
       }
 
       // Schema validation: ensure all indexable fields exist in catalog (via ingest schema).
@@ -970,9 +1001,8 @@ public final class KnowledgeServer implements Closeable {
       // to the background task (after IndexWriter opens). In migration mode, run synchronously.
       // Skipped when the rebuild brake is exhausted: ingest is the READ-ONLY Blue runtime then, so
       // there is no writer to drain into.
-      if (!rebuildBrakeExhausted
-          && ingestLifecycle != null
-          && !(ingestLifecycle instanceof DeferredRuntime)) {
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
+          && !rebuildBrakeExhausted && ingestLifecycle instanceof RunningRuntime) {
         drainSwitchBufferBestEffort();
       }
 
@@ -1028,6 +1058,9 @@ public final class KnowledgeServer implements Closeable {
 
       // Recorded recovery cannot run until the actual serving generation and owner are attached.
       attachRecordedIngestion();
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+        startMigrationCutoverMonitorBestEffort();
+      }
       jobQueue.recoverStuckJobs();
       startStuckJobReaper(jobQueue);
 
@@ -1058,7 +1091,10 @@ public final class KnowledgeServer implements Closeable {
       // status surface says why ingestion stopped (BLOCKED_REBUILD_BRAKE ->
       // index.rebuild_brake_exhausted). Recovery is an operator-initiated rebuild, which clears the
       // brake at promotion (IndexGenerationManager.promoteBuildingGenerationToActive).
-      if (rebuildBrakeExhausted) {
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.CAPTURING
+          || generationBootDisposition == IndexGenerationManager.BootDisposition.FENCED) {
+        log.info("Ingestion awaits recorded generation authority; current active index remains read-only");
+      } else if (rebuildBrakeExhausted) {
         log.error(
             "Ingestion is STOPPED: the automatic-rebuild budget for this index shape is spent."
                 + " Search continues to serve the existing index read-only. To recover, run"
@@ -1120,7 +1156,8 @@ public final class KnowledgeServer implements Closeable {
     // Validate state even when an intentionally denying attachment does not read its source.
     currentRecordedServingGeneration();
     recordedIngestionAttachment = Objects.requireNonNull(recordedIngestionLifecycle.attach(
-        jobQueue, this::currentRecordedServingGeneration, this::recordedWorkerOnline),
+        jobQueue, this::currentRecordedServingGeneration, this::recordedWorkerOnline,
+        this::currentRecordedBulkRuntime),
         "recorded ingestion attachment");
   }
 
@@ -1142,6 +1179,31 @@ public final class KnowledgeServer implements Closeable {
       return java.util.Optional.empty();
     }
     return generation;
+  }
+
+  private java.util.Optional<RecordedIngestionLifecycle.BulkRuntime> currentRecordedBulkRuntime() throws IOException {
+    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native
+        || appServices == null) {
+      return java.util.Optional.empty();
+    }
+    var current = indexGenerationManager.initializeForBoot(generationBootOwnership, expectedIndexFingerprintOrNull());
+    String writable = null;
+    if (ingestLifecycle instanceof RunningRuntime) {
+      if (current.disposition() == IndexGenerationManager.BootDisposition.BUILDING
+          && current.layout().activeGenerationPath().equals(activeIndexPath)
+          && current.layout().indicesDir().resolve(current.layout().state().building_generation())
+              .equals(buildingIndexPath) && ingestLifecycle != searchLifecycle) {
+        writable = current.layout().state().building_generation();
+      } else if (current.disposition() == IndexGenerationManager.BootDisposition.PROMOTED
+          && current.layout().activeGenerationPath().equals(activeIndexPath)
+          && ingestLifecycle == searchLifecycle) {
+        writable = current.layout().activeGenerationId();
+      }
+    }
+    return java.util.Optional.of(new RecordedIngestionLifecycle.BulkRuntime(current.disposition(),
+        current.layout().activeGenerationId(), current.layout().state().building_generation(),
+        current.layout().state().migration_state(), writable,
+        generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED));
   }
 
   /** Index runtime presence only; no queue query, model call or Head-side readiness dependency. */
@@ -1816,6 +1878,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void maybeAutoStartEmbeddingRebuildForBlockedLegacyBestEffort() {
+    if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) return;
     io.justsearch.indexerworker.loop.ops.EmbeddingRecoveryOps.rescueBlockedLegacyIndex(
         embeddingCompatController, ingestLifecycle, 1000, log);
   }
@@ -2652,7 +2715,9 @@ public final class KnowledgeServer implements Closeable {
                         indexGenerationManager,
                         jobQueue,
                         () -> running,
-                        () -> migrationEnumeratorDone,
+                        () -> migrationEnumeratorDone
+                            && (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+                                || recordedIngestionLifecycle.recordedCutoverReady(recorded.operationKey())),
                         () -> migrationEnumeratorFailure,
                         MIGRATION_SWITCHING_QUEUE_DEPTH_THRESHOLD,
                         MIGRATION_SWITCHING_MAX_DURATION_MS,
@@ -2664,7 +2729,12 @@ public final class KnowledgeServer implements Closeable {
                         this::flushTelemetryBestEffort,
                         () -> migrationRestartAction.run(),
                         dataDir,
-                        log)),
+                        log,
+                        () -> generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+                            ? recordedIngestionLifecycle.promoteRecordedGeneration(recorded.operationKey(), jobQueue,
+                                () -> indexGenerationManager.promoteRecordedGenerationToActive(recorded.operationKey(),
+                                    recorded.source(), recorded.targetFingerprint(), recorded.sourceGeneration()))
+                            : indexGenerationManager.promoteBuildingGenerationToActive())),
             "migration-cutover");
     migrationCutoverThread.setDaemon(true);
     migrationCutoverThread.start();

@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -352,6 +353,81 @@ final class KnowledgeServerRecordedIngestionTest {
     } finally {
       server.close();
     }
+  }
+
+  @Test
+  void recordedOwnershipPrecedesNativePrevRepairInRealBoot(@TempDir Path tempDir) throws Exception {
+    var layout = preparedLayout(tempDir);
+    String key = "01994180-0000-7000-8000-000000000199";
+    layout.genManager().startRecordedMigration(key, "recorded-boot-test", "a".repeat(64));
+    byte[] previous = Files.readAllBytes(layout.indexBase().resolve("state.json.prev"));
+    String corrupt = "{unfinished recorded current";
+    Files.writeString(layout.indexBase().resolve("state.json"), corrupt);
+    var observed = new AtomicBoolean();
+    var lifecycle = fencedBootLifecycle(observed);
+    var server = withoutDeferredModels(new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle));
+    try {
+      assertThrows(IOException.class, server::start);
+      assertTrue(observed.get(), "application ownership is observed on the opened queue before initialization");
+      assertEquals(corrupt, Files.readString(layout.indexBase().resolve("state.json")));
+      assertArrayEquals(previous, Files.readAllBytes(layout.indexBase().resolve("state.json.prev")));
+      try (var generations = Files.list(layout.indexBase().resolve("indices"))) {
+        assertEquals(2, generations.count(), "boot cannot allocate a fallback generation");
+      }
+    } finally {
+      if (!server.awaitClosed(0)) server.close();
+    }
+  }
+
+  @Test
+  void fencedRealBootServesCurrentBlueWithoutPollingOrReplacingRecordedGreen(@TempDir Path tempDir)
+      throws Exception {
+    var layout = preparedLayout(tempDir);
+    WorkerBootFixture.seed(layout.activePath(), null, 1);
+    layout.genManager().startRecordedMigration(
+        "01994180-0000-7000-8000-000000000199", "recorded-boot-test", "a".repeat(64));
+    byte[] state = Files.readAllBytes(layout.indexBase().resolve("state.json"));
+    var observed = new AtomicBoolean();
+    var server = withoutDeferredModels(new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), fencedBootLifecycle(observed)));
+    var loopStarts = new AtomicInteger();
+    org.mockito.Mockito.doAnswer(call -> {
+      var services = org.mockito.Mockito.spy((DefaultWorkerAppServices) call.callRealMethod());
+      org.mockito.Mockito.doAnswer(start -> {
+        loopStarts.incrementAndGet();
+        return start.callRealMethod();
+      }).when(services).startIndexingLoop();
+      return services;
+    }).when(server).newAppServices();
+    try {
+      server.start();
+      assertTrue(observed.get());
+      assertEquals(0, loopStarts.get(), "fenced Blue must not consume queued work through a read-only runtime");
+      assertTrue(server.currentRecordedServingGeneration().isEmpty(), "fenced Blue grants no writer authority");
+      assertArrayEquals(state, Files.readAllBytes(layout.indexBase().resolve("state.json")));
+      Path target = layout.indexBase().resolve("indices/g-01994180-0000-7000-8000-000000000199");
+      try (var contents = Files.list(target)) {
+        assertEquals(2, contents.count(), "fenced Green remains unopened with only its ownership metadata");
+      }
+    } finally { server.close(); }
+  }
+
+  private static RecordedIngestionLifecycle fencedBootLifecycle(AtomicBoolean observed) {
+    return new RecordedIngestionLifecycle() {
+      @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {
+        assertTrue(queue.queueDepth() >= 0, "ownership observation receives the already opened queue");
+        observed.set(true);
+        return new IndexGenerationManager.BootOwnership.Fenced();
+      }
+      @Override public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
+        return JobQueue.RecordedClaimDecision.DENY;
+      }
+      @Override public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
+          java.util.function.BooleanSupplier online) { return () -> {}; }
+    };
   }
 
   private static KnowledgeServer withoutDeferredModels(KnowledgeServer original) {

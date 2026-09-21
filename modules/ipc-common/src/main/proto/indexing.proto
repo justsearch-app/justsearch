@@ -1166,10 +1166,12 @@ message MigrationStartRequest {
   string reason = 1;
   // Requests an Engine restart requirement in the response; the caller owns dispatch.
   bool restart_worker = 2;
-  // Accepted UUIDv7 operation identity. Both recorded fields must be supplied together.
+  // Accepted UUIDv7 operation identity. All recorded fields must be supplied together.
   string recorded_operation_key = 3;
   // Authoritative physical index fingerprint captured during operation preparation.
   string target_index_fingerprint = 4;
+  // Exact serving generation frozen in the accepted preparation.
+  string expected_source_generation = 5;
 }
 
 message MigrationStartResponse {

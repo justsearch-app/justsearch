@@ -9,11 +9,6 @@ import io.justsearch.app.api.indexing.FailedIndexingJobsResponse;
 import io.justsearch.app.api.indexing.FailedJob;
 import io.justsearch.app.api.indexing.FailedJobsResponse;
 import io.justsearch.app.api.indexing.IndexingJobView;
-import io.justsearch.app.api.OpCriticality;
-import io.justsearch.app.api.OpLeaseOutcome;
-import io.justsearch.app.api.OperationLeaseHandle;
-import io.justsearch.app.api.OperationLeaseService;
-import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.ipc.KnowledgeServerNotConnectedException;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.telemetry.Telemetry;
@@ -45,21 +40,17 @@ public class IndexingController {
   private final ExcludesService excludesService;
   private final Path userHome; // nullable — null means "not available"
   private final Telemetry telemetry;
-  // Tempdoc 542 Phase 3: op-lease SPI for migration / bulk-reindex / index-gc REST entry points.
-  private final OperationLeaseService leaseService;
   private volatile io.justsearch.app.services.lifecycle.WorkerCapability workerCapability;
 
   public IndexingController(
       Supplier<IndexingService> indexingServiceSupplier,
       ExcludesService excludesService,
       Path userHome,
-      Telemetry telemetry,
-      OperationLeaseService leaseService) {
+      Telemetry telemetry) {
     this.indexingServiceSupplier = indexingServiceSupplier;
     this.excludesService = excludesService;
     this.userHome = userHome;
     this.telemetry = telemetry;
-    this.leaseService = java.util.Objects.requireNonNull(leaseService, "leaseService");
   }
 
   private IndexingService indexingService() {
@@ -368,59 +359,6 @@ public class IndexingController {
       ctx.status(200).json(wire);
     } catch (Exception e) {
       log.error("Failed to apply exclude patterns", e);
-      ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
-    }
-  }
-
-  public void handleMigrationStart(Context ctx) {
-    Map<String, Object> body;
-    try {
-      body = ctx.bodyAsClass(Map.class);
-    } catch (Exception e) {
-      ctx.status(400).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-    // Tempdoc 837 §2.3(i) — the one boundary where an OUTSIDE caller writes the migration source into
-    // the persisted generation manifest. Everything else that starts a migration passes a vocabulary
-    // member already, so this is where the closure is enforced: a recognized member passes through,
-    // anything else is coerced to `manual` (a REST-initiated migration with an unrecognized label IS
-    // a manual start) rather than being forwarded verbatim into on-disk state that outlives it.
-    String requestedReason = body == null ? "" : String.valueOf(body.getOrDefault("reason", ""));
-    MigrationSource requestedSource = MigrationSource.fromWire(requestedReason);
-    if (requestedSource == MigrationSource.UNKNOWN) {
-      if (!requestedReason.isBlank()) {
-        log.warn(
-            "Migration start requested with an unrecognized reason \"{}\" — recording it as \"{}\"",
-            requestedReason,
-            MigrationSource.MANUAL.wire());
-      }
-      requestedSource = MigrationSource.MANUAL;
-    }
-    String reason = requestedSource.wire();
-    // Tempdoc 542 Phase 3 — REST entry for migration: MUST_COMPLETE op-lease registered
-    // BEFORE the gRPC dispatches so concurrent takeover gate reads see the lease.
-    OperationLeaseHandle handle = leaseService.register(
-        "indexing.migration",
-        OpCriticality.MUST_COMPLETE,
-        1800L,
-        Map.of("source", "REST /api/indexing/migration/start", "reason", reason));
-    try {
-      var outcome = indexingService().startMigration(reason, RequestEngineContext.get(ctx));
-      if (outcome.accepted()) {
-        // Worker persists MIGRATING before acknowledging, then owns the asynchronous lifetime.
-        handle.release(OpLeaseOutcome.SUCCESS);
-        ctx.status(202).json(Map.of("status", "migration start requested", "restartRequired", outcome.restartRequired()));
-      } else {
-        handle.release(OpLeaseOutcome.FAILURE);
-        ctx.status(409).json(Map.of("status", "migration start rejected by worker"));
-      }
-    } catch (KnowledgeClientException e) {
-      handle.release(OpLeaseOutcome.FAILURE);
-      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
-      ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
-    } catch (Exception e) {
-      handle.release(OpLeaseOutcome.FAILURE);
-      log.error("Failed to start migration", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
   }

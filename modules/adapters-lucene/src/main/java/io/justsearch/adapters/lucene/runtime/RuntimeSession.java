@@ -461,7 +461,7 @@ final class RuntimeSession implements AutoCloseable {
     // 3. Open Lucene components, with corruption / schema-mismatch recovery.
     Components components;
     try {
-      components = openComponentsWithRecovery(openReadOnly);
+      components = builder.recoveryAllowed() ? openComponentsWithRecovery(openReadOnly) : openComponents(openReadOnly);
     } catch (RuntimeException e) {
       // Best-effort cleanup of any partial state, then propagate.
       try {

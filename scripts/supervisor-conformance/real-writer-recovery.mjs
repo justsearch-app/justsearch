@@ -94,6 +94,11 @@ if (aiEnabled) {
   delete env.AI_OFFLINE;
 }
 if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
+  const sources = path.join(work, 'migration-sources');
+  fs.mkdirSync(sources, { recursive: true });
+  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
+    schemaVersion: 1, roots: [{ path: sources }],
+  }));
   // A locally resolvable embedding model makes its fingerprint a cutover precondition.
   // Exercise that model instead of disabling embeddings and bypassing verification.
   delete env.JUSTSEARCH_AI_EMBED_ENABLED;
@@ -161,11 +166,11 @@ function jobStateFor(filename) {
     database.close();
   }
 }
-function requireOperationSuccess(response, label) {
+function requireOperationSuccess(response, label, expectedStatus = 200) {
   let body;
   try { body = JSON.parse(response.text); }
   catch { throw new Error(`${label} returned invalid JSON: ${response.text}`); }
-  requireThat(response.status === 200 && body.success === true,
+  requireThat(response.status === expectedStatus && body.success === true,
     `${label} failed: HTTP ${response.status} ${response.text}`);
   const metadata = body.structuredData;
   requireThat(typeof metadata?.operationKey === 'string'

@@ -583,6 +583,21 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         }
         continue;
       }
+      if (decision instanceof Reconciliation.CheckpointBulkAndWait checkpoint) {
+        if (row.state() != OperationState.RUNNING || control.kind != OperationKind.REINDEX
+            || control.started.get() || control.done.isDone()) {
+          throw new IllegalArgumentException("Bulk recovery checkpoint requires a running, unstarted reindex control");
+        }
+        try {
+          if (!store.checkpointBulkReindex(control.id, checkpoint.progress())) {
+            throw new IllegalStateException("Bulk recovery checkpoint refused for a conflicting operation");
+          }
+        } catch (RuntimeException | Error failure) {
+          persistenceFailed(control, OperationState.RUNNING, failure);
+          throw failure;
+        }
+        continue;
+      }
       if (decision instanceof Reconciliation.Wait || !control.started.compareAndSet(false, true)) continue;
       switch (decision) {
         case Reconciliation.Complete complete -> finishObserved(control, OperationState.COMPLETE, complete.receipt());
@@ -591,6 +606,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         case Reconciliation.Resume resume -> execute(control, resume.body(), true);
         case Reconciliation.Wait ignored -> throw new IllegalStateException("Wait was already handled");
         case Reconciliation.CheckpointAndWait ignored -> throw new IllegalStateException("Checkpoint was already handled");
+        case Reconciliation.CheckpointBulkAndWait ignored -> throw new IllegalStateException("Bulk checkpoint was already handled");
       }
     }
   }

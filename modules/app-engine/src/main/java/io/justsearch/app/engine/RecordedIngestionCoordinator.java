@@ -9,6 +9,10 @@ import io.justsearch.agent.api.registry.RequiredCapability;
 import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.IndexingService;
+import io.justsearch.app.api.operations.BulkReindexProgress;
+import io.justsearch.app.api.operations.OperationOutcomeView;
+import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
 import io.justsearch.app.api.operations.CanonicalOperationArguments;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationAttemptRunner.Reconciliation;
@@ -19,6 +23,8 @@ import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.RecordedIngestChild;
 import io.justsearch.app.api.operations.RecordedIngestionService;
 import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.app.api.operations.RecordedBulkPlan;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.app.services.bootstrap.OperationAuthority;
 import io.justsearch.app.services.bootstrap.OperationAuthority.RecordedIngestRecoveryDecision;
 import io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver;
@@ -65,6 +71,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private final OperationAuthority authority;
   private final RecordedIngestPlanResolver resolver = new RecordedIngestPlanResolver();
   private final Map<String, Parent> parents = new HashMap<>();
+  private final Map<String, Bulk> bulks = new HashMap<>();
+  private final ConcurrentHashMap<String, Bulk> bulkPermissions = new ConcurrentHashMap<>();
   // The queue predicate never takes lock or reads operations/jobs. Entries only exist for live children.
   private final ConcurrentHashMap<String, Permission> permissions = new ConcurrentHashMap<>();
   private volatile Attached attached;
@@ -79,6 +87,44 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.admission = Objects.requireNonNull(admission, "admission");
     this.authority = Objects.requireNonNull(authority, "authority");
+  }
+
+  @Override
+  public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) throws IOException {
+    synchronized (lock) {
+      var pending = operations.openRecords().stream().filter(row -> isBulk(row)).toList();
+      if (pending.isEmpty()) return new IndexGenerationManager.BootOwnership.Native();
+      if (pending.size() != 1) return new IndexGenerationManager.BootOwnership.Fenced();
+      var row = pending.getFirst();
+      Bulk owner = bulks.get(row.key());
+      if (owner != null && owner.cancelled) return new IndexGenerationManager.BootOwnership.Fenced();
+      try {
+        if (operations.bulkReindexProgress(row.id()).map(progress -> progress.refusalCode() != null).orElse(false)) {
+          return new IndexGenerationManager.BootOwnership.Fenced();
+        }
+        var decision = authority.evaluateRecordedBulk(row, preparation(row));
+        if (!(decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Authorized authorized)) {
+          return new IndexGenerationManager.BootOwnership.Fenced();
+        }
+        RecordedBulkPlan plan = authorized.plan();
+        var walk = queue.recordedWalk(row.key());
+        boolean complete = walk.isPresent() && walk.orElseThrow().capturedPlan()
+            && plan.planHash().equals(walk.orElseThrow().planHash())
+            && walk.orElseThrow().enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE;
+        return new IndexGenerationManager.BootOwnership.Recorded(row.key(), plan.scope().generation(),
+            plan.source(), plan.target().fingerprint(), complete);
+      } catch (IllegalArgumentException | JobQueue.RecordedWalkGapException invalid) {
+        return new IndexGenerationManager.BootOwnership.Fenced();
+      }
+    }
+  }
+
+  private static boolean isBulk(OperationRecord row) {
+    if (row.descriptor().kind() != OperationKind.REINDEX) return false;
+    for (RecordedBulkPlan.Profile profile : RecordedBulkPlan.Profile.values()) {
+      if (profile.operationRef().equals(row.descriptor().operationRef())) return true;
+    }
+    return false;
   }
 
   @Override
@@ -97,6 +143,25 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         throw new IllegalArgumentException("Recorded parent requires its exact admitted context");
       }
       var stored = preparation(row);
+      if (isBulk(row)) {
+        if (bulks.containsKey(row.key())) throw new IllegalStateException("Recorded bulk already has an owner");
+        if (operations.openRecords().stream().anyMatch(other -> isBulk(other) && !other.key().equals(row.key()))) {
+          return OperationExecution.finished(OperationResult.failure("Another bulk rebuild owns the index",
+              "BULK_GENERATION_CONFLICT", Map.of(), false));
+        }
+        var decision = authority.evaluateRecordedBulk(row, stored);
+        if (!(decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Authorized authorized)) {
+          return OperationExecution.finished(OperationResult.failure("Bulk authorization refused",
+              "RECOVERY_AUTHORIZATION_REFUSED", Map.of(), false));
+        }
+        var bulk = new Bulk(row, stored, authorized.plan(), handle, true);
+        bulk.work = admitted.retain();
+        observeBulkCancellation(bulk);
+        bulks.put(row.key(), bulk);
+        attempts.checkpointBulkReindex(handle, capturing(bulk));
+        maintain();
+        return pending(bulk.completion);
+      }
       var plan = resolver.resolve(row, stored);
       if (parents.containsKey(row.key())) throw new IllegalStateException("Recorded parent already has an owner");
       if (plan.roots().isEmpty()) return OperationExecution.finished(OperationResult.success("No ingestion roots"));
@@ -119,6 +184,9 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   @Override
   public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
+    Bulk bulk = bulkPermissions.get(key);
+    if (bulk != null) return bulkClaimAllowed(bulk) ? JobQueue.RecordedClaimDecision.ALLOW_FORCE
+        : JobQueue.RecordedClaimDecision.DENY;
     Permission permission = permissions.get(key);
     Attached physical = attached;
     if (permission == null || physical == null || physical != permission.physical || physical.stopping
@@ -141,9 +209,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   @Override
   public Attachment attach(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online) throws IOException {
+    return attach(queue, generation, online, Optional::empty);
+  }
+
+  @Override
+  public Attachment attach(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online,
+      CheckedBulkRuntime bulkRuntime) throws IOException {
     synchronized (lock) {
       if (attached != null) throw new IOException("Recorded ingestion still owns its prior queue");
-      Attached physical = new Attached(queue, generation, online);
+      Attached physical = new Attached(queue, generation, online, bulkRuntime);
       attached = physical;
       try {
         physical.queueSubscription = queue.subscribeRecordedWalks(ignored -> maintain());
@@ -176,6 +250,17 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
   }
 
+  void bindBulkProducer(Producer producer, IndexingService indexing, Runnable restart) {
+    synchronized (lock) {
+      Attached physical = Objects.requireNonNull(attached, "No recorded ingestion attachment");
+      if (physical.stopping || physical.bulkProducer != null) throw new IllegalStateException("Bulk producer cannot bind");
+      physical.bulkProducer = Objects.requireNonNull(producer, "producer");
+      physical.bulkIndexing = Objects.requireNonNull(indexing, "indexing");
+      physical.bulkRestart = Objects.requireNonNull(restart, "restart");
+      maintain();
+    }
+  }
+
   /** Revoke and request actual producer exit before closing its client; preserve pending parent work. */
   void stopProducers(long timeoutMillis) throws IOException {
     CompletableFuture<?>[] exits;
@@ -184,7 +269,13 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (physical == null) return;
       physical.stopping = true;
       permissions.clear();
+      bulkPermissions.clear();
       List<CompletableFuture<?>> pending = new ArrayList<>();
+      for (Bulk bulk : bulks.values()) {
+        if (bulk.cancellation != null) bulk.cancellation.cancel("index attachment stopping");
+        if (bulk.exit != null) pending.add(bulk.exit.handle((ignored, failure) -> null));
+        if (bulk.notification != null) pending.add(bulk.notification);
+      }
       for (Parent parent : parents.values()) {
         parent.fresh = false;
         Child child = parent.child;
@@ -219,6 +310,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           advanced = false;
           pump(attached);
         } while (advanced);
+        // Retry a failed restart on the next maintenance call, not each internal progress pass.
+        restartAfterBulkRefusal(attached);
       } finally {
         pumping = false;
       }
@@ -238,8 +331,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return new Reconciliation.Wait();
     });
     for (Parent parent : List.copyOf(parents.values())) drive(parent, physical, openChildParents, unknownChild[0]);
+    for (Bulk bulk : List.copyOf(bulks.values())) driveBulk(bulk, physical);
     attempts.reconcile(OperationKind.REINDEX,
-        row -> reconcileParent(row, physical, openChildParents, unknownChild[0]));
+        row -> isBulk(row) ? reconcileBulk(row, physical)
+            : reconcileParent(row, physical, openChildParents, unknownChild[0]));
+    for (Bulk bulk : List.copyOf(bulks.values())) driveBulk(bulk, physical);
+    repairBulkAcknowledgements(physical);
     attempts.reconcile(OperationKind.INGEST, row -> row.descriptor().operationRef() == null
         ? reconcileChild(row, physical)
         : reconcileParent(row, physical, openChildParents, unknownChild[0]));
@@ -812,6 +909,548 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     else completion.complete(OperationResult.failure("Recorded ingestion could not complete", receipt.code(), Map.of(), false));
   }
 
+  private static BulkReindexProgress capturing(Bulk bulk) {
+    return new BulkReindexProgress("g-" + bulk.row.key(), bulk.plan.target(),
+        BulkReindexProgress.Phase.CAPTURING, null, null);
+  }
+
+  private BulkReindexProgress bulkProgress(Bulk bulk) {
+    var progress = operations.bulkReindexProgress(bulk.row.id()).orElseThrow(
+        () -> new JobQueue.RecordedWalkGapException("Bulk operation progress disappeared"));
+    if (!progress.generationId().equals("g-" + bulk.row.key()) || !progress.target().equals(bulk.plan.target())) {
+      throw new JobQueue.RecordedWalkGapException("Bulk target binding changed");
+    }
+    return progress;
+  }
+
+  private JobQueue.WalkProgress bulkWalk(Bulk bulk, Attached physical) {
+    var walk = physical.queue.recordedWalk(bulk.row.key()).orElseThrow(
+        () -> new JobQueue.RecordedWalkGapException("Captured bulk walk disappeared"));
+    if (!walk.capturedPlan() || !walk.planHash().equals(bulk.plan.planHash())) {
+      throw new JobQueue.RecordedWalkGapException("Captured bulk plan binding changed");
+    }
+    return walk;
+  }
+
+  private static BulkReindexProgress.Capture capture(JobQueue.WalkProgress walk) {
+    if (walk.enumerationOutcome() != JobQueue.WalkEnumerationOutcome.COMPLETE) {
+      throw new JobQueue.RecordedWalkGapException("Bulk capture is not complete");
+    }
+    return new BulkReindexProgress.Capture(walk.manifestSha256(), walk.plannedUnits());
+  }
+
+  private String bulkRefusalReason(Bulk bulk) {
+    if (bulk.refusalCode != null) return bulk.refusalCode;
+    if (bulk.cancelled || (bulk.work != null && bulk.work.cancellationReason().isPresent())) return "cancelled";
+    if (bulk.work == null) return "RECOVERY_AUTHORIZATION_REFUSED";
+    var decision = authority.evaluateRecordedBulk(bulk.row, bulk.preparation);
+    if (decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Refused refused) return refused.receipt().code();
+    var authorized = (OperationAuthority.RecordedBulkRecoveryDecision.Authorized) decision;
+    return bulk.plan.equals(authorized.plan()) ? null : "RECOVERY_BINDING_INVALID";
+  }
+
+  private boolean bulkAuthorized(Bulk bulk) {
+    return bulkRefusalReason(bulk) == null;
+  }
+
+  private boolean bulkClaimAllowed(Bulk bulk) {
+    Attached physical = attached;
+    if (physical == null || physical != bulk.physical || physical.stopping || !bulk.ready
+        || !physical.online.getAsBoolean() || !bulkAuthorized(bulk)) return false;
+    try {
+      var runtime = physical.bulkRuntime.current();
+      return runtime.isPresent() && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.BUILDING
+          && ("g-" + bulk.row.key()).equals(runtime.orElseThrow().writableGeneration());
+    } catch (IOException unavailable) { return false; }
+  }
+
+  @Override public boolean recordedCutoverReady(String operationKey) {
+    Bulk bulk = bulkPermissions.get(operationKey);
+    return bulk != null && bulkClaimAllowed(bulk);
+  }
+
+  @Override public boolean beforeRecordedPromotion(String operationKey, JobQueue queue) {
+    synchronized (lock) {
+      Bulk bulk = bulks.get(operationKey);
+      Attached physical = attached;
+      if (bulk == null || physical == null || physical.queue != queue || !bulkClaimAllowed(bulk)) return false;
+      if (bulkProgress(bulk).refusalCode() != null) return false;
+      if (!checkpointBulkSettlement(bulk, physical)) return false;
+      return bulkAuthorized(bulk) && bulkClaimAllowed(bulk);
+    }
+  }
+
+  @Override public IndexGenerationManager.State promoteRecordedGeneration(String operationKey,
+      JobQueue queue, CheckedPromotion promotion) throws IOException {
+    synchronized (lock) {
+      if (!beforeRecordedPromotion(operationKey, queue)) return null;
+      return promotion.promote();
+    }
+  }
+
+  private Reconciliation reconcileBulk(OperationRecord row, Attached physical) {
+    if (physical.stopping || physical.bulkProducer == null || bulks.containsKey(row.key())) return new Reconciliation.Wait();
+    OperationStore.Preparation stored;
+    RecordedBulkPlan plan;
+    try {
+      stored = preparation(row);
+      plan = new RecordedBulkPlanResolver().resolve(row, stored);
+      var progress = operations.bulkReindexProgress(row.id());
+      if (progress.isPresent() && progress.orElseThrow().refusalCode() != null) {
+        return reconcileBulkRefusal(row, plan, physical, progress.orElseThrow().refusalCode());
+      }
+      var decision = authority.evaluateRecordedBulk(row, stored);
+      if (decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Refused refused) {
+        return reconcileBulkRefusal(row, plan, physical, refused.receipt().code());
+      }
+      var runtime = physical.bulkRuntime.current();
+      if (progress.isPresent() && progress.orElseThrow().phase() == BulkReindexProgress.Phase.SETTLED
+          && promotedTarget(row.key(), runtime)) {
+        requireBulkSettlement(row, plan, physical, progress.orElseThrow());
+        return progress.orElseThrow().settlement().gaps().isEmpty()
+            ? new Reconciliation.Complete(new OperationReceipt("SUCCESS", null))
+            : failed("PROMOTED_WITH_GAPS");
+      }
+    } catch (IOException unavailable) { return new Reconciliation.Wait(); }
+    catch (IllegalArgumentException | JobQueue.RecordedWalkGapException invalid) {
+      return physical.queue.hasIssuedRecordedClaims(row.key()) ? new Reconciliation.Wait()
+          : failed(RecordedIngestionSettlement.UNAVAILABLE);
+    }
+    if (row.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS) {
+      return reconcileBulkRefusal(row, plan, physical, RecordedIngestionSettlement.EXHAUSTED);
+    }
+    return new Reconciliation.Resume(handle -> {
+      var bulk = new Bulk(row, stored, plan, handle, row.state() == OperationState.ACCEPTED);
+      bulks.put(row.key(), bulk);
+      if (operations.bulkReindexProgress(row.id()).isEmpty()) attempts.checkpointBulkReindex(handle, capturing(bulk));
+      advanced = true;
+      return pending(bulk.completion);
+    });
+  }
+
+  private Reconciliation reconcileBulkRefusal(OperationRecord row, RecordedBulkPlan plan,
+      Attached physical, String reason) {
+    physical.bulkRefusalRestartKeys.add(row.key());
+    if (physical.queue.hasIssuedRecordedClaims(row.key())) return new Reconciliation.Wait();
+    var found = physical.queue.recordedWalk(row.key());
+    var observedProgress = operations.bulkReindexProgress(row.id());
+    if (observedProgress.isEmpty()) return bulkRefusalDecision(found.isEmpty() ? reason : RecordedIngestionSettlement.UNAVAILABLE);
+    var progress = observedProgress.orElseThrow();
+    if (!progress.generationId().equals("g-" + row.key()) || !progress.target().equals(plan.target())) {
+      return failed(RecordedIngestionSettlement.UNAVAILABLE);
+    }
+    if (progress.refusalCode() == null) {
+      advanced = true;
+      return new Reconciliation.CheckpointBulkAndWait(progress.withRefusal(reason));
+    }
+    reason = progress.refusalCode();
+    if (found.isEmpty()) return bulkRefusalDecision(reason);
+    var walk = found.orElseThrow();
+    if (!walk.capturedPlan() || !walk.planHash().equals(plan.planHash())) {
+      return failed(RecordedIngestionSettlement.UNAVAILABLE);
+    }
+    if (walk.enumerationClosedAt() == null) {
+      physical.queue.closeRecordedWalkEnumeration(row.key(), walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.FAILED);
+    } else if (walk.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE) {
+      physical.queue.retireRefusedRecordedWalk(row.key(), plan.planHash());
+    }
+    physical.queue.trySealRecordedWalk(row.key());
+    if (physical.queue.sealedRecordedWalkReceipt(row.key()).isEmpty()) return new Reconciliation.Wait();
+    if (progress.phase() != BulkReindexProgress.Phase.CAPTURING) {
+      var settled = physical.queue.capturedWalkSettlement(row.key()).orElseThrow(
+          () -> new JobQueue.RecordedWalkGapException("Refused bulk settlement disappeared"));
+      var next = settlementProgress(row.key(), plan, settled).withRefusal(reason);
+      if (!progress.capture().equals(next.capture())
+          || (progress.phase() == BulkReindexProgress.Phase.SETTLED && !progress.equals(next))) {
+        return failed(RecordedIngestionSettlement.UNAVAILABLE);
+      }
+      if (!progress.equals(next)) {
+        advanced = true;
+        return new Reconciliation.CheckpointBulkAndWait(next);
+      }
+      requireBulkSettlement(row, plan, physical, progress);
+    }
+    return bulkRefusalDecision(reason);
+  }
+
+  private static Reconciliation bulkRefusalDecision(String reason) {
+    return "cancelled".equals(reason) ? new Reconciliation.Cancelled(new OperationReceipt(reason, null)) : failed(reason);
+  }
+
+  private void observeBulkCancellation(Bulk bulk) {
+    bulk.cancellationSubscription = bulk.work.onCancel(reason -> {
+      bulk.cancelled = true;
+      synchronized (lock) {
+        bulkPermissions.remove(bulk.row.key());
+        CancelToken cancellation = bulk.cancellation;
+        if (cancellation != null) cancellation.cancel(reason);
+      }
+      maintain();
+    });
+  }
+
+  private void driveBulk(Bulk bulk, Attached physical) {
+    var row = operations.find(bulk.row.key()).orElseThrow();
+    if (row.state().terminal()) {
+      bulkPermissions.remove(row.key());
+      bulk.ready = false;
+      if (bulk.refusalCode != null) physical.bulkRefusalRestartKeys.add(row.key());
+      acknowledgeBulk(row, bulk.plan, physical);
+      if (bulks.remove(row.key(), bulk)) advanced = true;
+      if (bulk.cancellationSubscription != null) bulk.cancellationSubscription.close();
+      if (bulk.work != null) bulk.work.close();
+      return;
+    }
+    if (bulk.completion.isDone() || physical.stopping || physical.bulkProducer == null) return;
+    if (bulk.physical != physical) {
+      bulkPermissions.remove(row.key());
+      bulk.physical = physical;
+      bulk.ready = false;
+      bulk.exit = null;
+      bulk.notification = null;
+      bulk.cancellation = null;
+      bulk.restartRequested = false;
+      bulk.started = false;
+    }
+    if (bulk.work == null) {
+      try { bulk.work = admission.attach(unattached(row.context())); observeBulkCancellation(bulk); }
+      catch (EngineAdmissionException unavailable) {
+        if (unavailable.reason() == EngineAdmissionException.Reason.WORK_FINISHED) throw unavailable;
+        return;
+      }
+    }
+    try {
+      var progress = bulkProgress(bulk);
+      bulk.refusalCode = progress.refusalCode();
+      String refusal = bulkRefusalReason(bulk);
+      if (refusal != null) {
+        refuseBulk(bulk, physical, refusal);
+        return;
+      }
+      var runtime = physical.bulkRuntime.current();
+      if (progress.phase() == BulkReindexProgress.Phase.SETTLED && promotedTarget(row.key(), runtime)) {
+        requireBulkSettlement(row, bulk.plan, physical, progress);
+        bulkPermissions.remove(row.key());
+        if (progress.settlement().gaps().isEmpty()) bulk.completion.complete(OperationResult.success("Bulk rebuild completed"));
+        else finish(bulk.completion, new OperationReceipt("PROMOTED_WITH_GAPS", null));
+        return;
+      }
+      if (progress.phase() == BulkReindexProgress.Phase.SETTLED && runtime.isPresent()
+          && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
+          && progress.generationId().equals(runtime.orElseThrow().activeGeneration())
+          && (!runtime.orElseThrow().promotedBoot() || runtime.orElseThrow().writableGeneration() == null)) {
+        // The old process can observe the pointer before its replacement proves the new writer.
+        bulkPermissions.remove(row.key());
+        bulk.ready = false;
+        return;
+      }
+      if (runtime.isPresent() && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.FENCED) {
+        refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
+        return;
+      }
+      if (bulk.started && runtime.isEmpty()) {
+        finishBulkStart(bulk, physical, bulkWalk(bulk, physical));
+        return;
+      }
+      if (progress.phase() == BulkReindexProgress.Phase.CAPTURING) {
+        if (runtime.isPresent() && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.BUILDING) {
+          // Exact state-before-binding crash: queue capture and the boot target witness already agree.
+          progress = new BulkReindexProgress(progress.generationId(), bulk.plan.target(),
+              BulkReindexProgress.Phase.BUILDING, capture(bulkWalk(bulk, physical)), null);
+          attempts.checkpointBulkReindex(bulk.handle, progress);
+        } else {
+          captureBulk(bulk, physical);
+          return;
+        }
+      }
+      if (runtime.isPresent() && runtime.orElseThrow().disposition() != IndexGenerationManager.BootDisposition.BUILDING) {
+        refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
+        return;
+      }
+      if (runtime.isPresent() && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.BUILDING
+          && progress.generationId().equals(runtime.orElseThrow().writableGeneration())) {
+        if (!progress.capture().equals(capture(bulkWalk(bulk, physical)))) {
+          throw new JobQueue.RecordedWalkGapException("Bulk capture differs from durable operation progress");
+        }
+        bulk.ready = true;
+        Bulk previous = bulkPermissions.put(row.key(), bulk);
+        if (previous == null) physical.queue.recoverStuckJobs();
+      }
+    } catch (IOException unavailable) {
+      bulkPermissions.remove(row.key());
+      log.debug("Bulk generation observation awaits readable current state", unavailable);
+    } catch (JobQueue.RecordedWalkGapException unavailable) {
+      bulkPermissions.remove(row.key());
+      if (!physical.queue.hasIssuedRecordedClaims(row.key())) {
+        finish(bulk.completion, new OperationReceipt(RecordedIngestionSettlement.UNAVAILABLE, null));
+      }
+    }
+  }
+
+  private void captureBulk(Bulk bulk, Attached physical) {
+    if (bulk.restartRequested || !physical.online.getAsBoolean()) return;
+    var context = bulk.work.context();
+    if (!bulk.plan.scope().generation().equals(physical.bulkIndexing.captureRebuildGeneration(context))
+        || !bulk.plan.target().equals(physical.bulkIndexing.captureIndexTarget(context))) {
+      refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
+      return;
+    }
+    if (bulk.exit == null) {
+      var existing = physical.queue.recordedWalk(bulk.row.key());
+      if (existing.isEmpty() && !bulk.createIfMissing) {
+        throw new JobQueue.RecordedWalkGapException("Interrupted bulk capture lost its queue evidence");
+      }
+      var walk = physical.queue.beginCapturedWalk(bulk.row.key(), bulk.plan.planHash(), bulk.createIfMissing);
+      bulk.createIfMissing = false;
+      bulk.epoch = walk.enumerationEpoch();
+      if (walk.enumerationClosedAt() == null) {
+        bulk.cancellation = new CancelToken();
+        if (!bulkAuthorized(bulk)) return;
+        try {
+          bulk.exit = physical.bulkProducer.enumerate(bulk.plan.scope(), bulk.row.key(), bulk.epoch,
+              context, bulk.cancellation).toCompletableFuture();
+        } catch (RuntimeException failure) {
+          bulk.exit = CompletableFuture.failedFuture(failure);
+        }
+        bulk.notification = bulk.exit.handle((ignored, failure) -> {
+          try { maintain(); }
+          catch (RuntimeException retryable) { log.error("Captured producer completion awaits maintenance", retryable); }
+          return null;
+        });
+      }
+    }
+    if (bulk.exit != null && !bulk.exit.isDone()) return;
+    flushBulkEnumeration(bulk, physical);
+    var walk = bulkWalk(bulk, physical);
+    if (walk.enumerationClosedAt() == null) return;
+    if (walk.enumerationOutcome() != JobQueue.WalkEnumerationOutcome.COMPLETE) {
+      refuseBulk(bulk, physical, bulk.cancelled ? "cancelled" : "BULK_CAPTURE_FAILED");
+      return;
+    }
+    if (!bulkAuthorized(bulk)) { refuseBulk(bulk, physical, "RECOVERY_AUTHORIZATION_REFUSED"); return; }
+    if (!bulk.plan.scope().generation().equals(physical.bulkIndexing.captureRebuildGeneration(context))
+        || !bulk.plan.target().equals(physical.bulkIndexing.captureIndexTarget(context))) {
+      refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
+      return;
+    }
+    finishBulkStart(bulk, physical, walk);
+  }
+
+  private void finishBulkStart(Bulk bulk, Attached physical, JobQueue.WalkProgress walk) {
+    if (bulk.restartRequested || !bulkAuthorized(bulk)) return;
+    var outcome = physical.bulkIndexing.startRecordedMigration(bulk.row.key(), bulk.plan.source(),
+        bulk.plan.target().fingerprint(), bulk.plan.scope().generation(), bulk.work.context());
+    String target = "g-" + bulk.row.key();
+    if (!outcome.accepted() || !target.equals(outcome.buildingGenerationId())
+        || !bulk.plan.scope().generation().equals(outcome.activeGenerationId())
+        || !("MIGRATING".equals(outcome.migrationState()) || "SWITCHING".equals(outcome.migrationState()))) {
+      refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
+      return;
+    }
+    bulk.started = true;
+    attempts.checkpointBulkReindex(bulk.handle, new BulkReindexProgress(target, bulk.plan.target(),
+        BulkReindexProgress.Phase.BUILDING, capture(walk), null));
+    if (!bulkAuthorized(bulk)) { refuseBulk(bulk, physical, "RECOVERY_AUTHORIZATION_REFUSED"); return; }
+    bulk.restartRequested = true;
+    try { physical.bulkRestart.run(); }
+    catch (RuntimeException unavailable) { bulk.restartRequested = false; throw unavailable; }
+  }
+
+  private void flushBulkEnumeration(Bulk bulk, Attached physical) {
+    if (bulk.physical != physical || bulk.exit == null || !bulk.exit.isDone()) return;
+    JobQueue.WalkEnumerationOutcome outcome;
+    try { outcome = bulk.exit.join(); }
+    catch (java.util.concurrent.CompletionException | CancellationException failure) {
+      if (physical.stopping && !bulk.cancelled) return;
+      outcome = bulk.cancelled ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.FAILED;
+    }
+    if (outcome == JobQueue.WalkEnumerationOutcome.CANCELLED && physical.stopping && !bulk.cancelled) return;
+    var walk = bulkWalk(bulk, physical);
+    if (walk.enumerationEpoch() != bulk.epoch) throw new JobQueue.RecordedWalkGapException("Captured producer epoch changed");
+    if (walk.enumerationClosedAt() == null) physical.queue.closeRecordedWalkEnumeration(bulk.row.key(), bulk.epoch, outcome);
+  }
+
+  private boolean checkpointBulkSettlement(Bulk bulk, Attached physical) {
+    var progress = bulkProgress(bulk);
+    if (progress.phase() == BulkReindexProgress.Phase.CAPTURING) return false;
+    var walk = bulkWalk(bulk, physical);
+    if (!progress.capture().equals(capture(walk))) throw new JobQueue.RecordedWalkGapException("Bulk capture changed before settlement");
+    if (physical.queue.hasIssuedRecordedClaims(bulk.row.key())) return false;
+    physical.queue.trySealRecordedWalk(bulk.row.key());
+    var settled = physical.queue.capturedWalkSettlement(bulk.row.key());
+    if (settled.isEmpty()) return false;
+    var next = settlementProgress(bulk.row.key(), bulk.plan, settled.orElseThrow());
+    if (progress.refusalCode() != null) next = next.withRefusal(progress.refusalCode());
+    if (progress.phase() == BulkReindexProgress.Phase.SETTLED && !progress.equals(next)) {
+      throw new JobQueue.RecordedWalkGapException("Immutable bulk settlement changed");
+    }
+    if (!progress.equals(next)) attempts.checkpointBulkReindex(bulk.handle, next);
+    return true;
+  }
+
+  private static BulkReindexProgress settlementProgress(String key, RecordedBulkPlan plan,
+      JobQueue.CapturedWalkSettlement settlement) {
+    var gaps = settlement.gaps().stream().map(unit -> new OperationOutcomeView.Gap(unit.pathHash(), unit.reasonCode())).toList();
+    var history = settlement.processingHistory().stream().map(unit -> new BulkReindexProgress.ProcessingEvent(
+        unit.pathHash(), unit.unitRevision(), unit.plannedSourceSha256(), unit.contentHash(), unit.coverage(),
+        unit.outcomeClass(), unit.reasonCode(), unit.retryPolicy())).toList();
+    return new BulkReindexProgress("g-" + key, plan.target(), BulkReindexProgress.Phase.SETTLED,
+        new BulkReindexProgress.Capture(settlement.manifestSha256(), settlement.plannedUnits()),
+        new BulkReindexProgress.Settlement(settlement.revision(), settlement.sha256(), settlement.failedEvents(),
+            settlement.supersededEvents(), gaps, history));
+  }
+
+  private static boolean promotedTarget(String key, Optional<BulkRuntime> runtime) {
+    return runtime.isPresent() && runtime.orElseThrow().promotedBoot()
+        && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
+        && ("g-" + key).equals(runtime.orElseThrow().activeGeneration())
+        && ("g-" + key).equals(runtime.orElseThrow().writableGeneration())
+        && "IDLE".equals(runtime.orElseThrow().migrationState());
+  }
+
+  private static void requireBulkSettlement(OperationRecord row, RecordedBulkPlan plan,
+      Attached physical, BulkReindexProgress progress) {
+    var walk = physical.queue.recordedWalk(row.key()).orElseThrow(
+        () -> new JobQueue.RecordedWalkGapException("Bulk settlement walk disappeared"));
+    if (!walk.capturedPlan() || !walk.planHash().equals(plan.planHash())) {
+      throw new JobQueue.RecordedWalkGapException("Bulk settlement plan changed");
+    }
+    var settled = physical.queue.capturedWalkSettlement(row.key()).orElseThrow(
+        () -> new JobQueue.RecordedWalkGapException("Bulk settlement disappeared"));
+    var expected = settlementProgress(row.key(), plan, settled);
+    if (progress.refusalCode() != null) expected = expected.withRefusal(progress.refusalCode());
+    if (!progress.equals(expected)
+        || progress.unitsCompleted() != row.unitsCompleted() || progress.unitsFailed() != row.unitsFailed()) {
+      throw new JobQueue.RecordedWalkGapException("Bulk operation and queue settlement disagree");
+    }
+  }
+
+  private void refuseBulk(Bulk bulk, Attached physical, String reason) {
+    bulkPermissions.remove(bulk.row.key());
+    bulk.ready = false;
+    var progress = bulkProgress(bulk);
+    if (progress.refusalCode() == null) {
+      String currentRefusal = bulkRefusalReason(bulk);
+      if (currentRefusal != null) reason = currentRefusal;
+      progress = progress.withRefusal(reason);
+      attempts.checkpointBulkReindex(bulk.handle, progress);
+    }
+    reason = progress.refusalCode();
+    bulk.refusalCode = reason;
+    if (bulk.cancellation != null) bulk.cancellation.cancel(reason);
+    if ((bulk.exit != null && !bulk.exit.isDone()) || physical.queue.hasIssuedRecordedClaims(bulk.row.key())) return;
+    var found = physical.queue.recordedWalk(bulk.row.key());
+    if (found.isPresent()) {
+      var walk = bulkWalk(bulk, physical);
+      if (walk.enumerationClosedAt() == null) physical.queue.closeRecordedWalkEnumeration(bulk.row.key(),
+          walk.enumerationEpoch(), "cancelled".equals(reason) ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.FAILED);
+      else if (walk.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE) {
+        physical.queue.retireRefusedRecordedWalk(bulk.row.key(), bulk.plan.planHash());
+      }
+      physical.queue.trySealRecordedWalk(bulk.row.key());
+      if (bulkProgress(bulk).phase() != BulkReindexProgress.Phase.CAPTURING
+          && !checkpointBulkSettlement(bulk, physical)) return;
+    }
+    finish(bulk.completion, new OperationReceipt(reason, null));
+  }
+
+  private void acknowledgeBulk(OperationRecord row, RecordedBulkPlan plan, Attached physical) {
+    if (!row.state().terminal()) return;
+    var walk = physical.queue.recordedWalk(row.key());
+    if (walk.isEmpty()) return;
+    if (!walk.orElseThrow().capturedPlan() || !walk.orElseThrow().planHash().equals(plan.planHash())) {
+      throw new JobQueue.RecordedWalkGapException("Terminal bulk plan changed");
+    }
+    var receipt = physical.queue.sealedRecordedWalkReceipt(row.key());
+    if (receipt.isEmpty()) return;
+    var progress = operations.bulkReindexProgress(row.id()).orElseThrow(
+        () -> new JobQueue.RecordedWalkGapException("Terminal bulk progress disappeared"));
+    if (!progress.generationId().equals("g-" + row.key()) || !progress.target().equals(plan.target())) {
+      throw new JobQueue.RecordedWalkGapException("Terminal bulk target changed");
+    }
+    String code = row.receipt() == null ? null : row.receipt().code();
+    if (progress.refusalCode() != null) {
+      if (!progress.refusalCode().equals(code)
+          || row.state() != ("cancelled".equals(code) ? OperationState.CANCELLED : OperationState.FAILED)) {
+        throw new JobQueue.RecordedWalkGapException("Terminal bulk refusal does not match its durable decision");
+      }
+    } else if (!((row.state() == OperationState.COMPLETE && "SUCCESS".equals(code))
+        || (row.state() == OperationState.FAILED && "PROMOTED_WITH_GAPS".equals(code)))) {
+      throw new JobQueue.RecordedWalkGapException("Terminal bulk lacks a matching completion or refusal witness");
+    }
+    if (progress.phase() == BulkReindexProgress.Phase.SETTLED) {
+      requireBulkSettlement(row, plan, physical, progress);
+      if ((row.state() == OperationState.COMPLETE && !progress.settlement().gaps().isEmpty())
+          || ("PROMOTED_WITH_GAPS".equals(code) && progress.settlement().gaps().isEmpty())) {
+        throw new JobQueue.RecordedWalkGapException("Terminal bulk completion contradicts its gaps");
+      }
+    } else if (progress.phase() != BulkReindexProgress.Phase.CAPTURING || progress.refusalCode() == null
+        || receipt.orElseThrow().completedUnits() != 0 || receipt.orElseThrow().failedUnits() != 0
+        || receipt.orElseThrow().currentFailedUnits() != 0 || row.unitsCompleted() != 0 || row.unitsFailed() != 0) {
+      throw new JobQueue.RecordedWalkGapException("Terminal bulk refusal lacks matching evidence");
+    }
+    physical.queue.acknowledgeRecordedWalk(row.key(), receipt.orElseThrow().revision());
+  }
+
+  private void restartAfterBulkRefusal(Attached physical) {
+    if (physical.stopping || physical.bulkRefusalRestartRequested || physical.bulkRestart == null
+        || physical.bulkRefusalRestartKeys.isEmpty()) return;
+    for (String key : physical.bulkRefusalRestartKeys) {
+      if (!operations.find(key).map(row -> row.state().terminal()).orElse(false)) return;
+    }
+    // A replacement releases an obsolete CAPTURING boot or fences an unowned refused Green.
+    physical.bulkRefusalRestartRequested = true;
+    try { physical.bulkRestart.run(); }
+    catch (RuntimeException unavailable) {
+      physical.bulkRefusalRestartRequested = false;
+      log.warn("Recorded refusal awaits its owned restart", unavailable);
+    }
+  }
+
+  private void repairBulkAcknowledgements(Attached physical) {
+    if (physical.bulkProducer == null || physical.stopping) return;
+    var keys = physical.queue.unacknowledgedCapturedWalkKeys(physical.bulkAckCursor, 256);
+    for (String key : keys) {
+      var row = operations.find(key);
+      if (row.isEmpty() || !row.orElseThrow().state().terminal() || !isBulk(row.orElseThrow())) continue;
+      try {
+        var plan = new RecordedBulkPlanResolver().resolve(row.orElseThrow(), preparation(row.orElseThrow()));
+        acknowledgeBulk(row.orElseThrow(), plan, physical);
+      } catch (IllegalArgumentException | JobQueue.RecordedWalkGapException mismatch) {
+        log.warn("Retaining contradictory terminal bulk acknowledgement evidence for {}", key, mismatch);
+      }
+    }
+    physical.bulkAckCursor = keys.size() == 256 ? keys.getLast() : null;
+    // The cursor strictly advances, including across retained contradictions; finish this inventory.
+    if (physical.bulkAckCursor != null) advanced = true;
+  }
+
+  private static final class Bulk {
+    final OperationRecord row;
+    final OperationStore.Preparation preparation;
+    final RecordedBulkPlan plan;
+    final OperationRecordHandle handle;
+    final CompletableFuture<OperationResult> completion = new CompletableFuture<>();
+    volatile Attached physical;
+    EngineWorkHandle work;
+    EngineWorkHandle.Registration cancellationSubscription;
+    volatile boolean cancelled;
+    volatile String refusalCode;
+    volatile boolean ready;
+    boolean createIfMissing;
+    boolean restartRequested;
+    boolean started;
+    long epoch;
+    volatile CancelToken cancellation;
+    CompletableFuture<JobQueue.WalkEnumerationOutcome> exit;
+    CompletableFuture<Void> notification;
+    Bulk(OperationRecord row, OperationStore.Preparation preparation, RecordedBulkPlan plan,
+        OperationRecordHandle handle, boolean createIfMissing) {
+      this.row = row; this.preparation = preparation; this.plan = plan; this.handle = handle;
+      this.createIfMissing = createIfMissing;
+    }
+  }
+
   private static final class Parent {
     final OperationRecord row;
     final OperationStore.Preparation preparation;
@@ -861,13 +1500,22 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     final JobQueue queue;
     final CheckedServingGeneration generation;
     final BooleanSupplier online;
+    final CheckedBulkRuntime bulkRuntime;
     final RecordedIngestionSettlement settlement;
     volatile boolean stopping;
     boolean flushing;
     Producer producer;
+    Producer bulkProducer;
+    IndexingService bulkIndexing;
+    Runnable bulkRestart;
+    String bulkAckCursor;
+    final Set<String> bulkRefusalRestartKeys = new HashSet<>();
+    boolean bulkRefusalRestartRequested;
     JobQueue.WalkSubscription queueSubscription;
     AutoCloseable operationSubscription;
-    Attached(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online) {
+    Attached(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online,
+        CheckedBulkRuntime bulkRuntime) {
+      this.bulkRuntime = Objects.requireNonNull(bulkRuntime, "bulkRuntime");
       this.queue = Objects.requireNonNull(queue, "queue"); this.generation = Objects.requireNonNull(generation, "generation");
       this.online = Objects.requireNonNull(online, "online"); this.settlement = new RecordedIngestionSettlement(operations, queue);
     }
@@ -879,7 +1527,13 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       synchronized (lock) {
         if (attached != this) return;
         permissions.clear();
+        bulkPermissions.clear();
         stopping = true;
+        for (Bulk bulk : bulks.values()) {
+          if (bulk.exit != null && !bulk.exit.isDone()) throw new IOException("Captured producer still running");
+          if (queue.hasIssuedRecordedClaims(bulk.row.key())) throw new IOException("Captured claim still running");
+          flushBulkEnumeration(bulk, this);
+        }
         for (Parent parent : parents.values()) {
           parent.fresh = false;
           if (parent.child != null) {

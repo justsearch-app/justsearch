@@ -1,5 +1,6 @@
 package io.justsearch.adapters.lucene.runtime;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -12,12 +13,14 @@ import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
+import io.justsearch.indexing.runtime.IndexOpenGuard;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import io.justsearch.indexing.runtime.IndexOpenGuard;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.yaml.YAMLFactory;
@@ -319,9 +324,121 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   }
 
   // ==========================================================================
-  // C3 — body corruption (628 Stage A+B): detect → recover → rebuild-pending marker
+  // Recovery opt-out — preserve externally owned index payload
   // ==========================================================================
 
+  @ParameterizedTest
+  @EnumSource(CorruptOpenMode.class)
+  void withoutRecoveryPreservesCorruptIndexEvenWhenRecoveryConfigIsEnabled(CorruptOpenMode mode)
+      throws Exception {
+    Path dataRoot = dataDir();
+    Path indexPath = dataRoot.resolve("corrupt-no-recovery-" + mode.name().toLowerCase(java.util.Locale.ROOT));
+    Files.createDirectories(indexPath);
+    IndexSchema schema = buildSchemaWithDim(4);
+
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).open();
+    seed.indexingCoordinator()
+        .indexSingle(
+            new IndexDocument(
+                Map.of(
+                    SchemaFields.DOC_ID, "doc-1",
+                    SchemaFields.DOC_UID, "doc-1#0",
+                    SchemaFields.CONTENT, "original content")));
+    seed.commitOps().commitAndTrack();
+    seed.close();
+    corruptSegmentsFile(indexPath);
+
+    IndexSnapshot before = snapshotIndex(indexPath);
+    ResolvedConfig recoveryEnabled = recoveryEnabledBackupFirstConfig();
+    var builder = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).withConfig(recoveryEnabled).withoutRecovery();
+
+    IndexRuntimeIOException failure = mode == CorruptOpenMode.READ_ONLY
+        ? assertThrows(IndexRuntimeIOException.class, () -> builder.openReadOnly())
+        : assertThrows(IndexRuntimeIOException.class, () -> builder.open());
+
+    assertEquals(IndexRuntimeIOException.Reason.CORRUPT_INDEX, failure.reason());
+    assertIndexUnchanged(indexPath, before);
+    assertEquals(0, listSiblingBackups(indexPath, indexPath.getFileName() + ".bak-").size(),
+        "withoutRecovery must not move the corrupt index to a sibling backup");
+  }
+
+  @Test
+  void withoutRecoveryPreservesWritableSchemaMismatchWithBackupFirstConfig() throws Exception {
+    Path dataRoot = dataDir();
+    Path indexPath = dataRoot.resolve("schema-no-recovery-writable");
+    Files.createDirectories(indexPath);
+    IndexSchema originalSchema = buildSchemaWithTitleType("text");
+    RunningRuntime seed = originalSchema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).open();
+    seed.indexingCoordinator()
+        .indexSingle(
+            new IndexDocument(
+                Map.of(
+                    SchemaFields.DOC_ID, "doc-1",
+                    SchemaFields.DOC_UID, "doc-1#0",
+                    SchemaFields.CONTENT, "original schema content",
+                    "title", "original title")));
+    seed.commitOps().commitAndTrack();
+    seed.close();
+
+    IndexSnapshot before = snapshotIndex(indexPath);
+    IndexSchema changedSchema = buildSchemaWithTitleType("keyword");
+    ResolvedConfig recoveryEnabled = recoveryEnabledBackupFirstConfig();
+    var builder = changedSchema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).withConfig(recoveryEnabled).withoutRecovery();
+
+    IndexRuntimeIOException failure =
+        assertThrows(IndexRuntimeIOException.class, () -> builder.open());
+
+    assertEquals(IndexRuntimeIOException.Reason.SCHEMA_MISMATCH, failure.reason());
+    assertIndexUnchanged(indexPath, before);
+    assertEquals(0, listSiblingBackups(indexPath, "schema-no-recovery-writable.bak-").size(),
+        "REBUILD_BACKUP_FIRST config cannot bypass withoutRecovery");
+    assertOriginalSchemaStillReadable(originalSchema, indexPath, dataRoot);
+    assertIndexUnchanged(indexPath, before);
+  }
+
+  @Test
+  void withoutRecoveryAllowsReadOnlySchemaMismatchWithoutChangingOriginalIndex() throws Exception {
+    Path dataRoot = dataDir();
+    Path indexPath = dataRoot.resolve("schema-no-recovery-readonly");
+    Files.createDirectories(indexPath);
+    IndexSchema originalSchema = buildSchemaWithTitleType("text");
+    RunningRuntime seed = originalSchema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).open();
+    seed.indexingCoordinator()
+        .indexSingle(
+            new IndexDocument(
+                Map.of(
+                    SchemaFields.DOC_ID, "doc-1",
+                    SchemaFields.DOC_UID, "doc-1#0",
+                    SchemaFields.CONTENT, "original schema content",
+                    "title", "original title")));
+    seed.commitOps().commitAndTrack();
+    seed.close();
+
+    IndexSnapshot before = snapshotIndex(indexPath);
+    IndexSchema changedSchema = buildSchemaWithTitleType("keyword");
+    ResolvedConfig recoveryEnabled = recoveryEnabledBackupFirstConfig();
+    var readOnly = changedSchema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).withConfig(recoveryEnabled).withoutRecovery().openReadOnly();
+
+    try {
+      SearchResult result = readOnly.readPathOps()
+          .search(new MatchAllDocsQuery(), 10, Set.of(), RuntimeSearchSort.RELEVANCE, null);
+      assertEquals(1, result.hits().size(), "read-only schema mismatch may continue serving the original index");
+    } finally {
+      readOnly.close();
+    }
+
+    assertIndexUnchanged(indexPath, before);
+    assertEquals(0, listSiblingBackups(indexPath, "schema-no-recovery-readonly.bak-").size(),
+        "read-only mismatch logging must not trigger the backup-first policy");
+  }
+
+  // C3 — body corruption (628 Stage A+B): detect → recover → rebuild-pending marker
   @Test
   void bodyCorruptionRecoversAndDropsRebuildMarker() throws Exception {
     Path dataRoot = dataDir();
@@ -518,8 +635,58 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
       return stream
           .filter(p -> p.getFileName().toString().startsWith(prefix))
           .sorted(Comparator.comparing(Path::getFileName))
-          .toList();
+        .toList();
     }
+  }
+
+  private void assertOriginalSchemaStillReadable(IndexSchema schema, Path indexPath, Path dataRoot)
+      throws Exception {
+    ReadOnlyRuntime original = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).withoutRecovery().openReadOnly();
+    try {
+      SearchResult result = original.readPathOps()
+          .search(new MatchAllDocsQuery(), 10, Set.of(), RuntimeSearchSort.RELEVANCE, null);
+      assertEquals(1, result.hits().size(), "the original committed document must remain searchable");
+    } finally {
+      original.close();
+    }
+  }
+
+  private static ResolvedConfig recoveryEnabledBackupFirstConfig() throws Exception {
+    ResolvedConfig config = resolvedConfigWith(
+        "index:\n  auto_recovery: true\n  schema_mismatch:\n    policy: REBUILD_BACKUP_FIRST\n");
+    assertTrue(config.index().indexAutoRecovery(), "the test must enable default corruption recovery");
+    assertEquals("REBUILD_BACKUP_FIRST", config.index().schemaMismatchPolicy());
+    return config;
+  }
+
+  /** Snapshot exact on-disk content, including any preexisting lock file. */
+  private static IndexSnapshot snapshotIndex(Path indexPath) throws IOException {
+    Map<Path, byte[]> files = new HashMap<>();
+    Set<Path> directories = new HashSet<>();
+    try (Stream<Path> paths = Files.walk(indexPath)) {
+      for (Path path : paths.toList()) {
+        Path relative = indexPath.relativize(path);
+        if (Files.isDirectory(path)) {
+          directories.add(relative);
+        } else if (Files.isRegularFile(path)) {
+          files.put(relative, Files.readAllBytes(path));
+        }
+      }
+    }
+    return new IndexSnapshot(files, directories);
+  }
+
+  private static void assertIndexUnchanged(Path indexPath, IndexSnapshot before) throws IOException {
+    IndexSnapshot after = snapshotIndex(indexPath);
+    assertEquals(before.directories(), after.directories(), "the original index directory layout must remain intact");
+    Set<Path> afterPaths = new HashSet<>(after.files().keySet());
+    Path writeLock = Path.of("write.lock");
+    // A failed Lucene writer open may leave its documented root-level lock file; ignore it only when new.
+    if (!before.files().containsKey(writeLock)) afterPaths.remove(writeLock);
+    assertEquals(before.files().keySet(), afterPaths, "the original index files must remain in place");
+    before.files().forEach((relative, bytes) ->
+        assertArrayEquals(bytes, after.files().get(relative), "original bytes changed at " + relative));
   }
 
   /**
@@ -609,4 +776,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
       }
     }
   }
+
+  private enum CorruptOpenMode { READ_ONLY, WRITABLE }
+
+  private record IndexSnapshot(Map<Path, byte[]> files, Set<Path> directories) {}
 }

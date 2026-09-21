@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 final class MigrationOutcomeProjectionTest {
   private static final String OPERATION_KEY = "01994180-0000-7000-8000-000000000121";
   private static final String TARGET_FINGERPRINT = "a".repeat(64);
+  private static final String SOURCE_GENERATION = "g-accepted-source";
 
   @ParameterizedTest
   @CsvSource({"true,true", "true,false", "false,false"})
@@ -51,23 +52,24 @@ final class MigrationOutcomeProjectionTest {
     when(calls.startMigration(any())).thenReturn(MigrationStartResponse.newBuilder()
         .setAccepted(true)
         .setRestartRequired(true)
-        .setActiveGenerationId("g-active")
+        .setActiveGenerationId(SOURCE_GENERATION)
         .setBuildingGenerationId("g-" + OPERATION_KEY)
         .setMigrationState("MIGRATING")
         .build());
     try (var client = new TestKnowledgeClient(
         new io.justsearch.core.execution.TestEngineExecutors(), null, calls, null)) {
       MigrationOutcome actual = client.startRecordedMigration(
-          OPERATION_KEY, "bulk_reindex", TARGET_FINGERPRINT,
+          OPERATION_KEY, "bulk_reindex", TARGET_FINGERPRINT, SOURCE_GENERATION,
           io.justsearch.app.services.TestEngineContexts.durableInternal());
 
       assertEquals(new MigrationOutcome(
-          true, true, "g-active", "g-" + OPERATION_KEY, "MIGRATING"), actual);
+          true, true, SOURCE_GENERATION, "g-" + OPERATION_KEY, "MIGRATING"), actual);
       ArgumentCaptor<MigrationStartRequest> request =
           ArgumentCaptor.forClass(MigrationStartRequest.class);
       verify(calls).startMigration(request.capture());
       assertEquals(OPERATION_KEY, request.getValue().getRecordedOperationKey());
       assertEquals(TARGET_FINGERPRINT, request.getValue().getTargetIndexFingerprint());
+      assertEquals(SOURCE_GENERATION, request.getValue().getExpectedSourceGeneration());
       assertEquals("bulk_reindex", request.getValue().getReason());
       assertTrue(request.getValue().getRestartWorker());
     }
@@ -80,11 +82,13 @@ final class MigrationOutcomeProjectionTest {
         new io.justsearch.core.execution.TestEngineExecutors(), null, calls, null)) {
       var context = io.justsearch.app.services.TestEngineContexts.durableInternal();
       assertFalse(
-          client.startRecordedMigration(OPERATION_KEY, "bulk_reindex", "", context).accepted());
+          client.startRecordedMigration(OPERATION_KEY, "bulk_reindex", "", SOURCE_GENERATION, context).accepted());
       assertFalse(
-          client.startRecordedMigration("", "bulk_reindex", TARGET_FINGERPRINT, context).accepted());
+          client.startRecordedMigration("", "bulk_reindex", TARGET_FINGERPRINT, SOURCE_GENERATION, context).accepted());
       assertFalse(
-          client.startRecordedMigration(null, "bulk_reindex", TARGET_FINGERPRINT, context).accepted());
+          client.startRecordedMigration(null, "bulk_reindex", TARGET_FINGERPRINT, SOURCE_GENERATION, context).accepted());
+      assertFalse(
+          client.startRecordedMigration(OPERATION_KEY, "bulk_reindex", TARGET_FINGERPRINT, "", context).accepted());
       verify(calls, never()).startMigration(any());
     }
   }

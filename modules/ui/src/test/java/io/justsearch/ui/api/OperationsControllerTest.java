@@ -91,6 +91,91 @@ final class OperationsControllerTest {
     verify(ctx).status(200);
   }
 
+  @Test
+  void migrationStartAliasNormalizesReasonForPreparedDispatchAndReturnsAcceptedReceipt() throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.fromString("0b05f8d6-c745-4cb0-8413-dc9501aaeb0c");
+    when(dispatcher.dispatch(any(), any(), any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce)))
+        .thenReturn(OperationResult.success(
+            "Recorded ingestion accepted",
+            Map.of("operationKey", key, "operationRecordId", 73)));
+
+    var ctx = mockContext("core.rebuild-index", """
+        {"reason":" Schema_Mismatch ","idempotencyKey":"%s",
+         "confirmationToken":"capsule","preparationNonce":"%s"}
+        """.formatted(key, nonce));
+    controller.handleMigrationStart(ctx);
+
+    verify(dispatcher).dispatch(
+        org.mockito.ArgumentMatchers.argThat(op -> op.id().equals(CoreOperationCatalog.REBUILD_INDEX)),
+        eq("{\"source\":\"schema_mismatch\"}"),
+        any(),
+        eq(Optional.of("capsule")),
+        any(),
+        eq(key),
+        eq(nonce));
+    verify(ctx).status(202);
+    JsonNode response = capture(ctx);
+    assertTrue(response.path("success").asBoolean());
+    assertEquals(key, response.path("structuredData").path("operationKey").asText());
+    assertEquals(73, response.path("structuredData").path("operationRecordId").asInt());
+  }
+
+  @Test
+  void migrationStartAliasMapsUnknownAndMissingReasonToManualAndLeavesOtherFieldsForSchema() throws Exception {
+    when(dispatcher.dispatch(any(), any(), any(), any(), any()))
+        .thenReturn(OperationResult.failure("Invalid bulk rebuild arguments", "BAD_REQUEST", Map.of(), false));
+    var unknown = mockContext("core.rebuild-index", "{\"reason\":\"future-source\",\"unexpected\":true}");
+    var missing = mockContext("core.rebuild-index", "{}");
+
+    controller.handleMigrationStart(unknown);
+    controller.handleMigrationStart(missing);
+
+    ArgumentCaptor<String> arguments = ArgumentCaptor.forClass(String.class);
+    verify(dispatcher, org.mockito.Mockito.times(2))
+        .dispatch(any(), arguments.capture(), any(), any(), any());
+    JsonNode unknownArguments = MAPPER.readTree(arguments.getAllValues().get(0));
+    assertEquals("manual", unknownArguments.path("source").asText());
+    assertTrue(unknownArguments.path("unexpected").asBoolean(), "non-control fields must reach the closed operation schema");
+    assertEquals("manual", MAPPER.readTree(arguments.getAllValues().get(1)).path("source").asText());
+
+    var rebuild = new CoreOperationCatalog().findById(CoreOperationCatalog.REBUILD_INDEX).orElseThrow();
+    var validator = new io.justsearch.app.services.registry.executor.OperationInputSchemaValidator();
+    assertTrue(rebuild.intf().inputs().contains("\"additionalProperties\":false"));
+    assertTrue(validator.validate(rebuild, unknownArguments.toString()).isPresent(),
+        "the existing rebuild schema must reject the retained unknown field");
+    assertTrue(validator.validate(rebuild, arguments.getAllValues().get(1)).isEmpty());
+    verify(unknown).status(200);
+    verify(missing).status(200);
+  }
+
+  @Test
+  void migrationStartAliasConfirmationUsesTheSharedPreconditionResponse() throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    var nonce = java.util.UUID.fromString("0b05f8d6-c745-4cb0-8413-dc9501aaeb0c");
+    var gate = new io.justsearch.agent.api.registry.ConfirmationRequiredException(
+        CoreOperationCatalog.REBUILD_INDEX,
+        io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM,
+        io.justsearch.agent.api.registry.ConfirmStrategy.Inline.INSTANCE,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED,
+        key,
+        nonce,
+        new io.justsearch.agent.api.registry.OperationApprovalPreview("Rebuild all watched roots"));
+    when(dispatcher.dispatch(any(), any(), any(), eq(Optional.empty()), any(), eq(key), eq(nonce)))
+        .thenThrow(gate);
+    var ctx = mockContext("core.rebuild-index", """
+        {"reason":"manual","idempotencyKey":"%s","preparationNonce":"%s"}
+        """.formatted(key, nonce));
+
+    controller.handleMigrationStart(ctx);
+
+    verify(dispatcher).dispatch(any(), eq("{\"source\":\"manual\"}"), any(), eq(Optional.empty()), any(), eq(key), eq(nonce));
+    verify(ctx).status(428);
+    JsonNode response = capture(ctx);
+    assertEquals(key, response.path("operationKey").asText());
+    assertEquals(nonce.toString(), response.path("preparationNonce").asText());
+  }
+
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void preparedPreviewReplacesRawContentInGateAndPendingPeek(boolean undo) throws Exception {

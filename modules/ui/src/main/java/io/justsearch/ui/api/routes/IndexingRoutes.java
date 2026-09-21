@@ -16,7 +16,6 @@ public final class IndexingRoutes {
     // watched-root-prefix prune can reach.
     app.delete("/api/indexing/collections", indexingController::handleDeleteCollection);
     app.post("/api/indexing/excludes/apply", indexingController::handleApplyExcludes);
-    app.post("/api/indexing/migration/start", indexingController::handleMigrationStart);
     app.post("/api/indexing/migration/cutover", indexingController::handleMigrationCutover);
     app.post("/api/indexing/migration/rollback", indexingController::handleMigrationRollback);
     app.post("/api/indexing/migration/pause", indexingController::handleMigrationPause);

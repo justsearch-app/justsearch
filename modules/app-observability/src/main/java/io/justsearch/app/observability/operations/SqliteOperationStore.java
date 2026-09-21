@@ -817,19 +817,21 @@ public final class SqliteOperationStore implements OperationStore {
       } else {
         var bound = previous.orElseThrow();
         if (!bound.generationId().equals(progress.generationId()) || !bound.target().equals(progress.target())) return false;
+        if (bound.refusalCode() != null && !bound.refusalCode().equals(progress.refusalCode())) return false;
         if (bound.phase() == progress.phase()) {
-          // Repeated checkpoints cannot replace the sealed projection, captured plan or target.
-          return bound.equals(progress);
-        }
-        if (progress.phase().ordinal() != bound.phase().ordinal() + 1
+          if (bound.equals(progress)) return true;
+          // A first refusal may be added, but no captured or sealed evidence can change with it.
+          if (bound.refusalCode() != null || progress.refusalCode() == null
+              || !bound.withRefusal(progress.refusalCode()).equals(progress)) return false;
+        } else if (progress.phase().ordinal() != bound.phase().ordinal() + 1
             || bound.capture() != null && !bound.capture().equals(progress.capture())) return false;
       }
       var settlement = progress.settlement();
-      var evidence = new BulkEvidence(1, progress.target().fingerprint(), progress.capture(),
+      var evidence = new BulkEvidence(2, progress.target().fingerprint(), progress.capture(),
           settlement == null ? null : settlement.revision(),
           settlement == null ? null : settlement.sha256(),
           settlement == null ? 0 : settlement.failedEvents(),
-          settlement == null ? 0 : settlement.supersededEvents());
+          settlement == null ? 0 : settlement.supersededEvents(), progress.refusalCode());
       try (var update = connection.prepareStatement("""
           UPDATE operations SET phase = ?, building_generation_id = ?, target_settings_json = ?,
             gaps_json = ?, processing_history_json = ?, processing_history_counts_json = ?,
@@ -865,8 +867,20 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   /** Versioned projection in the existing counts column; the queue retains the underlying ledger. */
-  private record BulkEvidence(int version, String targetFingerprint, BulkReindexProgress.Capture capture,
+  private record BulkEvidenceV1(int version, String targetFingerprint, BulkReindexProgress.Capture capture,
       Long sealedRevision, String settlementSha256, long failedEvents, long supersededEvents) {}
+  private record BulkEvidence(int version, String targetFingerprint, BulkReindexProgress.Capture capture,
+      Long sealedRevision, String settlementSha256, long failedEvents, long supersededEvents, String refusalCode) {}
+
+  private static BulkEvidence readBulkEvidence(String counts) {
+    var tree = BULK_JSON.readTree(counts);
+    if (tree != null && tree.path("version").asInt() == 1) {
+      var legacy = BULK_JSON.readValue(counts, BulkEvidenceV1.class);
+      return new BulkEvidence(2, legacy.targetFingerprint(), legacy.capture(), legacy.sealedRevision(),
+          legacy.settlementSha256(), legacy.failedEvents(), legacy.supersededEvents(), null);
+    }
+    return BULK_JSON.readValue(counts, BulkEvidence.class);
+  }
 
   private java.util.Optional<BulkReindexProgress> bulkProgressRow(long id) throws SQLException {
     try (var query = connection.prepareStatement("SELECT * FROM operations WHERE id = ?")) {
@@ -887,8 +901,8 @@ public final class SqliteOperationStore implements OperationStore {
               || phase == null || settings == null || gaps == null || history == null || counts == null) {
             throw new IllegalArgumentException("Invalid bulk progress ownership or partial projection");
           }
-          var evidence = BULK_JSON.readValue(counts, BulkEvidence.class);
-          if (evidence == null || evidence.version() != 1
+          var evidence = readBulkEvidence(counts);
+          if (evidence == null || evidence.version() != 2
               || (evidence.sealedRevision() == null) != (evidence.settlementSha256() == null)
               || evidence.sealedRevision() == null && (evidence.failedEvents() != 0 || evidence.supersededEvents() != 0)) {
             throw new IllegalArgumentException("Invalid bulk evidence version or settlement binding");
@@ -904,7 +918,7 @@ public final class SqliteOperationStore implements OperationStore {
               evidence.sealedRevision(), evidence.settlementSha256(), evidence.failedEvents(),
               evidence.supersededEvents(), parsedGaps, parsedHistory);
           var progress = new BulkReindexProgress(generation,
-              new IndexTargetSnapshot(evidence.targetFingerprint(), settings), parsedPhase, evidence.capture(), settlement);
+              new IndexTargetSnapshot(evidence.targetFingerprint(), settings), parsedPhase, evidence.capture(), settlement, evidence.refusalCode());
           if (row.unitsCompleted() != progress.unitsCompleted() || row.unitsFailed() != progress.unitsFailed()
               || !Objects.equals(row.checkpointCursor(), progress.cursor())) {
             throw new IllegalArgumentException("Bulk evidence and operation checkpoint disagree");

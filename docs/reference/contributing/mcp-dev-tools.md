@@ -234,6 +234,14 @@ only boundary.
 
 When an endpoint is not allowlisted, update the dev MCP implementation and this table together instead of bypassing the tool. (Whether the allowlist should exist at all is an open question — tempdoc 844 §11.5 argues a control with a sanctioned `curl` bypass is a tax rather than a control. Until that is decided, this table documents what is, not what should be.)
 
+`POST /api/indexing/migration/start` is an alias of the shared prepared
+`core.rebuild-index` operation. It uses normal operation-key, preparation-nonce and
+approval-token handling: confirmation returns 428; accepted success returns 202
+with the operation receipt used for outcome lookup. Its optional legacy `reason`
+is normalized to migration source (missing/unknown becomes `manual`); unknown extra
+fields remain schema errors. It no longer returns the direct migration
+`restartRequired` response or owns a separate short-lived migration lease.
+
 ## Search and Ingest
 
 - Use `justsearch.dev.search_query` for search checks instead of constructing search requests manually.

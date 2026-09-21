@@ -142,6 +142,7 @@ final class MigrationRestartRequiredTest {
         .setRestartWorker(true)
         .setRecordedOperationKey(OPERATION_KEY)
         .setTargetIndexFingerprint(TARGET_FINGERPRINT)
+        .setExpectedSourceGeneration(initial.active_generation())
         .build();
 
     MigrationStartResponse first = opsOver(indexBase).startMigration(request);
@@ -189,9 +190,15 @@ final class MigrationRestartRequiredTest {
     MigrationStartResponse fingerprintOnly = ops.startMigration(MigrationStartRequest.newBuilder()
         .setReason("bulk_reindex").setRestartWorker(true)
         .setTargetIndexFingerprint(TARGET_FINGERPRINT).build());
+    MigrationStartResponse missingSource = ops.startMigration(MigrationStartRequest.newBuilder()
+        .setReason("bulk_reindex").setRestartWorker(true)
+        .setRecordedOperationKey(OPERATION_KEY)
+        .setTargetIndexFingerprint(TARGET_FINGERPRINT).build());
 
     assertFalse(keyOnly.getAccepted());
     assertFalse(fingerprintOnly.getAccepted());
+    assertFalse(missingSource.getAccepted());
+    assertTrue(missingSource.getError().contains("source generation"));
     var unchanged = new IndexGenerationManager(indexBase).readStateBestEffort();
     assertEquals(initial.active_generation(), unchanged.active_generation());
     assertEquals(initial.building_generation(), unchanged.building_generation());

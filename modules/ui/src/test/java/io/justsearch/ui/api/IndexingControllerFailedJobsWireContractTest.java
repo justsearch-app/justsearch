@@ -148,8 +148,7 @@ class IndexingControllerFailedJobsWireContractTest {
             IndexingControllerFailedJobsWireContractTest::stubService,
             null,
             null,
-            null,
-            io.justsearch.app.api.OperationLeaseService.noOp());
+            null);
     WorkerCapability worker = new WorkerCapability();
     worker.transition(CapabilityHealth.READY, null);
     controller.setWorkerCapability(worker);

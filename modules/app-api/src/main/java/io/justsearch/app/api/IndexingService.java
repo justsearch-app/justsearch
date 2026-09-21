@@ -260,7 +260,7 @@ public interface IndexingService {
    * The operation owner must durably bind the returned witness before requesting that restart.
    */
   default MigrationOutcome startRecordedMigration(String operationKey, String reason,
-      String targetIndexFingerprint, EngineContext engineContext) {
+      String targetIndexFingerprint, String expectedSourceGeneration, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 

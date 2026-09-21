@@ -50,30 +50,63 @@ final class RecordedGenerationStartTest {
   void createsExactTargetIsIdempotentAndSurvivesPromotionAndNewManager() throws Exception {
     Path base = temp.resolve("exact-start");
     var manager = new IndexGenerationManager(base);
-    manager.initializeOrLoad();
+    String expectedSource = manager.initializeOrLoad().state().active_generation();
 
-    var created = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT);
+    var created = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, expectedSource);
     String target = IndexGenerationManager.recordedGenerationId(KEY);
     assertEquals(target, created.building_generation());
     assertEquals("MIGRATING", created.migration_state());
     assertRecordedMetadata(base, target, SOURCE, FINGERPRINT);
-    assertEquals(created, manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT),
+    assertEquals(created, manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, expectedSource),
         "retry against the same building target returns the original state");
     assertEquals(2, directoryCount(base.resolve("indices")), "idempotent retry cannot allocate another Green");
 
-    var promoted = manager.promoteBuildingGenerationToActive();
+    Path targetDirectory = generation(base, KEY);
+    String manifestBytes = Files.readString(targetDirectory.resolve(MANIFEST));
+    String sentinelBytes = Files.readString(targetDirectory.resolve(SENTINEL));
+    var promoted = manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, expectedSource);
     assertEquals(target, promoted.active_generation());
     assertNull(promoted.building_generation());
+    assertEquals(expectedSource, promoted.previous_generation());
     assertEquals("IDLE", promoted.migration_state());
-    var acceptedActive = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT);
+    String promotedStateBytes = Files.readString(base.resolve("state.json"));
+
+    assertEquals(promoted,
+        manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, expectedSource),
+        "retry against the already-promoted exact target is idempotent");
+    assertEquals(promotedStateBytes, Files.readString(base.resolve("state.json")),
+        "idempotent promotion does not rewrite the state pointer");
+    assertEquals(manifestBytes, Files.readString(targetDirectory.resolve(MANIFEST)));
+    assertEquals(sentinelBytes, Files.readString(targetDirectory.resolve(SENTINEL)));
+
+    var acceptedActive = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, expectedSource);
     assertEquals(target, acceptedActive.active_generation(), "the exact already-active target is accepted");
     assertNull(acceptedActive.building_generation());
 
     var reopened = new IndexGenerationManager(base);
     assertEquals(target, reopened.readStateBestEffort().active_generation());
-    var retained = reopened.startRecordedMigration(KEY, SOURCE, FINGERPRINT);
+    var retained = reopened.startRecordedMigration(KEY, SOURCE, FINGERPRINT, expectedSource);
     assertEquals(target, retained.active_generation());
     assertRecordedMetadata(base, target, SOURCE, FINGERPRINT);
+  }
+
+  @Test
+  void wrongExpectedSourceRefusesBeforeStateOrGenerationMutation() throws Exception {
+    Path base = temp.resolve("wrong-expected-source");
+    var manager = new IndexGenerationManager(base);
+    var initial = manager.initializeOrLoad().state();
+    String stateBytes = Files.readString(base.resolve("state.json"));
+    String wrongSource = IndexGenerationManager.recordedGenerationId(OTHER_KEY);
+
+    assertThrows(IOException.class,
+        () -> manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, wrongSource));
+
+    assertEquals(stateBytes, Files.readString(base.resolve("state.json")));
+    assertEquals(initial.active_generation(), new IndexGenerationManager(base)
+        .readStateBestEffort().active_generation());
+    assertEquals(1, directoryCount(base.resolve("indices")),
+        "a source mismatch must be rejected before allocating the recorded target");
+    assertFalse(Files.exists(generation(base, KEY), LinkOption.NOFOLLOW_LINKS));
   }
 
   @Test
@@ -103,18 +136,30 @@ final class RecordedGenerationStartTest {
   void fingerprintAndSourceMismatchRefuseTheExistingExactBuilding() throws Exception {
     Path base = temp.resolve("metadata-mismatch");
     var manager = new IndexGenerationManager(base);
-    manager.initializeOrLoad();
-    var started = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT);
+    String expectedSource = manager.initializeOrLoad().state().active_generation();
+    var started = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, expectedSource);
     String stateBytes = Files.readString(base.resolve("state.json"));
     Path target = generation(base, KEY);
     String manifestBytes = Files.readString(target.resolve(MANIFEST));
+    String sentinelBytes = Files.readString(target.resolve(SENTINEL));
 
     assertThrows(IOException.class,
         () -> manager.startRecordedMigration(KEY, SOURCE, OTHER_FINGERPRINT));
     assertThrows(IOException.class,
         () -> manager.startRecordedMigration(KEY, OTHER_SOURCE, FINGERPRINT));
+
+    assertThrows(IOException.class,
+        () -> manager.promoteRecordedGenerationToActive(KEY, OTHER_SOURCE, FINGERPRINT, expectedSource));
+    assertEquals(stateBytes, Files.readString(base.resolve("state.json")),
+        "a source mismatch cannot promote or rewrite the state pointer");
+    assertEquals(manifestBytes, Files.readString(target.resolve(MANIFEST)));
+    assertEquals(sentinelBytes, Files.readString(target.resolve(SENTINEL)));
+
+    assertThrows(IOException.class,
+        () -> manager.promoteRecordedGenerationToActive(KEY, SOURCE, OTHER_FINGERPRINT, expectedSource));
     assertEquals(stateBytes, Files.readString(base.resolve("state.json")));
     assertEquals(manifestBytes, Files.readString(target.resolve(MANIFEST)));
+    assertEquals(sentinelBytes, Files.readString(target.resolve(SENTINEL)));
     assertEquals(started.building_generation(), new IndexGenerationManager(base)
         .readStateBestEffort().building_generation());
     assertEquals(2, directoryCount(base.resolve("indices")));

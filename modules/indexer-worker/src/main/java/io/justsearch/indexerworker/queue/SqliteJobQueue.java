@@ -302,6 +302,24 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public List<String> unacknowledgedCapturedWalkKeys(String afterKey, int limit) {
+    if (limit < 1 || limit > 256) throw new IllegalArgumentException("Captured inventory limit must be 1..256");
+    return accessRecordedWalk(() -> {
+      List<String> keys = new ArrayList<>();
+      try (var query = connection.prepareStatement("SELECT operation_key FROM ingestion_walk_progress "
+          + "WHERE captured_plan = 1 AND sealed_at IS NOT NULL AND acknowledged_revision < revision "
+          + "AND operation_key > ? ORDER BY operation_key LIMIT ?")) {
+        query.setString(1, afterKey == null ? "" : afterKey);
+        query.setInt(2, limit);
+        try (var rows = query.executeQuery()) {
+          while (rows.next()) keys.add(rows.getString(1));
+        }
+      }
+      return List.copyOf(keys);
+    }, false);
+  }
+
+  @Override
   public boolean acknowledgeRecordedWalk(String operationKey, long revision) {
     return accessRecordedWalk(() -> SqliteIngestionWalkOps.acknowledge(connection, operationKey, revision), true);
   }

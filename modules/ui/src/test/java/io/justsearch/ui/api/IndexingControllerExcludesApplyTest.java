@@ -92,8 +92,7 @@ class IndexingControllerExcludesApplyTest {
             () -> indexing,
             new io.justsearch.app.services.excludes.ExcludesServiceImpl(() -> indexing),
             null,
-            null,
-            io.justsearch.app.api.OperationLeaseService.noOp());
+            null);
 
     app =
         Javalin.create(cfg -> { cfg.showJavalinBanner = false; cfg.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper()); })
@@ -156,8 +155,7 @@ class IndexingControllerExcludesApplyTest {
             () -> indexing,
             new io.justsearch.app.services.excludes.ExcludesServiceImpl(() -> indexing),
             null,
-            null,
-            io.justsearch.app.api.OperationLeaseService.noOp());
+            null);
 
     app =
         Javalin.create(cfg -> { cfg.showJavalinBanner = false; cfg.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper()); })
@@ -213,8 +211,7 @@ class IndexingControllerExcludesApplyTest {
             () -> indexing,
             new io.justsearch.app.services.excludes.ExcludesServiceImpl(() -> indexing),
             null,
-            null,
-            io.justsearch.app.api.OperationLeaseService.noOp());
+            null);
 
     app =
         Javalin.create(cfg -> { cfg.showJavalinBanner = false; cfg.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper()); })

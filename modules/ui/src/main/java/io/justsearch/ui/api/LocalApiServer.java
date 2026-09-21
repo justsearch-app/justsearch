@@ -193,8 +193,7 @@ public class LocalApiServer {
             ? b.HeadAssembly.serviceOut().operationLeaseService()
             : new io.justsearch.app.services.lease.OperationLeaseServiceImpl();
     this.indexingController =
-        new IndexingController(indexingSvcSupplier, excludesService, b.userHome, this.telemetry,
-            leaseSvc);
+        new IndexingController(indexingSvcSupplier, excludesService, b.userHome, this.telemetry);
     if (b.HeadAssembly != null) {
       this.indexingController.setWorkerCapability(b.HeadAssembly.capabilities().worker());
     }

@@ -146,6 +146,12 @@ public interface OperationAttemptRunner {
      * attempt. The owner serializes its decisions and remains eligible for later reconciliation.
      */
     record CheckpointAndWait(String cursor, long completed, long failed) implements Reconciliation {}
+    /** Persist typed bulk progress for a recovered RUNNING attempt without resuming it. */
+    record CheckpointBulkAndWait(BulkReindexProgress progress) implements Reconciliation {
+      public CheckpointBulkAndWait {
+        java.util.Objects.requireNonNull(progress, "progress");
+      }
+    }
     record Complete(OperationReceipt receipt) implements Reconciliation {}
     record Failed(OperationReceipt receipt) implements Reconciliation {}
     record Cancelled(OperationReceipt receipt) implements Reconciliation {}

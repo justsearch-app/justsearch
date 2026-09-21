@@ -387,8 +387,40 @@ hashes eligible raw sources before admission, and keeps bounded 2,000-entry batc
 without waiting for claim-driven queue drainage. Cloud placeholders refuse capture
 before deferred-ledger admission. The Engine's capture producer sequences frozen
 roots with one supplied epoch and retains its admission owner until actual walk
-and progress-delivery exit; it stops on failure or cancellation. Its caller must
-still close the epoch and connect generation/restart settlement.
+and progress-delivery exit; it stops on failure or cancellation. The shared
+RecordedIngestionCoordinator closes the epoch only after that exit, validates the
+accepted source/physical target, starts exact `g-<operation key>` under the generation
+control lock, and checkpoints BUILDING before requesting restart. Bulk work uses
+one captured walk under the existing REINDEX reconciliation owner.
+
+Before any generation fallback or writable open, recorded boot ownership compares
+strict current format-2 state, source identity, target metadata, physical fingerprint
+and COMPLETE capture. It opens exact Green only for matching BUILDING ownership;
+CAPTURING/FENCED serve strict current active read-only and suppress native migration.
+Recorded opens disable ordinary Lucene recovery so a failed open cannot move or
+replace ownership evidence. Missing/corrupt current state cannot borrow authority
+from `.prev`. An unowned recorded building target remains fenced; completed recorded
+active generations may later participate in normal native migration.
+
+Bulk operation progress uses existing operation columns, with immutable target,
+CAPTURING/BUILDING/SETTLED phases and sealed capture/settlement evidence. Version-2
+bulk evidence also carries a first-wins refusal code; strict version-1 reads remain
+supported. The owner persists refusal before retiring queued members, retains it
+through settlement, and never resumes a refused plan after permissions recover.
+Interrupted refusal settlement uses a typed runner reconciliation checkpoint without
+spending another attempt. Promotion occurs inside the coordinator's cancellation
+barrier after SETTLED is durable and exact generation identity is revalidated.
+Cancellation before effect entry suppresses promotion. An already-entered promotion
+finishes before cancellation returns; its CANCELLED receipt retains truthful settled
+counts and refusal evidence without rolling back the committed generation.
+Success requires a successor boot with the target actually open for serving/writing;
+merely seeing its promoted pointer in the old process is insufficient. Captured gaps
+produce PROMOTED_WITH_GAPS rather than success. Durable terminalization precedes
+exact ACK, repaired through a paged queue inventory independent of public history.
+After refusal terminalization the existing restart callback replaces the immutable
+boot decision; retained recorded targets remain fenced without destructive cleanup.
+Failed restart callbacks retry on the next existing maintenance invocation, after
+the current finite reconciliation loop has finished.
 Queue notifications deliver committed keys outside the lock. Existing age cleanup prunes old
 sealed exactly acknowledged progress only after all keyed jobs and ledger references are gone.
 The Engine's `RecordedIngestionCoordinator` owns outer acknowledgement and uses queue

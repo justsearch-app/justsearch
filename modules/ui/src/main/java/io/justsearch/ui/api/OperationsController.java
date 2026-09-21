@@ -10,6 +10,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.registry.OperationInvocationRequest;
 import io.justsearch.app.api.registry.OperationInvocationResponse;
+import io.justsearch.app.api.status.MigrationSource;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -54,9 +55,10 @@ public final class OperationsController {
   static final String INVOKE_PATH = "/api/operations/{id}/invoke";
   static final String INGEST_PATH = "/api/knowledge/ingest";
   static final String REINDEX_PATH = "/api/indexing/reindex";
+  static final String MIGRATION_START_PATH = "/api/indexing/migration/start";
   static final String UNDO_PATH = "/api/undo/{id}";
 
-  private enum InputForm { ENVELOPE, INGEST, REINDEX }
+  private enum InputForm { ENVELOPE, INGEST, REINDEX, MIGRATION_START }
 
   /** Matched-route classification shares the dispatch catalog; it grants no authority. */
   Optional<Operation> admissionOperation(Context ctx) {
@@ -64,6 +66,8 @@ public final class OperationsController {
     return switch (ctx.matchedPath()) {
       case INGEST_PATH -> resolveOperation("core.ingest-files");
       case REINDEX_PATH -> resolveOperation("core.reindex");
+      case MIGRATION_START_PATH -> resolveOperation(
+          io.justsearch.app.services.registry.operations.CoreOperationCatalog.REBUILD_INDEX.value());
       case INVOKE_PATH, UNDO_PATH -> resolveOperation(ctx.pathParam("id"));
       default -> Optional.empty();
     };
@@ -143,7 +147,20 @@ public final class OperationsController {
     handleInvocation(ctx, io.justsearch.app.services.registry.operations.CoreOperationCatalog.REINDEX.value(), InputForm.REINDEX);
   }
 
+  /** Flat legacy-reason alias for the prepared, durable {@code core.rebuild-index} operation. */
+  public void handleMigrationStart(Context ctx) {
+    handleInvocation(
+        ctx,
+        io.justsearch.app.services.registry.operations.CoreOperationCatalog.REBUILD_INDEX.value(),
+        InputForm.MIGRATION_START,
+        202);
+  }
+
   private void handleInvocation(Context ctx, String idValue, InputForm inputForm) {
+    handleInvocation(ctx, idValue, inputForm, 200);
+  }
+
+  private void handleInvocation(Context ctx, String idValue, InputForm inputForm, int acceptedStatus) {
     if (idValue == null || idValue.isBlank()) {
       writeError(ctx, 400, "Missing operation id in path", "BAD_REQUEST");
       return;
@@ -238,7 +255,7 @@ public final class OperationsController {
       return;
     }
 
-    writeResponse(ctx, 200, OperationInvocationResponse.fromResult(result));
+    writeResponse(ctx, result.success() ? acceptedStatus : 200, OperationInvocationResponse.fromResult(result));
   }
 
   /**
@@ -397,6 +414,22 @@ public final class OperationsController {
     if (inputForm == InputForm.REINDEX) {
       // Preserve the existing alias's query contract; a body force value never overrides it.
       arguments.put("force", Boolean.parseBoolean(ctx.queryParam("force")));
+    } else if (inputForm == InputForm.MIGRATION_START) {
+      // Preserve the legacy start endpoint's closed source write: recognized values pass through,
+      // while a missing or unknown reason is recorded as a manual migration.
+      var reason = arguments.remove("reason");
+      String requestedReason = reason == null ? "" : reason.isTextual() ? reason.textValue() : reason.toString();
+      MigrationSource source = MigrationSource.fromWire(requestedReason);
+      if (source == MigrationSource.UNKNOWN) {
+        if (!requestedReason.isBlank()) {
+          log.warn(
+              "Migration start requested with an unrecognized reason \"{}\" — recording it as \"{}\"",
+              requestedReason,
+              MigrationSource.MANUAL.wire());
+        }
+        source = MigrationSource.MANUAL;
+      }
+      arguments.put("source", source.wire());
     }
     request.set("args", arguments);
     return MAPPER.treeToValue(request, OperationInvocationRequest.class);

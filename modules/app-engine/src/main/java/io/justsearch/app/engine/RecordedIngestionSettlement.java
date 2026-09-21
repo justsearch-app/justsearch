@@ -51,6 +51,7 @@ final class RecordedIngestionSettlement {
     Reconciliation decision = reconcile(row, expectedPlanHash, enumerationExited, false, false);
     return switch (decision) {
       case Reconciliation.Wait ignored -> java.util.Optional.empty();
+      case Reconciliation.CheckpointBulkAndWait ignored -> throw new IllegalStateException("Ingestion cannot record bulk progress");
       case Reconciliation.CheckpointAndWait ignored -> throw new IllegalStateException("Receipt settlement cannot record a parent decision");
       case Reconciliation.Resume resume -> java.util.Optional.of(resume.body().apply(handle));
       case Reconciliation.Complete ignored -> java.util.Optional.of(

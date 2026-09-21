@@ -15,6 +15,7 @@ import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.core.context.EngineContext;
 import java.nio.charset.StandardCharsets;
@@ -85,6 +86,81 @@ final class BulkReindexCheckpointCapabilityTest {
 
       foreignEffect.complete(OperationResult.success("complete"));
       assertEquals(OperationState.COMPLETE, foreignRun.completion().toCompletableFuture().join().state());
+    }
+  }
+
+  @Test
+  void recoveredBulkCheckpointAtAttemptLimitDoesNotResumeAndRemainsEligible() throws Exception {
+    try (var store = new SqliteOperationStore(temp.resolve("recovery-limit.db"), clock, ignored -> {})) {
+      var request = request();
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(row.id()));
+      var target = target("{\"index\":\"recovery\"}");
+      var capturing = capturing(row.key(), target);
+      assertTrue(store.checkpointBulkReindex(row.id(), capturing));
+      for (int attempt = 1; attempt < OperationAttemptRunner.MAX_DURABLE_ATTEMPTS; attempt++) {
+        assertTrue(store.resume(row.id()));
+      }
+      assertEquals(OperationAttemptRunner.MAX_DURABLE_ATTEMPTS,
+          store.find(row.key()).orElseThrow().attempts());
+
+      var capture = new BulkReindexProgress.Capture("1".repeat(64), 3);
+      var building = new BulkReindexProgress(capturing.generationId(), target,
+          BulkReindexProgress.Phase.BUILDING, capture, null);
+      assertTrue(store.checkpointBulkReindex(row.id(), building));
+      var settlement = new BulkReindexProgress.Settlement(1, "3".repeat(64),
+          0, 0, java.util.List.of(), java.util.List.of());
+      var settled = new BulkReindexProgress(capturing.generationId(), target,
+          BulkReindexProgress.Phase.SETTLED, capture, settlement);
+      var runner = new OperationAttemptRunnerImpl(store, clock, Set.of(OperationKind.REINDEX));
+      runner.reconcile(OperationKind.REINDEX,
+          ignored -> new OperationAttemptRunner.Reconciliation.CheckpointBulkAndWait(settled));
+
+      var checkpointed = store.find(row.key()).orElseThrow();
+      assertEquals(OperationState.RUNNING, checkpointed.state());
+      assertEquals(OperationAttemptRunner.MAX_DURABLE_ATTEMPTS, checkpointed.attempts());
+      assertEquals(settled.cursor(), checkpointed.checkpointCursor());
+      assertEquals(3, checkpointed.unitsCompleted());
+      assertEquals(0, checkpointed.unitsFailed());
+      assertEquals(Optional.of(settled), store.bulkReindexProgress(row.id()));
+      assertFalse(runner.persistenceFailure().toCompletableFuture().isDone());
+
+      runner.reconcile(OperationKind.REINDEX, current -> {
+        assertEquals(checkpointed, current);
+        return new OperationAttemptRunner.Reconciliation.Complete(new OperationReceipt("RECOVERED", null));
+      });
+      var completed = store.find(row.key()).orElseThrow();
+      assertEquals(OperationState.COMPLETE, completed.state());
+      assertEquals(OperationAttemptRunner.MAX_DURABLE_ATTEMPTS, completed.attempts());
+    }
+  }
+
+  @Test
+  void recoveredBulkCheckpointRejectsRegressiveEvidenceAndSignalsPersistenceFailure() throws Exception {
+    try (var store = new SqliteOperationStore(temp.resolve("recovery-regression.db"), clock, ignored -> {})) {
+      var request = request();
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(row.id()));
+      var target = target("{\"index\":\"recovery\"}");
+      var capturing = capturing(row.key(), target);
+      assertTrue(store.checkpointBulkReindex(row.id(), capturing));
+      var capture = new BulkReindexProgress.Capture("2".repeat(64), 2);
+      var building = new BulkReindexProgress(capturing.generationId(), target,
+          BulkReindexProgress.Phase.BUILDING, capture, null);
+      assertTrue(store.checkpointBulkReindex(row.id(), building));
+
+      var runner = new OperationAttemptRunnerImpl(store, clock, Set.of(OperationKind.REINDEX));
+      assertThrows(IllegalStateException.class, () -> runner.reconcile(OperationKind.REINDEX,
+          ignored -> new OperationAttemptRunner.Reconciliation.CheckpointBulkAndWait(capturing)));
+
+      var unchanged = store.find(row.key()).orElseThrow();
+      assertEquals(OperationState.RUNNING, unchanged.state());
+      assertEquals(1, unchanged.attempts());
+      assertEquals(building.cursor(), unchanged.checkpointCursor());
+      assertEquals(Optional.of(building), store.bulkReindexProgress(row.id()));
+      var failure = runner.persistenceFailure().toCompletableFuture().join();
+      assertEquals(row.key(), failure.operationKey());
+      assertEquals(OperationState.RUNNING, failure.intendedState());
     }
   }
 

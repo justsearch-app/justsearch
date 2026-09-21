@@ -261,6 +261,57 @@ final class CapturedWalkSettlementTest {
   }
 
   @Test
+  void unacknowledgedCapturedWalkKeysPageSealedCapturesUntilExactAcknowledgement() throws Exception {
+    String firstKey = key(11);
+    String secondKey = key(12);
+    String thirdKey = key(13);
+    String ordinaryKey = key(14);
+    String unsealedKey = key(15);
+    Path db = temp.resolve("captured-inventory.db");
+
+    try (var queue = open(db)) {
+      var firstWalk = capture(queue, firstKey, List.of(entry(temp.resolve("inventory.txt"), H1)));
+      var claim = queue.pollPending(1).getFirst();
+      queue.markDoneTransitions(List.of(transition(claim, H1)), success());
+      var firstSealed = closeAndSeal(queue, firstKey, firstWalk.enumerationEpoch());
+
+      for (String capturedKey : List.of(secondKey, thirdKey)) {
+        var emptyWalk = queue.beginCapturedWalk(capturedKey, PLAN, true);
+        closeAndSeal(queue, capturedKey, emptyWalk.enumerationEpoch());
+      }
+
+      var ordinaryWalk = queue.beginRecordedWalk(ordinaryKey, PLAN, true);
+      closeAndSeal(queue, ordinaryKey, ordinaryWalk.enumerationEpoch());
+
+      capture(queue, unsealedKey, List.of(entry(temp.resolve("pending.txt"), H2)));
+      assertNull(queue.trySealRecordedWalk(unsealedKey).sealedAt(),
+          "a completed enumeration with pending work has not reached settlement");
+
+      var settlement = queue.capturedWalkSettlement(firstKey).orElseThrow();
+      assertEquals(firstSealed.manifestSha256(), settlement.manifestSha256());
+      assertEquals(1L, settlement.plannedUnits());
+
+      assertEquals(List.of(firstKey, secondKey),
+          queue.unacknowledgedCapturedWalkKeys(null, 2),
+          "the sealed settlement remains discoverable before queue acknowledgement");
+      assertEquals(List.of(thirdKey),
+          queue.unacknowledgedCapturedWalkKeys(secondKey, 2),
+          "the exclusive key cursor returns the next bounded page");
+      assertTrue(queue.unacknowledgedCapturedWalkKeys(thirdKey, 2).isEmpty());
+      assertThrows(IllegalArgumentException.class,
+          () -> queue.unacknowledgedCapturedWalkKeys(null, 257),
+          "inventory pages cannot exceed the configured bound");
+
+      assertFalse(queue.acknowledgeRecordedWalk(firstKey, firstSealed.revision() - 1),
+          "a stale acknowledgement leaves the terminal settlement discoverable");
+      assertTrue(queue.unacknowledgedCapturedWalkKeys(null, 256).contains(firstKey));
+      assertTrue(queue.acknowledgeRecordedWalk(firstKey, firstSealed.revision()));
+      assertEquals(List.of(secondKey, thirdKey), queue.unacknowledgedCapturedWalkKeys(null, 256),
+          "exact acknowledgement removes only that capture from recovery inventory");
+    }
+  }
+
+  @Test
   void incompatibleLedgerOutcomeRefusesInitialSeal() throws Exception {
     String key = key(10);
     Path db = temp.resolve("preseal-outcome.db");

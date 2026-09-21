@@ -41,9 +41,10 @@ final class MigrationOps {
     }
 
     MigrationOutcome startRecordedMigration(String operationKey, String reason,
-            String targetIndexFingerprint, EngineContext engineContext) {
+            String targetIndexFingerprint, String expectedSourceGeneration, EngineContext engineContext) {
         if (operationKey == null || operationKey.isEmpty()
-                || targetIndexFingerprint == null || targetIndexFingerprint.isEmpty()) {
+                || targetIndexFingerprint == null || targetIndexFingerprint.isEmpty()
+                || expectedSourceGeneration == null || expectedSourceGeneration.isBlank()) {
             return new MigrationOutcome(false, false);
         }
         return startMigration(MigrationStartRequest.newBuilder()
@@ -51,6 +52,7 @@ final class MigrationOps {
                 .setRestartWorker(true)
                 .setRecordedOperationKey(operationKey)
                 .setTargetIndexFingerprint(targetIndexFingerprint)
+                .setExpectedSourceGeneration(expectedSourceGeneration)
                 .build(), engineContext);
     }
 

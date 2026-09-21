@@ -180,6 +180,11 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
   }
 
+  /** Bounded receipt-repair inventory; keys are observations, never permission to execute. */
+  default List<String> unacknowledgedCapturedWalkKeys(String afterKey, int limit) {
+    throw new UnsupportedOperationException("Captured acknowledgement inventory is unavailable");
+  }
+
   /** The outer owner acknowledges only after its matching terminal operation receipt is durable. */
   default boolean acknowledgeRecordedWalk(String operationKey, long revision) {
     throw new UnsupportedOperationException("Recorded walks are unavailable");

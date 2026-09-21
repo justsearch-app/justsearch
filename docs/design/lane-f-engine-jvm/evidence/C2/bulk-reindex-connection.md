@@ -1,9 +1,13 @@
 # C2-10 bulk reindex connection
 
-2026-09-21 design settled against `0a23b0a4f`. Implementation remains open. The installed
-INGEST/SETTINGS fault proof does not discharge it. Current source and the owning
-operations-store design agree on the gap; no later amendment transfers C2's row,
-plan, resume or processing-history/gaps obligations to D1.
+2026-09-21 current state: the prepared bulk/rebuild consumer and manual REST alias
+are connected in the worktree after `de1d25201`. Real Engine two-restart proof,
+controlled crash/cancellation cases and broad storage/index/API suites pass locally;
+installed bulk fault cuts, negative guards and final integrated/hosted proof remain
+open. See the dated evidence below for exact runs. The design originated against
+`0a23b0a4f`; earlier implementation entries are historical, not current blockers.
+Installed INGEST/SETTINGS proof does not discharge bulk acceptance. No amendment
+transfers C2's row, plan, resume or processing-history/gaps obligations to D1.
 
 ## Scope and existing owners
 
@@ -11,32 +15,31 @@ plan, resume or processing-history/gaps obligations to D1.
 reopen test preserves parent/child identity and advances the stored operation.
 Do not restore the old full document/hash pre-walk on that path. `core.bulk-reindex`
 is different: its former immediate startMigration response and dispatch lease have
-been replaced in the current sequence3 worktree by a shared prepared bulk/rebuild
-handler and REINDEX/DURABLE catalog profiles. The application continuation consumer
-is still unconnected and this work is not complete. C2-10 still requires
+been replaced by a shared prepared bulk/rebuild handler, REINDEX/DURABLE catalog
+profiles and the RecordedIngestionCoordinator bulk consumer. C2-10 requires
 the bulk row, frozen plan, resume and bounded history/full gaps; D1 owns journal,
 replay, live activation and gap refusal.
 
 The existing OperationAttemptRunner remains the sole attempt/terminal writer;
 SqliteOperationStore remains the durable owner. EngineRoot composes the application
 and index owners. Do not add another execution journal or terminal writer.
-RecordedIngestionCoordinator currently reconciles all REINDEX rows through its
-root-plan resolver. Bulk routing must distinguish operation reference within the
-shared kind recovery pass; a second competing REINDEX reconciler is incorrect.
+RecordedIngestionCoordinator routes bulk by its closed operation references within
+the shared REINDEX recovery pass; streaming root plans retain their resolver.
+A second competing REINDEX reconciler is incorrect.
 
 ## Exact source map for continuation
 
 | Owner | Current behavior / required seam |
 | --- | --- |
-| app-services `CoreOperationCatalog.bulkReindex`, `BulkReindexHandler` | Sequence3 freezes bulk/rebuild scope and target before approval; durable consumer connection remains open |
+| app-services `CoreOperationCatalog.bulkReindex`, `BulkReindexHandler` | Freezes bulk/rebuild scope and target before approval; dispatches to the shared durable consumer |
 | app-engine `EngineKnowledgeClient.startMigration` | Requests restart on accepted + restartRequired, before asynchronous rebuild |
 | app-services `worker/MigrationOps`, app-api `IndexingService.MigrationOutcome` | Pushed29071724c preserves active/building/state witnesses and provides deferred recorded start |
 | worker-services `services/MigrationControlOps` | Start response already exposes building generation id |
 | worker-core `index/IndexGenerationManager` | Persists active/building/previous and lifecycle; start creates Green/MIGRATING; promotion sets active=Green, clears building and returns IDLE |
-| indexer-worker `server/ops/KnowledgeServerMigrationOps` | Promotion precedes a second restart request; boot enumeration reloads current roots and streams path/size, not an acceptance-frozen hash plan |
+| indexer-worker `server/ops/KnowledgeServerMigrationOps` | Recorded cutover invokes the owner settlement/promotion barrier; native migration retains current-root enumeration |
 | app-observability `operations/OperationSchema` | Existing building_generation_id, target_settings_json, gaps_json and processing_history columns |
 | app-api `operations/OperationStore`, `OperationAttemptRunner` | Sequence3 adds typed immutable bulk projection and issued-handle checkpoint; ordinary row reads avoid large evidence payloads |
-| app-engine `RecordedIngestionCoordinator.pump` | Shared REINDEX pass must preserve root-plan ownership and route bulk explicitly |
+| app-engine `RecordedIngestionCoordinator.pump` | One REINDEX pass dispatches bulk explicitly and preserves root-plan ownership |
 
 The building id must be durable before the first restart; successor comparison must
 use active generation after promotion because building generation is cleared.
@@ -54,7 +57,7 @@ The serving index alone is insufficient: content_sha256 hashes extracted stored
 content, not source-file bytes, and excludes unindexed/new files under captured roots.
 Migration currently enqueues path/size only, without operation membership. The closest
 existing durable substrate is jobs/recorded-walk/ingestion-ledger membership, and pushed3caf90cbc adds frozen H1, captured manifest and immutable settlement.
-The application still must connect that substrate to actual capture and migration.
+The application consumer connects that substrate to actual capture and migration.
 Using it requires an explicit capture-before-claim contract and preserved H1 evidence;
 the current root-plan digest must not be relabeled as a captured-document manifest.
 
@@ -663,3 +666,276 @@ fenced. A valid current IDLE active recorded generation is not permanently fence
 merely because its completed, ACKed operation row has expired. This distinction
 preserves normal startup after successful bulk work without authorizing a pending
 target from fallback state.
+
+
+### Strict boot projection contract (2026-09-21)
+
+IndexGenerationManager owns the ephemeral BootOwnership projection: Native,
+Fenced, or Recorded(operationKey, sourceGeneration, source, targetFingerprint,
+captureComplete). The application interprets operations and the opened queue once
+before manager initialization, then passes this immutable projection. BootLayout
+returns layout plus NATIVE/CAPTURING/BUILDING/PROMOTED/FENCED; this is a runtime
+observation, not a persisted state machine or second journal. Only BUILDING may
+open exact Green, and only after captureComplete and the effective Worker physical
+fingerprint match. FENCED/CAPTURING keep strict Blue read-only and suppress native
+migration. PROMOTED opens the exact active target but suppresses native replacement
+until the operation completes. Native boot retains existing recovery when there is
+no unresolved recorded evidence. Unowned recorded building state or recorded
+fallback/orphan evidence fences; missing/corrupt current then fails without writes.
+A valid IDLE current pointer with no pending owner remains native even when its
+active generation is a completed recorded target. Strict recorded loading accepts
+only current state format 2; legacy v1 remains supported through native bootstrap.
+This avoids changing bytes to manufacture a pending operation's authority.
+
+FENCED always preserves the strict current active serving identity read-only. It
+is Blue before promotion; if current state already durably promotes Green, a
+missing capture/fingerprint proof must not silently roll back to previous Blue.
+It fences writes and successful operation completion on the current active target.
+
+
+Independent boot review found that ordinary Lucene opens can recover by moving
+and replacing even a read-only index. Non-native boot therefore opts out of the
+existing runtime recovery wrapper for both serving and writable opens; failures
+preserve generation ownership evidence. Native behavior keeps configured recovery.
+A second review clarified orphan detection: under a valid current pointer, only
+unreferenced pristine recorded directories (no content beyond generation metadata,
+including partially written metadata) fence native startup. Completed empty targets
+have Lucene commits, and old non-pristine recorded archives can legitimately outlive
+both current/previous pointers. Scanning every UUID directory would incorrectly
+fence those archives. With damaged current state, any recorded directory/backup
+evidence still refuses fallback. This uses existing metadata/file ownership, not
+another persistent lifecycle marker.
+
+
+### Consumer integration worklist after strict boot
+
+Keep bulk ownership subordinate to RecordedIngestionCoordinator's existing lock,
+maintenance and single REINDEX reconciliation pass. Route by the closed bulk
+operation references before the ordinary root-plan resolver. A separate ephemeral
+Bulk value is justified because bulk has one captured walk and two physical runtime
+boundaries, while Parent owns sequential derived child operations; forcing bulk into
+Parent would manufacture child semantics and duplicate terminal authority.
+
+Bind the current EngineKnowledgeClient's captured producer, indexing control port
+and existing requested-restart callback alongside the ordinary producer. A fresh
+winning handle retains admission and checkpoints CAPTURING. Captured traversal uses
+one queue epoch, completes only after actual producer/delivery exit, then validates
+source and target again before exact generation start and BUILDING checkpoint.
+Generation-start-before-checkpoint recovery uses exact queue capture plus the
+operation-derived target; it must not allocate another target. Queue evidence lost
+after an interrupted RUNNING attempt is a refusal, never a fabricated empty capture.
+
+On physical replacement, cancel/drain the old producer but retain the durable
+operation owner; its new attachment rechecks policy, source/target and cancellation.
+Only an exact writable target runtime with complete matching capture installs bulk
+claim permission. The permission callback may read immutable owner/preparation and
+strict runtime identity, but never operations/jobs under the queue lock. A live
+runtime projection must distinguish FAILED/conflicting target from temporary
+unavailability so permanent migration failure cannot leave the operation waiting
+forever. A promoted-boot witness is distinct from merely observing state promotion
+while the old Blue-serving runtime remains alive.
+
+Immediately before promotion, revoke/drain as needed, seal the queue, read its
+immutable captured settlement, leave queue locking, checkpoint SETTLED through the
+issued runner handle, and recheck policy/cancellation. The successor verifies exact
+active IDLE target, actual writable/serving target binding and matching settlement;
+only empty gaps succeed. Nonempty gaps fail PROMOTED_WITH_GAPS pending D1 activation
+rules. A terminal row precedes exact ACK. Terminal-before-ACK recovery needs a bounded
+queue-owned inventory of unacknowledged captured keys (not only open operation rows
+or the public 200-row history), followed by exact retained operation/progress/receipt
+comparison outside queue locking. No additional journal or terminal writer is needed.
+
+The manual REST alias uses the normal operation invocation response and approval
+flow. Successful accepted invocations return 202; confirmation remains 428, and
+shared error handling remains authoritative. Legacy reason is translated before
+preparation into normalized source (unknown/missing => manual). Unknown extra fields
+remain visible to the closed schema and are rejected. The old restartRequired
+response and direct short-lived migration lease are retired; outcome lookup uses
+the accepted operation key. This is an intentional contract correction, not a second
+compatibility execution path.
+
+
+The consolidated review also fences active-recorded FAILED/unknown phase with no
+building identity, delays recorded cutover until lifecycle attachment plus explicit
+owner readiness, and suppresses native startup switch-buffer replay and deferred
+legacy embedding rescue on non-native boots. Root refined the active-recorded guard:
+a completed recorded generation may later be Blue for an ordinary native migration;
+a valid native building identity and migration phase must retain native recovery.
+The IDLE-only exception applies when there is no building identity, not to that
+later native migration. Dedicated controls cover both shapes.
+
+
+### Consumer refusal and promotion review decision (2026-09-21)
+
+The connected consumer compiles in 2183; boot/REST 2182 passes 168 cases, and
+source-bound start plus REST 2184 passes 135 cases with one existing Windows
+symlink-privilege skip. These are component proofs, not completed C2 acceptance.
+The real-store/queue coordinator integration and new recovery checkpoints are
+under focused verification in 2186.
+
+A refusal observed only in memory is insufficient: queue retirement followed by a
+crash could otherwise resume under restored policy and promote a plan already
+retired for refusal. The existing typed bulk projection now carries an optional,
+first-wins refusalCode in the existing operation row. New evidence serialization
+is version 2; strict version 1 reads remain supported without rewriting. No new
+journal, database column, authority epoch or independent writer is introduced.
+The first refusal may be added within a phase without changing capture/settlement;
+it cannot be cleared/replaced and is retained through SETTLED. This is preferable
+to a new REFUSING phase because capture/build/settlement identity remains unchanged.
+A refusal is orthogonal to those physical progress phases.
+
+Live ownership checkpoints this decision through the issued handle before queue
+retirement. Interrupted ownership uses the existing runner reconciliation path's
+typed CheckpointBulkAndWait to persist the same evidence on a RUNNING row without
+spending a resume attempt. After the durable refusal, pending unissued members can
+retire and seal; BUILDING evidence advances to matching SETTLED before terminal
+failure/cancellation. Boot and claim/promotion ownership must refuse the persisted
+witness even if present-day policy later allows the original preparation.
+Contradictory or unavailable evidence is retained and is never ACKed as a refusal.
+
+The target remains fenced after refusal, deliberately preserving the earlier boot
+contract; automatic abandonment/deletion is not an acceptable cleanup substitute.
+ACK of an exact refused operation does not grant target activation. Successful
+terminalization requires post-promotion writable-runtime proof; ACK then compares
+the immutable terminal receipt/progress, allowing recovery even after later native
+lifecycle changes. The bounded captured ACK inventory advances across retained
+contradictions until its current scan reaches the end.
+
+Promotion uses a supplied exact-generation action inside the existing coordinator
+lock, after sealed SETTLED checkpoint and final authorization/cancellation checks.
+Cancellation records its flag and waits through that same effect boundary; the
+admission owner invokes callbacks outside its own lock. Generation promotion also
+revalidates operation/source/target under existing STATE_CONTROL, preserving the
+native promotion path. Cancellation requests maintenance even when no producer or
+issued claim remains, so it cannot depend on an unrelated queue notification.
+
+If cancellation overlaps an already-entered promotion action, the physical effect
+linearizes first and cancellation waits for that action to exit. The operation then
+records CANCELLED with truthful SETTLED counts and its durable refusal; it does not
+roll back an already promoted generation. Cancellation before action entry suppresses
+promotion. COMPLETE still requires successor writable-runtime proof without refusal.
+
+The review found no reverse STATE_CONTROL-to-queue acquisition. Per-claim policy
+canonicalization and strict runtime observation can delay queue locking, but caching
+those facts would weaken current root/gate revocation without an existing complete
+invalidation carrier. Preserve present authorization while recording this latency
+trade-off; do not manufacture a new policy epoch or silently relax scope checks.
+
+
+2189 verifies the connected controlled coordinator with real SQLite operation/queue
+owners: 71 cases/four suites, zero failures/errors, one existing Windows symlink
+privilege skip; both test tasks execute fresh. It includes strict generation promotion
+source/target rejection and byte-preserving retry. Earlier 2186 preserves 85 cases/
+nine suites, zero runtime failures and the same platform skip; app-engine compile
+failed on two new fixture mistakes. 2187/2188 preserve the two follow-on fixture
+failures, corrected to supply the actual rebuild-generation port and assert success
+coverage separately from the bounded failed/superseded history sample.
+Artifacts: `tmp/2186-bulk-focused*`, `tmp/2187-bulk-engine-focused*`,
+`tmp/2188-bulk-engine-focused*`, `tmp/2189-bulk-engine-focused*`; copied XML,
+counts and source inventories retain exact local scope. Crash/refusal/promotion-race
+and actual Engine restart evidence remain required. No negative mutations are active.
+
+Refusal terminalization requests a replacement through the existing restart callback,
+once per physical attachment, with callback-failure retry through the existing
+HeadAssembly operations maintenance cadence. This releases an obsolete CAPTURING
+boot with no target or reboots an unowned refused target into FENCED mode. No new
+scheduler is needed: HeadAssembly already binds recordedIngestion::maintain to its
+operations timer. D1 still owns synchronous untagged-write/journal fencing and the
+activation gap decision; a recorded claim predicate does not govern untagged jobs.
+
+
+Full storage 2190 executes 1,238 cases in 227 suites with zero failures/errors;
+all six PMD tasks pass. Seven existing skips: BgeM3VocabLoadTest (1),
+OnnxEmbeddingEncoder late-chunking model tests (5), and the Windows symlink
+privilege case in RecordedGenerationStartTest (1). All three test tasks are fresh.
+`tmp/2190-bulk-storage-full.txt`, copied XML/counts/source/skip inventories preserve
+scope. Full index/runtime 2191 executes 2,823 cases/465 suites with zero
+failures/errors and 17 existing skips (AdversarialCorpus 1, SpladeCrash 1,
+OnnxEmbedding 12, MigrationEnumeration 3). Its one PMD failure was an unnecessary
+ArrayList qualifier; removing it passes indexer-worker pmdMain in 2193. The other
+five PMD tasks pass in 2191. This syntax-only correction does not require repeating
+the unchanged full runtime suites.
+The installed migration scenario has been adapted to the prepared approval/operation
+contract and exact terminal/ACK checks; Node syntax checks pass, installed execution
+remains owed. Blue-only setup is now an explicitly approved out-of-root document
+that remains present, while the preboot watched-root scope contains only A. This
+avoids relying on mutable roots seeded after preparation or a deletion/watch race.
+
+2194 caught a checked-close exception in the new real Engine test fixture before
+test execution; corrected its AutoCloseable declaration. 2195 then runs seven
+cases: the real three-epoch/two-restart Engine test and five crash/cancel cases pass,
+while refusal restart retry timing fails. The restart callback ran at the end of
+every internal pump pass and retried a failed callback in the same maintain call.
+Moving it after the finite progress loop uses the existing maintenance cadence
+without another marker or scheduler. 2196 passes 58 cases/four suites, no skips,
+failures or errors, including ordinary coordinator and restart-dispatch regressions.
+Its pmdMain passes; four test-only redundant qualifiers fail pmdTest, then their
+removal passes pmdTest/format in 2197. Copied XML, counts and source inventories:
+`tmp/2194-bulk-adversarial*`, `tmp/2195-bulk-adversarial*`,
+`tmp/2196-bulk-adversarial*`; PMD log `tmp/2197-bulk-test-pmd.txt`.
+
+The real Engine proof accepts a prepared bulk operation, captures its exact target
+and roots, observes BUILDING before first restart and SETTLED before second,
+reopens the promoted writer, verifies SUCCESS and actual search from the target,
+then reopens SQLite to verify exact sealed revision ACK. Controlled fault proofs
+cover durable refusal before queue retirement and after settlement but before
+terminal persistence, restored allowing policy, no-issued-claim cancellation,
+pre-entry promotion suppression, and cancellation waiting for an entered promotion.
+Consumer MAX-attempt/paged-inventory proof and negative guards remain next.
+
+Full service/API 2198 passes 4,285 cases/636 suites, zero failures/errors, four
+existing skips (three deferred CompositionRootGuardrails cases and one optional
+McpEntityCarriageMetric dataset case). Both test tasks execute fresh and all four
+PMD tasks pass. 2200 rebuilds ui:installDist and passes launcher architecture
+selection: 38 cases/16 suites including all three UnreferencedCodeTest predicates.
+The earlier hosted unreferenced captured producer is now connected and locally green.
+
+Installed 2201 passes the actual prepared manual REST migration, both required
+Engine restarts, exact target serving and terminal/ACK verification, followed by
+rollback reopening the distinct Blue-only document. Key
+`01a0c33a-45cd-71ec-ae51-1d6eba52a0ad`, target `g-` plus that key, COMPLETE/SUCCESS,
+one captured/completed unit, zero failures and sealed/ACK revision 6. All three
+voluntary exits use code 4 and leave the crash restart count at zero. The fixture
+prints MIGRATION_PASS and owned STOP with portsClosed:true; post-run quick_health
+is ABSENT with no foreign run/inference orphan. Incarnation 2 engine.log proves
+gte-multilingual-base loaded on GPU and produced the captured document vector.
+This is live embedding/cutover proof, not a chat-model query or quality benchmark.
+
+Command: `JUSTSEARCH_REAL_RECOVERY_SCENARIO=migration`,
+`JUSTSEARCH_WRITER_RECOVERY_WORK=<worktree>/tmp/2201-installed-bulk-migration`,
+`node scripts/supervisor-conformance/real-writer-recovery.mjs` after 2200 installDist.
+Raw output `tmp/2201-installed-bulk-migration.txt`; runtime/store/queue/stop evidence
+and incarnation logs under `tmp/2201-installed-bulk-migration/`, run id
+`10a7cbe3-e44b-4e36-a313-8a31d88e9435`. Sources and compiled test evidence are in
+`tmp/2200-bulk-installed-build*` and `tmp/2198-bulk-services-ui-full*`.
+Installed kill cuts remain required; successful requested restarts do not prove them.
+
+Full Engine 2203 executes 340 cases/59 suites, one failure, no errors/skips;
+both PMD tasks pass (pmdMain reused 2196). The new MAX-attempt and 257-entry ACK
+inventory tests pass. The sole failure is existing EngineForegroundPacingTest
+teardown: its assertions pass, then the Lucene write-lock channel is invalid at
+writer close, and the owner correctly retains the incomplete close. This is not
+a startup failure. Its full XML and extracted output are preserved under
+`tmp/2203-bulk-engine-full*` and `tmp/2203-pacing-output.txt`. A thread snapshot
+confirms the later long-running suite was progressing through EngineSoakTest.
+Root-cause investigation remains open; it is not waived by a passing retry.
+
+2199 disables four guards and observes four intended failures: durable refusal
+boot fencing, successor-boot requirement, cancellation/promotion serialization,
+and advancing ACK repair past a full contradictory page. The script restores the
+production source byte-for-byte in finally. Logs/XML/failure messages are retained
+in `tmp/2199-bulk-negative*`; restored inventory is `tmp/2199-bulk-restored-sources.json`.
+2204 re-executes the two bulk suites plus pacing: ten cases, zero failures/errors/
+skips. It proves restored guards but does not discharge the intermittent close defect.
+
+2205 `build -x test -PskipWebBuild=true` fails only indexer-worker formatting after
+the qualifier correction. 2206 applies that module's formatter and passes the same
+whole build (including static checks); web asset build is skipped because frontend
+sources are unchanged. No negative mutations, Gradle process or dev stack remain.
+2202 engine-port and operation-surface gates pass (one informational engine-port
+finding), and store recoverability passes six stores/46 authorities/27 policies.
+
+The connected checkpoint is publishable with the close defect explicitly open;
+it is not C2 completion. Next: diagnose/fix and re-prove close, then the installed
+partial-capture, state-before-BUILDING-checkpoint and promotion-before-terminal
+kill cuts. Final integrated stress and hosted test-level evidence remain required.
