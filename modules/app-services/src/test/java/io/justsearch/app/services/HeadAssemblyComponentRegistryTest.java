@@ -33,6 +33,9 @@ final class HeadAssemblyComponentRegistryTest {
     assertEquals(Duration.ofSeconds(180), spec.startDeadline());
     assertEquals(2, spec.recoveryBudget());
     assertEquals(Set.of(
+        EnvRegistry.LLM_ENABLED.configKey(),
+        EnvRegistry.AI_DISABLED.configKey(),
+        EnvRegistry.LITE_MODE.configKey(),
         EnvRegistry.SERVER_EXE.configKey(),
         EnvRegistry.LLM_MODEL_PATH.configKey(),
         EnvRegistry.MMPROJ_MODEL.configKey(),

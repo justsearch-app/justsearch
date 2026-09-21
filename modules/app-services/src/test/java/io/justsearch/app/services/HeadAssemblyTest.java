@@ -366,6 +366,51 @@ class HeadAssemblyTest {
     }
   }
 
+  @Test
+  void llmHardDisableCreatesNoManagerAndLeavesGenerativeIntentionallyAbsent() throws Exception {
+    String previousLlm = System.getProperty("justsearch.llm.enabled");
+    String previousLite = System.getProperty("justsearch.lite.mode");
+    System.setProperty("justsearch.llm.enabled", "true");
+    System.setProperty("justsearch.lite.mode", "false");
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.data.dir", tempDir.toString(),
+        "justsearch.home", tempDir.toString(),
+        "justsearch.ai.disabled", "false",
+        "justsearch.llm.enabled", "false"))));
+    try (var components = new io.justsearch.core.component.TestEngineComponents();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      try (var fixture = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+        fixture.snapshot().components().stream()
+            .filter(component -> !component.spec().name().equals("generative"))
+            .forEach(component -> components.register(component.spec()));
+      }
+      try (var assembly = new HeadAssembly(
+          mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+          executors, new NoopTelemetry(), new ConfigManagerBootstrap(), null,
+          new io.justsearch.app.services.settings.UiSettingsStore(
+              io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+          new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
+          org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class),
+          io.justsearch.app.services.bootstrap.OperationAuthority.load(tempDir),
+          io.justsearch.app.api.operations.RecordedIngestionService.unavailable(), components)) {
+        Field field = HeadAssembly.class.getDeclaredField("inferenceManager");
+        field.setAccessible(true);
+        assertNull(field.get(assembly), "the actual factory must honor the captured disable");
+        var generative = components.snapshot().components().stream()
+            .filter(component -> component.spec().name().equals("generative")).findFirst().orElseThrow();
+        assertEquals(io.justsearch.core.component.ComponentState.ABSENT, generative.state());
+        assertFalse(io.justsearch.app.services.bootstrap.CapabilityGraph.fromRegistry(components)
+            .inference().required());
+      }
+    } finally {
+      if (previousLlm == null) System.clearProperty("justsearch.llm.enabled");
+      else System.setProperty("justsearch.llm.enabled", previousLlm);
+      if (previousLite == null) System.clearProperty("justsearch.lite.mode");
+      else System.setProperty("justsearch.lite.mode", previousLite);
+    }
+  }
+
   /** A bound client must complete tool composition even while sampled readiness is pending. */
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.EnumSource(

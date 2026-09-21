@@ -901,15 +901,12 @@ public final class WorkerSearchService {
                 + passageCount);
       }
       try {
-        double threshold = request.getSimilarityThreshold() > 0
-            ? request.getSimilarityThreshold()
-            : CitationMatchOps.DEFAULT_SIMILARITY_THRESHOLD;
         return citationMatchOps.execute(
             request.getAnswerText(),
             request.getChunkDocIdsList(),
             request.getChunkIndicesList(),
             request.getPassageTextsList(),
-            threshold);
+            request.getSimilarityThreshold());
       } catch (RuntimeException e) {
         log.error("MatchCitations failed", e);
         throw WorkerServiceException.internal("MatchCitations failed: " + e.getMessage());

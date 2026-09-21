@@ -275,7 +275,7 @@ final class WatchedRootScanCollectionTest {
 
       client =
           new TestKnowledgeClient(
-              new io.justsearch.core.execution.TestEngineExecutors(),
+              io.justsearch.core.execution.TestEngineExecutors.awaitingTermination(),
               null,
               null,
               req -> {

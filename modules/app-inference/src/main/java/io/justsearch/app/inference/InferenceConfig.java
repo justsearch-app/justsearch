@@ -103,15 +103,19 @@ public record InferenceConfig(
    * @return configuration based on environment
    */
   public static InferenceConfig fromEnvironment(Path baseDir) {
-    log.debug("Creating InferenceConfig from environment");
+    return fromResolvedConfig(ConfigStore.global().get(), baseDir);
+  }
 
-    ResolvedConfig rc = ConfigStore.global().get();
+  /** Resolves manager configuration from the same snapshot used by its composition decision. */
+  public static InferenceConfig fromResolvedConfig(ResolvedConfig rc, Path baseDir) {
+    Objects.requireNonNull(rc, "rc");
+    log.debug("Creating InferenceConfig from resolved configuration");
     Path resolvedBaseDir =
         ResolvedPathResolver.resolveBaseDir(
             rc,
             baseDir != null
                 ? baseDir.toAbsolutePath().normalize().toString()
-                : System.getProperty("user.dir"));
+                : SystemAccess.sysProp("user.dir"));
     log.debug("  Base directory: {}", resolvedBaseDir);
 
     Path configuredModelsDir = ResolvedPathResolver.resolveModelsDir(rc, resolvedBaseDir);
@@ -151,7 +155,7 @@ public record InferenceConfig(
     log.debug("  CUDA available: {} (derived from gpu_layers={})", cudaAvailable, layers);
 
     // Find llama-server executable (prefer CUDA variant when GPU is available)
-    Path serverExe = findServerExecutable(resolvedBaseDir, cudaAvailable);
+    Path serverExe = findServerExecutable(rc, resolvedBaseDir, cudaAvailable);
 
     // ---------------------------------------------------------------------
     // Chat model selection (tempdoc 842 §2.1 correction + §2.3).
@@ -398,13 +402,10 @@ public record InferenceConfig(
     return new Builder();
   }
 
-  private static Path findServerExecutable(Path baseDir, boolean preferCudaVariant) {
+  private static Path findServerExecutable(ResolvedConfig rc, Path baseDir, boolean preferCudaVariant) {
     log.debug("Finding llama-server executable (preferCuda={})...", preferCudaVariant);
 
-    ConfigStore cs = ConfigStore.globalOrNull();
-    ResolvedConfig rc = cs != null ? cs.get() : null;
-    String envPath = cs != null && cs.get().ai().serverExe() != null
-        ? cs.get().ai().serverExe().toString() : null;
+    String envPath = rc.ai().serverExe() != null ? rc.ai().serverExe().toString() : null;
     if (envPath != null && !envPath.isBlank()) {
       Path p = Path.of(envPath);
       log.debug("  JUSTSEARCH_SERVER_EXE set to: {}", envPath);

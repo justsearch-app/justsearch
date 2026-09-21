@@ -893,11 +893,6 @@ public enum EnvRegistry {
     GPL_REEVAL_SIZE_FACTOR(
         "justsearch.gpl.reeval_size_factor", "JUSTSEARCH_GPL_REEVAL_SIZE_FACTOR", LifecycleStage.PERMANENT),
 
-    // ==================== Worker Indexer Connection (tempdoc 314 C1) ====================
-
-    /** Whether the indexer worker gRPC client is enabled. */
-    INDEXER_ENABLED("workers.indexer.enabled", "JUSTSEARCH_INDEXER_ENABLED", LifecycleStage.PERMANENT),
-
     // ==================== Indexing Tracing (tempdoc 312 Phase 0) ====================
 
     /** Indexing pipeline tracing level: none (default), sample (1%), detailed (100%). */

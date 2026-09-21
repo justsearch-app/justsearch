@@ -17,36 +17,8 @@ import org.slf4j.Logger;
 public final class BootstrapInferenceFactory {
   private BootstrapInferenceFactory() {}
 
-  // Cached config from willInferenceManagerBeCreated(), reused by createInferenceManager()
-  // to avoid duplicate filesystem probes during startup. Both are called sequentially
-  // on the same thread during HeadAssembly construction.
-  private static volatile InferenceConfig cachedInferenceConfig;
-
   /**
-   * Checks if InferenceLifecycleManager will be created based on same conditions
-   * as createInferenceManager(). Used to prevent double model loading.
-   */
-  public static boolean willInferenceManagerBeCreated(
-      boolean aiEnabled, ResolvedConfig resolvedConfig, String userDir) {
-    if (!aiEnabled) {
-      return false;
-    }
-
-    try {
-      Path baseDir = resolveBaseDir(resolvedConfig, userDir);
-      InferenceConfig config = InferenceConfig.fromEnvironment(baseDir);
-      cachedInferenceConfig = config;
-
-      // Mirror createInferenceManager(): we create the manager even if files are missing, so the UI
-      // can guide BYO setup without requiring a restart.
-      return config != null;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  /**
-   * Creates the InferenceLifecycleManager from environment configuration. Tempdoc 412 Phase 4
+   * Creates the InferenceLifecycleManager from captured configuration. Tempdoc 412 Phase 4
    * overload: now takes a {@link Telemetry} reference so the catalog adapter can be wired. The
    * adapter is constructed against {@code lt.registry()} when {@code telemetry} is a
    * {@link LocalTelemetry}; otherwise the no-op events sink is used.
@@ -79,13 +51,8 @@ public final class BootstrapInferenceFactory {
     }
 
     try {
-      // Reuse config from willInferenceManagerBeCreated() if available
-      InferenceConfig config = cachedInferenceConfig;
-      cachedInferenceConfig = null; // Clear after use
-      if (config == null) {
-        Path baseDir = resolveBaseDir(resolvedConfig, userDir);
-        config = InferenceConfig.fromEnvironment(baseDir);
-      }
+      Path baseDir = resolveBaseDir(resolvedConfig, userDir);
+      InferenceConfig config = InferenceConfig.fromResolvedConfig(resolvedConfig, baseDir);
 
       // Do NOT require server/model to exist at startup.
       // BYO AI contract: users may add the files after installation; runtime control must still exist

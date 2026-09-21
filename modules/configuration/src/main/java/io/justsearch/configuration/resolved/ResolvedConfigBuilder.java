@@ -252,7 +252,6 @@ public final class ResolvedConfigBuilder {
     contributeYamlHybridSearch(root);
     contributeYamlSearch(root);
     contributeYamlIndexComposite(root);
-    contributeYamlWorkers(root);
     contributeYamlCollections(root);
     contributeYamlInfra(root);
     // YAML key app.data_dir -> justsearch.data.dir (a yaml-tier source for paths resolution; the
@@ -582,10 +581,6 @@ public final class ResolvedConfigBuilder {
     if (boostsNode.isObject() && !boostsNode.isEmpty()) {
       put("index.boosts", ORDINAL_YAML, "yaml", "index.boosts", boostsNode.toString());
     }
-  }
-
-  private void contributeYamlWorkers(JsonNode root) {
-    putYamlBoolean("workers.indexer.enabled", root, "workers.indexer.enabled");
   }
 
   private void contributeYamlCollections(JsonNode root) {
@@ -1555,9 +1550,7 @@ public final class ResolvedConfigBuilder {
   }
 
   private ResolvedConfig.WorkerIndexer buildWorkerIndexer() {
-    return new ResolvedConfig.WorkerIndexer(
-        resolveBoolean("workers.indexer.enabled", false),
-        resolveString("indexer.worker.version", "0.1.0-dev"));
+    return new ResolvedConfig.WorkerIndexer(resolveString("indexer.worker.version", "0.1.0-dev"));
   }
 
   private ResolvedConfig.InfraHealth buildInfraHealth() {

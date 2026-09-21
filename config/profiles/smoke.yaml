@@ -17,9 +17,6 @@ workers:
     host: 127.0.0.1
     port: 50061
     deadlineMs: 1500
-  indexer:
-    enabled: false
-
 telemetry:
   metrics:
     flush_ms: 15000

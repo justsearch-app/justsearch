@@ -47,7 +47,6 @@ io.justsearch.aibackend.local.DeterminismProfile#from
 io.justsearch.app.inference.BrainSupervisionPolicy#defaults
 io.justsearch.app.inference.CudaRuntimeDetection#detectCudaRuntimeWarning
 io.justsearch.app.inference.InferenceConfig#findServerExecutable
-io.justsearch.app.inference.InferenceConfig#fromEnvironment
 io.justsearch.app.inference.InferenceLifecycleManager#resolveModelStatePath
 io.justsearch.app.inference.LlamaServerOps#allowHealthOnlyExternalAdoption
 io.justsearch.app.inference.LlamaServerOps#policyDisallowExternalInferenceServers
@@ -73,8 +72,6 @@ io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#getJustSearchHome
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#initialRuntimeContext
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#resolveOccurrenceBufferSize
 io.justsearch.app.services.bootstrap.phases.ExamplePlugin#enabled
-io.justsearch.app.services.bootstrap.phases.InferenceDecision#createInferenceManager
-io.justsearch.app.services.bootstrap.phases.InferenceDecision#decideInferenceConfigured
 io.justsearch.app.services.bootstrap.phases.InferenceWiring#seedAutostartSpec
 io.justsearch.app.services.bootstrap.phases.InfraPhase#runWithOutcome
 io.justsearch.app.services.indexing.ExcludeGlobs#isWindows

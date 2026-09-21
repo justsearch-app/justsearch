@@ -12,6 +12,8 @@ import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import io.justsearch.ipc.MatchCitationsRequest;
 import io.justsearch.ipc.MatchCitationsResponse;
+import io.justsearch.reranker.CitationScorer;
+import io.justsearch.reranker.CitationScorerConfig;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -136,6 +138,74 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
   class HappyPath {
 
     @Test
+    @DisplayName("resolves request and captured default thresholds through the cross-encoder path")
+    void resolvesThresholdThroughWorkerRequestPath() throws Exception {
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
+      List<Double> observedThresholds = new ArrayList<>();
+      citationMatchOps(service)
+          .setCrossEncoderProducer(
+              (sentences, passages, passageDocIds, threshold, deadlineMs) -> {
+                observedThresholds.add(threshold);
+                return new CitationScorer.ScoringResult(
+                    List.of(), sentences.size(), 0, 1L, sentences.size());
+              });
+
+      MatchCitationsRequest unsetThreshold =
+          MatchCitationsRequest.newBuilder()
+              .setAnswerText("The source supports this claim.")
+              .addChunkDocIds("source-1")
+              .addChunkIndices(0)
+              .addPassageTexts("The source supports this claim.")
+              .build();
+
+      service.setCitationScorerConfig(configWithThreshold(0.72));
+      callMatchCitations(service, unsetThreshold);
+      callMatchCitations(
+          service, unsetThreshold.toBuilder().setSimilarityThreshold(-0.2).build());
+
+      callMatchCitations(
+          service, unsetThreshold.toBuilder().setSimilarityThreshold(0.81).build());
+
+      service.setCitationScorerConfig(null);
+      callMatchCitations(service, unsetThreshold);
+
+      service.setCitationScorerConfig(configWithThreshold(1.01));
+      callMatchCitations(service, unsetThreshold);
+
+      assertEquals(List.of(0.72, 0.72, 0.81, 0.5, 0.5), observedThresholds);
+    }
+
+    @Test
+    @DisplayName("uses the same resolved threshold for embedding fallback")
+    void resolvesThresholdForEmbeddingFallback() throws Exception {
+      String sentence = "The source supports this claim.";
+      String passage = "The source supports this claim with more detail.";
+      EmbeddingService embeddings =
+          embeddingServiceWithDeterministicVectors(
+              Map.of(
+                  "search_query: " + sentence, new float[] {1.0f, 0.0f},
+                  "search_document: " + passage, new float[] {0.8f, 0.6f}));
+      WorkerSearchService service = new WorkerSearchService(lifecycle, embeddings);
+      service.setCitationScorerConfig(configWithThreshold(0.9));
+      MatchCitationsRequest request =
+          MatchCitationsRequest.newBuilder()
+              .setAnswerText(sentence)
+              .addChunkDocIds("source-1")
+              .addChunkIndices(0)
+              .addPassageTexts(passage)
+              .build();
+
+      MatchCitationsResponse configuredDefault = callMatchCitations(service, request);
+      MatchCitationsResponse explicitOverride =
+          callMatchCitations(
+              service, request.toBuilder().setSimilarityThreshold(0.7).build());
+
+      assertEquals(0, configuredDefault.getSentencesMatched());
+      assertEquals(1, explicitOverride.getSentencesMatched());
+      assertEquals("EMBEDDING_COSINE", explicitOverride.getScorer());
+    }
+
+    @Test
     @DisplayName("matches answer sentences to correct source chunks by embedding similarity")
     void matchesSentencesToCorrectChunks() throws Exception {
       // Two chunks with distinct topics
@@ -253,6 +323,16 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
 
     assertNotNull(response, "Response should not be null");
     return response;
+  }
+
+  private static CitationScorerConfig configWithThreshold(double threshold) {
+    return new CitationScorerConfig(false, null, threshold, 512, 2000);
+  }
+
+  private static CitationMatchOps citationMatchOps(WorkerSearchService service) throws Exception {
+    Field field = WorkerSearchService.class.getDeclaredField("citationMatchOps");
+    field.setAccessible(true);
+    return (CitationMatchOps) field.get(service);
   }
 
   /** EmbeddingService that reports available but returns null from embed() (backend is null). */

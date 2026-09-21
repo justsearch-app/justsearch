@@ -1,7 +1,6 @@
 package io.justsearch.applauncher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tools.jackson.databind.JsonNode;
@@ -223,19 +222,6 @@ final class SmokeDriverTest {
   }
 
   @Test
-  void executeSkipsWorkerMissingDiagnosticsWhenWorkersEnabled() throws Exception {
-    StubCommandRunner commands =
-        new StubCommandRunner(
-            LauncherCommands.CommandResult.success(java.util.List.of("COMMAND/OK")));
-    try (TestContext ctx = createContext(successFacade(), commands)) {
-      SmokeResult result = ctx.driver().execute();
-      assertFalse(
-          result.diagnostics().stream()
-              .anyMatch(marker -> marker.startsWith("LAUNCHER/WORKER_MISSING")));
-    }
-  }
-
-  @Test
   void recordCommandResultIgnoresNullResults() throws Exception {
     try (TestContext ctx = createContext(successFacade())) {
       SmokeDriver driver = ctx.driver();
@@ -349,8 +335,6 @@ final class SmokeDriverTest {
           block_all: true
         workers:
           ai:
-            enabled: true
-          indexer:
             enabled: true
         """
         .formatted(normalizePath(dataDir));

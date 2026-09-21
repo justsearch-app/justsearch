@@ -46,9 +46,6 @@ final class SmokeDriver implements Launcher.SmokeDriverHandle {
     List<String> failures = new ArrayList<>();
 
     ResolvedConfig rc = ConfigStore.global().get();
-    if (!rc.workerIndexer().enabled()) {
-      diagnostics.add("LAUNCHER/WORKER_MISSING kind=indexer");
-    }
     if (rc.ai().llmEnabled()) {
       Path llmModelPath = rc.ai().llmModelPath();
       String modelPathStr = llmModelPath != null ? llmModelPath.toString() : null;

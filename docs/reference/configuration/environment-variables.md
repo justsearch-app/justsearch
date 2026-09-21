@@ -55,7 +55,7 @@ Scope:
 | `JUSTSEARCH_AI_AUTOSTART_DISABLED` | `justsearch.ai.autostart.disabled` | Bool | Explicitly disable LLM auto-start, overriding `AI_AUTOSTART_ENABLED`. (369) |
 | | `justsearch.inference.health_check_timeout_ms` | Int | llama-server health check timeout in milliseconds (default `120000`). Eval runs override to `180000`. Default was `30000` pre-alpha.17 — raised because Qwen3.5-9B Q4_K_M + multimodal cold-load legitimately exceeds 30s on first launch (374 alpha.17 R1). Honored by both `LlamaServerOps` (smoke test / mode transition) and `RuntimeActivationService` (activation self-test). Sysprop only — static init in both classes. (369, 374) |
 | `JUSTSEARCH_AI_DISABLED` | `justsearch.ai.disabled` | Bool | Disables all AI features (forces keyword-only flows where applicable). |
-| `JUSTSEARCH_LLM_ENABLED` | `justsearch.llm.enabled` | Bool | Enables/disables LLM features (escape hatch; policy/UI may override). |
+| `JUSTSEARCH_LLM_ENABLED` | `justsearch.llm.enabled` | Bool | When false, prevents creation of the generative LLM manager; changing this startup gate requires a process restart. AI-disabled and lite mode also prevent creation. |
 | `JUSTSEARCH_AI_EMBED_ENABLED` | `justsearch.ai.embed.enabled` | Bool | Enables/disables embeddings independently (escape hatch). |
 | `JUSTSEARCH_LLM_MODEL_PATH` | `justsearch.llm.model_path` | Path | Path to the main chat/VLM GGUF model used by `llama-server`. |
 | `JUSTSEARCH_CHAT_PROFILE` | `justsearch.chat.profile` | String | Chat-model profile (tempdoc 842): selects the llama-server `(model, mmproj)` pair. `standard` (default) is the user-facing Qwen3.5-9B pair; `compact` is the dev-tier small sibling (its own files under `models/compact/`), never part of a user install plan. Unknown values warn-fall-back to `standard`. The dev runner defaults dev stacks to `compact`; packaged/user launches default `standard`. An explicit `JUSTSEARCH_LLM_MODEL_PATH`/`justsearch.llm.model_path` override still wins over the profile. |
@@ -320,6 +320,8 @@ from shape selection.
 `JUSTSEARCH_EMBED_DIM` / `justsearch.embed.dimension` did not set encoder output
 dimensions and is retired, including its former evaluation identity knob. Actual
 model output and the index vector schema determine dimensional compatibility.
+`JUSTSEARCH_INDEXER_ENABLED` / `workers.indexer.enabled` is retired: it only
+emitted a smoke diagnostic and did not control the required embedded index.
 The old indexer host/port/deadline/queue/max-in-flight/backpressure carriers are
 retired with the removed indexer transport. `index.commit.debounce_ms` did not own
 commit cadence; `index.commit.timer_interval_ms` remains the timer setting.

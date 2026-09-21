@@ -13,8 +13,8 @@ The uncovered declarations are reconciled in the
 
 ## Key identity and lifecycle precedence
 
-After thirteen justified retirements, the declaration union is237 EnvRegistry
-plus53 ConfigKey entries, with12 aliases:278 unique keys. The preceding audit
+After fourteen justified retirements, the declaration union is236 EnvRegistry
+plus53 ConfigKey entries, with12 aliases:277 unique keys. The preceding audit
 measured291 before retirement. Use the existing declaration-parity parsers in
 `scripts/docs/runtime-config-matrix-lib.mjs`, not a line-based enum regex.
 `EnvRegistry.configKey()` equals `sysProp()` verbatim, including any `justsearch.`
@@ -285,3 +285,39 @@ reader/architecture audit. justsearch.llm.enabled likewise lacks an operational
 reader despite a documented disable promise; it needs deliberate connection or
 an explicit superseding contract, not a fictional hot row. The next bounded
 reader decision audit is tmp/2385-control-reader-decisions.md.
+
+
+## Next reader connections after d87a0e60c (2026-09-21)
+
+The source-backed decisions in tmp/2385-control-reader-decisions.md are accepted.
+Retire workers.indexer.enabled: its only effect was a misleading smoke diagnostic;
+the required embedded index owns actual lifecycle. Preserve worker version. This
+fourteenth retirement yields277 unique keys; root regenerates matrix and shrinks pins.
+
+Connect llm.enabled as a restart-required hard disable through the existing
+InferenceDecision, using HeadAssembly's captured configuration for both capability
+and actual BootstrapInferenceFactory creation. Remove the duplicate creation wrapper
+that re-sampled global settings. Headless declared launch identity uses the same
+predicate. Add the three manager-existence gates to generative dependencies;
+an actual manager proves llm.enabled=true, ai.disabled=false and lite.mode=false.
+Lite mode remains a process launch flag, not a newly claimed hot setting.
+
+Connect citation.scorer.threshold at its existing captured CitationMatchOps owner.
+Positive explicit request thresholds retain precedence; an unset/nonpositive wire
+value uses valid captured configuration in(0,1], otherwise the existing0.5 default.
+Both cross-encoder and embedding fallback must use that selected threshold.
+These reader connections do not implement D1-4 dispatch or close D1 acceptance.
+
+The next QU/filter normalization connection must preserve request-level sampling:
+KSE currently checks availability and then service dispatch checks it again.
+Resolve this at the existing service/dispatch boundary; preserve KSE's full feature
+gate and RetrieveContextController's always-available deterministic normalization.
+A new supplier alone would leave an operation able to see two snapshots.
+
+The successor audit `tmp/2391-apply-reconciliation.json` preserves the historical
+2381 artifact and reconciles277 distinct rows/14 retirements. LLM existence and
+scorer defaults now have actual readers; their register/owner work remains open.
+Counts remain45 connected hot rows,230 owner-work rows and2 pending readers
+(QU/filter). This deliberately does not promote reader tests to apply-dispatch
+acceptance. Candidate scopes:34 restart,119 index,38 encoders,13 generative,
+51 hot and22 generation-bound. No unresolved indexer-enabled row remains.

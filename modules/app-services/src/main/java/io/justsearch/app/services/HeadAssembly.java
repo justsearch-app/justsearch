@@ -66,6 +66,9 @@ public final class HeadAssembly implements AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(HeadAssembly.class);
   private static final Set<String> GENERATIVE_DEPENDENCIES = Set.of(
+      EnvRegistry.LLM_ENABLED.configKey(),
+      EnvRegistry.AI_DISABLED.configKey(),
+      EnvRegistry.LITE_MODE.configKey(),
       EnvRegistry.SERVER_EXE.configKey(),
       EnvRegistry.LLM_MODEL_PATH.configKey(),
       EnvRegistry.MMPROJ_MODEL.configKey(),
@@ -476,7 +479,7 @@ public final class HeadAssembly implements AutoCloseable {
     // §4 Phase 2 — CapabilityPhase first (F3 reorder); mode-change listener attached in
     // ServicePhase after the manager exists.
     boolean inferenceConfigured =
-        io.justsearch.app.services.bootstrap.phases.InferenceDecision.decideInferenceConfigured();
+        io.justsearch.app.services.bootstrap.phases.InferenceDecision.decideInferenceConfigured(rc);
     // Tempdoc 541 §5.3 + fix-pass D.1 — CapabilityPhase uses the unified PhaseOutcome-aware
     // tracedPhase helper; Ready/Degraded/Failed mapping happens inside the helper so the
     // call site stays concise.
@@ -501,10 +504,9 @@ public final class HeadAssembly implements AutoCloseable {
 
     // §4 Phase 3 — ServicePhase.
     InferenceLifecycleManager manager =
-        inferenceConfigured
-            ? io.justsearch.app.services.bootstrap.phases.InferenceDecision.createInferenceManager(
-                executors, telemetry, managedChildRegistry)
-            : null;
+        io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.createInferenceManager(
+            executors, inferenceConfigured, rc, io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
+            managedChildRegistry);
     this.inferenceManager = manager;
     if (generativeObservation != null) {
       if (manager != null) {
@@ -1678,6 +1680,10 @@ public final class HeadAssembly implements AutoCloseable {
   static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config) {
     Objects.requireNonNull(config, "config");
     var values = new java.util.LinkedHashMap<String, Object>();
+    // A constructed manager proves these existence gates were accepted at composition.
+    values.put(EnvRegistry.LLM_ENABLED.configKey(), true);
+    values.put(EnvRegistry.AI_DISABLED.configKey(), false);
+    values.put(EnvRegistry.LITE_MODE.configKey(), false);
     values.put(EnvRegistry.SERVER_EXE.configKey(), normalized(config.serverExecutable()));
     values.put(EnvRegistry.LLM_MODEL_PATH.configKey(), normalized(config.modelPath()));
     values.put(EnvRegistry.MMPROJ_MODEL.configKey(), normalized(config.mmprojPath()));

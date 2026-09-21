@@ -748,8 +748,8 @@ public record ResolvedConfig(
     }
   }
 
-  /** Index service enablement and advertised service version. */
-  public record WorkerIndexer(boolean enabled, String serviceVersion) {}
+  /** Advertised index service version. */
+  public record WorkerIndexer(String serviceVersion) {}
 
   /** Infrastructure health check thresholds from YAML {@code infra.health.*}. */
   public record InfraHealth(

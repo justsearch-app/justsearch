@@ -1043,9 +1043,10 @@ public class HeadlessApp {
       manifestPublisher = new RuntimeManifestPublisher(configPhase.dataDir(), childRegistry);
       String declaredLlamaConfigHashCandidate = null;
       if (io.justsearch.app.services.bootstrap.phases.InferenceDecision
-          .decideInferenceConfigured()) {
+          .decideInferenceConfigured(configPhase.resolvedConfig())) {
         io.justsearch.app.inference.InferenceConfig inferenceConfig =
-            io.justsearch.app.inference.InferenceConfig.fromEnvironment(
+            io.justsearch.app.inference.InferenceConfig.fromResolvedConfig(
+                configPhase.resolvedConfig(),
                 io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
                     configPhase.resolvedConfig(), SystemAccess.sysProp("user.dir", ".")));
         int effectiveGpuLayers =

@@ -655,12 +655,15 @@ jobs:
       - name: Verify Claude skill doc sections are up to date
         run: node scripts/docs/skills-sync.mjs --check
 
-      - name: Upload this run's governance-health snapshot
+      - name: Upload this run's governance findings and health snapshot
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: governance-health-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tmp/governance-history.ndjson
+          path: |
+            tmp/governance-history.ndjson
+            tmp/governance-report.sarif
+            tmp/knip-report.json
           if-no-files-found: warn
 
   jseval-suite:

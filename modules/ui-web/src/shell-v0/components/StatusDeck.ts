@@ -58,6 +58,7 @@ import './Control.js';
 import { subscribeTasks, listRunningTasks, type Task } from '../substrates/tasks/index.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
+import type { ComponentState } from '../../api/generated/schema-types/status-response.js';
 
 // Tempdoc 508 §4.3 — core items register via the same contribution
 // mechanism plugins use. The render functions are markers (returning
@@ -415,8 +416,10 @@ export class StatusDeck extends JfElement {
     // fact, and before the shell has looked even once there is no contact either).
     if (!this.status) return { cls: 'muted', name: 'unknown' };
     if (this.aiState && !this.aiState.snapshotLive) return { cls: 'error', name: 'disconnected' };
-    const api = this.status.readiness?.engineComponents?.api?.state;
-    const index = this.status.readiness?.engineComponents?.index?.state;
+    const api: ComponentState | null | undefined =
+      this.status.readiness?.engineComponents?.api?.state;
+    const index: ComponentState | null | undefined =
+      this.status.readiness?.engineComponents?.index?.state;
     if (api === 'READY' && index === 'READY')
       return { cls: 'healthy', name: 'connected' };
     if (api === 'STARTING' || index === 'STARTING')

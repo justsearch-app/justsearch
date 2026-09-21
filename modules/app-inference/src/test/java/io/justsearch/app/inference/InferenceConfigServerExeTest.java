@@ -257,8 +257,8 @@ class InferenceConfigServerExeTest {
    */
   private static Path invokeFindServerExecutable(Path baseDir, boolean preferCuda) throws Exception {
     Method method = InferenceConfig.class.getDeclaredMethod(
-        "findServerExecutable", Path.class, boolean.class);
+        "findServerExecutable", io.justsearch.configuration.resolved.ResolvedConfig.class, Path.class, boolean.class);
     method.setAccessible(true);
-    return (Path) method.invoke(null, baseDir, preferCuda);
+    return (Path) method.invoke(null, ConfigStore.global().get(), baseDir, preferCuda);
   }
 }
