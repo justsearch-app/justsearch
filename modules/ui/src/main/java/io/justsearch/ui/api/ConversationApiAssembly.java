@@ -144,6 +144,34 @@ final class ConversationApiAssembly {
                 : DocumentService::unavailable);
     DocumentService docs =
         new io.justsearch.app.services.conversation.LazyDocumentService(docsSupplier);
+    // Capture the installed authority once. Each operation reads that store's current immutable
+    // snapshot; replacing the global later must not silently switch this graph to another owner.
+    io.justsearch.configuration.resolved.ConfigStore conversationConfigStore =
+        io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    java.util.function.DoubleSupplier citationThreshold =
+        () -> {
+          var rag = resolvedRag(conversationConfigStore);
+          return rag == null
+              ? DocumentService.DEFAULT_CITATION_SIMILARITY_THRESHOLD
+              : rag.citationMatchThreshold();
+        };
+    java.util.function.IntSupplier defaultTopK =
+        () -> {
+          var rag = resolvedRag(conversationConfigStore);
+          return rag == null
+              ? io.justsearch.app.services.conversation.spi.RAGContext.DEFAULT_TOP_K
+              : rag.ragTopK();
+        };
+    java.util.function.IntSupplier summaryMaxInputTokens =
+        () -> {
+          if (conversationConfigStore == null) {
+            return io.justsearch.configuration.resolved.ResolvedConfig.Summary.DEFAULT_MAX_TOKENS;
+          }
+          var snapshot = conversationConfigStore.get();
+          return snapshot == null
+              ? io.justsearch.configuration.resolved.ResolvedConfig.Summary.DEFAULT_MAX_TOKENS
+              : snapshot.summary().maxTokens();
+        };
     // Tempdoc 526 §4.2 — typed DocumentAddress → canonical resolver.
     ResolveAddressController resolveAddressController = new ResolveAddressController(docs);
     // Slice 487 SPI contributors require HeadAssembly (live operation catalog +
@@ -167,12 +195,9 @@ final class ConversationApiAssembly {
     // Tempdoc 799 N.2: the citation cutoff is now read from config. Tempdoc 565 15.A made this
     // the ONE cutoff shared with the agent path, so AgentLoopWiring must read the same key —
     // wiring only one side would reintroduce the RAG/agent divergence 565 removed.
-    var ragCfgForCitations = resolvedRag();
     streamConsumers.add(
-        ragCfgForCitations == null
-            ? new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(docs)
-            : new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(
-                docs, ragCfgForCitations.citationMatchThreshold()));
+        new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(
+            docs, citationThreshold));
     streamConsumers.add(io.justsearch.app.services.conversation.spi.RAGDoneEnricher.INSTANCE);
     // Slice 491 §9.D Phase E (C4 + F1) — same URLExtractor instance is registered in the
     // substrate-driven streamConsumers list AND consumed by ToolIteratingShapeRunner via
@@ -224,18 +249,15 @@ final class ConversationApiAssembly {
     io.justsearch.app.services.conversation.ContextInjectorRegistry contextInjectorRegistry =
         io.justsearch.app.services.conversation.ContextInjectorRegistry.of(
             List.of(
-                new io.justsearch.app.services.conversation.spi.DocAccess(docs),
-                new io.justsearch.app.services.conversation.spi.BatchDocAccess(docs),
+                new io.justsearch.app.services.conversation.spi.DocAccess(
+                    docs, summaryMaxInputTokens),
+                new io.justsearch.app.services.conversation.spi.BatchDocAccess(
+                    docs, summaryMaxInputTokens),
                 // Tempdoc 845 — the same onlineAiSupplier the engine uses, so the RAG token budget
                 // is computed against the window the running llama-server actually has (observed
                 // n_ctx, else the configured launch window) instead of a hardcoded 8192.
-                ragCfgForCitations == null
-                    ? new io.justsearch.app.services.conversation.spi.RAGContext(
-                        docs,
-                        io.justsearch.app.services.conversation.spi.RAGContext.DEFAULT_TOP_K,
-                        onlineAiSupplier)
-                    : new io.justsearch.app.services.conversation.spi.RAGContext(
-                        docs, ragCfgForCitations.ragTopK(), onlineAiSupplier),
+                new io.justsearch.app.services.conversation.spi.RAGContext(
+                    docs, defaultTopK, onlineAiSupplier),
                 io.justsearch.app.services.conversation.spi.UserPromptInjector.INSTANCE,
                 // Tempdoc 883 decision 3 — the same onlineAiSupplier RAGContext gets, so the
                 // history cap is a fraction of the window the running server actually has.
@@ -245,7 +267,7 @@ final class ConversationApiAssembly {
                 new io.justsearch.app.services.conversation.spi.QueryRewriteInjector(onlineAiSupplier),
                 // tempdoc 526 §12.4 — typed selection injector (core.selection).
                 new io.justsearch.app.services.conversation.spi.SelectionContextInjector(
-                    docs, onlineAiSupplier)));
+                    docs, onlineAiSupplier, summaryMaxInputTokens)));
     io.justsearch.app.services.conversation.IterationControllerRegistry iterationControllerRegistry =
         io.justsearch.app.services.conversation.IterationControllerRegistry.of(List.of(
             // SingleHopController for all ONE_SHOT shapes (including FreeChat).
@@ -495,9 +517,10 @@ final class ConversationApiAssembly {
    * unit-testable. Falls back to the compiled defaults when no ConfigStore is installed (tests,
    * early boot), mirroring {@code DefaultWorkerAppServices.resolvedOcrConfig()}.
    */
-  private static io.justsearch.configuration.resolved.ResolvedConfig.Rag resolvedRag() {
-    io.justsearch.configuration.resolved.ConfigStore store =
-        io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-    return store == null || store.get() == null ? null : store.get().rag();
+  private static io.justsearch.configuration.resolved.ResolvedConfig.Rag resolvedRag(
+      io.justsearch.configuration.resolved.ConfigStore store) {
+    if (store == null) return null;
+    io.justsearch.configuration.resolved.ResolvedConfig snapshot = store.get();
+    return snapshot == null ? null : snapshot.rag();
   }
 }

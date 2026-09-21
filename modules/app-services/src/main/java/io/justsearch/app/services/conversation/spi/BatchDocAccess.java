@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,14 +53,25 @@ public final class BatchDocAccess implements ContextInjector {
 
   private final DocumentService documents;
   private final Duration fetchTimeout;
+  private final SummaryInputLimit inputLimit;
 
   public BatchDocAccess(DocumentService documents) {
-    this(documents, DEFAULT_FETCH_TIMEOUT);
+    this(documents, DEFAULT_FETCH_TIMEOUT, () -> SummaryInputLimit.DEFAULT_MAX_TOKENS);
   }
 
   public BatchDocAccess(DocumentService documents, Duration fetchTimeout) {
+    this(documents, fetchTimeout, () -> SummaryInputLimit.DEFAULT_MAX_TOKENS);
+  }
+
+  public BatchDocAccess(DocumentService documents, IntSupplier maxInputTokens) {
+    this(documents, DEFAULT_FETCH_TIMEOUT, maxInputTokens);
+  }
+
+  public BatchDocAccess(
+      DocumentService documents, Duration fetchTimeout, IntSupplier maxInputTokens) {
     this.documents = Objects.requireNonNull(documents, "documents");
     this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
+    this.inputLimit = new SummaryInputLimit(maxInputTokens);
   }
 
   @Override
@@ -81,10 +93,6 @@ public final class BatchDocAccess implements ContextInjector {
       return InjectorResult.terminalError(new SseEvent("error", err));
     }
 
-    // Make docIds + count visible to downstream consumers (e.g., BatchSummaryDoneEnricher).
-    ctx.attributes().put("batch.docIds", docIds);
-    ctx.attributes().put("batch.fileCount", docIds.size());
-
     // Resolve all docs; failed fetches are tolerated (their slot becomes empty, with a
     // {{File: <name>}} delimiter so the model can see what was attempted).
     Map<String, DocumentRecord> records = fetchAll(docIds, engineContext);
@@ -98,6 +106,14 @@ public final class BatchDocAccess implements ContextInjector {
       err.put("docIds", docIds);
       return InjectorResult.terminalError(new SseEvent("error", err));
     }
+
+    SseEvent rejection = inputLimit.rejection(concatenated);
+    if (rejection != null) return InjectorResult.terminalError(rejection);
+
+    // Publish batch metadata only after the request is accepted. A refused request never reaches
+    // downstream summary consumers and must not leave attributes claiming that it did.
+    ctx.attributes().put("batch.docIds", docIds);
+    ctx.attributes().put("batch.fileCount", docIds.size());
 
     String truncated =
         concatenated.length() > MAX_CONTENT_CHARS

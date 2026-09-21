@@ -1028,6 +1028,13 @@ public final class AgentLoopService implements AgentService {
    */
   public void setCitationDocumentService(
       io.justsearch.app.api.DocumentService documentService, double similarityThreshold) {
+    setCitationDocumentService(documentService, () -> similarityThreshold);
+  }
+
+  /** Same, with a cutoff read from the current immutable configuration snapshot per answer. */
+  public void setCitationDocumentService(
+      io.justsearch.app.api.DocumentService documentService,
+      java.util.function.DoubleSupplier similarityThreshold) {
     stepRunner.setCitationResolver(
         documentService == null
             ? null

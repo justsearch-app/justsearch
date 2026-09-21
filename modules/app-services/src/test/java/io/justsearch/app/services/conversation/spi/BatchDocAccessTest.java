@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -94,7 +95,7 @@ final class BatchDocAccessTest {
   void truncation() {
     String huge = "x".repeat(BatchDocAccess.MAX_CONTENT_CHARS * 2);
     var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", huge, Map.of())));
-    var injector = new BatchDocAccess(docs);
+    var injector = new BatchDocAccess(docs, () -> Integer.MAX_VALUE);
 
     InjectorResult result = injector.inject(stubCtx(Map.of("docIds", List.of("doc"))));
 
@@ -117,6 +118,39 @@ final class BatchDocAccessTest {
 
     assertEquals(List.of("doc"), ctx.attributes().get("batch.docIds"));
     assertEquals(1, ctx.attributes().get("batch.fileCount"));
+  }
+
+  @Test
+  @DisplayName("rejects the exact untruncated batch against one configured input-limit read")
+  void rejectsUntruncatedBatch() {
+    String source = "dense-source".repeat(20);
+    var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", source, Map.of())));
+    AtomicInteger reads = new AtomicInteger();
+    var injector =
+        new BatchDocAccess(
+            docs,
+            () -> {
+              reads.incrementAndGet();
+              return 2;
+            });
+    var ctx = stubCtx(Map.of("docIds", List.of("doc")));
+
+    InjectorResult result = injector.inject(ctx);
+
+    var error = result.terminalError().orElseThrow();
+    assertEquals("CONTEXT_TOO_LARGE", error.payload().get("errorCode"));
+    assertEquals(2, error.payload().get("maxTokens"));
+    assertEquals(
+        io.justsearch.core.util.TokenEstimation.estimateTokens(
+            "--- File: doc ---\n" + source + "\n\n"),
+        error.payload().get("estimatedTokens"),
+        "the guard estimates the exact concatenated input, not an additive approximation");
+    assertTrue(
+        error.payload().get("error").toString()
+            .contains("configured summary source-input limit of 2 tokens"));
+    assertEquals(1, reads.get());
+    assertFalse(ctx.attributes().containsKey("batch.docIds"));
+    assertFalse(ctx.attributes().containsKey("batch.fileCount"));
   }
 
   // ---- fixtures ----

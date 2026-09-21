@@ -2,6 +2,7 @@
 package io.justsearch.app.services.conversation.spi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -132,6 +134,99 @@ final class SelectionContextInjectorTest {
   }
 
   @Test
+  @DisplayName("every summarize selection source is checked before dispatch or truncation")
+  void summarizeSelectionVariantsUseUntruncatedInputLimit() {
+    String dense = "x".repeat(120);
+    var docs =
+        new StubDocs(
+            Map.of(
+                "/docs/a.md", new DocumentRecord("/docs/a.md", dense, Map.of()),
+                "/docs/b.md", new DocumentRecord("/docs/b.md", dense, Map.of())));
+
+    for (Map<String, Object> selection : summarySelections(dense)) {
+      AtomicInteger reads = new AtomicInteger();
+      var injector =
+          new SelectionContextInjector(
+              docs,
+              () -> null,
+              () -> {
+                reads.incrementAndGet();
+                return 2;
+              });
+
+      ConversationContext context =
+          ctx(SummarizeShape.ID.value(), Map.of("selection", selection));
+      InjectorResult result = injector.inject(context);
+
+      var error = result.terminalError().orElseThrow();
+      assertEquals("CONTEXT_TOO_LARGE", error.payload().get("errorCode"), selection.toString());
+      assertEquals(2, error.payload().get("maxTokens"));
+      if ("result-set".equals(selection.get("kind"))) {
+        String exact =
+            "Document: /docs/a.md\n\n" + dense
+                + DocumentService.SECTION_SEPARATOR
+                + "Document: /docs/b.md\n\n" + dense;
+        assertEquals(
+            io.justsearch.core.util.TokenEstimation.estimateTokens(exact),
+            error.payload().get("estimatedTokens"),
+            "result sets are estimated as their exact combined input, not per-doc estimates");
+      } else if ("health-condition".equals(selection.get("kind"))) {
+        String exact = "Health condition worker.ready (severity=warning):\n\n" + dense;
+        assertEquals(
+            io.justsearch.core.util.TokenEstimation.estimateTokens(exact),
+            error.payload().get("estimatedTokens"),
+            "health summary must estimate the exact constructed message");
+      } else if ("search-trace".equals(selection.get("kind"))) {
+        String exact =
+            "Explain, in plain language, what this search did and why — based on the pipeline "
+                + "trace below.\n\nSearch trace:\n" + dense;
+        assertEquals(
+            io.justsearch.core.util.TokenEstimation.estimateTokens(exact),
+            error.payload().get("estimatedTokens"),
+            "search trace must estimate the exact constructed message");
+      }
+      assertTrue(
+          error.payload().get("error").toString()
+              .contains("configured summary source-input limit of 2 tokens"));
+      assertEquals(1, reads.get(), "one hot snapshot read for " + selection.get("kind"));
+      assertTrue(result.messages().isEmpty());
+      assertTrue(
+          context.attributes().isEmpty(),
+          "a refused selection must not publish citation/RAG attributes: " + selection.get("kind"));
+    }
+  }
+
+  @Test
+  @DisplayName("non-summary selection variants never consult the summary input limit")
+  void nonSummarySelectionVariantsIgnoreSummaryLimit() {
+    String dense = "x".repeat(120);
+    var docs =
+        new StubDocs(
+            Map.of(
+                "/docs/a.md", new DocumentRecord("/docs/a.md", dense, Map.of()),
+                "/docs/b.md", new DocumentRecord("/docs/b.md", dense, Map.of())));
+    var selections = summarySelections(dense);
+
+    for (Map<String, Object> selection : selections) {
+      AtomicInteger reads = new AtomicInteger();
+      var injector =
+          new SelectionContextInjector(
+              docs,
+              () -> null,
+              () -> {
+                reads.incrementAndGet();
+                return 1;
+              });
+
+      InjectorResult result =
+          injector.inject(ctx(ExtractShape.ID.value(), Map.of("selection", selection)));
+
+      assertFalse(result.terminalError().isPresent(), selection.toString());
+      assertEquals(0, reads.get(), "non-summary path read the summary limit: " + selection);
+    }
+  }
+
+  @Test
   @DisplayName("Every injector ExtractShape declares is a real, registered id")
   void extractInjectorIdsAreReal() {
     ConversationShape extract = ExtractShape.definition();
@@ -144,6 +239,53 @@ final class SelectionContextInjectorTest {
               .contains(id),
           "unknown context injector id declared by ExtractShape: " + id);
     }
+  }
+
+  private static List<Map<String, Object>> summarySelections(String dense) {
+    return List.of(
+        Map.of(
+            "kind", "text-range",
+            "address",
+                Map.of(
+                    "coords", "canonical",
+                    "docId", "/docs/a.md",
+                    "startChar", 0,
+                    "endChar", dense.length()),
+            "selectionText", dense,
+            "hostEntity", Map.of("kind", "doc", "id", "/docs/a.md")),
+        Map.of(
+            "kind", "item",
+            "itemKind", "search-hit",
+            "itemId", "/docs/a.md"),
+        Map.of(
+            "kind", "citation",
+            "citation",
+                Map.of(
+                    "parentDocId", "/docs/a.md",
+                    "startChar", 0,
+                    "endChar", dense.length(),
+                    "excerpt", dense)),
+        Map.of(
+            "kind", "citation",
+            "citation",
+                Map.of(
+                    "parentDocId", "/docs/missing.md",
+                    "startChar", 0,
+                    "endChar", dense.length(),
+                    "excerpt", dense)),
+        Map.of(
+            "kind", "result-set",
+            "items",
+                List.of(
+                    Map.of("id", "/docs/a.md", "kind", "search-hit"),
+                    Map.of("id", "/docs/b.md", "kind", "search-hit")),
+            "query", "dense"),
+        Map.of(
+            "kind", "health-condition",
+            "conditionId", "worker.ready",
+            "severity", "warning",
+            "summary", dense),
+        Map.of("kind", "search-trace", "scope", "query", "summary", dense));
   }
 
   // ---- fixtures ----

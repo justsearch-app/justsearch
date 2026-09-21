@@ -20,6 +20,12 @@ look.
 > responses; these prove UI rendering, not backend or model behavior. A step with
 > a non-default fixture variant (for example `chat-chip-yield`) requires that flag.
 > The retired `?demo=true` mode is unrelated and remains inert.
+>
+> A mount failure naming `504 /node_modules/.vite/deps/...` is a failed Vite
+> optimized dependency, not evidence that backend readiness or a UI selector is
+> wrong. Use the owned stack lifecycle to restart/reoptimize, verify the current
+> served dependency returns200, then repeat the unchanged capture. Preserve the
+> failed evidence; do not hide it with fixtures or a longer mount timeout.
 
 ## Quick reference
 

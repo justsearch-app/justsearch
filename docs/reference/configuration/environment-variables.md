@@ -44,11 +44,9 @@ Scope:
 | **Telemetry** | | | |
 | `JUSTSEARCH_TELEMETRY_FLUSH_MS` | `justsearch.telemetry.flushMs` | Long | Telemetry flush interval in milliseconds (NDJSON exporter). |
 | **Indexing & Search** | | | |
-| `JUSTSEARCH_INDEX_COLLECTION` | `justsearch.index.collection` | String | Index “collection” name (legacy escape hatch; prefer YAML). |
 | `JUSTSEARCH_INDEX_PARITY_ALLOW_MISMATCH` | `justsearch.index.parity.allow_mismatch` | Bool | Operator escape hatch to allow opening read-only on schema parity mismatch; not set by default anywhere (tempdoc 915). |
 | `JUSTSEARCH_INDEX_TRACING_LEVEL` | `justsearch.index.tracing_level` | String | Indexing pipeline OTel tracing level: `none` (default, no spans), `sample` (1% ratio sampling), `detailed` (100% — all batches/docs). Requires Worker restart. **Cost guidance:** `none` has validated sub-10µs overhead (tempdoc 312 item 7). `detailed` produced ~7,400 spans on a 15-query scifact eval (tempdoc 400 §23.8); production use should stay on `none` and only enable `detailed` for the nightly observability workflow or explicit debug sessions. See `docs/explanation/08-observability.md` for the span tree and `traces.ndjson` rotation limits (10 MB / 7-day default). |
 | `JUSTSEARCH_HEAD_TRACING_LEVEL` | `justsearch.head.tracing_level` | String | Head process OTel tracing level: `none` (default, no spans), `sample` (1% ratio), `detailed` (100%). Tempdoc 518 Appendix G W4.2 — when non-`none`, the head's `HeadlessApp` initializes a `TracingBootstrap` so the existing span-authoring code (`AgentLoopService.invoke_agent`, `KnowledgeHttpApiAdapter.search`, etc.) emits to `traces.ndjson` + optional OTLP fan-out. Spans automatically carry the `justsearch.inference.generation` attribute (per W2.2) when an inference runtime is registered. Cost profile mirrors the indexing tracing key. |
-| `JUSTSEARCH_SEARCH_PROFILE` | `justsearch.search.pipeline.profile` | String | Selects a search pipeline profile (e.g., `default`, `semantic`, `hybrid`). |
 | **Worker / Build Info** | | | |
 | `JUSTSEARCH_INDEXER_WORKER_VERSION` | `indexer.worker.version` | String | Overrides the Worker version string (primarily for build/debug). |
 | `JUSTSEARCH_BUILD_STAMP` | `justsearch.build.stamp` | String | SHA-256 content hash of the Engine distribution (16 hex chars), from `modules/ui/build/install/ui/build-stamp.txt`. Used for stale-JVM detection — jseval compares the running stamp against the on-disk stamp to warn of mismatches. Lane F stage A item A13 re-homed the stamp off the deleted Worker distribution; its `WorkerSpawner` injector went at item A11, so today only `DevReloadManager` sets this after a hot reload. (371, ADR-0021) |
@@ -92,8 +90,7 @@ Scope:
 | `JUSTSEARCH_AGENT_MAX_COMPLETION_TOKENS` | `justsearch.agent.max_completion_tokens` | Int | Per-call completion-token cap for the agent loop. Default `0` = derive from the live context window: `min(1024, n_ctx / 4)`, floored at `256`. A positive value is an operator ceiling on that same window fraction, so a window too small to afford it still reduces it — the reduction is reported at INFO rather than applied silently. |
 | `JUSTSEARCH_RERANK_GPU_MEM_MB` | `justsearch.rerank.gpu_mem_mb` | Int | GPU memory arena size (MB) for the Worker-side ONNX reranker CUDA execution provider. Default `2048`. Minimum for GTE-ModernBERT at seq=512. See `docs/explanation/05-ai-architecture.md` §Reranker GPU Coordination. |
 | **Summary runtime** | | | |
-| `JUSTSEARCH_SUMMARY_MAX_TOKENS` | `justsearch.summary.max_tokens` | Int | Max summary estimated tokens before rejection (default `20000`, clamped `>= 1`). |
-| `JUSTSEARCH_SUMMARY_PIPELINE` | `justsearch.summary.pipeline` | String | Summary pipeline id (default `summary_mapreduce_v1` after sanitize). |
+| `JUSTSEARCH_SUMMARY_MAX_TOKENS` | `justsearch.summary.max_tokens` | Int | Maximum estimated source tokens for single-pass document, batch, and selection summaries before rejection (default `20000`, clamped `>= 1`; read per operation). Hierarchical multi-pass summaries are exempt. |
 | **LLM runtime tuning** | | | |
 | **Pipeline ids** | | | |
 | **RAG** | | | |
@@ -193,7 +190,7 @@ Scope:
 | `JUSTSEARCH_INGESTION_SKIP_EXTENSIONS` | `justsearch.ingestion.skip.extensions` | String | Comma-separated lowercase file extensions (no leading dot) treated as build/cache output. Defaults to `pyc,pyo,class,o,obj`. Set replaces the defaults wholesale. Same empty-string semantics + sentinel-disable pattern as `JUSTSEARCH_INGESTION_SKIP_PATTERNS`. |
 | `JUSTSEARCH_INGESTION_SKIP_DIRECTORY_NAMES` | `justsearch.ingestion.skip.directory_names` | String | Comma-separated lowercase directory basenames a tree walk should never descend into. Defaults to `.git,.svn,.hg,.bzr,cvs,node_modules,bower_components,__pycache__,.tox,.pytest_cache,.mypy_cache,$recycle.bin,system volume information`. Set replaces the defaults wholesale. Same empty-string semantics + sentinel-disable pattern as `JUSTSEARCH_INGESTION_SKIP_PATTERNS`. Disabling causes the walker to descend into `.git/objects/`, `node_modules/`, etc. — orders of magnitude more files than typical user content. |
 | **Path Resolution + Test Mode (tempdoc 419 T5/T6, ADR-0028)** | | | |
-| `JUSTSEARCH_PATH_RESOLUTION_RETENTION_DAYS` | `justsearch.path_resolution.retention_days` | Int | Retention window (in days) for entries in the `path_resolution` table after a file's deletion has been observed. Default `90`. Rows with non-null `removed_at` are pruned by the periodic job-cleanup task once `removed_at + retention < now`. The 90-day default lets the activity panel still answer "this file was deleted on X" for recently-removed entries without unbounded table growth. Removing a watched root immediately prunes everything under it regardless of retention (ADR-0028). Lower values reduce table size but shorten the "recently deleted" UX window. |
+| `JUSTSEARCH_PATH_RESOLUTION_RETENTION_DAYS` | `justsearch.path_resolution.retention_days` | Int | Retention window (in days) for entries in the `path_resolution` table after a file's deletion has been observed. Default `90`, clamped to at least `1` day; the existing daily cleanup reads the current setting once per sweep. Rows with non-null `removed_at` are pruned by the periodic job-cleanup task once `removed_at + retention < now`. The 90-day default lets the activity panel still answer "this file was deleted on X" for recently-removed entries without unbounded table growth. Removing a watched root immediately prunes everything under it regardless of retention (ADR-0028). Lower values reduce table size but shorten the "recently deleted" UX window. |
 | `JUSTSEARCH_LITE_MODE` | `justsearch.lite.mode` | Bool | Lite mode for ingestion-only test scenarios. When `true` the Head process skips InferenceLifecycleManager initialization (the AI stack), cascading through the `OnlineAiService.unavailable()` fallback. Equivalent in effect to `JUSTSEARCH_AI_DISABLED=true` but namespaced for the test-harness use case so future test-mode skips have an obvious home. Saves ~3-8s of startup time. Used by the per-class `IsolatedBackendFixture` (see `docs/how-to/spawn-isolated-test-backend.md`). Default `false`. |
 | **NRT / commit cadence** | | | |
 | `JUSTSEARCH_INDEX_NRT_MODE` | `index.nrt.mode` | String | NRT reopen strategy: `continuous` (default) or `on_demand`. In `continuous` mode the background `ControlledRealTimeReopenThread` reopens on the `index.nrt.target_max_stale_ms` / `index.nrt.max_stale_ms` bounds whether or not anyone is searching. In `on_demand` mode the background thread drops to `index.nrt.background_reopen_ms` and every foreground search refreshes the searcher itself before acquiring it, moving the segment-open cost onto the first query after new documents. An unrecognised value falls back to `continuous` with a WARN. Resolved onto `ResolvedConfig.Index`, which the index half reads in process. |
@@ -309,3 +306,28 @@ $env:JUSTSEARCH_GPU_LAYERS = "99"
 
 Notes:
 - GPU offload requires a GPU-capable runtime (e.g., a v3 runtime variant under `<AI_HOME>/native-bin/llama-server/variants/<variantId>/llama-server.exe`).
+
+
+## Retired inert configuration
+
+The Engine no longer declares the singular `JUSTSEARCH_INDEX_COLLECTION` /
+`justsearch.index.collection` override. Configure the supported collection list
+with YAML `index.collections` instead. `JUSTSEARCH_SUMMARY_PIPELINE` /
+`justsearch.summary.pipeline` is also retired: explicit conversation shapes select
+summary behavior. The `justsearch.summary.max_tokens` declaration remains separate
+from shape selection.
+
+`JUSTSEARCH_EMBED_DIM` / `justsearch.embed.dimension` did not set encoder output
+dimensions and is retired, including its former evaluation identity knob. Actual
+model output and the index vector schema determine dimensional compatibility.
+The old indexer host/port/deadline/queue/max-in-flight/backpressure carriers are
+retired with the removed indexer transport. `index.commit.debounce_ms` did not own
+commit cadence; `index.commit.timer_interval_ms` remains the timer setting.
+`index.watcher.overflow.rescan_on_overflow` is retired because overflow always
+triggers reconciliation as a safety behavior.
+
+The legacy `JUSTSEARCH_SEARCH_PIPELINE` and `JUSTSEARCH_SEARCH_PROFILE` selectors
+are retired. Pipeline definition files were removed by ADR-0014; profile labels
+never selected an execution path. Search request flags or an explicit mode select
+the pipeline. A request with neither uses the backend's capability-derived AUTO
+selection; MCP and RAG retain their explicit hybrid defaults.

@@ -13,8 +13,9 @@ The uncovered declarations are reconciled in the
 
 ## Key identity and lifecycle precedence
 
-The declaration union is247 EnvRegistry plus56 ConfigKey entries, with12 aliases:
-291 unique keys. Use the existing declaration-parity parsers in
+After thirteen justified retirements, the declaration union is237 EnvRegistry
+plus53 ConfigKey entries, with12 aliases:278 unique keys. The preceding audit
+measured291 before retirement. Use the existing declaration-parity parsers in
 `scripts/docs/runtime-config-matrix-lib.mjs`, not a line-based enum regex.
 `EnvRegistry.configKey()` equals `sysProp()` verbatim, including any `justsearch.`
 prefix. The extracted inventory is retained in `tmp/2298-declared-key-union.json`.
@@ -175,3 +176,112 @@ Canonical SUMMARY_PIPELINE/INDEX_COLLECTION descriptions, obsolete lifecycle row
 config schema/profile values and dead-config baseline also belong to the same
 retirement. Recompute the normalized union with the existing matrix parser;280
 is an expectation after11 removals, not a hard-coded acceptance replacement.
+
+
+## Retirement implementation reconciliation, 2026-09-21
+
+The11 approved removals are implemented in declarations, carriers, YAML/schema,
+fixtures and the jseval identity projection. The primary index path now derives
+from the already-parsed plural collection projection; it does not keep a shadow
+singular setting. Focused runtime tests remain pending. Actual parser counts in
+2375 are239 EnvRegistry +53 ConfigKey -12 aliases =280 unique keys. Matrix rows
+are292 because aliases remain distinct declaration rows. The config-surface gate
+passes after regenerating its registered input and shrinking pins to104 YAML,
+239 env/sysprop and53 ConfigKey. No growth waiver was added.
+
+
+## Missing-reader connection design, 2026-09-21
+
+Both retained promises use hot readers of one captured ConfigStore, without a
+listener or component rebuild. Summary input limits apply to single-pass source
+material (whole document, concatenated batch, or summarize selection), estimated
+before existing truncation. Resolve default20000 and clamp>=1 in the typed builder;
+read once per eligible operation. A shared narrow input-limit helper centralizes
+estimation/refusal, using the existing CONTEXT_TOO_LARGE error vocabulary and an
+explicit configured-limit message. Hierarchical summarization remains multi-pass
+and exempt from this single-pass guard; a regression must prove a >20000-token
+source still splits. This clarifies the old unqualified summary-limit prose,
+without capping long-document hierarchical capability or replacing output budgets.
+Selection variants must be checked before their own truncation; non-summary uses
+of the shared selection injector remain unchanged.
+
+Path-resolution retention adds a typed Paths value, default90 days, normalized to
+at least1 day. This explicit minimum preserves a bounded recent-deletion history
+rather than silently making nonpositive input an immediate erase. The existing
+KnowledgeServer daily sentinel cleanup calls the existing store prune method with
+now minus the sampled duration. Reuse its job/ledger cleanup owner and close order;
+no new scheduler, persistent marker or duplicated retention store. The EngineRoot
+composition supplies its captured ConfigStore authority. Legacy explicit-snapshot
+construction stays fixed to that snapshot. A deterministic package-private cleanup
+method permits real store/cutoff tests without waiting a day; prove current-store
+swaps, replacement-global isolation and untouched live/recent rows. This auxiliary
+history setting remains outside the physical index dependency digest.
+
+Acceptance includes valid defaults/clamping, strict boundary behavior, actual
+composition wiring, once-per-operation sampling and canonical docs. Configuration
+register rows may claim hot only after those behaviors are implemented and proved.
+
+
+## Pipeline-selector retirement decision, 2026-09-21
+
+A separate source review confirms that justsearch.search.pipeline is a residue
+of the definition-file system explicitly retired by ADR-0014. The profile key
+has no implemented mapping (desktop-default in YAML versus default/semantic/hybrid
+in old prose); its only read prints a launcher marker. Retire both selectors and
+the marker/smoke requirement rather than introduce a new global override over
+settled request behavior. Preserve explicit PipelineConfig, explicit mode, call
+surface defaults, and capability-derived AUTO when the request supplies neither.
+The refined UI uses AUTO; quick UI, MCP and RAG keep their explicit choices.
+Canonical search overview must correct its obsolete universal-hybrid-default
+claim. An actual KnowledgeSearchEngine precedence regression must prove the
+outgoing request, not just helper preset behavior. Recompute counts after edits;
+these two justified retirements are additional to the11 above.
+
+
+###2380 reconciliation and retention review corrections
+
+The actual parser union after both batches is278 (237 EnvRegistry +53 ConfigKey
+minus12 aliases); YAML mappings103, declaration rows290. Regenerated config gate
+passes with pins shrunk to103/237/53. Removed path-retention's dead-key baseline
+entry because the new typed reader now reaches the actual store. Matrix/canonical
+links and synchronized skill embeds pass; manually reconciled the Codex search
+skill's copied overview as well. Runtime Java verification remains pending.
+
+Independent review found two defects before acceptance. Public embedded EngineRoot
+construction must remain valid before global configuration exists: the production
+forProcess factory now receives Headless's already-owned ConfigStore explicitly,
+while compatibility constructors retain lazy start-time resolution. A real factory
+composition test covers store identity/current snapshots; another covers no-global
+construction. Queue retention can deliberately throw RecordedWalkGapException to
+protect terminal evidence, so job, ledger and path cleanup now have separate
+nonfatal boundaries. The new fault regression requires old path rows to expire
+while preserving queue refusal and live/recent paths. No new scheduler is needed.
+
+
+## Complete inventory reconciliation,2381 audit (2026-09-21)
+
+`tmp/2381-apply-reconciliation.json` projects all278 current unique declarations,
+with parser parity and source/audit evidence per row. It is an audit artifact,
+not the governed apply register or proof that dispatch exists. Counts:119 index,
+38 encoders,13 generative,51 hot candidates,34 restart-required,22 generation
+candidates and1 unresolved.45 readers connected;232 require reader/owner work;
+1 unresolved. Historical291-key audit remains intact.
+
+The22 generation candidates split eight existing direct fingerprint inputs from
+fourteen persisted-output identity gaps (embedding4, SPLADE3, NER3, BGE3 and actual
+field catalog1). These gaps retain their D1-12 identity/binding obligation; an
+accepted register cannot claim current fingerprint coverage from a scope label.
+Five former candidates were refuted by their actual consumers: SPLADE query_mode
+installs a query encoder, and citation scorer enabled/model/max-sequence/threshold
+serve MatchCitations after retrieval without writing index fields. Their component
+scope follows actual ownership, not configuration prefixes. Citation scorer
+threshold additionally needs its default reader connected; the current service
+uses a request value or hard-coded0.5 while composition only stores/logs config.
+
+Shared GPU policy is settled: primary component:encoders plus generative dependency
+and all-matching-owner dispatch. Do not invent restart scope to accommodate a
+single label. The remaining workers.indexer.enabled decision needs a smoke-only
+reader/architecture audit. justsearch.llm.enabled likewise lacks an operational
+reader despite a documented disable promise; it needs deliberate connection or
+an explicit superseding contract, not a fictional hot row. The next bounded
+reader decision audit is tmp/2385-control-reader-decisions.md.

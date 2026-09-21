@@ -18,8 +18,6 @@ infra:
       ann_cache_ready_percent: 75
 
 search:
-  pipeline:
-    profile: desktop-default
   facets:
     enabled: true
     fields:
@@ -37,8 +35,6 @@ search:
 
 index:
   auto_recovery: true  # Automatically delete corrupted index and rebuild (data loss on recovery)
-  commit:
-    debounce_ms: 0
   # 883 decision 5: `index.pipeline.profile` was removed here. Unlike its `search.` sibling it had
   # no resolver key, no EnvRegistry constant and no consumer anywhere in the tree — a value an
   # operator could edit that reached nothing at all. The new config-surface/yaml-key-unread rule
@@ -49,9 +45,6 @@ index:
       enabled: true
       days: 7
       # max_versions: 3
-  watcher:
-    overflow:
-      rescan_on_overflow: true
   ocr:
     enabled: true
     languages: []

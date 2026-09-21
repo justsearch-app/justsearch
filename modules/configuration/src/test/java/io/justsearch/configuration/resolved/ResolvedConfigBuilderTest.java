@@ -191,13 +191,27 @@ final class ResolvedConfigBuilderTest {
   class Build {
 
     @Test
+    void promisedInputAndHistoryLimitsHaveDefaultsAndMinimums() {
+      var defaults = new ResolvedConfigBuilder().build();
+      assertEquals(20_000, defaults.summary().maxTokens());
+      assertEquals(90, defaults.paths().pathResolutionRetentionDays());
+      for (int value : new int[] {-1, 0, 1, 17}) {
+        var builder = new ResolvedConfigBuilder();
+        builder.putDefault("justsearch.summary.max_tokens", Integer.toString(value));
+        builder.putDefault("justsearch.path_resolution.retention_days", Integer.toString(value));
+        var resolved = builder.build();
+        assertEquals(Math.max(1, value), resolved.summary().maxTokens());
+        assertEquals(Math.max(1, value), resolved.paths().pathResolutionRetentionDays());
+      }
+    }
+
+    @Test
     @DisplayName("build() produces ResolvedConfig with all sub-records")
     void buildProducesCompleteConfig() {
       ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
       builder.putDefault("justsearch.data.dir", "/tmp/data");
       builder.putDefault("justsearch.api.port", "9090");
       builder.putDefault("justsearch.llm.enabled", "true");
-      builder.putDefault("justsearch.search.pipeline.profile", "bm25");
       builder.putDefault("justsearch.prod", "true");
 
       ResolvedConfig config = builder.build();
@@ -220,7 +234,6 @@ final class ResolvedConfigBuilderTest {
       assertEquals(Path.of("/tmp/data"), config.paths().dataDir());
       assertEquals(9090, config.ports().apiPort());
       assertTrue(config.ai().llmEnabled());
-      assertEquals("bm25", config.search().profile());
       assertTrue(config.policy().prodMode());
       // 691 §N/F-031: embed GPU mem default raised 3072 → 6144 to
       // accommodate gte-multilingual-base FP16 activations (post-358).
@@ -790,6 +803,25 @@ final class ResolvedConfigBuilderTest {
     }
 
     @Test
+    @DisplayName("indexBasePath uses the primary configured collection")
+    void indexBasePathUsesPrimaryCollection() {
+      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
+      builder.putDefault("justsearch.data.dir", "/tmp/data");
+      builder.contributeYaml(parseYaml(
+          """
+          index:
+            collections:
+              - name: research
+                roots: [/tmp/research]
+          """));
+
+      ResolvedConfig config = builder.build();
+
+      assertEquals(Path.of("/tmp/data/index/research"), config.paths().indexBasePath());
+      assertEquals("research", config.collections().items().get(0).name());
+    }
+
+    @Test
     @DisplayName("contributeYaml reads OCR config including languages list")
     void ocrConfig() {
       String yaml =
@@ -1060,7 +1092,6 @@ final class ResolvedConfigBuilderTest {
             writer:
               ram_buffer_mb: 256
             commit:
-              debounce_ms: 1000
               meta:
                 enabled: false
             vector:

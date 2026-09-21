@@ -61,17 +61,19 @@ class WorkerBootRecoveryE2ETest {
   @Test
   @DisplayName("a boot that exhausts its retries recovers to a READY worker in the same process")
   void bootRecoveryConvergesWithoutAProcessRestart() throws Exception {
-    // start() is itself the primary assertion: awaitWorkerReady blocks on components.worker.state =
+    // start() is itself the primary assertion: awaitWorkerReady blocks on components.index.state =
     // READY inside the fixture's 90s worker gate, and (tempdoc 825) fails FAST if the Head narrates
     // worker.spawn_recovery_exhausted — the give-up this run must not reach.
     BACKEND.withSystemProperty("justsearch.worker.boot.faultInjectAttempts", INJECTED_BOOT_FAULTS);
     BACKEND.start();
 
     String health = get("/api/health");
-    assertTrue(
-        health.contains("\"worker\":{\"state\":\"LIFECYCLE_STATE_READY\"")
-            || health.contains("\"worker\":{\"state\":\"READY\""),
-        "the worker must be serving after recovery; body: " + health);
+    var healthBody = new tools.jackson.databind.ObjectMapper().readTree(health);
+    assertEquals(2, healthBody.path("schema_version").asInt(), "health must use schema 2");
+    assertEquals(
+        "READY",
+        healthBody.path("components").path("index").path("state").asText(),
+        "the index must be serving after recovery; body: " + health);
     assertFalse(
         health.contains("worker.spawn_recovery_exhausted"),
         "the recovery budget must not have been spent; body: " + health);

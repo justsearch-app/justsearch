@@ -7,7 +7,7 @@ description: "End-to-end search pipeline: ingestion stages, query-time retrieval
 
 # Search Pipeline Overview
 
-JustSearch's search pipeline spans two processes (Head and Body) and is
+JustSearch's search pipeline spans the application and index halves of one Engine JVM and is
 split into ingestion-time (offline, index-building) and query-time (online,
 search-serving) stages. This document traces the full path end-to-end.
 
@@ -23,9 +23,12 @@ For subsystem deep-dives, see:
 
 ## How a Search Request Works
 
-When a user types a query, the default `hybrid` preset activates BM25 +
-Dense KNN retrieval (with optional SPLADE), fused via CC (convex
-combination). The pipeline executes across the two halves of the Engine, in one JVM:
+An explicit request `PipelineConfig` selects the retrieval flags. Otherwise an
+explicit request mode selects its preset. If neither is supplied, the backend
+uses capability-derived AUTO selection. Refined UI search uses this AUTO path;
+quick UI search supplies its text pipeline, while MCP and RAG supply hybrid
+choices explicitly. The retired global pipeline/profile settings do not override
+these request choices. The pipeline executes across the two halves of one Engine JVM:
 
 1. **The application half** (`KnowledgeHttpApiAdapter`) resolves the
    `PipelineConfig` from a named preset or explicit flags, and optionally
@@ -63,7 +66,7 @@ provide backwards-compatible aliases:
 | Preset     | `sparse` | `dense` | `splade` | `expansion` | `crossEncoder` | Notes                                            |
 | ---------- | -------- | ------- | -------- | ----------- | -------------- | ------------------------------------------------ |
 | **text**   | ✓        | —       | —        | ✓           | ✓*             | Sort, cursor, facets, fuzzy correction available |
-| **hybrid** | ✓        | ✓       | opt      | —           | ✓*             | Default for interactive search                   |
+| **hybrid** | ✓        | ✓       | opt      | —           | ✓*             | Explicit MCP/RAG default                         |
 | **vector** | —        | ✓       | —        | —           | ✓*             | Pure semantic similarity                         |
 | **splade** | —        | —       | ✓        | ✓           | ✓*             | Learned sparse retrieval                         |
 

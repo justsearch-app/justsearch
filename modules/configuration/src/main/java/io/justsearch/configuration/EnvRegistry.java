@@ -173,14 +173,8 @@ public enum EnvRegistry {
 
 
 
-    /** Summary pipeline identifier. */
-    SUMMARY_PIPELINE("justsearch.summary.pipeline", "JUSTSEARCH_SUMMARY_PIPELINE", LifecycleStage.PERMANENT),
-
     /** Summary max estimated tokens before rejection. */
     SUMMARY_MAX_TOKENS("justsearch.summary.max_tokens", "JUSTSEARCH_SUMMARY_MAX_TOKENS", LifecycleStage.PERMANENT),
-
-    /** Embedding dimension override for worker/runtime compatibility. */
-    EMBED_DIMENSION_OVERRIDE("justsearch.embed.dimension", "JUSTSEARCH_EMBED_DIM", LifecycleStage.PERMANENT),
 
     /** Embedding backend to use: "auto" (default) or "onnx". "llama" was removed in March 2026. */
     EMBED_BACKEND("justsearch.embed.backend", "JUSTSEARCH_EMBED_BACKEND", LifecycleStage.PERMANENT),
@@ -260,12 +254,6 @@ public enum EnvRegistry {
     /** CUDA device ID for chunk reranker inference (default 0). */
     RERANK_CHUNKS_GPU_DEVICE_ID(
         "justsearch.rerank.chunks.gpu.device_id", "JUSTSEARCH_RERANK_CHUNKS_GPU_DEVICE_ID", "0", LifecycleStage.PERMANENT),
-
-    /** Search pipeline profile. */
-    SEARCH_PROFILE("justsearch.search.pipeline.profile", "JUSTSEARCH_SEARCH_PROFILE", LifecycleStage.PERMANENT),
-
-    /** Primary index collection override (legacy escape hatch; prefer YAML). */
-    INDEX_COLLECTION("justsearch.index.collection", "JUSTSEARCH_INDEX_COLLECTION", LifecycleStage.DEPRECATED),
 
     /** Index parity guard escape hatch (allow opening read-only on mismatch). */
     INDEX_PARITY_ALLOW_MISMATCH(
@@ -374,9 +362,6 @@ public enum EnvRegistry {
 
     /** ORT VERBOSE-level session logging toggle (diagnostic, tempdoc 397 §14.24 FB). */
     ORT_VERBOSE_LOGGING("justsearch.ort.verbose", "JUSTSEARCH_ORT_VERBOSE", LifecycleStage.PERMANENT),
-
-    /** Search pipeline definition file path (full path override). */
-    SEARCH_PIPELINE("justsearch.search.pipeline", "JUSTSEARCH_SEARCH_PIPELINE", LifecycleStage.PERMANENT),
 
     /** 306: enable/disable query classification for A/B eval (default: true via builder). */
     SEARCH_QUERY_CLASSIFICATION_ENABLED(
@@ -912,22 +897,6 @@ public enum EnvRegistry {
 
     /** Whether the indexer worker gRPC client is enabled. */
     INDEXER_ENABLED("workers.indexer.enabled", "JUSTSEARCH_INDEXER_ENABLED", LifecycleStage.PERMANENT),
-
-    /** Indexer worker client host (gRPC connection from Head). */
-    INDEXER_HOST("justsearch.indexer.host", "JUSTSEARCH_INDEXER_HOST", LifecycleStage.PERMANENT),
-
-    /** Indexer worker client port (gRPC connection from Head). */
-    INDEXER_PORT("justsearch.indexer.port", "JUSTSEARCH_INDEXER_PORT", LifecycleStage.PERMANENT),
-
-    /** Indexer worker client deadline (ms). */
-    INDEXER_DEADLINE_MS("justsearch.indexer.deadlineMs", "JUSTSEARCH_INDEXER_DEADLINE_MS", LifecycleStage.PERMANENT),
-
-    /** Indexer worker ingest queue size. */
-    INDEXER_QUEUE_SIZE("justsearch.indexer.queueSize", "JUSTSEARCH_INDEXER_QUEUE_SIZE", LifecycleStage.PERMANENT),
-
-    /** Indexer worker max in-flight bytes. */
-    INDEXER_MAX_INFLIGHT_BYTES(
-        "justsearch.indexer.maxInFlightBytes", "JUSTSEARCH_INDEXER_MAX_INFLIGHT_BYTES", LifecycleStage.PERMANENT),
 
     // ==================== Indexing Tracing (tempdoc 312 Phase 0) ====================
 

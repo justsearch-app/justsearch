@@ -42,8 +42,6 @@ class IndexConfigurationProjectionTest {
         ConfigKey.INDEX_WRITER_RAM_BUFFER_MB.configKey(), "96")));
     assertNotEquals(baseline, bootVersion(Map.of(
         ConfigKey.INDEX_OCR_MAX_PAGES.configKey(), "17")));
-    assertFalse(KnowledgeServer.componentDependencies().contains(EnvRegistry.INDEXER_PORT.configKey()),
-        "retired IPC carrier fields are not applied index inputs");
   }
 
   @Test

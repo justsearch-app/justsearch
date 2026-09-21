@@ -182,3 +182,130 @@ Browser inspection confirms an empty root with no error log; backend freshness
 and all component readiness are healthy, and served frontend code embeds the
 correct53671 port. Vite stdout/stderr has no build error. This is an open live UI
 issue under investigation, not waived by the full unit pass or earlier captures.
+
+
+## Continuation evidence2372-2385 (2026-09-21)
+
+This continuation section was reconstructed from preserved run logs/counts and
+session evidence after a Python default-encoding write truncated the owned file.
+The committed predecessor section above is preserved byte-for-byte in Git. Use
+explicit UTF-8 encoding before opening output files; newline control alone is not
+sufficient on Windows. Raw evidence was unaffected.
+
+2372 resolves2370's empty UI: Vite optimized dependency URL returned504
+OutdatedOptimizeDep. Restarting the owned Vite dependency cache fixed the served
+module URL and live home capture passed0 axe/console/overflow. No timeout or fixture
+mask was used. Both owned stacks stopped with portsClosed:true and MCP client/tab
+closed.2374 UI mount diagnostics use bounded same-origin failed resource timing
+(path only, no query);39 Python tests pass including real Chromium. Both harness
+ui-check skills document the observed remedy.
+
+2375 retires11 superseded keys after source/fixture audit. Parser counts280 unique
+(239 EnvRegistry +53 ConfigKey -12 aliases),104 YAML mappings. Config gate shrank
+pins;39 index-identity Python tests and6 Node lifecycle/YAML tests pass.2376 removes
+the hosted runtime-state orphan row for deleted mutable InferenceCapability;
+all11 hermetic gates pass locally with evidence in tmp/2376-hermetic-gates.sarif.
+A stale custom-output matrix report was corrected by regenerating the registered
+default input; no baseline growth or semantic waiver.
+
+Hosted CI35651061321 at4e4cd88f6 completed FAILED: Public claims had that orphan;
+WorkerBootRecoveryE2ETest still asserted schema1 worker READY despite actual schema2
+index READY after recovery. Root migrated the assertion to schema_version2 and
+components.index.state, preserving occurrence, faultKind, no-flap and manifest
+oracles. Other hosted jobs including build/app-ui/search-worker/Windows-native/Rust
+passed. Logs/artifacts live in tmp/ci-35651061321-public-claims and
+ tmp/ci-35651061321-integration; conclusions tmp/2377-hosted-conclusions.json.
+Hosted successor proof remains required.
+
+2377 full selected-module run emitted3217 passing cases,26 skips,506 suites from
+4 tasks;3 other tasks failed test compilation (helper placement and missing stub
+methods). Corrected fixture ownership without new dependencies.2378 emitted4688
+cases,1 failure,4 skips,697 suites. The UI composition fixture lacked Head's
+core.memory-extraction registration.2379 reproduced exact missing-consumer failure
+(4 cases,1 failure); root corrected the fixture to invoke actual composed readers
+from the real registries while preserving store-A/global-B/update assertions.
+It does not alter production behavior or claim a fully assembled Head.
+
+2380 final parser union is278 after13 retirements (237 EnvRegistry +53 ConfigKey
+-12 aliases); matrix/config gate passes103 YAML/237 EnvRegistry/53 ConfigKey with
+downward pins. Two additional obsolete pipeline selectors retired after source/ADR
+audit; explicit request pipeline > mode > supplied surface defaults > backend AUTO
+is preserved by actual owner-level request tests. Canonical overview and both
+search-quality skills were regenerated/aligned.2381 regen passes all7sets.
+
+2381 focused8-module/static command emitted479 passing cases,0 failures/skips,
+75 suites from7 tasks, but build FAILED. app-engine fixture imported unavailable
+TestResolvedConfigHelper; root used existing public ResolvedConfigBuilder and
+ConfigStore restore APIs. Two unnecessary qualifiers failed PMD; six modules failed
+LF formatting. Root corrected these without weakening checks or adding dependencies.
+Logs/XML/counts/source inventory: tmp/2381-missing-readers-focused*.
+
+Summary review found SEARCH_TRACE/HEALTH_CONDITION bypassing the limit and batch
+attributes published before refusal. Both source defects are corrected. Every7
+selection variants now checks exact untruncated input, one supplier read, empty
+messages/attributes on refusal; non-summary reads zero times. Hierarchical remains
+multi-pass/injector-free with a90K dense-character (~30K token) proof. Default is
+ResolvedConfig.Summary.DEFAULT_MAX_TOKENS=20000. Independent final reread found no
+remaining material defect; reviewer ran source/diff inspection only.
+
+2382 command:
+`./gradlew.bat :modules:configuration:test :modules:app-services:test --tests '*DocAccessCitationTest' --tests '*BatchDocAccessTest' --tests '*SelectionContextInjectorTest' --tests '*HierarchicalShapeRunnerTest' --tests '*AgentLoopWiringCapturedConfigTest' --tests '*RAGContextTest' --tests '*StreamingCitationMatcherTest' --tests '*KnowledgeSearchEnginePipelinePrecedenceTest' :modules:app-agent:test --tests '*AgentCitationResolverThresholdTest' :modules:ui:test --tests '*ConversationApiAssemblyCapturedConfigTest' :modules:indexer-worker:test --tests '*KnowledgeServerPathRetentionTest' :modules:app-engine:test --tests '*EngineRootConfigAuthorityTest' :modules:app-launcher:test --tests '*SmokeDriverTest' --tests '*UnreferencedCodeTest' :modules:worker-services:test --tests '*SearchPlannerApprovalCorpusTest' spotlessCheck pmdAll --continue --console=plain`
+PASS in52s at4e4cd88f6 plus corrected WIP:481 cases,0 failures/errors/skips,
+76 suites across8 tasks.163 cases executed;318 reused in configuration, app-agent,
+worker-services and indexer-worker, whose Java inputs remained unchanged.
+All static checks pass. tmp/2382-missing-readers-corrected* retains XML/counts and
+40-source inventory. Protobuf Unsafe/rrd4j advisory warnings remain visible.
+The final selection empty-attributes assertion was added after2382 and is in2385.
+
+Retention production review corrections: independent job/ledger/path cleanup
+boundaries preserve path pruning despite receipt-gap failures; explicit process
+store capture retains same startup/live authority; embedded constructors remain
+lazy. Actual SQLite tests distinguish old/boundary/recent/live rows and distinct
+store-B startup data.2383 deliberately bypassed live supplier sampling: targeted
+regression fails at read-count line51 (7 cases,1 expected failure).2384 preserves
+sampling but uses startup retention: fails at old-row deletion line57 after A90->5
+and global B365 (7 cases,1 expected failure). These prove distinct obligations.
+Logs/XML/counts and mutation/restore JSON: tmp/2383-retention-negative* and
+ tmp/2384-retention-negative*. KnowledgeServer restored byte-for-byte each time,
+SHA256 fd93fe299f281d4de891653555be745afd1a1c90d0dca2eb96df1b56f393d369.
+
+2385 RUNNING, sources frozen after final summary-test correction:
+`./gradlew.bat spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist :modules:system-tests:integrationTest --tests '*WorkerBootRecoveryE2ETest' --continue --console=plain`.
+Full unit/stress/static plus corrected schema2 integration results are pending in
+ tmp/2385-missing-readers-integrated.txt. No hosted/full acceptance inferred.
+
+
+2385 completed PASS in10m41s:11487 cases,0 failures/errors,31 skips,1792 suites,
+35 test tasks.10859 cases executed and628 reused from11 unchanged tasks. Full
+static checks and installDist pass. The schema2 boot-recovery test passed after
+three injected startup failures, same-process recovery, and16.449s fixture-ready
+observation. Latest refusal-attributes regression is included. Accessible XML,
+counts/skips and40-source inventory are under tmp/2385-missing-readers-integrated*.
+All test outputs were preserved before future reruns. Late read-only thread dumps
+found only workers already idle as the build completed; no process was interrupted.
+2386 regen-all --check passes8 generated sets. Hosted successor and live proof
+remain outstanding; no D1 acceptance is inferred from this checkpoint.
+
+
+###2386 installed/live proof
+
+Owned run6cda5238-ffa7-41f4-b16c-6c1ff5170918, API64080, same retained1982 data
+path, standard profile. Correct worktree MCP preflight passes all5 gates; no
+legacy Worker distribution or lease bypass. Runtime-client live smoke passes
+contract0.4.0/readiness200/health200. Online intent converged at accepted revision3.
+Health schema2 reports all4 components READY. Real tier2 query uses
+Qwen_Qwen3.5-9B-Q4_K_M.gguf and returns Captain Mortimer Flux, exact1.0 with0
+query/anchor errors. This is functional proof, not benchmark acceptance.
+
+Live POST /api/chat/summarize with a65K-character synthetic search-trace selection
+returns exactly one SSE error: CONTEXT_TOO_LARGE, estimatedTokens21711,
+maxTokens20000, no model chunks. The generic MCP API tool lacks that streaming
+route in its allowlist; the one-shot local HTTP contract assertion uses the
+existing jseval SSE parser/session-header helper. No timing loop, eval substitute,
+security-filter change, or tool-allowlist modification was introduced.
+
+Evidence: tmp/2386-preflight.json,2386-live-start.json,2386-online-intent.json,
+2386-health.json,2386-runtime-client.txt,2386-model-query/tier2-eval.json and
+2386-summary-limit-live.json. The owned stop result is tmp/2386-stop.json.
+
+2386 stop completed portsClosed:true; MCP client closed. No owned stack remains.

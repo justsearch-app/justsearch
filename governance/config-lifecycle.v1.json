@@ -28,20 +28,6 @@
       "evidenceLink": "docs/decisions/0016-query-understanding-soft-boost.md"
     },
     {
-      "declaration": "EnvRegistry.INDEX_COLLECTION",
-      "owner": "Configuration",
-      "rationale": "The singular environment/property override is a legacy escape hatch; the supported replacement is the YAML-only ConfigKey.INDEX_COLLECTIONS declaration at index.collections.",
-      "replacement": "ConfigKey.INDEX_COLLECTIONS",
-      "introducedOn": "2026-06-25",
-      "lastReviewedOn": "2026-09-03",
-      "reviewBy": "2026-12-03",
-      "exitCriteria": {
-        "promoteWhen": "Restore only if a supported consumer requires a singular collection override that cannot use index.collections and a contract test demonstrates that need.",
-        "removeWhen": "Repository and packaged-runtime scans find no reads of JUSTSEARCH_INDEX_COLLECTION or justsearch.index.collection outside compatibility tests, and migration guidance points operators to index.collections."
-      },
-      "evidenceLink": "docs/reference/configuration/environment-variables.md"
-    },
-    {
       "declaration": "EnvRegistry.VLM_PROFILE",
       "owner": "Inference runtime",
       "rationale": "VLM_PROFILE remains only as a legacy inference fallback; the supported engine-profile replacement is EnvRegistry.CHAT_PROFILE.",

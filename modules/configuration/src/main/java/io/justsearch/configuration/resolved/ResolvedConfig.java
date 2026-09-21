@@ -110,6 +110,7 @@ public record ResolvedConfig(
    * @param modelsDir directory for AI model files
    * @param ssotPath path to SSOT directory
    * @param repoRoot repository root path (for dev/test)
+   * @param pathResolutionRetentionDays removed path-history retention, at least one day
    */
   public record Paths(
       Path dataDir,
@@ -118,7 +119,8 @@ public record ResolvedConfig(
       Path modelsDir,
       Path ssotPath,
       Path repoRoot,
-      Path ortNativePath) {}
+      Path ortNativePath,
+      int pathResolutionRetentionDays) {}
 
   /**
    * Network ports for API and inference services.
@@ -373,15 +375,14 @@ public record ResolvedConfig(
       int contextCompressionMinChars,
       int contextCompressionKeepLastResults) {}
 
-  /** Summary pipeline configuration. */
-  public record Summary(String pipeline, int maxTokens) {}
+  /** Summary size configuration. */
+  public record Summary(int maxTokens) {
+    public static final int DEFAULT_MAX_TOKENS = 20_000;
+  }
 
   /**
    * Search pipeline configuration.
    *
-   * @param profile search pipeline profile name
-   * @param pipeline search pipeline definition file path
-   * @param collection primary index collection name
    * @param queryClassificationEnabled 306: enable query classification for CE/expansion gating
    * @param titleBoost 306: title field boost in DisjunctionMaxQuery (0 to disable)
    * @param evidenceSpanEnabled 775: enable answer-bearing EvidenceSpan-backed excerpt selection
@@ -395,9 +396,6 @@ public record ResolvedConfig(
    * @param mcpEntityCarriage 771 item (b): the MCP entity-carriage settings (default OFF)
    */
   public record Search(
-      String profile,
-      String pipeline,
-      String collection,
       boolean queryClassificationEnabled,
       double titleBoost,
       boolean chunkAwareEnabled,
@@ -750,10 +748,8 @@ public record ResolvedConfig(
     }
   }
 
-  /** Indexer worker gRPC client connection config (Head→Body). */
-  public record WorkerIndexer(
-      boolean enabled, String host, int port, long deadlineMs,
-      int queueSize, int maxInFlightBytes, String backpressureMode, String serviceVersion) {}
+  /** Index service enablement and advertised service version. */
+  public record WorkerIndexer(boolean enabled, String serviceVersion) {}
 
   /** Infrastructure health check thresholds from YAML {@code infra.health.*}. */
   public record InfraHealth(

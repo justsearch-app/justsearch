@@ -17,6 +17,8 @@ import io.justsearch.app.api.DocumentService.ContextSection;
 import io.justsearch.app.api.DocumentService.DocumentRecord;
 import io.justsearch.app.api.RetrieveContextParams;
 import io.justsearch.app.inference.InferenceLifecycleManager;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.util.TokenEstimation;
 import io.justsearch.indexing.rag.ContextBudgeter;
 import java.util.HashMap;
@@ -26,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +58,36 @@ final class RAGContextTest {
     var injector = new RAGContext(docs, 17);
     injector.inject(stubCtx(Map.of("question", "what?", "topK", 3)));
     assertEquals(3, docs.lastTopK, "per-request topK must not be overridden by config");
+  }
+
+  @Test
+  @DisplayName("D1: one RAGContext observes same-store top-K swaps once per defaulted request")
+  void liveTopKReadsCurrentSnapshotOnceAndExplicitOverrideSkipsIt() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(Map.of("justsearch.rag.top_k", "7")));
+    AtomicInteger reads = new AtomicInteger();
+    var docs = new TrackingDocs();
+    var injector =
+        new RAGContext(
+            docs,
+            () -> {
+              reads.incrementAndGet();
+              return store.get().rag().ragTopK();
+            },
+            () -> stubAi(32768, 32768));
+
+    injector.inject(stubCtx(Map.of("question", "first")));
+    assertEquals(7, docs.lastTopK);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(Map.of("justsearch.rag.top_k", "11")));
+    injector.inject(stubCtx(Map.of("question", "second")));
+    assertEquals(11, docs.lastTopK);
+    assertEquals(2, reads.get(), "the default supplier is captured once per eligible request");
+
+    injector.inject(stubCtx(Map.of("question", "explicit", "topK", 3)));
+    assertEquals(3, docs.lastTopK);
+    assertEquals(2, reads.get(), "an explicit request must not consult the configured default");
   }
 
   @Test

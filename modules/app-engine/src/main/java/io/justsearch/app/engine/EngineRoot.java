@@ -33,11 +33,10 @@ import org.slf4j.LoggerFactory;
  * {@link WorkerConfig} the worker built for itself, construct a {@link KnowledgeServer}, start it —
  * and hands back an {@link EngineKnowledgeClient} whose calls are calls.
  *
- * <p><b>One config, no snapshot.</b> {@link WorkerConfig#load()} reads
- * {@code ConfigStore.global()}, which the Head has already resolved. In the split world the worker
- * received a serialised copy at config ordinal 450 and then checked it for divergence from the
- * Head's; in one JVM there is one {@code ResolvedConfig} and divergence is not a thing that can
- * happen. The snapshot tier itself is retired at item A19; nothing here depends on it either way.
+ * <p><b>One process configuration authority.</b> The factory retains the installed
+ * {@code ConfigStore}. Each physical index start samples one immutable {@code ResolvedConfig}
+ * for its composed resources; auxiliary hot readers observe that same store's current snapshot.
+ * The old cross-process serialized copy at ordinal 450 remains retired.
  *
  * <p><b>What A6 deliberately left standing, and where it went.</b> Between A6 and A9
  * {@link KnowledgeServer#start()} still bound the gRPC server and still published a port — both
@@ -180,9 +179,11 @@ public final class EngineRoot implements WorkerHost {
   public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize,
       IntConsumer terminalWriterFaultAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
-      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
-    return new EngineRoot(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction,
-        childRegistry, requestedRestartAction, authority);
+      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.configuration.resolved.ConfigStore configStore) {
+    Objects.requireNonNull(configStore, "configStore");
+    return new EngineRoot(operations, attempts, serverFactory(childRegistry, () -> configStore),
+        deadlineMs, batchSize, terminalWriterFaultAction, requestedRestartAction, authority);
   }
 
   private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize, IntConsumer exitAction) {
@@ -213,22 +214,28 @@ public final class EngineRoot implements WorkerHost {
       IntConsumer exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this(operations, attempts,
-        (gauge, executorRegistry, ingestion, indexComponent, encoderComponent) -> {
-          var startupConfiguration = io.justsearch.configuration.resolved.ConfigStore.global().get();
-          WorkerConfig workerConfig = WorkerConfig.load(startupConfiguration);
-          // Review S2: the hot-reload trigger is a file under <dataDir>/runtime/, written by the
-          // dev MCP tool from another process. Supplying the directory here is what re-arms it;
-          // the no-arg bus (tests, any composition without a data dir) leaves reload disabled
-          // rather than watching a path nobody writes.
-          return new KnowledgeServer(
-              executorRegistry, workerConfig,
-              new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
-              childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration);
-        },
+        serverFactory(childRegistry, io.justsearch.configuration.resolved.ConfigStore::global),
         deadlineMs,
         batchSize,
         exitAction,
         requestedRestartAction, authority);
+  }
+
+  private static ServerFactory serverFactory(
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      java.util.function.Supplier<io.justsearch.configuration.resolved.ConfigStore> authority) {
+    // Process boot supplies its explicit owner; embedded compatibility constructors resolve at start.
+    return (gauge, executorRegistry, ingestion, indexComponent, encoderComponent) -> {
+      var configStore = authority.get();
+      var startupConfiguration = configStore.get();
+      WorkerConfig workerConfig = WorkerConfig.load(startupConfiguration);
+      // Dev reload signals arrive under this runtime directory from the owning dev tool.
+      return new KnowledgeServer(
+          executorRegistry, workerConfig,
+          new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
+          childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
+          configStore::get);
+    };
   }
 
   /** Test seam: supply the index half rather than building it from the global config. */

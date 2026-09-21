@@ -214,9 +214,6 @@ final class SmokeDriver implements Launcher.SmokeDriverHandle {
       if (!root.path("egress").has("block_all")) {
         failures.add("LAUNCHER/CONFIG_MISSING key=egress.block_all");
       }
-      if (!root.path("search").path("pipeline").has("profile")) {
-        failures.add("LAUNCHER/CONFIG_MISSING key=search.pipeline.profile");
-      }
       JsonNode collections = root.path("index").path("collections");
       if (collections.isArray()) {
         for (JsonNode collection : collections) {

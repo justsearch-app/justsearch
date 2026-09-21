@@ -20,9 +20,6 @@ class EnvRegistryTest {
     void sysProp_returnsCorrectValue() {
         assertEquals("justsearch.data.dir", EnvRegistry.DATA_DIR.sysProp());
         assertEquals("justsearch.ssot.path", EnvRegistry.SSOT_PATH.sysProp());
-        assertEquals("justsearch.summary.pipeline", EnvRegistry.SUMMARY_PIPELINE.sysProp());
-        assertEquals(
-            "justsearch.embed.dimension", EnvRegistry.EMBED_DIMENSION_OVERRIDE.sysProp());
         assertEquals("justsearch.vram.threshold.12gb", EnvRegistry.VRAM_THRESHOLD_12GB.sysProp());
         assertEquals("justsearch.vram.threshold.8gb", EnvRegistry.VRAM_THRESHOLD_8GB.sysProp());
         assertEquals("justsearch.vram.threshold.4gb", EnvRegistry.VRAM_THRESHOLD_4GB.sysProp());
@@ -32,8 +29,6 @@ class EnvRegistryTest {
     void envVar_returnsCorrectValue() {
         assertEquals("JUSTSEARCH_DATA_DIR", EnvRegistry.DATA_DIR.envVar());
         assertEquals("JUSTSEARCH_SSOT_PATH", EnvRegistry.SSOT_PATH.envVar());
-        assertEquals("JUSTSEARCH_SUMMARY_PIPELINE", EnvRegistry.SUMMARY_PIPELINE.envVar());
-        assertEquals("JUSTSEARCH_EMBED_DIM", EnvRegistry.EMBED_DIMENSION_OVERRIDE.envVar());
         assertEquals("JUSTSEARCH_VRAM_THRESHOLD_12GB", EnvRegistry.VRAM_THRESHOLD_12GB.envVar());
         assertEquals("JUSTSEARCH_VRAM_THRESHOLD_8GB", EnvRegistry.VRAM_THRESHOLD_8GB.envVar());
         assertEquals("JUSTSEARCH_VRAM_THRESHOLD_4GB", EnvRegistry.VRAM_THRESHOLD_4GB.envVar());

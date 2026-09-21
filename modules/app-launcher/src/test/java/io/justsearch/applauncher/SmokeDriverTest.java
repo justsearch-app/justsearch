@@ -113,8 +113,6 @@ final class SmokeDriverTest {
               - name: docs
                 roots:
                   - /tmp/absolute/path
-          search:
-            pipeline: {}
           """
               .formatted(normalizePath(ctx.dataDir())));
       SmokeResult result = ctx.driver().execute();
@@ -127,9 +125,6 @@ final class SmokeDriverTest {
           () -> "failures=" + result.failures());
       assertTrue(
           result.failures().contains("LAUNCHER/CONFIG_MISSING key=egress.block_all"),
-          () -> "failures=" + result.failures());
-      assertTrue(
-          result.failures().contains("LAUNCHER/CONFIG_MISSING key=search.pipeline.profile"),
           () -> "failures=" + result.failures());
       assertTrue(
           result.failures().contains("CONFIG/UNKNOWN_KEY key=unknown_section"),
@@ -352,9 +347,6 @@ final class SmokeDriverTest {
           data_dir: %s
         egress:
           block_all: true
-        search:
-          pipeline:
-            profile: default
         workers:
           ai:
             enabled: true

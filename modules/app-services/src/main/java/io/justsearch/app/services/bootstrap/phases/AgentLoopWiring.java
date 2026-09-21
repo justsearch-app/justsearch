@@ -144,11 +144,12 @@ public final class AgentLoopWiring {
     // agent and RAG cutoffs precisely because a divergent local value was a defect.
     io.justsearch.configuration.resolved.ConfigStore citationConfigStore =
         io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-    if (citationConfigStore == null || citationConfigStore.get() == null) {
+    if (citationConfigStore == null) {
       agentHolder[0].setCitationDocumentService(citationDocumentService);
     } else {
       agentHolder[0].setCitationDocumentService(
-          citationDocumentService, citationConfigStore.get().rag().citationMatchThreshold());
+          citationDocumentService,
+          () -> citationConfigStore.get().rag().citationMatchThreshold());
     }
     return agentHolder[0];
   }

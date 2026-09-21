@@ -66,7 +66,6 @@ final class LauncherCommands implements Launcher.CommandRunner {
       }
       SearchResponse response = search.search(request, io.justsearch.app.services.intent.EngineProvenance.context(EngineContext.ClientKind.CLI, "launcher", java.util.Optional.empty(), java.util.Optional.empty(), io.justsearch.agent.api.registry.TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND));
       markers.add("VERIFY/OK hits=" + response.hits().size());
-      markers.add("VERIFY/PIPELINE profile=" + io.justsearch.configuration.resolved.ConfigStore.global().get().search().profile());
       return CommandResult.success(markers);
     } catch (Exception e) {
       markers.add("VERIFY/FAIL code=" + e.getClass().getSimpleName());

@@ -12,25 +12,14 @@ import java.util.Map;
 import java.util.Objects;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.RepoRootLocator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public record WorkerConfig(
-    String host,
-    int port,
-    long deadlineMs,
-    int queueSize,
-    int maxInFlightBytes,
     Path dataDir,
-    String collection,
     long telemetryFlushMs,
     String serviceVersion,
     Map<String, Object> ssotMetadata,
     String manifestHash,
-    long nrtTargetMaxStaleMs,
-    String backpressureMode) {
-
-  private static final Logger log = LoggerFactory.getLogger(WorkerConfig.class);
+    long nrtTargetMaxStaleMs) {
 
   /**
    * Builds the worker config from the globally-resolved config.
@@ -53,14 +42,7 @@ public record WorkerConfig(
     if (wi == null) {
       throw new IllegalStateException("ConfigStore not initialized — cannot load WorkerConfig");
     }
-    String host = wi.host();
-    int port = wi.port();
-    long deadlineMs = wi.deadlineMs();
-    int queueSize = wi.queueSize();
-    int maxInFlightBytes = wi.maxInFlightBytes();
-    String backpressureMode = wi.backpressureMode();
     Path dataDir = rc.paths().dataDir();
-    String collection = rc.search().collection();
     Integer nrt = rc.index().nrtTargetMaxStaleMs();
     long nrtTarget = nrt != null ? nrt : 500L;
     long telemetryFlush = rc.telemetry().flushMs();
@@ -68,13 +50,8 @@ public record WorkerConfig(
     Map<String, Object> metadata = new SsotCommitMetadataSource(rc).build();
     Path repoRoot = RepoRootLocator.findRepoRoot();
     String manifestHash = sha256(repoRoot.resolve("SSOT/manifests/repro/repro.v1.json"));
-    log.info(
-        "Loaded indexer worker config host={} port={} queueSize={} maxInFlightBytes={}"
-            + " deadlineMs={} collection={}",
-        host, port, queueSize, maxInFlightBytes, deadlineMs, collection);
     return new WorkerConfig(
-        host, port, deadlineMs, queueSize, maxInFlightBytes, dataDir, collection,
-        telemetryFlush, version, metadata, manifestHash, nrtTarget, backpressureMode);
+        dataDir, telemetryFlush, version, metadata, manifestHash, nrtTarget);
   }
 
   private static String sha256(Path file) {

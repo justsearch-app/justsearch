@@ -62,12 +62,12 @@ final class HierarchicalShapeRunnerTest {
   }
 
   @Test
-  @DisplayName("Large document triggers hierarchical: split + per-section + synthesis")
+  @DisplayName("A source above the 20K single-pass limit remains eligible for hierarchical synthesis")
   void largeDocHierarchical() {
-    // Comfortably over the derived hierarchical threshold (tempdoc 883: the input budget, which is
-    // 2304 tokens at this stub's 4096-token window). This filler has NO whitespace, so
-    // estimateTokens takes its dense arm (chars/3, not chars/4): 30k chars is ~10000 tokens.
-    String huge = "x".repeat(30_000);
+    // The shared dense-source estimator is chars/3, so this is ~30,000 tokens: above the
+    // canonical 20K guard for single-pass summary inputs. This path must split rather than inherit
+    // that refusal, because its section calls each fit the live context window.
+    String huge = "x".repeat(90_000);
     var ai = new StubAi(List.of("s1", "s2", "final synthesis"));
     var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", huge, Map.of())));
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);

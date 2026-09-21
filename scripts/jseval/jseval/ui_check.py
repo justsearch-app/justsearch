@@ -43,7 +43,7 @@ class AppNotMountedError(Exception):
 async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
     """Block until the app shell has mounted (rail button visible), else raise
     AppNotMountedError with the best-available reason (Vite stderr tail / error-overlay
-    text / honest fallback). ONE gate, reused by every capture path."""
+    text / failed resource status / honest fallback). ONE gate, reused by every capture path."""
     try:
         await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
             state="visible", timeout=timeout_ms)
@@ -75,10 +75,23 @@ async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
         stderr_tail = ""
     # (2) Vite's in-page error overlay (615 §28 U3 — confirmed channel, no false positive).
     overlay = None
+    failed_resources = []
     try:
-        overlay = await page.evaluate(
-            "() => { const o = document.querySelector('vite-error-overlay');"
-            " return o ? (o.shadowRoot?.textContent || o.textContent || 'present').slice(0,400) : null; }")
+        diagnostics = await page.evaluate("""() => {
+            const overlay = document.querySelector('vite-error-overlay');
+            return {
+                overlay: overlay
+                    ? (overlay.shadowRoot?.textContent || overlay.textContent || 'present').slice(0, 400)
+                    : null,
+                failedResources: performance.getEntriesByType('resource')
+                    .filter(entry => entry.responseStatus >= 400
+                        && new URL(entry.name).origin === location.origin)
+                    .slice(0, 3)
+                    .map(entry => `${entry.responseStatus} ${new URL(entry.name).pathname}`)
+            };
+        }""")
+        overlay = diagnostics["overlay"]
+        failed_resources = diagnostics["failedResources"]
     except Exception:
         overlay = None
 
@@ -86,6 +99,12 @@ async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
         reason = f"app shell never mounted within {secs}s; vite stderr tail: {stderr_tail}"
     elif overlay:
         reason = f"app shell never mounted within {secs}s; vite error overlay: {overlay.strip()}"
+    elif failed_resources:
+        # Optimizer 504s can prevent every app module from evaluating without an overlay
+        # or server stderr. Read the browser's completed requests, including those before
+        # this gate began; no extra listener lifetime or retry can hide the failed mount.
+        reason = (f"app shell never mounted within {secs}s; failed same-origin resources: "
+                  + "; ".join(failed_resources))
     else:
         reason = (f"app shell never mounted within {secs}s; no Vite stderr or error overlay "
                   "captured (a server may be serving non-app content, or the bundle failed silently)")

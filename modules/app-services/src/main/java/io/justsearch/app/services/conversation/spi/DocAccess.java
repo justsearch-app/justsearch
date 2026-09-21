@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,14 +62,25 @@ public final class DocAccess implements ContextInjector {
 
   private final DocumentService documents;
   private final Duration fetchTimeout;
+  private final SummaryInputLimit inputLimit;
 
   public DocAccess(DocumentService documents) {
-    this(documents, DEFAULT_FETCH_TIMEOUT);
+    this(documents, DEFAULT_FETCH_TIMEOUT, () -> SummaryInputLimit.DEFAULT_MAX_TOKENS);
   }
 
   public DocAccess(DocumentService documents, Duration fetchTimeout) {
+    this(documents, fetchTimeout, () -> SummaryInputLimit.DEFAULT_MAX_TOKENS);
+  }
+
+  public DocAccess(DocumentService documents, IntSupplier maxInputTokens) {
+    this(documents, DEFAULT_FETCH_TIMEOUT, maxInputTokens);
+  }
+
+  public DocAccess(
+      DocumentService documents, Duration fetchTimeout, IntSupplier maxInputTokens) {
     this.documents = Objects.requireNonNull(documents, "documents");
     this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
+    this.inputLimit = new SummaryInputLimit(maxInputTokens);
   }
 
   @Override
@@ -97,6 +109,9 @@ public final class DocAccess implements ContextInjector {
     if (fullContent == null || fullContent.isBlank()) {
       return InjectorResult.empty();
     }
+
+    SseEvent rejection = inputLimit.rejection(fullContent);
+    if (rejection != null) return InjectorResult.terminalError(rejection);
 
     String truncated = fullContent.length() > MAX_CONTENT_CHARS
         ? fullContent.substring(0, MAX_CONTENT_CHARS)

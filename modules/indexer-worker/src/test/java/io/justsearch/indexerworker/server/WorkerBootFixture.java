@@ -10,7 +10,6 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.configuration.JustSearchConfigurationLoader;
 import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
@@ -166,21 +165,13 @@ final class WorkerBootFixture {
   }
 
   static WorkerConfig workerConfig(Path dataDir) {
-    ResolvedConfig rc = ConfigStore.global().get();
     return new WorkerConfig(
-        "127.0.0.1",
-        0,
-        30_000L,
-        128,
-        64 * 1024 * 1024,
         dataDir,
-        rc.search().collection(),
         60_000L,
         "0.0.0-test",
         new SsotCommitMetadataSource().build(),
         "test-manifest",
-        500L,
-        "block");
+        500L);
   }
 
   /** A data directory with an initialised generation layout. */

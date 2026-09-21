@@ -19,10 +19,6 @@ workers:
     deadlineMs: 1500
   indexer:
     enabled: false
-    host: 127.0.0.1
-    port: 50071
-    deadlineMs: 5000
-    queueSize: 64
 
 telemetry:
   metrics:
@@ -53,8 +49,6 @@ infra:
       port: 0
 
 search:
-  pipeline:
-    profile: desktop-default
   tiebreak_field: doc_uid
   paging:
     strategy: pit
@@ -82,8 +76,6 @@ search:
 index:
   language_detection:
     enabled: true
-  commit:
-    debounce_ms: 0
   pipeline:
     profile: desktop-default
   soft_deletes:
@@ -91,9 +83,6 @@ index:
     retention:
       enabled: true
       days: 7
-  watcher:
-    overflow:
-      rescan_on_overflow: true
   ocr:
     enabled: false
     languages: []

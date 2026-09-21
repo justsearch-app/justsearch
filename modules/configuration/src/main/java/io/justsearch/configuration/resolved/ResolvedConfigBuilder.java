@@ -475,13 +475,6 @@ public final class ResolvedConfigBuilder {
   private void contributeYamlSearch(JsonNode root) {
     JsonNode searchRoot = root.path("search");
     if (searchRoot.isMissingNode()) return;
-    // Tempdoc 883 decision 5: `search.pipeline.profile` shipped in config/application.yaml with a
-    // value (`desktop-default`) that reached nothing — the resolver only ever resolved the
-    // env/sysprop spelling `justsearch.search.pipeline.profile`, so editing the YAML did nothing,
-    // silently. Note the key here carries the `justsearch.` prefix while the yamlPath does not;
-    // that mismatch is exactly why it was missed, and why the new yaml-reader gate resolves the
-    // relative path against `searchRoot` instead of trusting the two spellings to match.
-    putYamlFromNode("justsearch.search.pipeline.profile", searchRoot, "pipeline.profile");
     putYamlIntFromNode("search.hybrid.bm25_k", searchRoot, "hybrid.bm25_k");
     putYamlIntFromNode("search.hybrid.ann_k", searchRoot, "hybrid.ann_k");
     putYamlFromNode("search.hybrid.auto_embed", searchRoot, "hybrid.auto_embed");
@@ -592,26 +585,13 @@ public final class ResolvedConfigBuilder {
   }
 
   private void contributeYamlWorkers(JsonNode root) {
-    // workers.indexer.*
     putYamlBoolean("workers.indexer.enabled", root, "workers.indexer.enabled");
-    putYaml("justsearch.indexer.host", root, "workers.indexer.host");
-    putYamlInt("justsearch.indexer.port", root, "workers.indexer.port");
-    putYamlLong("justsearch.indexer.deadlineMs", root, "workers.indexer.deadlineMs");
-    putYamlInt("justsearch.indexer.queueSize", root, "workers.indexer.queueSize");
-    putYamlInt("justsearch.indexer.maxInFlightBytes", root, "workers.indexer.maxInFlightBytes");
-    putYaml("workers.indexer.backpressure_mode", root, "workers.indexer.backpressure_mode");
   }
 
   private void contributeYamlCollections(JsonNode root) {
     JsonNode colsNode = root.path("index").path("collections");
     if (colsNode.isArray() && !colsNode.isEmpty()) {
       put("index.collections", ORDINAL_YAML, "yaml", "index.collections", colsNode.toString());
-      // Contribute first collection's name to Search.collection at ordinal 200
-      JsonNode firstName = colsNode.path(0).path("name");
-      if (firstName.isTextual() && !firstName.asText().isBlank()) {
-        put("justsearch.index.collection", ORDINAL_YAML, "yaml",
-            "index.collections[0].name", firstName.asText());
-      }
     }
   }
 
@@ -862,7 +842,8 @@ public final class ResolvedConfigBuilder {
     }
 
     // Build sub-records from resolved values
-    ResolvedConfig.Paths paths = buildPaths();
+    ResolvedConfig.Collections collections = buildCollections();
+    ResolvedConfig.Paths paths = buildPaths(collections);
     ResolvedConfig.Ports ports = buildPorts();
     ResolvedConfig.Ai ai = buildAi();
     ResolvedConfig.Agent agent = buildAgent();
@@ -878,7 +859,6 @@ public final class ResolvedConfigBuilder {
     ResolvedConfig.Rag rag = buildRag();
     ResolvedConfig.HybridSearch hybridSearch = buildHybridSearch();
     ResolvedConfig.Worker worker = buildWorker();
-    ResolvedConfig.Collections collections = buildCollections();
     ResolvedConfig.WorkerIndexer workerIndexer = buildWorkerIndexer();
     ResolvedConfig.InfraHealth infraHealth = buildInfraHealth();
 
@@ -901,12 +881,12 @@ public final class ResolvedConfigBuilder {
 
   // ==================== Sub-record Builders ====================
 
-  private ResolvedConfig.Paths buildPaths() {
+  private ResolvedConfig.Paths buildPaths(ResolvedConfig.Collections collections) {
     Path dataDir = resolvePath("justsearch.data.dir", null);
     Path indexBasePath = resolvePath("justsearch.index.base_path", null);
     // Derive indexBasePath from dataDir + primary collection name if not explicitly set
     if (indexBasePath == null && dataDir != null) {
-      String collection = resolveString("justsearch.index.collection", "default");
+      String collection = collections.items().isEmpty() ? "default" : collections.items().get(0).name();
       indexBasePath = dataDir.resolve("index").resolve(collection);
     }
     return new ResolvedConfig.Paths(
@@ -916,7 +896,8 @@ public final class ResolvedConfigBuilder {
         resolvePath("justsearch.models.dir", null),
         resolvePath("justsearch.ssot.path", null),
         resolvePath("justsearch.repo.root", null),
-        resolvePath("justsearch.onnxruntime.native_path", null));
+        resolvePath("justsearch.onnxruntime.native_path", null),
+        Math.max(1, resolveInt("justsearch.path_resolution.retention_days", 90)));
   }
 
   private ResolvedConfig.Ports buildPorts() {
@@ -1372,15 +1353,14 @@ public final class ResolvedConfigBuilder {
 
   private ResolvedConfig.Summary buildSummary() {
     return new ResolvedConfig.Summary(
-        resolveString("justsearch.summary.pipeline", ""),
-        resolveInt("justsearch.summary.max_tokens", 0));
+        Math.max(
+            1,
+            resolveInt(
+                "justsearch.summary.max_tokens", ResolvedConfig.Summary.DEFAULT_MAX_TOKENS)));
   }
 
   private ResolvedConfig.Search buildSearch() {
     return new ResolvedConfig.Search(
-        resolveString("justsearch.search.pipeline.profile", null),
-        resolveString("justsearch.search.pipeline", null),
-        resolveString("justsearch.index.collection", "default"),
         resolveBoolean("justsearch.search.query_classification.enabled", true),
         resolveDouble("justsearch.search.title_boost", 3.0),
         resolveBoolean("search.chunk_aware.enabled", true),
@@ -1577,12 +1557,6 @@ public final class ResolvedConfigBuilder {
   private ResolvedConfig.WorkerIndexer buildWorkerIndexer() {
     return new ResolvedConfig.WorkerIndexer(
         resolveBoolean("workers.indexer.enabled", false),
-        resolveString("justsearch.indexer.host", "127.0.0.1"),
-        resolveInt("justsearch.indexer.port", 50071),
-        resolveLong("justsearch.indexer.deadlineMs", 5_000L),
-        Math.max(1, resolveInt("justsearch.indexer.queueSize", 64)),
-        Math.max(1, resolveInt("justsearch.indexer.maxInFlightBytes", 512 * 1024 * 1024)),
-        resolveString("workers.indexer.backpressure_mode", null),
         resolveString("indexer.worker.version", "0.1.0-dev"));
   }
 

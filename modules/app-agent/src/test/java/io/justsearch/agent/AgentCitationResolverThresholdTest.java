@@ -8,10 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.context.EngineContext;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -79,6 +83,65 @@ class AgentCitationResolverThresholdTest {
     double[] seen = {-1.0};
     new AgentCitationResolver(capturingDocs(seen), 0.83).resolve("The grass is green.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(0.83, seen[0], 1e-9);
+  }
+
+  @Test
+  @DisplayName("D1: one resolver observes same-store cutoff swaps once per eligible answer")
+  void liveThresholdReadsCurrentSnapshotOncePerEligibleAnswer() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of("justsearch.citation.match_threshold", "0.62")));
+    AtomicInteger reads = new AtomicInteger();
+    List<Double> seen = new java.util.ArrayList<>();
+    DocumentService docs = capturingDocs(seen);
+    var resolver =
+        new AgentCitationResolver(
+            docs,
+            () -> {
+              reads.incrementAndGet();
+              return store.get().rag().citationMatchThreshold();
+            });
+
+    resolver.resolve("First answer.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(
+            Map.of("justsearch.citation.match_threshold", "0.81")));
+    resolver.resolve("Second answer.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
+
+    assertEquals(List.of(0.62, 0.81), seen);
+    assertEquals(2, reads.get());
+  }
+
+  @Test
+  @DisplayName("D1: ineligible agent citation resolution does not read the cutoff supplier")
+  void ineligibleResolutionDoesNotReadThreshold() {
+    AtomicInteger reads = new AtomicInteger();
+    var resolver = new AgentCitationResolver(capturingDocs(new double[1]), reads::incrementAndGet);
+
+    resolver.resolve("", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
+    resolver.resolve("Answer", List.of(), EngineContextTestFixtures.AGENT_LOOP);
+
+    assertEquals(0, reads.get());
+  }
+
+  private static DocumentService capturingDocs(List<Double> sink) {
+    return new DocumentService() {
+      @Override
+      public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
+        return CompletableFuture.completedFuture(null);
+      }
+
+      @Override
+      public CompletionStage<CitationMatchResult> matchCitationsAgainst(
+          String answerText,
+          List<VerificationSource> sources,
+          double threshold,
+          EngineContext engineContext) {
+        sink.add(threshold);
+        return CompletableFuture.completedFuture(null);
+      }
+    };
   }
 
   @Test

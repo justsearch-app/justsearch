@@ -4,8 +4,6 @@
 #
 # Left in place rather than deleted because each is a wire-it-or-withdraw-it product call, the same
 # judgement 754 deferred — the gate's job is to stop the list GROWING while those calls are made.
-key:justsearch.embed.dimension
-key:justsearch.path_resolution.retention_days
 key:search.facets.enabled
 key:search.hybrid.ann_k
 key:search.hybrid.auto_embed

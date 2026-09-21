@@ -1098,7 +1098,7 @@ public class HeadlessApp {
       var operationAuthority = io.justsearch.app.services.bootstrap.OperationAuthority.load(configPhase.dataDir());
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
-          childRegistry, requestedRestartAction, operationAuthority);
+          childRegistry, requestedRestartAction, operationAuthority, configPhase.configStore());
       processRoot = engineRoot;
 
       // Phase 1: infrastructure (telemetry, policy)

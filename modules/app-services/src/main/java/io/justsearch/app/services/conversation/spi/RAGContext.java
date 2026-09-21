@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -184,7 +185,7 @@ public final class RAGContext implements ContextInjector {
    * <p>Precedence is body -> this -> {@link #DEFAULT_TOP_K}; an explicit per-request topK still
    * wins, so wiring config cannot override a caller that asked for a specific value.
    */
-  private final int defaultTopK;
+  private final IntSupplier defaultTopK;
 
   public RAGContext(DocumentService documents) {
     this(documents, DEFAULT_TIMEOUT, DEFAULT_TOP_K);
@@ -203,7 +204,7 @@ public final class RAGContext implements ContextInjector {
   }
 
   public RAGContext(DocumentService documents, Duration timeout, int defaultTopK) {
-    this(documents, timeout, defaultTopK, null);
+    this(documents, timeout, () -> defaultTopK, null);
   }
 
   /**
@@ -219,9 +220,17 @@ public final class RAGContext implements ContextInjector {
       Duration timeout,
       int defaultTopK,
       Supplier<OnlineAiService> onlineAi) {
+    this(documents, timeout, () -> defaultTopK, onlineAi);
+  }
+
+  public RAGContext(
+      DocumentService documents,
+      Duration timeout,
+      IntSupplier defaultTopK,
+      Supplier<OnlineAiService> onlineAi) {
     this.documents = Objects.requireNonNull(documents, "documents");
     this.timeout = Objects.requireNonNull(timeout, "timeout");
-    this.defaultTopK = defaultTopK > 0 ? defaultTopK : DEFAULT_TOP_K;
+    this.defaultTopK = Objects.requireNonNull(defaultTopK, "defaultTopK");
     this.onlineAi = onlineAi;
   }
 
@@ -230,6 +239,12 @@ public final class RAGContext implements ContextInjector {
    */
   public RAGContext(
       DocumentService documents, int defaultTopK, Supplier<OnlineAiService> onlineAi) {
+    this(documents, DEFAULT_TIMEOUT, defaultTopK, onlineAi);
+  }
+
+  /** Live configured top-K plus the live model context window. */
+  public RAGContext(
+      DocumentService documents, IntSupplier defaultTopK, Supplier<OnlineAiService> onlineAi) {
     this(documents, DEFAULT_TIMEOUT, defaultTopK, onlineAi);
   }
 
@@ -308,11 +323,11 @@ public final class RAGContext implements ContextInjector {
     // Tempdoc 883 decision 3 — ONE budget per request, built before anything is asked for, so the
     // shape of the ask and the cut that follows it cannot disagree about how much room there is.
     ContextBudget budget = budgetFor(onlineAi, ctx);
-    int topK = extractTopK(body, budget);
 
     if (question == null || question.isBlank()) {
       return InjectorResult.terminalError(errorEvent("No question provided", "NO_QUESTION"));
     }
+    int topK = extractTopK(body, budget);
     // Stash docIds + fileCount for the done enricher (set even on retrieval failure).
     ctx.attributes().put(ATTR_DOC_IDS, docIds);
     ctx.attributes().put(ATTR_FILE_COUNT, docIds.size());
@@ -852,7 +867,9 @@ public final class RAGContext implements ContextInjector {
       }
     }
     int affordable = budget.inputBudget() / ChunkSplitter.DEFAULT_CHUNK_TOKENS;
-    return Math.max(1, Math.min(defaultTopK, affordable));
+    int configured = defaultTopK.getAsInt();
+    int effectiveDefault = configured > 0 ? configured : DEFAULT_TOP_K;
+    return Math.max(1, Math.min(effectiveDefault, affordable));
   }
 
   private static String asString(Object o) {

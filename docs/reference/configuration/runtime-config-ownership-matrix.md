@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-14.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-21.
 
 Precedence note:
 1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.
@@ -28,7 +28,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | ConfigKey.INDEX_AUTO_RECOVERY | permanent | index.auto_recovery | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | ConfigKey.INDEX_BOOSTS | permanent | index.boosts | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | ConfigKey.INDEX_COLLECTIONS | permanent | index.collections | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
-| ConfigKey.INDEX_COMMIT_DEBOUNCE_MS | permanent | index.commit.debounce_ms | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | ConfigKey.INDEX_COMMIT_META_ENABLED | permanent | index.commit.meta.enabled | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | EnvRegistry.INDEX_COMMIT_TIMER_INTERVAL_MS | permanent | - | JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS | index.commit.timer_interval_ms | INDEX_COMMIT_TIMER_INTERVAL_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | ConfigKey.INDEX_DIRECTORY_TYPE | permanent | index.directory.type | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
@@ -108,7 +107,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.INDEX_VECTOR_HNSW_EF_CONSTRUCTION | permanent | index.vector.hnsw.ef_construction | JUSTSEARCH_INDEX_VECTOR_HNSW_EF_CONSTRUCTION | index.vector.hnsw.ef_construction | INDEX_VECTOR_HNSW_EF_CONSTRUCTION | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEX_VECTOR_HNSW_M | permanent | index.vector.hnsw.m | JUSTSEARCH_INDEX_VECTOR_HNSW_M | index.vector.hnsw.m | INDEX_VECTOR_HNSW_M | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEX_VECTOR_QUANTIZATION_ENABLED | permanent | index.vector.quantization.enabled | JUSTSEARCH_INDEX_VECTOR_QUANTIZATION_ENABLED | index.vector.quantization.enabled | INDEX_VECTOR_QUANTIZATION_ENABLED | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
-| ConfigKey.INDEX_WATCHER_RESCAN_ON_OVERFLOW | permanent | index.watcher.overflow.rescan_on_overflow | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | ConfigKey.INDEX_WRITER_MAX_BUFFERED_DOCS | permanent | index.writer.max_buffered_docs | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | ConfigKey.INDEX_WRITER_RAM_BUFFER_MB | permanent | index.writer.ram_buffer_mb | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | EnvRegistry.INDEXER_WORKER_VERSION | permanent | - | JUSTSEARCH_INDEXER_WORKER_VERSION | indexer.worker.version | INDEXER_WORKER_VERSION | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -160,7 +158,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.DEV_HOTRELOAD | permanent | - | JUSTSEARCH_DEV_HOTRELOAD | justsearch.dev.hotreload | DEV_HOTRELOAD | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_BACKEND | permanent | - | JUSTSEARCH_EMBED_BACKEND | justsearch.embed.backend | EMBED_BACKEND | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_CONTEXT_LENGTH | permanent | - | JUSTSEARCH_EMBED_CONTEXT_LENGTH | justsearch.embed.context_length | EMBED_CONTEXT_LENGTH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.EMBED_DIMENSION_OVERRIDE | permanent | - | JUSTSEARCH_EMBED_DIM | justsearch.embed.dimension | EMBED_DIMENSION_OVERRIDE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_GPU_MEM_MB | permanent | - | JUSTSEARCH_EMBED_GPU_MEM_MB | justsearch.embed.gpu_mem_mb | EMBED_GPU_MEM_MB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_GPU_DEVICE_ID | permanent | - | JUSTSEARCH_EMBED_GPU_DEVICE_ID | justsearch.embed.gpu.device_id | EMBED_GPU_DEVICE_ID | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_GPU_ENABLED | permanent | - | JUSTSEARCH_EMBED_GPU_ENABLED | justsearch.embed.gpu.enabled | EMBED_GPU_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -182,14 +179,8 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.HEAD_TRACING_LEVEL | permanent | - | JUSTSEARCH_HEAD_TRACING_LEVEL | justsearch.head.tracing_level | HEAD_TRACING_LEVEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HOME | permanent | - | JUSTSEARCH_HOME | justsearch.home | HOME | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEX_BASE_PATH | permanent | - | JUSTSEARCH_INDEX_BASE_PATH | justsearch.index.base_path | INDEX_BASE_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.INDEX_COLLECTION | deprecated | - | JUSTSEARCH_INDEX_COLLECTION | justsearch.index.collection | INDEX_COLLECTION | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEX_PARITY_ALLOW_MISMATCH | permanent | - | JUSTSEARCH_INDEX_PARITY_ALLOW_MISMATCH | justsearch.index.parity.allow_mismatch | INDEX_PARITY_ALLOW_MISMATCH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEX_TRACING_LEVEL | permanent | - | JUSTSEARCH_INDEX_TRACING_LEVEL | justsearch.index.tracing_level | INDEX_TRACING_LEVEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.INDEXER_DEADLINE_MS | permanent | justsearch.indexer.deadlineMs | JUSTSEARCH_INDEXER_DEADLINE_MS | justsearch.indexer.deadlineMs | INDEXER_DEADLINE_MS | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
-| EnvRegistry.INDEXER_HOST | permanent | justsearch.indexer.host | JUSTSEARCH_INDEXER_HOST | justsearch.indexer.host | INDEXER_HOST | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
-| EnvRegistry.INDEXER_MAX_INFLIGHT_BYTES | permanent | justsearch.indexer.maxInFlightBytes | JUSTSEARCH_INDEXER_MAX_INFLIGHT_BYTES | justsearch.indexer.maxInFlightBytes | INDEXER_MAX_INFLIGHT_BYTES | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
-| EnvRegistry.INDEXER_PORT | permanent | justsearch.indexer.port | JUSTSEARCH_INDEXER_PORT | justsearch.indexer.port | INDEXER_PORT | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
-| EnvRegistry.INDEXER_QUEUE_SIZE | permanent | justsearch.indexer.queueSize | JUSTSEARCH_INDEXER_QUEUE_SIZE | justsearch.indexer.queueSize | INDEXER_QUEUE_SIZE | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_COOLDOWN_MS | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_COOLDOWN_MS | justsearch.indexing.foreground_cooldown_ms | INDEXING_FOREGROUND_COOLDOWN_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_DUTY_PCT | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_DUTY_PCT | justsearch.indexing.foreground_duty_pct | INDEXING_FOREGROUND_DUTY_PCT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_DIRECTORY_NAMES | permanent | - | JUSTSEARCH_INGESTION_SKIP_DIRECTORY_NAMES | justsearch.ingestion.skip.directory_names | INGESTION_SKIP_DIRECTORY_NAMES | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -252,8 +243,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.RERANK_MODEL_PATH | permanent | - | JUSTSEARCH_RERANK_MODEL_PATH | justsearch.rerank.model_path | RERANK_MODEL_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.RERANK_TOP_K | permanent | - | JUSTSEARCH_RERANK_TOP_K | justsearch.rerank.top_k | RERANK_TOP_K | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.RULE_TICK_MS | permanent | - | JUSTSEARCH_RULE_TICK_MS | justsearch.rule.tick.ms | RULE_TICK_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.SEARCH_PIPELINE | permanent | - | JUSTSEARCH_SEARCH_PIPELINE | justsearch.search.pipeline | SEARCH_PIPELINE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.SEARCH_PROFILE | permanent | justsearch.search.pipeline.profile | JUSTSEARCH_SEARCH_PROFILE | justsearch.search.pipeline.profile | SEARCH_PROFILE | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.SEARCH_QUERY_CLASSIFICATION_ENABLED | permanent | - | JUSTSEARCH_SEARCH_QUERY_CLASSIFICATION_ENABLED | justsearch.search.query_classification.enabled | SEARCH_QUERY_CLASSIFICATION_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SEARCH_TITLE_BOOST | permanent | - | JUSTSEARCH_SEARCH_TITLE_BOOST | justsearch.search.title_boost | SEARCH_TITLE_BOOST | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SERVER_EXE | permanent | - | JUSTSEARCH_SERVER_EXE | justsearch.server.exe | SERVER_EXE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -270,7 +259,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.SPLADE_QUERY_MODE | permanent | - | JUSTSEARCH_SPLADE_QUERY_MODE | justsearch.splade.query_mode | SPLADE_QUERY_MODE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SSOT_PATH | permanent | - | JUSTSEARCH_SSOT_PATH | justsearch.ssot.path | SSOT_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SUMMARY_MAX_TOKENS | permanent | - | JUSTSEARCH_SUMMARY_MAX_TOKENS | justsearch.summary.max_tokens | SUMMARY_MAX_TOKENS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.SUMMARY_PIPELINE | permanent | - | JUSTSEARCH_SUMMARY_PIPELINE | justsearch.summary.pipeline | SUMMARY_PIPELINE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.TELEMETRY_FLUSH_MS | permanent | - | JUSTSEARCH_TELEMETRY_FLUSH_MS | justsearch.telemetry.flushMs | TELEMETRY_FLUSH_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.TESSDATA_PATH | permanent | - | JUSTSEARCH_TESSDATA_PATH | justsearch.tessdata.path | TESSDATA_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.TESSERACT_PATH | permanent | - | JUSTSEARCH_TESSERACT_PATH | justsearch.tesseract.path | TESSERACT_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -325,5 +313,4 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | ConfigKey.SEARCH_MCP_FRAMING_WEAK_SCORE_FLOOR | experimental | search.mcp_framing.weak_score_floor | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | EnvRegistry.WORKER_MAX_CONTENT_LENGTH | permanent | worker.limits.max_content_length | JUSTSEARCH_WORKER_MAX_CONTENT_LENGTH | worker.limits.max_content_length | WORKER_MAX_CONTENT_LENGTH | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.WORKER_MAX_FILE_SIZE | permanent | worker.limits.max_file_size | JUSTSEARCH_WORKER_MAX_FILE_SIZE | worker.limits.max_file_size | WORKER_MAX_FILE_SIZE | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
-| ConfigKey.INDEXER_BACKPRESSURE_MODE | permanent | workers.indexer.backpressure_mode | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | EnvRegistry.INDEXER_ENABLED | permanent | workers.indexer.enabled | JUSTSEARCH_INDEXER_ENABLED | workers.indexer.enabled | INDEXER_ENABLED | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |

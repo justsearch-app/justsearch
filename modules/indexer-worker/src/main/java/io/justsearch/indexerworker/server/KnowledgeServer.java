@@ -339,6 +339,7 @@ public final class KnowledgeServer implements Closeable {
   private final io.justsearch.core.component.ComponentHandle encoderComponent;
   private RecordedIngestionLifecycle.Attachment recordedIngestionAttachment;
   private volatile ResolvedConfig startupConfiguration;
+  private final java.util.function.Supplier<ResolvedConfig> liveConfiguration;
   private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
 
   public KnowledgeServer(
@@ -380,7 +381,23 @@ public final class KnowledgeServer implements Closeable {
       io.justsearch.core.component.ComponentHandle indexComponent,
       io.justsearch.core.component.ComponentHandle encoderComponent,
       ResolvedConfig startupConfiguration) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, startupConfiguration, null);
+  }
+
+  /** Hot auxiliary settings read the same authority captured by the process composition. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration) {
     this.startupConfiguration = startupConfiguration;
+    this.liveConfiguration = liveConfiguration;
     this.indexComponent = indexComponent;
     this.encoderComponent = encoderComponent;
     this.recordedIngestionLifecycle = Objects.requireNonNull(recordedIngestionLifecycle,
@@ -2296,7 +2313,6 @@ public final class KnowledgeServer implements Closeable {
     log.info("║ Active index dir: {}", padRight(String.valueOf(activeIndexPath), 44) + "║");
     log.info("║ Build index dir:  {}", padRight(String.valueOf(buildingIndexPath), 44) + "║");
     log.info("║ Jobs DB path:     {}", padRight(dataDir.resolve("jobs.db").toString(), 44) + "║");
-    log.info("║ Host:             {}", padRight(config.host(), 44) + "║");
 
     // SSOT paths
     ResolvedConfig captured = startupConfiguration;
@@ -2344,6 +2360,39 @@ public final class KnowledgeServer implements Closeable {
   // missing from search?" questions remain answerable past the queue retention window.
   private static final int LEDGER_RETENTION_DAYS = 180;
 
+  /** Same daily cleanup operation as the sentinel, exposed in-package for deterministic proof. */
+  void runPeriodicCleanup(long now) {
+    try {
+      int deleted = jobQueue.cleanupOldJobs(CLEANUP_RETENTION_DAYS);
+      if (deleted > 0) {
+        log.info("Periodic cleanup: removed {} old jobs (>{} days)", deleted, CLEANUP_RETENTION_DAYS);
+      }
+    } catch (Exception e) {
+      log.warn("Periodic job cleanup failed (non-fatal)", e);
+    }
+    try {
+      int deletedLedger = jobQueue.cleanupOldLedgerEvents(LEDGER_RETENTION_DAYS);
+      if (deletedLedger > 0) {
+        log.info("Periodic cleanup: removed {} old ledger events (>{} days)",
+            deletedLedger, LEDGER_RETENTION_DAYS);
+      }
+    } catch (Exception e) {
+      log.warn("Periodic ledger cleanup failed (non-fatal)", e);
+    }
+    try {
+      if (pathResolutionStore != null) {
+        ResolvedConfig current = liveConfiguration == null ? startupConfiguration : liveConfiguration.get();
+        int retentionDays = current.paths().pathResolutionRetentionDays();
+        int deletedPaths = pathResolutionStore.pruneOldRemoved(now - TimeUnit.DAYS.toMillis(retentionDays));
+        if (deletedPaths > 0) {
+          log.info("Periodic cleanup: removed {} old path resolutions (>{} days)", deletedPaths, retentionDays);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Periodic path-resolution cleanup failed (non-fatal)", e);
+    }
+  }
+
   private void startSentinelThread() {
     sentinelThread = new Thread(() -> {
       log.info("Sentinel thread started");
@@ -2377,21 +2426,7 @@ public final class KnowledgeServer implements Closeable {
           // Periodic job queue cleanup: remove old DONE/FAILED rows
           long now = System.currentTimeMillis();
           if (jobQueue != null && now - lastCleanupMs > CLEANUP_INTERVAL_MS) {
-            try {
-              int deleted = jobQueue.cleanupOldJobs(CLEANUP_RETENTION_DAYS);
-              if (deleted > 0) {
-                log.info("Periodic cleanup: removed {} old jobs (>{} days)", deleted, CLEANUP_RETENTION_DAYS);
-              }
-              int deletedLedger = jobQueue.cleanupOldLedgerEvents(LEDGER_RETENTION_DAYS);
-              if (deletedLedger > 0) {
-                log.info(
-                    "Periodic cleanup: removed {} old ledger events (>{} days)",
-                    deletedLedger,
-                    LEDGER_RETENTION_DAYS);
-              }
-            } catch (Exception e) {
-              log.warn("Periodic job cleanup failed (non-fatal)", e);
-            }
+            runPeriodicCleanup(now);
             lastCleanupMs = now;
           }
         } catch (InterruptedException e) {
