@@ -124,16 +124,30 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
   }
 
   private void mutate(DefaultComponentHandle handle, Mutation mutation) {
+    mutate(handle, null, mutation);
+  }
+
+  private boolean mutate(DefaultComponentHandle handle,
+      EngineComponentSnapshot.Component expected, Mutation mutation) {
+    return mutate(handle, expected, null, mutation);
+  }
+
+  private boolean mutate(DefaultComponentHandle handle,
+      EngineComponentSnapshot.Component expected, EngineComponentSnapshot expectedRegistry,
+      Mutation mutation) {
     EngineComponentSnapshot published;
     List<Consumer<EngineComponentSnapshot>> observers;
     synchronized (monitor) {
       ensureOpen();
-      if (!mutation.apply(handle)) return;
+      if (expectedRegistry != null && !expectedRegistry.equals(snapshotLocked())) return false;
+      if (expected != null && !expected.equals(handle.snapshotLocked())) return false;
+      if (!mutation.apply(handle)) return true;
       revision++;
       published = snapshotLocked();
       observers = listenersLocked();
     }
     publish(observers, published);
+    return true;
   }
 
   private EngineComponentSnapshot snapshotLocked() {
@@ -208,10 +222,30 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
 
     @Override
     public void transition(ComponentState next, String nextReasonCode, String nextEvidence) {
+      transition(null, null, next, nextReasonCode, nextEvidence);
+    }
+
+    @Override
+    public boolean transitionIfUnchanged(EngineComponentSnapshot.Component expected,
+        ComponentState next, String nextReasonCode, String nextEvidence) {
+      Objects.requireNonNull(expected, "expected");
+      return transition(expected, null, next, nextReasonCode, nextEvidence);
+    }
+
+    @Override
+    public boolean transitionIfUnchanged(EngineComponentSnapshot expected,
+        ComponentState next, String nextReasonCode, String nextEvidence) {
+      Objects.requireNonNull(expected, "expected");
+      return transition(null, expected, next, nextReasonCode, nextEvidence);
+    }
+
+    private boolean transition(EngineComponentSnapshot.Component expected,
+        EngineComponentSnapshot expectedRegistry,
+        ComponentState next, String nextReasonCode, String nextEvidence) {
       Objects.requireNonNull(next, "state");
       optionalNonBlank(nextReasonCode, "reasonCode");
       optionalNonBlank(nextEvidence, "evidence");
-      mutate(this, handle -> {
+      return mutate(this, expected, expectedRegistry, handle -> {
         boolean stateChanged = handle.state != next;
         if (!stateChanged && Objects.equals(handle.reasonCode, nextReasonCode)
             && Objects.equals(handle.evidence, nextEvidence)) return false;

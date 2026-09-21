@@ -125,13 +125,7 @@ public final class RegistryBackedCapability implements Capability {
         .orElseThrow(() -> construction
             ? new IllegalArgumentException("Component is not registered: " + componentName)
             : new IllegalStateException("Registered component disappeared: " + componentName));
-    CapabilityHealth health = switch (component.state()) {
-      case ABSENT, UNAVAILABLE -> CapabilityHealth.OFFLINE;
-      case STARTING -> CapabilityHealth.PENDING;
-      case READY -> CapabilityHealth.READY;
-      case RELOADING -> CapabilityHealth.RECOVERING;
-      case FAILED -> CapabilityHealth.DEGRADED;
-    };
+    CapabilityHealth health = healthOf(component.state());
     boolean ready = component.state() == ComponentState.READY;
     return new Observation(
         snapshot.revision(),
@@ -140,6 +134,16 @@ public final class RegistryBackedCapability implements Capability {
         ready ? null : component.evidence(),
         component.spec().essential() || component.state() != ComponentState.ABSENT,
         legacyName);
+  }
+
+  static CapabilityHealth healthOf(ComponentState state) {
+    return switch (state) {
+      case ABSENT, UNAVAILABLE -> CapabilityHealth.OFFLINE;
+      case STARTING -> CapabilityHealth.PENDING;
+      case READY -> CapabilityHealth.READY;
+      case RELOADING -> CapabilityHealth.RECOVERING;
+      case FAILED -> CapabilityHealth.DEGRADED;
+    };
   }
 
   private static boolean sameProjection(Observation left, Observation right) {

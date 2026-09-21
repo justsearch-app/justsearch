@@ -16,6 +16,7 @@ import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.ComposeEvidence.Mode;
 import io.justsearch.core.component.EngineComponentRegistry.ApplyAttempt;
 import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.core.context.RetainedStateBudget;
 import java.time.Duration;
 import java.time.Instant;
@@ -27,9 +28,151 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 final class DefaultEngineComponentRegistryTest {
+  @Test
+  void conditionalPublicationRejectsObsoleteObservationsButAcceptsMatchingNoOps() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var index = registry.register(spec("index", Set.of()));
+      var api = registry.register(spec("api", Set.of()));
+      index.transition(ComponentState.STARTING, "worker.starting", "opening");
+      var observed = index.snapshot();
+      var publications = new AtomicInteger();
+      var subscription = registry.subscribe(snapshot -> publications.incrementAndGet());
+      try (subscription) {
+        long revision = registry.snapshot().revision();
+        assertTrue(index.transitionIfUnchanged(observed,
+            ComponentState.STARTING, "worker.starting", "opening"));
+        assertEquals(revision, registry.snapshot().revision());
+        assertEquals(0, publications.get());
+        api.transition(ComponentState.READY, null, null);
+        assertTrue(index.transitionIfUnchanged(observed, ComponentState.READY, null, null),
+            "another component's observation cannot invalidate an index sample");
+        var ready = index.snapshot();
+        int beforeStale = publications.get();
+        assertFalse(index.transitionIfUnchanged(observed,
+            ComponentState.FAILED, "worker.lost", "obsolete failure"));
+        assertEquals(ready, index.snapshot());
+        assertEquals(beforeStale, publications.get());
+        index.transition(ComponentState.RELOADING, "worker.recovering", null);
+        index.transition(ComponentState.READY, null, null);
+        assertFalse(index.transitionIfUnchanged(ready,
+            ComponentState.UNAVAILABLE, "worker.lost", "old ready epoch"));
+      }
+    }
+  }
+
+  @Test
+  void onlyOneConcurrentConditionalWriterCanReplaceTheSameObservation() throws Exception {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = registry.register(spec("index", Set.of()));
+      var observed = handle.snapshot();
+      var start = new CountDownLatch(1);
+      var won = new AtomicInteger();
+      var failure = new AtomicReference<Throwable>();
+      var threads = new ArrayList<Thread>();
+      for (var state : List.of(ComponentState.STARTING, ComponentState.FAILED)) {
+        var thread = new Thread(() -> {
+          try {
+            await(start);
+            if (handle.transitionIfUnchanged(observed, state, "worker.starting", null)) {
+              won.incrementAndGet();
+            }
+          } catch (RuntimeException | Error error) {
+            failure.compareAndSet(null, error);
+          }
+        });
+        threads.add(thread);
+        thread.start();
+      }
+      start.countDown();
+      for (var thread : threads) thread.join(TimeUnit.SECONDS.toMillis(5));
+      assertTrue(threads.stream().noneMatch(Thread::isAlive));
+      assertNull(failure.get(), "neither conditional publisher may crash");
+      assertEquals(1, won.get());
+      assertEquals(2, registry.snapshot().revision());
+    }
+  }
+
+  @Test
+  void readinessPublicationRejectsAnApiChangeBetweenObservationAndCommit() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var index = new ReasonRetainingComponentHandle(
+          registry.register(spec("index", Set.of())));
+      var api = registry.register(spec("api", Set.of()));
+      index.transition(ComponentState.STARTING, "worker.starting", null);
+      api.transition(ComponentState.READY, null, null);
+      var sampled = registry.snapshot();
+      var sameIndex = index.snapshot();
+      assertTrue(index.transitionIfUnchanged(sampled,
+          ComponentState.STARTING, "worker.starting", null));
+      assertEquals(sampled.revision(), registry.snapshot().revision());
+
+      // The physical API owner closes after the sampler saw API READY. An index-only
+      // comparison would still match and falsely promote this obsolete conjunction.
+      api.transition(ComponentState.ABSENT, null, null);
+      assertEquals(sameIndex, index.snapshot());
+      long afterApiClose = registry.snapshot().revision();
+      assertFalse(index.transitionIfUnchanged(sampled, ComponentState.READY, null, null));
+      assertEquals(afterApiClose, registry.snapshot().revision());
+      assertEquals(ComponentState.STARTING, index.snapshot().state());
+
+      api.transition(ComponentState.READY, null, null);
+      assertFalse(index.transitionIfUnchanged(sampled, ComponentState.READY, null, null));
+      assertTrue(index.transitionIfUnchanged(registry.snapshot(), ComponentState.READY, null, null));
+    }
+  }
+
+  @Test
+  void reasonRetentionDoesNotHoldAPublicationLockAcrossRegistryCallbacks() throws Exception {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = new ReasonRetainingComponentHandle(
+          registry.register(spec("index", Set.of())));
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var faultFailure = new AtomicReference<Throwable>();
+      var subscription = registry.subscribe(snapshot -> {
+        if (snapshot.revision() == 2) {
+          entered.countDown();
+          await(release);
+        }
+      });
+      var fault = new Thread(() -> {
+        try {
+          handle.transition(ComponentState.FAILED,
+              "worker.index_corrupt", "precise corruption evidence");
+        } catch (RuntimeException | Error failure) {
+          faultFailure.set(failure);
+        }
+      });
+      try (subscription) {
+        fault.start();
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        handle.transition(ComponentState.RELOADING, "worker.recovering", "retry narration");
+        assertEquals(ComponentState.RELOADING, handle.snapshot().state());
+        assertEquals("worker.index_corrupt", handle.snapshot().reasonCode());
+        assertEquals("precise corruption evidence", handle.snapshot().evidence());
+      } finally {
+        release.countDown();
+        fault.join(TimeUnit.SECONDS.toMillis(5));
+      }
+      assertFalse(fault.isAlive());
+      assertNull(faultFailure.get(), "the blocked callback must be released, not time out");
+      var failedObservation = handle.snapshot();
+      handle.transition(ComponentState.READY, null, null);
+      assertFalse(handle.transitionIfUnchanged(failedObservation,
+          ComponentState.UNAVAILABLE, "worker.lost", "obsolete sample"));
+      assertNull(handle.snapshot().reasonCode());
+      assertNull(handle.snapshot().evidence());
+      handle.transition(ComponentState.FAILED, "worker.spawn.failed", "failed boot");
+      handle.transition(ComponentState.RELOADING, "worker.recovering", "boot retry");
+      assertEquals("worker.recovering", handle.snapshot().reasonCode());
+      assertEquals("boot retry", handle.snapshot().evidence());
+    }
+  }
+
   @Test
   void publishesSortedImmutableCoherentSnapshotsWithoutResettingStateClockOnNoOp() {
     var budget = budget();

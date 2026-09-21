@@ -12,17 +12,17 @@ C2 is accepted at `ba1440624`: installed2260 (11 cases), stress2264
 [C2 acceptance](evidence/C2/verification-2026-09-21.md) owns exact revisions,
 commands, skips and artifacts. Later governance correction2271 passed hosted CI.
 
-D1 batch1 is active: registry/hash foundation `e9e024738` and bounded observation/
-metadata seams `8114d50ca` are pushed; owner wiring is uncommitted.
+D1 batch1 is active: registry/hash foundation `e9e024738`, bounded observation/
+metadata seams `8114d50ca`, and captured owner wiring `6c95d7989` are pushed.
 Focused2287 passes72 cases/16 suites;2289 freshly passes45 cases/10 suites after
 extraction capture, real encoder composition/wiring proof (native assembly mocked),
 API fallback and the restored thin-composer ceiling. No failures or skips.
 Full affected2281 passed5,359 cases before those corrections; it is not fresh
 integrated proof of the current diff. No D1 acceptance is claimed.
 
-Next: finish independent review of normalized index/extraction applied-value projection, then replace
-readiness authorities and complete the291-key apply register. Root has replaced the
-misleading WorkerConfig hash in WIP with IndexConfigurationProjection and real-boot
+Next: finish integrated verification, then replace readiness authorities and complete
+the291-key apply register. Root has replaced the misleading WorkerConfig hash
+with IndexConfigurationProjection and real-boot
 regressions. Root also holds WorkerServiceConfiguration once per physical index
 start so service reconstruction cannot repeat filesystem discovery. These changes
 passed focused2290 (91 cases/11 suites). Root then corrected separate commit-refresh
@@ -31,10 +31,32 @@ failures or skips. Consolidated review's three digest gaps (hot reload, retained
 health discovery, acquired tracing sampler) are corrected.2296 passed22 tests/8
 suites, including real four-owner registration/API bind and tracing cleanup;
 spotlessCheck and pmdAll pass.2297 cleanup omission failed for the intended surviving
-exporter thread; production source is restored byte-exactly. All agents are frozen.
+exporter thread; production source is restored byte-exactly.
 2294 passed1,024 tests in configuration/adapters before static failure stopped
-remaining tasks; it predates review corrections. Next run2298 is fresh integrated
-affected-module proof, including telemetry. No stack is active. D1 is not accepted.
+remaining tasks; it predates review corrections. Run2298 passes at `6c95d7989`:
+8370 cases/1326 suites represented, zero failures/errors,29 skips; eight test tasks
+fresh and configuration/adapters-lucene reused unchanged. The
+[integrated verification](evidence/D1/owner-integrated-verification-2026-09-21.md)
+owns counts, limits and captured artifacts. Source freeze is lifted; root has begun
+the conditional registry publication and reason-retaining handle seam. No stack is
+active. D1-3 bounded owner audits are complete; their findings and required fixes
+are indexed by the [apply-register plan](evidence/D1/apply-register-plan-2026-09-21.md).
+They expose missing dependencies and inert declarations; classification is not
+implemented apply behavior. Agents now map schema/host consumers and independently
+review the readiness plan; root owns publication and integration. Conditional
+publication and the stateless retention seam pass static2299 and focused2300
+(40 cases/4 suites, no failures/skips). Negative2301 proves the API-race guard;
+source is restored byte-exactly, and2302 reuses matching restored proof. See the
+[seam verification](evidence/D1/publication-seam-verification-2026-09-21.md).
+Runtime capability/schema/host migration remains open. No Gradle or stack is
+active; next run2303.
+D1 is not accepted.
+
+Workflow correction `b4d01c1cc` is pushed: collect independent static failures in
+one `spotlessCheck pmdAll --continue` pass, preserving every failure and separating
+expensive runtime checks until static blockers are resolved. The canonical workflow
+and both harness CI-triage skills share that rule. Documentation/skill validators
+passed; no additional always-loaded policy copy was introduced.
 
 Use the [component plan](evidence/D1/component-plan-2026-09-21.md),
 [wiring proof](evidence/D1/owner-wiring-2026-09-21.md),

@@ -104,3 +104,91 @@ The production-registration regression now passes in2296 through HeadlessApp.bui
 with the real shared EngineRoot registry and real API bind. It enforces floor4 and
 an empty exception set without calling register itself. AI is disabled and the
 index is not started in that fixture, so it does not prove model/index readiness.
+
+## Aggregate projection decision
+
+The four component states and the six existing overall lifecycle states are
+different vocabularies. Keep the overall wire enum; publish the component enum
+directly in schema2's four slots. Do not map ABSENT to an overall STOPPED slot or
+collapse FAILED and UNAVAILABLE in the component vector.
+
+The one aggregate function uses this ordered table, extending the existing index
+policy to both essential components (`api`, `index`):
+
+| First matching condition | Overall lifecycle |
+| --- | --- |
+| An essential component is FAILED or RELOADING | ERROR |
+| An essential component is STARTING | STARTING |
+| An essential component is ABSENT or UNAVAILABLE | DEGRADED |
+| An optional component is neither READY nor intentionally ABSENT | DEGRADED |
+| Otherwise | READY |
+
+Choose the diagnostic component from the winning row in stable name order, and
+project its reason/evidence into both health and manifest. Missing required
+registrations are a composition error, not intentional absence. Optional absence
+does not prevent text search; optional failure changes aggregate diagnostics but
+not the host's essential readiness, which is the index component's READY state.
+Enumerate all1296 four-component combinations against an independent expected
+table and require identical manifest/health aggregate results. STOPPING/STOPPED
+remain in the established overall wire vocabulary but are not inferred from
+ABSENT; shutdown is represented by physical owners' component observations.
+
+Conditional transition compares the complete immutable component observation
+under the existing registry monitor. A matching no-op succeeds without a new
+revision or listener callback; a mismatch returns false without side effects.
+Unrelated components do not invalidate this single-component form. Reason-retaining
+writers retry a mismatch. The sampler instead uses the explicit full-registry
+conditional form: API readiness is a related precondition, and an API transition
+between observation and publication must invalidate the sample atomically. A
+sampler must discard its obsolete result rather than retry
+with a newly read physical state. State transitions update the existing monotonic
+state clock, so a physical phase change and return cannot accept an old sample.
+
+The independent review also identified a bootstrap cycle in the old sampler's
+`workerCapability.available()` guard. After the registry migration STARTING
+projects PENDING, so that guard would prevent the first successful sample forever.
+Sample eligibility must use structural client availability instead; READY remains
+the sampled result. Bootstrap/monitor success performs its existing auxiliary
+initialization and requests reconciliation without blindly publishing READY.
+Preserve the existing monitor tick trigger. Explicitly suppress sampler-owned
+index publications from scheduling another sample while still responding to
+physical, API and optional-component changes. Prove exact RPC/run counts and
+STARTING-to-READY boot/recovery, not just eventual readiness or burst coalescing.
+
+## Schema and consumer decisions
+
+The [schema consumer audit](schema2-consumer-plan-2026-09-21.md) and
+[host audit](host-readiness-plan-2026-09-21.md) own the current paths and required
+commands. Emit `LifecycleSnapshotV2` and a v2 lifecycle schema at the existing
+routes; retire the unused v1 Java/schema artifacts when all references migrate.
+The envelope retains camelCase `stateSince`; lifecycle slots retain snake_case
+`state_since`. Both project the same registry Instant. Hosts treat `stateSince`
+as an epoch token and measure continuous readiness with their existing local
+monotonic clock, never by subtracting JVM wall time from a host clock.
+
+StatusDeck preserves its existing meaning: live transport first, then both API
+and index READY. Optional model state remains in the existing diagnostic notices.
+Unknown/missing component state cannot satisfy a READY gate. No second frontend
+aggregate policy replaces the existing diagnostic composites.
+
+Manifest aggregate publication uses one registry subscription, installed before
+reading the initial snapshot. The two old capability listeners miss API/encoder
+changes. Worker/AI/mode/chat axis callbacks may remain projections but cannot pass
+or overwrite the overall lifecycle. Under the existing publisher monitor, reject
+registry revisions below the highest observed, advancing that high-water mark
+before both no-op detection and fallible I/O. An equal-revision retry may retry a
+failed write; a successful duplicate remains a lifecycle-equality no-op. Preserve
+the existing write-before-current ordering and failure reporting. Own and close
+the registry subscription before registry/publisher teardown. Tests must cover
+API-only/encoder-only updates, delayed old callbacks after a newer no-op, failed
+write plus same-revision retry, and closed subscriptions.
+
+Core's ComponentState remains the runtime authority and gains no protobuf
+dependency. The distinct proto component enum is a wire projection, with a
+bijection test against core values. It must serialize plain component names
+such as READY, not the overall LIFECYCLE_STATE_READY vocabulary. Reserve the
+old StatusResponse components field number4 and allocate a new field number
+for the new component message while preserving JSON name `components`. Never
+reuse old head/worker/inference tags for different meanings. Retire unreferenced
+old messages after a reference sweep. Keep unknown numeric proto values permitted
+for forward compatibility; readiness decisions accept only known READY.
