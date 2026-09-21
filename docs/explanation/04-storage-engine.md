@@ -305,6 +305,14 @@ Writing to disk is expensive. `IndexingLoop` controls commits, but `LuceneIndexR
     2.  **Size:** > 1000 documents in buffer.
     3.  **Event:** Shutdown signal received (Safe close).
 
+Shutdown stops the indexing loop cooperatively and waits up to five seconds for its
+current work and final commit to finish. It does not interrupt the Lucene-owning
+thread: interruption during NIO can invalidate the writer's file-lock channel.
+If the loop remains alive or the closing caller is interrupted, close fails and
+retains the extractor, encoders and enclosing runtime for a later close attempt.
+Dev hot reload retains that replacement request in its existing sentinel and
+retries closing the incumbent before constructing or starting replacement services.
+
 ### 4. Backpressure
 The `queueDepth` counter guards against overloading the writer.
 *   If `queueDepth > maxQueueDepth` (default 10,000), `indexBatch` throws `BACKPRESSURE` exception to slow down the ingest loop.

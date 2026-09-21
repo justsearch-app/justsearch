@@ -2241,7 +2241,7 @@ public final class KnowledgeServer implements Closeable {
           // sequence the composition root drives.
 
           // Dev hot-reload: check for reload signal from Gradle continuous build
-          if (devReloadManager != null && signalBus.isReloadRequested()) {
+          if (devReloadManager != null && devReloadManager.isReloadRequested()) {
             log.info("Sentinel detected reload signal");
             devReloadManager.performReload();
           }

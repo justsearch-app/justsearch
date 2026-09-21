@@ -38,10 +38,15 @@ final class DevReloadManager {
 
   private final KnowledgeServer server;
   private final AtomicBoolean reloadInProgress = new AtomicBoolean(false);
+  private volatile boolean closeRetryPending;
 
   DevReloadManager(KnowledgeServer server) {
     this.server = server;
     log.info("DevReloadManager initialized");
+  }
+
+  boolean isReloadRequested() {
+    return closeRetryPending || server.signalBus.isReloadRequested();
   }
 
   void performReload() {
@@ -64,7 +69,11 @@ final class DevReloadManager {
       WorkerAppServices oldServices = server.appServices;
       if (oldServices != null) {
         log.info("Closing old application services...");
+        // The incumbent may already have stopped its watcher while its indexing owner drains.
+        // Retain this reload in the existing sentinel instead of requiring another compile.
+        closeRetryPending = true;
         oldServices.close();
+        closeRetryPending = false;
       }
 
       // 4. Construct new services from the same InfraContext.

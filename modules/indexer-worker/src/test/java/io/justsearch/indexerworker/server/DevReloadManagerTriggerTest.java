@@ -3,6 +3,8 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.*;
 
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -67,6 +69,39 @@ final class DevReloadManagerTriggerTest {
     // the same thing directly. Package-private for exactly this kind of access.
     server.signalBus = bus;
     return server;
+  }
+
+  @Test
+  void incompleteCloseRetainsReloadUntilIncumbentExitsAndReplacementStarts(@TempDir Path tempDir)
+      throws Exception {
+    Path runtimeDir = Files.createDirectories(tempDir.resolve("runtime"));
+    var bus = busOver(runtimeDir);
+    Files.writeString(runtimeDir.resolve(InProcessWorkerSignalBus.RELOAD_REQUEST_FILENAME), "reload");
+    var server = spy(serverWith(bus, tempDir));
+    var incumbent = mock(WorkerAppServices.class);
+    var replacement = mock(DefaultWorkerAppServices.class);
+    server.appServices = incumbent;
+    doReturn(replacement).when(server).newAppServices();
+    doThrow(new java.io.IOException("Indexing owner still running"))
+        .doNothing().when(incumbent).close();
+    var manager = new DevReloadManager(server);
+
+    manager.performReload();
+
+    assertFalse(bus.isReloadRequested(), "the original compile request was consumed");
+    assertTrue(manager.isReloadRequested(), "the sentinel must retry without another compile");
+    assertSame(incumbent, server.appServices);
+    verify(server, never()).newAppServices();
+    verify(incumbent, never()).startIndexingLoop();
+
+    manager.performReload();
+
+    assertFalse(manager.isReloadRequested(), "successful close consumes the retained retry");
+    assertSame(replacement, server.appServices);
+    var order = inOrder(incumbent, server, replacement);
+    order.verify(incumbent, times(2)).close();
+    order.verify(server).newAppServices();
+    order.verify(replacement).startIndexingLoop();
   }
 
   @Test

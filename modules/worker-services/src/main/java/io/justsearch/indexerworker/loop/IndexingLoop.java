@@ -1125,11 +1125,16 @@ public class IndexingLoop implements Closeable {
     signalBus.setPendingIngestProbe(null);
 
     if (loopThread != null) {
-      loopThread.interrupt();
+      // Like resetForProfiling, stop cooperatively. Interrupting this owner during Lucene
+      // NIO can close its writer/lock channels, including during the final shutdown commit.
       try {
         loopThread.join(5000);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        throw new IOException("Interrupted waiting for indexing loop shutdown; resources retained", e);
+      }
+      if (loopThread.isAlive()) {
+        throw new IOException("Indexing loop still running; resources retained for shutdown retry");
       }
     }
 
