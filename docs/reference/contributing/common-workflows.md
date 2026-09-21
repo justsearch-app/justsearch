@@ -83,6 +83,20 @@ Load `/ssot-catalog` for the dual-copy checklist and field role reference.
 - Format check: `./gradlew.bat spotlessCheck`
 - Format fix: `./gradlew.bat spotlessApply`
 
+### Collect independent static failures together
+
+At a coherent source checkpoint, use `./gradlew.bat spotlessCheck pmdAll --continue`
+to collect independent formatting and PMD failures in one pass. Gradle's default
+early stop can leave later modules unchecked, turning one correction batch into
+several discovery runs. `--continue` runs only tasks whose prerequisites permit it;
+the command still fails when any check fails. Preserve that exit status and inspect
+all reported failures and unperformed tasks before selecting a focused rerun.
+
+Keep expensive runtime/model tests in a separate invocation while static failures
+are unresolved, so an unrelated formatting failure cannot prevent their scheduling.
+This does not change which acceptance checks must eventually pass or authorize
+ignoring a failed check.
+
 ## Add a field to an API record
 
 **The caveat that bites first:** `KnowledgeSearchController.handleSearch()` builds its

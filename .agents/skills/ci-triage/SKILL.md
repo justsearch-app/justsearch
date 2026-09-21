@@ -9,6 +9,10 @@ description: >-
 
 Decision tree for diagnosing CI and build failures. Match the symptom, follow the fix.
 
+For a batch of independent formatting/PMD findings, use the
+[static failure collection workflow](../../../docs/reference/contributing/common-workflows.md#collect-independent-static-failures-together)
+to collect them once without losing the failed exit status or blocking expensive runtime tests.
+
 ## Workflow Signals
 
 Before interpreting a GitHub Actions failure, run:
