@@ -43,8 +43,8 @@
     {
       "kind": "attempted-configurations",
       "cap": 1,
-      "awaitingProducer": "D1",
-      "note": "There is no retained attempted configuration at C1. The existing synchronized applyConfig invocation and pre-VDU restore snapshot are different lifetimes."
+      "producer": "EngineComponentRegistry.applyLock",
+      "note": "The process-owned component registry activates this counter and holds one permit for each admitted apply lease. A second holder, including same-thread reentry, is refused. The durable attempted record remains the reconfigure operation row."
     }
   ]
 }

@@ -73,7 +73,9 @@ record EngineResourcePolicy(Map<String, Integer> execution, RetainedStateBudget 
       if (!root.path("retained").isArray()) throw new IllegalStateException("Missing retained policy");
       var kinds = new java.util.HashSet<String>();
       for (var row : root.path("retained")) {
-        if (!row.path("kind").isString() || !row.path("awaitingProducer").isString()
+        boolean futureProducer = row.path("awaitingProducer").isString();
+        boolean connectedProducer = row.path("producer").isString();
+        if (!row.path("kind").isString() || futureProducer == connectedProducer
             || !row.path("cap").isIntegralNumber() || !row.path("cap").canConvertToInt()
             || (row.has("perContextCap") && (!row.path("perContextCap").isIntegralNumber()
                 || !row.path("perContextCap").canConvertToInt()))) {
@@ -82,7 +84,7 @@ record EngineResourcePolicy(Map<String, Integer> execution, RetainedStateBudget 
         kinds.add(row.path("kind").asText());
         retained.declare(row.path("kind").asText(), row.path("cap").asInt(),
             row.has("perContextCap") ? Integer.valueOf(row.path("perContextCap").asInt()) : null,
-            row.path("awaitingProducer").asText());
+            row.path(futureProducer ? "awaitingProducer" : "producer").asText());
       }
       if (!kinds.equals(RETAINED_KINDS)) throw new IllegalStateException("Retained resource kinds do not match the consumer");
       return new EngineResourcePolicy(Map.copyOf(execution), retained);

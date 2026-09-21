@@ -22,19 +22,31 @@ import tools.jackson.databind.ObjectMapper;
 @ResourceLock(value = Resources.SYSTEM_PROPERTIES, mode = ResourceAccessMode.READ_WRITE)
 final class EngineResourcePolicyTest {
   @Test
-  void everyRetainedKindNamesItsActualFutureProducer() {
+  void everyRetainedKindNamesItsOwnerBeforeThatOwnerConnects() {
     var policy = EngineResourcePolicy.load();
     assertEquals(Set.of("search-cursors", "pinned-readers", "representation-generations",
         "co-resident-encoders", "attempted-configurations"),
         policy.retained().snapshot().stream().map(s -> s.kind()).collect(Collectors.toSet()));
     for (var entry : policy.retained().snapshot()) {
       assertTrue(entry.cap() > 0);
-      assertNull(entry.count(), "No retained producer is connected in C1");
+      assertNull(entry.count(), "Loading policy alone must not invent a live producer");
       assertEquals(entry.kind().equals("search-cursors") || entry.kind().equals("pinned-readers")
-          ? "D2" : "D1", entry.awaitingProducer());
+          ? "D2" : entry.kind().equals("attempted-configurations")
+              ? "EngineComponentRegistry.applyLock" : "D1", entry.awaitingProducer());
     }
     assertEquals(4, policy.retained().snapshot().stream()
         .filter(s -> s.kind().equals("search-cursors")).findFirst().orElseThrow().perContextCap());
+    try (var components = new DefaultEngineComponentRegistry(policy.retained())) {
+      for (var entry : policy.retained().snapshot()) {
+        if (entry.kind().equals("attempted-configurations")) {
+          assertEquals(0, entry.count());
+          assertNull(entry.awaitingProducer());
+        } else {
+          assertNull(entry.count(), "Only the component apply owner is connected by D1-1");
+          assertNotNull(entry.awaitingProducer());
+        }
+      }
+    }
   }
 
   @Test
@@ -46,6 +58,10 @@ final class EngineResourcePolicyTest {
         source.replace("\"schemaVersion\": 1", "\"schemaVersion\": \"1\""),
         source.replace("\"retained\":", "\"missing\":"),
         source.replace("\"pinned-readers\"", "\"unknown-kind\""),
+        source.replace("\"producer\": \"EngineComponentRegistry.applyLock\"",
+            "\"missingProducer\": \"EngineComponentRegistry.applyLock\""),
+        source.replace("\"producer\": \"EngineComponentRegistry.applyLock\"",
+            "\"producer\": \"EngineComponentRegistry.applyLock\", \"awaitingProducer\": \"D1\""),
         source.replace("\"cap\": 34", "\"cap\": 34.5"),
         source.replace("\"perContextCap\": 4", "\"perContextCap\": \"4\"")}) {
       assertThrows(IllegalStateException.class, () -> EngineResourcePolicy.parse(mapper.readTree(invalid)));
