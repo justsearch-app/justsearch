@@ -133,3 +133,14 @@ screenshot with the connected/online status visible. Evidence: tmp/2393-model-qu
 tmp/2393-runtime-client.txt, tmp/2393-normal-health.json and tmp/2393-ui-home.
 
 No remaining D1/D2/E/F acceptance is waived by these bounded reader proofs.
+
+## Hosted successor2394
+
+Checkpoint ecfa96797 is pushed. CI35662899194 Public claims failed the hermetic
+contract-projection gate: the new StatusDeck generated-type consumer lacked a
+contract-surfaces registration. The new unconditional artifact upload worked:
+downloaded tmp/2394-hosted-governance/governance-report.sarif names the exact
+undeclared consumer. Registering StatusDeck under StatusResponse fixes that omission
+without changing the schema or gate. Contract-projection passes with zero findings;
+all11 hermetic gates pass locally (tmp/2394-hermetic-gates.txt). Other hosted jobs
+are still running; their results are not inferred from local proof.

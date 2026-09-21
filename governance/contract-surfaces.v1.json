@@ -21,7 +21,8 @@
       "outFile": "status-response.ts",
       "consumers": [
         "modules/ui-web/src/shell-v0/utils/statusPoll.ts",
-        "modules/ui-web/src/api/lifecycleState.ts"
+        "modules/ui-web/src/api/lifecycleState.ts",
+        "modules/ui-web/src/shell-v0/components/StatusDeck.ts"
       ]
     },
     {
