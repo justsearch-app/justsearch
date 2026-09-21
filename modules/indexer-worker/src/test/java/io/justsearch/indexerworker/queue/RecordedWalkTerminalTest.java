@@ -315,7 +315,12 @@ final class RecordedWalkTerminalTest {
       assertFalse(legacy.unitRevision().equals(string(db, "SELECT unit_revision FROM jobs")));
       queue.markDoneTransitions(List.of(transition(legacy, HASH_A)), success());
       assertEquals("PENDING", string(db, "SELECT state FROM jobs"));
-      assertEquals(0, count(db, "SELECT count(*) FROM ingestion_ledger"));
+      // A real legacy effect remains history, but matching a later scan key cannot manufacture
+      // recorded membership or complete the fresh recorded revision.
+      assertEquals(1, count(db, "SELECT count(*) FROM ingestion_ledger"));
+      assertEquals(0, count(db, "SELECT count(*) FROM ingestion_ledger WHERE operation_key IS NOT NULL"));
+      assertEquals(0, count(db, "SELECT count(*) FROM ingestion_ledger WHERE terminal_coverage IS NOT NULL"));
+      assertEquals(0, queue.recordedWalk(KEY).orElseThrow().completedUnits());
       var recorded = queue.pollPending(1).getFirst();
       queue.markDoneTransitions(List.of(transition(recorded, HASH_A)), success());
       assertEquals(1, queue.recordedWalk(KEY).orElseThrow().completedUnits());

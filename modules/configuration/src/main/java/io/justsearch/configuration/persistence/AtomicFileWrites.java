@@ -2,15 +2,18 @@
 package io.justsearch.configuration.persistence;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /** Sibling-temp replacement that preserves the prior target until the replacement is complete. */
 public final class AtomicFileWrites {
@@ -57,7 +60,7 @@ public final class AtomicFileWrites {
       if (strict) files.writeForced(temp, content);
       else files.write(temp, content);
       try {
-        files.moveAtomicReplace(temp, absoluteTarget);
+        moveAtomicReplace(temp, absoluteTarget, files);
       } catch (AtomicMoveNotSupportedException unsupported) {
         if (strict) throw unsupported;
         files.moveReplace(temp, absoluteTarget);
@@ -69,6 +72,40 @@ public final class AtomicFileWrites {
         if (cleanup != failure) failure.addSuppressed(cleanup);
       }
       throw failure;
+    }
+  }
+
+  private static void moveAtomicReplace(Path temp, Path target, FileAccess files) throws IOException {
+    long started = System.nanoTime();
+    long budget = TimeUnit.SECONDS.toNanos(2);
+    AccessDeniedException firstDenial = null;
+    for (;;) {
+      if (Thread.currentThread().isInterrupted()) {
+        var interrupted = new InterruptedIOException("Interrupted before replacing " + target);
+        if (firstDenial != null) interrupted.addSuppressed(firstDenial);
+        throw interrupted;
+      }
+      if (firstDenial != null && System.nanoTime() - started >= budget) throw firstDenial;
+      try {
+        files.moveAtomicReplace(temp, target);
+        return;
+      } catch (AccessDeniedException denied) {
+        // Windows refuses atomic replacement while an ordinary reader has the old file open.
+        // Keep the completed temp and prior authority; never turn this into a non-atomic move.
+        // A permanent permission denial remains the original failure after the bounded wait.
+        if (firstDenial == null) firstDenial = denied;
+        long remaining = budget - (System.nanoTime() - started);
+        if (remaining <= 0) throw firstDenial;
+        try {
+          TimeUnit.NANOSECONDS.sleep(Math.min(TimeUnit.MILLISECONDS.toNanos(10), remaining));
+        } catch (InterruptedException stopped) {
+          Thread.currentThread().interrupt();
+          var interrupted = new InterruptedIOException("Interrupted while replacing " + target);
+          interrupted.initCause(stopped);
+          interrupted.addSuppressed(firstDenial);
+          throw interrupted;
+        }
+      }
     }
   }
 

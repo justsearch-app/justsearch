@@ -1129,7 +1129,7 @@ public class HeadlessApp {
               () ->
                   tryStartKnowledgeServer(
                       sharedWorkerCapability, ksConfig, engineRoot,
-                      operationFaultHook == io.justsearch.app.observability.operations.OperationAttemptRunnerImpl.NO_FAULT_HOOK));
+                      OperationFaultBarrier.automaticRootProducersEnabled(SystemAccess::rawEnvVar, operationFaultHook)));
       // Graceful retirement from the completing task cannot interrupt its own completion path.
       // The process registry continues accounting the concrete instance until it actually exits.
       pendingIndexStartup = workerFuture;

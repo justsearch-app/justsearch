@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
@@ -21,6 +22,24 @@ import tools.jackson.databind.json.JsonMapper;
 final class OperationFaultBarrierTest {
   private static final String KEY = "01994180-0000-7000-8000-000000000001";
   @TempDir Path data;
+
+  @Test
+  void automaticProducerIsolationRequiresTheSelectedHarnessProof() {
+    var noop = OperationAttemptRunnerImpl.NO_FAULT_HOOK;
+    for (String scenario : java.util.List.of("processing", "operation")) {
+      assertTrue(OperationFaultBarrier.automaticRootProducersEnabled(
+          Map.of("JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario)::get, noop));
+      assertFalse(OperationFaultBarrier.automaticRootProducersEnabled(
+          Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1", "JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario)::get, noop));
+    }
+    for (String scenario : java.util.List.of("writer", "migration", "lock-boot", "lock-ingest", "")) {
+      assertTrue(OperationFaultBarrier.automaticRootProducersEnabled(
+          Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1", "JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario)::get, noop));
+    }
+    assertTrue(OperationFaultBarrier.automaticRootProducersEnabled(Map.<String, String>of()::get, noop));
+    assertFalse(OperationFaultBarrier.automaticRootProducersEnabled(selection()::get,
+        OperationFaultBarrier.fromEnvironment(data, selection()::get)));
+  }
 
   @Test
   void absentSelectionUsesTheExactNoopAndAnySelectionRequiresHarnessMode() {

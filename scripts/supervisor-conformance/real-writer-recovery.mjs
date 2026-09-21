@@ -63,14 +63,17 @@ delete env.JUSTSEARCH_OPERATION_FAULT_KEY;
 delete env.JUSTSEARCH_OPERATION_FAULT_KIND;
 delete env.JUSTSEARCH_OPERATION_FAULT_POINT;
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
-if (['processing', 'operation'].includes(scenario) || operationFault) {
+if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
+    || operationFault || lockScenario) {
   // Recovery revalidates persisted scope. Keep the successful replay corpus under a
   // real watched root; fresh out-of-root authority intentionally cannot survive restart.
-  const corpus = path.join(work, 'corpus');
+  const corpus = path.join(work, lockScenario ? 'contention-corpus' : 'corpus');
   fs.mkdirSync(corpus, { recursive: true });
   fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
     schemaVersion: 1, roots: [{ path: corpus }],
   }));
+}
+if (['processing', 'operation'].includes(scenario) || operationFault) {
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
@@ -152,7 +155,7 @@ function jobStateFor(filename) {
   const database = new DatabaseSync(path.join(data, 'jobs.db'), { readOnly: true });
   try {
     return database
-      .prepare('SELECT path, state, last_updated FROM jobs WHERE path LIKE ? ORDER BY last_updated DESC LIMIT 1')
+      .prepare('SELECT path, state, last_updated, scan_id, unit_revision FROM jobs WHERE path LIKE ? ORDER BY last_updated DESC LIMIT 1')
       .get(`%${filename}`);
   } finally {
     database.close();
@@ -236,7 +239,7 @@ try {
       readJson, waitFor, request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit,
       output: () => output });
   } else {
-  const firstDoc = path.join(work, 'first.txt');
+  const firstDoc = path.join(work, 'corpus', 'first.txt');
   fs.writeFileSync(firstDoc, 'firstdurablemarker quokka');
   const firstOperationKey = createOperationKey();
   const firstIngest = await waitFor('first ingest acceptance', 90000, async () => {
@@ -264,7 +267,7 @@ try {
   const collision = path.join(path.dirname(parsed[0].file), `_${(parsed[0].n + 1).toString(36)}.cfs`);
   fs.writeFileSync(collision, 'collision', { flag: 'wx' });
   console.log('COLLISION', collision);
-  const secondDoc = path.join(work, 'second.txt');
+  const secondDoc = path.join(work, 'corpus', 'second.txt');
   fs.writeFileSync(secondDoc, 'secondreplayedmarker wombat');
   const secondOperationKey = createOperationKey();
   const secondIngest = await post(apiPort, '/api/knowledge/ingest', {

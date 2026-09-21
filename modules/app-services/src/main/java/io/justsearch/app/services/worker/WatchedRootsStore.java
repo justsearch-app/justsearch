@@ -5,6 +5,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
+import io.justsearch.configuration.persistence.ContendedFileReads;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.WatchedRootsFormat;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
@@ -117,7 +118,7 @@ final class WatchedRootsStore {
       return new LoadResult(Map.of(), Map.of(), java.util.Set.of(), Map.of());
     }
     try {
-      String content = Files.readString(rootsFile);
+      String content = readRootsContent();
       if (content.trim().startsWith("{")) {
         var node = JSON.readTree(content);
         WatchedRootsFormat.requireReadableObject(node);
@@ -159,7 +160,7 @@ final class WatchedRootsStore {
           roots.put(e.getKey(), e.getValue());
         }
       }
-    } catch (CorruptDurableStoreException | UnsupportedStoreVersionException e) {
+    } catch (CorruptDurableStoreException | UnsupportedStoreVersionException | UncheckedIOException e) {
       throw e;
     } catch (Exception e) {
       throw new CorruptDurableStoreException("watched-roots", "cannot parse " + rootsFile, e);
@@ -187,7 +188,7 @@ final class WatchedRootsStore {
         return Map.of();
       }
 
-      String content = Files.readString(rootsFile);
+      String content = readRootsContent();
       int loaded = 0;
 
       // Try new format first: {"roots": [{"path": "...", "lastIndexed": "..."}]}
@@ -233,11 +234,25 @@ final class WatchedRootsStore {
       }
       // Values may be null for old-format roots (no timestamps), so avoid Map.copyOf().
       return java.util.Collections.unmodifiableMap(out);
-    } catch (CorruptDurableStoreException | UnsupportedStoreVersionException e) {
+    } catch (CorruptDurableStoreException | UnsupportedStoreVersionException | UncheckedIOException e) {
       throw e;
     } catch (Exception e) {
       throw new CorruptDurableStoreException("watched-roots", "cannot parse " + rootsFile, e);
     }
+  }
+
+  private String readRootsContent() throws java.nio.charset.CharacterCodingException {
+    byte[] bytes;
+    try {
+      bytes = ContendedFileReads.readAllBytes(rootsFile);
+    } catch (IOException unavailable) {
+      // Classify only the byte-read seam; malformed content still fails at the parsing owner.
+      throw new UncheckedIOException("Cannot read watched roots " + rootsFile, unavailable);
+    }
+    return java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+        .decode(java.nio.ByteBuffer.wrap(bytes)).toString();
   }
 
   /**

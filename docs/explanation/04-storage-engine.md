@@ -37,9 +37,23 @@ The index root is **generation-scoped** (managed by `IndexGenerationManager`):
 
 This layout enables safe schema migration (build a new generation alongside the active one) and crash-safe pointer updates.
 
+Generation-state and watched-root authority reads distinguish unavailable bytes from
+malformed content. They acquire a shared file lock on the channel being read, retry
+contention for at most two seconds, and close the channel before parsing. Interruption
+and exhausted contention remain unavailable I/O; a cold generation owner cannot adopt
+or restore IDLE merely because the current pointer is locked. Strict generation checks
+never authorize from a cache or backup, and are observations rather than generation
+leases. Watched-root JSON retains strict UTF-8 decoding.
+
+On Windows, even an ordinary open reader can temporarily deny atomic replacement.
+`AtomicFileWrites` retains the completed temporary file and retries only an atomic
+rename's `AccessDeniedException`, for at most two seconds. It never converts that
+denial into a non-atomic fallback; persistent denial, other I/O failures and interruption
+still fail while preserving the prior target and attempting temporary-file cleanup.
+
 *   **MMapDirectory:** We use memory-mapped files for the index.
     *   *Pros:* Extremely fast read access. The OS handles caching.
-    *   *Cons:* On Windows, MMap files are **locked** by the OS. This is the primary reason for our 3-process architecture: only the Worker process ever opens these files, preventing `AccessDeniedException` when the UI process tries to delete them.
+    *   *Cons:* On Windows, mapped files retain OS handles. The Engine's index owner must close those handles before deletion; replacing the Engine process releases its index ownership. The desktop shell and extraction helpers do not open Lucene files.
 
 ## Schema Management
 
@@ -315,6 +329,9 @@ enumeration preserves same-walk retry state; maintenance preserves active member
 assigning a fresh admission revision. Recorded terminal ledger coverage and monotonic counters
 commit with the job outcome on the same connection. Successful counters deduplicate by
 walk, path hash and committed content hash; failed counters count each terminal admission once.
+An exact issued claim that commits after a newer admission still contributes truthful
+general ledger history. An unrecorded claim cannot acquire recorded coverage from a
+matching scan key, and its completion cannot complete the newer job revision.
 Enumeration closure and administrative skips commit with their ledger coverage. Sealing
 requires closed enumeration, terminal current members, exact matching ledger coverage and
 no issued claims; the immutable versioned receipt distinguishes historical effects from

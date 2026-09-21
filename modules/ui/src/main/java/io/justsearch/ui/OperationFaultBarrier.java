@@ -18,6 +18,16 @@ import tools.jackson.databind.json.JsonMapper;
 final class OperationFaultBarrier {
   private OperationFaultBarrier() {}
 
+  static boolean automaticRootProducersEnabled(Function<String, String> env,
+      Consumer<OperationAttemptRunnerImpl.FaultBoundary> hook) {
+    if (hook != OperationAttemptRunnerImpl.NO_FAULT_HOOK) return false;
+    // These installed proofs must claim the explicitly accepted recorded revision, rather than
+    // a watcher revision that is legitimately superseded by the later recorded admission.
+    if (!"1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) return true;
+    String scenario = env.apply("JUSTSEARCH_REAL_RECOVERY_SCENARIO");
+    return !"processing".equals(scenario) && !"operation".equals(scenario);
+  }
+
   static Consumer<OperationAttemptRunnerImpl.FaultBoundary> fromEnvironment(Path data, Function<String, String> env) {
     String phase = env.apply("JUSTSEARCH_OPERATION_FAULT_POINT");
     String key = env.apply("JUSTSEARCH_OPERATION_FAULT_KEY");

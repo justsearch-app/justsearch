@@ -32,7 +32,21 @@ failure in11,119 cases; its XML is preserved. The reviewed configuration correct
 and harness-marker classification pass final2075 (288 cases, including all8 installed)
 and store2076. Health2080 is ABSENT, no foreign run/orphan. [Current full/hosted
 reconciliation and remaining integration failures](evidence/C2/hosted-governance-reconciliation.md).
-No dev stack is running. Next: close those real integration/gate failures, then the still-owed
+Governance correction is pushed as4f276a46c. The rooted writer fixture passes2082;
+installed2083 passes4/5 but exposes boot-time file-lock misclassification.
+[Active correction and exact retained failures](evidence/C2/hostile-lock-acceptance.md).
+Read-lock correction is WIP:2085 isolated ordinary Windows read-handle/atomic-rename
+contention;2089 passes281 configuration cases. Generation2087 exposed a cold-cache
+unavailable-read→IDLE adoption defect, now corrected and covered by full worker-core2090.
+Reviewed roots/queue2093 passes65 cases; all three2094 negative controls fail for
+their intended reasons and fixed sources are restored. Final2095 passes89 cases,
+including all13 installed recovery scenarios with original hostile attacks and
+exact recorded Resume evidence. Every owned stack is stopped; no build is active.
+Latest4f276 hosted governance jobs pass but Windows-native supervisor test fails
+and integration is cancelled; logs2096 have a bounded active triage. The replay timeout is a fixture producer-isolation
+defect under intended latest-revision supersession, not grounds for a second claim
+table. A separate stale untagged batch-effect ledger omission needs a bounded fix.
+Next: close those real integration failures, then the still-owed
 [C2-10 bulk durable row/plan/resume](evidence/C2/bulk-reindex-connection.md),
 and C2-12 sweep/full verification. Streamed `core.reindex` proof does not discharge
 `core.bulk-reindex`; its source-grounded design and implementation sequence are now

@@ -687,7 +687,8 @@ public final class IndexGenerationManager {
   /** Return the identity from the same strict observation that validates the captured target. */
   public java.util.Optional<String> idleActiveGeneration(Path capturedTarget) throws IOException {
     Objects.requireNonNull(capturedTarget, "capturedTarget");
-    State current = JSON.readValue(Files.readAllBytes(statePath), State.class);
+    State current = JSON.readValue(
+        io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath), State.class);
     if (current == null || (current.format_version() != 1
         && current.format_version() != STATE_FORMAT_VERSION)) {
       throw new IOException("Unsupported or empty authoritative index state");
@@ -915,7 +916,7 @@ public final class IndexGenerationManager {
     }
   }
 
-  private State loadStateBestEffort() {
+  private State loadStateBestEffort() throws IOException {
     // state.json is authoritative; state.json.prev is a fallback if state.json is corrupted/partial.
     State s = tryReadState(statePath);
     if (s != null) {
@@ -934,12 +935,13 @@ public final class IndexGenerationManager {
     return null;
   }
 
-  private State tryReadState(Path p) {
+  private State tryReadState(Path p) throws IOException {
+    if (!Files.exists(p)) return null;
+    // Unavailable bytes are not an absent/corrupt pointer. In particular, never adopt a new
+    // IDLE state or restore .prev merely because an external process holds the current file.
+    byte[] bytes = io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(p);
     try {
-      if (!Files.exists(p)) {
-        return null;
-      }
-      return JSON.readValue(p.toFile(), State.class);
+      return JSON.readValue(bytes, State.class);
     } catch (Exception e) {
       log.warn("Failed to read index state from {}", p, e);
       return null;

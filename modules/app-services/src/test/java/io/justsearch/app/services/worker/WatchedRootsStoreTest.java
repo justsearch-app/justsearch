@@ -177,4 +177,59 @@ final class WatchedRootsStoreTest {
     assertThrows(CorruptDurableStoreException.class, store::loadPersistedRootsWithErrors);
     assertEquals(malformed, Files.readString(rootsFile));
   }
+
+  @Test
+  void heldReadLockIsUnavailableRatherThanCorruptForBothLoaders() throws Exception {
+    Path rootsFile = tempDir.resolve("watched_roots.json");
+    String original = "{\"schemaVersion\":1,\"roots\":[]}";
+    Files.writeString(rootsFile, original);
+    var store = new WatchedRootsStore(rootsFile, null);
+    List<Runnable> readers = List.of(store::loadPersistedRoots, store::loadPersistedRootsWithErrors);
+    try (var channel = java.nio.channels.FileChannel.open(rootsFile,
+        java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE);
+        var held = channel.lock()) {
+      assertTrue(held.isValid());
+      for (Runnable reader : readers) {
+        var failure = assertThrows(java.io.UncheckedIOException.class, reader::run);
+        assertInstanceOf(io.justsearch.configuration.persistence.ContendedFileReads.FileReadContendedException.class,
+            failure.getCause());
+      }
+    }
+    assertEquals(original, Files.readString(rootsFile));
+    assertTrue(store.loadPersistedRoots().isEmpty());
+    assertTrue(store.loadPersistedRootsWithErrors().roots().isEmpty());
+  }
+
+  @Test
+  void invalidUtf8InsideJsonStringRemainsCorruptForBothLoaders() throws Exception {
+    Path rootsFile = tempDir.resolve("watched_roots.json");
+    var bytes = new java.io.ByteArrayOutputStream();
+    bytes.writeBytes("{\"schemaVersion\":1,\"roots\":[{\"path\":\"".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    bytes.writeBytes(new byte[] {(byte) 0xc3, 0x28});
+    bytes.writeBytes("\"}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    byte[] original = bytes.toByteArray();
+    Files.write(rootsFile, original);
+    var store = new WatchedRootsStore(rootsFile, null);
+    assertThrows(CorruptDurableStoreException.class, store::loadPersistedRoots);
+    assertThrows(CorruptDurableStoreException.class, store::loadPersistedRootsWithErrors);
+    assertArrayEquals(original, Files.readAllBytes(rootsFile));
+  }
+
+  @Test
+  void interruptedAuthorityReadRetainsInterruptionWithoutClaimingCorruption() throws Exception {
+    Path rootsFile = tempDir.resolve("watched_roots.json");
+    Files.writeString(rootsFile, "{\"schemaVersion\":1,\"roots\":[]}");
+    var store = new WatchedRootsStore(rootsFile, null);
+    List<Runnable> readers = List.of(store::loadPersistedRoots, store::loadPersistedRootsWithErrors);
+    for (Runnable reader : readers) {
+      try {
+        Thread.currentThread().interrupt();
+        var failure = assertThrows(java.io.UncheckedIOException.class, reader::run);
+        assertInstanceOf(java.io.InterruptedIOException.class, failure.getCause());
+        assertTrue(Thread.currentThread().isInterrupted());
+      } finally {
+        Thread.interrupted();
+      }
+    }
+  }
 }

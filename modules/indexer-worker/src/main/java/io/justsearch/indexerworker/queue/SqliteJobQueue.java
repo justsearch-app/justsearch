@@ -1230,7 +1230,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                       rows = executeMutation(stmt::executeUpdate);
                     }
                     rowCounts.add(rows);
-                    if (rows > 0 || receipt != null) {
+                    if (rows > 0 || transition.claim() != null) {
+                      // The eligible list contains only exact issued claims. A superseded untagged
+                      // claim still committed an effect; retain its history without completing R1.
                       insertLedgerEvent(normalizedPath, outcome,
                           ledgerEntryForClaim(normalizedPath, transition.entry(), transition.claim()), receipt);
                     }
