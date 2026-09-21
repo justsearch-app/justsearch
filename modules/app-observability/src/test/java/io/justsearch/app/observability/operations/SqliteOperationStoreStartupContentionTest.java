@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +37,7 @@ class SqliteOperationStoreStartupContentionTest {
 
   @Test
   @EnabledOnOs(OS.WINDOWS)
+  @Tag("windows")
   void windowsFileLockExhaustsBudgetAndCanReopenAfterRelease() throws Exception {
     Path path = temp.resolve("operations.db");
     AtomicInteger beforeJournalMode = new AtomicInteger();

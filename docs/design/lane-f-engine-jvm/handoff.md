@@ -64,9 +64,23 @@ the green integration job conceals one explicit OPERATION_STORAGE_FAILED ingest;
 the stale assertion is corrected without weakening job-hash safety. Isolated SQLite
 proof distinguishes prewriteBUSY/cleanrollback from commitIOERR_WRITE/uncertainrollback;
 no generic retry is permitted, and the historicalHTTP500 still lacks exact SQL cause.
-SQLite acceptance ambiguity,
-final full/hosted proof and bulk/later-stage work remain open.
-Next: close those real integration failures, then the still-owed
+Preflight checkpoint03c5d0487 is pushed. Native2113 proves raw BEGIN IMMEDIATE waits
+for short SHM locks, retains transaction visibility and rolls back correctly. Root
+has replaced the runtime transaction helper with explicit SQL begin/commit/rollback;
+this uses the existing busy timeout, avoiding both an application retry loop and
+JDBC's implicit next transaction after commit. Final full app-observability2116 passes586 cases with no failures or skips;
+PMD/format pass. Negative controls2115/2117 fail the intended deferred-upgrade and
+cleanup-preservation predicates, then restore sources. Final2118 executes28 focused
+and installed cases, including all13 recovery scenarios, with zero failures/skips.
+Both hostile attacks prove100 exact paths and original-key durable SUCCESS; all
+owned stacks are stopped. Windows-only selection2121 executes all4 native storage
+cases. CI now schedules app-observability in that tagged Windows lane; workflow and
+store-authority gates2122/2123 pass. Hosted2119 at03c5d0487 is green at job and test
+level (96 integration cases,42 explicit unrelated skips); it precedes the SQLite
+correction and cannot prove it. Historical HTTP500's exact SQL cause remains unknown;
+the structural deferred-upgrade defect is independently reproduced and corrected.
+The SQLite batch is ready for a compiling checkpoint. No build or stack is active.
+Next: push that checkpoint, then implement the still-owed
 [C2-10 bulk durable row/plan/resume](evidence/C2/bulk-reindex-connection.md),
 and C2-12 sweep/full verification. Streamed `core.reindex` proof does not discharge
 `core.bulk-reindex`; its source-grounded design and implementation sequence are now

@@ -1042,6 +1042,7 @@ public final class SqliteOperationStore implements OperationStore {
       if (connection == null || connection.isClosed()) throw new SQLException("Operations store is closed");
       return work.run();
     } catch (SQLException failure) {
+      LOG.warn("Operations store SQL failure (code={})", failure.getErrorCode(), failure);
       throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, failure);
     } finally {
       lock.unlock();
@@ -1049,21 +1050,31 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   private <T> T transaction(SqlWork<T> work) throws SQLException {
-    connection.setAutoCommit(false);
-    boolean ended = false;
-    try {
-      T result = work.run();
-      connection.commit();
-      ended = true;
-      return result;
-    } catch (SQLException | RuntimeException | Error failure) {
-      try { connection.rollback(); ended = true; }
-      catch (SQLException rollbackFailure) { failure.addSuppressed(rollbackFailure); }
-      throw failure;
-    } finally {
-      // Do not turn an uncertain rollback into an implicit commit by restoring auto-commit.
-      if (ended) connection.setAutoCommit(true);
-      else connection.close();
+    // Every caller writes. Acquire the writer before reading: a deferred read-to-write upgrade
+    // may return BUSY immediately instead of using the existing native busy timeout.
+    // Keep JDBC auto-commit unchanged. Xerial commit()/rollback() implicitly begin another
+    // transaction, which could fail after our real commit and make its outcome ambiguous.
+    try (Statement control = connection.createStatement()) {
+      control.execute("BEGIN IMMEDIATE");
+      try {
+        T result = work.run();
+        control.execute("COMMIT");
+        return result;
+      } catch (SQLException | RuntimeException | Error failure) {
+        try {
+          control.execute("ROLLBACK");
+        } catch (SQLException | RuntimeException | Error rollbackFailure) {
+          if (rollbackFailure != failure) failure.addSuppressed(rollbackFailure);
+          // Retire the uncertain handle before close, even if cleanup itself fails.
+          Connection uncertain = connection;
+          connection = null;
+          try { uncertain.close(); }
+          catch (SQLException | RuntimeException | Error closeFailure) {
+            if (closeFailure != failure) failure.addSuppressed(closeFailure);
+          }
+        }
+        throw failure;
+      }
     }
   }
 

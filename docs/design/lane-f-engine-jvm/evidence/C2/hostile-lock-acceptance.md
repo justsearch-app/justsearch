@@ -323,9 +323,109 @@ preserve phase and proven rollback/commit outcomes. Diagnostic evidence is being
 retained under `tmp/2111-sqlite-acceptance-probe/`. This remains open after this
 preflight checkpoint, together with final full-stress/hosted proof and bulk/later stages.
 
+The preflight batch is committed and pushed as03c5d0487. Before selecting an
+application retry loop, compare native BEGIN IMMEDIATE ownership with the current
+deferred read→write upgrade using the existing5000ms busy timeout and a short held
+SHM lock. All four transactional runtime methods write, while ordinary reads are
+outside the transaction helper. This could let the existing native busy handler
+wait before any acceptance read rather than add a scheduler, marker or retry owner.
+No production transaction-mode change is made yet.
+
+Local sqlite-jdbc bytecode inspection adds a necessary constraint: commit()/rollback()
+immediately begin another transaction, and setAutoCommit(false) changes its Java flag
+before native BEGIN. Globally setting transaction_mode=IMMEDIATE could therefore
+report a failed new BEGIN after the actual commit already succeeded. Raw SQL ownership
+under JDBC auto-commit is only a candidate until separate-reader visibility and
+rollback tests establish atomicity; never infer it from a successful final row alone.
+The bounded2113 comparison owns this question. WAL IOERR_WRITE is distinct and must
+not be assumed repaired by a BEGIN-mode change. Bytecode evidence is retained in
+`tmp/2113-sqlite-connection-bytecode.txt` and `tmp/2113-sqlite-db-bytecode.txt`.
+
+Native2113 confirms the smaller owner: with the same5000ms busy timeout, deferred
+read→write upgrade fails BUSY after1ms although the helper releases SHM at250ms.
+Raw BEGIN IMMEDIATE waits336ms for release at250ms, then completes acceptance.
+A separate reader sees zero operations/one preparation before explicit COMMIT and
+one operation/zero preparations afterward; a second transaction remains invisible
+and its new row is absent after explicit ROLLBACK. Short250ms exclusive WAL locking
+also succeeds through SQLite's existing native write handling; prolonged held WAL
+still has the distinct2111 IOERR_WRITE failure. These are isolated actual SQLite
+outcomes, not attribution of the historical hosted request.
+
+Selected implementation changes the one runtime transaction helper to explicit
+BEGIN IMMEDIATE/COMMIT/ROLLBACK under the existing store lock, leaving JDBC auto-commit
+unchanged. Its four callers already write. Failed BEGIN runs no body and leaves a
+usable connection; failed work/commit still requires an explicit rollback, and an
+uncertain rollback closes the connection as before. Schema startup retains its
+existing separate retry/preservation contract. No application retry loop, timer,
+configuration, dependency, journal or cross-owner writer is added. SQL failures now
+log their numeric code and cause internally, retaining the public failure boundary.
+Real-store Windows release/exhaustion/commit-failure regressions and independent
+review are in progress; no compiled or installed proof is yet claimed for this edit.
+
+Root2114 executes the full app-observability module:583 cases/88 suites, zero
+failures/errors/skips, plus main/test PMD and format. It includes all three real
+Windows contention cases and existing prepared-transfer rollback tests. Output,
+XML/counts use `tmp/2114-operation-transaction*`. This precedes the cleanup correction
+below; installed proof of the transaction change remains pending.
+
+Consolidated review finds no hidden nested transaction or preparation atomicity
+defect. It identifies a pre-existing cleanup hole exposed by the uncertain-rollback
+contract: a failed connection.close in finally can replace the primary SQL exception
+and leave the same field available. Root now nulls the field before closing the
+uncertain handle and preserves rollback/close failures as suppressed evidence on
+the primary, including unchecked cleanup failures. This follows the existing startup
+close pattern and adds no recovery state machine. Successful rollback and failed
+BEGIN retain same-store reuse. The real WAL case is being strengthened to prove its
+IOERR_WRITE/failed-rollback boundary and retired same-store behavior; a separate
+cross-platform injected cleanup-failure test must prove original-cause preservation.
+The reviewer withdrew a draft-file lock-order concern after reading the frozen tests:
+all lock acquisition precedes task submission. Required final proof is still pending.
+
 Root owns production lifecycle/state changes and the single build/stack. Bounded
 tests/review may be delegated once contracts are fixed. Run focused deterministic
 regressions, preserve the original red evidence, then the installed five-case
 matrix and eight-case operation matrix, followed by integrated/hosted proof.
 No scenario failure is waived. C2 bulk design is settled but not implemented;
 C2-12 and D1/D2/E/F remain. Retain artifacts through acceptance plus30 days.
+
+## Final SQLite correction proof (2026-09-21)
+
+The reviewed correction preserves the original failure while retiring an uncertain
+connection before close. Real WAL failure proves SQL code10/IOERR_WRITE, suppressed
+rollback failure and same-store refusal. Cross-platform SQL/runtime/Error cleanup
+cases prove primary-cause identity and ordered suppressed causes. The mock intercepts
+only the first control statement; body queries use separate real statements.
+
+| Run | Revision and result |
+| --- | --- |
+| 2115 native negative | Temporarily restores03c's deferred transaction helper:3 cases,2 intended failures (short SHM release and native-wait exhaustion),1 auxiliary pass. Source restored byte-for-byte. |
+| 2116 full module | Corrected transaction/cleanup source:586 cases/89 suites,0 failures/errors/skips; main/test PMD and format pass. |
+| 2117 cleanup negative | Temporarily removes retirement/close suppression:4 cases,3 intended failures across SQL/runtime/Error cleanup,1 auxiliary pass. Source restored byte-for-byte. |
+| 2118 final focused + installed | Final production and narrowed test mock:28 cases/6 suites,0 failures/errors/skips; all test tasks execute,5m51s. All13 installed cases pass; main/test PMD and format pass. |
+| 2121 Windows selection | Same production, explicit windows tags:4 cases/2 suites,0 failures/errors/skips under -PwindowsOnly=true; test PMD and format pass. |
+| 2122 workflow / 2123 store gate | Workflow triggers pass; operations-db registers all three contention/cleanup test owners;6 catalogs/46 authorities pass. |
+
+Exact command/log/XML/counts are retained under tmp/2115-native-transaction-negative*,
+tmp/2116-operation-transaction*, tmp/2117-cleanup-negative*,
+tmp/2118-installed-operation-transaction* and tmp/2121-windows-store-discovery*.
+Negative scripts and original source backups accompany2115/2117. The2118 installed
+manifest names8 operation fixtures; its supervised manifest names5 recovery fixtures.
+Both original hostile attacks prove100 exact paths and the original accepted key's
+COMPLETE/SUCCESS with zero failed units. All13 owned stops report portsClosed=true;
+final health is ABSENT with no foreign run or inference orphan. No build remains active.
+
+Hosted CI35559286589 at03c5d0487 passes all jobs. Integration job106208910312 has96
+cases,0 failures/errors and42 explicit model/external-fixture skips; all13 owned
+recovery cases pass. Search-worker also passes. Exact logs, artifact XML, counts and
+skip inventory are retained under tmp/2119-*. This predates the SQLite correction;
+fresh hosted proof remains required. Historical HTTP500's exact interleaving remains
+unproven, although2111/2113 establish the independent structural defect and its fix.
+
+The Windows job now includes :modules:app-observability:test. Its windowsOnly property
+selects @Tag("windows"), so @EnabledOnOs alone was insufficient: the three acceptance
+cases and the existing Windows startup lock case now carry the tag. The cleanup
+cases remain cross-platform. Wiring is not hosted execution;2121 proves local discovery.
+
+All artifacts retain the lane-acceptance-plus30-days policy and must be exported
+before this worktree is released. Final full stress, fresh hosted proof, C2 bulk and
+later stages remain open; this checkpoint is not lane completion.

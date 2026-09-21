@@ -1559,6 +1559,9 @@
       ],
       "tests": [
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreStartupContentionTest.java",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreAcceptanceContentionTest.java",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTransactionFailureTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPendingTest.java"
       ],
