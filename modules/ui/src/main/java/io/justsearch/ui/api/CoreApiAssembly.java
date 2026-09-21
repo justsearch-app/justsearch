@@ -70,7 +70,8 @@ final class CoreApiAssembly {
       HeadHttpInflightMetricCatalog inflightCatalog,
       HeadGpuMetricCatalog gpuCatalog,
       KnowledgeSearchController knowledgeSearchController,
-      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch) {}
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
+      ConfigStore configStore) {}
 
   static Result assemble(
       LocalApiServer.Builder b,
@@ -514,7 +515,8 @@ final class CoreApiAssembly {
             telemetry,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(),
             b.lambdaMartReranker,
-            apiCatalog)
+            apiCatalog,
+            b.configStore)
         : null;
     if (knowledgeSearchController != null && headAssemblyRef != null) {
       knowledgeSearchController.setWorkerCapability(headAssemblyRef.capabilities().worker());
@@ -552,7 +554,8 @@ final class CoreApiAssembly {
         inflightCatalog,
         gpuCatalog,
         knowledgeSearchController,
-        perSourceSearch);
+        perSourceSearch,
+        b.configStore);
   }
 
   private static io.justsearch.app.api.lifecycle.Capability resolveWorkerCapability(

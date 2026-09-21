@@ -474,6 +474,7 @@ public class HeadlessApp {
       Path userHome = Path.of(System.getProperty("user.home", ""));
       LocalApiServer apiServer =
           LocalApiServer.builder(engineRoot.executors(), settingsStore, indexBasePath)
+              .configStore(configStore)
               .HeadAssembly(bootstrap)
               .componentRegistry(engineRoot.components())
               .indexComponent(engineRoot.indexComponent())

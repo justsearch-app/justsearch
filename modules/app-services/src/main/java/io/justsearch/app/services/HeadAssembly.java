@@ -432,7 +432,8 @@ public final class HeadAssembly implements AutoCloseable {
     Objects.requireNonNull(managedChildRegistry, "managedChildRegistry");
     Objects.requireNonNull(configManager, "configManager");
     ConfigSnapshot snapshot = configManager.currentSnapshot();
-    ResolvedConfig rc = ConfigStore.global().get();
+    ConfigStore configStore = ConfigStore.global();
+    ResolvedConfig rc = configStore.get();
     Path dataDir = rc.paths().dataDir() != null
         ? rc.paths().dataDir() : PlatformPaths.resolveDataDir();
     this.dataDir = dataDir;
@@ -562,7 +563,7 @@ public final class HeadAssembly implements AutoCloseable {
                             attempts,
                             this.lateBindings,
                             () -> this.knowledgeClient,
-                            this::currentKnowledgeServer, operationLeases, recordedIngestion, authority.roots())))
+                            this::currentKnowledgeServer, operationLeases, recordedIngestion, authority.roots(), configStore)))
             .orThrow();
     long t_service_1 = System.currentTimeMillis();
     this.serviceOut = serviceOut;
@@ -988,7 +989,7 @@ public final class HeadAssembly implements AutoCloseable {
                   this.fileOperationLog,
                   this.memoryStore,
                   this.services.worker().documents(), recordedIngestion, authority.roots(),
-                  () -> this.knowledgeClient);
+                  () -> this.knowledgeClient, configStore);
             });
     bootTraceBuilder.record(
         io.justsearch.app.services.bootstrap.PhaseRecord.lazyPending(

@@ -1179,6 +1179,26 @@ final class ResolvedConfigBuilderTest {
       // Worker defaults
       // AI defaults — must match RuntimePolicyConfigFactory defaults
       assertTrue(config.ai().llmEnabled(), "llmEnabled default must be true (matches factory)");
+      assertFalse(config.search().queryUnderstandingEnabled());
+      assertFalse(config.search().filterNormalizationEnabled());
+    }
+
+    @Test
+    @DisplayName("query feature flags honor explicit true and false values")
+    void queryFeatureFlagsHonorExplicitValues() {
+      ResolvedConfigBuilder queryUnderstandingEnabled = new ResolvedConfigBuilder();
+      queryUnderstandingEnabled.putDefault("justsearch.qu.enabled", "true");
+      queryUnderstandingEnabled.putDefault("justsearch.filter_norm.enabled", "false");
+      ResolvedConfig first = queryUnderstandingEnabled.build();
+      assertTrue(first.search().queryUnderstandingEnabled());
+      assertFalse(first.search().filterNormalizationEnabled());
+
+      ResolvedConfigBuilder filterNormalizationEnabled = new ResolvedConfigBuilder();
+      filterNormalizationEnabled.putDefault("justsearch.qu.enabled", "false");
+      filterNormalizationEnabled.putDefault("justsearch.filter_norm.enabled", "true");
+      ResolvedConfig second = filterNormalizationEnabled.build();
+      assertFalse(second.search().queryUnderstandingEnabled());
+      assertTrue(second.search().filterNormalizationEnabled());
     }
   }
 

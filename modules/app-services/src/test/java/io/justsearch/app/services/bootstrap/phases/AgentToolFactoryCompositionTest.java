@@ -6,21 +6,36 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.OnlineAiService;
+import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
+import io.justsearch.app.api.knowledge.KnowledgeSearchRequestFiltersBuilder;
+import io.justsearch.app.api.knowledge.PipelineConfig;
+import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.SearchPerSourceExecutor;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ipc.SearchRequest;
+import io.justsearch.ipc.SearchResponse;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +62,7 @@ final class AgentToolFactoryCompositionTest {
   }
 
   private static KnowledgeHttpApiAdapter agentAdapter() {
-    return new KnowledgeHttpApiAdapter(mock(KnowledgeServerBootstrap.class), mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
+    return new KnowledgeHttpApiAdapter(mock(KnowledgeServerBootstrap.class), mock(SearchPerSourceExecutor.class));
   }
 
   /**
@@ -70,7 +85,7 @@ final class AgentToolFactoryCompositionTest {
     HandlerRegistry eager = new HandlerRegistry();
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -86,7 +101,7 @@ final class AgentToolFactoryCompositionTest {
     HandlerRegistry lateBound = new HandlerRegistry();
     assertTrue(
         AgentToolHandlers.registerLateBound(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             lateBound,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -134,7 +149,7 @@ final class AgentToolFactoryCompositionTest {
     // Step 1: the eager path, exactly as SubstratePhase.run calls it at construction time.
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -156,7 +171,7 @@ final class AgentToolFactoryCompositionTest {
     // permanently suppresses REMEMBER").
     boolean lateBoundRan =
         AgentToolHandlers.registerLateBound(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             registry,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -194,7 +209,7 @@ final class AgentToolFactoryCompositionTest {
 
     AgentToolFactory.Output reused =
         AgentToolFactory.assemble(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -206,12 +221,12 @@ final class AgentToolFactoryCompositionTest {
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
-            () -> mock(KnowledgeClient.class));
+            () -> mock(KnowledgeClient.class), null);
     assertSame(existing, reused.agentSearchAdapter(), "a supplied adapter is reused, not replaced");
 
     AgentToolFactory.Output fresh =
         AgentToolFactory.assemble(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -223,9 +238,141 @@ final class AgentToolFactoryCompositionTest {
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
-            () -> mock(KnowledgeClient.class));
+            () -> mock(KnowledgeClient.class), null);
     assertNotNull(fresh.agentSearchAdapter(), "a fresh adapter is built when none is supplied");
     assertNotSame(existing, fresh.agentSearchAdapter());
+  }
+
+  @Test
+  @DisplayName("eager adapter reads feature flags from its captured ConfigStore on every search")
+  void eagerAdapterUsesCapturedLiveSearchFlags(@TempDir Path dataDir) {
+    assertComposedAdapterUsesCapturedLiveSearchFlags(dataDir, true);
+  }
+
+  @Test
+  @DisplayName("late adapter reads feature flags from its captured ConfigStore on every search")
+  void lateAdapterUsesCapturedLiveSearchFlags(@TempDir Path dataDir) {
+    assertComposedAdapterUsesCapturedLiveSearchFlags(dataDir, false);
+  }
+
+  /**
+   * Exercises the adapter produced by each real factory path. The process-global snapshot is the
+   * contradictory disabled snapshot; only the explicitly captured store starts enabled. After the
+   * adapter is built, replacing that captured snapshot must change the next operations without
+   * reconstructing the adapter.
+   */
+  private static void assertComposedAdapterUsesCapturedLiveSearchFlags(
+      Path dataDir, boolean eager) {
+    ConfigStore captured =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of(
+                    "justsearch.qu.enabled", "true",
+                    "justsearch.filter_norm.enabled", "true")));
+    ConfigStore.setGlobal(
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of(
+                    "justsearch.qu.enabled", "false",
+                    "justsearch.filter_norm.enabled", "false"))));
+
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    when(bootstrap.client()).thenReturn(client);
+    when(client.search(any(SearchRequest.class), any(EngineContext.class)))
+        .thenReturn(SearchResponse.getDefaultInstance());
+
+    OnlineAiService ai = mock(OnlineAiService.class);
+    when(ai.isAvailable()).thenReturn(true);
+    when(ai.chatCompletion(any(), anyInt(), any(), any(EngineContext.class)))
+        .thenReturn(
+            CompletableFuture.completedFuture(
+                "{\"query\":\"captured query\",\"meta_source\":[\"captured source\"]}"));
+
+    SearchPerSourceExecutor perSource = mock(SearchPerSourceExecutor.class);
+    AgentToolFactory.Output output =
+        eager
+            ? AgentToolFactory.build(
+                perSource,
+                dataDir,
+                bootstrap,
+                client,
+                client,
+                ai,
+                null,
+                mock(DocumentService.class),
+                io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+                io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+                () -> client,
+                captured)
+            : AgentToolFactory.assemble(
+                perSource,
+                dataDir,
+                bootstrap,
+                client,
+                client,
+                ai,
+                null,
+                null,
+                null,
+                mock(DocumentService.class),
+                io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+                io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+                () -> client,
+                captured);
+
+    KnowledgeHttpApiAdapter adapter = output.agentSearchAdapter();
+    assertNotNull(adapter);
+    var quEnabled = adapter.search(queryUnderstandingRequest(), TestEngineContexts.internal());
+    var normalizationEnabled =
+        adapter.search(filterNormalizationRequest(), TestEngineContexts.internal());
+    assertNotNull(quEnabled.queryUnderstanding(), "captured A enables query understanding");
+    assertNotNull(
+        normalizationEnabled.filterNormalization(), "captured A enables filter normalization");
+    verify(ai, times(2)).chatCompletion(any(), anyInt(), any(), any(EngineContext.class));
+
+    captured.update(
+        TestResolvedConfigHelper.fromEntries(
+            Map.of(
+                "justsearch.qu.enabled", "false",
+                "justsearch.filter_norm.enabled", "false")));
+    var quDisabled = adapter.search(queryUnderstandingRequest(), TestEngineContexts.internal());
+    var normalizationDisabled =
+        adapter.search(filterNormalizationRequest(), TestEngineContexts.internal());
+    assertNull(quDisabled.queryUnderstanding(), "the next request observes disabled QU");
+    assertNull(
+        normalizationDisabled.filterNormalization(),
+        "the next request observes disabled filter normalization");
+    verify(ai, times(2)).chatCompletion(any(), anyInt(), any(), any(EngineContext.class));
+    verify(client, times(4)).search(any(SearchRequest.class), any(EngineContext.class));
+  }
+
+  private static KnowledgeSearchRequest queryUnderstandingRequest() {
+    return searchRequest(null);
+  }
+
+  private static KnowledgeSearchRequest filterNormalizationRequest() {
+    return searchRequest(
+        KnowledgeSearchRequestFiltersBuilder.builder()
+            .metaSource(List.of("Unresolved Source"))
+            .build());
+  }
+
+  private static KnowledgeSearchRequest searchRequest(KnowledgeSearchRequest.Filters filters) {
+    return new KnowledgeSearchRequest(
+        "budget report",
+        10,
+        "text",
+        null,
+        null,
+        List.of(),
+        filters,
+        null,
+        null,
+        null,
+        false,
+        false,
+        new PipelineConfig(false, true, false, "none", false, false, 1, false, false));
   }
 
   @Test
@@ -234,7 +381,7 @@ final class AgentToolFactoryCompositionTest {
     KnowledgeClient client = mock(KnowledgeClient.class);
     AgentToolFactory.Output out =
         AgentToolFactory.build(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -276,7 +423,7 @@ final class AgentToolFactoryCompositionTest {
   void eagerGuardNullsTheWorkerBackedToolsButNotTheJournal(@TempDir Path dataDir) {
     AgentToolFactory.Output out =
         AgentToolFactory.build(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             null,
@@ -329,7 +476,7 @@ final class AgentToolFactoryCompositionTest {
 
     AgentToolFactory.Output reused =
         AgentToolFactory.assemble(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -341,12 +488,12 @@ final class AgentToolFactoryCompositionTest {
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
-            () -> mock(KnowledgeClient.class));
+            () -> mock(KnowledgeClient.class), null);
     assertSame(existing, reused.fileOperationLog(), "a supplied journal is reused, not replaced");
 
     AgentToolFactory.Output fresh =
         AgentToolFactory.assemble(
-            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
+            mock(SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -358,7 +505,7 @@ final class AgentToolFactoryCompositionTest {
             mock(DocumentService.class),
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
-            () -> mock(KnowledgeClient.class));
+            () -> mock(KnowledgeClient.class), null);
     assertNotNull(fresh.fileOperationLog(), "a fresh journal is built when none is supplied");
     assertNotSame(existing, fresh.fileOperationLog());
   }

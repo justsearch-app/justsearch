@@ -31,6 +31,7 @@ import io.justsearch.app.services.observability.HttpMethod;
 import io.justsearch.app.services.observability.HttpStatusClass;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.SearchPerSourceExecutor;
+import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.telemetry.Telemetry;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -274,10 +275,29 @@ public class KnowledgeSearchController {
       OnlineAiService onlineAi,
       RerankerService lambdaMartReranker,
       HeadApiMetricCatalog apiCatalog) {
+    this(
+        knowledgeServer,
+        perSourceSearch,
+        telemetry,
+        onlineAi,
+        lambdaMartReranker,
+        apiCatalog,
+        null);
+  }
+
+  public KnowledgeSearchController(
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
+      Telemetry telemetry,
+      OnlineAiService onlineAi,
+      RerankerService lambdaMartReranker,
+      HeadApiMetricCatalog apiCatalog,
+      ConfigStore configStore) {
     this.knowledgeServer = knowledgeServer;
     this.telemetry = telemetry;
     this.apiCatalog = apiCatalog;
-    this.adapter = new KnowledgeHttpApiAdapter(knowledgeServer, perSourceSearch, onlineAi, lambdaMartReranker);
+    this.adapter =
+        new KnowledgeHttpApiAdapter(
+            knowledgeServer, perSourceSearch, onlineAi, lambdaMartReranker, configStore);
   }
 
   /**

@@ -164,3 +164,9 @@ the changeset parser intentionally discovers committed PR changes via
 baseline...HEAD (git-utils.mjs:263-268), excluding uncommitted additions even when
 staged. The correction must be committed locally before its actual gate proof can
 run. Logs and SARIF are preserved; no successful wire proof is claimed yet.
+
+After local commit51b01365d,2401 wire gate passes against the actual merge-base.
+The SARIF intentionally retains all three structural breaks at error severity;
+the declared-breaking truth-table verdict accepts their explicit remove declaration
+and major VERSION delta. This is declared migration proof, not a claim of backward
+compatibility. The corrected checkpoint is being pushed to the existing PR.

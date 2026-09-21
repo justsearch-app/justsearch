@@ -9,6 +9,7 @@ import io.justsearch.app.api.RetrieveContextParams;
 import io.justsearch.app.services.worker.ContextSufficiencyService;
 import io.justsearch.app.services.worker.FilterNormalizationService;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.configuration.resolved.ConfigStore;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,7 +44,21 @@ public class RetrieveContextController {
       DocumentService documentService,
       OnlineAiService onlineAiService,
       Supplier<String> facetSnapshotSupplier) {
-    this(knowledgeServer, () -> documentService, onlineAiService, facetSnapshotSupplier);
+    this(knowledgeServer, () -> documentService, onlineAiService, facetSnapshotSupplier, null);
+  }
+
+  public RetrieveContextController(
+      KnowledgeServerBootstrap knowledgeServer,
+      DocumentService documentService,
+      OnlineAiService onlineAiService,
+      Supplier<String> facetSnapshotSupplier,
+      ConfigStore configStore) {
+    this(
+        knowledgeServer,
+        () -> documentService,
+        onlineAiService,
+        facetSnapshotSupplier,
+        configStore);
   }
 
   // knowledgeServer is retained for the constructor-overload/wiring API; its backing field was
@@ -54,10 +69,25 @@ public class RetrieveContextController {
       Supplier<DocumentService> documentServiceSupplier,
       OnlineAiService onlineAiService,
       Supplier<String> facetSnapshotSupplier) {
+    this(knowledgeServer, documentServiceSupplier, onlineAiService, facetSnapshotSupplier, null);
+  }
+
+  @SuppressWarnings("PMD.UnusedFormalParameter")
+  public RetrieveContextController(
+      KnowledgeServerBootstrap knowledgeServer,
+      Supplier<DocumentService> documentServiceSupplier,
+      OnlineAiService onlineAiService,
+      Supplier<String> facetSnapshotSupplier,
+      ConfigStore configStore) {
     this.documentServiceSupplier = documentServiceSupplier;
     this.facetSnapshotSupplier = facetSnapshotSupplier != null ? facetSnapshotSupplier : () -> "";
     this.sufficiencyService = new ContextSufficiencyService(onlineAiService);
-    this.normService = new FilterNormalizationService(onlineAiService);
+    this.normService =
+        configStore == null
+            ? new FilterNormalizationService(onlineAiService)
+            : new FilterNormalizationService(
+                onlineAiService,
+                () -> configStore.get().search().filterNormalizationEnabled());
   }
 
   private DocumentService documentService() {

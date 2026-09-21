@@ -98,7 +98,8 @@ public final class ServicePhase {
       // rationale as knowledgeClientSupplier above.
       Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier,
       OperationLeaseService operationLeases,
-      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots) {}
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      io.justsearch.configuration.resolved.ConfigStore configStore) {}
 
   /**
    * Inference-manager teardown handles (tempdoc 737 Phase 1). Bundles the GPU-broadcast listener
@@ -263,7 +264,7 @@ public final class ServicePhase {
             in.indexingService(),
             onlineAiService,
             in.lambdaMartReranker(),
-            in.documentService(), in.recordedIngestion(), in.recordedRoots(), in.indexingServiceSupplier());
+            in.documentService(), in.recordedIngestion(), in.recordedRoots(), in.indexingServiceSupplier(), in.configStore());
 
     // §31 Step 1.1: ExcludesService constructed via supplier-aware IndexingService.
     ExcludesService excludes = new ExcludesServiceImpl(in.indexingServiceSupplier());

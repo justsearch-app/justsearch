@@ -158,6 +158,24 @@ public final class AgentToolHandlers {
       DocumentService documentService,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
       java.util.function.Supplier<IndexingService> liveIndexing) {
+    return registerLateBound(perSourceSearch, operationHandlers, knowledgeServer, knowledgeClient,
+        dataDir, indexingService, onlineAiService, lambdaMartReranker, existingAdapter,
+        existingFileOperationLog, memoryStore, documentService, recordedIngestion, recordedRoots,
+        liveIndexing, null);
+  }
+
+  public static boolean registerLateBound(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
+      HandlerRegistry operationHandlers, KnowledgeServerBootstrap knowledgeServer,
+      KnowledgeClient knowledgeClient, Path dataDir, IndexingService indexingService,
+      OnlineAiService onlineAiService, LambdaMartReranker lambdaMartReranker,
+      KnowledgeHttpApiAdapter existingAdapter,
+      io.justsearch.agent.tools.FileOperationLog existingFileOperationLog,
+      io.justsearch.agent.api.memory.MemoryStore memoryStore, DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
+      io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      java.util.function.Supplier<IndexingService> liveIndexing,
+      io.justsearch.configuration.resolved.ConfigStore configStore) {
     if (knowledgeClient == null) {
       log.warn("registerAgentToolHandlers skipped: knowledgeClient unavailable");
       return false;
@@ -195,7 +213,7 @@ public final class AgentToolHandlers {
             lambdaMartReranker,
             existingAdapter,
             existingFileOperationLog,
-            documentService, recordedIngestion, recordedRoots, liveIndexing);
+            documentService, recordedIngestion, recordedRoots, liveIndexing, configStore);
     // Tempdoc 877 §2.10: the log line is DERIVED from what this method actually registered. It
     // used to hand-list the names, which is a second authority that drifts the moment a
     // conditional registration is skipped (READ_DOCUMENT and REMEMBER both are, below).

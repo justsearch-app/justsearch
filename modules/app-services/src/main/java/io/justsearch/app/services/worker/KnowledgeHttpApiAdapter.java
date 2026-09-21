@@ -49,8 +49,15 @@ public final class KnowledgeHttpApiAdapter {
       KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       OnlineAiService onlineAiService,
       RerankerService lambdaMartReranker) {
+    this(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker, null);
+  }
+
+  public KnowledgeHttpApiAdapter(
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
+      OnlineAiService onlineAiService, RerankerService lambdaMartReranker,
+      io.justsearch.configuration.resolved.ConfigStore configStore) {
     this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
-    this.searchEngine = new KnowledgeSearchEngine(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker);
+    this.searchEngine = new KnowledgeSearchEngine(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker, configStore);
   }
 
   // ========== Search + status (delegated to KnowledgeSearchEngine) ==========

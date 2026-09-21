@@ -1372,7 +1372,9 @@ public final class ResolvedConfigBuilder {
             ResolvedConfig.Search.DEFAULT_MCP_DELIVERY_BUDGET_BYTES),
         buildSearchMcpFraming(),
         buildSearchEntityCarriage(),
-        buildSearchCorrections());
+        buildSearchCorrections(),
+        resolveBoolean("justsearch.qu.enabled", false),
+        resolveBoolean("justsearch.filter_norm.enabled", false));
   }
 
   /**

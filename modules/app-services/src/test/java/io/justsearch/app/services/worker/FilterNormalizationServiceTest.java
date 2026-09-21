@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -228,6 +229,59 @@ class FilterNormalizationServiceTest {
   @Nested
   @DisplayName("normalize — LLM call (semantic gaps only)")
   class LlmCall {
+
+    @Test
+    void samplesEnabledOncePerOperationAndCallsLlmOnlyForEnabledOperation() throws Exception {
+      AtomicInteger samples = new AtomicInteger();
+      FilterNormalizationService alternating =
+          new FilterNormalizationService(aiService, () -> samples.getAndIncrement() == 0);
+      when(aiService.isAvailable()).thenReturn(true);
+      when(aiService.chatCompletion(any(), anyInt(), any(), any()))
+          .thenReturn(CompletableFuture.completedFuture("cbs sports -> cbssports.com"));
+
+      var enabled =
+          alternating
+              .normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT)
+              .get();
+      var disabled =
+          alternating
+              .normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT)
+              .get();
+
+      assertEquals(List.of("cbssports.com"), enabled.normalizedFilters().metaSource());
+      assertEquals(List.of("cbs sports"), disabled.normalizedFilters().metaSource());
+      assertEquals(2, samples.get());
+      verify(aiService, times(1)).isAvailable();
+      verify(aiService, times(1)).chatCompletion(any(), anyInt(), any(), any());
+    }
+
+    @Test
+    void disabledPublicNormalizeStaysDeterministicWhileGatedMethodReturnsNull() throws Exception {
+      AtomicInteger samples = new AtomicInteger();
+      FilterNormalizationService disabled =
+          new FilterNormalizationService(
+              aiService,
+              () -> {
+                samples.incrementAndGet();
+                return false;
+              });
+
+      var deterministic =
+          disabled.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT);
+      var gated =
+          disabled.normalizeIfAvailable(
+              filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT);
+
+      assertNotNull(deterministic);
+      assertEquals(
+          List.of("cbs sports"), deterministic.get().normalizedFilters().metaSource());
+      assertNull(gated);
+      assertEquals(2, samples.get());
+      assertNull(disabled.normalize(null, FACET_SNAPSHOT, TEST_CONTEXT).get());
+      assertEquals(2, samples.get(), "null filters must not sample the feature flag");
+      verify(aiService, never()).isAvailable();
+      verify(aiService, never()).chatCompletion(any(), anyInt(), any(), any());
+    }
 
     @Test
     void semanticGapNormalizedByLlm() throws Exception {

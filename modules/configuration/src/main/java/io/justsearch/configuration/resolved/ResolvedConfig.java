@@ -394,6 +394,8 @@ public record ResolvedConfig(
    *     (default {@link Search#DEFAULT_MCP_DELIVERY_BUDGET_BYTES}; 0 disables the governor)
    * @param mcpFraming 789 Phase 2: the agent-delivery framing flags (all default OFF)
    * @param mcpEntityCarriage 771 item (b): the MCP entity-carriage settings (default OFF)
+   * @param queryUnderstandingEnabled whether query-understanding inference is enabled
+   * @param filterNormalizationEnabled whether filter-normalization inference is enabled
    */
   public record Search(
       boolean queryClassificationEnabled,
@@ -422,7 +424,9 @@ public record ResolvedConfig(
       // on email) because long documents bury the bridge sentence past the 4 KB content_preview
       // window — so even a successful hop-1 retrieval could not seed hop-2. Default OFF.
       EntityCarriage mcpEntityCarriage,
-      Corrections corrections) {
+      Corrections corrections,
+      boolean queryUnderstandingEnabled,
+      boolean filterNormalizationEnabled) {
 
     /**
      * Default MCP delivery-governor budget (tempdoc 775 §E, settled by the orchestrator's live

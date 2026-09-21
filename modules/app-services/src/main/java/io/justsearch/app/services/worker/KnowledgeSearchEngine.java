@@ -550,13 +550,24 @@ final class KnowledgeSearchEngine {
       KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       OnlineAiService onlineAiService,
       RerankerService lambdaMartReranker) {
+    this(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker, null);
+  }
+
+  KnowledgeSearchEngine(
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
+      OnlineAiService onlineAiService, RerankerService lambdaMartReranker,
+      ConfigStore configStore) {
     this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
     this.perSourceSearch = Objects.requireNonNull(perSourceSearch, "perSourceSearch");
     this.onlineAiService = Objects.requireNonNull(onlineAiService, "onlineAiService");
     this.lambdaMartReranker = lambdaMartReranker; // nullable
     this.rerankConfig = RerankerConfig.fromEnv();
-    this.quService = new QueryUnderstandingService(onlineAiService);
-    this.normService = new FilterNormalizationService(onlineAiService);
+    this.quService = configStore == null ? new QueryUnderstandingService(onlineAiService)
+        : new QueryUnderstandingService(onlineAiService,
+            () -> configStore.get().search().queryUnderstandingEnabled());
+    this.normService = configStore == null ? new FilterNormalizationService(onlineAiService)
+        : new FilterNormalizationService(onlineAiService,
+            () -> configStore.get().search().filterNormalizationEnabled());
     this.statusCache = new WorkerStatusCache(knowledgeServer);
     if (rerankConfig.enabled()) {
       log.info("Reranker enabled: topK={}, deadline={}ms, modelPath={}",
@@ -711,15 +722,14 @@ final class KnowledgeSearchEngine {
         && !queryText.isBlank()
         && (req.cursor() == null || req.cursor().isBlank())
         && effectiveQueryType != QueryType.NAVIGATIONAL
-        && effectiveQueryType != QueryType.EXACT_MATCH
-        && quService.isAvailable()) {
-      quFuture = quService.extract(queryText, statusCache.getCachedFacetSnapshot(), engineContext);
+        && effectiveQueryType != QueryType.EXACT_MATCH) {
+      quFuture = quService.extractIfAvailable(queryText, statusCache.getCachedFacetSnapshot(), engineContext);
     }
 
     // 366: Fire filter normalization async when explicit filters are present (mutually exclusive with QU)
     CompletableFuture<FilterNormalizationService.NormResult> normFuture = null;
-    if (hasExplicitFilters && normService.isAvailable()) {
-      normFuture = normService.normalize(req.filters(), statusCache.getCachedFacetSnapshot(), engineContext);
+    if (hasExplicitFilters) {
+      normFuture = normService.normalizeIfAvailable(req.filters(), statusCache.getCachedFacetSnapshot(), engineContext);
     }
 
     // 256-G3: PipelineConfig is the sole pipeline control on wire. Deprecated mode field no longer set.

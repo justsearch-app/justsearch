@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,9 +94,17 @@ public final class QueryUnderstandingService {
   }
 
   private final OnlineAiService aiService;
+  private final BooleanSupplier enabled;
 
   public QueryUnderstandingService(OnlineAiService aiService) {
+    this(
+        aiService,
+        () -> io.justsearch.configuration.EnvRegistry.QU_ENABLED.getBoolean(false));
+  }
+
+  public QueryUnderstandingService(OnlineAiService aiService, BooleanSupplier enabled) {
     this.aiService = Objects.requireNonNull(aiService, "aiService");
+    this.enabled = Objects.requireNonNull(enabled, "enabled");
     if (PROMPT_TEMPLATE != null && QU_SAMPLING != null) {
       log.info("QueryUnderstandingService initialized (prompt loaded, schema loaded)");
     } else {
@@ -108,10 +117,7 @@ public final class QueryUnderstandingService {
    * available. Disabled by default (366 — experimental). Enable via JUSTSEARCH_QU_ENABLED=true.
    */
   public boolean isAvailable() {
-    return io.justsearch.configuration.EnvRegistry.QU_ENABLED.getBoolean(false)
-        && PROMPT_TEMPLATE != null
-        && QU_SAMPLING != null
-        && aiService.isAvailable();
+    return isAvailable(enabled.getAsBoolean());
   }
 
   /**
@@ -124,8 +130,24 @@ public final class QueryUnderstandingService {
    */
   public CompletableFuture<QuResult> extract(String query, String indexSnapshot,
       io.justsearch.core.context.EngineContext engineContext) {
-    if (!isAvailable()) {
-      return CompletableFuture.completedFuture(null);
+    CompletableFuture<QuResult> extraction =
+        extractIfAvailable(query, indexSnapshot, engineContext);
+    return extraction != null ? extraction : CompletableFuture.completedFuture(null);
+  }
+
+  /**
+   * Extracts filters when query understanding is available for this operation.
+   *
+   * @return the extraction future, or {@code null} when the captured availability decision is
+   *     disabled or unavailable
+   */
+  CompletableFuture<QuResult> extractIfAvailable(
+      String query,
+      String indexSnapshot,
+      io.justsearch.core.context.EngineContext engineContext) {
+    boolean enabledForOperation = enabled.getAsBoolean();
+    if (!isAvailable(enabledForOperation)) {
+      return null;
     }
 
     String systemPrompt = buildSystemPrompt(indexSnapshot);
@@ -151,6 +173,13 @@ public final class QueryUnderstandingService {
               log.debug("QU extraction failed after {}ms: {}", elapsedMs, ex.getMessage());
               return null;
             });
+  }
+
+  private boolean isAvailable(boolean enabledForOperation) {
+    return enabledForOperation
+        && PROMPT_TEMPLATE != null
+        && QU_SAMPLING != null
+        && aiService.isAvailable();
   }
 
   /** Result of query understanding extraction. */

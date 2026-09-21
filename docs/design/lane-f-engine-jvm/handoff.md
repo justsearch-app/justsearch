@@ -9,7 +9,13 @@ are authorized; merge remains at stage F. No routine owner approval is pending.
 Continue after status answers, commits and reviews. C2 is accepted; D1/D2/E/F
 remain open. Root owns all Gradle runs, stack lifecycle and integration.
 
-Latest committed/pushed checkpoint: `d87a0e60c` (live RAG/citation readers,
+Latest committed/pushed checkpoint: `51b01365d` (explicit schema2 wire3.0.0 migration),
+CI35664958821 pending/running. `c948cf85f` registered the generated status consumer;
+its wire gate exposed the missing major declaration, now locally proved by2401.
+`ecfa96797` contains captured LLM existence/config,
+citation defaults,14th retirement and hosted fixture/schema corrections. Its Public
+claims failed the omitted registration; other unfinished jobs were superseded.
+Previous `d87a0e60c` (live RAG/citation readers,
 summary source limits, path-history retention,13 retired keys, schema2 hosted-test
 correction, UI mount diagnostics). Previous architecture checkpoint4e4cd88f6
 contains schema2/process-resource ownership. CI35659220060 atd87a0e60c completed red;
@@ -28,7 +34,7 @@ Qwen9B query exact1.0, runtime0.4.0/all4READY, summary trace rejection21711>2000
 chunks. Stack stopped portsClosed:true; persistent MCP client terminated. Evidence
 captured.2386 regeneration passes8 sets.
 
-Current WIP afterd87: workers.indexer.enabled retired (14total ->277unique keys),
+Verified ecfa checkpoint: workers.indexer.enabled retired (14total ->277unique keys),
 LLM hard-disable connected through captured configuration/actual manager creation,
 and captured scorer threshold now supplies unset wire defaults. Root owns LLM files;
 workers finished retirement and scorer connection, source-frozen. Independent LLM
@@ -63,10 +69,17 @@ Do not connect suppliers while retaining those double reads.
 
 ## Next coherent work
 
-1. Commit/push verified control-reader checkpoint and inspect its hosted successor.
-2. Complete QU/filter ConfigStore wiring with once-per-operation sampling while
+1. Inspect51b's hosted successor while continuing implementation.
+2. Complete current QU/filter ConfigStore wiring with once-per-operation sampling while
    preserving KSE feature gating and retrieve-context deterministic normalization.
    The bounded plan is evidence/D1/query-reader-plan-2026-09-22.md.
+   Focused2395 passes377 cases/3 existing skips. HTTP2397 passes13 UI cases but
+   exposes an orphan internal overload and11 redundant qualifiers;2398 corrects
+   both and passes52 cases/static. Full2400 passes11500 cases/0 failures/errors/
+   31 skips plus static/stress/installDist. Installed2402 all4READY/runtime0.4.0/
+   real-model query passes; actual QU author boost and hybrid filter projection
+   return200. Owned stack stopped portsClosed:true. Reader slice complete; preserve
+   source inventory and raw proof in tmp/2400* and tmp/2402*. Next run2403.
 3. Continue full governed apply register, dependency/value projections and D1
    dispatch. All D1/D2/E/F acceptance remains binding, including identity gaps.
 4. Preserve compiling checkpoints/push authorization to PR727 and inspect hosted
@@ -79,9 +92,11 @@ ACK. COMPLETE_WITH_GAPS/accept-gaps/live activation requires explicit design/pro
 ## Active ownership
 
 - Root: shared-owner integration, all builds, stack, evidence and scoped publication.
-- `bulk_engine_restart_proof`: scorer-default connection source-frozen; no builds.
-- `d1_encoder_projection`: retirement/schema consumer fixes source-frozen; no builds.
-- `d1_owner_review`: LLM final review clear; read-only QU/filter composition brief.
+- Root: integrated verification, live proof, staged/source ownership and next register.
+- `bulk_engine_restart_proof`: QU/filter source-frozen; no builds.
+- `d1_encoder_projection`: source-frozen; preparing tmp-only277-row register proposal.
+- `query_http_composition`: HTTP/controller/request tests source-frozen; no builds.
+- `d1_owner_review`: QU/filter production review clear; wire triage delivered, idle.
 
 ## Evidence and owner map
 

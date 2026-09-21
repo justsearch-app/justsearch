@@ -513,7 +513,9 @@ final class SearchPlannerApprovalCorpusTest {
             /* mcpDeliveryBudgetBytes= */ ResolvedConfig.Search.DEFAULT_MCP_DELIVERY_BUDGET_BYTES,
             /* mcpFraming= */ ResolvedConfig.Search.McpFraming.OFF,
             /* mcpEntityCarriage= */ ResolvedConfig.Search.EntityCarriage.OFF,
-            corrections);
+            corrections,
+            /* queryUnderstandingEnabled= */ false,
+            /* filterNormalizationEnabled= */ false);
     ResolvedConfig config = mock(ResolvedConfig.class);
     when(config.search()).thenReturn(search);
     return new SearchPlanner(() -> config);

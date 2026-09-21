@@ -922,7 +922,8 @@ public class LocalApiServer {
           this.telemetry,
           this.HeadAssemblyRef != null ? this.HeadAssemblyRef.inference().onlineAi() : OnlineAiService.unavailable(),
           this.lambdaMartReranker,
-          this.apiCatalog);
+          this.apiCatalog,
+          this.core.configStore());
       this.knowledgeSearchController = ctrl;
       // Tempdoc 778 — seal the disposition + feature-snapshot streams with the AUTHORED feedback key.
       if (this.HeadAssemblyRef != null) {
@@ -935,7 +936,8 @@ public class LocalApiServer {
           ? new RetrieveContextController(ks,
               this.HeadAssemblyRef.workers().documents(),
               this.HeadAssemblyRef.inference().onlineAi(),
-              () -> ctrl.getAdapter().getCachedFacetSnapshot())
+              () -> ctrl.getAdapter().getCachedFacetSnapshot(),
+              this.core.configStore())
           : null;
       KnowledgeRoutes.register(this.app, ctrl, ragCtrl, log);
     }
@@ -1127,10 +1129,17 @@ public class LocalApiServer {
     ComponentHandle indexComponent;
     ComponentHandle apiComponent;
     io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
+    ConfigStore configStore;
 
     /** Explicit dependency for fixtures without a HeadAssembly; the supplying owner closes it. */
     public Builder perSourceSearch(io.justsearch.app.services.worker.SearchPerSourceExecutor value) {
       this.perSourceSearch = java.util.Objects.requireNonNull(value);
+      return this;
+    }
+
+    /** Borrows the Head-owned live configuration authority for request-time feature decisions. */
+    public Builder configStore(ConfigStore value) {
+      this.configStore = java.util.Objects.requireNonNull(value, "configStore");
       return this;
     }
     Path upgradeDataDir;

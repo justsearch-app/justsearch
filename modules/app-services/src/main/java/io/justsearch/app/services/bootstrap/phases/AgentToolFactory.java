@@ -77,6 +77,20 @@ public final class AgentToolFactory {
       DocumentService documentService,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
       Supplier<IndexingService> liveIndexing) {
+    return build(perSourceSearch, dataDir, knowledgeServer, knowledgeClient, indexingService,
+        onlineAiService, lambdaMartReranker, documentService, recordedIngestion, recordedRoots,
+        liveIndexing, null);
+  }
+
+  public static Output build(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
+      Path dataDir, KnowledgeServerBootstrap knowledgeServer, KnowledgeClient knowledgeClient,
+      IndexingService indexingService, OnlineAiService onlineAiService,
+      LambdaMartReranker lambdaMartReranker, DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
+      io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      Supplier<IndexingService> liveIndexing,
+      io.justsearch.configuration.resolved.ConfigStore configStore) {
     if (knowledgeClient == null || indexingService == null) {
       return new Output(null, fileOperationLog(dataDir), null, null, null, null, null);
     }
@@ -90,7 +104,7 @@ public final class AgentToolFactory {
         lambdaMartReranker,
         null,
         null,
-        documentService, recordedIngestion, recordedRoots, liveIndexing);
+        documentService, recordedIngestion, recordedRoots, liveIndexing, configStore);
   }
 
   /**
@@ -125,21 +139,18 @@ public final class AgentToolFactory {
    */
   static Output assemble(
       io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
-      Path dataDir,
-      KnowledgeServerBootstrap knowledgeServer,
-      KnowledgeClient knowledgeClient,
-      IndexingService indexingService,
-      OnlineAiService onlineAiService,
-      LambdaMartReranker lambdaMartReranker,
-      KnowledgeHttpApiAdapter existingAdapter,
-      FileOperationLog existingFileOperationLog,
-      DocumentService documentService,
-      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
-      Supplier<IndexingService> liveIndexing) {
+      Path dataDir, KnowledgeServerBootstrap knowledgeServer, KnowledgeClient knowledgeClient,
+      IndexingService indexingService, OnlineAiService onlineAiService,
+      LambdaMartReranker lambdaMartReranker, KnowledgeHttpApiAdapter existingAdapter,
+      FileOperationLog existingFileOperationLog, DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
+      io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      Supplier<IndexingService> liveIndexing,
+      io.justsearch.configuration.resolved.ConfigStore configStore) {
     KnowledgeHttpApiAdapter agentSearchAdapter =
         existingAdapter != null
             ? existingAdapter
-            : new KnowledgeHttpApiAdapter(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker);
+            : new KnowledgeHttpApiAdapter(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker, configStore);
     FileOperationLog fileOperationLog =
         existingFileOperationLog != null ? existingFileOperationLog : fileOperationLog(dataDir);
     java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier =

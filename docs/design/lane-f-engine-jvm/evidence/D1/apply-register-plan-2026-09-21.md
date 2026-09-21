@@ -321,3 +321,19 @@ Counts remain45 connected hot rows,230 owner-work rows and2 pending readers
 (QU/filter). This deliberately does not promote reader tests to apply-dispatch
 acceptance. Candidate scopes:34 restart,119 index,38 encoders,13 generative,
 51 hot and22 generation-bound. No unresolved indexer-enabled row remains.
+
+## Generation classification versus fingerprint coverage (2026-09-22)
+
+The eight-only generation equality in D1-3 conflicted with the audited fourteen
+persisted-output identity gaps. Keep all22 controls generation-bound: changing their
+scope to component/hot would misstate whether existing indexed output stays valid.
+The register test will assert an exact partition of eight current direct configured
+fingerprint inputs plus fourteen explicitly named D1-12 gaps, after restart precedence.
+The fourteen remain mandatory fingerprint/model-binding/boot work; register validation
+does not close them or claim that current fingerprints cover them.
+
+Prefer a closed test oracle for this known gap set over adding runtime binding-state
+metadata or a second registry solely to carry unfinished work. The minimal register
+remains key/applyScope entries with a document note. The test rejects a fifteenth
+unaccounted gap or any omitted/misclassified current input. Applied overall revision
+is still a separate D1-3 deliverable; exhaustive labels alone do not satisfy D1-3.
