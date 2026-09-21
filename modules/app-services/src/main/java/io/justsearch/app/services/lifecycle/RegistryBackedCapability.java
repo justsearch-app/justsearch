@@ -196,7 +196,7 @@ public final class RegistryBackedCapability implements Capability {
     }
 
     private void accept(EngineComponentSnapshot snapshot) {
-      boolean shouldDrain = false;
+      boolean shouldDrain;
       synchronized (monitor) {
         if (closed) return;
         if (!bootstrapped) {

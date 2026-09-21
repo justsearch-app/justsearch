@@ -56,6 +56,7 @@ public record ResolvedConfig(
     Ui ui,
     Watcher watcher,
     Ocr ocr,
+    Extraction extraction,
     Index index,
     Rag rag,
     HybridSearch hybridSearch,
@@ -77,6 +78,7 @@ public record ResolvedConfig(
     Objects.requireNonNull(ui, "ui");
     Objects.requireNonNull(watcher, "watcher");
     Objects.requireNonNull(ocr, "ocr");
+    Objects.requireNonNull(extraction, "extraction");
     Objects.requireNonNull(index, "index");
     Objects.requireNonNull(rag, "rag");
     Objects.requireNonNull(hybridSearch, "hybridSearch");
@@ -175,7 +177,11 @@ public record ResolvedConfig(
       // arguments the engine used to choose for itself; naming them makes the choice reviewable
       // and the argv reproducible.
       int llmSlots,
-      String llmKvType) {
+      String llmKvType,
+      // D1: preserve the two shared inputs that derive every per-role GPU decision. These are
+      // projections of existing keys, not new settings.
+      boolean masterGpuEnabled,
+      boolean gpuAccelerationAllowed) {
 
     /** BGE-M3 multi-vector retrieval configuration. */
     public record BgeM3(
@@ -582,6 +588,23 @@ public record ResolvedConfig(
   }
 
   /**
+   * Declared extraction sandbox and ingestion-admission inputs captured in this snapshot.
+   *
+   * <p>These are source values, not a second set of runtime defaults. The extraction owner applies
+   * its existing mode, command, pool and skip-policy normalizers exactly once when it constructs
+   * the runtime configuration.
+   */
+  public record Extraction(
+      String sandboxMode,
+      String sandboxCommand,
+      String sandboxHeap,
+      Integer sandboxPoolSize,
+      Integer sandboxMaxRequestsPerChild,
+      String ingestionSkipPatterns,
+      String ingestionSkipExtensions,
+      String ingestionSkipDirectoryNames) {}
+
+  /**
    * Index writer, commit, NRT, soft-delete, and vector configuration.
    *
    * @param writerRamBufferMb RAM buffer size for IndexWriter
@@ -631,6 +654,7 @@ public record ResolvedConfig(
    *     §C.6). Temporary absence — an unmounted drive, a sync client hiding a file — must not
    *     permanently break identity, and a confirmed replacement must not inherit the old
    *     document's feedback; the window is what separates the two.
+   * @param tracingLevel normalized index tracing level used when registering index spans
    */
   public record Index(
       Integer writerRamBufferMb,
@@ -667,7 +691,8 @@ public record ResolvedConfig(
       int nrtBackgroundReopenMs,
       int nrtOnDemandMaxStaleMs,
       int commitTimerIntervalMs,
-      long identityDeletionGraceMs) {
+      long identityDeletionGraceMs,
+      String tracingLevel) {
 
     /** Default deletion grace for document identity: 30 days in ms (tempdoc 931 §C.6). */
     public static final long DEFAULT_IDENTITY_DELETION_GRACE_MS = 2_592_000_000L;
@@ -728,7 +753,7 @@ public record ResolvedConfig(
   /** Indexer worker gRPC client connection config (Head→Body). */
   public record WorkerIndexer(
       boolean enabled, String host, int port, long deadlineMs,
-      int queueSize, int maxInFlightBytes, String backpressureMode) {}
+      int queueSize, int maxInFlightBytes, String backpressureMode, String serviceVersion) {}
 
   /** Infrastructure health check thresholds from YAML {@code infra.health.*}. */
   public record InfraHealth(

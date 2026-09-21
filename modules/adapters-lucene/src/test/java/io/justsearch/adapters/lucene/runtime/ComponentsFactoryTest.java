@@ -531,7 +531,15 @@ class ComponentsFactoryTest {
 
   @Test
   void buildWithRetentionDisabledAndMetricsUsesTelemetryMergePolicy() throws Exception {
-    String yaml = "index:\n  directory: {}";
+    String yaml =
+        """
+        index:
+          soft_deletes:
+            retention:
+              enabled: false
+              days: -2
+              max_versions: 0
+        """;
     SoftDeletesMetrics metrics =
         new SoftDeletesMetrics() {
           @Override
@@ -548,6 +556,28 @@ class ComponentsFactoryTest {
           TelemetrySoftDeletesMergePolicy.class,
           mp,
           "no retention + metrics should still use TelemetrySoftDeletesMergePolicy");
+      assertEquals(
+          true,
+          c.runtimeConfiguration()
+              .values()
+              .get(
+                  io.justsearch.configuration.ConfigKey.INDEX_SOFT_DELETES_RETENTION_ENABLED
+                      .configKey()),
+          "projection must report the retention wrapper that metrics actually installed");
+      assertEquals(
+          0,
+          c.runtimeConfiguration()
+              .values()
+              .get(
+                  io.justsearch.configuration.ConfigKey.INDEX_SOFT_DELETES_RETENTION_DAYS
+                      .configKey()));
+      assertNull(
+          c.runtimeConfiguration()
+              .values()
+              .get(
+                  io.justsearch.configuration.ConfigKey
+                      .INDEX_SOFT_DELETES_RETENTION_MAX_VERSIONS
+                      .configKey()));
     } finally {
       closeComponents(c);
     }

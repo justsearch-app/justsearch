@@ -117,6 +117,11 @@ public final class ReadOnlyRuntime implements LuceneRuntime {
   }
 
   @Override
+  public Map<String, Object> appliedConfigurationValues() {
+    return session.appliedConfigurationValues();
+  }
+
+  @Override
   public boolean commitMetadataEnabled() {
     return session.commitMetadataEnabled;
   }

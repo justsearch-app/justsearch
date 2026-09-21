@@ -29,6 +29,8 @@ import io.justsearch.app.observability.CapabilitiesService;
 import io.justsearch.app.observability.InfraDiagnosticsService;
 import io.justsearch.app.observability.InfraHealthBootstrap;
 import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.AppliedConfigurationVersion;
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.search.SearchPort;
@@ -38,6 +40,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -62,6 +65,14 @@ public final class HeadAssembly implements AutoCloseable {
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
 
   private static final Logger log = LoggerFactory.getLogger(HeadAssembly.class);
+  private static final Set<String> GENERATIVE_DEPENDENCIES = Set.of(
+      EnvRegistry.SERVER_EXE.configKey(),
+      EnvRegistry.LLM_MODEL_PATH.configKey(),
+      EnvRegistry.MMPROJ_MODEL.configKey(),
+      EnvRegistry.SERVER_PORT.configKey(),
+      EnvRegistry.CONTEXT_SIZE.configKey(),
+      EnvRegistry.GPU_LAYERS.configKey(),
+      EnvRegistry.CHAT_PROFILE.configKey());
 
   // §10 endpoint: bootstrap holds typed phase records (capabilities/services/substrateGraph/
   // orchestration) + 4 substrate Outputs (healthOut/operationOut/resourceOut/metricsOut) + a
@@ -77,6 +88,7 @@ public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.app.services.bootstrap.CapabilityGraph capabilities;
   private io.justsearch.app.services.bootstrap.SubstrateGraph substrateGraph;
   private final InferenceLifecycleManager inferenceManager;
+  private final io.justsearch.core.component.ComponentHandle generativeComponent;
   // Tempdoc 518 Wave A-E defect Fix-3 (ported from main commits 17545ad2a + 3a5355216) —
   // async transition-log decorator. Kept off the TransitionRunner's transition lock so
   // sidecar I/O does not add user-visible transition latency. Closed during teardown.
@@ -372,12 +384,34 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.api.EngineAdmissionService engineAdmission,
       io.justsearch.app.services.bootstrap.OperationAuthority authority,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion) {
+    this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
+        sharedWorkerCapability, managedChildRegistry, operationLeases, engineAdmission, authority,
+        recordedIngestion, null);
+  }
+
+  /** Process boot supplies the shared component registry; compatibility/test paths may omit it. */
+  public HeadAssembly(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      Telemetry telemetry,
+      ConfigManagerBootstrap configManager,
+      KnowledgeServerBootstrap knowledgeServer,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
+      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
+      io.justsearch.app.api.OperationLeaseService operationLeases,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry) {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.recordedIngestion = Objects.requireNonNull(recordedIngestion, "recordedIngestion");
     Objects.requireNonNull(telemetry, "telemetry");
     Objects.requireNonNull(engineAdmission, "engineAdmission");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
+    io.justsearch.core.component.ComponentHandle generativeObservation = null;
     try {
     this.perSourceSearch = new io.justsearch.app.services.worker.SearchPerSourceExecutor(executors, engineAdmission);
     acquiredOwners.add(perSourceSearch);
@@ -463,6 +497,10 @@ public final class HeadAssembly implements AutoCloseable {
                         sharedWorkerCapabilityFinal))
             .orThrow();
 
+    if (componentRegistry != null) {
+      generativeObservation = componentRegistry.register(generativeSpec());
+    }
+
     // §4 Phase 3 — ServicePhase.
     InferenceLifecycleManager manager =
         inferenceConfigured
@@ -470,6 +508,14 @@ public final class HeadAssembly implements AutoCloseable {
                 executors, telemetry, managedChildRegistry)
             : null;
     this.inferenceManager = manager;
+    if (generativeObservation != null) {
+      if (manager != null) {
+        String version = generativeAppliedVersion(manager.currentConfig());
+        generativeObservation.setDesiredVersion(version);
+        generativeObservation.setAppliedVersion(version);
+      }
+      observeGenerativeCapability(generativeObservation, this.capabilities.inference());
+    }
     // Tempdoc 518 Wave B + Slice 2 (ported from main 17545ad2a + 3a5355216) — install the
     // persistent transition sidecar at the composition root. Wrap NdjsonInferenceTransitionLog
     // in AsyncInferenceTransitionLog so disk I/O does NOT happen under TransitionRunner's
@@ -654,7 +700,7 @@ public final class HeadAssembly implements AutoCloseable {
                     // MCP-host servers (tempdoc 560 §6): resolved by the config authority here at
                     // the allowlisted entrypoint, parsed downstream (app-services may not read env).
                     io.justsearch.app.services.mcphost.McpHostConfig.fromPath(
-                        io.justsearch.configuration.EnvRegistry.MCP_HOST_CONFIG.getPath()),
+                        EnvRegistry.MCP_HOST_CONFIG.getPath()),
                     new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager), authority, recordedIngestion))
             .orThrow();
 
@@ -952,7 +998,14 @@ public final class HeadAssembly implements AutoCloseable {
     this.operationsHistoryProjector =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
             operations, executors, this.substrateOut.operationOut());
+    this.generativeComponent = generativeObservation;
     } catch (RuntimeException | Error failure) {
+      if (generativeObservation != null) {
+        generativeObservation.transition(
+            io.justsearch.core.component.ComponentState.FAILED,
+            "generative.compose_failed",
+            failure.getClass().getSimpleName());
+      }
       closeFailedOwners(acquiredOwners, failure);
       throw failure;
     }
@@ -1112,6 +1165,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operationsHistoryProjector =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
             operations, executors, this.substrateOut.operationOut());
+    this.generativeComponent = null;
     } catch (RuntimeException | Error failure) {
       closeFailedOwners(acquiredOwners, failure);
       throw failure;
@@ -1374,7 +1428,7 @@ public final class HeadAssembly implements AutoCloseable {
   }
 
   /** Serialized-record identity set for the feedback restore's skip-existing check. */
-  private static <T> java.util.Set<String> toJsonSet(
+  private static <T> Set<String> toJsonSet(
       List<T> records, tools.jackson.databind.ObjectMapper mapper) {
     var set = new java.util.HashSet<String>();
     for (T r : records) {
@@ -1546,6 +1600,26 @@ public final class HeadAssembly implements AutoCloseable {
   /** §4 F4 LIFO teardown via the typed OrchestrationHandles record. */
   @Override
   public void close() {
+    try {
+      closeOwnedResources();
+      if (generativeComponent != null) {
+        generativeComponent.transition(
+            io.justsearch.core.component.ComponentState.ABSENT,
+            "generative.stopped",
+            null);
+      }
+    } catch (RuntimeException | Error failure) {
+      if (generativeComponent != null) {
+        generativeComponent.transition(
+            io.justsearch.core.component.ComponentState.FAILED,
+            "generative.stop_failed",
+            failure.getClass().getSimpleName());
+      }
+      throw failure;
+    }
+  }
+
+  private void closeOwnedResources() {
     // Repeatable termination barrier: an unfinished procedure must leave a later close able to
     // finish dependency teardown. Never claim the one-shot closed state before this succeeds.
     if (offlineCoordinator != null) offlineCoordinator.close();
@@ -1607,6 +1681,59 @@ public final class HeadAssembly implements AutoCloseable {
         }
       }
     }
+  }
+
+  static io.justsearch.core.component.ComponentSpec generativeSpec() {
+    return new io.justsearch.core.component.ComponentSpec(
+        "generative",
+        false,
+        GENERATIVE_DEPENDENCIES,
+        io.justsearch.core.component.ComponentSpec.ComposeCapability.IN_PLACE,
+        java.time.Duration.ofSeconds(180),
+        2);
+  }
+
+  static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config) {
+    Objects.requireNonNull(config, "config");
+    var values = new java.util.LinkedHashMap<String, Object>();
+    values.put(EnvRegistry.SERVER_EXE.configKey(), normalized(config.serverExecutable()));
+    values.put(EnvRegistry.LLM_MODEL_PATH.configKey(), normalized(config.modelPath()));
+    values.put(EnvRegistry.MMPROJ_MODEL.configKey(), normalized(config.mmprojPath()));
+    values.put(EnvRegistry.SERVER_PORT.configKey(), config.serverPort());
+    values.put(EnvRegistry.CONTEXT_SIZE.configKey(), config.contextSize());
+    values.put(EnvRegistry.GPU_LAYERS.configKey(), config.gpuLayers());
+    values.put(EnvRegistry.CHAT_PROFILE.configKey(), config.chatProfileId());
+    // vduMode is a runtime procedure mode, not a declared configuration key. The existing
+    // inference mode projection observes it; this applied-config digest deliberately does not.
+    return AppliedConfigurationVersion.digest(GENERATIVE_DEPENDENCIES, values);
+  }
+
+  private static String normalized(Path path) {
+    return path == null ? null : path.toAbsolutePath().normalize().toString();
+  }
+
+  static void observeGenerativeCapability(
+      io.justsearch.core.component.ComponentHandle component,
+      io.justsearch.app.services.lifecycle.InferenceCapability capability) {
+    Objects.requireNonNull(component, "component");
+    Objects.requireNonNull(capability, "capability");
+    publishGenerativeCapability(component, capability);
+    capability.addListener((previous, current) ->
+        publishGenerativeCapability(component, capability));
+  }
+
+  private static void publishGenerativeCapability(
+      io.justsearch.core.component.ComponentHandle component,
+      io.justsearch.app.services.lifecycle.InferenceCapability capability) {
+    io.justsearch.core.component.ComponentState state = !capability.required()
+        ? io.justsearch.core.component.ComponentState.ABSENT : switch (capability.health()) {
+      case PENDING -> io.justsearch.core.component.ComponentState.STARTING;
+      case READY -> io.justsearch.core.component.ComponentState.READY;
+      case RECOVERING -> io.justsearch.core.component.ComponentState.RELOADING;
+      case DEGRADED -> io.justsearch.core.component.ComponentState.FAILED;
+      case OFFLINE -> io.justsearch.core.component.ComponentState.UNAVAILABLE;
+    };
+    component.transition(state, capability.pendingReason(), capability.pendingDetail());
   }
 
   private static void closeFailedOwners(List<AutoCloseable> owners, Throwable failure) {

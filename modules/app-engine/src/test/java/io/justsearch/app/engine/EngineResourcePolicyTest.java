@@ -36,7 +36,8 @@ final class EngineResourcePolicyTest {
     }
     assertEquals(4, policy.retained().snapshot().stream()
         .filter(s -> s.kind().equals("search-cursors")).findFirst().orElseThrow().perContextCap());
-    try (var components = new DefaultEngineComponentRegistry(policy.retained())) {
+    var components = new DefaultEngineComponentRegistry(policy.retained());
+    try (components) {
       for (var entry : policy.retained().snapshot()) {
         if (entry.kind().equals("attempted-configurations")) {
           assertEquals(0, entry.count());

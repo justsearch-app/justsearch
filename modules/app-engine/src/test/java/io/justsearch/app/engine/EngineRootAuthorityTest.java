@@ -34,7 +34,7 @@ final class EngineRootAuthorityTest {
     when(server.foregroundLoad()).thenReturn(new ForegroundLoad());
     when(server.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
     var root = new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class),
-        (ignored, executors, ingestion) -> {
+        (ignored, executors, ingestion, indexComponent, encoderComponent) -> {
           EngineRootRecordedLifecycleTestSupport.bindOffline(server, ingestion);
           return server;
         }, 1_000, 100, ignored -> {}, () -> {}, authority);

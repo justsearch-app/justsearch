@@ -197,9 +197,9 @@ final class RecordedBulkEngineRestartTest {
         new RecordedIngestPlanResolver());
     var authority = OperationAuthority.load(dataDirectory);
     var root = new EngineRoot(operations, attempts,
-        (gauge, executors, ingestion) -> new KnowledgeServer(executors,
+        (gauge, executors, ingestion, indexComponent, encoderComponent) -> new KnowledgeServer(executors,
             WorkerConfig.load(), new InProcessWorkerSignalBus(gauge),
-            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent),
         30_000L, 5_000,
         code -> { throw new AssertionError("unexpected terminal writer exit " + code); },
         requestedRestart::countDown, authority);

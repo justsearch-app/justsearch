@@ -26,7 +26,7 @@ final class EngineRecordedBindingTest {
   void missingPhysicalAttachmentCannotReturnAUsableClient() throws Exception {
     var server = server();
     try (var root = new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class),
-        (gauge, executors, ingestion) -> server, 1_000, 100)) {
+        (gauge, executors, ingestion, indexComponent, encoderComponent) -> server, 1_000, 100)) {
       try {
         assertThrows(NullPointerException.class, () -> root.start(new GpuSchedulingGauge(), IpcTelemetry.noop()));
         verify(server).close();
@@ -54,7 +54,7 @@ final class EngineRecordedBindingTest {
     try (var clients = mockConstruction(EngineKnowledgeClient.class, (client, context) ->
         doThrow(closeFailure).doNothing().when(client).close());
         var root = new EngineRoot(mock(OperationStore.class), attempts,
-            (gauge, executors, ingestion) -> {
+            (gauge, executors, ingestion, indexComponent, encoderComponent) -> {
               lifecycle.set(ingestion);
               return server;
             }, 1_000, 100, ignored -> {}, () -> {}, OperationAuthority.inMemory())) {

@@ -873,6 +873,7 @@ public final class ResolvedConfigBuilder {
     ResolvedConfig.Ui ui = buildUi();
     ResolvedConfig.Watcher watcher = buildWatcher();
     ResolvedConfig.Ocr ocr = buildOcr();
+    ResolvedConfig.Extraction extraction = buildExtraction();
     ResolvedConfig.Index index = buildIndex();
     ResolvedConfig.Rag rag = buildRag();
     ResolvedConfig.HybridSearch hybridSearch = buildHybridSearch();
@@ -885,7 +886,7 @@ public final class ResolvedConfigBuilder {
         new ResolvedConfig(
             paths, ports, ai, agent, summary,
             search, telemetry, policy, ui,
-            watcher, ocr, index, rag, hybridSearch, worker,
+            watcher, ocr, extraction, index, rag, hybridSearch, worker,
             collections, workerIndexer,
             infraHealth,
             allResolutions);
@@ -1036,7 +1037,9 @@ public final class ResolvedConfigBuilder {
         resolveBoolean("justsearch.models.capability_contract_strict", false),
         // Tempdoc 883 decision 2 — append region; keep new resolve lines last.
         resolveLlmSlots(),
-        resolveLlmKvType());
+        resolveLlmKvType(),
+        resolveMasterGpuEnabled(),
+        resolvePolicyGpuAllowed());
   }
 
   /**
@@ -1472,6 +1475,18 @@ public final class ResolvedConfigBuilder {
         resolveNullableInt("index.ocr.workers"));
   }
 
+  private ResolvedConfig.Extraction buildExtraction() {
+    return new ResolvedConfig.Extraction(
+        resolveString("justsearch.extraction.sandbox.mode", null),
+        resolveString("justsearch.extraction.sandbox.command", null),
+        resolveString("justsearch.extraction.sandbox.heap", null),
+        resolveNullableInt("justsearch.extraction.sandbox.pool"),
+        resolveNullableInt("justsearch.extraction.sandbox.max_requests"),
+        resolveString("justsearch.ingestion.skip.patterns", null),
+        resolveString("justsearch.ingestion.skip.extensions", null),
+        resolveString("justsearch.ingestion.skip.directory_names", null));
+  }
+
   private ResolvedConfig.Index buildIndex() {
     return new ResolvedConfig.Index(
         resolveNullableInt("index.writer.ram_buffer_mb"),
@@ -1525,7 +1540,8 @@ public final class ResolvedConfigBuilder {
         // never see a Head-side value.
         resolveLong(
             "index.identity.deletion_grace_ms",
-            ResolvedConfig.Index.DEFAULT_IDENTITY_DELETION_GRACE_MS));
+            ResolvedConfig.Index.DEFAULT_IDENTITY_DELETION_GRACE_MS),
+        resolveString("justsearch.index.tracing_level", "none").toLowerCase(Locale.ROOT));
   }
 
   private ResolvedConfig.Collections buildCollections() {
@@ -1566,7 +1582,8 @@ public final class ResolvedConfigBuilder {
         resolveLong("justsearch.indexer.deadlineMs", 5_000L),
         Math.max(1, resolveInt("justsearch.indexer.queueSize", 64)),
         Math.max(1, resolveInt("justsearch.indexer.maxInFlightBytes", 512 * 1024 * 1024)),
-        resolveString("workers.indexer.backpressure_mode", null));
+        resolveString("workers.indexer.backpressure_mode", null),
+        resolveString("indexer.worker.version", "0.1.0-dev"));
   }
 
   private ResolvedConfig.InfraHealth buildInfraHealth() {

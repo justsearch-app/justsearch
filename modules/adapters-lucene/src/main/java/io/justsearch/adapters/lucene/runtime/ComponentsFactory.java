@@ -290,6 +290,24 @@ final class ComponentsFactory {
       long reopenTargetMs = nrtMode == NrtMode.ON_DEMAND ? nrtBackgroundMs : nrtTargetMs;
       long reopenHardMs = nrtMode == NrtMode.ON_DEMAND ? nrtBackgroundMs : nrtHardMs;
       NrtReopenStats stats = nrtStats != null ? nrtStats : new NrtReopenStats();
+      IndexRuntimeConfiguration runtimeConfiguration =
+          IndexRuntimeConfiguration.fromFactory(
+              idx,
+              dir,
+              cfg,
+              tmp,
+              mergePolicy,
+              fieldMapper,
+              kf,
+              knnVectorsFormatOverride == null,
+              hnswM,
+              efConstruction,
+              softDeleteFieldResolved,
+              nrtTargetMs,
+              nrtHardMs,
+              nrtMode,
+              nrtBackgroundMs,
+              nrtOnDemandMaxStaleMs);
 
       if (readOnly) {
         try {
@@ -329,7 +347,8 @@ final class ComponentsFactory {
             nrtMode,
             nrtOnDemandMaxStaleMs,
             reopenTargetMs,
-            reopenHardMs);
+            reopenHardMs,
+            runtimeConfiguration);
       }
 
       w = new IndexWriter(dir, cfg);
@@ -371,7 +390,8 @@ final class ComponentsFactory {
           nrtMode,
           nrtOnDemandMaxStaleMs,
           reopenTargetMs,
-          reopenHardMs);
+          reopenHardMs,
+          runtimeConfiguration);
     } catch (Exception e) {
       // Best-effort cleanup to avoid leaking file handles (especially on Windows).
       try {

@@ -35,7 +35,7 @@ final class EngineRootStartupCleanupTest {
 
     KnowledgeServer replacement = mockServer();
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root((gauge, executors, ingestion) -> {
+    EngineRoot root = root((gauge, executors, ingestion, indexComponent, encoderComponent) -> {
       if (factoryCalls.getAndIncrement() == 0) return failed;
       EngineRootRecordedLifecycleTestSupport.bindOffline(replacement, ingestion);
       return replacement;
@@ -69,7 +69,7 @@ final class EngineRootStartupCleanupTest {
 
     KnowledgeServer replacement = mockServer();
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root((gauge, executors, ingestion) -> {
+    EngineRoot root = root((gauge, executors, ingestion, indexComponent, encoderComponent) -> {
       if (factoryCalls.getAndIncrement() == 0) return failed;
       EngineRootRecordedLifecycleTestSupport.bindOffline(replacement, ingestion);
       return replacement;
@@ -93,7 +93,7 @@ final class EngineRootStartupCleanupTest {
     when(failed.awaitClosed(anyLong())).thenReturn(false, true);
 
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root((gauge, executors, ingestion) -> {
+    EngineRoot root = root((gauge, executors, ingestion, indexComponent, encoderComponent) -> {
       factoryCalls.incrementAndGet();
       return failed;
     });
@@ -121,7 +121,7 @@ final class EngineRootStartupCleanupTest {
         .thenReturn(true);
 
     AtomicInteger factoryCalls = new AtomicInteger();
-    EngineRoot root = root((gauge, executors, ingestion) -> {
+    EngineRoot root = root((gauge, executors, ingestion, indexComponent, encoderComponent) -> {
       factoryCalls.incrementAndGet();
       return failed;
     });

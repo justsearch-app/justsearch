@@ -10,7 +10,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
-import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.RepoRootLocator;
 import org.slf4j.Logger;
@@ -44,6 +43,11 @@ public record WorkerConfig(
   public static WorkerConfig load() {
     ConfigStore cs = ConfigStore.globalOrNull();
     var rc = cs != null ? cs.get() : null;
+    return load(rc);
+  }
+
+  /** Uses the exact snapshot captured for this physical index start attempt. */
+  public static WorkerConfig load(io.justsearch.configuration.resolved.ResolvedConfig rc) {
     var wi = rc != null ? rc.workerIndexer() : null;
 
     if (wi == null) {
@@ -60,8 +64,8 @@ public record WorkerConfig(
     Integer nrt = rc.index().nrtTargetMaxStaleMs();
     long nrtTarget = nrt != null ? nrt : 500L;
     long telemetryFlush = rc.telemetry().flushMs();
-    String version = EnvRegistry.INDEXER_WORKER_VERSION.getString("0.1.0-dev");
-    Map<String, Object> metadata = new SsotCommitMetadataSource().build();
+    String version = wi.serviceVersion();
+    Map<String, Object> metadata = new SsotCommitMetadataSource(rc).build();
     Path repoRoot = RepoRootLocator.findRepoRoot();
     String manifestHash = sha256(repoRoot.resolve("SSOT/manifests/repro/repro.v1.json"));
     log.info(

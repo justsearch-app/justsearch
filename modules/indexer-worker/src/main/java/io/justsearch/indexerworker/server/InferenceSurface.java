@@ -5,11 +5,16 @@ import io.justsearch.indexerworker.bgem3.BgeM3Assembly;
 import io.justsearch.indexerworker.embed.onnx.EmbeddingAssembly;
 import io.justsearch.indexerworker.ner.NerAssembly;
 import io.justsearch.indexerworker.splade.SpladeAssembly;
+import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.PolicySnapshot;
 import io.justsearch.ort.SessionHandle;
 import io.justsearch.reranker.RerankerAssembly;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Typed bundle returned by {@link InferenceCompositionRoot#compose} — the §7.6 single-entry-point
@@ -37,6 +42,7 @@ import java.util.Optional;
  * @param bgeM3 unified dense+sparse encoder; empty unless selected + available
  * @param policies snapshot of {@link PolicySnapshot} for the roles whose variant resolved
  * @param handles every {@link SessionHandle} the surface owns; iterated for shutdown
+ * @param componentObservation config digest and requested/missing-role composition evidence
  */
 public record InferenceSurface(
     Optional<EmbeddingAssembly> embedding,
@@ -46,8 +52,80 @@ public record InferenceSurface(
     Optional<SpladeAssembly> splade,
     Optional<BgeM3Assembly> bgeM3,
     PolicySnapshot policies,
-    List<SessionHandle> handles)
+    List<SessionHandle> handles,
+    ComponentObservation componentObservation)
     implements AutoCloseable {
+
+  /** Back-compatible test constructor. Its observation is explicitly unknown, never ready. */
+  public InferenceSurface(
+      Optional<EmbeddingAssembly> embedding,
+      Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker,
+      Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade,
+      Optional<BgeM3Assembly> bgeM3,
+      PolicySnapshot policies,
+      List<SessionHandle> handles) {
+    this(
+        embedding,
+        ner,
+        reranker,
+        citation,
+        splade,
+        bgeM3,
+        policies,
+        handles,
+        ComponentObservation.unknown());
+  }
+
+  public InferenceSurface {
+    handles = List.copyOf(handles);
+    Objects.requireNonNull(componentObservation, "componentObservation");
+  }
+
+  /** Immutable evidence used by the physical owner after it completes service wiring. */
+  public record ComponentObservation(
+      Optional<String> configurationDigest,
+      Set<EncoderRole> requestedRoles,
+      Set<EncoderRole> missingRoles) {
+
+    public ComponentObservation {
+      configurationDigest = Optional.ofNullable(configurationDigest).orElseGet(Optional::empty);
+      requestedRoles = immutableRoles(requestedRoles);
+      missingRoles = immutableRoles(missingRoles);
+      if (!requestedRoles.containsAll(missingRoles)) {
+        throw new IllegalArgumentException("missing roles must be a subset of requested roles");
+      }
+    }
+
+    public static ComponentObservation unknown() {
+      return new ComponentObservation(Optional.empty(), Set.of(), Set.of());
+    }
+
+    static ComponentObservation composed(
+        String appliedVersion, Set<EncoderRole> requestedRoles, Set<EncoderRole> presentRoles) {
+      Set<EncoderRole> missingRoles = EnumSet.noneOf(EncoderRole.class);
+      missingRoles.addAll(requestedRoles);
+      missingRoles.removeAll(presentRoles);
+      return new ComponentObservation(
+          Optional.of(appliedVersion), requestedRoles, missingRoles);
+    }
+
+    public boolean hasRequestedRoles() {
+      return !requestedRoles.isEmpty();
+    }
+
+    public boolean compositionSatisfied() {
+      return configurationDigest.isPresent() && hasRequestedRoles() && missingRoles.isEmpty();
+    }
+
+    private static Set<EncoderRole> immutableRoles(Set<EncoderRole> roles) {
+      Objects.requireNonNull(roles, "roles");
+      EnumSet<EncoderRole> copy = EnumSet.noneOf(EncoderRole.class);
+      copy.addAll(roles);
+      return Collections.unmodifiableSet(copy);
+    }
+  }
 
   @Override
   public void close() {

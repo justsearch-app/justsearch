@@ -7,6 +7,81 @@ Continue autonomously in `.claude/worktrees/lane-f-pr1-verify`, branch
 stage-F merge authorization persists; no routine owner approval is pending.
 C2 is accepted; D1/D2/E/F remain open. Root owns shared Gradle and dev-stack lifecycle.
 
+C2 is accepted at `ba1440624`: installed2260 (11 cases), stress2264
+(11,329 cases), hosted2268 and standard-model2269 provide the required proof.
+[C2 acceptance](evidence/C2/verification-2026-09-21.md) owns exact revisions,
+commands, skips and artifacts. Later governance correction2271 passed hosted CI.
+
+D1 batch1 is active: registry/hash foundation `e9e024738` and bounded observation/
+metadata seams `8114d50ca` are pushed; owner wiring is uncommitted.
+Focused2287 passes72 cases/16 suites;2289 freshly passes45 cases/10 suites after
+extraction capture, real encoder composition/wiring proof (native assembly mocked),
+API fallback and the restored thin-composer ceiling. No failures or skips.
+Full affected2281 passed5,359 cases before those corrections; it is not fresh
+integrated proof of the current diff. No D1 acceptance is claimed.
+
+Next: finish independent review of normalized index/extraction applied-value projection, then replace
+readiness authorities and complete the291-key apply register. Root has replaced the
+misleading WorkerConfig hash in WIP with IndexConfigurationProjection and real-boot
+regressions. Root also holds WorkerServiceConfiguration once per physical index
+start so service reconstruction cannot repeat filesystem discovery. These changes
+passed focused2290 (91 cases/11 suites). Root then corrected separate commit-refresh
+thresholds and inactive refresh/recall settings;2291 passed16 cases/4 suites with no
+failures or skips. Consolidated review's three digest gaps (hot reload, retained
+health discovery, acquired tracing sampler) are corrected.2296 passed22 tests/8
+suites, including real four-owner registration/API bind and tracing cleanup;
+spotlessCheck and pmdAll pass.2297 cleanup omission failed for the intended surviving
+exporter thread; production source is restored byte-exactly. All agents are frozen.
+2294 passed1,024 tests in configuration/adapters before static failure stopped
+remaining tasks; it predates review corrections. Next run2298 is fresh integrated
+affected-module proof, including telemetry. No stack is active. D1 is not accepted.
+
+Use the [component plan](evidence/D1/component-plan-2026-09-21.md),
+[wiring proof](evidence/D1/owner-wiring-2026-09-21.md),
+[readiness plan](evidence/D1/readiness-plan-2026-09-21.md) and
+[index capture plan](evidence/D1/index-capture-plan-2026-09-21.md).
+Do not hash raw/nullable desired settings as effective runtime values, count a
+manufactured success observation as composition proof, or start another lifecycle
+authority. Compiled sources must be frozen before root starts Gradle.
+
+### D1 preparation after C2 reconciliation
+
+Read-only audit confirms the first slice is D1-1 through D1-3: component registry,
+readiness projections and config-apply register. The registry and initial wiring are
+implemented but not accepted; readiness replacement and the full register remain.
+D1's source anchors predate current C2 and must be re-grounded. Before Flow A,
+reconcile streaming core.reindex versus captured core.bulk-reindex: D1 abandonment
+cannot delete C2 evidence before terminal ownership and exact queue ACK, and its
+COMPLETE_WITH_GAPS/accept-gaps/live activation supersedes current promoted-with-gaps
+failure/replacement behavior only through an explicit design and proof. Use the [current D1-1 owner map](evidence/D1/regrounding-2026-09-21.md) before
+reading owners; it preserves actual front/index/model composition paths and the
+configuration-authority ambiguity for D1-3.
+
+### Owner and evidence map
+
+All paths below are relative to this worktree. Discover moved paths rather than
+guessing a neighboring module; ignored `tmp`/`build` evidence needs `--no-ignore`.
+
+| Concern | Owner / retained evidence |
+| --- | --- |
+| Lessons and autonomous working contract | [resumption](evidence/C2/resume-2026-09-21.md); current status lives here |
+| Bulk acceptance and design | [bulk connection](evidence/C2/bulk-reindex-connection.md); [prior checkpoint detail](evidence/C2/connected-bulk-checkpoint-2026-09-21.md) |
+| Earlier lock/replay acceptance | [hostile-lock acceptance](evidence/C2/hostile-lock-acceptance.md) |
+| Bulk composition | `modules/app-engine/src/main/java/io/justsearch/app/engine/RecordedIngestionCoordinator.java`, adjacent `EngineKnowledgeClient.java` |
+| Recorded boot/live witness | `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java`; `modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java` |
+| Fresh empty index durability | `modules/adapters-lucene/src/{main,test}/java/io/justsearch/adapters/lucene/runtime/ComponentsFactory{,Test}.java`; `tmp/2226*` through `tmp/2228*` |
+| Attempt runner / port | `modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java`; `modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java` |
+| Indexing close / tests | `modules/worker-services/src/{main,test}/java/io/justsearch/indexerworker/loop/IndexingLoop{,RestartTest}.java` |
+| Reload owner / trigger tests | `modules/indexer-worker/src/{main,test}/java/io/justsearch/indexerworker/server/DevReloadManager{,TriggerTest}.java`; adjacent `KnowledgeServer.java` |
+| Installed harness | `scripts/supervisor-conformance/real-writer-recovery.mjs`, `migration-restart-scenario.mjs`, `operation-fault-scenario.mjs`, `bulk-fault-scenario.mjs`; `modules/ui/src/main/java/io/justsearch/ui/OperationFaultBarrier.java` |
+| Verification artifacts | `tmp/2201-installed-bulk-migration*`, `tmp/2203-bulk-engine-full*`, `tmp/2208-engine-cooperative-close-full*`, `tmp/2210-worker-cooperative-close*`, `tmp/2211-cooperative-reload-focused*` |
+
+Raw logs/XML are local-only, retained through lane acceptance plus30days; export
+before releasing this worktree. Source hashes supplement accessible artifacts.
+Historical material below is background, not the current execution queue.
+
+## Historical C2-to-D1 checkpoint narrative (through2286)
+
 Pushed checkpoint `0f1bec7e324a7aa8fab86bab0452d6167dd2d940` connects recorded bulk
 admission, captured enumeration, exact generation recovery/promotion, durable
 refusal, terminal settlement and acknowledgement. Installed 2201 proves the actual
@@ -85,45 +160,21 @@ build; owned stack stopped with closed ports and health ABSENT/no orphans.
 
 Public claims correction passes hosted2271 on492af9b89 (synthetic1028274b),
 including8566/8573byte budget. Independent reconciliation finds no remaining C2
-acceptance gap. C2 is accepted; D1 batch1 is active. The newer workflow's remaining
-jobs are still running, not claimed green. Root owns integration and shared builds;
-bounded agent owns new component contract/registry/tests, explorers map configuration
-and readiness. [Current D1 plan](evidence/D1/component-plan-2026-09-21.md).
+acceptance gap. C2 is accepted; D1 batch1 is active. Workflow35597743409 subsequently
+completed successfully; its badge does not replace the test-level C2 proof above.
+Root owns integration and shared builds. Registry/hash foundation checkpoint
+`e9e024738` is pushed. Run2281 passed all four affected module suites (5,359 cases,
+zero failures/errors, 19 skips) before owner-projection review corrections. Those
+corrections are WIP: snapshot-bound model discovery/service wiring and index runtime
+capture, API fallback digest, metadata capture, intentional ABSENT semantics, and
+the registry-backed capability adapter. Focused retry is pending after compile
+fixes and removal of unbounded adapter callback queues. No D1 acceptance is claimed.
+[Current D1 plan](evidence/D1/component-plan-2026-09-21.md) and
+[current wiring proof and remaining obligations](evidence/D1/owner-wiring-2026-09-21.md).
+Use the [readiness migration plan](evidence/D1/readiness-plan-2026-09-21.md) and
+[index capture/projection plan](evidence/D1/index-capture-plan-2026-09-21.md) before
+repeating owner discovery. No stack is active; root owns the next Gradle run.
 
-### D1 preparation after C2 reconciliation
-
-Read-only audit confirms the first slice is D1-1 through D1-3: component registry,
-readiness projections and config-apply register; these remain unimplemented.
-D1's source anchors predate current C2 and must be re-grounded. Before Flow A,
-reconcile streaming core.reindex versus captured core.bulk-reindex: D1 abandonment
-cannot delete C2 evidence before terminal ownership and exact queue ACK, and its
-COMPLETE_WITH_GAPS/accept-gaps/live activation supersedes current promoted-with-gaps
-failure/replacement behavior only through an explicit design and proof. Use the [current D1-1 owner map](evidence/D1/regrounding-2026-09-21.md) before
-reading owners; it preserves actual front/index/model composition paths and the
-configuration-authority ambiguity for D1-3.
-
-### Owner and evidence map
-
-All paths below are relative to this worktree. Discover moved paths rather than
-guessing a neighboring module; ignored `tmp`/`build` evidence needs `--no-ignore`.
-
-| Concern | Owner / retained evidence |
-| --- | --- |
-| Lessons and autonomous working contract | [resumption](evidence/C2/resume-2026-09-21.md); current status lives here |
-| Bulk acceptance and design | [bulk connection](evidence/C2/bulk-reindex-connection.md); [prior checkpoint detail](evidence/C2/connected-bulk-checkpoint-2026-09-21.md) |
-| Earlier lock/replay acceptance | [hostile-lock acceptance](evidence/C2/hostile-lock-acceptance.md) |
-| Bulk composition | `modules/app-engine/src/main/java/io/justsearch/app/engine/RecordedIngestionCoordinator.java`, adjacent `EngineKnowledgeClient.java` |
-| Recorded boot/live witness | `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java`; `modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java` |
-| Fresh empty index durability | `modules/adapters-lucene/src/{main,test}/java/io/justsearch/adapters/lucene/runtime/ComponentsFactory{,Test}.java`; `tmp/2226*` through `tmp/2228*` |
-| Attempt runner / port | `modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java`; `modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java` |
-| Indexing close / tests | `modules/worker-services/src/{main,test}/java/io/justsearch/indexerworker/loop/IndexingLoop{,RestartTest}.java` |
-| Reload owner / trigger tests | `modules/indexer-worker/src/{main,test}/java/io/justsearch/indexerworker/server/DevReloadManager{,TriggerTest}.java`; adjacent `KnowledgeServer.java` |
-| Installed harness | `scripts/supervisor-conformance/real-writer-recovery.mjs`, `migration-restart-scenario.mjs`, `operation-fault-scenario.mjs`, `bulk-fault-scenario.mjs`; `modules/ui/src/main/java/io/justsearch/ui/OperationFaultBarrier.java` |
-| Verification artifacts | `tmp/2201-installed-bulk-migration*`, `tmp/2203-bulk-engine-full*`, `tmp/2208-engine-cooperative-close-full*`, `tmp/2210-worker-cooperative-close*`, `tmp/2211-cooperative-reload-focused*` |
-
-Raw logs/XML are local-only, retained through lane acceptance plus30days; export
-before releasing this worktree. Source hashes supplement accessible artifacts.
-Historical material below is background, not the current execution queue.
 
 ## Historical handoff record (preserved)
 

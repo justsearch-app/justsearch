@@ -1313,6 +1313,18 @@ final class ResolvedConfigBuilderTest {
     }
 
     @Test
+    @DisplayName("Indexer service version and index tracing level are captured in typed owners")
+    void processOwnerInputsAreCapturedAndNormalized() {
+      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
+      builder.putDefault("indexer.worker.version", "9.9.9-test");
+      builder.putDefault("justsearch.index.tracing_level", "FULL");
+
+      ResolvedConfig config = builder.build();
+      assertEquals("9.9.9-test", config.workerIndexer().serviceVersion());
+      assertEquals("full", config.index().tracingLevel());
+    }
+
+    @Test
     @DisplayName("Ports are clamped to [0, 65535]")
     void portsClamped() {
       ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
@@ -1830,6 +1842,42 @@ final class ResolvedConfigBuilderTest {
       assertFalse(
           config.index().indexAutoRecovery(),
           "documents the pre-fix divergence: env-only standalone defaulted recovery off");
+    }
+  }
+
+  @Nested
+  @DisplayName("Extraction capture")
+  class ExtractionCapture {
+
+    @Test
+    void capturesAllDeclaredSandboxAndSkipInputsWithoutInventingRuntimeDefaults() {
+      ResolvedConfig config =
+          new ResolvedConfigBuilder()
+              .putDefault("justsearch.extraction.sandbox.mode", "process")
+              .putDefault("justsearch.extraction.sandbox.command", "worker --child")
+              .putDefault("justsearch.extraction.sandbox.heap", "768m")
+              .putDefault("justsearch.extraction.sandbox.pool", "3")
+              .putDefault("justsearch.extraction.sandbox.max_requests", "41")
+              .putDefault("justsearch.ingestion.skip.patterns", "cache,temp")
+              .putDefault("justsearch.ingestion.skip.extensions", "bak,old")
+              .putDefault("justsearch.ingestion.skip.directory_names", "vendor,generated")
+              .build();
+
+      assertEquals("process", config.extraction().sandboxMode());
+      assertEquals("worker --child", config.extraction().sandboxCommand());
+      assertEquals("768m", config.extraction().sandboxHeap());
+      assertEquals(3, config.extraction().sandboxPoolSize());
+      assertEquals(41, config.extraction().sandboxMaxRequestsPerChild());
+      assertEquals("cache,temp", config.extraction().ingestionSkipPatterns());
+      assertEquals("bak,old", config.extraction().ingestionSkipExtensions());
+      assertEquals("vendor,generated", config.extraction().ingestionSkipDirectoryNames());
+
+      ResolvedConfig.Extraction absent = new ResolvedConfigBuilder().build().extraction();
+      assertNull(absent.sandboxMode());
+      assertNull(absent.sandboxCommand());
+      assertNull(absent.sandboxHeap());
+      assertNull(absent.sandboxPoolSize());
+      assertNull(absent.sandboxMaxRequestsPerChild());
     }
   }
 

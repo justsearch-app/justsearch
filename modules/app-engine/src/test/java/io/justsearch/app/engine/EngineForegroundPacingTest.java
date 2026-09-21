@@ -124,8 +124,8 @@ final class EngineForegroundPacingTest {
     KnowledgeServer[] built = new KnowledgeServer[1];
     root =
         new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
-            (g, executors, ingestion) -> {
-              built[0] = new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(g), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion);
+            (g, executors, ingestion, indexComponent, encoderComponent) -> {
+              built[0] = new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(g), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
               return built[0];
             },
             30_000L,

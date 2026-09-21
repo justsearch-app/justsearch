@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.embed.onnx;
 
 import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 
 /**
@@ -27,6 +28,14 @@ public final class EmbeddingOnnxModelDiscovery {
     var shared =
         io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
             explicitPath, MODEL_NAME, null);
+    return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
+  }
+
+  /** Snapshot-bound discovery; unlike the legacy overload this never consults EnvRegistry. */
+  public static Result resolve(ResolvedConfig config, String explicitPath) {
+    var shared =
+        io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
+            config, explicitPath, MODEL_NAME, null);
     return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
   }
 }

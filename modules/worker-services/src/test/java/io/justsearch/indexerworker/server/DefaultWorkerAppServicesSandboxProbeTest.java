@@ -1,13 +1,18 @@
 package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexerworker.extract.ContentExtractor;
+import io.justsearch.indexerworker.extract.ExtractionConfiguration;
 import io.justsearch.indexerworker.extract.ExtractionMetricCatalog;
 import io.justsearch.indexerworker.extract.ExtractionSandboxRestartTags;
 import io.justsearch.indexerworker.extract.OcrMetricCatalog;
@@ -57,9 +62,12 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
   private WorkerExecutorRegistrations executors;
   private ListAppender<ILoggingEvent> logs;
   private ch.qos.logback.classic.Logger wiringLogger;
+  private ConfigStore previousConfigStore;
+  private ConfigStore installedConfigStore;
 
   @BeforeEach
   void setUp() {
+    previousConfigStore = ConfigStore.globalOrNull();
     System.clearProperty(MODE_PROP);
     System.clearProperty(COMMAND_PROP);
     registry = new TestMetricRegistry(ExtractionMetricCatalog.DEFINITIONS);
@@ -88,6 +96,9 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
     }
     if (registry != null) {
       registry.close();
+    }
+    if (installedConfigStore != null) {
+      ConfigStore.restoreGlobal(installedConfigStore, previousConfigStore);
     }
   }
 
@@ -178,6 +189,56 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
       assertEquals("no child process here", extractor.extract(file).content().trim());
       assertEquals(0L, probeFailures(), "in_process spawns nothing, so nothing can fail a probe");
       assertTrue(logs.list.stream().noneMatch(e -> e.getFormattedMessage().contains("startup probe")));
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void capturedNormalizedConfigurationDrivesFactoryAfterGlobalChanges() throws Exception {
+    ResolvedConfig captured =
+        new ResolvedConfigBuilder()
+            .putDefault("justsearch.extraction.sandbox.mode", "in_process")
+            .putDefault("justsearch.extraction.sandbox.command", "ignored-captured-command")
+            .putDefault("justsearch.extraction.sandbox.pool", "7")
+            .putDefault("justsearch.ingestion.skip.extensions", "captured")
+            .build();
+    ExtractionConfiguration applied =
+        ExtractionConfiguration.capture(
+            captured,
+            executors.pdfOcr().spec().threadCount(),
+            DefaultWorkerAppServices.buildSkipPolicy(captured));
+
+    ResolvedConfig replacement =
+        new ResolvedConfigBuilder()
+            .putDefault("justsearch.extraction.sandbox.mode", "process")
+            .putDefault(
+                "justsearch.extraction.sandbox.command",
+                "justsearch-no-such-extraction-child-binary")
+            .putDefault("justsearch.ingestion.skip.extensions", "replacement")
+            .build();
+    installedConfigStore = new ConfigStore(replacement);
+    ConfigStore.setGlobal(installedConfigStore);
+
+    assertEquals(
+        java.util.Set.of("captured"), applied.ingestionSkipPolicy().skipExtensions());
+    assertEquals(io.justsearch.indexerworker.extract.ExtractionSandboxFactory.Mode.IN_PROCESS,
+        applied.sandboxMode());
+    assertNull(applied.sandboxCommand());
+    try (TimeboxedContentExtractor extractor =
+        DefaultWorkerAppServices.buildContentExtractor(
+            executors,
+            null,
+            catalog,
+            OcrMetricCatalog.noop(),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            applied)) {
+      assertEquals(
+          "captured factory input survives",
+          extractor
+              .extract(write("captured.txt", "captured factory input survives"))
+              .content()
+              .trim());
+      assertEquals(0L, probeFailures(), "replacement global process mode must not run a probe");
     }
   }
 

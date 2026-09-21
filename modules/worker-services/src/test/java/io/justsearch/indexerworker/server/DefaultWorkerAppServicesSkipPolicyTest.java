@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexerworker.ingest.IngestionSkipPolicy;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -119,5 +121,17 @@ final class DefaultWorkerAppServicesSkipPolicyTest {
     // Both parseCsvSet and IngestionSkipPolicy.normalise lowercase + trim; the chain produces
     // a case-folded set.
     assertEquals(Set.of("foo", "bar", "baz"), policy.skipExtensions());
+  }
+
+  @Test
+  void explicitSnapshotDoesNotFollowLaterGlobalPropertyChanges() {
+    System.setProperty(EXTENSIONS_PROP, "captured");
+    ResolvedConfig captured =
+        new ResolvedConfigBuilder().contributeEnvRegistry().build();
+    System.setProperty(EXTENSIONS_PROP, "replacement");
+
+    IngestionSkipPolicy policy = DefaultWorkerAppServices.buildSkipPolicy(captured);
+
+    assertEquals(Set.of("captured"), policy.skipExtensions());
   }
 }

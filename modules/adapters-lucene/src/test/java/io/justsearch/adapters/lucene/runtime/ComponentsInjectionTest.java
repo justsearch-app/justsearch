@@ -36,6 +36,7 @@ class ComponentsInjectionTest extends LuceneExecutorTestBase {
 
     Directory dir = new ByteBuffersDirectory();
     IndexWriterConfig cfg = new IndexWriterConfig(new WhitespaceAnalyzer());
+    cfg.setSoftDeletesField(SchemaFields.SOFT_DELETE);
     IndexWriter writer = new IndexWriter(dir, cfg);
     SearcherManager sm =
         new SearcherManager(writer, true, true, new SearcherFactory());
@@ -50,6 +51,10 @@ class ComponentsInjectionTest extends LuceneExecutorTestBase {
           }
         });
 
+    ResolvedConfig resolvedConfig = resolveForTest();
+    FieldMapper fieldMapper = new FieldMapper(FieldCatalogDef.forTesting(4));
+    org.apache.lucene.index.TieredMergePolicy mergePolicy =
+        (org.apache.lucene.index.TieredMergePolicy) cfg.getMergePolicy();
     Components components =
         new Components(
             /*commitMetadataEnabled*/ true,
@@ -64,13 +69,30 @@ class ComponentsInjectionTest extends LuceneExecutorTestBase {
             cfg.getCodec().knnVectorsFormat(),
             cfg.getCodec().knnVectorsFormat() == null ? 0 : 10,
             cfg.getAnalyzer(),
-            resolveForTest(),
+            resolvedConfig,
             500L,
             1_000L,
             NrtMode.CONTINUOUS,
             1_000L,
             500L,
-            1_000L);
+            1_000L,
+            IndexRuntimeConfiguration.fromFactory(
+                resolvedConfig.index(),
+                dir,
+                cfg,
+                mergePolicy,
+                mergePolicy,
+                fieldMapper,
+                cfg.getCodec().knnVectorsFormat(),
+                false,
+                resolvedConfig.index().effectiveVectorHnswM(),
+                resolvedConfig.index().effectiveVectorHnswEfConstruction(),
+                SchemaFields.SOFT_DELETE,
+                500L,
+                1_000L,
+                NrtMode.CONTINUOUS,
+                2_000L,
+                1_000L));
 
     // Tempdoc 406 Phase 4b: injection via builder.withPrebuiltComponentsForTests
     // (replaces the legacy LuceneLifecycleManager + LifecycleTestAccessor.setComponentsForTests
@@ -78,7 +100,7 @@ class ComponentsInjectionTest extends LuceneExecutorTestBase {
     // builder) and uses it instead of calling ComponentsFactory.build.
     IndexSchema schema =
         new IndexSchema(
-            new FieldMapper(FieldCatalogDef.forTesting(4)),
+            fieldMapper,
             new SsotAnalyzerRegistry(),
             () -> (CommitMetadataSource) Map::of,
             new CommitMetadataValidator() {

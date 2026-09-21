@@ -80,6 +80,9 @@ public sealed interface LuceneRuntime extends AutoCloseable
   /** The resolved configuration for this runtime. */
   ResolvedConfig resolvedConfig();
 
+  /** Immutable effective configuration values selected when this runtime was opened. */
+  Map<String, Object> appliedConfigurationValues();
+
   /** Whether commit metadata stamping is enabled for this runtime. */
   boolean commitMetadataEnabled();
 

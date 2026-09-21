@@ -45,6 +45,41 @@ class OnnxModelDiscoveryTest {
   }
 
   @Test
+  @DisplayName("snapshot-bound discovery ignores a disagreeing global model root")
+  void snapshotBoundDiscoveryUsesSuppliedModelRoot() throws IOException {
+    Path globalRoot = tmp.resolve("global-models");
+    Path suppliedRoot = tmp.resolve("supplied-models");
+    Path globalModel = globalRoot.resolve("onnx").resolve("ner");
+    Path suppliedModel = suppliedRoot.resolve("onnx").resolve("ner");
+    createDefaultModel(globalModel);
+    createDefaultModel(suppliedModel);
+    ResolvedConfig global =
+        ResolvedConfig.builder()
+            .putDefault("justsearch.models.dir", globalRoot.toString())
+            .build();
+    ResolvedConfig supplied =
+        ResolvedConfig.builder()
+            .putDefault("justsearch.models.dir", suppliedRoot.toString())
+            .build();
+    ConfigStore previous = ConfigStore.globalOrNull();
+    try {
+      ConfigStore.setGlobal(new ConfigStore(global));
+
+      OnnxModelDiscovery.Result result =
+          OnnxModelDiscovery.resolve(supplied, null, "ner", null);
+
+      assertNotNull(result);
+      assertEquals(suppliedModel.toAbsolutePath().normalize(), result.modelDir());
+    } finally {
+      if (previous != null) {
+        ConfigStore.setGlobal(previous);
+      } else {
+        ConfigStore.clearGlobal();
+      }
+    }
+  }
+
+  @Test
   @DisplayName("model.onnx + tokenizer.json + vocab.txt → discovered (existing happy path)")
   void conventionalLayout_discovered() throws IOException {
     Path modelDir = tmp.resolve("models").resolve("splade").resolve("naver-splade-v3");
@@ -177,5 +212,11 @@ class OnnxModelDiscoveryTest {
     } else {
       System.setProperty(key, previous);
     }
+  }
+
+  private static void createDefaultModel(Path dir) throws IOException {
+    Files.createDirectories(dir);
+    Files.writeString(dir.resolve("model.onnx"), "stub");
+    Files.writeString(dir.resolve("tokenizer.json"), "stub");
   }
 }

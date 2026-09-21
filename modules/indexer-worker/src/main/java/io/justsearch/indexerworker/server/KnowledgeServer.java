@@ -21,7 +21,6 @@ import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.indexerworker.embed.EmbeddingFingerprint;
 import io.justsearch.indexerworker.splade.SpladeFingerprint;
-import io.justsearch.indexerworker.embed.EmbeddingConfig;
 import io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard;
 import io.justsearch.adapters.lucene.runtime.ParityDiagnostics;
 import io.justsearch.indexerworker.embed.EmbeddingMetadataOverlay;
@@ -41,7 +40,6 @@ import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerSafeMetrics;
 import io.justsearch.indexing.SchemaFields;
-import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
@@ -165,6 +163,7 @@ public final class KnowledgeServer implements Closeable {
   EmbeddingService embeddingService;
   EmbeddingCompatibilityController embeddingCompatController;
   volatile WorkerAppServices appServices;
+  private WorkerServiceConfiguration serviceConfiguration;
 
   /**
    * Tempdoc 885 item 3: the foreground-load gauge and the duty-cycle policy that reads it. Both are
@@ -336,7 +335,10 @@ public final class KnowledgeServer implements Closeable {
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final WorkerExecutorRegistrations workerExecutors;
   private final RecordedIngestionLifecycle recordedIngestionLifecycle;
+  private final io.justsearch.core.component.ComponentHandle indexComponent;
+  private final io.justsearch.core.component.ComponentHandle encoderComponent;
   private RecordedIngestionLifecycle.Attachment recordedIngestionAttachment;
+  private volatile ResolvedConfig startupConfiguration;
   private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
 
   public KnowledgeServer(
@@ -353,6 +355,34 @@ public final class KnowledgeServer implements Closeable {
       WorkerSignalBus signalBus,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       RecordedIngestionLifecycle recordedIngestionLifecycle) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle, null, null);
+  }
+
+  /** Process composition supplies stable handles retained across physical index replacement. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, null);
+  }
+
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration) {
+    this.startupConfiguration = startupConfiguration;
+    this.indexComponent = indexComponent;
+    this.encoderComponent = encoderComponent;
     this.recordedIngestionLifecycle = Objects.requireNonNull(recordedIngestionLifecycle,
         "recordedIngestionLifecycle");
     this.executors = Objects.requireNonNull(executors, "executors");
@@ -431,6 +461,10 @@ public final class KnowledgeServer implements Closeable {
    */
   public void start() throws IOException {
     log.info("Starting KnowledgeServer...");
+    if (indexComponent != null) {
+      indexComponent.transition(io.justsearch.core.component.ComponentState.STARTING,
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_STARTING.code(), null);
+    }
     running = true;
     long t0 = System.nanoTime();
     long tPrev = t0;
@@ -438,6 +472,7 @@ public final class KnowledgeServer implements Closeable {
 
     try {
       // 0. Initialize Worker-owned telemetry (must not write to the Head metrics file).
+      if (startupConfiguration == null) startupConfiguration = ConfigStore.global().get();
       // Tempdoc 417 Phase 1: register IndexRuntimeMetricCatalog.DEFINITIONS so the SDK builds
       // per-metric Views (tag schemas + bucket bounds + exemplar policies) before the
       // SdkMeterProvider is built. F2 fix: catalog has only a registry-arg constructor (final
@@ -533,7 +568,7 @@ public final class KnowledgeServer implements Closeable {
       telemetry = workerTelemetry;
 
       // 0b. Initialize tracing (must happen before service class loading at step 3b).
-      // Read config directly from EnvRegistry — ConfigStore is not ready until step 3.
+      // Use the same resolved snapshot captured for this physical index start.
       //
       // Lane F review S13: there is ONE GlobalOpenTelemetry per JVM, and since item A6 the Head and
       // the index half share one. Whichever bootstrap runs first wins, and the Head's runs first
@@ -544,8 +579,7 @@ public final class KnowledgeServer implements Closeable {
       // projection is re-cut in stage B); what it must not do is happen silently. The catch below
       // used to log at DEBUG under the Worker's INFO threshold, so an operator who set the index
       // level and saw no indexing spans had nothing to read.
-      String tracingLevel = EnvRegistry.INDEX_TRACING_LEVEL
-          .getString("none").toLowerCase(Locale.ROOT);
+      String tracingLevel = startupConfiguration.index().tracingLevel();
       if (!"none".equals(tracingLevel)) {
         try {
           tracingBootstrap = io.justsearch.telemetry.TracingBootstrap.forIndexing(
@@ -630,9 +664,8 @@ public final class KnowledgeServer implements Closeable {
       tPrev = tPhase;
 
       // 3. Resolve generation-scoped index path BEFORE opening Lucene.
-      // Prefer ConfigStore (populated from worker snapshot); fall back to RuntimeConfig.
-      ConfigStore cs = ConfigStore.globalOrNull();
-      ResolvedConfig rc = cs != null ? cs.get() : null;
+      // Production root captured this once; legacy fixture constructors capture at first start.
+      ResolvedConfig rc = startupConfiguration;
       if (rc == null) {
         throw new IllegalStateException("ConfigStore not initialized — cannot start KnowledgeServer");
       }
@@ -1066,7 +1099,7 @@ public final class KnowledgeServer implements Closeable {
 
 
       // Dev hot-reload manager (Phase 2, tempdoc 305)
-      if (ConfigStore.global().get().ai().devHotReload()) {
+      if (startupConfiguration.ai().devHotReload()) {
         devReloadManager = new DevReloadManager(this);
         log.info("Dev hot-reload enabled (justsearch.dev.hotreload=true)");
       }
@@ -1116,6 +1149,7 @@ public final class KnowledgeServer implements Closeable {
           telemetryMs, signalBusMs, jobQueueMs, luceneMs, initMs, loopMs, totalMs);
 
       log.info("KnowledgeServer started successfully (in-process; no port)");
+      publishIndexConfiguration();
 
       // --- Deferred model initialization (background) ---
       // Models load in a background thread while the ports are already answering. Callers
@@ -1124,6 +1158,10 @@ public final class KnowledgeServer implements Closeable {
       startDeferredModelInitialization(this::initDeferredModels);
 
     } catch (Exception | Error e) {
+      if (indexComponent != null) {
+        indexComponent.transition(io.justsearch.core.component.ComponentState.FAILED,
+            io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), null);
+      }
       log.error("Failed to start KnowledgeServer", e);
       // tempdoc 628 Stage D-part2: if startup failed because the index is corrupt and could not be
       // auto-recovered (FAIL_CLOSED / recovery-failed), stamp a fatal-reason marker so the Head can
@@ -1301,6 +1339,24 @@ public final class KnowledgeServer implements Closeable {
     return false;
   }
 
+  /** Declared configuration inputs consumed by this physical index composition. */
+  public static Set<String> componentDependencies() {
+    return IndexConfigurationProjection.dependencies();
+  }
+
+  private void publishIndexConfiguration() {
+    if (indexComponent == null) return;
+    if (!(appServices instanceof DefaultWorkerAppServices services)) {
+      throw new IllegalStateException("Index configuration requires the composed service owners");
+    }
+    String version = IndexConfigurationProjection.digest(
+        startupConfiguration, config, indexBasePath, searchLifecycle, services,
+        indexingPacing, documentIdentityStore.deletionGraceMs(),
+        tracingBootstrap == null ? null : tracingBootstrap.samplerDescription());
+    indexComponent.setDesiredVersion(version);
+    indexComponent.setAppliedVersion(version);
+  }
+
   /**
    * Constructs a {@link DefaultWorkerAppServices} with the 2 KS-owned pre-wired values
    * (migration-active supplier + embedding telemetry) already supplied at ctor time.
@@ -1314,6 +1370,10 @@ public final class KnowledgeServer implements Closeable {
    * {@link DevReloadManager}'s hot-reload path so all three observe the same wiring.
    */
   DefaultWorkerAppServices newAppServices() {
+    if (serviceConfiguration == null) {
+      serviceConfiguration = WorkerServiceConfiguration.capture(
+          startupConfiguration, workerExecutors.pdfOcr().spec().threadCount());
+    }
     LuceneRuntime currentIngest = this.ingestLifecycle;
     if (currentIngest instanceof RunningRuntime runningRuntime) {
       bindTerminalWriterFaultSource(runningRuntime);
@@ -1324,16 +1384,16 @@ public final class KnowledgeServer implements Closeable {
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
         embeddingTelemetry,
         indexingPacing,
-        childRegistry);
+        childRegistry,
+        serviceConfiguration);
   }
 
   /** Tempdoc 885 item 3: the process-scoped duty-cycle policy, built from resolved config. */
   private IndexingPacing buildIndexingPacing() {
-    ConfigStore store = ConfigStore.globalOrNull();
     ResolvedConfig.Ai.BackfillPacing pacing =
-        store == null || store.get() == null
+        startupConfiguration == null
             ? ResolvedConfig.Ai.BackfillPacing.DEFAULTS
-            : store.get().ai().backfillPacing();
+            : startupConfiguration.ai().backfillPacing();
     return new IndexingPacing(
         foregroundLoad, pacing.foregroundDutyPct(), pacing.foregroundCooldownMs());
   }
@@ -1432,6 +1492,7 @@ public final class KnowledgeServer implements Closeable {
   void notifyRecordedServicesPublished() {
     // Runtime replacement notifies after releasing its existing transition lock.
     if (runtimeSwapLock.isLocked()) return;
+    if (running && appServices instanceof DefaultWorkerAppServices) publishIndexConfiguration();
     var attachment = recordedIngestionAttachment;
     if (attachment != null) attachment.servicesPublished();
   }
@@ -1505,6 +1566,9 @@ public final class KnowledgeServer implements Closeable {
   @SuppressWarnings("PMD.CognitiveComplexity")
   private ModelContext initDeferredModels() {
     long bgStart = System.nanoTime();
+    if (encoderComponent != null) {
+      encoderComponent.transition(io.justsearch.core.component.ComponentState.STARTING, null, null);
+    }
     try {
       // Open IndexWriter (deferred from sync path so reads are answerable sooner).
       // Phase types: DeferredRuntime.upgradeWriter() returns a fresh RunningRuntime;
@@ -1523,20 +1587,15 @@ public final class KnowledgeServer implements Closeable {
       }
 
       // --- Composition root: resolve install contract + hardware profile ---
-      Path aiHome = null;
-      try {
-        aiHome = PlatformPaths.resolveDataDir();
-      } catch (Exception e) {
-        log.debug("Failed to resolve AI Home for contract reading (dev mode)", e);
-      }
+      var compositionConfig = startupConfiguration;
+      Path aiHome = compositionConfig.paths().dataDir();
       InstallContract contract = aiHome != null ? InstallContractIO.read(aiHome) : null;
       // Tempdoc 374 alpha.18 Bug H + alpha.20 Bug M: honor JUSTSEARCH_MODELS_DIR.
       // alpha.20 prefers contract.modelsDir() (recorded at install time, survives
       // cold restart) over runtime env-var resolution (which doesn't inherit across
       // GUI launches). See resolveModelsDir Javadoc for the three-tier fallback.
-      Path modelsDir = resolveModelsDir(contract, aiHome);
-      boolean gpuEnabled =
-          EnvRegistry.GPU_ENABLED.get().map(Boolean::parseBoolean).orElse(false);
+      Path modelsDir = resolveModelsDir(contract, aiHome, compositionConfig);
+      boolean gpuEnabled = compositionConfig.ai().masterGpuEnabled();
       HardwareProfile hardware =
           (contract != null && contract.hardwareProfile() != null)
               ? contract.hardwareProfile()
@@ -1553,9 +1612,10 @@ public final class KnowledgeServer implements Closeable {
       // Tempdoc 397 §14.26 T2-C1/C2: single-entry compose returns a typed surface. Per-encoder
       // wiring below destructures the surface; graceful degradation is preserved via
       // Optional<> on each role.
+      var encoderConfiguration = EncoderConfigurationProjection.from(compositionConfig);
       InferenceSurface surface =
           InferenceCompositionRoot.compose(
-              ConfigStore.global().get(),
+              encoderConfiguration,
               hardware,
               contract,
               modelsDir,
@@ -1564,7 +1624,7 @@ public final class KnowledgeServer implements Closeable {
       this.inferenceSurface = surface;
 
       // Embedding — skip when BGE-M3 is active (surface.embedding() is already empty in that case).
-      var embeddingConfig = EmbeddingConfig.fromEnv();
+      var embeddingConfig = encoderConfiguration.embedding();
       if (surface.embedding().isPresent()) {
         var embedAssembly = surface.embedding().get();
         var encoder =
@@ -1616,7 +1676,7 @@ public final class KnowledgeServer implements Closeable {
       maybeAutoStartEmbeddingRebuildForBlockedLegacyBestEffort();
 
       // NER — surface-provided assembly wraps in NerService.
-      var nerConfig = io.justsearch.indexerworker.ner.NerConfig.fromEnv();
+      var nerConfig = encoderConfiguration.ner();
       if (surface.ner().isPresent()) {
         var nerService = new io.justsearch.indexerworker.ner.NerService(
             surface.ner().get(), nerConfig);
@@ -1633,7 +1693,7 @@ public final class KnowledgeServer implements Closeable {
       // BGE-M3 unified dense+sparse encoder (when selected + surface has it).
       if (surface.bgeM3().isPresent()) {
         var bgeAssembly = surface.bgeM3().get();
-        var bgeConfig = io.justsearch.indexerworker.bgem3.BgeM3Config.fromEnv();
+        var bgeConfig = encoderConfiguration.bgeM3();
         var bgeEncoder =
             new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
                 bgeAssembly.sessions(),
@@ -1648,7 +1708,7 @@ public final class KnowledgeServer implements Closeable {
       }
 
       // SPLADE (default, or fallback if BGE-M3 was selected but unavailable).
-      var spladeConfig = io.justsearch.indexerworker.splade.SpladeConfig.fromEnv();
+      var spladeConfig = encoderConfiguration.splade();
       if (surface.splade().isPresent()) {
         var spladeAssembly = surface.splade().get();
         var spladeEncoder =
@@ -1695,7 +1755,7 @@ public final class KnowledgeServer implements Closeable {
       }
 
       // 360: Search reranker (GPU-capable, in Worker process).
-      var searchRerankConfig = io.justsearch.reranker.RerankerConfig.fromEnv();
+      var searchRerankConfig = encoderConfiguration.reranker();
       if (surface.reranker().isPresent()) {
         var rerankAssembly = surface.reranker().get();
         searchRerankerInstance =
@@ -1801,6 +1861,8 @@ public final class KnowledgeServer implements Closeable {
           spladeEncoderInstance != null,
           nerServiceInstance != null);
 
+      publishEncoderComposition();
+
       // 332 + 397 §14.28 U3: release the shared modelReadyLatch after ALL models are
       // wired (embedding + ECC + SPLADE + BGE-M3 + disambiguation + NER + reranker +
       // citation). This closes both (a) the SPLADE timing gap from 312 — migration
@@ -1822,6 +1884,10 @@ public final class KnowledgeServer implements Closeable {
           disambiguationService);
 
     } catch (Exception e) {
+      if (encoderComponent != null) {
+        encoderComponent.transition(io.justsearch.core.component.ComponentState.FAILED, null,
+            "encoder_service_wiring_failed");
+      }
       logBackgroundInitFailure(e);
       long bgMs = (System.nanoTime() - bgStart) / 1_000_000;
       log.info("Background model init failed after ({}ms)", bgMs);
@@ -1837,6 +1903,41 @@ public final class KnowledgeServer implements Closeable {
       // Ensure enumerator is unblocked even if init failed partway through.
       modelReadyLatch.countDown();
     }
+  }
+
+  /** Latch release also happens on failure; only the actual composed-and-wired surface certifies readiness. */
+  void publishEncoderComposition() {
+    if (encoderComponent == null || inferenceSurface == null) return;
+    var observation = inferenceSurface.componentObservation();
+    var missing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+    missing.addAll(observation.missingRoles());
+    for (var role : observation.requestedRoles()) {
+      boolean wired = switch (role) {
+        case EMBEDDING -> embeddingService != null && embeddingService.isAvailable();
+        case BGE_M3 -> bgeM3EncoderInstance != null;
+        case SPLADE -> spladeEncoderInstance != null;
+        case NER -> nerServiceInstance != null;
+        case RERANKER -> searchRerankerInstance != null;
+        case CITATION -> citationScorerInstance != null;
+      };
+      if (!wired) missing.add(role);
+    }
+    observation.configurationDigest().ifPresent(encoderComponent::setDesiredVersion);
+    if (observation.configurationDigest().isPresent() && missing.isEmpty()) {
+      encoderComponent.setAppliedVersion(observation.configurationDigest().orElseThrow());
+    }
+    boolean ready = observation.configurationDigest().isPresent()
+        && observation.hasRequestedRoles() && missing.isEmpty();
+    boolean intentionallyAbsent = observation.configurationDigest().isPresent()
+        && !observation.hasRequestedRoles();
+    String evidence = observation.configurationDigest().isEmpty() ? "encoder_observation_unknown"
+        : missing.isEmpty()
+        ? (observation.hasRequestedRoles() ? null : "no_encoder_roles_requested")
+        : "missing_roles=" + missing.stream()
+            .map(Enum::name).sorted().collect(java.util.stream.Collectors.joining(","));
+    encoderComponent.transition(ready ? io.justsearch.core.component.ComponentState.READY
+        : intentionallyAbsent ? io.justsearch.core.component.ComponentState.ABSENT
+        : io.justsearch.core.component.ComponentState.UNAVAILABLE, null, evidence);
   }
 
 
@@ -2056,7 +2157,7 @@ public final class KnowledgeServer implements Closeable {
     io.justsearch.configuration.FieldCatalogDef catalog = loader.loadFieldCatalog();
 
     // Apply vector dimension override for BGE-M3 (1024-dim vs nomic-embed's 768-dim)
-    String sparseModel = EnvRegistry.SPARSE_MODEL.getString("splade");
+    String sparseModel = startupConfiguration.ai().sparseModel();
     if ("bge-m3".equalsIgnoreCase(sparseModel)) {
       catalog = catalog.withVectorDimension(1024);
       log.info("Field catalog: vector dimension overridden to 1024 (BGE-M3 active)");
@@ -2067,7 +2168,7 @@ public final class KnowledgeServer implements Closeable {
         metadataSupplier =
             () ->
                 new EmbeddingMetadataOverlay(
-                    new SsotCommitMetadataSource(), fingerprintSupplier, SpladeFingerprint::get);
+                    new SsotCommitMetadataSource(startupConfiguration), fingerprintSupplier, SpladeFingerprint::get);
 
     IndexSchema schema =
         new IndexSchema(
@@ -2076,7 +2177,8 @@ public final class KnowledgeServer implements Closeable {
             metadataSupplier,
             new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
             null);
-    LuceneRuntimeBuilder builder = schema.atPath(indexPath).withExecutorRegistrations(luceneExecutors);
+    LuceneRuntimeBuilder builder = schema.atPath(indexPath)
+        .withConfig(startupConfiguration).withExecutorRegistrations(luceneExecutors);
     // Tempdoc 406 observability: wire WorkerLuceneTelemetryAdapter so commit /
     // backpressure / drain / swap / lock-contention events flow into
     // metrics-worker.ndjson under the index.runtime.* namespace.
@@ -2100,8 +2202,8 @@ public final class KnowledgeServer implements Closeable {
    * {@code SsotCommitMetadataSource}, so the status surface's own fresh instance computed a
    * different fingerprint than the commit path did.
    */
-  private static java.util.function.Supplier<Integer> effectiveVectorDimensionSupplier() {
-    boolean bgeM3 = "bge-m3".equalsIgnoreCase(EnvRegistry.SPARSE_MODEL.getString("splade"));
+  private java.util.function.Supplier<Integer> effectiveVectorDimensionSupplier() {
+    boolean bgeM3 = "bge-m3".equalsIgnoreCase(startupConfiguration.ai().sparseModel());
     return () -> bgeM3 ? 1024 : null;
   }
 
@@ -2112,7 +2214,7 @@ public final class KnowledgeServer implements Closeable {
   private Map<String, Object> expectedCommitMetadata(
       java.util.function.Supplier<java.util.Optional<String>> fingerprintSupplier) {
     return new EmbeddingMetadataOverlay(
-            new SsotCommitMetadataSource(),
+            new SsotCommitMetadataSource(startupConfiguration),
             fingerprintSupplier,
             SpladeFingerprint::get)
         .build();
@@ -2123,12 +2225,12 @@ public final class KnowledgeServer implements Closeable {
     io.justsearch.configuration.JustSearchConfigurationLoader loader =
         new io.justsearch.configuration.JustSearchConfigurationLoader();
     io.justsearch.configuration.FieldCatalogDef catalog = loader.loadFieldCatalog();
-    String sparseModel = EnvRegistry.SPARSE_MODEL.getString("splade");
+    String sparseModel = startupConfiguration.ai().sparseModel();
     if ("bge-m3".equalsIgnoreCase(sparseModel)) {
       catalog = catalog.withVectorDimension(1024);
     }
     LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath)
-        .withExecutorRegistrations(luceneExecutors);
+        .withConfig(startupConfiguration).withExecutorRegistrations(luceneExecutors);
     if (telemetry != null) {
       builder.withTelemetry(
           new io.justsearch.indexerworker.services.WorkerLuceneTelemetryAdapter(
@@ -2197,9 +2299,9 @@ public final class KnowledgeServer implements Closeable {
     log.info("║ Host:             {}", padRight(config.host(), 44) + "║");
 
     // SSOT paths
-    ConfigStore cs = ConfigStore.globalOrNull();
-    String ssotPath = cs != null && cs.get().paths().ssotPath() != null
-        ? cs.get().paths().ssotPath().toString() : null;
+    ResolvedConfig captured = startupConfiguration;
+    String ssotPath = captured != null && captured.paths().ssotPath() != null
+        ? captured.paths().ssotPath().toString() : null;
     Path effectiveRepoRoot = RepoRootLocator.findRepoRootOrNull();
     String repoRoot = effectiveRepoRoot != null ? effectiveRepoRoot.toString() : "auto-detect";
     if (ssotPath == null || ssotPath.isBlank()) {
@@ -2209,8 +2311,8 @@ public final class KnowledgeServer implements Closeable {
     log.info("║ Repo root:        {}", padRight(repoRoot, 44) + "║");
 
     // Search pipeline configuration
-    if (cs != null && cs.get().hybridSearch() != null) {
-      ResolvedConfig.HybridSearch hs = cs.get().hybridSearch();
+    if (captured != null && captured.hybridSearch() != null) {
+      ResolvedConfig.HybridSearch hs = captured.hybridSearch();
       log.info("╠══════════════════════════════════════════════════════════════╣");
       log.info("║ Fusion strategy:  {}", padRight(hs.fusionStrategy(), 44) + "║");
       if ("cc".equals(hs.fusionStrategy())) {
@@ -2219,7 +2321,7 @@ public final class KnowledgeServer implements Closeable {
                 hs.ccWeightSparse(), hs.ccWeightDense(), hs.ccWeightSplade()), 44) + "║");
       }
       log.info("║ Branch fusion:    {}", padRight(hs.branchFusionStrategy(), 44) + "║");
-      ConfigResolution chunkAwareRes = cs.get().resolutions().get("search.chunk_aware.enabled");
+      ConfigResolution chunkAwareRes = captured.resolutions().get("search.chunk_aware.enabled");
       String chunkAware = chunkAwareRes != null && chunkAwareRes.value() != null
           ? chunkAwareRes.value() : "true";
       log.info("║ Chunk-aware merge:{}", padRight(chunkAware, 44) + "║");
@@ -2329,9 +2431,9 @@ public final class KnowledgeServer implements Closeable {
     return genManager.recordAutoRebuildAttempt(targetFingerprint);
   }
 
-  private static String expectedIndexFingerprintOrNull() {
+  private String expectedIndexFingerprintOrNull() {
     try {
-      Object fp = new SsotCommitMetadataSource().build().get(IndexFingerprint.COMMIT_META_KEY);
+      Object fp = new SsotCommitMetadataSource(startupConfiguration).build().get(IndexFingerprint.COMMIT_META_KEY);
       String s = fp == null ? null : String.valueOf(fp);
       return s == null || s.isBlank() ? null : s;
     } catch (RuntimeException ex) {
@@ -2665,6 +2767,15 @@ public final class KnowledgeServer implements Closeable {
         //
         // It is the last statement of close() now, so it means exactly one thing: this server ran its
         // shutdown to completion. That is what EngineRoot.close() consults.
+        if (indexComponent != null) {
+          indexComponent.transition(io.justsearch.core.component.ComponentState.ABSENT,
+              io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SHUT_DOWN.code(), null);
+          indexComponent.setAppliedVersion(null);
+        }
+        if (encoderComponent != null) {
+          encoderComponent.transition(io.justsearch.core.component.ComponentState.ABSENT, null, null);
+          encoderComponent.setAppliedVersion(null);
+        }
         shutdownLatch.countDown();
         log.info("KnowledgeServer shutdown complete");
       } finally {
@@ -3036,10 +3147,15 @@ public final class KnowledgeServer implements Closeable {
    * spinning up a real {@code KnowledgeServer}.
    */
   static Path resolveModelsDir(InstallContract contract, Path aiHome) {
+    if (contract != null && contract.modelsDir() != null) return contract.modelsDir();
+    return resolveModelsDir(contract, aiHome, ConfigStore.global().get());
+  }
+
+  static Path resolveModelsDir(InstallContract contract, Path aiHome, ResolvedConfig config) {
     if (contract != null && contract.modelsDir() != null) {
       return contract.modelsDir();
     }
-    Path configured = ConfigStore.global().get().paths().modelsDir();
+    Path configured = config.paths().modelsDir();
     if (configured != null) return configured;
     return aiHome != null ? aiHome.resolve("models") : null;
   }

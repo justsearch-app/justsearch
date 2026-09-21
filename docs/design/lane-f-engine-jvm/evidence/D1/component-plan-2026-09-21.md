@@ -67,12 +67,27 @@ do not certify procedure mode or native resource identity.
 Encoder composition observes roles at their existing selection sites. Disabled
 optional roles do not fail readiness; a requested-but-missing role does. A selected
 BGE-M3 failure stays missing even when the existing SPLADE fallback can serve.
-No requested roles means intentionally UNAVAILABLE encoders with lexical operation
+No requested roles means intentionally ABSENT encoders with lexical operation
 preserved. READY requires every requested role composed and service wiring finished;
 the always-released model latch is insufficient. The composition's supplied config
 must feed the typed role factories and their digest, without a second global read.
 Component reason vocabulary/projections and live observation remain D1-2/D1-15 work;
 foundation unit tests do not close this connected acceptance.
+
+For partial encoder composition, the complete typed projection is the desired version;
+it does not certify that missing roles were applied. Publish the applied version only
+after all requested roles are composed and wired. An explicitly disabled, known
+configuration can be applied while the encoder component remains ABSENT. Legacy
+surfaces with no observation certify neither version nor readiness. Service wiring
+uses the same captured ResolvedConfig as composition, never another global snapshot.
+
+Readiness analysis corrected the initial UNAVAILABLE choice for disabled components:
+design §7.6 already distinguishes intentional absence from failed availability.
+ABSENT means intentionally unconfigured or physically closed; UNAVAILABLE means
+requested but not usable. Unknown legacy observations remain UNAVAILABLE. This lets
+the registry project optional-component readiness without retaining a second
+configured flag as lifecycle authority. A stopped process also has absent essential
+components, so optional absence cannot accidentally make it ready.
 
 ## Sequence and proof
 
@@ -87,7 +102,13 @@ foundation unit tests do not close this connected acceptance.
    held-cause semantics, listeners and consumer gates. Derive envelope/health/manifest
    from the same snapshot; schema2 and host/readiness consumers change together.
    Delete superseded lifecycle derivation in this batch. Preserve actual index READY
-   conjunction and stability-clock evidence.
+   conjunction and stability-clock evidence. Refresh contact age from the cached
+   worker sample on response paths as today, so a wedged sampler cannot freeze a
+   READY observation forever; this adds no worker query or new poller. Avoid
+   registry-to-capability-to-sampler feedback. INDEX_SERVING's optional-AI,
+   compatibility and throughput diagnostics can remain DEGRADED while the essential
+   index component is READY; these diagnostics must not become another readiness
+   authority or disappear in the projection.
 4. D1-3 supplies the complete config-apply projection/register, generation-dependent
    aggregate hash, and config-surface fourth scalar. Negative controls prove missing
    and unknown keys fail. Regenerate schemas and connected UI consumers.

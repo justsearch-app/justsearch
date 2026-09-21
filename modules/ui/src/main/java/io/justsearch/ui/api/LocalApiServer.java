@@ -17,7 +17,12 @@ import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.observability.HeadApiMetricCatalog;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.AppliedConfigurationVersion;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentSpec;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.ui.api.routes.AiRoutes;
@@ -32,6 +37,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -119,7 +125,6 @@ public class LocalApiServer {
   private volatile KnowledgeSearchController knowledgeSearchController;
   // Tempdoc 374 alpha.27: the single GPU/VRAM access point (owns its nvidia-smi-fallback VramDetector).
   private final GpuCapabilitiesService gpuCapabilitiesService;
-  private final Integer configuredPort;
   private final Instant startTime = Instant.now();
   private final EventBuffer eventBuffer = new EventBuffer();
   private final AtomicInteger inflightRequests = new AtomicInteger(0);
@@ -134,6 +139,7 @@ public class LocalApiServer {
   private volatile long gpuSnapshotTimestamp;
   private final RerankerService lambdaMartReranker;
   private final HeadApiMetricCatalog apiCatalog;
+  private final ComponentHandle apiComponent;
 
   /** Creates a new builder. Required: settingsStore, indexBasePath. The bootstrap and per-service
    * overrides are provided via fluent setters (.HeadAssembly, .onlineAiService, etc.).
@@ -146,6 +152,7 @@ public class LocalApiServer {
   }
 
   private LocalApiServer(Builder b) {
+    this.apiComponent = b.apiComponent;
     this.telemetry = b.telemetry;
     this.lambdaMartReranker = b.lambdaMartReranker;
     // §31 Phase 4: read helpers/infra from the bootstrap's ServicePhase output rather than
@@ -289,7 +296,7 @@ public class LocalApiServer {
             ? new ConversationBackupController(
                 this.HeadAssemblyRef, this.HeadAssemblyRef.dataKeyManager())
             : null;
-    this.configuredPort = resolveConfiguredPort();
+    Integer configuredPort = resolveConfiguredPort();
     ConfigStore cs = ConfigStore.globalOrNull();
     this.prodMode = cs != null && cs.get().policy().prodMode();
     this.sessionToken = b.sessionToken;
@@ -317,28 +324,45 @@ public class LocalApiServer {
 
     // Bind to explicit port when provided (dev/prod), otherwise pick a free port.
     int bindPort = configuredPort == null ? 0 : configuredPort;
+    String desiredVersion = AppliedConfigurationVersion.digest(
+        Set.of(EnvRegistry.API_PORT.configKey()),
+        java.util.Collections.singletonMap(EnvRegistry.API_PORT.configKey(), configuredPort));
+    if (apiComponent != null) {
+      apiComponent.setDesiredVersion(desiredVersion);
+      apiComponent.transition(ComponentState.STARTING, "api.starting", null);
+    }
+    Integer effectivePortPolicy = configuredPort;
     // Bind loopback-only by default (prod + dev). This is a local desktop app; avoid LAN exposure.
     try {
-      buildAndStartApp(bindPort);
-    } catch (Exception e) {
-      if (configuredPort != null && configuredPort != 0 && isBindFailure(e)) {
-        log.warn("Failed to bind to explicit port {} ({}). Falling back to ephemeral port.",
-            configuredPort, e.getMessage());
-        eventBuffer.warn("LocalApiServer",
-            "Port " + configuredPort + " in use, falling back to ephemeral",
-            Map.of("requestedPort", configuredPort, "error", String.valueOf(e.getMessage())));
-        // Tempdoc 374 alpha.21 Bug O: build a FRESH Javalin instance for the
-        // ephemeral retry. Javalin/Jetty's lifecycle prohibits re-starting a failed
-        // instance — pre-alpha.21 the second start() call threw
-        // `JavalinException: Server already started - Javalin instances cannot be
-        // reused.` The previous failed instance is GC-eligible after this
-        // reassignment.
-        buildAndStartApp(0);
-      } else {
-        throw e;
+      try {
+        buildAndStartApp(bindPort);
+      } catch (Exception e) {
+        if (configuredPort != null && configuredPort != 0 && isBindFailure(e)) {
+          log.warn("Failed to bind to explicit port {} ({}). Falling back to ephemeral port.",
+              configuredPort, e.getMessage());
+          eventBuffer.warn("LocalApiServer",
+              "Port " + configuredPort + " in use, falling back to ephemeral",
+              Map.of("requestedPort", configuredPort, "error", String.valueOf(e.getMessage())));
+          // Javalin cannot restart the failed instance; retry with a fresh ephemeral bind.
+          buildAndStartApp(0);
+          effectivePortPolicy = null;
+        } else {
+          throw e;
+        }
       }
+    } catch (RuntimeException | Error failure) {
+      observeApiFailure("api.bind_failed", failure);
+      throw failure;
     }
     this.port = app.port();
+    if (apiComponent != null) {
+      String appliedVersion = AppliedConfigurationVersion.digest(
+          Set.of(EnvRegistry.API_PORT.configKey()),
+          java.util.Collections.singletonMap(
+              EnvRegistry.API_PORT.configKey(), effectivePortPolicy));
+      apiComponent.setAppliedVersion(appliedVersion);
+      apiComponent.transition(ComponentState.READY, null, "boundPort=" + port);
+    }
     log.info("Local API Server started on port {}", port);
     eventBuffer.info("LocalApiServer", "API Server started on port " + port, Map.of("port", port));
     // Tempdoc 419 C3 V2 P3: start the GPU saturation sampler. The sampler's first probe
@@ -944,6 +968,18 @@ public class LocalApiServer {
   }
 
   public void stop() {
+    try {
+      stopOwnedResources();
+      if (apiComponent != null) {
+        apiComponent.transition(ComponentState.ABSENT, "api.stopped", null);
+      }
+    } catch (RuntimeException | Error failure) {
+      observeApiFailure("api.stop_failed", failure);
+      throw failure;
+    }
+  }
+
+  private void stopOwnedResources() {
     slowRequestOwner.close();
     // Tempdoc 419 C3 V2 P3: stop the GPU saturation sampler thread.
     try {
@@ -1013,6 +1049,23 @@ public class LocalApiServer {
     }
   }
 
+  private void observeApiFailure(String reasonCode, Throwable failure) {
+    if (apiComponent != null) {
+      apiComponent.transition(
+          ComponentState.FAILED, reasonCode, failure.getClass().getSimpleName());
+    }
+  }
+
+  private static ComponentSpec apiComponentSpec() {
+    return new ComponentSpec(
+        "api",
+        true,
+        Set.of(EnvRegistry.API_PORT.configKey()),
+        ComponentSpec.ComposeCapability.IN_PLACE,
+        java.time.Duration.ZERO,
+        2);
+  }
+
   private static boolean isBindFailure(Throwable t) {
     while (t != null) {
       if (t instanceof java.net.BindException) return true;
@@ -1069,6 +1122,8 @@ public class LocalApiServer {
     Runnable lifecycleShutdownAction = () -> {};
     io.justsearch.app.api.OperationLeaseService operationLeaseService;
     io.justsearch.app.api.EngineAdmissionService engineAdmission;
+    EngineComponentRegistry componentRegistry;
+    ComponentHandle apiComponent;
     io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
 
     /** Explicit dependency for fixtures without a HeadAssembly; the supplying owner closes it. */
@@ -1185,6 +1240,12 @@ public class LocalApiServer {
       return this;
     }
 
+    /** Process boot supplies the one component registry; tests may omit it. */
+    public Builder componentRegistry(EngineComponentRegistry registry) {
+      this.componentRegistry = java.util.Objects.requireNonNull(registry);
+      return this;
+    }
+
     public Builder inferenceCapability(io.justsearch.app.services.lifecycle.InferenceCapability cap) {
       this.inferenceCapability = cap;
       return this;
@@ -1246,7 +1307,21 @@ public class LocalApiServer {
         throw new IllegalStateException("Knowledge Server requires the Head per-source search owner"
             + " or an explicitly supplied perSourceSearch owner");
       }
-      return new LocalApiServer(this);
+      if (componentRegistry != null) {
+        apiComponent = componentRegistry.register(apiComponentSpec());
+      }
+      try {
+        return new LocalApiServer(this);
+      } catch (RuntimeException | Error failure) {
+        if (apiComponent != null
+            && apiComponent.snapshot().state() != ComponentState.FAILED) {
+          apiComponent.transition(
+              ComponentState.FAILED,
+              "api.compose_failed",
+              failure.getClass().getSimpleName());
+        }
+        throw failure;
+      }
     }
   }
 }

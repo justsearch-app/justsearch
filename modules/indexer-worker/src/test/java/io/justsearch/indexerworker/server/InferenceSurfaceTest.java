@@ -2,6 +2,7 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.ort.EncoderRole;
@@ -15,6 +16,7 @@ import io.justsearch.ort.SessionHandle.Lease;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
@@ -218,5 +220,71 @@ class InferenceSurfaceTest {
     List<EncoderRole> order = new ArrayList<>(surface.policies().models().keySet());
     // EMBEDDING comes before SPLADE in the enum declaration.
     assertEquals(List.of(EncoderRole.EMBEDDING, EncoderRole.SPLADE), order);
+  }
+
+  @Test
+  @DisplayName("legacy constructor carries an explicitly unknown component observation")
+  void legacyConstructorObservationIsUnknown() {
+    InferenceSurface surface =
+        new InferenceSurface(
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            emptySnapshot(),
+            List.of());
+
+    assertTrue(surface.componentObservation().configurationDigest().isEmpty());
+    assertFalse(surface.componentObservation().compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("a composed lexical-only surface is unavailable")
+  void noRequestedRolesAreUnavailable() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed("digest", Set.of(), Set.of());
+
+    assertTrue(observation.configurationDigest().isPresent());
+    assertFalse(observation.hasRequestedRoles());
+    assertFalse(observation.compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("requested roles missing from the surface prevent readiness")
+  void requestedMissingRoleIsUnavailable() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed(
+            "digest", Set.of(EncoderRole.EMBEDDING, EncoderRole.NER), Set.of(EncoderRole.NER));
+
+    assertEquals(Set.of(EncoderRole.EMBEDDING), observation.missingRoles());
+    assertFalse(observation.compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("a successful requested subset satisfies composition")
+  void successfulRequestedSubsetSatisfiesComposition() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed(
+            "digest",
+            Set.of(EncoderRole.EMBEDDING, EncoderRole.CITATION),
+            Set.of(EncoderRole.EMBEDDING, EncoderRole.CITATION));
+
+    assertTrue(observation.missingRoles().isEmpty());
+    assertTrue(observation.compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("BGE selection remains missing when a SPLADE fallback is present")
+  void bgeFailureRemainsVisibleThroughSpladeFallback() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed(
+            "digest",
+            Set.of(EncoderRole.BGE_M3, EncoderRole.SPLADE),
+            Set.of(EncoderRole.SPLADE));
+
+    assertEquals(Set.of(EncoderRole.BGE_M3), observation.missingRoles());
+    assertFalse(observation.compositionSatisfied());
   }
 }

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.splade;
 
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -25,6 +26,18 @@ final class SpladeModelDiscovery {
     var shared =
         io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
             explicitPath, "splade", "splade/naver-splade-v3", REQUIRED_FILES, true);
+    return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
+  }
+
+  static Result resolve(ResolvedConfig config, String explicitPath) {
+    var shared =
+        io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
+            config,
+            explicitPath,
+            "splade",
+            "splade/naver-splade-v3",
+            REQUIRED_FILES,
+            true);
     return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
   }
 }

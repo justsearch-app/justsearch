@@ -455,7 +455,8 @@ public class HeadlessApp {
         new HeadAssembly(
             engineRoot.operations(), engineRoot.operationAttempts(),
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
-            childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority(), engineRoot.recordedIngestion());
+            childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority(),
+            engineRoot.recordedIngestion(), engineRoot.components());
     LocalApiServer constructedApi = null;
     try {
       log.info("HeadAssembly started (degraded — Worker connecting in background).");
@@ -475,6 +476,7 @@ public class HeadlessApp {
       LocalApiServer apiServer =
           LocalApiServer.builder(engineRoot.executors(), settingsStore, indexBasePath)
               .HeadAssembly(bootstrap)
+              .componentRegistry(engineRoot.components())
               .engineAdmission(engineRoot.admission())
               .knowledgeServer(null)
               .configRoot(configRoot)
@@ -1364,6 +1366,9 @@ public class HeadlessApp {
         }
       } catch (Exception ignored) {
         // best effort
+      }
+      if (processRoot != null && headCleanupComplete && indexCleanupComplete) {
+        processRoot.components().close();
       }
       if (processExecutors != null) {
         processExecutors.close();

@@ -192,10 +192,10 @@ final class RegistryBackedCapabilityTest {
         snapshot(1, ComponentState.STARTING, true, "starting", null, null));
     var capability = new RegistryBackedCapability(registry, "generative", "inference");
     var observed = new CopyOnWriteArrayList<CapabilityHealth>();
-    try (var throwing = capability.subscribe(change -> {
+    var throwing = capability.subscribe(change -> {
            throw new RuntimeException("listener failure");
          });
-         var reentrant = capability.subscribe(change -> {
+    var reentrant = capability.subscribe(change -> {
            observed.add(change.current().health());
            if (change.current().health() == CapabilityHealth.READY) {
              registry.deliver(snapshot(
@@ -206,14 +206,16 @@ final class RegistryBackedCapabilityTest {
                  null,
                  null));
            }
-         })) {
+         });
+    try (throwing; reentrant) {
       registry.deliver(snapshot(2, ComponentState.READY, true, null, null, null));
     }
     assertEquals(List.of(CapabilityHealth.READY, CapabilityHealth.DEGRADED), observed);
 
-    try (var fatal = capability.subscribe(change -> {
+    var fatal = capability.subscribe(change -> {
       throw new AssertionError("fatal listener");
-    })) {
+    });
+    try (fatal) {
       assertThrows(
           AssertionError.class,
           () -> registry.deliver(snapshot(4, ComponentState.READY, true, null, null, null)));

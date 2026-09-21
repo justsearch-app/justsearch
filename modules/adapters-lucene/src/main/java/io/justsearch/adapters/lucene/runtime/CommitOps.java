@@ -373,9 +373,7 @@ public final class CommitOps {
       var resolved = session.resolvedConfig();
       if (resolved != null && resolved.index() != null) {
         int configured = resolved.index().commitTimerIntervalMs();
-        if (configured > 0) {
-          return configured;
-        }
+        if (configured > 0) return effectiveCommitTimerIntervalMs(configured);
         log.warn(
             "Ignoring index.commit.timer_interval_ms={} (must be > 0); using {}ms",
             configured,
@@ -385,6 +383,10 @@ public final class CommitOps {
       log.debug("Commit timer interval unresolved; using the default", e);
     }
     return DEFAULT_COMMIT_TIMER_INTERVAL_MS;
+  }
+
+  static long effectiveCommitTimerIntervalMs(int configured) {
+    return configured > 0 ? configured : DEFAULT_COMMIT_TIMER_INTERVAL_MS;
   }
 
   /**

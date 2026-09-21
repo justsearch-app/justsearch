@@ -40,8 +40,10 @@ import io.justsearch.reranker.RerankerAssembly;
 import io.justsearch.reranker.RerankerConfig;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
@@ -59,6 +61,11 @@ public final class InferenceCompositionRoot {
   private static final Logger log = LoggerFactory.getLogger(InferenceCompositionRoot.class);
 
   private InferenceCompositionRoot() {}
+
+  /** Stable config dependencies for the process-owned encoders component registration. */
+  public static Set<String> componentDependencies() {
+    return EncoderConfigurationProjection.dependencies();
+  }
 
   // =========================================================================
   // §7.6 single-entry composition — tempdoc 397 §14.26 T2-C1.
@@ -121,9 +128,27 @@ public final class InferenceCompositionRoot {
       Path modelsDir,
       GpuArbiter arbiter,
       OrtSessionTelemetryEvents events) {
+    return compose(
+        EncoderConfigurationProjection.from(cfg),
+        hardware,
+        contract,
+        modelsDir,
+        arbiter,
+        events);
+  }
 
+  /** Package-private owner path used when KnowledgeServer must wire the exact same typed configs. */
+  static InferenceSurface compose(
+      EncoderConfigurationProjection projection,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events) {
+    ResolvedConfig cfg = projection.config();
     List<SessionHandle> handles = new ArrayList<>();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
+    EnumSet<EncoderRole> requestedRoles = EnumSet.noneOf(EncoderRole.class);
 
     // BGE-M3 replaces the separate Embedding + SPLADE encoders when selected.
     String sparseModel = cfg.ai().sparseModel();
@@ -133,15 +158,43 @@ public final class InferenceCompositionRoot {
         bgeM3Selected
             ? Optional.empty()
             : composeEmbeddingRole(
-                cfg, hardware, contract, modelsDir, arbiter, handles, policies, events);
+                projection.embedding(),
+                cfg,
+                hardware,
+                contract,
+                modelsDir,
+                arbiter,
+                handles,
+                policies,
+                requestedRoles,
+                events);
 
     Optional<NerAssembly> ner =
-        composeNerRole(cfg, hardware, contract, modelsDir, arbiter, handles, policies, events);
+        composeNerRole(
+            projection.ner(),
+            cfg,
+            hardware,
+            contract,
+            modelsDir,
+            arbiter,
+            handles,
+            policies,
+            requestedRoles,
+            events);
 
     Optional<BgeM3Assembly> bgeM3 =
         bgeM3Selected
             ? composeBgeM3Role(
-                cfg, hardware, contract, modelsDir, arbiter, handles, policies, events)
+                projection.bgeM3(),
+                cfg,
+                hardware,
+                contract,
+                modelsDir,
+                arbiter,
+                handles,
+                policies,
+                requestedRoles,
+                events)
             : Optional.empty();
 
     // If BGE-M3 was selected but failed, fall back to SPLADE (matches today's KnowledgeServer
@@ -150,25 +203,69 @@ public final class InferenceCompositionRoot {
     Optional<SpladeAssembly> splade =
         spladeActive
             ? composeSpladeRole(
-                cfg, hardware, contract, modelsDir, arbiter, handles, policies, events)
+                projection.splade(),
+                cfg,
+                hardware,
+                contract,
+                modelsDir,
+                arbiter,
+                handles,
+                policies,
+                requestedRoles,
+                events)
             : Optional.empty();
 
     Optional<RerankerAssembly> reranker =
         composeRerankerRole(
-            cfg, hardware, contract, modelsDir, arbiter, handles, policies, events);
+            projection.reranker(),
+            cfg,
+            hardware,
+            contract,
+            modelsDir,
+            arbiter,
+            handles,
+            policies,
+            requestedRoles,
+            events);
 
     Optional<RerankerAssembly> citation =
-        composeCitationRole(cfg, hardware, contract, modelsDir, handles, policies, events);
+        composeCitationRole(
+            projection.citation(),
+            cfg,
+            hardware,
+            contract,
+            modelsDir,
+            handles,
+            policies,
+            requestedRoles,
+            events);
 
     RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
     PolicySnapshot snapshot = new PolicySnapshot(runtime, policies);
+    EnumSet<EncoderRole> presentRoles = EnumSet.noneOf(EncoderRole.class);
+    embedding.ifPresent(ignored -> presentRoles.add(EncoderRole.EMBEDDING));
+    ner.ifPresent(ignored -> presentRoles.add(EncoderRole.NER));
+    reranker.ifPresent(ignored -> presentRoles.add(EncoderRole.RERANKER));
+    citation.ifPresent(ignored -> presentRoles.add(EncoderRole.CITATION));
+    splade.ifPresent(ignored -> presentRoles.add(EncoderRole.SPLADE));
+    bgeM3.ifPresent(ignored -> presentRoles.add(EncoderRole.BGE_M3));
     return new InferenceSurface(
-        embedding, ner, reranker, citation, splade, bgeM3, snapshot, handles);
+        embedding,
+        ner,
+        reranker,
+        citation,
+        splade,
+        bgeM3,
+        snapshot,
+        handles,
+        InferenceSurface.ComponentObservation.composed(
+            projection.digest(), requestedRoles, presentRoles));
   }
 
   // -------- Per-role composition helpers (tempdoc 397 §14.26 T2-C1). --------
 
   private static Optional<EmbeddingAssembly> composeEmbeddingRole(
+      EmbeddingConfig embedCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
       InstallContract contract,
@@ -176,8 +273,11 @@ public final class InferenceCompositionRoot {
       GpuArbiter arbiter,
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
-    EmbeddingConfig embedCfg = EmbeddingConfig.fromEnv();
+    if (embedCfg.enabled()) {
+      requestedRoles.add(EncoderRole.EMBEDDING);
+    }
     if (!embedCfg.isReady()) {
       return Optional.empty();
     }
@@ -226,6 +326,7 @@ public final class InferenceCompositionRoot {
   }
 
   private static Optional<NerAssembly> composeNerRole(
+      NerConfig nerCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
       InstallContract contract,
@@ -233,8 +334,11 @@ public final class InferenceCompositionRoot {
       GpuArbiter arbiter,
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
-    NerConfig nerCfg = NerConfig.fromEnv();
+    if (nerCfg.enabled()) {
+      requestedRoles.add(EncoderRole.NER);
+    }
     if (!nerCfg.isReady()) {
       return Optional.empty();
     }
@@ -264,6 +368,7 @@ public final class InferenceCompositionRoot {
   }
 
   private static Optional<BgeM3Assembly> composeBgeM3Role(
+      BgeM3Config bgeCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
       InstallContract contract,
@@ -271,8 +376,11 @@ public final class InferenceCompositionRoot {
       GpuArbiter arbiter,
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
-    BgeM3Config bgeCfg = BgeM3Config.fromEnv();
+    // Selection itself is the request. A disabled/missing BGE-M3 remains observable even when
+    // the compatible SPLADE fallback is usable.
+    requestedRoles.add(EncoderRole.BGE_M3);
     if (!bgeCfg.isReady()) {
       log.warn("BGE-M3 selected but model not found, falling back to SPLADE");
       return Optional.empty();
@@ -309,6 +417,7 @@ public final class InferenceCompositionRoot {
   }
 
   private static Optional<SpladeAssembly> composeSpladeRole(
+      SpladeConfig spladeCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
       InstallContract contract,
@@ -316,8 +425,11 @@ public final class InferenceCompositionRoot {
       GpuArbiter arbiter,
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
-    SpladeConfig spladeCfg = SpladeConfig.fromEnv();
+    if (spladeCfg.enabled()) {
+      requestedRoles.add(EncoderRole.SPLADE);
+    }
     if (!spladeCfg.isReady()) {
       return Optional.empty();
     }
@@ -352,6 +464,7 @@ public final class InferenceCompositionRoot {
   }
 
   private static Optional<RerankerAssembly> composeRerankerRole(
+      RerankerConfig rerankCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
       InstallContract contract,
@@ -359,8 +472,11 @@ public final class InferenceCompositionRoot {
       GpuArbiter arbiter,
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
-    RerankerConfig rerankCfg = RerankerConfig.fromEnv();
+    if (rerankCfg.enabled()) {
+      requestedRoles.add(EncoderRole.RERANKER);
+    }
     if (!rerankCfg.isReady()) {
       return Optional.empty();
     }
@@ -414,14 +530,18 @@ public final class InferenceCompositionRoot {
   }
 
   private static Optional<RerankerAssembly> composeCitationRole(
+      CitationScorerConfig citationCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
       InstallContract contract,
       Path modelsDir,
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
-    CitationScorerConfig citationCfg = CitationScorerConfig.fromEnv();
+    if (citationCfg != null && citationCfg.enabled()) {
+      requestedRoles.add(EncoderRole.CITATION);
+    }
     if (citationCfg == null || !citationCfg.isReady()) {
       return Optional.empty();
     }

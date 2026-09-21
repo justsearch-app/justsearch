@@ -133,7 +133,7 @@ public final class WorkerHealthService {
     this.embeddingProvider =
         embeddingProvider != null ? embeddingProvider : NoOpEmbeddingProvider.INSTANCE;
     this.workerStateSupplier = workerStateSupplier;
-    this.discoveredModels = discoveredModels != null ? discoveredModels : List.of();
+    this.discoveredModels = discoveredModels != null ? List.copyOf(discoveredModels) : List.of();
     // Tempdoc 374 alpha.25 R13-A defect #2 deliberate-trigger hook. Default 0 (off).
     this.syntheticDelayMs = parseLongEnv("JUSTSEARCH_WORKER_HEALTH_SYNTHETIC_DELAY_MS", 0L);
     if (this.syntheticDelayMs > 0) {
@@ -141,6 +141,11 @@ public final class WorkerHealthService {
           "WorkerHealthService synthetic warmup delay enabled: {}ms (test hook for R13-A retry-loop verification)",
           this.syntheticDelayMs);
     }
+  }
+
+  /** Immutable discovery results actually retained for this service's health reports. */
+  public List<WorkerModelDiscovery.DiscoveredModel> discoveredModels() {
+    return discoveredModels;
   }
 
   /** Parse a long env-var value, returning {@code defaultValue} on null/blank/parse failure. */

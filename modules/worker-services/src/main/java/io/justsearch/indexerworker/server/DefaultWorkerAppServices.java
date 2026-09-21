@@ -3,10 +3,13 @@ package io.justsearch.indexerworker.server;
 
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.extract.ExtractionMetricCatalog;
+import io.justsearch.indexerworker.extract.ExtractionConfiguration;
 import io.justsearch.indexerworker.extract.ExtractionSandboxCommand;
 import io.justsearch.indexerworker.extract.ExtractionSandboxFactory;
 import io.justsearch.indexerworker.extract.ExtractionSandboxRestartTags;
@@ -63,6 +66,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   private final WorkerSearchService searchService;
   private final WorkerIngestService ingestService;
   private final WorkerHealthService healthService;
+  private final ResolvedConfig resolvedConfig;
+  private final ExtractionConfiguration extractionConfiguration;
+  private final boolean detailedTracing;
+  private final RerankerConfig.ChunkRerankerConfig chunkRerankerConfig;
+  private final CitationScorerConfig citationScorerConfig;
   // W7.2: shared registry held by both IndexingLoop and SearchOrchestrator.
   private final EncoderBindings encoderBindings;
   // Tempdoc 418 Phase B — Worker-side filesystem watcher. Owned by appServices so its lifecycle
@@ -76,7 +84,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    */
   public DefaultWorkerAppServices(WorkerExecutorRegistrations executors, InfraContext ctx) {
     this(executors, ctx, null, null, IndexingPacing.unthrottled(),
-        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), captureResolvedConfig());
   }
 
   /**
@@ -96,7 +104,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
       IndexingPacing indexingPacing) {
     this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
-        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), captureResolvedConfig());
   }
 
   public DefaultWorkerAppServices(
@@ -106,12 +114,50 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
       IndexingPacing indexingPacing,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this(
+        executors,
+        ctx,
+        migrationActiveSupplier,
+        embeddingTelemetryEvents,
+        indexingPacing,
+        childRegistry,
+        captureResolvedConfig());
+  }
+
+  /** Canonical snapshot-bound composition used by {@code KnowledgeServer}. */
+  public DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      ResolvedConfig resolvedConfig) {
+    this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
+        childRegistry, WorkerServiceConfiguration.capture(
+            resolvedConfig, executors.pdfOcr().spec().threadCount()));
+  }
+
+  /** Reuses filesystem discovery and effective settings across deferred writer reconstruction. */
+  public DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      WorkerServiceConfiguration configuration) {
     java.util.Objects.requireNonNull(executors, "executors");
     java.util.Objects.requireNonNull(childRegistry, "childRegistry");
+    this.resolvedConfig = configuration.snapshot();
+    this.extractionConfiguration = configuration.extraction();
+    this.detailedTracing =
+        !"none".equalsIgnoreCase(resolvedConfig.index().tracingLevel());
     // Tempdoc 410 §13 Slice B — publish the operator-resolved IngestionSkipPolicy before any
     // ingestion path can call it. WorkerScanOps and WorkerIngestionAuthority fire during gRPC
     // handling that always happens after this constructor returns, so installing here is safe.
-    io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(buildSkipPolicy());
+    io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
+        extractionConfiguration.ingestionSkipPolicy());
 
     // 1. Content extractor + indexing loop. Tempdoc 417 Phase 2b: catalogs are constructed
     // here against the registry (worker-core can't import worker-services' catalog types).
@@ -143,15 +189,19 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       // slots. Deferred/read-only service sets cannot ingest and never close an IndexingLoop, so
       // constructing an extractor for them leaks all three owners until process exit.
       var contentExtractor =
-          buildContentExtractor(executors, ctx, extractionCatalog, ocrCatalog, childRegistry);
+          buildContentExtractor(
+              executors,
+              ctx,
+              extractionCatalog,
+              ocrCatalog,
+              childRegistry,
+              extractionConfiguration);
       // Tempdoc 516 P3 / Slice 5 (W7.2 followup): the 5 startup-config setters are now
       // IndexingLoopOptions record fields. Construct the options upfront so the loop is
       // immutable post-ctor (no setDetailedTracing/setCommitMetadataSupplier/etc.).
-      String tracingLevel = EnvRegistry.INDEX_TRACING_LEVEL
-          .getString("none");
       io.justsearch.indexerworker.loop.IndexingLoopOptions loopOptions =
           new io.justsearch.indexerworker.loop.IndexingLoopOptions(
-              !"none".equalsIgnoreCase(tracingLevel),                  // detailedTracing
+              detailedTracing,                                         // detailedTracing
               ctx.pathResolutionStore(),                                // pathResolutionStore
               ctx.documentIdentityStore(),                              // documentIdentityStore
               migrationActiveSupplier,                                  // 516 P3 final — pre-wired at ctor
@@ -232,7 +282,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
     // 4. Health service (also converted off the ImplBase; its wire adapter went at item A9).
     List<WorkerModelDiscovery.DiscoveredModel> discoveredModels =
-        WorkerModelDiscovery.discoverAll();
+        configuration.discoveredModels();
     this.healthService =
         new WorkerHealthService(
             ctx.config().serviceVersion(),
@@ -243,10 +293,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             discoveredModels);
 
     // 5. Cross-service wiring (previously in the gRPC wiring, deleted at item A9)
-    RerankerConfig.ChunkRerankerConfig chunkRerankerConfig =
-        RerankerConfig.ChunkRerankerConfig.fromEnv();
+    this.chunkRerankerConfig = configuration.chunkReranker();
+    this.citationScorerConfig = configuration.citationScorer();
     searchService.setChunkRerankerConfig(chunkRerankerConfig);
-    searchService.setCitationScorerConfig(CitationScorerConfig.fromEnv());
+    searchService.setCitationScorerConfig(citationScorerConfig);
     // setSignalBus removed by tempdoc 397 §14.26 T2-E1 along with the RagContextOps CPU-only
     // lazy chunkReranker fallback that was the only consumer of the signal bus in the rerank
     // path.
@@ -322,6 +372,28 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public WorkerHealthService healthService() {
     return healthService;
+  }
+
+  /** Snapshot from which this complete service set was composed. */
+  public ResolvedConfig resolvedConfig() {
+    return resolvedConfig;
+  }
+
+  /** Exact normalized extraction and admission values applied by this service set. */
+  public ExtractionConfiguration extractionConfiguration() {
+    return extractionConfiguration;
+  }
+
+  public boolean detailedTracing() {
+    return detailedTracing;
+  }
+
+  public RerankerConfig.ChunkRerankerConfig chunkRerankerConfig() {
+    return chunkRerankerConfig;
+  }
+
+  public CitationScorerConfig citationScorerConfig() {
+    return citationScorerConfig;
   }
 
   // ==================== Indexing loop lifecycle ====================
@@ -535,27 +607,35 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       ExtractionMetricCatalog catalog,
       OcrMetricCatalog ocrCatalog,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
-    String mode = EnvRegistry.EXTRACTION_SANDBOX_MODE.getString("auto").trim();
-    OcrRoutingConfig ocrConfig = resolvedOcrConfig().withWorkerLimit(executors.pdfOcr().spec().threadCount());
+    ResolvedConfig snapshot = captureResolvedConfig();
+    return buildContentExtractor(
+        executors,
+        ctx,
+        catalog,
+        ocrCatalog,
+        childRegistry,
+        ExtractionConfiguration.capture(
+            snapshot, executors.pdfOcr().spec().threadCount(), buildSkipPolicy(snapshot)));
+  }
+
+  static TimeboxedContentExtractor buildContentExtractor(
+      WorkerExecutorRegistrations executors,
+      @SuppressWarnings("unused") InfraContext ctx,
+      ExtractionMetricCatalog catalog,
+      OcrMetricCatalog ocrCatalog,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      ExtractionConfiguration configuration) {
+    OcrRoutingConfig ocrConfig = configuration.ocr();
     logEffectiveOcrConfig(ocrConfig);
-    TikaExtractionPolicy extractionPolicy = resolvedExtractionPolicy();
-    ExtractionSandboxFactory.Mode sandboxMode = parseSandboxMode(mode);
+    TikaExtractionPolicy extractionPolicy = configuration.tikaPolicy();
+    ExtractionSandboxFactory.Mode sandboxMode = configuration.sandboxMode();
     if (sandboxMode == ExtractionSandboxFactory.Mode.IN_PROCESS) {
       return ExtractionSandboxFactory.inProcessStructured(
           executors.pdfOcr(),
           executors.extractionTimebox(), catalog, ocrConfig, ocrCatalog, extractionPolicy);
     }
-    String rawCommand = EnvRegistry.EXTRACTION_SANDBOX_COMMAND.getString("");
-    List<String> command =
-        rawCommand == null || rawCommand.isBlank()
-            ? ExtractionSandboxCommand.defaultCommand(
-                extractionPolicy, EnvRegistry.EXTRACTION_SANDBOX_HEAP.getString(""))
-            : ExtractionSandboxCommand.tokenize(rawCommand);
-    ExtractionSandboxFactory.PoolSettings poolSettings =
-        new ExtractionSandboxFactory.PoolSettings(
-            EnvRegistry.EXTRACTION_SANDBOX_POOL.getInt(1),
-            EnvRegistry.EXTRACTION_SANDBOX_MAX_REQUESTS.getInt(
-                ExtractionSandboxFactory.PoolSettings.defaults().maxRequestsPerChild()));
+    List<String> command = configuration.sandboxCommand();
+    ExtractionSandboxFactory.PoolSettings poolSettings = configuration.sandboxPool();
     log.info(
         "Extraction sandbox mode={} pool={} maxRequestsPerChild={} command={}",
         sandboxMode,
@@ -598,44 +678,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         childRegistry);
   }
 
-  private static ExtractionSandboxFactory.Mode parseSandboxMode(String mode) {
-    if (mode.isEmpty() || "auto".equalsIgnoreCase(mode)) {
-      return ExtractionSandboxFactory.Mode.AUTO;
-    }
-    if ("in_process".equalsIgnoreCase(mode)) {
-      return ExtractionSandboxFactory.Mode.IN_PROCESS;
-    }
-    if ("process".equalsIgnoreCase(mode)) {
-      return ExtractionSandboxFactory.Mode.PROCESS;
-    }
-    throw new IllegalStateException(
-        "Unknown JUSTSEARCH_EXTRACTION_SANDBOX_MODE='"
-            + mode
-            + "': expected 'auto', 'in_process' or 'process'");
-  }
-
-  /**
-   * Extraction policy honouring {@code worker.limits.max_content_length} / {@code max_file_size}
-   * (tempdoc 799 §N.2). Mirrors {@link #resolvedOcrConfig()}. Returns the deterministic defaults
-   * when no ConfigStore is installed or the limits match the defaults, so an unconfigured install
-   * keeps the {@code tika-default-v1} identity in the extraction ledger.
-   */
-  private static TikaExtractionPolicy resolvedExtractionPolicy() {
-    ConfigStore store = ConfigStore.globalOrNull();
-    if (store == null || store.get() == null) {
-      return TikaExtractionPolicy.defaults();
-    }
-    return TikaExtractionPolicy.fromWorkerLimits(store.get().worker());
-  }
-
-  private static OcrRoutingConfig resolvedOcrConfig() {
-    ConfigStore store = ConfigStore.globalOrNull();
-    if (store == null || store.get() == null) {
-      return OcrRoutingConfig.defaults();
-    }
-    return OcrRoutingConfig.from(store.get().ocr());
-  }
-
   /**
    * Diagnosability fix (tempdoc 706): the effective OCR config previously appeared nowhere in the
    * worker's log, which made an unbounded-OCR incident undiagnosable without code archaeology.
@@ -663,10 +705,25 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * directly testable.
    */
   static io.justsearch.indexerworker.ingest.IngestionSkipPolicy buildSkipPolicy() {
+    return buildSkipPolicy(captureResolvedConfig());
+  }
+
+  static io.justsearch.indexerworker.ingest.IngestionSkipPolicy buildSkipPolicy(
+      ResolvedConfig snapshot) {
+    ResolvedConfig.Extraction extraction = snapshot.extraction();
     return new io.justsearch.indexerworker.ingest.IngestionSkipPolicy(
-        parseCsvSet(EnvRegistry.INGESTION_SKIP_PATTERNS.getString(null)),
-        parseCsvSet(EnvRegistry.INGESTION_SKIP_EXTENSIONS.getString(null)),
-        parseCsvSet(EnvRegistry.INGESTION_SKIP_DIRECTORY_NAMES.getString(null)));
+        parseCsvSet(extraction.ingestionSkipPatterns()),
+        parseCsvSet(extraction.ingestionSkipExtensions()),
+        parseCsvSet(extraction.ingestionSkipDirectoryNames()));
+  }
+
+  private static ResolvedConfig captureResolvedConfig() {
+    ConfigStore store = ConfigStore.globalOrNull();
+    ResolvedConfig current = store == null ? null : store.get();
+    if (current != null) {
+      return current;
+    }
+    return new ResolvedConfigBuilder().contributeEnvRegistry().build();
   }
 
   /** Package-private since Slice G.3 so the parser is unit-testable in isolation. */

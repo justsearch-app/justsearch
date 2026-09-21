@@ -142,6 +142,8 @@ final class RuntimeSession implements AutoCloseable {
    */
   volatile boolean vectorExhaustiveSearch;
 
+  volatile Map<String, Object> appliedConfigurationValues;
+
   volatile String softDeleteField;
   String uidField;
   String hardDeleteField;
@@ -381,6 +383,7 @@ final class RuntimeSession implements AutoCloseable {
     this.knnVectorsFormat = null;
     this.vectorEfSearchOverrideOrNull = null;
     this.vectorExhaustiveSearch = false;
+    this.appliedConfigurationValues = Map.of();
     this.softDeleteField = SchemaFields.SOFT_DELETE;
     this.uidField = SchemaFields.DOC_UID;
     this.hardDeleteField = SchemaFields.HARD_DELETE;
@@ -445,6 +448,7 @@ final class RuntimeSession implements AutoCloseable {
     this.softDeleteField = SchemaFields.SOFT_DELETE;
     this.vectorEfSearchOverrideOrNull = null;
     this.vectorExhaustiveSearch = false;
+    this.appliedConfigurationValues = Map.of();
 
     // Mode → readOnly flag passed through to ComponentsFactory.build.
     boolean openReadOnly = (mode == Mode.READ_ONLY) || (mode == Mode.DEFERRED);
@@ -554,6 +558,16 @@ final class RuntimeSession implements AutoCloseable {
     String vm = idx.validationMode();
     this.validationMode =
         "warn".equalsIgnoreCase(vm) ? ValidationMode.WARN : ValidationMode.FAIL;
+    this.appliedConfigurationValues =
+        components
+            .runtimeConfiguration()
+            .withSession(
+                resolvedConfig,
+                vectorEfSearchOverrideOrNull,
+                vectorExhaustiveSearch,
+                maxQueueDepth,
+                validationMode)
+            .values();
 
     // Activate the timer before NRT: timer refusal must not strand a live reopen thread in a
     // constructor whose runtime never reaches a caller. No writes are pending during activation.
@@ -977,6 +991,10 @@ final class RuntimeSession implements AutoCloseable {
 
   ResolvedConfig resolvedConfig() {
     return resolvedConfig != null ? resolvedConfig : resolveFromConfigStore();
+  }
+
+  Map<String, Object> appliedConfigurationValues() {
+    return appliedConfigurationValues;
   }
 
   // ==========================================================================

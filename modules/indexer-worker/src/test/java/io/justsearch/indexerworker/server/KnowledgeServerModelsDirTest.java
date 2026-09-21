@@ -38,6 +38,18 @@ class KnowledgeServerModelsDirTest {
 
   private static final String KEY_MODELS_DIR = "justsearch.models.dir";
 
+  @Test
+  void capturedSnapshotWinsOverGlobalChangedDuringComposition() {
+    Path capturedModels = tmp.resolve("captured-models");
+    var captured = TestResolvedConfigHelper.fromEntries(
+        Map.of(KEY_MODELS_DIR, capturedModels.toString()));
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(
+        Map.of(KEY_MODELS_DIR, tmp.resolve("new-global-models").toString()))));
+
+    assertEquals(capturedModels,
+        KnowledgeServer.resolveModelsDir(null, tmp.resolve("aihome"), captured));
+  }
+
   @TempDir Path tmp;
 
   private ConfigStore previousStore;

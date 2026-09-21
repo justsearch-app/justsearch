@@ -63,9 +63,23 @@ public final class EngineRoot implements WorkerHost {
   private final EngineAdmissionController admission = new EngineAdmissionController(resources);
   private final io.justsearch.core.execution.EngineExecutorRegistry executors =
       new DefaultEngineExecutorRegistry(resources);
+  private final io.justsearch.core.component.EngineComponentRegistry components =
+      new DefaultEngineComponentRegistry(resources.retained());
+  private final io.justsearch.core.component.ComponentHandle indexComponent = components.register(
+      new io.justsearch.core.component.ComponentSpec("index", true, KnowledgeServer.componentDependencies(),
+          io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
+          java.time.Duration.ofSeconds(60), 2));
+  private final io.justsearch.core.component.ComponentHandle encoderComponent = components.register(
+      new io.justsearch.core.component.ComponentSpec("encoders", false,
+          io.justsearch.indexerworker.server.InferenceCompositionRoot.componentDependencies(),
+          io.justsearch.core.component.ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY,
+          java.time.Duration.ofMinutes(2), 2));
 
   /** Process lifetime, deliberately independent of the restartable index-half close. */
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
+
+  /** Process-owned observations shared by all four component owners and their projections. */
+  public io.justsearch.core.component.EngineComponentRegistry components() { return components; }
 
   /** The same owner is shared by the API front, library calls and ordered shutdown. */
   public io.justsearch.app.api.EngineAdmissionService admission() { return admission; }
@@ -98,7 +112,9 @@ public final class EngineRoot implements WorkerHost {
   @FunctionalInterface
   interface ServerFactory {
     KnowledgeServer create(GpuSchedulingGauge gauge, io.justsearch.core.execution.EngineExecutorRegistry executors,
-        io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion);
+        io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+        io.justsearch.core.component.ComponentHandle indexComponent,
+        io.justsearch.core.component.ComponentHandle encoderComponent);
   }
   private final ServerFactory serverFactory;
   private boolean clientReady;
@@ -189,8 +205,9 @@ public final class EngineRoot implements WorkerHost {
       IntConsumer exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority) {
     this(operations, attempts,
-        (gauge, executorRegistry, ingestion) -> {
-          WorkerConfig workerConfig = WorkerConfig.load();
+        (gauge, executorRegistry, ingestion, indexComponent, encoderComponent) -> {
+          var startupConfiguration = io.justsearch.configuration.resolved.ConfigStore.global().get();
+          WorkerConfig workerConfig = WorkerConfig.load(startupConfiguration);
           // Review S2: the hot-reload trigger is a file under <dataDir>/runtime/, written by the
           // dev MCP tool from another process. Supplying the directory here is what re-arms it;
           // the no-arg bus (tests, any composition without a data dir) leaves reload disabled
@@ -198,7 +215,7 @@ public final class EngineRoot implements WorkerHost {
           return new KnowledgeServer(
               executorRegistry, workerConfig,
               new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
-              childRegistry, ingestion);
+              childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration);
         },
         deadlineMs,
         batchSize,
@@ -261,7 +278,8 @@ public final class EngineRoot implements WorkerHost {
     if (server != null) {
       throw new IOException("EngineRoot cannot start while its previous server close is incomplete");
     }
-    KnowledgeServer started = serverFactory.create(gpuScheduling, executors, recordedIngestion);
+    KnowledgeServer started = serverFactory.create(gpuScheduling, executors, recordedIngestion,
+        indexComponent, encoderComponent);
     synchronized (terminalWriterFaultOwnerLock) {
       if (terminalWriterExitAccepted) {
         throw new IOException("EngineRoot cannot restart after accepting a terminal writer fault");
