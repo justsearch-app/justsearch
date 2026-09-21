@@ -105,6 +105,15 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Recorded walks are unavailable");
   }
 
+  /**
+   * Owner has durably refused the parent and revoked permission. Retire only unissued pending
+   * members of an exact completed enumeration; preserve its outcome and existing terminal evidence.
+   * An issued claim leaves the projection unchanged. No permission to execute is granted.
+   */
+  default WalkProgress retireRefusedRecordedWalk(String operationKey, String expectedPlanHash) {
+    throw new UnsupportedOperationException("Recorded walks are unavailable");
+  }
+
   /** Missing or contradictory terminal evidence must never be interpreted as an empty receipt. */
   final class RecordedWalkGapException extends IllegalStateException {
     public RecordedWalkGapException(String message) { super(message); }

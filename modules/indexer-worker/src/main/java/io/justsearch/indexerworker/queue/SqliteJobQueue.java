@@ -193,6 +193,27 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return accessRecordedWalk(() -> sealRecordedWalk(operationKey), true);
   }
 
+  @Override
+  public WalkProgress retireRefusedRecordedWalk(String operationKey, String expectedPlanHash) {
+    return accessRecordedWalk(() -> {
+      var before = SqliteIngestionWalkOps.find(connection, operationKey)
+          .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded walk state is unavailable"));
+      if (!before.planHash().equals(expectedPlanHash)) throw new JobQueue.RecordedWalkGapException("Recorded plan changed");
+      if (before.sealedAt() != null || hasIssuedRecordedClaimsLocked(operationKey)) return before;
+      if (before.enumerationOutcome() != WalkEnumerationOutcome.COMPLETE) {
+        throw new JobQueue.RecordedWalkGapException("Refused retirement requires completed enumeration");
+      }
+      List<String> pending = new ArrayList<>();
+      try (var query = connection.prepareStatement("SELECT path FROM jobs WHERE scan_id = ? "
+          + "AND walk_seen_epoch IS NOT NULL AND state IN ('PENDING', 'PROCESSING')")) {
+        query.setString(1, operationKey);
+        try (var rows = query.executeQuery()) { while (rows.next()) pending.add(rows.getString(1)); }
+      }
+      for (String path : pending) skipRecordedMember(path, IngestionOutcomeClass.SKIPPED_POLICY, "RECOVERY_REFUSED");
+      return SqliteIngestionWalkOps.find(connection, operationKey).orElseThrow();
+    }, true);
+  }
+
   private WalkProgress sealRecordedWalk(String operationKey) throws SQLException {
     boolean issued = hasIssuedRecordedClaimsLocked(operationKey);
     return SqliteIngestionWalkOps.seal(connection, operationKey, issued, SqliteJobQueue::sha256, System.currentTimeMillis());

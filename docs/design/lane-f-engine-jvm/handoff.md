@@ -17,7 +17,11 @@ focused cases, PMD/format, review and production incremental alias/retained-retr
 its owned stack is stopped. Both-store reopen cases execute for real prepared
 INGEST/REINDEX dispatch with new owners; all38 coordinator cases and PMD/format
 pass2018. [Proof and limits](evidence/C2/recorded-production-composition.md).
-Next: installed fault scenarios.
+Installed processing/retry baseline2022/2027 passes after persisting its watched corpus
+scope. Baseline2020 also exposed a real closed-enumeration refusal defect; the
+[active correction](evidence/C2/closed-enumeration-refusal.md) persists the refusal
+before retiring unfinished units and preserves receipt settlement at the attempt limit.
+Next: commit the reviewed correction, then all six installed fault scenarios.
 Live forced-disconnect proof is
 still distinct from the controlled frontend detachment tests.
 The [pause record](evidence/C2/pause-2026-09-21.md) is historical.

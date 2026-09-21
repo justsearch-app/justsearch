@@ -609,8 +609,11 @@ metadata alone is not sufficient after replacement. Missing binding fails after 
 producer/issued-owner drain and never acknowledges unprovable evidence.
 
 The live child checkpoint cursor is ingest-progress:1:<queue revision>, with only committed
-historical counts. The parent cursor is ingest-parent:1:<completed root count>; its counts
-include confirmed current-child progress while that child runs. Neither cursor acknowledges
+historical counts. The ordinary parent cursor is ingest-parent:1:<completed root count>; its counts
+include confirmed current-child progress while that child runs. Permanent refusal instead
+uses ingest-refusal:1:<allowlisted-code>, preserved by later count checkpoints; see
+[the refusal correction](closed-enumeration-refusal.md) for decision-before-retirement
+ordering and crash recovery. Neither progress nor refusal cursor acknowledges
 a sealed queue receipt. Terminal child completion still requires the exact ingest-receipt
 cursor. Finishing an already-running third durable attempt spends no fourth attempt;
 recovery repair requires a winning Resume within the total limit3. Terminal parent recovery

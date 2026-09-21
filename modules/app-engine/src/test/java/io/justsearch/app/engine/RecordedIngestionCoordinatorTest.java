@@ -916,6 +916,220 @@ final class RecordedIngestionCoordinatorTest {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"none", "before-marker", "after-marker", "after-retirement", "after-terminal", "exhausted"})
+  void refusedRecoveryRetiresUnsettledUnitsAfterEnumerationAlreadyCompleted(String cut) throws Exception {
+    try (Fixture old = new Fixture(temp, 1)) {
+      var childKey = new AtomicReference<String>();
+      old.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        childKey.set(key);
+        old.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(
+            plan.roots().getFirst().path().resolve("pending.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = old.request();
+      var accepted = old.accept(request);
+      try (var work = old.admission.admit(request.context(), false)) {
+        old.runner.start(accepted, handle -> old.coordinator.execute(handle, work.context()));
+      }
+      assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE,
+          old.queue.recordedWalk(childKey.get()).orElseThrow().enumerationOutcome());
+      old.coordinator.stopProducers(1000);
+      old.attachment.close();
+      old.queue.close();
+      if ("exhausted".equals(cut)) {
+        for (String key : List.of(request.key(), childKey.get())) {
+          long id = old.operations.find(key).orElseThrow().id();
+          assertTrue(old.operations.resume(id));
+          assertTrue(old.operations.resume(id));
+        }
+      } else if (!"none".equals(cut)) {
+        cutRefusalRecovery(old, request.key(), childKey.get(), cut);
+        if ("before-marker".equals(cut)) return;
+      }
+      var admission = new EngineAdmissionController(2, 2, 1);
+      var runner = new OperationAttemptRunnerImpl(old.operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+      var recovered = new RecordedIngestionCoordinator(old.operations, runner, admission, old.authority);
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        queue.open();
+        // After a durable refusal, restored authority must not reverse the recorded decision.
+        String generation = "none".equals(cut) ? "different-generation" : GENERATION;
+        try (var attachment = recovered.attach(queue, () -> Optional.of(generation), () -> true)) {
+          org.junit.jupiter.api.Assertions.assertNotNull(attachment);
+          if ("exhausted".equals(cut)) {
+            assertEquals(OperationState.FAILED, old.operations.find(request.key()).orElseThrow().state(),
+                "receipt bookkeeping at the attempt limit needs neither producer binding nor another tick");
+          }
+          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+            throw new AssertionError("refused recovery must not invoke a producer");
+          });
+          recovered.maintain();
+          var parent = old.operations.find(request.key()).orElseThrow();
+          assertEquals(OperationState.FAILED, parent.state(), "permanent refusal cannot strand a closed walk");
+          String refusal = "exhausted".equals(cut) ? RecordedIngestionSettlement.EXHAUSTED : "RECOVERY_GENERATION_MISMATCH";
+          assertEquals(refusal, parent.receipt().code());
+          assertEquals("ingest-refusal:1:" + refusal, parent.checkpointCursor());
+          if ("exhausted".equals(cut)) {
+            assertEquals(3, parent.attempts());
+            assertEquals(3, old.operations.find(childKey.get()).orElseThrow().attempts());
+          }
+          assertTrue(old.operations.find(childKey.get()).orElseThrow().state().terminal());
+          var receipt = queue.recordedWalk(childKey.get()).orElseThrow();
+          org.junit.jupiter.api.Assertions.assertNotNull(receipt.sealedAt());
+          assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+          assertEquals(0, parent.unitsCompleted());
+          assertTrue(queue.pollPending(1).isEmpty());
+          assertEquals(0, admission.activeWorkCount());
+        }
+      }
+    }
+  }
+
+  @Test
+  void liveRefusalSurvivesAuthorityRestorationAndCountCheckpointsAfterAnIssuedClaimDrains() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var generation = new AtomicReference<>(GENERATION);
+      f.attachment.close();
+      f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(generation.get()), () -> true);
+      var childKey = new AtomicReference<String>();
+      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        childKey.set(key);
+        Path root = plan.roots().getFirst().path();
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("issued.txt")),
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("pending.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        var issued = f.queue.pollPending(1).getFirst();
+        generation.set("replacement-generation");
+        f.coordinator.maintain();
+        var refusing = f.operations.find(request.key()).orElseThrow();
+        assertEquals(OperationState.RUNNING, refusing.state());
+        assertEquals("ingest-refusal:1:RECOVERY_GENERATION_MISMATCH", refusing.checkpointCursor());
+        assertEquals(1, f.queue.jobStateCounts().pendingCount(), "issued claim blocks retirement of other members");
+        generation.set(GENERATION);
+        f.queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(issued, null, "a".repeat(64))),
+            io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+        f.coordinator.maintain();
+        var terminal = f.operations.find(request.key()).orElseThrow();
+        assertEquals(OperationState.FAILED, terminal.state());
+        assertEquals("RECOVERY_GENERATION_MISMATCH", terminal.receipt().code());
+        assertEquals(refusing.checkpointCursor(), terminal.checkpointCursor());
+        assertEquals(1, terminal.unitsCompleted(), "the issued owner's committed effect remains counted");
+        var receipt = f.queue.recordedWalk(childKey.get()).orElseThrow();
+        assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+      }
+      assertEquals(0, f.admission.activeWorkCount());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ingest-refusal:2:RECOVERY_GENERATION_MISMATCH", "ingest-refusal:1:UNKNOWN"})
+  void malformedRefusalWitnessCannotFallBackToCurrentAuthority(String marker) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var childKey = new AtomicReference<String>();
+      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        childKey.set(key);
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(
+            plan.roots().getFirst().path().resolve("unresolved.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+      }
+      var row = f.operations.find(request.key()).orElseThrow();
+      f.coordinator.stopProducers(1000);
+      f.attachment.close();
+      f.operations.checkpoint(row.id(), marker, 0, 0);
+      var unresolved = f.queue.recordedWalk(childKey.get()).orElseThrow();
+      var runner = new OperationAttemptRunnerImpl(f.operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+      var recoveredAdmission = new EngineAdmissionController(2, 2, 1);
+      var recovered = new RecordedIngestionCoordinator(f.operations, runner, recoveredAdmission, f.authority);
+      try (var attachment = recovered.attach(f.queue, () -> Optional.of(GENERATION), () -> true)) {
+        org.junit.jupiter.api.Assertions.assertNotNull(attachment);
+        recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+          throw new AssertionError("malformed refusal must not execute");
+        });
+        recovered.maintain();
+        var terminal = f.operations.find(request.key()).orElseThrow();
+        assertEquals(OperationState.FAILED, terminal.state());
+        assertEquals(RecordedIngestionSettlement.UNAVAILABLE, terminal.receipt().code());
+        assertEquals(marker, terminal.checkpointCursor());
+        assertEquals(unresolved, f.queue.recordedWalk(childKey.get()).orElseThrow(),
+            "corrupt decision cannot retire, seal or acknowledge unresolved queue evidence");
+        assertEquals(1, f.queue.jobStateCounts().pendingCount());
+        assertTrue(f.queue.pollPending(1).isEmpty());
+        assertEquals(0, recoveredAdmission.activeWorkCount());
+      }
+    }
+  }
+
+  private void cutRefusalRecovery(Fixture old, String parentKey, String childKey, String cut) throws Exception {
+    var tripped = new AtomicBoolean();
+    long parentId = old.operations.find(parentKey).orElseThrow().id();
+    long childId = old.operations.find(childKey).orElseThrow().id();
+    var port = (io.justsearch.app.api.operations.OperationStore) java.lang.reflect.Proxy.newProxyInstance(
+        getClass().getClassLoader(), new Class<?>[] {io.justsearch.app.api.operations.OperationStore.class},
+        (proxy, method, args) -> {
+          boolean marker = method.getName().equals("checkpoint") && args[0].equals(parentId)
+              && args[1].toString().startsWith("ingest-refusal:");
+          if (marker && "before-marker".equals(cut) && tripped.compareAndSet(false, true)) throw new RefusalCrash();
+          final Object result;
+          try { result = method.invoke(old.operations, args); }
+          catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+          boolean selected = marker && "after-marker".equals(cut)
+              || method.getName().equals("finish") && args[0].equals(childId) && "after-terminal".equals(cut);
+          if (selected && tripped.compareAndSet(false, true)) throw new RefusalCrash();
+          return result;
+        });
+    var runner = new OperationAttemptRunnerImpl(port, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+        null, new RecordedIngestPlanResolver());
+    var recovered = new RecordedIngestionCoordinator(port, runner, new EngineAdmissionController(2, 2, 1), old.authority);
+    try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+      queue.open();
+      var queuePort = (JobQueue) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+          new Class<?>[] {JobQueue.class}, (proxy, method, args) -> {
+            final Object result;
+            try { result = method.invoke(queue, args); }
+            catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+            if (method.getName().equals("retireRefusedRecordedWalk") && "after-retirement".equals(cut)
+                && tripped.compareAndSet(false, true)) throw new RefusalCrash();
+            return result;
+          });
+      assertThrows(RefusalCrash.class,
+          () -> recovered.attach(queuePort, () -> Optional.of("different-generation"), () -> true), cut);
+      assertTrue(tripped.get(), "must reach the selected durable boundary");
+      var parent = old.operations.find(parentKey).orElseThrow();
+      assertEquals(OperationState.RUNNING, parent.state());
+      var progress = queue.recordedWalk(childKey).orElseThrow();
+      if ("before-marker".equals(cut)) {
+        assertFalse(String.valueOf(parent.checkpointCursor()).startsWith("ingest-refusal:"));
+        assertTrue(progress.receiptJson() == null);
+        assertEquals(1, queue.jobStateCounts().pendingCount(), "a failed decision write cannot retire the pending member");
+      } else {
+        assertEquals("ingest-refusal:1:RECOVERY_GENERATION_MISMATCH", parent.checkpointCursor());
+        if ("after-terminal".equals(cut)) {
+          assertEquals(OperationState.COMPLETE, old.operations.find(childKey).orElseThrow().state());
+          assertTrue(progress.acknowledgedRevision() < progress.revision());
+        }
+      }
+    }
+  }
+
+  private static final class RefusalCrash extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+  }
+
+  @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void actualEngineProducerJournalsAndAcknowledgesARealFilesystemRoot(boolean singleFile) throws Exception {
     var generations = new io.justsearch.indexerworker.index.IndexGenerationManager(temp.resolve("index"));

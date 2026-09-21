@@ -459,6 +459,21 @@ the coordinator derives children, freezes their policy and checks generation and
 before queue effects. It checkpoints committed progress and waits for sealed child receipts
 and durable acknowledgements before completing the parent. On restart it resolves the stored
 prepared envelope rather than preparing against current filesystem or configuration state.
+Permanent recovery refusal is recorded before retiring unfinished queue members. The
+parent checkpoint `ingest-refusal:1:<code>` preserves the allowlisted refusal across
+restart and later authority changes; progress checkpoints retain that decision. Unknown
+versions or codes fail closed with unavailable-state failure and retain unresolved queue
+evidence; a corrupt marker cannot authorize retirement or acknowledgement. Boot
+reconciliation writes a valid checkpoint on the existing
+RUNNING attempt without executing a new attempt. The parent stays open until existing
+children settle and their receipts are acknowledged, then publishes the recorded failure.
+At the attempt limit, receipt bookkeeping for a validated refusal also uses the existing
+RUNNING attempt; it cannot spend another execution attempt or replace the refusal with
+attempt-exhaustion noise from a child.
+For a completed enumeration, queue retirement requires the exact plan hash and no issued
+claims. It records policy-skipped coverage for pending or orphaned processing members,
+preserving indexed results and the enumeration outcome. Cancellation and temporary
+recovery waits do not become permanent refusal markers.
 The public REST ingestion alias enters the same operation dispatcher and prepared handler.
 Its response supplies the durable operation key; the keyed operation-history read projects
 committed progress and the terminal outcome from the operations store.

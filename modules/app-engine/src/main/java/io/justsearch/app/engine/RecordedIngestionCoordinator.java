@@ -47,6 +47,10 @@ import java.util.function.BooleanSupplier;
 /** Stable Engine owner of finite parent/child attempts; physical queue attachments are replaceable. */
 final class RecordedIngestionCoordinator implements RecordedIngestionService, RecordedIngestionLifecycle {
   private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RecordedIngestionCoordinator.class);
+  private static final String REFUSAL_CURSOR = "ingest-refusal:1:";
+  private static final Set<String> DURABLE_REFUSALS = Set.of("RECOVERY_BINDING_INVALID",
+      "RECOVERY_SCOPE_REFUSED", "RECOVERY_AUTHORIZATION_REFUSED", "RECOVERY_GENERATION_MISMATCH",
+      RecordedIngestionSettlement.EXHAUSTED);
   /** Completion is actual producer exit, including cancellation/deadline cleanup, not caller release. */
   @FunctionalInterface
   interface Producer {
@@ -250,6 +254,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     try {
       stored = preparation(row);
       plan = resolver.resolve(row, stored);
+      recordedRefusal(row);
     } catch (IllegalArgumentException invalid) {
       return passes == 1 || unknownChild || openChildParents.contains(row.key())
           ? new Reconciliation.Wait() : failed(RecordedIngestionSettlement.UNAVAILABLE);
@@ -260,12 +265,24 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     RecordedIngestRecoveryDecision decision = recovery(row, stored, physical);
     if (decision instanceof RecordedIngestRecoveryDecision.Refused refused) {
+      if (!unknownChild && row.state() == OperationState.RUNNING && recordedRefusal(row) == null
+          && DURABLE_REFUSALS.contains(refused.receipt().code()) && fenceChildren(row, plan)) {
+        advanced = true;
+        return new Reconciliation.CheckpointAndWait(REFUSAL_CURSOR + refused.receipt().code(),
+            row.unitsCompleted(), row.unitsFailed());
+      }
       Reconciliation outcome = refusalAfterChildren(row, plan, physical, refused.receipt());
       return unknownChild || openChildParents.contains(row.key()) ? new Reconciliation.Wait() : outcome;
     }
     Optional<Reconciliation> completed = completedParent(row, plan, physical);
     if (completed.isPresent()) return completed.orElseThrow();
     if (row.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS) {
+      if (!unknownChild && row.state() == OperationState.RUNNING && recordedRefusal(row) == null
+          && fenceChildren(row, plan)) {
+        advanced = true;
+        return new Reconciliation.CheckpointAndWait(REFUSAL_CURSOR + RecordedIngestionSettlement.EXHAUSTED,
+            row.unitsCompleted(), row.unitsFailed());
+      }
       Reconciliation outcome = refusalAfterChildren(row, plan, physical, new OperationReceipt(RecordedIngestionSettlement.EXHAUSTED, null));
       return unknownChild || openChildParents.contains(row.key()) ? new Reconciliation.Wait() : outcome;
     }
@@ -347,6 +364,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           () -> new IllegalArgumentException("Recorded parent disappeared"));
       parentPreparation = preparation(parentRow);
       var parentPlan = resolver.resolve(parentRow, parentPreparation);
+      recordedRefusal(parentRow);
       if (parentRow.state().terminal() || !parentPlan.generation().equals(binding.plan().generation())
           || !parentPlan.roots().contains(binding.plan().roots().getFirst())
           || findChild(parentRow.key(), binding.plan()).filter(found -> found.id() == row.id()).isEmpty()) {
@@ -373,10 +391,17 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         permissions.remove(row.key());
         physical.queue.closeRecordedWalkEnumeration(row.key(), progress.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.FAILED);
       }
+      if (recordedRefusal(parentRow) != null && progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE) {
+        permissions.remove(row.key());
+        physical.queue.retireRefusedRecordedWalk(row.key(), hash);
+      }
       physical.queue.trySealRecordedWalk(row.key());
       if (physical.queue.sealedRecordedWalkReceipt(row.key()).isPresent() || refused) {
         permissions.remove(row.key());
-        return physical.settlement.reconcile(row, hash, true);
+        var settlement = recordedRefusal(parentRow) == null ? physical.settlement.reconcile(row, hash, true)
+            : physical.settlement.reconcileRefused(row, hash);
+        if (settlement instanceof Reconciliation.CheckpointAndWait) advanced = true;
+        return settlement;
       }
     } catch (JobQueue.RecordedWalkGapException unavailable) {
       permissions.remove(row.key());
@@ -415,6 +440,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     if (decision instanceof RecordedIngestRecoveryDecision.Refused refused) parent.refusal = refused.receipt();
     if (parent.work != null && parent.work.cancellationReason().isPresent()) {
       parent.refusal = new OperationReceipt("cancelled", null);
+    }
+    if (recordedRefusal(row) != null) parent.refusal = recordedRefusal(row);
+    if (parent.refusal != null && DURABLE_REFUSALS.contains(parent.refusal.code())
+        && recordedRefusal(row) == null && fenceChildren(row, parent.plan)) {
+      parent.handle.checkpoint(REFUSAL_CURSOR + parent.refusal.code(), row.unitsCompleted(), row.unitsFailed());
+      row = operations.find(row.key()).orElseThrow();
     }
     Child child = parent.child;
     if (child != null) {
@@ -515,7 +546,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   private void checkpointParent(Parent parent, OperationRecord observed) {
     if (parent.completed >= observed.unitsCompleted() && parent.failed >= observed.unitsFailed()) {
-      parent.handle.checkpoint("ingest-parent:1:" + parent.nextRoot, parent.completed, parent.failed);
+      parent.handle.checkpoint(parentCursor(observed, parent.nextRoot), parent.completed, parent.failed);
     }
   }
 
@@ -586,6 +617,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         if (progress.enumerationClosedAt() == null) physical.queue.closeRecordedWalkEnumeration(row.key(),
             progress.enumerationEpoch(), "cancelled".equals(parent.refusal.code())
                 ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.FAILED);
+        else if (progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE
+            && recordedRefusal(operations.find(parent.row.key()).orElseThrow()) != null) {
+          physical.queue.retireRefusedRecordedWalk(row.key(), planHash(child.plan));
+        }
       } else if (allowed) {
         if (child.retryEnumeration) {
           child.exit = null;
@@ -667,7 +702,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       long completed = Math.addExact(parent.completed, progress.completedUnits());
       long failed = Math.addExact(parent.failed, progress.failedUnits());
       if (completed >= parentRow.unitsCompleted() && failed >= parentRow.unitsFailed()) {
-        parent.handle.checkpoint("ingest-parent:1:" + parent.nextRoot, completed, failed);
+        parent.handle.checkpoint(parentCursor(parentRow, parent.nextRoot), completed, failed);
       }
     } catch (JobQueue.RecordedWalkGapException unavailable) {
       permissions.remove(row.key());
@@ -692,8 +727,38 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   private RecordedIngestRecoveryDecision recovery(OperationRecord row, OperationStore.Preparation preparation, Attached physical) {
+    var refused = recordedRefusal(row);
+    if (refused != null) return new RecordedIngestRecoveryDecision.Refused(refused);
     return authority.evaluateRecordedIngest(row, preparation, physical.generationValue(),
         required -> required instanceof RequiredCapability.WorkerOnline && physical.online.getAsBoolean());
+  }
+
+  /** Fence the exact frozen family before persisting a decision; never grant a cleanup permit. */
+  private boolean fenceChildren(OperationRecord row, RecordedRootPlan plan) {
+    for (int index = 0; index < plan.roots().size(); index++) {
+      final Optional<OperationRecord> child;
+      try { child = findChild(row.key(), oneRoot(plan, index)); }
+      catch (JobQueue.RecordedWalkGapException invalid) { return false; }
+      child.ifPresent(found -> permissions.remove(found.key()));
+    }
+    var parent = parents.get(row.key());
+    if (parent != null && parent.child != null && parent.child.cancellation != null) {
+      parent.child.cancellation.cancel("recorded recovery permanently refused");
+    }
+    return true;
+  }
+
+  private static OperationReceipt recordedRefusal(OperationRecord row) {
+    String cursor = row.checkpointCursor();
+    if (cursor == null || !cursor.startsWith("ingest-refusal:")) return null;
+    if (!cursor.startsWith(REFUSAL_CURSOR) || !DURABLE_REFUSALS.contains(cursor.substring(REFUSAL_CURSOR.length()))) {
+      throw new IllegalArgumentException("Recorded ingestion refusal is malformed");
+    }
+    return new OperationReceipt(cursor.substring(REFUSAL_CURSOR.length()), null);
+  }
+
+  private static String parentCursor(OperationRecord row, int nextRoot) {
+    return recordedRefusal(row) == null ? "ingest-parent:1:" + nextRoot : row.checkpointCursor();
   }
 
   private Optional<OperationRecord> findChild(String parentKey, RecordedRootPlan plan) {

@@ -360,6 +360,68 @@ final class OperationAttemptRunnerTest {
   private SqliteOperationStore store() throws Exception {
     return new SqliteOperationStore(temp.resolve("operations.db"), CLOCK, step -> {});
   }
+
+  @Test
+  void recoveryCheckpointAtAttemptLimitPreservesEligibilityWithoutExecutingAnAttempt() throws Exception {
+    try (var store = store()) {
+      var request = request(OperationKind.INGEST, EngineContext.Survival.DURABLE);
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(row.id()));
+      assertTrue(store.resume(row.id()));
+      assertTrue(store.resume(row.id()));
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.INGEST));
+      var completed = new AtomicInteger();
+      try (var subscription = store.subscribeCompletions(ignored -> completed.incrementAndGet())) {
+        assertNotNull(subscription);
+        runner.reconcile(OperationKind.INGEST, ignored -> new OperationAttemptRunner.Reconciliation.CheckpointAndWait(
+            "ingest-refusal:1:RECOVERY_SCOPE_REFUSED", 0, 0));
+        var checkpointed = store.find(row.key()).orElseThrow();
+        assertEquals(OperationState.RUNNING, checkpointed.state());
+        assertEquals(OperationAttemptRunner.MAX_DURABLE_ATTEMPTS, checkpointed.attempts());
+        assertEquals("ingest-refusal:1:RECOVERY_SCOPE_REFUSED", checkpointed.checkpointCursor());
+        assertEquals(0, completed.get());
+        runner.reconcile(OperationKind.INGEST, current -> {
+          assertEquals(checkpointed, current);
+          return new OperationAttemptRunner.Reconciliation.Failed(new OperationReceipt("RECOVERY_SCOPE_REFUSED", null));
+        });
+        assertEquals(1, completed.get());
+        assertEquals(OperationState.FAILED, store.find(row.key()).orElseThrow().state());
+        assertEquals(OperationAttemptRunner.MAX_DURABLE_ATTEMPTS, store.find(row.key()).orElseThrow().attempts());
+      }
+    }
+  }
+
+  @Test
+  void ignoredRecoveryCheckpointSignalsUnresolvedPersistenceAndCannotAdvanceToCleanup() throws Exception {
+    try (var store = store()) {
+      var request = request(OperationKind.INGEST, EngineContext.Survival.DURABLE);
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(row.id()));
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.INGEST));
+      execute("CREATE TRIGGER ignore_checkpoint BEFORE UPDATE OF checkpoint_cursor ON operations "
+          + "BEGIN SELECT RAISE(IGNORE); END");
+      assertThrows(RuntimeException.class, () -> runner.reconcile(OperationKind.INGEST,
+          ignored -> new OperationAttemptRunner.Reconciliation.CheckpointAndWait("decision", 0, 0)));
+      assertNull(store.find(row.key()).orElseThrow().checkpointCursor());
+      assertEquals(1, store.find(row.key()).orElseThrow().attempts());
+      var failure = runner.persistenceFailure().toCompletableFuture().join();
+      assertEquals(row.key(), failure.operationKey());
+      assertEquals(OperationState.RUNNING, failure.intendedState());
+    }
+  }
+
+  @Test
+  void recoveryCheckpointCannotStartAnAcceptedRow() throws Exception {
+    try (var store = store()) {
+      var request = request(OperationKind.INGEST, EngineContext.Survival.DURABLE);
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.INGEST));
+      assertThrows(IllegalArgumentException.class, () -> runner.reconcile(OperationKind.INGEST,
+          ignored -> new OperationAttemptRunner.Reconciliation.CheckpointAndWait("decision", 0, 0)));
+      assertEquals(row, store.find(row.key()).orElseThrow());
+      assertFalse(runner.persistenceFailure().toCompletableFuture().isDone());
+    }
+  }
   private static OperationAttemptRunner.Request request(OperationKind kind, EngineContext.Survival survival) {
     return new OperationAttemptRunner.Request(OperationKeys.generate(CLOCK), descriptor(kind), context(survival), null);
   }

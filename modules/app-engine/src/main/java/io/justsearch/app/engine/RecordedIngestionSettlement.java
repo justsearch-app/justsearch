@@ -37,15 +37,21 @@ final class RecordedIngestionSettlement {
    * Missing evidence may fail only after both producer and process-local queue owners exited.
    */
   Reconciliation reconcile(OperationRecord row, String expectedPlanHash, boolean enumerationExited) {
-    return reconcile(row, expectedPlanHash, enumerationExited, true);
+    return reconcile(row, expectedPlanHash, enumerationExited, true, false);
+  }
+
+  /** A durable parent refusal owns this cleanup; acknowledging its receipt cannot run another effect. */
+  Reconciliation reconcileRefused(OperationRecord row, String expectedPlanHash) {
+    return reconcile(row, expectedPlanHash, true, true, true);
   }
 
   /** Settle the already-running attempt without spending another durable recovery attempt. */
   java.util.Optional<OperationExecution> settleRunning(OperationRecord row, String expectedPlanHash,
       boolean enumerationExited, io.justsearch.agent.api.registry.OperationRecordHandle handle) {
-    Reconciliation decision = reconcile(row, expectedPlanHash, enumerationExited, false);
+    Reconciliation decision = reconcile(row, expectedPlanHash, enumerationExited, false, false);
     return switch (decision) {
       case Reconciliation.Wait ignored -> java.util.Optional.empty();
+      case Reconciliation.CheckpointAndWait ignored -> throw new IllegalStateException("Receipt settlement cannot record a parent decision");
       case Reconciliation.Resume resume -> java.util.Optional.of(resume.body().apply(handle));
       case Reconciliation.Complete ignored -> java.util.Optional.of(
           OperationExecution.finished(OperationResult.success("Recorded ingestion completed")));
@@ -55,7 +61,7 @@ final class RecordedIngestionSettlement {
   }
 
   private Reconciliation reconcile(OperationRecord row, String expectedPlanHash,
-      boolean enumerationExited, boolean newAttempt) {
+      boolean enumerationExited, boolean newAttempt, boolean refusedParent) {
     Objects.requireNonNull(row, "row");
     Objects.requireNonNull(expectedPlanHash, "expectedPlanHash");
     if (row.state().terminal()) throw new IllegalArgumentException("Cannot reconcile a terminal child");
@@ -75,7 +81,13 @@ final class RecordedIngestionSettlement {
       return failed(UNAVAILABLE);
     }
     if (RecordedIngestionReceipt.checkpointMatches(row, receipt)) return terminalDecision(receipt);
-    if (newAttempt && row.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS) return failed(EXHAUSTED);
+    if (newAttempt && row.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS) {
+      if (refusedParent && row.state() == OperationState.RUNNING) {
+        return new Reconciliation.CheckpointAndWait(RecordedIngestionReceipt.cursor(receipt),
+            receipt.completedUnits(), receipt.failedUnits());
+      }
+      return failed(EXHAUSTED);
+    }
     return new Reconciliation.Resume(handle -> {
       // A decision is a snapshot, never permission to checkpoint a replaced/corrupt projection.
       try {

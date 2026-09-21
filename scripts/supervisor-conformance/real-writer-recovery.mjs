@@ -54,6 +54,13 @@ const env = {
 };
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['processing', 'operation'].includes(process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO)) {
+  // Recovery revalidates persisted scope. Keep the successful replay corpus under a
+  // real watched root; fresh out-of-root authority intentionally cannot survive restart.
+  const corpus = path.join(work, 'corpus');
+  fs.mkdirSync(corpus, { recursive: true });
+  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
+    schemaVersion: 1, roots: [{ path: corpus }],
+  }));
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';

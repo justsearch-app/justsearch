@@ -136,6 +136,11 @@ public interface OperationAttemptRunner {
 
   sealed interface Reconciliation {
     record Wait() implements Reconciliation {}
+    /**
+     * Persist a RUNNING owner's recovery decision without starting an effect or spending an
+     * attempt. The owner serializes its decisions and remains eligible for later reconciliation.
+     */
+    record CheckpointAndWait(String cursor, long completed, long failed) implements Reconciliation {}
     record Complete(OperationReceipt receipt) implements Reconciliation {}
     record Failed(OperationReceipt receipt) implements Reconciliation {}
     record Cancelled(OperationReceipt receipt) implements Reconciliation {}

@@ -15,7 +15,7 @@ export async function exerciseProcessingReplay(c) {
   requireThat(originalProcess?.CommandLine?.includes(data), 'Engine command must name this fixture data');
   const record = { pid: first.pid, creationFileTimeUtc: originalProcess.CreationFileTimeUtc,
     cmdlineFingerprint: originalProcess.CommandLine };
-  const file = path.join(work, 'chaos-hang-processing.txt');
+  const file = path.join(work, 'corpus', 'chaos-hang-processing.txt');
   const marker = 'processingreplayedmarker';
   fs.writeFileSync(file, `${marker} platypus durable replay\n`);
   const operationKey = createOperationKey();

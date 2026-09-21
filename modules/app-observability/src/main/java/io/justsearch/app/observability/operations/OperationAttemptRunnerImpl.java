@@ -517,6 +517,15 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       Control control = controlFor(row);
       if (control.started.get()) continue;
       Reconciliation decision = Objects.requireNonNull(reconciler.apply(row), "Reconciliation verdict");
+      if (decision instanceof Reconciliation.CheckpointAndWait checkpoint) {
+        if (row.state() != OperationState.RUNNING) throw new IllegalArgumentException("Recovery checkpoint requires RUNNING");
+        try { control.checkpoint(checkpoint.cursor(), checkpoint.completed(), checkpoint.failed()); }
+        catch (RuntimeException | Error failure) {
+          persistenceFailed(control, OperationState.RUNNING, failure);
+          throw failure;
+        }
+        continue;
+      }
       if (decision instanceof Reconciliation.Wait || !control.started.compareAndSet(false, true)) continue;
       switch (decision) {
         case Reconciliation.Complete complete -> finishObserved(control, OperationState.COMPLETE, complete.receipt());
@@ -524,6 +533,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         case Reconciliation.Cancelled cancelled -> finishObserved(control, OperationState.CANCELLED, cancelled.receipt());
         case Reconciliation.Resume resume -> execute(control, resume.body(), true);
         case Reconciliation.Wait ignored -> throw new IllegalStateException("Wait was already handled");
+        case Reconciliation.CheckpointAndWait ignored -> throw new IllegalStateException("Checkpoint was already handled");
       }
     }
   }
