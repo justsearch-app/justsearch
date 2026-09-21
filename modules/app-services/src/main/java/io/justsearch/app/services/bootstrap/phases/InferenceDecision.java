@@ -14,9 +14,14 @@ public final class InferenceDecision {
    * callers retain this decision through construction rather than sampling configuration again.
    */
   public static boolean decideInferenceConfigured(ResolvedConfig snapshot) {
+    return decideInferenceConfigured(snapshot, EnvRegistry.LITE_MODE.getBoolean(false));
+  }
+
+  /** The owner may retain the sampled launch gate for its applied composition identity. */
+  public static boolean decideInferenceConfigured(ResolvedConfig snapshot, boolean liteMode) {
     Objects.requireNonNull(snapshot, "snapshot");
     return !snapshot.ai().disabled()
         && snapshot.ai().llmEnabled()
-        && !EnvRegistry.LITE_MODE.getBoolean(false);
+        && !liteMode;
   }
 }

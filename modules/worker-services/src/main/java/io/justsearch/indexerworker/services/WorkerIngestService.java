@@ -7,6 +7,7 @@ import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.SwapReason;
+import io.justsearch.app.api.operations.AppliedIndexGeneration;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.ipc.logging.MdcContext;
 import io.justsearch.ipc.BatchRequest;
@@ -104,6 +105,12 @@ public final class WorkerIngestService {
   /** Maximum queue depth before rejecting new submissions. */
   private static final long MAX_QUEUE_DEPTH = 100_000;
 
+  private static final tools.jackson.databind.ObjectMapper COMMITTED_INPUTS_JSON =
+      tools.jackson.databind.json.JsonMapper.builder()
+          .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+          .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .build();
+
   /** Opens an MDC scope with the trace_id and request_id the caller propagated. */
   private MdcContext openRequestMdc(
       CallContext ctx) { // NOPMD - AutoCloseable for logging context side-effect
@@ -121,6 +128,7 @@ public final class WorkerIngestService {
   private final IndexGenerationManager indexGenerationManager;
   private final boolean ingestIsServing;
   private final boolean hasServingRuntime;
+  private final io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle;
   private final Path capturedServingPath;
   private final OperationalMetrics metrics = OperationalMetrics.getInstance();
   private final IndexStatusOps statusOps;
@@ -173,6 +181,7 @@ public final class WorkerIngestService {
     this.ingestLifecycle = ingestLifecycle;
     this.ingestIsServing = ingestLifecycle != null && ingestLifecycle == searchLifecycle;
     this.hasServingRuntime = searchLifecycle != null;
+    this.searchLifecycle = searchLifecycle;
     this.capturedServingPath = indexPath;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
@@ -692,6 +701,87 @@ public final class WorkerIngestService {
   /** Read-only active witness for the recovery rebuild; this never grants ordinary ingestion. */
   public String captureRebuildGeneration(CallContext ctx) {
     return captureActiveGeneration(ctx, false);
+  }
+
+  /**
+   * Strictly observes the committed fingerprint/input pair served by the captured search runtime.
+   * The authoritative active pointer is fenced before and after the commit read; a build may be in
+   * progress because Blue remains the applied generation until promotion.
+   */
+  public AppliedIndexGeneration captureAppliedGeneration(CallContext ctx) {
+    try (var ignored = openRequestMdc(ctx)) {
+      requireAppliedGenerationNotCancelled(ctx);
+      if (!hasServingRuntime || searchLifecycle == null || indexGenerationManager == null
+          || capturedServingPath == null) {
+        throw WorkerServiceException.unavailable("Applied generation authority is unavailable");
+      }
+
+      String generationBefore = requireCapturedActiveGeneration(false);
+      Map<String, String> metadata;
+      try {
+        metadata = searchLifecycle.latestCommitUserDataBestEffort();
+      } catch (RuntimeException failure) {
+        throw new WorkerServiceException(
+            WorkerServiceException.Status.UNAVAILABLE,
+            "Committed index metadata could not be read",
+            failure);
+      }
+      requireAppliedGenerationNotCancelled(ctx);
+      AppliedIndexGeneration observation = appliedGeneration(generationBefore, metadata);
+      String generationAfter = requireCapturedActiveGeneration(true);
+      if (!generationBefore.equals(generationAfter)) {
+        throw WorkerServiceException.aborted("Active generation moved during applied observation");
+      }
+      requireAppliedGenerationNotCancelled(ctx);
+      return observation;
+    }
+  }
+
+  private String requireCapturedActiveGeneration(boolean observationStarted) {
+    final java.util.Optional<String> generation;
+    try {
+      generation = indexGenerationManager.activeGeneration(capturedServingPath);
+    } catch (java.io.IOException | RuntimeException failure) {
+      throw new WorkerServiceException(
+          WorkerServiceException.Status.UNAVAILABLE,
+          "Active generation state could not be established",
+          failure);
+    }
+    return generation.orElseThrow(() -> observationStarted
+        ? WorkerServiceException.aborted("Captured serving generation is no longer active")
+        : WorkerServiceException.unavailable("Captured serving generation is not active"));
+  }
+
+  private static AppliedIndexGeneration appliedGeneration(
+      String generationId, Map<String, String> metadata) {
+    if (metadata == null) {
+      throw WorkerServiceException.unavailable("Committed index metadata is unavailable");
+    }
+    String fingerprint = metadata.get(IndexFingerprint.COMMIT_META_KEY);
+    String inputs = metadata.get(IndexFingerprint.COMMIT_META_INPUTS_KEY);
+    if (fingerprint == null || inputs == null) {
+      throw WorkerServiceException.unavailable(
+          "Committed index fingerprint evidence is incomplete");
+    }
+    try {
+      IndexTargetSnapshot target = new IndexTargetSnapshot(fingerprint, inputs);
+      tools.jackson.databind.JsonNode parsed = COMMITTED_INPUTS_JSON.readTree(inputs);
+      if (parsed == null || !parsed.isObject()) {
+        throw new IllegalArgumentException("Canonical index inputs must be a JSON object");
+      }
+      return new AppliedIndexGeneration(generationId, target);
+    } catch (tools.jackson.core.JacksonException | IllegalArgumentException invalid) {
+      throw new WorkerServiceException(
+          WorkerServiceException.Status.UNAVAILABLE,
+          "Committed index fingerprint evidence is invalid",
+          invalid);
+    }
+  }
+
+  private static void requireAppliedGenerationNotCancelled(CallContext ctx) {
+    if (ctx.cancelled()) {
+      throw WorkerServiceException.cancelled("Applied generation capture cancelled");
+    }
   }
 
   private String captureActiveGeneration(CallContext ctx, boolean requireWriter) {

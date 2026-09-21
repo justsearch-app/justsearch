@@ -34,8 +34,12 @@ EngineRoot captures registry snapshot A, obtains the strict generation observati
 then captures B. A changed registry revision or replaced EngineKnowledgeClient
 refuses instead of hashing a mixed
 observation. The revision is only a validation fence, never a digest input. Require
-the four registered component names; use each actual appliedVersion, including
-explicit null for an absent optional owner. Hash sorted names/applied versions,
+the four registered component names and a nonnull actual appliedVersion for each.
+An optional ABSENT owner with null may still be initializing (notably deferred
+encoders), so it cannot certify a revision. After manager construction completes,
+HeadAssembly publishes an explicit generative absence digest when no manager exists:
+the captured LLM/AI/lite gates are actual values and all unapplied manager argv/resource
+values are null. The same retained lite sample feeds decision and digest. Hash sorted names/applied versions,
 generation ID and committed canonical inputs through the existing canonical digest
 utility. Desired values, lifecycle states, timestamps, evidence and registry
 revision must not affect the hash.

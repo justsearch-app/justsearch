@@ -479,8 +479,9 @@ public final class HeadAssembly implements AutoCloseable {
 
     // §4 Phase 2 — CapabilityPhase first (F3 reorder); mode-change listener attached in
     // ServicePhase after the manager exists.
+    boolean liteMode = EnvRegistry.LITE_MODE.getBoolean(false);
     boolean inferenceConfigured =
-        io.justsearch.app.services.bootstrap.phases.InferenceDecision.decideInferenceConfigured(rc);
+        io.justsearch.app.services.bootstrap.phases.InferenceDecision.decideInferenceConfigured(rc, liteMode);
     // Tempdoc 541 §5.3 + fix-pass D.1 — CapabilityPhase uses the unified PhaseOutcome-aware
     // tracedPhase helper; Ready/Degraded/Failed mapping happens inside the helper so the
     // call site stays concise.
@@ -509,12 +510,11 @@ public final class HeadAssembly implements AutoCloseable {
             executors, inferenceConfigured, rc, io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
             managedChildRegistry);
     this.inferenceManager = manager;
-    if (generativeObservation != null) {
-      if (manager != null) {
-        String version = generativeAppliedVersion(manager.currentConfig());
-        generativeObservation.setDesiredVersion(version);
-        generativeObservation.setAppliedVersion(version);
-      }
+    if (generativeObservation != null && (manager != null || !inferenceConfigured)) {
+      String version = manager == null ? generativeAbsentVersion(rc, liteMode)
+          : generativeAppliedVersion(manager.currentConfig());
+      generativeObservation.setDesiredVersion(version);
+      generativeObservation.setAppliedVersion(version);
     }
     // Tempdoc 518 Wave B + Slice 2 (ported from main 17545ad2a + 3a5355216) — install the
     // persistent transition sidecar at the composition root. Wrap NdjsonInferenceTransitionLog
@@ -1694,6 +1694,16 @@ public final class HeadAssembly implements AutoCloseable {
     values.put(EnvRegistry.CHAT_PROFILE.configKey(), config.chatProfileId());
     // vduMode is a runtime procedure mode, not a declared configuration key. The existing
     // inference mode projection observes it; this applied-config digest deliberately does not.
+    return AppliedConfigurationVersion.digest(GENERATIVE_DEPENDENCIES, values);
+  }
+
+  static String generativeAbsentVersion(ResolvedConfig configuration, boolean liteMode) {
+    var values = new java.util.LinkedHashMap<String, Object>();
+    // No manager argv or resources were applied. Only the retained existence gates are values.
+    GENERATIVE_DEPENDENCIES.forEach(key -> values.put(key, null));
+    values.put(EnvRegistry.LLM_ENABLED.configKey(), configuration.ai().llmEnabled());
+    values.put(EnvRegistry.AI_DISABLED.configKey(), configuration.ai().disabled());
+    values.put(EnvRegistry.LITE_MODE.configKey(), liteMode);
     return AppliedConfigurationVersion.digest(GENERATIVE_DEPENDENCIES, values);
   }
 

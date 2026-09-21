@@ -190,6 +190,16 @@ resource bundle does not invent registrations. Restarting the index leaves this
 process owner alive. Final shutdown drains its users, then closes component
 observations before executors.
 
+EngineRoot computes the internal applied configuration identity from established
+component digests and the active generation's committed fingerprint inputs and ID.
+The index half captures that committed pair from its serving runtime; runtime-owner,
+client and registry checks refuse concurrent replacement instead of mixing observations.
+Desired rebuild targets and accepted-settings counters remain separate authorities.
+Every component must publish an applied digest, including intentionally absent
+generative composition; an enabled factory failure or unfinished encoder startup
+cannot certify an applied revision. This calculation does not implement configuration
+dispatch or the remaining generation/model binding work.
+
 The port bindings remain:
 
 ```text

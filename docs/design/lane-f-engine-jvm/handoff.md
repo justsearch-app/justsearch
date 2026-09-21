@@ -92,7 +92,10 @@ Do not connect suppliers while retaining those double reads.
    passes4cases/configSpotless. Review also closes deleted-pin bypass;2410all31
    governance files and actual count gate pass. Overall applied revision implementation follows
    evidence/D1/applied-revision-plan-2026-09-22.md; runtime-owner/client/registry
-   fences are required. No build/stack active. Next run2411.
+   fences are implemented. Evidence/D1/applied-revision-verification-2026-09-22.md
+   records2416realcommits,2417actualabsence/failure33cases,2418root/static47cases,
+   and2419/2420/2421independentfence-removalreds with exactsourcebytesrestored.
+   Full integrated/live proof is next; do not claim D1-3 complete yet. Next run2422.
    Continue dependency/value projections and D1 dispatch. All D1/D2/E/F acceptance
    remains binding, including the14 identity gaps.
 4. Preserve compiling checkpoints/push authorization to PR727 and inspect hosted
@@ -107,9 +110,9 @@ ACK. COMPLETE_WITH_GAPS/accept-gaps/live activation requires explicit design/pro
 - Root: shared-owner integration, all builds, stack, evidence and scoped publication.
 - Root: integrated verification, live proof, staged/source ownership and next register.
 - `bulk_engine_restart_proof`: QU/filter source-frozen; no builds.
-- `d1_encoder_projection`: strict index generation/committed metadata observation and tests.
-- `query_http_composition`: independent register/scalar review; no builds.
-- `d1_owner_review`: applied-generation race design delivered; reviewing null-version semantics.
+- `d1_encoder_projection`: lower observation and generative absence tests source-frozen.
+- `query_http_composition`: app-engine revision/fence tests source-frozen.
+- `d1_owner_review`: read-only D1-4 commit/publication owner discovery while D1-3 verifies.
 
 ## Evidence and owner map
 

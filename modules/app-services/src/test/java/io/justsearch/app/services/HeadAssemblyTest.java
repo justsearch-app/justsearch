@@ -2,9 +2,10 @@ package io.justsearch.app.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,11 +15,13 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpPrincipal;
 import io.justsearch.agent.api.encryption.StoreCatalog;
 import io.justsearch.agent.api.encryption.StoreDescriptor;
-import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.app.api.SearchRequest;
 import io.justsearch.app.api.SearchResponse;
 import io.justsearch.app.config.ConfigManagerBootstrap;
+import io.justsearch.configuration.AppliedConfigurationVersion;
+import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.core.dto.Result;
 import io.justsearch.core.search.SearchPort;
@@ -35,8 +38,11 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -372,11 +378,12 @@ class HeadAssemblyTest {
     String previousLite = System.getProperty("justsearch.lite.mode");
     System.setProperty("justsearch.llm.enabled", "true");
     System.setProperty("justsearch.lite.mode", "false");
-    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+    var captured = TestResolvedConfigHelper.fromEntries(Map.of(
         "justsearch.data.dir", tempDir.toString(),
         "justsearch.home", tempDir.toString(),
         "justsearch.ai.disabled", "false",
-        "justsearch.llm.enabled", "false"))));
+        "justsearch.llm.enabled", "false"));
+    ConfigStore.setGlobal(new ConfigStore(captured));
     try (var components = new io.justsearch.core.component.TestEngineComponents();
         var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
       try (var fixture = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
@@ -400,6 +407,11 @@ class HeadAssemblyTest {
         var generative = components.snapshot().components().stream()
             .filter(component -> component.spec().name().equals("generative")).findFirst().orElseThrow();
         assertEquals(io.justsearch.core.component.ComponentState.ABSENT, generative.state());
+        String expectedVersion = expectedGenerativeAbsentVersion(captured, false);
+        assertNotNull(generative.appliedVersion());
+        assertNotNull(generative.desiredVersion());
+        assertEquals(expectedVersion, generative.appliedVersion());
+        assertEquals(expectedVersion, generative.desiredVersion());
         assertFalse(io.justsearch.app.services.bootstrap.CapabilityGraph.fromRegistry(components)
             .inference().required());
       }
@@ -409,6 +421,129 @@ class HeadAssemblyTest {
       if (previousLite == null) System.clearProperty("justsearch.lite.mode");
       else System.setProperty("justsearch.lite.mode", previousLite);
     }
+  }
+
+  @Test
+  void enabledInferenceFactoryFailureDoesNotPublishIntentionalAbsenceVersion() throws Exception {
+    String previousLlm = System.getProperty("justsearch.llm.enabled");
+    String previousLite = System.getProperty("justsearch.lite.mode");
+    System.setProperty("justsearch.llm.enabled", "true");
+    System.setProperty("justsearch.lite.mode", "false");
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.data.dir", tempDir.toString(),
+        "justsearch.home", tempDir.toString(),
+        "justsearch.ai.disabled", "false",
+        "justsearch.llm.enabled", "true",
+        // ResolvedConfig retains this requested value; InferenceConfig rejects it inside the
+        // actual bootstrap factory because GPU layers must be non-negative.
+        "justsearch.gpu.layers", "-1"))));
+    try (var components = new io.justsearch.core.component.TestEngineComponents();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      try (var fixture = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+        fixture.snapshot().components().stream()
+            .filter(component -> !component.spec().name().equals("generative"))
+            .forEach(component -> components.register(component.spec()));
+      }
+      try (var assembly = new HeadAssembly(
+          mockOperationStore(),
+          org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+          executors,
+          new NoopTelemetry(),
+          new ConfigManagerBootstrap(),
+          null,
+          new io.justsearch.app.services.settings.UiSettingsStore(
+              io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+          new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
+          org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class),
+          io.justsearch.app.services.bootstrap.OperationAuthority.load(tempDir),
+          io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+          components)) {
+        Field field = HeadAssembly.class.getDeclaredField("inferenceManager");
+        field.setAccessible(true);
+        assertNull(field.get(assembly), "invalid enabled inference config must fail composition");
+        var generative = components.snapshot().components().stream()
+            .filter(component -> component.spec().name().equals("generative"))
+            .findFirst()
+            .orElseThrow();
+        assertNull(generative.appliedVersion());
+        assertNull(generative.desiredVersion());
+      }
+    } finally {
+      if (previousLlm == null) System.clearProperty("justsearch.llm.enabled");
+      else System.setProperty("justsearch.llm.enabled", previousLlm);
+      if (previousLite == null) System.clearProperty("justsearch.lite.mode");
+      else System.setProperty("justsearch.lite.mode", previousLite);
+    }
+  }
+
+  @Test
+  void generativeAbsenceDigestContainsOnlyCapturedExistenceGates() {
+    Set<String> gateDigests = new HashSet<>();
+    for (boolean llmEnabled : List.of(false, true)) {
+      for (boolean aiDisabled : List.of(false, true)) {
+        for (boolean liteMode : List.of(false, true)) {
+          var captured = TestResolvedConfigHelper.fromEntries(Map.of(
+              EnvRegistry.LLM_ENABLED.configKey(), Boolean.toString(llmEnabled),
+              EnvRegistry.AI_DISABLED.configKey(), Boolean.toString(aiDisabled)));
+          String actual = HeadAssembly.generativeAbsentVersion(captured, liteMode);
+          assertEquals(expectedGenerativeAbsentVersion(captured, liteMode), actual);
+          assertTrue(gateDigests.add(actual),
+              () -> "existence gate vector must have a distinct digest: "
+                  + llmEnabled + "/" + aiDisabled + "/" + liteMode);
+        }
+      }
+    }
+    assertEquals(8, gateDigests.size());
+
+    var baseline = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.LLM_ENABLED.configKey(), "false",
+        EnvRegistry.AI_DISABLED.configKey(), "false"));
+    String baselineDigest = HeadAssembly.generativeAbsentVersion(baseline, false);
+    assertNotEquals(baselineDigest, HeadAssembly.generativeAbsentVersion(
+        TestResolvedConfigHelper.fromEntries(Map.of(
+            EnvRegistry.LLM_ENABLED.configKey(), "true",
+            EnvRegistry.AI_DISABLED.configKey(), "false")), false));
+    assertNotEquals(baselineDigest, HeadAssembly.generativeAbsentVersion(
+        TestResolvedConfigHelper.fromEntries(Map.of(
+            EnvRegistry.LLM_ENABLED.configKey(), "false",
+            EnvRegistry.AI_DISABLED.configKey(), "true")), false));
+    assertNotEquals(baselineDigest, HeadAssembly.generativeAbsentVersion(baseline, true));
+
+    var firstInputs = TestResolvedConfigHelper.fromEntries(Map.ofEntries(
+        Map.entry(EnvRegistry.LLM_ENABLED.configKey(), "false"),
+        Map.entry(EnvRegistry.AI_DISABLED.configKey(), "false"),
+        Map.entry(EnvRegistry.SERVER_EXE.configKey(), "server-a"),
+        Map.entry(EnvRegistry.LLM_MODEL_PATH.configKey(), "model-a.gguf"),
+        Map.entry(EnvRegistry.MMPROJ_MODEL.configKey(), "projection-a.gguf"),
+        Map.entry(EnvRegistry.SERVER_PORT.configKey(), "18081"),
+        Map.entry(EnvRegistry.CONTEXT_SIZE.configKey(), "2048"),
+        Map.entry(EnvRegistry.GPU_LAYERS.configKey(), "1"),
+        Map.entry(EnvRegistry.CHAT_PROFILE.configKey(), "standard")));
+    var changedInputs = TestResolvedConfigHelper.fromEntries(Map.ofEntries(
+        Map.entry(EnvRegistry.LLM_ENABLED.configKey(), "false"),
+        Map.entry(EnvRegistry.AI_DISABLED.configKey(), "false"),
+        Map.entry(EnvRegistry.SERVER_EXE.configKey(), "server-b"),
+        Map.entry(EnvRegistry.LLM_MODEL_PATH.configKey(), "model-b.gguf"),
+        Map.entry(EnvRegistry.MMPROJ_MODEL.configKey(), "projection-b.gguf"),
+        Map.entry(EnvRegistry.SERVER_PORT.configKey(), "18082"),
+        Map.entry(EnvRegistry.CONTEXT_SIZE.configKey(), "4096"),
+        Map.entry(EnvRegistry.GPU_LAYERS.configKey(), "7"),
+        Map.entry(EnvRegistry.CHAT_PROFILE.configKey(), "compact")));
+    assertEquals(HeadAssembly.generativeAbsentVersion(firstInputs, false),
+        HeadAssembly.generativeAbsentVersion(changedInputs, false),
+        "unapplied model, server, context, GPU, and profile inputs must remain null");
+  }
+
+  private static String expectedGenerativeAbsentVersion(
+      io.justsearch.configuration.resolved.ResolvedConfig configuration, boolean liteMode) {
+    Set<String> dependencies = HeadAssembly.generativeSpec().dependencyKeys();
+    var values = new LinkedHashMap<String, Object>();
+    dependencies.forEach(key -> values.put(key, null));
+    values.put(EnvRegistry.LLM_ENABLED.configKey(), configuration.ai().llmEnabled());
+    values.put(EnvRegistry.AI_DISABLED.configKey(), configuration.ai().disabled());
+    values.put(EnvRegistry.LITE_MODE.configKey(), liteMode);
+    return AppliedConfigurationVersion.digest(dependencies, values);
   }
 
   /** A bound client must complete tool composition even while sampled readiness is pending. */

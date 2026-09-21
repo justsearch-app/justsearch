@@ -115,6 +115,25 @@ final class IndexGenerationVduEligibilityTest {
   }
 
   @Test
+  void strictActiveObservationKeepsBlueVisibleWhileGreenBuilds(@TempDir Path tempDir)
+      throws Exception {
+    Path base = tempDir.resolve("active-during-build");
+    IndexGenerationManager manager = new IndexGenerationManager(base);
+    IndexGenerationManager.IndexLayout blue = manager.initializeOrLoad();
+
+    IndexGenerationManager.State building = manager.startMigration("applied-observation-test");
+
+    assertNotNull(building.building_generation(), "precondition: Green is building");
+    assertEquals(
+        blue.activeGenerationId(),
+        manager.activeGeneration(blue.activeGenerationPath()).orElseThrow(),
+        "the committed serving Blue remains the active applied generation during the build");
+    assertTrue(
+        manager.idleActiveGeneration(blue.activeGenerationPath()).isEmpty(),
+        "the mutation-only idle contract remains stricter than read-only observation");
+  }
+
+  @Test
   void validStateCannotCreateOrAuthorizeAnAbsentGenerationLayout(@TempDir Path tempDir)
       throws Exception {
     var original = new IndexGenerationManager(tempDir.resolve("original")).initializeOrLoad();

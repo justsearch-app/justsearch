@@ -85,6 +85,25 @@ public final class EngineRoot implements WorkerHost {
   /** Process-owned observations shared by all four component owners and their projections. */
   public io.justsearch.core.component.EngineComponentRegistry components() { return components; }
 
+  /** Value identity of the applied components and committed active index; never a desired revision. */
+  public String appliedConfigurationRevision(io.justsearch.core.context.EngineContext context) {
+    EngineKnowledgeClient capturedClient = client;
+    if (capturedClient == null) {
+      throw new io.justsearch.app.api.knowledge.KnowledgeClientException(
+          io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE,
+          "Applied configuration requires a serving index");
+    }
+    var before = components.snapshot();
+    var generation = capturedClient.captureAppliedGeneration(context);
+    var after = components.snapshot();
+    if (client != capturedClient || before.revision() != after.revision()) {
+      throw new io.justsearch.app.api.knowledge.KnowledgeClientException(
+          io.justsearch.app.api.knowledge.KnowledgeClientException.Status.ABORTED,
+          "Engine composition changed during applied configuration capture");
+    }
+    return AppliedConfigurationRevision.digest(before, generation);
+  }
+
   /** The shared physical and sampled index publisher, with the same reason-retention policy. */
   public io.justsearch.core.component.ComponentHandle indexComponent() { return indexComponent; }
 

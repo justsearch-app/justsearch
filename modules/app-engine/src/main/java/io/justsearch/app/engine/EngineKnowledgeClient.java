@@ -555,6 +555,24 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     return service;
   }
 
+  /** Coherent committed inputs for the composition root, with the normal call ownership/budget. */
+  io.justsearch.app.api.operations.AppliedIndexGeneration captureAppliedGeneration(
+      EngineContext engineContext) {
+    return withBudget("captureAppliedGeneration", deadline(RpcDeadlineCategory.STANDARD),
+        engineContext, budget -> {
+          WorkerAppServices owner = services.get();
+          WorkerIngestService ingest = owner == null ? null : owner.ingestService();
+          if (ingest == null) {
+            throw WorkerServiceException.unavailable("Applied generation services are unavailable");
+          }
+          var generation = ingest.captureAppliedGeneration(budget.context());
+          if (services.get() != owner) {
+            throw WorkerServiceException.aborted("Index runtime changed during applied generation capture");
+          }
+          return generation;
+        });
+  }
+
   private io.justsearch.app.api.EngineAdmissionException engineLimit() {
     return new io.justsearch.app.api.EngineAdmissionException(
         io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,

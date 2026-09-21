@@ -38,6 +38,11 @@ class InferenceDecisionTest {
       System.setProperty("justsearch.lite.mode", "true");
       assertFalse(InferenceDecision.decideInferenceConfigured(enabled),
           "the process lite-mode gate remains stronger than LLM enablement");
+      assertTrue(InferenceDecision.decideInferenceConfigured(enabled, false),
+          "the retained non-lite decision must win over a contradictory raw global");
+      System.setProperty("justsearch.lite.mode", "false");
+      assertFalse(InferenceDecision.decideInferenceConfigured(enabled, true),
+          "the retained lite decision must win over a contradictory raw global");
     } finally {
       TestResolvedConfigHelper.restoreGlobal(previous);
       restore("justsearch.lite.mode", previousLite);

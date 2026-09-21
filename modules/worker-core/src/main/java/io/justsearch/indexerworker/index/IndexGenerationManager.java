@@ -1024,8 +1024,28 @@ public final class IndexGenerationManager {
     return idleActiveGeneration(capturedTarget).isPresent();
   }
 
+  /**
+   * Returns the active identity from a strict authoritative-state read when it still names the
+   * captured runtime path. Unlike {@link #idleActiveGeneration}, an in-progress build does not make
+   * the serving Blue generation unobservable.
+   */
+  public java.util.Optional<String> activeGeneration(Path capturedTarget) throws IOException {
+    StrictActiveGeneration active = strictActiveGeneration(capturedTarget);
+    return active.matchesCapturedTarget() ? java.util.Optional.of(active.generationId())
+        : java.util.Optional.empty();
+  }
+
   /** Return the identity from the same strict observation that validates the captured target. */
   public java.util.Optional<String> idleActiveGeneration(Path capturedTarget) throws IOException {
+    StrictActiveGeneration active = strictActiveGeneration(capturedTarget);
+    State current = active.state();
+    boolean eligible = active.matchesCapturedTarget()
+        && MigrationState.IDLE.name().equals(current.migration_state())
+        && (current.building_generation() == null || current.building_generation().isBlank());
+    return eligible ? java.util.Optional.of(active.generationId()) : java.util.Optional.empty();
+  }
+
+  private StrictActiveGeneration strictActiveGeneration(Path capturedTarget) throws IOException {
     Objects.requireNonNull(capturedTarget, "capturedTarget");
     State current = JSON.readValue(
         io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath), State.class);
@@ -1035,12 +1055,13 @@ public final class IndexGenerationManager {
     }
     String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
     Path activePath = resolveGenerationPathReadOnly(active);
-    boolean eligible = MigrationState.IDLE.name().equals(current.migration_state())
-        && (current.building_generation() == null || current.building_generation().isBlank())
-        && activePath.equals(capturedTarget.toAbsolutePath().normalize())
+    boolean matches = activePath.equals(capturedTarget.toAbsolutePath().normalize())
         && Files.isDirectory(activePath);
-    return eligible ? java.util.Optional.of(active) : java.util.Optional.empty();
+    return new StrictActiveGeneration(current, active, matches);
   }
+
+  private record StrictActiveGeneration(
+      State state, String generationId, boolean matchesCapturedTarget) {}
 
   /**
    * Reads the current state pointer best-effort, without performing legacy imports or creating new
