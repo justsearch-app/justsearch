@@ -14,7 +14,10 @@ proves DURABLE ingest and Library reindex rows, acknowledged receipts, exact ret
 retry/conflict behavior and one standard-model query. Its owned stack is stopped.
 The [reindex alias correction](evidence/C2/reindex-alias-connection.md) passes64
 focused cases, PMD/format, review and production incremental alias/retained-retry proof;
-its owned stack is stopped. Next: both-store reopen and installed fault scenarios.
+its owned stack is stopped. Both-store reopen cases execute for real prepared
+INGEST/REINDEX dispatch with new owners; all38 coordinator cases and PMD/format
+pass2018. [Proof and limits](evidence/C2/recorded-production-composition.md).
+Next: installed fault scenarios.
 Live forced-disconnect proof is
 still distinct from the controlled frontend detachment tests.
 The [pause record](evidence/C2/pause-2026-09-21.md) is historical.

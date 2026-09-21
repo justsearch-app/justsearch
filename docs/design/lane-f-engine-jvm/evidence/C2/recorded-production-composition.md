@@ -206,3 +206,48 @@ contract and is unnecessary. The actual shutdown order is visible in EngineRoot.
 and KnowledgeServer's attachment-before-queue close; RecordedIngestionCoordinator's
 Attached.close preserves unfinished enumeration when its uncancelled producer exits
 CANCELLED. The installed harness separately owes verified OS death and index effects.
+
+### Both-store reopen proof (2026-09-21)
+
+At base935fc723f plus the new coordinator test, focused2017 executes both INGEST
+and forced REINDEX cases; integrated coordinator2018 executes all38 cases with
+zero failures/errors/skips. Both runs pass app-engine pmdTest and spotlessJavaCheck.
+Commands, output and copied XML/counts are tmp/2017* and tmp/2018* (retained through
+lane acceptance plus30 days; export before releasing the worktree).
+
+`bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation` dispatches
+through actual registered IngestTool/ReindexHandler and OperationExecutorImpl.
+It persists a queued file under a held producer, requests and observes that
+producer's completed exit, then closes attachment, jobs.db and operations.db.
+It opens both paths with new store objects, reloads the authority directory and
+creates a new runner, coordinator and admission controller. Before attachment,
+the persisted queue grants no claim permission. Recovery consumes the winning
+Resume bodies once, increments original parent/child attempts, retains their IDs
+and preparation, admits a new durable owner and reuses the frozen forced flag.
+Enumeration remains nonterminal while the unit is unsettled. A controlled queue
+completion then seals/acknowledges the receipt, completes both rows and releases
+the new owner. No handler preparation runs in the successor.
+
+This is same-JVM process-epoch simulation with controlled queue settlement, not
+an installed Engine death, actual Lucene write or forced client-disconnect proof.
+Those separate C2 obligations remain required. No production API or additional
+persistent ownership mechanism was introduced for the fixture.
+
+Independent review requested exact child preparation/context preservation in
+addition to the parent. Both are now captured before close and compared after
+reopen;2021 reruns all38 coordinator cases and PMD/format successfully. Root
+independently reread the correction. This closes the bounded same-JVM test item.
+
+Installed baseline2020 is RED (one executed case, no skips), not credited as
+recovery proof. It correctly observes Engine death but times out on successor
+replay. Raw output/data: tmp/lane-f-takeover/writer-junit-b619aa3c-a946-4547-ae36-c17725534078/.
+The successor is running with restartCount1; parent2/child3 remain RUNNING with
+attempts1, and the unit remains PROCESSING.2020-walk.json shows enumeration already
+COMPLETE, revision3, unsealed. The harness has no watched_roots.json, so its
+StructuralAuto out-of-root effect is correctly refused on restart (the canonical
+policy regression explicitly distinguishes fresh continuation from recovery).
+The refusal path strands the already-enumerated unsettled child because it only
+retires pending members while closing an open enumeration. Fix this refusal gap
+and seed the successful replay harness with an actual persistent recovery scope;
+do not grant arbitrary out-of-root restart authority or weaken the search/retry
+assertions. The harness's owned stop succeeds with portsClosed:true.

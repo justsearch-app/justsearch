@@ -798,6 +798,125 @@ final class RecordedIngestionCoordinatorTest {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
+  void bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(boolean reindex) throws Exception {
+    OperationRecord originalParent;
+    OperationRecord originalChild;
+    io.justsearch.app.api.operations.OperationStore.Preparation originalPreparation;
+    io.justsearch.app.api.operations.OperationStore.Preparation originalChildPreparation;
+    RecordedRootPlan frozen;
+    Path file;
+    var preparations = new AtomicInteger();
+    var oldExited = new AtomicBoolean();
+    try (Fixture old = new Fixture(temp, 1)) {
+      Path root = old.plan.roots().getFirst().path();
+      file = Files.writeString(root.resolve("resume.txt"), "persisted producer epoch");
+      var handlers = new HandlerRegistry();
+      var operation = reindex ? new CoreOperationCatalog().findById(CoreOperationCatalog.REINDEX).orElseThrow()
+          : new AgentToolsOperationCatalog().findById(AgentToolsOperationCatalog.INGEST_FILES).orElseThrow();
+      if (reindex) {
+        handlers.register(operation.id(), new ReindexHandler(old.coordinator, context -> {
+          preparations.incrementAndGet(); return List.of(new RootBinding(root, "documents"));
+        }, context -> GENERATION, List::of));
+      } else {
+        handlers.register(operation.id(), new IngestTool(old.coordinator, context -> {
+          preparations.incrementAndGet(); return List.of(new RootBinding(root, "documents"));
+        }, context -> GENERATION, List::of));
+      }
+      var dispatcher = new OperationExecutorImpl(old.runner, old.admission, handlers, null, Map.of(),
+          CLOCK, new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog());
+      var exit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      var childKey = new AtomicReference<String>();
+      old.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        assertTrue(childKey.compareAndSet(null, key), "one producer before shutdown");
+        old.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+        cancellation.onCancel(() -> {
+          oldExited.set(true);
+          exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED);
+        });
+        return exit;
+      });
+      var seed = old.request();
+      String arguments = reindex ? "{\"force\":true}"
+          : tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+              Map.of("paths", List.of(root.toString()), "collection", "documents"));
+      var result = dispatcher.dispatch(operation, arguments, seed.provenance(), Optional.empty(), seed.context(), seed.key());
+      assertTrue(result.success());
+      assertEquals(1, preparations.get());
+      old.coordinator.stopProducers(1000);
+      assertTrue(oldExited.get(), "actual producer completion precedes either store close");
+      assertTrue(exit.isDone());
+      originalParent = old.operations.find(seed.key()).orElseThrow();
+      originalChild = old.operations.find(childKey.get()).orElseThrow();
+      originalPreparation = old.operations.acceptedPreparation(originalParent.id()).orElseThrow();
+      originalChildPreparation = old.operations.acceptedPreparation(originalChild.id()).orElseThrow();
+      frozen = new RecordedIngestPlanResolver().resolve(originalParent, originalPreparation);
+      assertEquals(OperationState.RUNNING, originalParent.state());
+      assertEquals(OperationState.RUNNING, originalChild.state());
+      assertTrue(old.queue.recordedWalk(originalChild.key()).orElseThrow().enumerationClosedAt() == null);
+      // Fixture close retires attachment, queue and operation store, in that order.
+      // Its abandoned volatile admission graph is not the successor's authority.
+    }
+
+    var admission = new EngineAdmissionController(2, 2, 1);
+    var authority = OperationAuthority.load(temp.resolve("authority"));
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+          null, new RecordedIngestPlanResolver());
+      var recovered = new RecordedIngestionCoordinator(operations, runner, admission, authority);
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        queue.open();
+        assertTrue(queue.pollPending(1).isEmpty(), "persisted rows alone grant no producer permission");
+        try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+          org.junit.jupiter.api.Assertions.assertNotNull(attachment);
+          var resumed = new AtomicInteger();
+          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+            assertTrue(oldExited.get());
+            assertEquals(1, resumed.incrementAndGet());
+            assertEquals(frozen, plan);
+            assertEquals(originalChild.key(), key);
+            assertEquals(EngineContext.Survival.DURABLE, context.survival());
+            assertEquals(1, admission.activeWorkCount());
+            queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+            return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+          });
+          recovered.maintain();
+          recovered.maintain();
+          assertEquals(1, resumed.get(), "winning Resume bodies execute once");
+          assertEquals(1, preparations.get(), "recovery uses stored preparation without sampling handlers");
+          assertEquals(originalPreparation, operations.acceptedPreparation(originalParent.id()).orElseThrow());
+          assertEquals(originalChildPreparation, operations.acceptedPreparation(originalChild.id()).orElseThrow());
+          var parent = operations.find(originalParent.key()).orElseThrow();
+          var child = operations.find(originalChild.key()).orElseThrow();
+          assertEquals(originalParent.id(), parent.id());
+          assertEquals(originalChild.id(), child.id());
+          assertEquals(originalParent.context(), parent.context());
+          assertEquals(originalChild.context(), child.context());
+          assertEquals(originalParent.attempts() + 1, parent.attempts());
+          assertEquals(originalChild.attempts() + 1, child.attempts());
+          assertEquals(OperationState.RUNNING, parent.state(), "enumeration alone cannot complete unsettled units");
+          assertEquals(OperationState.RUNNING, child.state());
+          var claim = queue.pollPending(1).getFirst();
+          assertEquals(originalChild.key(), claim.scanId());
+          assertEquals(reindex, claim.recordedForce());
+          queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, "d".repeat(64))),
+              io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                  io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                  io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+          recovered.maintain();
+          assertEquals(OperationState.COMPLETE, operations.find(originalParent.key()).orElseThrow().state());
+          assertEquals(OperationState.COMPLETE, operations.find(originalChild.key()).orElseThrow().state());
+          assertEquals(1, operations.find(originalParent.key()).orElseThrow().unitsCompleted());
+          var receipt = queue.recordedWalk(originalChild.key()).orElseThrow();
+          org.junit.jupiter.api.Assertions.assertNotNull(receipt.sealedAt());
+          assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+          assertEquals(0, admission.activeWorkCount());
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
   void actualEngineProducerJournalsAndAcknowledgesARealFilesystemRoot(boolean singleFile) throws Exception {
     var generations = new io.justsearch.indexerworker.index.IndexGenerationManager(temp.resolve("index"));
     var layout = generations.initializeOrLoad();
