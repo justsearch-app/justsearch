@@ -5,12 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.sun.net.httpserver.HttpServer;
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
@@ -34,12 +37,10 @@ final class ManagedLlamaAdoptionTest {
   @Test
   void failedRegistrationRollbackRetainsHandleForRootCleanup(@TempDir Path tmp) throws Exception {
     RetryKillProcess process = new RetryKillProcess();
-    InferenceConfig config =
-        new InferenceConfig(tmp.resolve("llama.exe"), tmp.resolve("model.gguf"), null, 1, 1, 0, false);
     LlamaServerOps ops =
         new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
-            HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, () -> Mode.OFFLINE,
-            new NoopPropsObserver(), () -> {}, ignored -> {},
+            HttpClient.newHttpClient(), new ObjectMapper(), null, () -> Mode.OFFLINE,
+            new NoopPropsObserver(), ignored -> {}, ignored -> {}, (ignored, guard) -> {},
             NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
     try {
       ops.rollbackFailedRegistration(process, new IOException("disk full"));
@@ -61,15 +62,22 @@ final class ManagedLlamaAdoptionTest {
     InferenceConfig config =
         new InferenceConfig(tmp.resolve("llama.exe"), tmp.resolve("model.gguf"), null, 1, 1, 0, false);
     LlamaServerOps ops = new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
-        HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, () -> Mode.OFFLINE,
-        new NoopPropsObserver(), () -> {}, ignored -> {},
+        HttpClient.newHttpClient(), new ObjectMapper(), null, () -> Mode.OFFLINE,
+        new NoopPropsObserver(), ignored -> {}, ignored -> {}, (ignored, guard) -> {},
         NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
     try {
       ops.rollbackFailedRegistration(process, new IOException("disk full"));
       assertThrows(IllegalStateException.class, ops::stopLlamaServer);
       assertTrue(process.isAlive());
       assertEquals(2, process.destroyCalls);
-      var refused = assertThrows(IllegalStateException.class, ops::startLlamaServer);
+      var refused =
+          assertThrows(
+              IllegalStateException.class,
+              () ->
+                  ops.startLlamaServer(
+                      new LlamaServerOps.StartRequest(
+                          context(config),
+                          LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL)));
       assertTrue(refused.getMessage().contains("survived terminal cleanup"));
       assertEquals(3, process.destroyCalls);
       assertThrows(IllegalStateException.class, ops::closeUnregisteredChild);
@@ -84,11 +92,19 @@ final class ManagedLlamaAdoptionTest {
     }
   }
 
+  private static LlamaServerConfigContext context(InferenceConfig config) {
+    ResolvedConfig resolved = mock(ResolvedConfig.class);
+    ResolvedConfig.Ai ai = mock(ResolvedConfig.Ai.class);
+    when(resolved.ai()).thenReturn(ai);
+    when(ai.gpuAccelerationAllowed()).thenReturn(true);
+    return new LlamaServerConfigContext(config, resolved);
+  }
+
   @Test
   void terminalCloseRetiresDeadAdoptedChildEvenWhenExitCallbackWasCancelled(@TempDir Path tmp)
       throws Exception {
     try (Fixture fixture = new Fixture(tmp)) {
-      assertTrue(fixture.ops.adoptManagedServerIfPresent("declared"));
+      assertTrue(fixture.adopt("declared"));
       // Stop the actual monitor before death, guaranteeing its callback cannot remove the record.
       fixture.ops.shutdown();
       fixture.child.destroyForcibly();
@@ -105,7 +121,7 @@ final class ManagedLlamaAdoptionTest {
       fixture.child.destroyForcibly();
       assertTrue(fixture.child.waitFor(5, TimeUnit.SECONDS));
 
-      assertFalse(fixture.ops.adoptManagedServerIfPresent("declared"));
+      assertFalse(fixture.adopt("declared"));
       assertTrue(fixture.registry.snapshot().isEmpty());
     }
   }
@@ -114,7 +130,7 @@ final class ManagedLlamaAdoptionTest {
   void adoptedManagedDeathRetiresOnlyItsRecord(@TempDir Path tmp) throws Exception {
     AtomicInteger recoveries = new AtomicInteger();
     try (Fixture fixture = new Fixture(tmp, null, recoveries::incrementAndGet)) {
-      assertTrue(fixture.ops.adoptManagedServerIfPresent("declared"));
+      assertTrue(fixture.adopt("declared"));
       assertTrue(
           fixture.ops.hasLiveManagedProcess(),
           "the periodic health path must treat the adopted handle as managed and probe it");
@@ -148,7 +164,7 @@ final class ManagedLlamaAdoptionTest {
       throws Exception {
     try (Fixture fixture = new Fixture(tmp, ignored -> false)) {
       assertThrows(
-          IOException.class, () -> fixture.ops.adoptManagedServerIfPresent("different-config"));
+          IOException.class, () -> fixture.adopt("different-config"));
       assertTrue(fixture.child.isAlive());
       assertTrue(fixture.registry.snapshot().stream().anyMatch(c -> c.id().equals("managed")));
     }
@@ -158,7 +174,7 @@ final class ManagedLlamaAdoptionTest {
   void configurationMismatchTerminatesMatchedChildBeforeActivation(@TempDir Path tmp)
       throws Exception {
     try (Fixture fixture = new Fixture(tmp)) {
-      assertFalse(fixture.ops.adoptManagedServerIfPresent("different-config"));
+      assertFalse(fixture.adopt("different-config"));
       assertTrue(fixture.child.waitFor(5, TimeUnit.SECONDS));
       assertTrue(fixture.registry.snapshot().isEmpty());
     }
@@ -168,7 +184,7 @@ final class ManagedLlamaAdoptionTest {
   void adoptedManagedHangReachesManagedCrashRecovery(@TempDir Path tmp) throws Exception {
     AtomicInteger recoveries = new AtomicInteger();
     try (Fixture fixture = new Fixture(tmp, null, recoveries::incrementAndGet)) {
-      assertTrue(fixture.ops.adoptManagedServerIfPresent("declared"));
+      assertTrue(fixture.adopt("declared"));
       fixture.mode.set(Mode.ONLINE);
       fixture.healthy.set(false);
 
@@ -176,9 +192,31 @@ final class ManagedLlamaAdoptionTest {
       fixture.ops.runPeriodicHealthCheck();
       fixture.ops.runPeriodicHealthCheck();
 
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (recoveries.get() == 0 && System.nanoTime() < deadline) {
+        Thread.sleep(10);
+      }
       assertEquals(1, recoveries.get());
       assertTrue(fixture.child.isAlive());
       assertTrue(fixture.registry.snapshot().stream().anyMatch(c -> c.id().equals("managed")));
+    }
+  }
+
+  @Test
+  void adoptedManagedChildThatDiesBeforeExplicitHealthCannotBeCertified(@TempDir Path tmp)
+      throws Exception {
+    try (Fixture fixture = new Fixture(tmp)) {
+      LlamaServerOps.StartResult result = fixture.adoptWithoutHealth("declared");
+      fixture.child.destroyForcibly();
+      assertTrue(fixture.child.waitFor(5, TimeUnit.SECONDS));
+
+      io.justsearch.app.api.ModeTransitionException failure =
+          assertThrows(
+              io.justsearch.app.api.ModeTransitionException.class,
+              () -> fixture.ops.waitForServerHealth(result));
+      assertEquals(
+          io.justsearch.app.api.ModeTransitionException.Reason.PROCESS_EXITED,
+          failure.reason());
     }
   }
 
@@ -187,6 +225,7 @@ final class ManagedLlamaAdoptionTest {
     private final Process child;
     private final HttpServer server;
     private final LlamaServerOps ops;
+    private final InferenceConfig config;
     private final AtomicReference<Mode> mode = new AtomicReference<>(Mode.OFFLINE);
     private final AtomicBoolean healthy = new AtomicBoolean(true);
 
@@ -232,7 +271,7 @@ final class ManagedLlamaAdoptionTest {
           });
       server.start();
       int port = server.getAddress().getPort();
-      InferenceConfig config = new InferenceConfig(executable, model, null, port, 4096, 0, false);
+      config = new InferenceConfig(executable, model, null, port, 4096, 0, false);
       registry.register(
           new ManagedChild(
               "managed", ManagedChild.Kind.LLAMA_SERVER, child.pid(),
@@ -242,14 +281,45 @@ final class ManagedLlamaAdoptionTest {
       ops =
           termination == null && managedCrashHandler == null
               ? new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
-                  HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, mode::get,
-                  new NoopPropsObserver(), () -> {}, ignored -> {},
+                  HttpClient.newHttpClient(), new ObjectMapper(), null, mode::get,
+                  new NoopPropsObserver(), ignored -> {}, ignored -> {}, (ignored, guard) -> {},
                   NoopInferenceTelemetryEvents.INSTANCE, registry)
               : new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
-                  HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, mode::get,
-                  new NoopPropsObserver(), () -> {}, ignored -> {},
+                  HttpClient.newHttpClient(), new ObjectMapper(), null, mode::get,
+                  new NoopPropsObserver(),
+                  guard -> {
+                    if (guard.getAsBoolean()) managedCrashHandler.run();
+                  },
+                  ignored -> {}, (ignored, guard) -> {},
                   NoopInferenceTelemetryEvents.INSTANCE, registry,
-                  termination == null ? handle -> true : termination, managedCrashHandler);
+                  termination == null ? handle -> true : termination);
+    }
+
+    boolean adopt(String declaredHash) throws IOException {
+      LlamaServerOps.StartResult result = result(declaredHash);
+      boolean adopted = ops.adoptManagedServerIfPresent(declaredHash, result);
+      if (adopted) {
+        try {
+          ops.waitForServerHealth(result);
+        } catch (io.justsearch.app.api.ModeTransitionException failure) {
+          throw new IOException("adopted server did not remain healthy", failure);
+        }
+      }
+      return adopted;
+    }
+
+    LlamaServerOps.StartResult adoptWithoutHealth(String declaredHash) throws IOException {
+      LlamaServerOps.StartResult result = result(declaredHash);
+      assertTrue(ops.adoptManagedServerIfPresent(declaredHash, result));
+      return result;
+    }
+
+    private LlamaServerOps.StartResult result(String declaredHash) {
+      return new LlamaServerOps.StartResult(
+          context(config),
+          LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL,
+          LlamaServerOps.StartDisposition.ADOPTED_MANAGED,
+          declaredHash);
     }
 
     @Override
@@ -282,7 +352,8 @@ final class ManagedLlamaAdoptionTest {
   }
 
   private static final class NoopPropsObserver implements PropsObserver {
-    @Override public void onModelIdObserved(String modelId) {}
+    @Override
+    public void onModelIdObserved(String modelId, LlamaServerConfigContext context) {}
     @Override public void onContextTokensObserved(int contextTokens) {}
     @Override public String observedModelId() { return null; }
     @Override public Integer observedContextTokens() { return null; }

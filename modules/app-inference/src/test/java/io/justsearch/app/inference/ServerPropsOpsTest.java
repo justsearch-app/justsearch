@@ -1,9 +1,12 @@
 package io.justsearch.app.inference;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,18 +29,8 @@ class ServerPropsOpsTest {
     lastContextTokens = new AtomicReference<>(null);
     externalActive = new AtomicReference<>(false);
     requestedContextTokens = new AtomicReference<>(4096);
-    InferenceConfig config =
-        new InferenceConfig(
-            Path.of("bin", "llama-server.exe"),
-            Path.of("models", "configured.gguf"),
-            null,
-            8080,
-            4096,
-            0,
-            false);
     ops =
-        new ServerPropsOps(
-            () -> config, externalActive::get, observer(), () -> requestedContextTokens.get());
+        new ServerPropsOps(observer(), () -> requestedContextTokens.get());
   }
 
   /** A config whose contextSize (4096) deliberately DISAGREES with the launched rung under test. */
@@ -55,7 +48,7 @@ class ServerPropsOpsTest {
   private PropsObserver observer() {
     return new PropsObserver() {
       @Override
-      public void onModelIdObserved(String modelId) {
+      public void onModelIdObserved(String modelId, LlamaServerConfigContext context) {
         lastModelId.set(modelId);
       }
 
@@ -74,6 +67,24 @@ class ServerPropsOpsTest {
         return lastContextTokens.get();
       }
     };
+  }
+
+  private void update(ServerPropsOps target, JsonNode root) {
+    ResolvedConfig resolved = mock(ResolvedConfig.class);
+    ResolvedConfig.Ai ai = mock(ResolvedConfig.Ai.class);
+    when(resolved.ai()).thenReturn(ai);
+    when(ai.gpuAccelerationAllowed()).thenReturn(true);
+    LlamaServerOps.StartDisposition disposition =
+        externalActive.get()
+            ? LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL
+            : LlamaServerOps.StartDisposition.LAUNCHED_MANAGED;
+    target.updateFromPropsBestEffort(
+        root,
+        new LlamaServerOps.StartResult(
+            new LlamaServerConfigContext(configuredAt4096(), resolved),
+            LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL,
+            disposition,
+            disposition == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL ? null : "declared"));
   }
 
   // ==================== resetExternalAdoptionState ====================
@@ -149,15 +160,13 @@ class ServerPropsOpsTest {
         new java.util.concurrent.atomic.AtomicInteger();
     ServerPropsOps stepped =
         new ServerPropsOps(
-            () -> configuredAt4096(),
-            externalActive::get,
             observer(),
             () -> {
               consulted.incrementAndGet();
               return requestedContextTokens.get();
             });
 
-    stepped.updateFromPropsBestEffort(MAPPER.readTree("{\"n_ctx\":2048}"));
+    update(stepped, MAPPER.readTree("{\"n_ctx\":2048}"));
 
     assertTrue(consulted.get() > 0, "the launched rung is the comparand");
     assertEquals(2048, lastContextTokens.get());
@@ -202,7 +211,7 @@ class ServerPropsOpsTest {
   @Test
   void updateFromPropsBestEffort_extractsModelIdFromAlias() throws Exception {
     JsonNode root = MAPPER.readTree("{\"model_alias\":\"my-model\",\"n_ctx\":4096}");
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
 
     assertEquals("my-model", lastModelId.get());
   }
@@ -210,7 +219,7 @@ class ServerPropsOpsTest {
   @Test
   void updateFromPropsBestEffort_extractsModelIdFromPathFilename() throws Exception {
     JsonNode root = MAPPER.readTree("{\"model_path\":\"/tmp/some-model.gguf\",\"n_ctx\":4096}");
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
 
     assertEquals("some-model.gguf", lastModelId.get());
   }
@@ -218,7 +227,7 @@ class ServerPropsOpsTest {
   @Test
   void updateFromPropsBestEffort_extractsContextTokens() throws Exception {
     JsonNode root = MAPPER.readTree("{\"n_ctx\":2048}");
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
 
     assertEquals(2048, lastContextTokens.get());
   }
@@ -231,7 +240,7 @@ class ServerPropsOpsTest {
             "{\"model_alias\":\"external\","
                 + "\"model_path\":\"/models/external.gguf\","
                 + "\"n_ctx\":2048}");
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
 
     var diag = ops.buildExternalDiagnostics(true, 0, null, 0);
     assertTrue(diag.verified());
@@ -261,7 +270,7 @@ class ServerPropsOpsTest {
   void updateFromPropsBestEffort_extractsVisionCapability() throws Exception {
     JsonNode root =
         MAPPER.readTree("{\"model_alias\":\"test\",\"modalities\":{\"vision\":true},\"n_ctx\":4096}");
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
 
     assertTrue(ops.hasVisionCapability());
   }
@@ -269,7 +278,7 @@ class ServerPropsOpsTest {
   @Test
   void visionCapability_falseWhenModalitiesMissing() throws Exception {
     JsonNode root = MAPPER.readTree("{\"model_alias\":\"test\",\"n_ctx\":4096}");
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
 
     assertFalse(ops.hasVisionCapability());
   }
@@ -278,7 +287,7 @@ class ServerPropsOpsTest {
   void visionCapability_resetOnExternalAdoptionReset() throws Exception {
     JsonNode root =
         MAPPER.readTree("{\"model_alias\":\"test\",\"modalities\":{\"vision\":true},\"n_ctx\":4096}");
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
     assertTrue(ops.hasVisionCapability());
 
     ops.resetExternalAdoptionState(true, null);
@@ -304,7 +313,7 @@ class ServerPropsOpsTest {
     assertTrue(ServerPropsOps.supportsPreserveReasoning(root));
     assertTrue(root.path("chat_template_caps").path("supports_enable_thinking").isMissingNode());
 
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
     assertEquals("b8571", ops.actualServerBuild());
   }
 
@@ -317,7 +326,7 @@ class ServerPropsOpsTest {
     assertFalse(ServerPropsOps.hasChatTemplateCaps(null));
     assertFalse(ServerPropsOps.supportsPreserveReasoning(null));
 
-    ops.updateFromPropsBestEffort(root);
+    update(ops, root);
   }
 
   @Test

@@ -76,7 +76,7 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
-      return new InferenceLifecycleManager(executors, config, events, childRegistry);
+      return new InferenceLifecycleManager(executors, config, events, childRegistry, resolvedConfig);
 
     } catch (Exception e) {
       if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refusal) throw refusal;

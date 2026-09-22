@@ -62,10 +62,10 @@ record StartResult(
 `StartResult` is the logical start/ownership token. A retry intentionally retains it because its configuration, policy, and declared hash do not change. Physical process identity is a second, internal immutable snapshot:
 
 ```java
-record ActiveServer(StartResult start) {}
+record ActiveServer(StartResult start, Process process, ProcessHandle adoptedHandle) {}
 ```
 
-`LlamaServerOps` retains `private volatile ActiveServer activeServer`; every adoption, launch, or health-time relaunch installs a fresh immutable object. Code compares `ActiveServer` identity (`activeServer == expectedProcess`), not record equality. This rejects a late health/props/exit response from the pre-retry process even though both processes share one `StartResult`. The existing `process`, `adoptedManagedHandle`, and managed-child id continue to own OS resources and supply the actual handle where needed; `ActiveServer` owns only configuration/proof association and callback identity. No numeric counter, duplicate generation authority, registry, or mode state machine is added.
+`LlamaServerOps` retains `private volatile ActiveServer activeServer`; every adoption, launch, or health-time relaunch installs a fresh immutable object. Code compares `ActiveServer` identity (`activeServer == expectedProcess`), not record equality. This rejects a late health/props/exit response from the pre-retry process even though both processes share one `StartResult`. The snapshot carries the exact launched process or adopted handle so probes and callbacks never borrow a successor's physical handle. The existing process/adopted-handle fields and managed-child id remain the cleanup owner's references; the snapshot associates those same resources with configuration and callback identity. No numeric counter, duplicate generation authority, registry, or mode state machine is added.
 
 The GPU policy is already captured by the canonical resolved snapshot: `ResolvedConfig.Ai.gpuAccelerationAllowed` is the projection of `policy.gpu_acceleration_enabled` (`ResolvedConfig.java:183-186`; `ResolvedConfigBuilder.java:1243`). `StartRequest.effectiveGpuLayers()` derives the effective value exclusively from those two immutable captured inputs. Remove the launch-time system-property reread at `LlamaServerOps.java:1733-1735`. Do not store another mutable policy flag. Declared hash, argv, VRAM planning, diagnostics, and post-health witness checks all use this same derived value, so a property/global change during health cannot change the witness.
 
@@ -197,13 +197,17 @@ Negative controls: make `probeHealth` read `config.get()` and candidate-isolatio
 
 The parent has settled the only product-policy question: new reconfigure requires a managed hash witness, while legacy entry points retain explicit external adoption. No broader lifecycle decision is required. Implementation must still choose the existing typed exception reason for strict external refusal without adding a new public wire code; `EXTERNAL_SERVER_CONFLICT` is the closest current contract (`InferenceLifecycleManager.java:732-746`).
 
-No check was executed for this read-only design. The missing proof is the focused context/concurrency suite above, affected-module tests/static checks, and integrated D1-4 reconfigure evidence. Root's successful preflight/offline checks are evidence for the preceding slice only.
+The original design pass was read-only. Current implementation evidence is below.
+The missing proof remains the focused context/concurrency suite above,
+affected-module tests/static checks, and integrated D1-4 reconfigure evidence.
+Root's successful preflight/offline checks are evidence for the preceding slice only.
 
 ## Implementation ownership
 
 Root owns manager integration, public result semantics, design/docs, all builds, stack and Git.
-The bounded server worker owns LlamaServerConfigContext, LlamaServerOps and ServerPropsOps,
-plus necessary existing server tests. New lifecycle/lock ordering ambiguity must return to
+Root also owns LlamaServerConfigContext, LlamaServerOps and ServerPropsOps after the
+lifecycle review exposed coupled lock/recovery changes. The bounded test worker owns only
+LlamaServerCandidateContextTest.java; the independent reviewer is read-only. New lifecycle/lock ordering ambiguity must return to
 the root before expanding the contract. In particular, a volatile before/after check alone
 does not make callback publication atomic: prove the owner-check/publication critical section
 and avoid lock inversion through manager failure callbacks. No I/O or process wait belongs
@@ -235,3 +239,119 @@ do not add a second writer merely to move that existing callback outside the loc
 - VDU entry/exit retains the whole existing procedure snapshot and policy; it must
   not recapture unrelated global flags. The existing procedure stash is cleared
   only after successful exit, so failed exit can still be retried.
+- Review exposed the serving-A / desired-C distinction after APPLY_ONLY. Successful
+  rollback publishes actual A's captured inference and resolved context with the
+  transaction policy, after health and witness verification. It must not republish
+  desired C or relax a strict transaction on the next startup. Failed rollback
+  retains the pretransaction desired snapshot and reports LEFT_OFFLINE; that
+  snapshot is not a claim of a serving process.
+- Model-ID observation carries the same captured context into existing diagnostic
+  persistence. Its path uses that context's data directory, never the global
+  configuration, including before candidate settings are committed.
+- The explicit owner also requires migrating detach rollback: toggling an external
+  flag after stopping the candidate cannot recreate a cleared physical owner.
+  Detach therefore retains the actual external context, requires managed proof for
+  its new-port candidate, and explicitly re-adopts/health-checks the captured
+  external incumbent on failure. Failed cleanup or restoration reports OFFLINE.
+  This is a required caller migration, not a separate detach state machine.
+- Physical recovery must serialize with manager-driven replacement, not only
+  guard props publication. The existing recovery scheduler retains delay/count
+  ownership but invokes a narrow manager callback with the captured physical-owner
+  predicate. Under the existing transition lock, the manager verifies that owner
+  is still current and mode is ONLINE, then invokes the existing server recovery
+  body. The same lock already orders apply, startup, detach and close. A queued
+  callback after close observes OFFLINE and cannot restart a preserved child.
+  No new executor or recovery state is introduced; server callbacks are never
+  invoked under the props ownership monitor.
+
+## Implementation verification (in progress)
+
+Base is local docs checkpoint `1d89a465f` plus the source inventories attached to each run.
+Compile2437 and compile/pmdMain2446 passed. The eleven compiler advisories predate this
+change; none was suppressed. Focused/static2445 passed351 cases but did not close proof:
+review refuted the recovery fixture because its second callback followed refusal before
+any physical retry. Production review also required post-health monitoring, pre-arm crash
+budget reset, dead final-attempt retirement and terminal strict cleanup.
+
+Full affected-module2448 then ran354 cases, one failure, zero skips across32 suites;
+Spotless/pmdMain/pmdTest passed. Its failed recovery fixture used a thread-local Mockito
+constructor mock while recovery ran on the scheduler. Focused2449 exposed another invalid
+fixture input: GPU launch without a GPU capability service. The corrected fixture delivers
+the first scheduled owner guard, executes recovery under the test-thread interception and
+uses the CPU8192→4096 ladder. It still requires a second scheduler callback, distinct real
+OS children/rungs, declared and realized registry hashes, dead-row retirement and crash
+count1→2. Focused2450 passes all seven candidate-context tests plus Spotless/pmdTest.
+
+Each run's log, test XML, counts and WIP source inventory is retained under `tmp/<run-label>*`
+in the assigned worktree. Labels are2448-candidate-focused,2449-candidate-recovery and
+2450-candidate-recovery. ProcessBuilder interception proves production argv/registration
+contracts while returning real OS children; it does not prove llama accepts those arguments.
+
+Negative controls2451–2455 each produced exactly one intended behavioral failure;
+the runner restored both production files byte-for-byte and root independently re-read
+all five saved XML failure messages. Commands use
+`./gradlew.bat :modules:app-inference:test --tests <class.method> --console=plain`.
+The exact per-run command and source inventory are in each run's counts/sources files.
+
+| Run / intentional mutation | Regression and observed rejection |
+| --- | --- |
+|2451-recovery-owner-negative: remove physical-owner predicate | `recoveryRejectsReplacedOwnersAndCannotRestartAfterPreservingChildOnClose`: NeverWantedButInvoked |
+|2452-recovery-close-negative: remove ONLINE guard | same regression: TooManyActualInvocations (2 instead of1) |
+|2453-recovery-lock-negative: remove manager synchronization | `queuedRecoveryWaitsForApplyThenRejectsItsReplacedPhysicalOwner`: expected TimeoutException was absent |
+|2454-recovery-budget-negative: reset crashCount in installActive | `recoveryContextRelaunchFinalFailureAdvancesSameCrashEpisode`: expected2, actual1 |
+|2455-clean-exit-negative: exclude exit0 | `armedLaunchedChildCleanExitQueuesCapturedRecovery`: expected callback did not arrive |
+
+These prove guard sensitivity, not real llama compatibility. Remaining proof includes direct
+helper/context and reasoning-fallback gaps, integrated/stress checks, installed standard
+model query and hosted CI. The preceding215af7809 live/hosted proof cannot certify this WIP.
+
+
+### Acceptance reconciliation before integrated verification
+
+All rows remain requirements. Listed tests are proof subjects, not pass claims for
+unexecuted edits.2450 proves the original seven candidate-context subjects;2448
+proves the other manager/module cases at its source inventory, except its named
+recovery fixture failure. New additions below need a combined restored-source run.
+
+| Acceptance | Existing proof and remaining addition |
+| --- | --- |
+|1 Candidate isolation|Explicit B GPU/argv/hash under changed global C; new direct launch-path test checks B log, runtime PATH and build pin while global C differs. Installed llama proof remains.|
+|2 Publication fence|Manager callback assertions retain A through B start/health, then publish B; mocked server boundary. New add/remove vision test pins active capability during APPLY_ONLY.|
+|3 Strict adoption|Real HTTP plus registered OS child proves matching managed witness; unregistered server refused under strict and accepted under explicit legacy policy.|
+|4 Retry identity|Real intercepted child launches prove distinct context rungs, PID/registry hashes and crash count; new reasoning rejection test adds same-rung flag removal before lower rung.|
+|5 Background identity|Stale health success/failure and props cannot mutate successor; queued recovery waits for apply, rejects old owner and stops after close.2451–2455 mutations prove recovery guards/count/clean-exit sensitivity.|
+|6 Rollback identity|Captured actual A restored despite global C/desired APPLY_ONLY configuration; strict policy retained; failed cleanup or rollback OFFLINE with both causes; no repeated VRAM gate for A.|
+|7 Failed stop|No candidate start after incumbent stop refusal; failed candidate cleanup blocks rollback. New detach cleanup test covers retained candidate without phantom external restoration.|
+|8 Close|Post-close recovery blocked, failed termination ownership retained, dead adopted row retired; new two-manager real-child/shared-registry round trip joins preservation to strict next-owner adoption.|
+|9 Existing contracts|Full affected-module/static and integrated/stress runs remain required after all new additions; installed standard query and hosted CI belong to the final candidate-context revision.|
+
+Review found one additional desired-versus-serving bug: hasVisionCapability still
+read desired configuration after APPLY_ONLY, although VduProcessor uses it to admit
+actual work. Run2457 proved both directions fail with the old desired-config read (false→true
+and true→false). Root changed the method to servingInference; combined2459 is running.
+Run2456 was only a fixture compile failure (ambiguous Mockito redirect overload),
+fixed by typing the matcher explicitly; it is not behavioral evidence. This is the same captured-serving contract,
+not a new design exception or reduced scope.
+
+
+### Combined focused proof2459
+
+`./gradlew.bat :modules:app-inference:test :modules:app-inference:spotlessCheck
+:modules:app-inference:pmdMain :modules:app-inference:pmdTest
+:modules:app-services:spotlessCheck :modules:app-services:compileJava --continue --console=plain`
+passes on Windows in33s:359 tests, zero failures/errors/skips across33 suites.
+Base1d89a465f plus the15-file inventory in tmp/2459-candidate-focused-sources.json;
+log, complete XML, counts and skips are retained under the same label. All new subjects
+in the reconciliation table executed, including both vision directions after correction.
+
+Integrated2460 is running with
+`./gradlew.bat spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist --continue --console=plain`.
+This and installed/hosted proof remain unclaimed until their actual results are captured.
+
+
+Independent final source/proof review after2459 found no remaining concrete defect
+in this bounded slice. It traced the new path/reasoning fixture to actual launch
+helpers, confirmed detach cleanup cannot pass through readoption, and verified the
+shared-registry two-manager round trip excludes replacement/external adoption. The
+reviewer did not run tests; root owns the2459 results. Full D1-4 integration remains
+outside this slice and still required by the stage contract.

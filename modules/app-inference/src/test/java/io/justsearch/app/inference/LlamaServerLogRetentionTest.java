@@ -145,12 +145,11 @@ final class LlamaServerLogRetentionTest {
     return new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
         HttpClient.newHttpClient(),
         new ObjectMapper(),
-        () -> null,
         null,
         () -> Mode.OFFLINE,
         new PropsObserver() {
           @Override
-          public void onModelIdObserved(String modelId) {}
+          public void onModelIdObserved(String modelId, LlamaServerConfigContext context) {}
 
           @Override
           public void onContextTokensObserved(int contextTokens) {}
@@ -165,8 +164,9 @@ final class LlamaServerLogRetentionTest {
             return null;
           }
         },
-        () -> {},
-        reason -> {},
+        ignored -> {},
+        ignored -> {},
+        (reason, guard) -> {},
         InferenceTelemetryEvents.noop());
   }
 }

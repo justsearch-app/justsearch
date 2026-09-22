@@ -9,6 +9,7 @@ import io.justsearch.app.inference.telemetry.StartupReason;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.app.api.Mode;
@@ -91,8 +92,37 @@ public class InferenceLifecycleManager
   /** Runtime view + lock + state-machine + listeners + telemetry envelope live in the runner. */
   private final TransitionRunner runner;
 
-  /** Mutable inference config; updated under {@link TransitionRunner#lock} by applyConfig. */
-  private volatile InferenceConfig config;
+  /** One immutable configured snapshot; publication is serialized by the transition lock. */
+  private volatile ConfiguredInference configured;
+
+  /** A null resolved snapshot exists only for the legacy constructor before context capture. */
+  private record ConfiguredInference(
+      InferenceConfig inference, ResolvedConfig resolved, LlamaServerOps.AdoptionPolicy policy) {
+    private ConfiguredInference {
+      Objects.requireNonNull(inference, "inference");
+      Objects.requireNonNull(policy, "policy");
+    }
+  }
+
+  private InferenceConfig configuredInference() {
+    return configured.inference();
+  }
+
+  private LlamaServerOps.StartRequest configuredStartRequest() {
+    ConfiguredInference snapshot = configured;
+    if (snapshot.resolved() == null) {
+      snapshot = new ConfiguredInference(snapshot.inference(), ConfigStore.global().get(), snapshot.policy());
+      configured = snapshot;
+    }
+    return new LlamaServerOps.StartRequest(
+        new LlamaServerConfigContext(snapshot.inference(), snapshot.resolved()), snapshot.policy());
+  }
+
+  private InferenceConfig servingInference() {
+    LlamaServerOps server = serverOps;
+    return server == null ? configuredInference()
+        : server.activeStartResult().map(start -> start.context().inference()).orElseGet(this::configuredInference);
+  }
 
   /** GPU/VRAM capability probe. */
   private final GpuCapabilitiesService gpuCapabilitiesService;
@@ -116,7 +146,7 @@ public class InferenceLifecycleManager
   // not model. The two are genuinely distinct, so the stash STAYS as a procedure-scoped
   // enter/exit config restore. The applyConfig(VDU config) call is real behavior (single slot, no
   // cache) and also stays. Only the *mode* return-to-spec moved to the reconciler.
-  private volatile InferenceConfig preVduConfig;
+  private volatile ConfiguredInference preVduConfig;
 
   // Configuration constants
   private static final long VRAM_FLUSH_DELAY_MS = 2000;
@@ -152,9 +182,19 @@ public class InferenceLifecycleManager
       InferenceConfig config,
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this(executorRegistry, config, events, childRegistry, null);
+  }
+
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      ResolvedConfig resolvedConfig) {
     this.executorRegistrations = new InferenceExecutorRegistrations(executorRegistry);
     this.events = Objects.requireNonNull(events, "events");
-    this.config = config;
+    this.configured = new ConfiguredInference(
+        config, resolvedConfig, LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
     this.gpuCapabilitiesService = new GpuCapabilitiesService();
     Object lock = new Object();
     ModeStateMachine modeState = new ModeStateMachine();
@@ -163,8 +203,8 @@ public class InferenceLifecycleManager
     PropsObserver propsObserver =
         new PropsObserver() {
           @Override
-          public void onModelIdObserved(String modelId) {
-            onModelIdUpdatedInternal(modelId);
+          public void onModelIdObserved(String modelId, LlamaServerConfigContext context) {
+            onModelIdUpdatedInternal(modelId, context);
           }
 
           @Override
@@ -199,26 +239,26 @@ public class InferenceLifecycleManager
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              () -> this.config.serverPort());
+              () -> servingInference().serverPort());
       openedOnline =
           new OnlineModeOps(
               executorRegistrations,
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              () -> this.config.serverPort(),
+              () -> servingInference().serverPort(),
               () -> runner.view().lastKnownModelId(),
-              () -> this.config.modelPath().getFileName().toString(),
+              () -> servingInference().modelPath().getFileName().toString(),
               this.events);
       openedServer =
           new LlamaServerOps(
               executorRegistrations,
               createdHttpClient,
               createdObjectMapper,
-              () -> this.config,
               gpuCapabilitiesService,
               runner::currentMode,
               propsObserver,
+              this::recoverManagedServer,
               this::handleMaxCrashOffline,
               this::handleExternalFailureOffline,
               this.events,
@@ -247,22 +287,41 @@ public class InferenceLifecycleManager
   }
 
   /** Crash-recovery callback installed on {@link LlamaServerOps}. Tempdoc 518 P1. */
-  private void handleMaxCrashOffline() {
+  private void handleMaxCrashOffline(java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
+      if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
       tokenOps.clearCaches();
-      runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
+      InferenceFailure cleanupFailure = null;
+      try {
+        serverOps.stopLlamaServer();
+      } catch (RuntimeException failure) {
+        cleanupFailure = new InferenceFailure.TransitionFailure(
+            TransitionCode.ONLINE_START_FAILED,
+            "Recovery exhausted and child cleanup failed: " + safeMessage(failure), failure);
+      }
+      runner.runForceOffline(TransitionReason.CRASH_RECOVERY, cleanupFailure);
+    }
+  }
+
+  /** Serializes a captured physical server's recovery with apply, detach and close. */
+  private void recoverManagedServer(java.util.function.BooleanSupplier stillOwned) {
+    synchronized (runner.lock()) {
+      if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
+      serverOps.recoverActiveServer();
     }
   }
 
   /** External-server-unhealthy callback installed on {@link LlamaServerOps}. Tempdoc 518 P1. */
-  private void handleExternalFailureOffline(String reason) {
+  private void handleExternalFailureOffline(
+      String reason, java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
-      if (!serverOps.isUsingExternalRaw() || runner.currentMode() != Mode.ONLINE) {
+      if (!stillOwned.getAsBoolean()
+          || !serverOps.isUsingExternalRaw() || runner.currentMode() != Mode.ONLINE) {
         return;
       }
       LOG.error(
           "External llama-server on port {} became unhealthy: {}. Switching to OFFLINE.",
-          this.config.serverPort(),
+          servingInference().serverPort(),
           reason);
       serverOps.setUsingExternal(false);
       tokenOps.clearCaches();
@@ -273,11 +332,11 @@ public class InferenceLifecycleManager
   // ==================== Mode Queries ====================
 
   public InferenceConfig currentConfig() {
-    return config;
+    return configuredInference();
   }
 
   public boolean hasVisionCapability() {
-    InferenceConfig cfg = config;
+    InferenceConfig cfg = servingInference();
     boolean configHasVision = cfg != null && cfg.mmprojPath() != null;
     return configHasVision || serverOps.hasVisionCapabilityFromProps();
   }
@@ -292,7 +351,7 @@ public class InferenceLifecycleManager
    * supported state — externally-staged binaries carry no pin).
    */
   public String expectedLlamaServerBuild() {
-    return serverOps.expectedServerBuild();
+    return LlamaServerBuildCheck.readExpectedNextTo(servingInference().serverExecutable());
   }
 
   /**
@@ -413,7 +472,7 @@ public class InferenceLifecycleManager
 
           // Validate BYO assets before attempting to start.
           try {
-            config.validate();
+            configuredInference().validate();
           } catch (Exception e) {
             return TransitionOutcome.failure(
                 new InferenceFailure.ConfigFailure(
@@ -422,15 +481,16 @@ public class InferenceLifecycleManager
                 priorView);
           }
 
-          // VRAM precondition when GPU offload is requested.
-          if (config.gpuLayers() > 0) {
+          var startRequest = configuredStartRequest();
+          // VRAM precondition uses the same captured policy as the launch.
+          if (startRequest.effectiveGpuLayers() > 0) {
             gpuCapabilitiesService.invalidateNvidiaSmiCache();
             Long totalVramBytes = readTotalVramBytes();
             if (totalVramBytes == null) {
               LOG.warn(
                   "VRAM detection unavailable (NVML and nvidia-smi both returned no value). "
                       + "Proceeding with GPU Online Mode because gpuLayers={} was explicitly requested.",
-                  config.gpuLayers());
+                  startRequest.effectiveGpuLayers());
             } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
               return TransitionOutcome.failure(
                   new InferenceFailure.StartupFailure(
@@ -447,7 +507,7 @@ public class InferenceLifecycleManager
           tokenOps.clearCaches();
 
           try {
-            events.onStartupAttempt(config, StartupReason.COLD_START, TargetPhase.ONLINE);
+            events.onStartupAttempt(configuredInference(), StartupReason.COLD_START, TargetPhase.ONLINE);
           } catch (RuntimeException ex) {
             LOG.warn("Telemetry events.onStartupAttempt threw: {}", ex.getMessage());
           }
@@ -463,8 +523,10 @@ public class InferenceLifecycleManager
             // fires) will repopulate via runner.mergeProps; if /props doesn't fire, the view
             // remains correctly null rather than carrying the prior server's stale data.
             runner.clearProps();
-            serverOps.startLlamaServer();
-            serverOps.waitForServerHealth();
+            serverOps.resetCrashCounters();
+            var started = serverOps.startLlamaServer(startRequest);
+            serverOps.waitForServerHealth(started);
+            verifyAppliedServer(startRequest, started);
             long elapsed = System.currentTimeMillis() - startupStart;
             LOG.info("Inference startup completed in {}ms", elapsed);
 
@@ -481,7 +543,7 @@ public class InferenceLifecycleManager
 
             try {
               events.onStartupComplete(
-                  config,
+                  configuredInference(),
                   Duration.ofMillis(elapsed),
                   RuntimeIdentity.nonProcess(runner.generation() + 1),
                   TargetPhase.ONLINE);
@@ -491,34 +553,38 @@ public class InferenceLifecycleManager
             return TransitionOutcome.success(Mode.ONLINE, nextView);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return TransitionOutcome.failure(
+            return failedOnlineStartup(
                 new InferenceFailure.TransitionFailure(
                     TransitionCode.INTERRUPTED, "Transition interrupted", e),
-                priorView);
+                priorView, e);
           } catch (ModeTransitionException mte) {
-            serverOps.stopPeriodicHealthCheck();
-            InferenceRuntimeView rollbackView = priorView;
-            if (serverOps.isExternalServerActive()) {
-              serverOps.setUsingExternal(false);
-              rollbackView = priorView.withExternal(false);
-            }
-            return TransitionOutcome.failure(
-                TransitionRunner.mapExceptionToFailure(mte), rollbackView);
+            return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
           } catch (Exception e) {
-            serverOps.stopPeriodicHealthCheck();
-            InferenceRuntimeView rollbackView = priorView;
-            if (serverOps.isExternalServerActive()) {
-              serverOps.setUsingExternal(false);
-              rollbackView = priorView.withExternal(false);
-            }
-            return TransitionOutcome.failure(
+            return failedOnlineStartup(
                 new InferenceFailure.TransitionFailure(
                     TransitionCode.ONLINE_START_FAILED,
                     "Failed to switch to Online Mode: " + safeMessage(e),
                     e),
-                rollbackView);
+                priorView, e);
           }
         });
+  }
+
+  private TransitionOutcome failedOnlineStartup(
+      InferenceFailure failure, InferenceRuntimeView priorView, Throwable startupFailure) {
+    try {
+      serverOps.stopLlamaServer();
+      return TransitionOutcome.failure(failure, priorView.withExternal(false));
+    } catch (RuntimeException cleanupFailure) {
+      var combined = new IllegalStateException(
+          "Startup failed: " + failure.detail() + "; cleanup failed: " + safeMessage(cleanupFailure),
+          cleanupFailure);
+      combined.addSuppressed(startupFailure);
+      return TransitionOutcome.failureOffline(
+          new InferenceFailure.TransitionFailure(
+              TransitionCode.ONLINE_START_FAILED, combined.getMessage(), combined),
+          priorView.withExternal(false));
+    }
   }
 
   @Override
@@ -541,7 +607,7 @@ public class InferenceLifecycleManager
           tokenOps.clearCaches();
 
           try {
-            events.onStartupAttempt(config, StartupReason.COLD_START, TargetPhase.INDEXING);
+            events.onStartupAttempt(configuredInference(), StartupReason.COLD_START, TargetPhase.INDEXING);
           } catch (RuntimeException ex) {
             LOG.warn("Telemetry events.onStartupAttempt threw: {}", ex.getMessage());
           }
@@ -565,7 +631,7 @@ public class InferenceLifecycleManager
 
             try {
               events.onStartupComplete(
-                  config,
+                  configuredInference(),
                   Duration.ofMillis(System.currentTimeMillis() - startupStart),
                   RuntimeIdentity.nonProcess(runner.generation() + 1),
                   TargetPhase.INDEXING);
@@ -575,12 +641,12 @@ public class InferenceLifecycleManager
             return TransitionOutcome.success(Mode.INDEXING, nextView);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return TransitionOutcome.failure(
+            return TransitionOutcome.failureOffline(
                 new InferenceFailure.TransitionFailure(
                     TransitionCode.INTERRUPTED, "Transition interrupted", e),
                 buildIndexingFailureRollback(priorView));
           } catch (Exception e) {
-            return TransitionOutcome.failure(
+            return TransitionOutcome.failureOffline(
                 new InferenceFailure.TransitionFailure(
                     TransitionCode.INDEXING_START_FAILED,
                     "Failed to switch to Indexing Mode: " + safeMessage(e),
@@ -614,27 +680,31 @@ public class InferenceLifecycleManager
             ModeTransitionException.Reason.ONLINE_START_FAILED,
             "VDU mode requires ONLINE mode (current: " + runner.currentMode() + ")");
       }
-      if (config.vduMode()) {
+      if (configuredInference().vduMode()) {
         LOG.debug("Already in VDU mode");
         return;
       }
       LOG.info("Entering VDU mode (restarting server with vision-safe flags)...");
-      preVduConfig = config;
-      applyConfig(
-          config.withVduMode(true), RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_ENTER);
+      ConfiguredInference previous = configured;
+      ConfigApplyResult result = applyConfiguration(previous.inference().withVduMode(true),
+          previous.resolved(), RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_ENTER, previous.policy());
+      if (result.failure() != null) throw result.failure();
+      preVduConfig = previous;
     }
   }
 
   public void exitVduMode() throws ModeTransitionException {
     synchronized (runner.lock()) {
-      InferenceConfig saved = preVduConfig;
-      if (saved == null || !config.vduMode()) {
+      ConfiguredInference saved = preVduConfig;
+      if (saved == null || !configuredInference().vduMode()) {
         LOG.debug("Not in VDU mode; exitVduMode is a no-op");
         return;
       }
       LOG.info("Exiting VDU mode (restoring normal server configuration)...");
+      ConfigApplyResult result = applyConfiguration(saved.inference(), saved.resolved(),
+          RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_EXIT, saved.policy());
+      if (result.failure() != null) throw result.failure();
       preVduConfig = null;
-      applyConfig(saved, RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_EXIT);
     }
   }
 
@@ -676,6 +746,29 @@ public class InferenceLifecycleManager
 
   // ==================== Runtime Config Apply ====================
 
+  public enum ConfigApplyDisposition {
+    APPLIED,
+    CONFIGURED,
+    UNCHANGED,
+    ROLLED_BACK_TO_A,
+    LEFT_OFFLINE
+  }
+
+  /** Configuration is the retained desired snapshot; a failed result never certifies it as serving. */
+  public record ConfigApplyResult(
+      ConfigApplyDisposition disposition,
+      InferenceConfig configuration,
+      String declaredConfigHash,
+      ModeTransitionException failure) {
+    public ConfigApplyResult {
+      Objects.requireNonNull(disposition, "disposition");
+      Objects.requireNonNull(configuration, "configuration");
+    }
+  }
+
+  private record ApplyExecution(
+      ConfigApplyDisposition disposition, String declaredConfigHash, TransitionOutcome transition) {}
+
   public void applyConfig(InferenceConfig newConfig, RestartPolicy policy)
       throws ModeTransitionException {
     applyConfig(newConfig, policy, TransitionReason.CONFIG_APPLY);
@@ -684,231 +777,237 @@ public class InferenceLifecycleManager
   public void applyConfig(
       InferenceConfig newConfig, RestartPolicy policy, TransitionReason transitionReason)
       throws ModeTransitionException {
+    ConfigApplyResult result = applyConfiguration(
+        newConfig, null, policy, transitionReason,
+        LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
+    if (result.failure() != null) throw result.failure();
+  }
+
+  /** Prepares the exact resolved candidate with managed configuration proof. */
+  public ConfigApplyResult applyResolvedConfig(
+      InferenceConfig candidate, ResolvedConfig candidateResolved, RestartPolicy policy)
+      throws ModeTransitionException {
+    Objects.requireNonNull(candidateResolved, "candidateResolved");
+    return applyConfiguration(candidate, candidateResolved, policy, TransitionReason.CONFIG_APPLY,
+        LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+  }
+
+  private ConfigApplyResult applyConfiguration(
+      InferenceConfig newConfig, ResolvedConfig suppliedResolved, RestartPolicy policy,
+      TransitionReason transitionReason, LlamaServerOps.AdoptionPolicy adoptionPolicy)
+      throws ModeTransitionException {
     if (newConfig == null) {
       InferenceFailure failure =
           new InferenceFailure.ConfigFailure(ConfigCode.CONFIG_REQUIRED, "Config is required");
-      runner.recordFailureOutsideTransition(failure);
-      try {
-        events.onConfigApplyFailure(failure);
-      } catch (RuntimeException ex) {
-        LOG.warn("Telemetry events.onConfigApplyFailure threw: {}", ex.getMessage());
-      }
+      recordApplyRefusal(failure);
       throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
     }
     RestartPolicy effective = policy == null ? RestartPolicy.RESTART_IF_ONLINE : policy;
-
     synchronized (runner.lock()) {
       if (runner.currentMode() == Mode.TRANSITIONING) {
-        InferenceFailure failure =
-            new InferenceFailure.ConfigFailure(
-                ConfigCode.ALREADY_TRANSITIONING,
-                "Inference runtime is transitioning; try again shortly");
-        runner.recordFailureOutsideTransition(failure);
-        try {
-          events.onConfigApplyFailure(failure);
-        } catch (RuntimeException ex) {
-          LOG.warn("Telemetry events.onConfigApplyFailure threw: {}", ex.getMessage());
-        }
-        throw modeTransition(
-            ModeTransitionException.Reason.ALREADY_TRANSITIONING,
-            "Inference runtime is transitioning; try again shortly");
+        String message = "Inference runtime is transitioning; try again shortly";
+        recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.ALREADY_TRANSITIONING, message));
+        throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING, message);
       }
-
-      final InferenceConfig oldConfig = this.config;
-      final boolean shouldRestart =
-          switch (effective) {
-            case RESTART_ALWAYS -> true;
-            case RESTART_IF_ONLINE -> runner.currentMode() == Mode.ONLINE;
-            case APPLY_ONLY -> false;
-          };
-
+      ConfiguredInference incumbentConfiguration = configured;
+      InferenceConfig oldConfig = incumbentConfiguration.inference();
+      boolean shouldRestart = switch (effective) {
+        case RESTART_ALWAYS -> true;
+        case RESTART_IF_ONLINE -> runner.currentMode() == Mode.ONLINE;
+        case APPLY_ONLY -> false;
+      };
       long applyStartNanos = System.nanoTime();
       try {
         events.onConfigApplyAttempt(oldConfig, newConfig, shouldRestart);
-      } catch (RuntimeException ex) {
-        LOG.warn("Telemetry events.onConfigApplyAttempt threw: {}", ex.getMessage());
+      } catch (RuntimeException failure) {
+        LOG.warn("Telemetry events.onConfigApplyAttempt threw: {}", failure.getMessage());
       }
-
       if (shouldRestart && serverOps.isExternalServerActive()) {
-        String msg =
-            "Cannot restart/apply config while using an external llama-server instance on port "
-                + config.serverPort()
-                + ". Stop the external process first or detach to a managed server.";
-        InferenceFailure failure =
-            new InferenceFailure.ConfigFailure(ConfigCode.EXTERNAL_SERVER_CONFLICT, msg);
-        runner.recordFailureOutsideTransition(failure);
-        try {
-          events.onConfigApplyFailure(failure);
-        } catch (RuntimeException ex) {
-          LOG.warn("Telemetry events.onConfigApplyFailure threw: {}", ex.getMessage());
-        }
-        throw modeTransition(
-            ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT, msg);
+        String message = "Cannot restart/apply config while using an external llama-server instance on port "
+            + oldConfig.serverPort() + ". Stop the external process first or detach to a managed server.";
+        recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.EXTERNAL_SERVER_CONFLICT, message));
+        throw modeTransition(ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT, message);
       }
-
+      ResolvedConfig resolved = suppliedResolved != null ? suppliedResolved : ConfigStore.global().get();
+      var candidate = new LlamaServerConfigContext(newConfig, resolved);
       if (!shouldRestart) {
-        this.config = newConfig;
-        LOG.info(
-            "Applied inference config (no restart): contextSize={}, gpuLayers={}, modelPath={}",
-            newConfig.contextSize(),
-            newConfig.gpuLayers(),
-            newConfig.modelPath());
         try {
-          events.onConfigApplyComplete(Duration.ofNanos(System.nanoTime() - applyStartNanos));
-        } catch (RuntimeException ex) {
-          LOG.warn("Telemetry events.onConfigApplyComplete threw: {}", ex.getMessage());
+          newConfig.validate();
+        } catch (Exception invalid) {
+          String message = "Invalid inference configuration: " + safeMessage(invalid);
+          recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.INVALID_CONFIG, message));
+          throw modeTransition(ModeTransitionException.Reason.INVALID_CONFIG, message);
         }
-        return;
+        configured = new ConfiguredInference(newConfig, resolved, adoptionPolicy);
+        emitApplyComplete(applyStartNanos);
+        return new ConfigApplyResult(ConfigApplyDisposition.CONFIGURED, newConfig, null, null);
       }
-
-      // Restart path goes through the envelope.
-      final Mode preApplyMode = runner.currentMode();
-
-      runner.run(
-          transitionReason,
-          events::onConfigApplyFailure,
-          priorView -> {
-            try {
-              newConfig.validate();
-            } catch (Exception e) {
-              return TransitionOutcome.failure(
-                  new InferenceFailure.ConfigFailure(
-                      ConfigCode.INVALID_CONFIG,
-                      "Invalid inference configuration: " + safeMessage(e)),
-                  priorView);
-            }
-
-            if (newConfig.gpuLayers() > 0) {
-              gpuCapabilitiesService.invalidateNvidiaSmiCache();
-              Long totalVramBytes = readTotalVramBytes();
-              if (totalVramBytes == null) {
-                LOG.warn(
-                    "VRAM detection unavailable (NVML and nvidia-smi both returned no value). "
-                        + "Proceeding with GPU Online Mode because gpuLayers={} was explicitly requested.",
-                    newConfig.gpuLayers());
-              } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
-                return TransitionOutcome.failure(
-                    new InferenceFailure.StartupFailure(
-                        StartupCode.INSUFFICIENT_VRAM,
-                        "Insufficient VRAM for GPU Online Mode: "
-                            + formatVramDescription(totalVramBytes)
-                            + " (set GPU layers to 0 for CPU mode)",
-                        null),
-                    priorView);
-              }
-            }
-
-            // Candidate preflight must leave the incumbent untouched on refusal.
-            tokenOps.clearCaches();
-            try {
-              serverOps.stopLlamaServer();
-            } catch (Exception ignore) {
-              // best-effort stop; continue to apply.
-            }
-
-            InferenceLifecycleManager.this.config = newConfig;
-            serverOps.resetCrashCounters();
-
-            try {
-              // Tempdoc 518 fix A: wipe stale /props from prior server before restart.
-              runner.clearProps();
-              // Tempdoc 601: time the startup window (as switchToOnlineMode does) so
-              // lastStartupDurationMs is surfaced after the activate + reload paths, which
-              // reach Online via applyConfig — not switchToOnlineMode.
-              long startupStart = System.currentTimeMillis();
-              serverOps.startLlamaServer();
-              serverOps.waitForServerHealth();
-              long elapsed = System.currentTimeMillis() - startupStart;
-              LOG.info("Inference config applied and llama-server restarted in {}ms", elapsed);
-              try {
-                events.onConfigApplyComplete(
-                    Duration.ofNanos(System.nanoTime() - applyStartNanos));
-              } catch (RuntimeException ex) {
-                LOG.warn("Telemetry events.onConfigApplyComplete threw: {}", ex.getMessage());
-              }
-              // Tempdoc 518 fix A: build from runner.view() (new server's /props), not
-              // priorView (stale). Tempdoc 601: record the measured startup duration.
-              InferenceRuntimeView nextView =
-                  runner
-                      .view()
-                      .withPhase(Mode.ONLINE)
-                      .withExternal(serverOps.isUsingExternalRaw())
-                      .withStartupDuration(elapsed);
-              return TransitionOutcome.success(Mode.ONLINE, nextView);
-            } catch (ModeTransitionException e) {
-              return applyConfigRollback(oldConfig, preApplyMode, e, priorView);
-            } catch (Exception e) {
-              ModeTransitionException wrapped =
-                  asModeTransition(
-                      e,
-                      ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
-                      "Failed to apply inference config: ");
-              return applyConfigRollback(oldConfig, preApplyMode, wrapped, priorView);
-            }
-          });
-    }
-  }
-
-  /**
-   * Helper for the apply-restart failure path. Restores prior config, attempts to re-start the
-   * previously-online server if any. Returns a {@link TransitionOutcome.Failure} carrying the
-   * original cause and the rollback view.
-   */
-  private TransitionOutcome applyConfigRollback(
-      InferenceConfig oldConfig,
-      Mode previousMode,
-      ModeTransitionException cause,
-      InferenceRuntimeView priorView) {
-    LOG.error("Failed to apply inference config; attempting rollback", cause);
-    try {
+      Mode priorMode = runner.currentMode();
+      // This is an attempt-local return slot, never a published configuration authority.
+      ApplyExecution[] execution = new ApplyExecution[1];
       try {
-        serverOps.stopLlamaServer();
-      } catch (Exception ignore) {
-        // best-effort stop
+        runner.run(transitionReason, events::onConfigApplyFailure, priorView -> {
+          execution[0] = composeCandidate(candidate, adoptionPolicy, incumbentConfiguration,
+              priorMode, priorView, applyStartNanos);
+          return execution[0].transition();
+        });
+      } catch (ModeTransitionException failure) {
+        if (execution[0] == null) throw failure;
+        return new ConfigApplyResult(execution[0].disposition(), configuredInference(),
+            execution[0].declaredConfigHash(), failure);
       }
-      this.config = oldConfig;
-      serverOps.resetCrashCounters();
-
-      if (previousMode == Mode.ONLINE) {
-        if (oldConfig.gpuLayers() > 0) {
-          gpuCapabilitiesService.invalidateNvidiaSmiCache();
-          Long totalVramBytes = readTotalVramBytes();
-          if (totalVramBytes != null && totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
-            return TransitionOutcome.failureOffline(
-                new InferenceFailure.StartupFailure(
-                    StartupCode.INSUFFICIENT_VRAM,
-                    "Rollback failed (VRAM): "
-                        + formatVramDescription(totalVramBytes)
-                        + " (set GPU layers to 0 for CPU mode)",
-                    cause),
-                priorView);
-          }
-        }
-        // Tempdoc 518 fix A: wipe stale /props before rollback restart.
-        runner.clearProps();
-        serverOps.startLlamaServer();
-        serverOps.waitForServerHealth();
-        // Tempdoc 518 fix A: build from runner.view() (which has the restored server's
-        // /props observation) rather than priorView.
-        InferenceRuntimeView rollbackView =
-            runner.view().withPhase(Mode.ONLINE).withExternal(serverOps.isUsingExternalRaw());
-        // Rollback succeeded but the apply failed — surface the original cause.
-        return TransitionOutcome.failure(
-            TransitionRunner.mapExceptionToFailure(cause), rollbackView);
-      } else {
-        return TransitionOutcome.failure(
-            TransitionRunner.mapExceptionToFailure(cause), priorView);
-      }
-    } catch (Exception rollback) {
-      LOG.error("Rollback failed; entering OFFLINE mode", rollback);
-      return TransitionOutcome.failureOffline(
-          new InferenceFailure.TransitionFailure(
-              TransitionCode.CONFIG_APPLY_FAILED,
-              "Rollback failed: " + safeMessage(rollback),
-              rollback),
-          priorView.withPhase(Mode.OFFLINE));
+      return new ConfigApplyResult(execution[0].disposition(), configuredInference(),
+          execution[0].declaredConfigHash(), null);
     }
   }
+
+  private void recordApplyRefusal(InferenceFailure failure) {
+    runner.recordFailureOutsideTransition(failure);
+    try {
+      events.onConfigApplyFailure(failure);
+    } catch (RuntimeException telemetryFailure) {
+      LOG.warn("Telemetry events.onConfigApplyFailure threw: {}", telemetryFailure.getMessage());
+    }
+  }
+
+  private void emitApplyComplete(long started) {
+    try {
+      events.onConfigApplyComplete(Duration.ofNanos(System.nanoTime() - started));
+    } catch (RuntimeException failure) {
+      LOG.warn("Telemetry events.onConfigApplyComplete threw: {}", failure.getMessage());
+    }
+  }
+
+  private ApplyExecution composeCandidate(
+      LlamaServerConfigContext candidate, LlamaServerOps.AdoptionPolicy policy,
+      ConfiguredInference incumbentConfiguration, Mode priorMode,
+      InferenceRuntimeView priorView, long applyStarted) {
+    var request = new LlamaServerOps.StartRequest(candidate, policy);
+    LlamaServerOps.StartResult incumbent;
+    try {
+      candidate.inference().validate();
+    } catch (Exception invalid) {
+      return failedApply(ConfigApplyDisposition.UNCHANGED,
+          new InferenceFailure.ConfigFailure(ConfigCode.INVALID_CONFIG,
+              "Invalid inference configuration: " + safeMessage(invalid)), priorView);
+    }
+    try {
+      if (request.effectiveGpuLayers() > 0) {
+        gpuCapabilitiesService.invalidateNvidiaSmiCache();
+        Long totalVramBytes = readTotalVramBytes();
+        if (totalVramBytes == null) {
+          LOG.warn("VRAM detection unavailable; proceeding with explicitly requested GPU layers={}",
+              request.effectiveGpuLayers());
+        } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
+          return failedApply(ConfigApplyDisposition.UNCHANGED,
+              new InferenceFailure.StartupFailure(StartupCode.INSUFFICIENT_VRAM,
+                  "Insufficient VRAM for GPU Online Mode: " + formatVramDescription(totalVramBytes)
+                      + " (set GPU layers to 0 for CPU mode)", null), priorView);
+        }
+      }
+      incumbent = serverOps.activeStartResult().orElse(null);
+      if (priorMode == Mode.ONLINE && incumbent == null) {
+        return failedApply(ConfigApplyDisposition.LEFT_OFFLINE,
+            new InferenceFailure.TransitionFailure(TransitionCode.CONFIG_APPLY_FAILED,
+                "Online inference has no captured server ownership", null), priorView);
+      }
+    } catch (RuntimeException preflightFailure) {
+      return failedApply(ConfigApplyDisposition.UNCHANGED,
+          new InferenceFailure.TransitionFailure(TransitionCode.CONFIG_APPLY_FAILED,
+              "Inference preflight failed: " + safeMessage(preflightFailure), preflightFailure), priorView);
+    }
+
+    tokenOps.clearCaches();
+    try {
+      serverOps.stopLlamaServer();
+    } catch (RuntimeException stopFailure) {
+      return failedApply(ConfigApplyDisposition.LEFT_OFFLINE,
+          new InferenceFailure.TransitionFailure(TransitionCode.CONFIG_APPLY_FAILED,
+              "Incumbent server stop failed: " + safeMessage(stopFailure), stopFailure), priorView);
+    }
+    try {
+      serverOps.resetCrashCounters();
+      runner.clearProps();
+      long startupStarted = System.currentTimeMillis();
+      LlamaServerOps.StartResult started = serverOps.startLlamaServer(request);
+      serverOps.waitForServerHealth(started);
+      verifyAppliedServer(request, started);
+      configured = new ConfiguredInference(candidate.inference(), candidate.resolved(), policy);
+      emitApplyComplete(applyStarted);
+      InferenceRuntimeView next = runner.view().withPhase(Mode.ONLINE)
+          .withExternal(serverOps.isUsingExternalRaw())
+          .withStartupDuration(System.currentTimeMillis() - startupStarted);
+      return new ApplyExecution(ConfigApplyDisposition.APPLIED, started.declaredConfigHash(),
+          TransitionOutcome.success(Mode.ONLINE, next));
+    } catch (Exception candidateFailure) {
+      return restoreIncumbent(incumbent, incumbentConfiguration, priorMode, priorView,
+          policy, candidateFailure);
+    }
+  }
+
+  private void verifyAppliedServer(
+      LlamaServerOps.StartRequest request, LlamaServerOps.StartResult started) {
+    if (started == null || !request.context().equals(started.context())
+        || request.adoptionPolicy() != started.adoptionPolicy()
+        || serverOps.activeStartResult().orElse(null) != started) {
+      throw new IllegalStateException("Server ownership changed during configuration apply");
+    }
+    if (started.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) {
+      if (request.adoptionPolicy() != LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL) {
+        throw new IllegalStateException("Managed configuration witness is required");
+      }
+      return;
+    }
+    String expected = ManagedLlamaConfigIdentity.declaredHash(request.context().inference(),
+        request.context().resolved(), request.effectiveGpuLayers());
+    if (!expected.equals(started.declaredConfigHash())) {
+      throw new IllegalStateException("Managed server configuration witness does not match candidate");
+    }
+  }
+
+  private ApplyExecution restoreIncumbent(
+      LlamaServerOps.StartResult incumbent, ConfiguredInference incumbentConfiguration,
+      Mode priorMode, InferenceRuntimeView priorView, LlamaServerOps.AdoptionPolicy policy,
+      Exception candidateFailure) {
+    ModeTransitionException candidate = asModeTransition(candidateFailure,
+        ModeTransitionException.Reason.CONFIG_APPLY_FAILED, "Failed to apply inference config: ");
+    configured = incumbentConfiguration;
+    try {
+      serverOps.stopLlamaServer();
+      if (priorMode != Mode.ONLINE) {
+        return failedApply(ConfigApplyDisposition.LEFT_OFFLINE,
+            TransitionRunner.mapExceptionToFailure(candidate), priorView);
+      }
+      var restore = new LlamaServerOps.StartRequest(incumbent.context(), policy);
+      serverOps.resetCrashCounters();
+      runner.clearProps();
+      var restored = serverOps.startLlamaServer(restore);
+      serverOps.waitForServerHealth(restored);
+      verifyAppliedServer(restore, restored);
+      configured = new ConfiguredInference(
+          incumbent.context().inference(), incumbent.context().resolved(), policy);
+      return new ApplyExecution(ConfigApplyDisposition.ROLLED_BACK_TO_A,
+          restored.declaredConfigHash(), TransitionOutcome.failure(
+              TransitionRunner.mapExceptionToFailure(candidate),
+              runner.view().withPhase(Mode.ONLINE).withExternal(serverOps.isUsingExternalRaw())));
+    } catch (Exception rollbackFailure) {
+      var combined = new IllegalStateException("Rollback failed: " + safeMessage(rollbackFailure),
+          rollbackFailure);
+      combined.addSuppressed(candidate);
+      return failedApply(ConfigApplyDisposition.LEFT_OFFLINE,
+          new InferenceFailure.TransitionFailure(TransitionCode.CONFIG_APPLY_FAILED,
+              combined.getMessage(), combined), priorView);
+    }
+  }
+
+  private static ApplyExecution failedApply(
+      ConfigApplyDisposition disposition, InferenceFailure failure, InferenceRuntimeView view) {
+    return new ApplyExecution(disposition, null,
+        disposition == ConfigApplyDisposition.LEFT_OFFLINE
+            ? TransitionOutcome.failureOffline(failure, view)
+            : TransitionOutcome.failure(failure, view));
+  }
+
 
   // ==================== Detach External ====================
 
@@ -922,11 +1021,14 @@ public class InferenceLifecycleManager
             "Inference runtime is transitioning; try again shortly");
       }
       if (!(serverOps.isExternalServerActive() && runner.currentMode() == Mode.ONLINE)) {
-        int port = config.serverPort();
+        int port = configuredInference().serverPort();
         return new DetachExternalServerResult(false, port, port);
       }
 
-      final InferenceConfig oldConfig = this.config;
+      final LlamaServerOps.StartResult incumbent = serverOps.activeStartResult().orElseThrow(
+          () -> new IllegalStateException("External server has no captured ownership"));
+      final ConfiguredInference previousConfiguration = configured;
+      final InferenceConfig oldConfig = incumbent.context().inference();
       final int previousPort = oldConfig.serverPort();
       final int newPort;
       try {
@@ -945,7 +1047,6 @@ public class InferenceLifecycleManager
           priorView -> {
             tokenOps.clearCaches();
             try {
-              serverOps.stopPeriodicHealthCheck();
               InferenceConfig next =
                   new InferenceConfig(
                       oldConfig.serverExecutable(),
@@ -960,8 +1061,7 @@ public class InferenceLifecycleManager
                       oldConfig.chatProfileId());
               next.validate();
 
-              serverOps.setUsingExternal(false);
-              InferenceLifecycleManager.this.config = next;
+              serverOps.stopLlamaServer();
               serverOps.resetCrashCounters();
               tokenOps.clearCaches();
 
@@ -969,8 +1069,14 @@ public class InferenceLifecycleManager
               // the new managed server. The managed server's /props observation (if it
               // fires) repopulates via runner.mergeProps.
               runner.clearProps();
-              serverOps.startLlamaServer();
-              serverOps.waitForServerHealth();
+              var request = new LlamaServerOps.StartRequest(
+                  new LlamaServerConfigContext(next, incumbent.context().resolved()),
+                  LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+              var started = serverOps.startLlamaServer(request);
+              serverOps.waitForServerHealth(started);
+              verifyAppliedServer(request, started);
+              configured = new ConfiguredInference(next, incumbent.context().resolved(),
+                  LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
 
               LOG.info(
                   "Detached from external llama-server on port {} and started managed on port {}",
@@ -987,20 +1093,8 @@ public class InferenceLifecycleManager
                   "Detach failed; reverting to external llama-server on port {} (best-effort)",
                   previousPort,
                   e);
-              try {
-                serverOps.stopLlamaServer();
-              } catch (Exception stopEx) {
-                LOG.debug("stop during detach rollback: {}", stopEx.getMessage(), stopEx);
-              }
-              InferenceLifecycleManager.this.config = oldConfig;
-              serverOps.setUsingExternal(true);
-              serverOps.schedulePeriodicHealthCheck();
-              return TransitionOutcome.failure(
-                  new InferenceFailure.TransitionFailure(
-                      TransitionCode.ONLINE_START_FAILED,
-                      "Failed to detach external llama-server: " + safeMessage(e),
-                      e),
-                  priorView.withExternal(true));
+              return restoreIncumbent(incumbent, previousConfiguration, Mode.ONLINE,
+                  priorView, incumbent.adoptionPolicy(), e).transition();
             }
           });
       return new DetachExternalServerResult(succeeded[0], previousPort, newPort);
@@ -1193,9 +1287,9 @@ public class InferenceLifecycleManager
     return runner.view().lastKnownContextTokens();
   }
 
-  /** Returns the configured llama-server context size (-c), even if actual differs. */
+  /** Returns the active launch context size (-c), or the retained configuration while stopped. */
   public int configuredContextTokens() {
-    return config.contextSize();
+    return servingInference().contextSize();
   }
 
   /** Returns the best-effort model ID observed from {@code /props} or config, or {@code null}. */
@@ -1300,7 +1394,9 @@ public class InferenceLifecycleManager
 
   @SuppressWarnings("unused") // Called from InferenceLifecycleManagerExternalServerTest
   void startLlamaServer() throws IOException, ModeTransitionException {
-    serverOps.startLlamaServer();
+    synchronized (runner.lock()) {
+      serverOps.startLlamaServer(configuredStartRequest());
+    }
   }
 
   @SuppressWarnings("unused") // Called from InferenceLifecycleManagerExternalServerTest
@@ -1379,12 +1475,13 @@ public class InferenceLifecycleManager
    * ID. Performs cross-restart model-swap detection against persisted state and merges the
    * observed model id into the view atom.
    */
-  private void onModelIdUpdatedInternal(String modelId) {
+  private void onModelIdUpdatedInternal(String modelId, LlamaServerConfigContext context) {
     if (modelId == null || modelId.isBlank()) {
       return;
     }
     runner.mergeProps(modelId, null);
-    String persisted = loadPersistedModelId();
+    Path statePath = context.resolved().paths().dataDir().resolve(MODEL_STATE_FILE);
+    String persisted = loadPersistedModelId(statePath);
     if (persisted != null && !persisted.equals(modelId)) {
       LOG.warn(
           "Model swap detected: persisted='{}', current='{}'. "
@@ -1392,21 +1489,11 @@ public class InferenceLifecycleManager
           persisted,
           modelId);
     }
-    persistModelId(modelId);
+    persistModelId(modelId, statePath);
   }
 
-  private Path resolveModelStatePath() {
-    ConfigStore cs = ConfigStore.globalOrNull();
-    Path dataDir = cs != null ? cs.get().paths().dataDir() : null;
-    if (dataDir != null) {
-      return dataDir.resolve(MODEL_STATE_FILE);
-    }
-    return Path.of(System.getProperty("user.dir")).resolve(MODEL_STATE_FILE);
-  }
-
-  private String loadPersistedModelId() {
+  private String loadPersistedModelId(Path statePath) {
     try {
-      Path statePath = resolveModelStatePath();
       if (Files.exists(statePath)) {
         String content = Files.readString(statePath).trim();
         return content.isBlank() ? null : content;
@@ -1417,9 +1504,8 @@ public class InferenceLifecycleManager
     return null;
   }
 
-  private void persistModelId(String modelId) {
+  private void persistModelId(String modelId, Path statePath) {
     try {
-      Path statePath = resolveModelStatePath();
       Files.createDirectories(statePath.getParent());
       Files.writeString(statePath, modelId);
     } catch (IOException e) {

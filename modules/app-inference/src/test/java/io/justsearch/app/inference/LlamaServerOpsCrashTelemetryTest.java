@@ -89,7 +89,7 @@ final class LlamaServerOpsCrashTelemetryTest {
 
   @Test
   @DisplayName("Brain give-up: reaching MAX_CRASHES fires goOfflineFromMaxCrashes (terminal OFFLINE)")
-  void maxCrashes_triggersTerminalGiveUp() {
+  void maxCrashes_triggersTerminalGiveUp() throws Exception {
     RecordingEvents events = new RecordingEvents();
     AtomicInteger giveUps = new AtomicInteger(0);
     LlamaServerOps ops =
@@ -102,6 +102,11 @@ final class LlamaServerOpsCrashTelemetryTest {
     int cap = BrainSupervisionPolicy.defaults().maxCrashes();
     for (int i = 0; i < cap; i++) {
       ops.handleServerCrash();
+    }
+
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+    while (giveUps.get() == 0 && System.nanoTime() < deadline) {
+      Thread.sleep(10);
     }
 
     assertTrue(
@@ -131,7 +136,7 @@ final class LlamaServerOpsCrashTelemetryTest {
     PropsObserver propsObserver =
         new PropsObserver() {
           @Override
-          public void onModelIdObserved(String modelId) {
+          public void onModelIdObserved(String modelId, LlamaServerConfigContext context) {
             modelIdRef.set(modelId);
           }
 
@@ -154,12 +159,12 @@ final class LlamaServerOpsCrashTelemetryTest {
         new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
             HttpClient.newHttpClient(),
             new ObjectMapper(),
-            () -> null, // config supplier — not exercised in handleServerCrash path
             null, // gpuCapabilitiesService — not exercised in handleServerCrash path
             currentMode,
             propsObserver,
-            goOfflineFromMaxCrashes,
-            reason -> {}, // goOfflineFromExternalFailure
+            ignored -> {},
+            ignored -> goOfflineFromMaxCrashes.run(),
+            (reason, guard) -> {}, // goOfflineFromExternalFailure
             events);
     // Preserve the original 'usingExternal' supplier semantics for the legacy test contract:
     // the LlamaServerOps now owns the flag internally; mirror the supplier into it.

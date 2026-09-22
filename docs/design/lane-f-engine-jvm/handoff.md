@@ -15,16 +15,46 @@ in9m18s,11530 cases/zero failures/31skips,1803suites,34tasks (27reused), evidenc
 captured under tmp/2433-generative-integrated*. Installed standard2434 all4READY,
 runtime0.4.0 smoke and realmodelquery exact/intersection/context100% pass; official
 stop confirms portsClosed:true. No build or stack active. Hosted35671548458 passed all jobs.
-Next free run2436 (2435 is read-only apply-drain design).
-Candidate-context implementation now follows evidence/D1/candidate-context-plan-2026-09-22.md.
-Server worker owns LlamaServerConfigContext/LlamaServerOps/ServerPropsOps and existing
-server tests; root owns manager/result integration. Do not edit overlapping files.
-Current WIP is unverified: manager ConfiguredInference holds scalar/resolved/policy
-atomically, typed apply results distinguish configured/active/rollback/offline,
-BootstrapInferenceFactory passes its captured resolved snapshot, VDU retains the
-whole procedure snapshot. Server worker migrates helpers/callbacks to logical and
-physical owner contexts. Manager test worker owns only InferenceLifecycleManagerApplyConfigTest.
-No Gradle run until source freeze. Reviewer is refuting manager WIP independently.
+Latest local docs commit is `1d89a465f`; candidate-context code remains uncommitted.
+Next free run2461; integrated2460 is running (root exec session80877), all Java frozen.
+Root owns every edited file. Candidate-context implementation follows
+ evidence/D1/candidate-context-plan-2026-09-22.md. The independent reviewer is
+clear on source and new test proof after2459; worker source has been integrated.
+
+Candidate context captures inference/resolved configuration plus adoption policy,
+separates logical start identity from physical process identity, publishes candidates
+only after health, and restores actual serving A on rollback. Manager transition
+locking serializes physical lifecycle changes; the short server ownership monitor
+fences health/props publication. Existing small props model-ID persistence stays
+serialized there by explicit design exception. Monitoring starts only after health;
+healthy recovery resets its crash budget before exposing monitors. Failed attempts
+retire dead child rows while retaining the logical recovery token. Uncancelled clean
+exits recover; terminal failure performs strict cleanup and reports OFFLINE even if
+the child refuses termination. No executor was added. Vision capability now uses
+serving configuration, so APPLY_ONLY cannot falsely advertise desired model features.
+
+Focused/static2459 passes359 tests, zero failures/errors/skips,33 suites,33s. Complete
+XML/counts/source inventory and log are tmp/2459-candidate-focused*. This includes
+real-child context/rule retries, captured B launch-log/runtime PATH/build marker
+under global C, detach cleanup refusal and both causes, add/remove vision capability,
+and a real child surviving manager A close then strict same-hash manager B adoption
+before final cleanup. All static checks pass; existing compiler advisories remain.
+
+Negative controls2451–2455 each produced the intended single failure for owner guard,
+post-close mode, transition lock, crash budget and clean-exit recovery; exact source
+bytes were restored and root re-read saved XML.2457 proved both vision directions
+fail against the former desired-config read before the one-line correction.
+Earlier2448/2449 failures were invalid recovery fixtures (thread-local constructor
+mock and missing GPU collaborator);2450 corrected them.2456 was a matcher compile
+failure, not behavioral evidence. See the candidate plan for commands and limitations.
+
+Remaining proof: integrated/stress2460,
+installed standard-model query and hosted CI for this candidate-context revision.
+The nine-row acceptance map is in the candidate plan; no D1-4 integration is claimed.
+The earlier installed2434/hosted evidence applies only to215af7809. Do not reuse it
+as proof of this WIP. The apply-drain proposal remains refuted for shared-freeze
+release and durable-work survival; no teardown implementation has begun. Typed
+API-port design is preserved in evidence/D1/api-port-design-2026-09-22.md.
 
 Previous `23cc8929a` (coherent applied revision),
 CI35669241131 completed successfully, including system integration and Windows-native.
@@ -122,10 +152,9 @@ Do not connect suppliers while retaining those double reads.
    generative ABSENT with the other three READY. Installed2424 standard-model
    proves all four READY, runtime contract0.4.0 smoke and real-model query
    exact/intersection/context100%,zero errors. Both official stops confirm
-   portsClosed:true. No build or stack is running. Next free run2425.
-   Read-only discovery is active for D1-4 settings commit ownership and D1-5
-   generative apply/rollback; reconcile current full-witness C2 authority and
-   actual patch domain before implementing the dated design's narrower seam.
+   portsClosed:true. Current run numbering and proof are in Current state above.
+   D1-4 ownership decisions are in evidence/D1/reconfigure-owner-decisions-2026-09-22.md;
+   full-witness C2 authority and the typed patch domain remain binding.
    Root has moved candidate VRAM preflight before incumbent destruction in
    InferenceLifecycleManager; focused tests and explicit OFFLINE failure-restoration
    work are implemented.2430 full inference module/static passes330 fresh cases;
@@ -133,9 +162,10 @@ Do not connect suppliers while retaining those double reads.
    telemetry and cache-preservation tests fail under their intended mutations.
    Exact source bytes restored. Independent review clear after duplicate telemetry
    correction. See generative-preflight-plan-2026-09-22.md and
-   reconfigure-owner-decisions-2026-09-22.md in evidence/D1. Next integrated run2433.
-   Candidate context design continues in tmp/2429-candidate-context-design.md;
-   full candidate publication/typed result/strict stop/adoption proof remains due.
+   reconfigure-owner-decisions-2026-09-22.md in evidence/D1. Integrated2433 and
+   installed2434 passed for that checkpoint. Candidate-context implementation and
+   its still-open proof follow evidence/D1/candidate-context-plan-2026-09-22.md;
+   do not use its superseded private design draft as the continuation authority.
    Continue dependency/value projections and D1 dispatch. All D1/D2/E/F acceptance
    remains binding, including the14 identity gaps.
 4. Preserve compiling checkpoints/push authorization to PR727 and inspect hosted
@@ -147,12 +177,10 @@ ACK. COMPLETE_WITH_GAPS/accept-gaps/live activation requires explicit design/pro
 
 ## Active ownership
 
-- Root: shared-owner integration, all builds, stack, evidence and scoped publication.
-- Root: integrated verification, live proof, staged/source ownership and next register.
-- `bulk_engine_restart_proof`: QU/filter source-frozen; no builds.
-- `d1_encoder_projection`: generative preflight/failed-restoration tests source-frozen.
-- `query_http_composition`: runner failure target frozen; candidate-context design read-only.
-- `d1_owner_review`: D1-4 discovery frozen; bounded D1-5 corrected review clear.
+- Root: all production integration, manager tests, docs, builds, stack, evidence and scoped publication.
+- `d1_encoder_projection`: stopped; root integrated its preserved-child test.
+- `query_http_composition`: source frozen; root owns its integrated candidate-context tests.
+- `d1_owner_review`: independent read-only contract and proof review.
 
 ## Evidence and owner map
 
