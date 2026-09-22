@@ -249,6 +249,21 @@ Settled empirical facts. Each was an open question that got answered.
 - **Evidence:** lane-F C1 `gpu-scheduling-connect.md` records clean standard-run207, the disabled
   broadcast log, unit215 and the connect-seed adverse mutation217. Restored live proof remains open.
 
+### F-019: refused generative configuration must preserve the incumbent; failed restoration must report OFFLINE
+
+- **Finding (2026-09-22):** apply previously stopped the incumbent and assigned the candidate
+  before checking VRAM. Separately, TransitionRunner overwrote a failed rollback's OFFLINE
+  view with the previous ONLINE mode.
+- **Correction:** candidate VRAM preflight precedes cache clearing and server mutation.
+  Explicit OFFLINE failure restoration completes the existing mode machine in OFFLINE;
+  ordinary failures still restore the previous mode. The runner owns the failure event
+  inside its transition envelope, avoiding a second manager emission.
+- **Evidence:** `InferenceLifecycleManagerApplyConfigTest` and `TransitionRunnerTest` exercise
+  the actual manager/runner with controlled GPU and server failures. Lane-F D1 evidence
+  records focused/module checks and negative controls for both original defects.
+- **Scope:** candidate publication after health and the full result-bearing compose protocol
+  remain D1-5 work; this correction does not establish atomic multi-component reconfigure.
+
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.

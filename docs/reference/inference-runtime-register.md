@@ -3,7 +3,7 @@ title: Inference Runtime Register
 type: reference
 status: stable
 created: 2026-03-19
-updated: 2026-04-24
+updated: 2026-09-22
 description: "Shared decision register for GPU, ORT, VRAM, and inference runtime. Read before starting inference work. Update before finishing."
 ---
 
@@ -235,6 +235,21 @@ Settled empirical facts. Each was an open question that got answered.
   indexing continues and query encoding uses CPU. Throughput proof must distinguish these arms.
 - **Evidence:** lane-F C1 `gpu-scheduling-connect.md` records clean standard-run207, the disabled
   broadcast log, unit215 and the connect-seed adverse mutation217. Restored live proof remains open.
+
+### F-019: refused generative configuration must preserve the incumbent; failed restoration must report OFFLINE
+
+- **Finding (2026-09-22):** apply previously stopped the incumbent and assigned the candidate
+  before checking VRAM. Separately, TransitionRunner overwrote a failed rollback's OFFLINE
+  view with the previous ONLINE mode.
+- **Correction:** candidate VRAM preflight precedes cache clearing and server mutation.
+  Explicit OFFLINE failure restoration completes the existing mode machine in OFFLINE;
+  ordinary failures still restore the previous mode. The runner owns the failure event
+  inside its transition envelope, avoiding a second manager emission.
+- **Evidence:** `InferenceLifecycleManagerApplyConfigTest` and `TransitionRunnerTest` exercise
+  the actual manager/runner with controlled GPU and server failures. Lane-F D1 evidence
+  records focused/module checks and negative controls for both original defects.
+- **Scope:** candidate publication after health and the full result-bearing compose protocol
+  remain D1-5 work; this correction does not establish atomic multi-component reconfigure.
 
 ## Decisions
 

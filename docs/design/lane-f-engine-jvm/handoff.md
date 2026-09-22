@@ -10,7 +10,9 @@ Continue after status answers, commits and reviews. C2 is accepted; D1/D2/E/F
 remain open. Root owns all Gradle runs, stack lifecycle and integration.
 
 Latest committed/pushed checkpoint: `23cc8929a` (coherent applied revision),
-CI35669241131 pending/running. Previous4bec3f00b implements the complete apply register;
+CI35669241131 completed successfully, including system integration and Windows-native.
+Documentation checkpoint53a64edb6 records integrated/installed proof locally.
+Previous4bec3f00b implements the complete apply register;
 921053650 connects captured live query feature controls. `51b01365d` declares schema2 wire3.0.0 migration;
 its Public claims and Windows-native passed, integration was cancelled by successor.
 `c948cf85f` registered the generated status consumer;
@@ -107,6 +109,16 @@ Do not connect suppliers while retaining those double reads.
    Read-only discovery is active for D1-4 settings commit ownership and D1-5
    generative apply/rollback; reconcile current full-witness C2 authority and
    actual patch domain before implementing the dated design's narrower seam.
+   Root has moved candidate VRAM preflight before incumbent destruction in
+   InferenceLifecycleManager; focused tests and explicit OFFLINE failure-restoration
+   work are implemented.2430 full inference module/static passes330 fresh cases;
+   2426/2427/2431/2432 prove stop-order, OFFLINE restoration, exactly-once failure
+   telemetry and cache-preservation tests fail under their intended mutations.
+   Exact source bytes restored. Independent review clear after duplicate telemetry
+   correction. See generative-preflight-plan-2026-09-22.md and
+   reconfigure-owner-decisions-2026-09-22.md in evidence/D1. Next integrated run2433.
+   Candidate context design continues in tmp/2429-candidate-context-design.md;
+   full candidate publication/typed result/strict stop/adoption proof remains due.
    Continue dependency/value projections and D1 dispatch. All D1/D2/E/F acceptance
    remains binding, including the14 identity gaps.
 4. Preserve compiling checkpoints/push authorization to PR727 and inspect hosted
@@ -121,9 +133,9 @@ ACK. COMPLETE_WITH_GAPS/accept-gaps/live activation requires explicit design/pro
 - Root: shared-owner integration, all builds, stack, evidence and scoped publication.
 - Root: integrated verification, live proof, staged/source ownership and next register.
 - `bulk_engine_restart_proof`: QU/filter source-frozen; no builds.
-- `d1_encoder_projection`: lower observation and generative absence tests source-frozen.
-- `query_http_composition`: app-engine revision/fence tests source-frozen.
-- `d1_owner_review`: read-only D1-4 commit/publication owner discovery while D1-3 verifies.
+- `d1_encoder_projection`: generative preflight/failed-restoration tests source-frozen.
+- `query_http_composition`: runner failure target frozen; candidate-context design read-only.
+- `d1_owner_review`: D1-4 discovery frozen; bounded D1-5 corrected review clear.
 
 ## Evidence and owner map
 

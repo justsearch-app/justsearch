@@ -160,6 +160,95 @@ final class TransitionRunnerTest {
   }
 
   @Test
+  @DisplayName("ordinary failure from ONLINE restores ONLINE")
+  void ordinaryFailureFromOnlineRestoresOnline() throws Exception {
+    RecordingListener listener = new RecordingListener();
+    runner.addListener(listener);
+    runner.run(
+        TransitionReason.USER_SWITCH,
+        null,
+        view -> TransitionOutcome.success(Mode.ONLINE, view.withPhase(Mode.ONLINE)));
+    listener.calls.clear();
+    events.transitions.clear();
+
+    InferenceFailure failure =
+        new InferenceFailure.ConfigFailure(ConfigCode.INVALID_CONFIG, "invalid candidate");
+
+    assertThrows(
+        ModeTransitionException.class,
+        () ->
+            runner.run(
+                TransitionReason.CONFIG_APPLY,
+                null,
+                view -> TransitionOutcome.failure(failure, view)));
+
+    assertEquals(Mode.ONLINE, runner.currentMode());
+    assertEquals(Mode.ONLINE, runner.view().phase());
+    assertSame(failure, runner.view().lastFailure());
+    assertEquals(2, listener.calls.size());
+    assertEquals(Mode.ONLINE, listener.calls.get(0)[0]);
+    assertEquals(Mode.TRANSITIONING, listener.calls.get(0)[1]);
+    assertEquals(Mode.TRANSITIONING, listener.calls.get(1)[0]);
+    assertEquals(Mode.ONLINE, listener.calls.get(1)[1]);
+    assertEquals(1, events.transitions.size());
+    assertEquals("ONLINE", events.transitions.get(0).from);
+    assertEquals("ONLINE", events.transitions.get(0).to);
+  }
+
+  @Test
+  @DisplayName("explicit offline failure from ONLINE completes OFFLINE exactly once")
+  void explicitOfflineFailureFromOnlineCompletesOffline() throws Exception {
+    RecordingListener listener = new RecordingListener();
+    runner.addListener(listener);
+    runner.run(
+        TransitionReason.USER_SWITCH,
+        null,
+        view -> TransitionOutcome.success(Mode.ONLINE, view.withPhase(Mode.ONLINE)));
+    long generationBefore = runner.generation();
+    listener.calls.clear();
+    events.transitions.clear();
+
+    InferenceFailure failure =
+        new InferenceFailure.TransitionFailure(
+            TransitionCode.CONFIG_APPLY_FAILED, "rollback failed", null);
+
+    ModeTransitionException thrown =
+        assertThrows(
+            ModeTransitionException.class,
+            () ->
+                runner.run(
+                    TransitionReason.CONFIG_APPLY,
+                    null,
+                    view -> TransitionOutcome.failureOffline(failure, view)));
+
+    assertEquals(ModeTransitionException.Reason.CONFIG_APPLY_FAILED, thrown.reason());
+    assertEquals(Mode.OFFLINE, runner.currentMode());
+    assertEquals(Mode.OFFLINE, runner.view().phase());
+    assertSame(failure, runner.view().lastFailure());
+    assertEquals(generationBefore + 1, runner.generation());
+    assertEquals(2, listener.calls.size());
+    assertEquals(Mode.ONLINE, listener.calls.get(0)[0]);
+    assertEquals(Mode.TRANSITIONING, listener.calls.get(0)[1]);
+    assertEquals(Mode.TRANSITIONING, listener.calls.get(1)[0]);
+    assertEquals(Mode.OFFLINE, listener.calls.get(1)[1]);
+    assertEquals(1, events.transitions.size());
+    assertEquals("ONLINE", events.transitions.get(0).from);
+    assertEquals("OFFLINE", events.transitions.get(0).to);
+    assertEquals(TransitionReason.CONFIG_APPLY, events.transitions.get(0).reason);
+  }
+
+  @Test
+  @DisplayName("failure restoration must be non-null")
+  void failureRestorationMustBeNonNull() {
+    InferenceFailure failure =
+        new InferenceFailure.ConfigFailure(ConfigCode.INVALID_CONFIG, "invalid candidate");
+
+    assertThrows(
+        NullPointerException.class,
+        () -> new TransitionOutcome.Failure(failure, runner.view(), null));
+  }
+
+  @Test
   @DisplayName("thrown ModeTransitionException from body: runner maps to typed failure, sink invoked, re-throws")
   void thrownExceptionFromBodyIsMapped() {
     AtomicReference<InferenceFailure> sinkCapture = new AtomicReference<>();

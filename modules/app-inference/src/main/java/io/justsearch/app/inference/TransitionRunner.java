@@ -391,7 +391,14 @@ final class TransitionRunner {
             return success.target();
           }
           case TransitionOutcome.Failure failure -> {
-            Mode restored = modeState.rollback();
+            Mode restored =
+                switch (failure.restoration()) {
+                  case PREVIOUS -> modeState.rollback();
+                  case OFFLINE -> {
+                    modeState.complete(Mode.OFFLINE);
+                    yield Mode.OFFLINE;
+                  }
+                };
             installFailureView(failure.rollbackView(), restored, failure.failure());
             notifyListeners(Mode.TRANSITIONING, restored, reason);
             emitFailureSink(failureSink, failure.failure());

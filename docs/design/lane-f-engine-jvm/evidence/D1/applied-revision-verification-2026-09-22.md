@@ -82,6 +82,11 @@ uses API50685; official stop confirms portsClosed:true. Evidence:
 
 ## Remaining scope
 
+Hosted CI35669241131 at23cc8929a completed successfully, including system
+integration, Windows-native, app-ui, platform-contracts, search-worker, public
+claims, build, Rust, Python, license and secret checks. This is hosted evidence
+for that revision, not for subsequent D1-5 edits.
+
 These checks establish the implemented applied-revision boundary, not later-stage acceptance.
 D1-4 dispatch/atomic publishing, D1-12's fourteen fingerprint/model-binding gaps,
 and all remaining D1/D2/E/F work remain required.

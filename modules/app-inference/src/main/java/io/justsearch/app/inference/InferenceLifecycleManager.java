@@ -764,96 +764,88 @@ public class InferenceLifecycleManager
       // Restart path goes through the envelope.
       final Mode preApplyMode = runner.currentMode();
 
-      try {
-        runner.run(
-            transitionReason,
-            events::onConfigApplyFailure,
-            priorView -> {
-              try {
-                newConfig.validate();
-              } catch (Exception e) {
+      runner.run(
+          transitionReason,
+          events::onConfigApplyFailure,
+          priorView -> {
+            try {
+              newConfig.validate();
+            } catch (Exception e) {
+              return TransitionOutcome.failure(
+                  new InferenceFailure.ConfigFailure(
+                      ConfigCode.INVALID_CONFIG,
+                      "Invalid inference configuration: " + safeMessage(e)),
+                  priorView);
+            }
+
+            if (newConfig.gpuLayers() > 0) {
+              gpuCapabilitiesService.invalidateNvidiaSmiCache();
+              Long totalVramBytes = readTotalVramBytes();
+              if (totalVramBytes == null) {
+                LOG.warn(
+                    "VRAM detection unavailable (NVML and nvidia-smi both returned no value). "
+                        + "Proceeding with GPU Online Mode because gpuLayers={} was explicitly requested.",
+                    newConfig.gpuLayers());
+              } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
                 return TransitionOutcome.failure(
-                    new InferenceFailure.ConfigFailure(
-                        ConfigCode.INVALID_CONFIG,
-                        "Invalid inference configuration: " + safeMessage(e)),
+                    new InferenceFailure.StartupFailure(
+                        StartupCode.INSUFFICIENT_VRAM,
+                        "Insufficient VRAM for GPU Online Mode: "
+                            + formatVramDescription(totalVramBytes)
+                            + " (set GPU layers to 0 for CPU mode)",
+                        null),
                     priorView);
               }
+            }
 
-              tokenOps.clearCaches();
+            // Candidate preflight must leave the incumbent untouched on refusal.
+            tokenOps.clearCaches();
+            try {
+              serverOps.stopLlamaServer();
+            } catch (Exception ignore) {
+              // best-effort stop; continue to apply.
+            }
+
+            InferenceLifecycleManager.this.config = newConfig;
+            serverOps.resetCrashCounters();
+
+            try {
+              // Tempdoc 518 fix A: wipe stale /props from prior server before restart.
+              runner.clearProps();
+              // Tempdoc 601: time the startup window (as switchToOnlineMode does) so
+              // lastStartupDurationMs is surfaced after the activate + reload paths, which
+              // reach Online via applyConfig — not switchToOnlineMode.
+              long startupStart = System.currentTimeMillis();
+              serverOps.startLlamaServer();
+              serverOps.waitForServerHealth();
+              long elapsed = System.currentTimeMillis() - startupStart;
+              LOG.info("Inference config applied and llama-server restarted in {}ms", elapsed);
               try {
-                serverOps.stopLlamaServer();
-              } catch (Exception ignore) {
-                // best-effort stop; continue to apply.
+                events.onConfigApplyComplete(
+                    Duration.ofNanos(System.nanoTime() - applyStartNanos));
+              } catch (RuntimeException ex) {
+                LOG.warn("Telemetry events.onConfigApplyComplete threw: {}", ex.getMessage());
               }
-
-              InferenceLifecycleManager.this.config = newConfig;
-              serverOps.resetCrashCounters();
-
-              if (newConfig.gpuLayers() > 0) {
-                gpuCapabilitiesService.invalidateNvidiaSmiCache();
-                Long totalVramBytes = readTotalVramBytes();
-                if (totalVramBytes == null) {
-                  LOG.warn(
-                      "VRAM detection unavailable (NVML and nvidia-smi both returned no value). "
-                          + "Proceeding with GPU Online Mode because gpuLayers={} was explicitly requested.",
-                      newConfig.gpuLayers());
-                } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
-                  return TransitionOutcome.failure(
-                      new InferenceFailure.StartupFailure(
-                          StartupCode.INSUFFICIENT_VRAM,
-                          "Insufficient VRAM for GPU Online Mode: "
-                              + formatVramDescription(totalVramBytes)
-                              + " (set GPU layers to 0 for CPU mode)",
-                          null),
-                      priorView);
-                }
-              }
-
-              try {
-                // Tempdoc 518 fix A: wipe stale /props from prior server before restart.
-                runner.clearProps();
-                // Tempdoc 601: time the startup window (as switchToOnlineMode does) so
-                // lastStartupDurationMs is surfaced after the activate + reload paths, which
-                // reach Online via applyConfig — not switchToOnlineMode.
-                long startupStart = System.currentTimeMillis();
-                serverOps.startLlamaServer();
-                serverOps.waitForServerHealth();
-                long elapsed = System.currentTimeMillis() - startupStart;
-                LOG.info("Inference config applied and llama-server restarted in {}ms", elapsed);
-                try {
-                  events.onConfigApplyComplete(
-                      Duration.ofNanos(System.nanoTime() - applyStartNanos));
-                } catch (RuntimeException ex) {
-                  LOG.warn("Telemetry events.onConfigApplyComplete threw: {}", ex.getMessage());
-                }
-                // Tempdoc 518 fix A: build from runner.view() (new server's /props), not
-                // priorView (stale). Tempdoc 601: record the measured startup duration.
-                InferenceRuntimeView nextView =
-                    runner
-                        .view()
-                        .withPhase(Mode.ONLINE)
-                        .withExternal(serverOps.isUsingExternalRaw())
-                        .withStartupDuration(elapsed);
-                return TransitionOutcome.success(Mode.ONLINE, nextView);
-              } catch (ModeTransitionException e) {
-                return applyConfigRollback(oldConfig, preApplyMode, e, priorView);
-              } catch (Exception e) {
-                ModeTransitionException wrapped =
-                    asModeTransition(
-                        e,
-                        ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
-                        "Failed to apply inference config: ");
-                return applyConfigRollback(oldConfig, preApplyMode, wrapped, priorView);
-              }
-            });
-      } catch (ModeTransitionException mte) {
-        try {
-          events.onConfigApplyFailure(TransitionRunner.mapExceptionToFailure(mte));
-        } catch (RuntimeException ex) {
-          LOG.warn("Telemetry events.onConfigApplyFailure threw: {}", ex.getMessage());
-        }
-        throw mte;
-      }
+              // Tempdoc 518 fix A: build from runner.view() (new server's /props), not
+              // priorView (stale). Tempdoc 601: record the measured startup duration.
+              InferenceRuntimeView nextView =
+                  runner
+                      .view()
+                      .withPhase(Mode.ONLINE)
+                      .withExternal(serverOps.isUsingExternalRaw())
+                      .withStartupDuration(elapsed);
+              return TransitionOutcome.success(Mode.ONLINE, nextView);
+            } catch (ModeTransitionException e) {
+              return applyConfigRollback(oldConfig, preApplyMode, e, priorView);
+            } catch (Exception e) {
+              ModeTransitionException wrapped =
+                  asModeTransition(
+                      e,
+                      ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+                      "Failed to apply inference config: ");
+              return applyConfigRollback(oldConfig, preApplyMode, wrapped, priorView);
+            }
+          });
     }
   }
 
@@ -882,7 +874,7 @@ public class InferenceLifecycleManager
           gpuCapabilitiesService.invalidateNvidiaSmiCache();
           Long totalVramBytes = readTotalVramBytes();
           if (totalVramBytes != null && totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
-            return TransitionOutcome.failure(
+            return TransitionOutcome.failureOffline(
                 new InferenceFailure.StartupFailure(
                     StartupCode.INSUFFICIENT_VRAM,
                     "Rollback failed (VRAM): "
@@ -909,7 +901,7 @@ public class InferenceLifecycleManager
       }
     } catch (Exception rollback) {
       LOG.error("Rollback failed; entering OFFLINE mode", rollback);
-      return TransitionOutcome.failure(
+      return TransitionOutcome.failureOffline(
           new InferenceFailure.TransitionFailure(
               TransitionCode.CONFIG_APPLY_FAILED,
               "Rollback failed: " + safeMessage(rollback),
