@@ -1411,15 +1411,20 @@ public final class RuntimeActivationService
     } else {
       log.warn("Runtime activation failed: {} {}", errorCode, message);
     }
-    synchronized (lock) {
-      status.state = "failed";
-      status.phase = "done";
-      status.message = safe(message);
-      status.errorCode = safe(errorCode);
-      status.updatedAtEpochMs = System.currentTimeMillis();
-      touch();
+    try {
+      // A terminal status promises that the component observation is visible. Publishing it
+      // afterward lets a status reader observe "failed" while the component is still STARTING.
+      reportToComponent(errorCode, publication);
+    } finally {
+      synchronized (lock) {
+        status.state = "failed";
+        status.phase = "done";
+        status.message = safe(message);
+        status.errorCode = safe(errorCode);
+        status.updatedAtEpochMs = System.currentTimeMillis();
+        touch();
+      }
     }
-    reportToComponent(errorCode, publication);
   }
 
   /**

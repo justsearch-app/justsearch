@@ -44,6 +44,7 @@ import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.core.component.TestEngineComponents;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -222,6 +223,47 @@ class RuntimeActivationServiceTest {
               () -> service.startActivate("cuda12")));
       assertEquals("failed", service.getActivationStatus().state);
       service.startActivate("cuda12");
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+      assertEquals(ComponentState.UNAVAILABLE, handle.snapshot().state());
+    }
+  }
+
+  @Test
+  void terminalFailureWaitsForItsComponentObservation() throws Exception {
+    setHome(tmp);
+    CountDownLatch publicationEntered = new CountDownLatch(1);
+    CountDownLatch releasePublication = new CountDownLatch(1);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("failure-publication-order"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = org.mockito.Mockito.spy(
+          new ReasonRetainingComponentHandle(components.handle("generative")));
+      org.mockito.Mockito.doAnswer(call -> {
+        if (call.getArgument(1) == ComponentState.UNAVAILABLE) {
+          publicationEntered.countDown();
+          if (!releasePublication.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("Timed out waiting for failure publication");
+          }
+        }
+        return call.callRealMethod();
+      }).when(handle).transitionIfUnchanged(
+          org.mockito.ArgumentMatchers.any(EngineComponentSnapshot.Component.class),
+          org.mockito.ArgumentMatchers.any(ComponentState.class),
+          org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.anyString());
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          intent.settings(), null, policy, null, handle);
+
+      service.startActivate("cuda12");
+      try {
+        assertTrue(publicationEntered.await(5, TimeUnit.SECONDS), "failure reached component owner");
+        assertEquals("running", service.getActivationStatus().state);
+      } finally {
+        releasePublication.countDown();
+      }
       assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
       assertEquals(ComponentState.UNAVAILABLE, handle.snapshot().state());
     }
