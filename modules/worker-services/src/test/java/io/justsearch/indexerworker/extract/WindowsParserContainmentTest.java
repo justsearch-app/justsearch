@@ -38,15 +38,15 @@ final class WindowsParserContainmentTest {
     ProcessHandle nativeChild = null;
     try (PersistentExtractionSandbox sandbox = new PersistentExtractionSandbox(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(), command,
-        // This response clock includes cold JVM/native bootstrap, as in the neighboring pool
-        // replacement fixtures. The timeout arm still waits for an actual pool timeout while
-        // the already-observed native child is alive; no production deadline changes.
-        TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), Duration.ofSeconds(10),
+        // This response clock includes cold JVM/native bootstrap. A hosted cold launch can
+        // exceed ten seconds before the native fixture writes its PID; retain enough headroom
+        // to observe the child before exercising each real retirement path.
+        TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), Duration.ofSeconds(20),
         1, termination.equals("recycle") ? 1 : 500, null)) {
       java.util.concurrent.FutureTask<ExtractionArtifact> pending =
           new java.util.concurrent.FutureTask<>(() -> sandbox.extract(request));
       Thread caller = Thread.ofVirtual().start(pending);
-      long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+      long deadline = System.nanoTime() + Duration.ofSeconds(25).toNanos();
       while (!Files.exists(pidFile) && System.nanoTime() < deadline && !pending.isDone()) {
         Thread.sleep(20);
       }
@@ -61,10 +61,10 @@ final class WindowsParserContainmentTest {
       Files.writeString(Path.of(request + ".release"), "parent observed live child");
       if (termination.equals("timeout")) {
         var failure = assertThrows(java.util.concurrent.ExecutionException.class,
-            () -> pending.get(15, TimeUnit.SECONDS));
+            () -> pending.get(25, TimeUnit.SECONDS));
         assertTrue(failure.getCause() instanceof TimeboxedContentExtractor.ExtractionTimeoutException);
       } else {
-        assertEquals("native child was alive", pending.get(15, TimeUnit.SECONDS).result().content());
+        assertEquals("native child was alive", pending.get(25, TimeUnit.SECONDS).result().content());
       }
       caller.join(Duration.ofSeconds(1));
       if (termination.equals("recycle")) {
