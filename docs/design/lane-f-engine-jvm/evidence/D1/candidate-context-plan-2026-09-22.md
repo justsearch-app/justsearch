@@ -355,3 +355,46 @@ helpers, confirmed detach cleanup cannot pass through readoption, and verified t
 shared-registry two-manager round trip excludes replacement/external adoption. The
 reviewer did not run tests; root owns the2459 results. Full D1-4 integration remains
 outside this slice and still required by the stage contract.
+
+
+### Integrated audit correction2460–2462
+
+Checkpoint78fca2b67 was pushed to existing draft PR727 after focused proof and independent
+review. Full2460 completed in9m21s with11559 tests,2 failures,31 skips,1805 suites,
+34 test tasks (27 reused). Static checks/installDist passed. Complete evidence is
+`tmp/2460-candidate-integrated*`; tested code is78fca2b67.
+
+Both failures expose residue of this migration: UnreferencedCodeTest rejects the
+no-argument schedulePeriodicHealthCheck, runPeriodicHealthCheck and handleServerCrash
+wrappers; SystemAccessFunnelTest rejects obsolete resolveModelStatePath and
+policyGpuAccelerationEnabled allowlist entries. Root retired those exact wrappers and
+entries. No audit exemption or baseline weakening was added. A narrow src/test helper
+now captures the current private owner and invokes the same owner-taking callback that
+production uses, failing if the fixture lacks an owner. Telemetry installs the existing
+logical-owner shape rather than relying on a non-production null-owner branch; that
+branch is retired. Recovery callbacks are no-ops in the telemetry fixture, so its obsolete
+Windows race exclusions were removed and owned schedulers close after each test.
+
+This matters behaviorally: direct test access must not preserve dead production wrappers
+or manufacture a path that real callbacks cannot take. Focused module proof did not
+substitute for the integrated dead-code/configuration audits. Independent review accepted
+the correction mechanism; actual focused2462 result and a corrected integrated pass remain
+pending. Hosted CI35678039813 belongs to the pre-correction78fca2b67 checkpoint.
+
+
+### Handoff proof2464
+
+After fixing a missed method reference in the test-only migration,2464 passes
+`./gradlew.bat :modules:app-inference:test :modules:app-inference:spotlessCheck
+:modules:app-inference:pmdMain :modules:app-inference:pmdTest :modules:app-launcher:test
+:modules:dead-code-audit:test --continue --console=plain` in33s.453 cases, zero
+failures/errors/skips,58 suites:359 inference cases rerun;94 audit cases reuse their
+successful2462 results against unchanged correction sources. Full evidence and five-file
+WIP source inventory are tmp/2464-candidate-residue-focused*.2462's overall failure was
+compile-only in inference tests; it did not invalidate the two completed audit tasks.
+
+The user requested handoff after usage limits interrupted work. Corrected full integrated,
+installed standard-model and hosted proof remain required; no completion is claimed.
+CI35678039813 finished with the same two failed audit classes, while other jobs passed;
+its log is tmp/2465-hosted-failed.txt. Resume at branch HEAD after the audit-correction
+handoff commit. See ../../handoff.md for exact continuation and authorization.

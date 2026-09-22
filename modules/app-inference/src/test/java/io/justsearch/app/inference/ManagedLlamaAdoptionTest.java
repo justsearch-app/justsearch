@@ -188,9 +188,9 @@ final class ManagedLlamaAdoptionTest {
       fixture.mode.set(Mode.ONLINE);
       fixture.healthy.set(false);
 
-      fixture.ops.runPeriodicHealthCheck();
-      fixture.ops.runPeriodicHealthCheck();
-      fixture.ops.runPeriodicHealthCheck();
+      LlamaServerTestAccess.checkCurrentHealth(fixture.ops);
+      LlamaServerTestAccess.checkCurrentHealth(fixture.ops);
+      LlamaServerTestAccess.checkCurrentHealth(fixture.ops);
 
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
       while (recoveries.get() == 0 && System.nanoTime() < deadline) {

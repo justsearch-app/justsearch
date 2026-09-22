@@ -47,10 +47,8 @@ io.justsearch.aibackend.local.DeterminismProfile#from
 io.justsearch.app.inference.BrainSupervisionPolicy#defaults
 io.justsearch.app.inference.CudaRuntimeDetection#detectCudaRuntimeWarning
 io.justsearch.app.inference.InferenceConfig#findServerExecutable
-io.justsearch.app.inference.InferenceLifecycleManager#resolveModelStatePath
 io.justsearch.app.inference.LlamaServerOps#allowHealthOnlyExternalAdoption
 io.justsearch.app.inference.LlamaServerOps#policyDisallowExternalInferenceServers
-io.justsearch.app.inference.LlamaServerOps#policyGpuAccelerationEnabled
 io.justsearch.app.inference.LlamaServerOps#resolveBundledRuntimeBinDirBestEffort
 io.justsearch.app.inference.LlamaServerOps#resolveLlamaServerLogFile
 io.justsearch.app.inference.OnlineAiServiceImpl#resolveModelsDir

@@ -1603,11 +1603,6 @@ final class LlamaServerOps {
    * recovery flow. This detects hung processes that are still alive but not responding to HTTP
    * requests.
    */
-  void schedulePeriodicHealthCheck() {
-    ActiveServer owner = activeServer;
-    if (owner != null) schedulePeriodicHealthCheck(owner);
-  }
-
   private void schedulePeriodicHealthCheck(ActiveServer owner) {
     synchronized (ownershipMonitor) {
       if (activeServer != owner) return;
@@ -1622,11 +1617,6 @@ final class LlamaServerOps {
     }
 
     LOG.debug("Scheduled periodic health checks every {}ms", PERIODIC_HEALTH_INTERVAL_MS);
-  }
-
-  void runPeriodicHealthCheck() {
-    ActiveServer owner = activeServer;
-    if (owner != null) runPeriodicHealthCheck(owner);
   }
 
   private void runPeriodicHealthCheck(ActiveServer owner) {
@@ -1746,18 +1736,6 @@ final class LlamaServerOps {
 
   // ==================== Crash Recovery ====================
 
-  // Package-private for direct invocation by Bug F regression test
-  // (LlamaServerOpsCrashTelemetryTest); the production caller is the crashMonitor future
-  // inside startManagedProcessAndMonitor.
-  void handleServerCrash() {
-    ActiveServer owner = activeServer;
-    if (owner == null) {
-      recordServerCrash(null, () -> true);
-    } else {
-      handleServerCrash(owner);
-    }
-  }
-
   private void handleManagedCrash(ActiveServer owner) {
     if (!isActive(owner)) return;
     handleServerCrash(owner);
@@ -1770,18 +1748,14 @@ final class LlamaServerOps {
 
   private void recordServerCrash(ActiveServer owner, BooleanSupplier stillCurrent) {
     int crashes;
-    if (owner == null) {
+    synchronized (ownershipMonitor) {
+      if (activeServer != owner) return;
       crashes = crashCount.incrementAndGet();
-    } else {
-      synchronized (ownershipMonitor) {
-        if (activeServer != owner) return;
-        crashes = crashCount.incrementAndGet();
-      }
     }
     LOG.warn("Server crash #{}", crashes);
 
     // Tempdoc 412 follow-up Bug F: process-death scenarios reach this method via the
-    // crashMonitor future (Process.waitFor returning non-zero exit), bypassing
+    // crashMonitor future (Process.waitFor returning without cancellation), bypassing
     // handlePeriodicHealthFailure entirely (its early-return at the process-dead check skips
     // probing). Without an explicit emit here, inference.health.failure_total never fires for
     // taskkill / SIGKILL / process-crash scenarios — leaving the most operationally important
@@ -1804,7 +1778,7 @@ final class LlamaServerOps {
 
     // Crash recovery delay: immediate for first crash, 5s thereafter (fire-and-forget)
     long delay = crashes == 1 ? 0 : CRASH_RECOVERY_DELAY_MS;
-    if (owner != null) scheduleRecoveryTask(owner, delay);
+    scheduleRecoveryTask(owner, delay);
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")

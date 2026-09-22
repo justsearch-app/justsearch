@@ -125,7 +125,7 @@ final class LlamaServerCandidateContextTest {
       assertEquals(candidateHash, started.declaredConfigHash());
       assertSame(context, started.context());
 
-      ops.handleServerCrash();
+      LlamaServerTestAccess.crashCurrent(ops);
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
       while (recoveryOwner.get() == null && System.nanoTime() < deadline) {
         Thread.sleep(10);
@@ -191,7 +191,7 @@ final class LlamaServerCandidateContextTest {
                   context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS));
       ops.waitForServerHealth(started);
       server.stop(0);
-      ops.handleServerCrash();
+      LlamaServerTestAccess.crashCurrent(ops);
       assertTrue(firstRecovery.await(5, TimeUnit.SECONDS));
       assertNotNull(firstRecoveryGuard.get());
       assertTrue(firstRecoveryGuard.get().getAsBoolean());
@@ -314,7 +314,7 @@ final class LlamaServerCandidateContextTest {
       installActive(ops, incumbentStart, incumbent);
       ops.waitForServerHealth(incumbentStart);
       server.stop(0);
-      ops.handleServerCrash();
+      LlamaServerTestAccess.crashCurrent(ops);
       assertTrue(recoveryReady.await(5, TimeUnit.SECONDS));
       assertTrue(recoveryGuard.get().getAsBoolean());
 
@@ -555,7 +555,10 @@ final class LlamaServerCandidateContextTest {
     var executor = Executors.newSingleThreadExecutor();
     try {
       legacyExternal(ops, first);
-      var checking = executor.submit(ops::runPeriodicHealthCheck);
+      var checking = executor.submit(() -> {
+        LlamaServerTestAccess.checkCurrentHealth(ops);
+        return null;
+      });
       assertTrue(blocked.await(5, TimeUnit.SECONDS));
       LlamaServerOps.StartResult replacement = legacyExternal(ops, second);
       release.countDown();
