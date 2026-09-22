@@ -82,3 +82,22 @@ NeverWantedButInvoked. Each has one intended behavioral failure, and the mutatio
 driver `tmp/2431-generative-review-negative-proof.py` restores exact source bytes.
 Logs/XML/counts are retained under `tmp/2431-duplicate-failure-negative*` and
 `tmp/2432-premature-cache-negative*`. Full integrated/live checks follow this checkpoint.
+
+At215af780988f1f455048425ff75a755f535f47d2,2433 full static/unit/stress/installDist
+passes in9m18s:11530 cases,1803 suites,zero failures/errors,31 recorded skips.
+Of34 test tasks,27 reuse unchanged results; counts identify fresh execution.
+Full logs/XML/counts/skips/five-file source inventory are captured under
+`tmp/2433-generative-integrated*` before any successor tests.
+
+Installed standard-model2434 reports all four schema2 components READY and passes
+runtime-client contract0.4.0 smoke. Real-model jseval's one regression query has
+zero errors and exact/intersection/context100%, retrieve1966ms, LLM2953ms,
+65 completion tokens. This proves live plumbing, not a broad quality benchmark.
+Run31bc93f7-e34c-4a2e-a88f-72b5e1713ca6 uses API57730; official stop confirms
+portsClosed:true. Evidence: `tmp/2434-generative-*.json`, `tmp/2434-online-intent.json`,
+`tmp/2434-runtime-smoke.txt`, `tmp/2434-model-query.txt` and
+`tmp/2434-model-query/tier2-eval.json`.
+
+Hosted CI35671548458 at215af7809 completed successfully, including integration,
+Windows-native, app-ui and all other jobs. This closes checkpoint verification;
+the successor candidate-context implementation remains separate and unverified.

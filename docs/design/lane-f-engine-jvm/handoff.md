@@ -9,7 +9,24 @@ are authorized; merge remains at stage F. No routine owner approval is pending.
 Continue after status answers, commits and reviews. C2 is accepted; D1/D2/E/F
 remain open. Root owns all Gradle runs, stack lifecycle and integration.
 
-Latest committed/pushed checkpoint: `23cc8929a` (coherent applied revision),
+Latest committed/pushed checkpoint: `215af7809` (generative preflight, failed
+restoration OFFLINE and single failure telemetry). Full2433 passes at this revision
+in9m18s,11530 cases/zero failures/31skips,1803suites,34tasks (27reused), evidence
+captured under tmp/2433-generative-integrated*. Installed standard2434 all4READY,
+runtime0.4.0 smoke and realmodelquery exact/intersection/context100% pass; official
+stop confirms portsClosed:true. No build or stack active. Hosted35671548458 passed all jobs.
+Next free run2436 (2435 is read-only apply-drain design).
+Candidate-context implementation now follows evidence/D1/candidate-context-plan-2026-09-22.md.
+Server worker owns LlamaServerConfigContext/LlamaServerOps/ServerPropsOps and existing
+server tests; root owns manager/result integration. Do not edit overlapping files.
+Current WIP is unverified: manager ConfiguredInference holds scalar/resolved/policy
+atomically, typed apply results distinguish configured/active/rollback/offline,
+BootstrapInferenceFactory passes its captured resolved snapshot, VDU retains the
+whole procedure snapshot. Server worker migrates helpers/callbacks to logical and
+physical owner contexts. Manager test worker owns only InferenceLifecycleManagerApplyConfigTest.
+No Gradle run until source freeze. Reviewer is refuting manager WIP independently.
+
+Previous `23cc8929a` (coherent applied revision),
 CI35669241131 completed successfully, including system integration and Windows-native.
 Documentation checkpoint53a64edb6 records integrated/installed proof locally.
 Previous4bec3f00b implements the complete apply register;
