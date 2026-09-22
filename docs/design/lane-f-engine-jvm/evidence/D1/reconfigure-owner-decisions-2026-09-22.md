@@ -29,9 +29,11 @@ C2 settings owner. These decisions preserve the acceptance scope.
   ownership if process-resource closure refuses. Existing shutdown ordering is
   an implementation obligation, not a reason to weaken apply guarantees.
 
-Next: finish D1-5 candidate/rollback semantics, then settle the prepared
-publication and teardown protocol against the actual owning code. No D1-4
-dispatch implementation or completion is claimed by this decision record.
+Next: close the outstanding D1-5 candidate-context integrated/installed/hosted
+proof at runtime code22800c842, then settle the prepared publication and teardown
+protocol against the actual owning code. The [continuation brief](../../continuation-brief.md)
+defines these first two batches. Candidate/rollback code and focused proof exist;
+no D1-4 dispatch implementation or completion is claimed by this decision record.
 
 ## Prepared-publication source check
 

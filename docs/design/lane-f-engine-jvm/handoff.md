@@ -1,5 +1,9 @@
 # Lane F handoff: implementation orchestrator
 
+Start with the [continuation brief](continuation-brief.md): the next two batches,
+owner boundaries, acceptance endpoints and execution protocol. This handoff owns
+current evidence; the brief does not narrow the remaining lane scope.
+
 ## Current state (2026-09-22)
 
 Continue autonomously in `.claude/worktrees/lane-f-pr1-verify`, branch
@@ -17,7 +21,9 @@ no foreign runs and no inference orphan. Next free verification run2466.
 
 Candidate-context checkpoint78fca2b67 and correction22800c842 are pushed.
 The correction retires audit residue; its Java state is the next tested candidate.
-Later retrospective documentation commits do not add runtime verification.
+Retrospective checkpointf38c9eebb and the subsequent continuation-brief checkpoint
+change documentation/evidence only; they do not add runtime verification.
+Resolve actual HEAD at startup and verify equivalence to the22800c842 runtime code.
 Root now owns all files; previous subagents are no longer active. Main remains untouched.
 
 Implemented: captured inference/resolved configuration and strict adoption policy;

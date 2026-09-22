@@ -21,8 +21,10 @@ related:
 
 # Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain
 
-Worktree `.claude/worktrees/lane-F`, branch `worktree-lane-F`, base `b96cd999` (#687). This
-document is the lane's contract: the design and the considerations that shaped it. The PR cut
+Historical origin: worktree `.claude/worktrees/lane-F`, branch `worktree-lane-F`,
+base `b96cd999` (#687). Current implementation workspace and revision are owned by
+the [handoff](handoff.md); start with its [continuation brief](continuation-brief.md).
+This document is the lane's contract: the design and the considerations that shaped it. The PR cut
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
