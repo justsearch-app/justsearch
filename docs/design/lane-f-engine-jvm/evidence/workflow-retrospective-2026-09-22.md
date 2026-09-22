@@ -242,7 +242,73 @@ status database. Expand measurement only when a decision requires it.
 The lane remains handed off at runtime code22800c842. Corrected integrated,
 installed standard-model and hosted proof remain unverified in this analysis.
 
-## Validation and retention
+## Routing theorization, 2026-09-23 — preventing specialist overuse
+
+Status: proposal only, not adopted routing policy or an implemented limit. The
+desired arrangement is a Sol orchestrator with Astra available for consequential
+unresolved design. No model configuration or role definition changes in this pass.
+
+The earlier suggested trigger (new ownership, recovery or concurrency contract)
+is too broad for this lane: almost every remaining item touches those concerns.
+Likewise, one active Astra child limits simultaneous work but not serial cost;
+reusing one child indefinitely can consume more than several bounded assignments.
+Making every design skill invocation select Astra would turn ordinary local
+implementation reasoning into specialist work. Existing complex-worker and
+reviewer briefs already expect difficult reasoning and refutation.
+
+Prefer an exception route with one named initial assignment: D1-4's unresolved
+publication/teardown protocol. Sol can close candidate-context verification while
+that read-only investigation proceeds. Do not pre-authorize a standing Astra
+reviewer, all later stages, or automatic second opinions after every change.
+
+For later escalation, the root should identify a concrete undecided choice,
+the governing acceptance obligation, source evidence that existing decisions do
+not resolve it, and which dependent work it blocks or would materially invalidate.
+Sol still investigates and makes ordinary design decisions. A failed test,
+difficult implementation, reviewer disagreement, or a file touching concurrency
+does not by itself qualify. Conversely, do not force two failed implementations
+before escalation when an architectural contradiction is already demonstrated.
+
+Each specialist assignment should end with a revision-stamped decision covering
+the alternatives, selected owner/protocol, proof obligations and invalidation
+conditions. A practical starting boundary is one investigation/result and one
+consolidated clarification round. This is a trial boundary, not an empirically
+optimal count or permission to ignore defects. Additional work must be explicitly
+re-scoped to unresolved evidence; no repeated generic "review again" requests.
+Closed decisions reopen only on a counterexample, changed requirement or changed
+code assumption. Astra should not delegate more Astra work. Routine implementation
+and independent review stay on the normal routes.
+
+Keep later design questions beside their owning acceptance items with the first
+dependent batch named. Dispatch when that batch approaches or a long dependency
+justifies starting early. Do not send the whole future backlog to Astra, and do
+not defer a near-term blocker merely because peripheral work can keep Sol busy.
+
+Potential instruction changes belong in the task brief and scoped role/routing
+guidance, with matching harness projections if made shared policy. Do not change
+the generic design skill into an Astra router or add another global policy copy.
+If a dedicated role is added, verify actual model selection and inheritance;
+a role name or an agent's assertion is not delivery evidence.
+
+These instruction boundaries would be soft controls. A hard guarantee against
+overuse needs a host-enforced model/dispatch budget covering root overrides,
+resumptions and descendants. Support for that enforcement has not been verified
+here. Do not describe a concurrency setting, prompt rule or role pin as a hard
+aggregate budget. If a strict bound is essential, a separately scheduled single
+design engagement gives the user tighter control but adds handoff/latency cost.
+
+Measure specialist invocations and follow-up work per accepted decision, the
+whole child lifetime, reopened decisions and resulting rework/escaped defects.
+Use the existing evidence/analytics owners. Reject the proposal if specialist
+use becomes routine, coordination dominates the delivered decision, or reduced
+use merely shifts work into repeated root correction. A numeric spending cap
+requires an explicit budget and usable metering; none is invented here.
+
+Preferred hypothesis: Sol owns execution and ordinary design; Astra answers a
+small number of demonstrated architectural questions. Start with D1-4 only, then
+assess the value before expanding the route.
+
+## Retrospective validation and retention
 
 The fixed-prefix counter was run twice and produced identical JSON, including
 the prefix hash. Relative links in the changed Markdown resolve. The moved
