@@ -1,11 +1,11 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED; A/B/C1 complete; C2-6 backend, frontend callers and physical writer retirement locally verified; browser structural proof and C2-7 checkpoint mechanism locally verified; live/installed/final-head proof and C2-8 onward open; D1-F remain. Draft PR727, merge at F."
+status: "LOCKED with dated amendments; A/B/C1/C2 accepted; D1 in progress, D2/E/F open. Remaining solvable design resolved 2026-09-23; implementation and production proof remain. Draft PR727, merge at F."
 created: 2026-09-06
-updated: 2026-09-14
+updated: 2026-09-23
 lane: F (decision re-examination programme, wave 4)
-model: fable (orchestration)
+model: Sol continuation; Astra design resolution 2026-09-23
 category: engine / process-boundary
 related:
   - 917-lane-f-derisk-and-consumer-audit           # consumer audit, eight brief corrections, four derisk results
@@ -28,6 +28,8 @@ This document is the lane's contract: the design and the considerations that sha
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-23: [Remaining design resolution](evidence/design-resolution-2026-09-23.md) selects publication/lifetime, generation/native/cursor, production composition, fairness and durable-write protocols. Owning sections and D1/D2 checklists are amended; runtime code and acceptance evidence are unchanged.
 
 - 2026-09-21: The launcher remains a CLI/smoke facade without an index runtime. Its unavailable recorded-ingestion port must omit INGEST/REINDEX from the existing composed operation-catalog projection and stop claiming those recovery kinds. The live Engine retains both declarations and its existing coordinator. No second Engine host or temporary-readiness gate is introduced. [Owning admission correction](evidence/C2/declared-survival-admission.md).
 
@@ -823,7 +825,7 @@ root binds an implementation. Ports on day one:
 | port | exists today as | notes |
 |---|---|---|
 | search | `SearchPort` (`core`) | unchanged contract; `SearchTrace` stays the one authority for "what the pipeline did" |
-| indexing | `IndexingService` (`app-api`) | gains the provenance parameter (3.4) and an immediate index-and-return call (section 4) |
+| indexing | `IndexingService` for watched-root management; `KnowledgeClient` for document writes | explicit context (3.4); immediate index-and-return/delete acknowledgement belongs on KnowledgeClient (section 4, D2-5) |
 | operations | operation surfaces (`governance/operation-surfaces.v1.json`) | interactive versus durable split; reconfigure as an operation (section 7) |
 | memory | the memory API and `remember` operation (Head-side today) | moves under the core's durable stores; no new behaviour in lane F |
 | health and self-description | `/api/health`, `/api/debug/state`, live witness | becomes the engine's component map (section 10) |
@@ -1455,13 +1457,17 @@ which made every source change under a captured unit a failure):
   generation missing documents the old one had is a regression the product would silently
   present as "no results", so a rebuild with failed units stays `complete with gaps`, not
   active, and names the units, until re-run or accepted. There is no partial activation.
+- *Publication and activation (2026-09-23).* The [publication/lifetime protocol](evidence/D1/publication-and-lifetime-design-2026-09-23.md) fixes atomic capture plus resource retention. The [generation protocol](evidence/D1/generation-native-cursor-design-2026-09-23.md) prepares all fallible services before strict durable promotion, fences final mutation replay and recovers forward after a witnessed commit. Two disk generations include a retained predecessor: another rebuild refuses until actual deletion frees capacity.
 - *Cursors.* A search cursor holds a snapshot of the old generation; activation retires the
   generation but does not tear down readers a live cursor holds (no reader outlives a request
   today: `SearcherManager` acquire and release per call, and `searchAfter` is stateless, so
   the pinning is new work in D2 *(corrected 2026-09-07, 17.9)*). A cursor whose generation
   has been retired is served to its normal expiry if the old encoder is still loaded, and
   fails with `cursor expired` if it is not; it is never silently served from the new
-  generation, which would change its evidence mid-page.
+  generation, which would change its evidence mid-page. A cursor has a fixed five-minute
+  maximum lifetime from creation; paging cannot retain a generation indefinitely. Every page
+  retains its exact reader/runtime/encoder binding; eviction does not release capacity held
+  by an active page. In-place encoder retirement expires affected cursors then drains pages.
 - *Resource envelope.* Building generation N+1 while serving N needs the new encoder beside
   the old one. The reindex declares its device footprint like any reconfigure and the same
   beside-or-in-place choice applies: beside when headroom allows; otherwise the transition
@@ -1936,8 +1942,11 @@ are structural, 16 carries the behavioural proof. Design requirements of the roo
   runs more than one instance only once the inference host exists.
 - **Engine as a library.** The composition root is callable from tests, CLI tools and jseval
   without a process boundary; the 20 `WorkerProcessManager` consumers become JVM-level tests
-  plus supervisor-contract tests. A size ratchet on `app-engine` and the module fan-in report
-  keep the root a wiring module, not the next `app-services`.
+  plus supervisor-contract tests. Existing module dependency/LayeringEnforcement checks,
+  a focused composition-boundary negative control and the module fan-in report keep the
+  root a wiring module. The retired size-ratchet mechanism is not restored. The production
+  facade extracts real ownership from HeadlessApp, not the mocked EngineTestHarness
+  (selected 2026-09-23; [composition decision](evidence/D1/d2-composition-and-request-design-2026-09-23.md)).
 
 ## 11. Capabilities the design must not preclude
 

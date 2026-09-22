@@ -244,7 +244,10 @@ installed standard-model and hosted proof remain unverified in this analysis.
 
 ## Routing theorization, 2026-09-23 — preventing specialist overuse
 
-Status: proposal only, not adopted routing policy or an implemented limit. The
+Status: historical proposal, not an implemented limit. The user subsequently assigned
+remaining design to the current Astra root; [design resolution](design-resolution-2026-09-23.md)
+closes that initial assignment. The continuation brief owns current Sol routing: no
+initial Astra dispatch remains. The text below records the prior rationale. The
 desired arrangement is a Sol orchestrator with Astra available for consequential
 unresolved design. No model configuration or role definition changes in this pass.
 

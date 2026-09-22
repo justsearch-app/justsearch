@@ -1,0 +1,47 @@
+{
+  "scope": "specification model only; no production code, native runtime or JVM memory-model proof",
+  "paired_capture": {
+    "unprotected_schedules": 6,
+    "unprotected_pairs": [
+      [
+        "A",
+        "A"
+      ],
+      [
+        "A",
+        "B"
+      ],
+      [
+        "B",
+        "A"
+      ],
+      [
+        "B",
+        "B"
+      ]
+    ],
+    "protected_pairs": [
+      [
+        "A",
+        "A"
+      ],
+      [
+        "B",
+        "B"
+      ]
+    ]
+  },
+  "lifetime": "capture requires retain; generation capacity requires witnessed deletion",
+  "shutdown": "old freeze release cannot reopen closing; index-only lock release is insufficient",
+  "commitment": {
+    "cancel then commit_admission": [
+      "A",
+      "CANCELLED"
+    ],
+    "commit_admission then cancel": [
+      "B",
+      "COMPLETE"
+    ]
+  },
+  "commit_coverage": "exclusive commit captures completed mutations; later writes and other epochs are not covered"
+}

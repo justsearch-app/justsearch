@@ -1,6 +1,6 @@
 # Lane F continuation brief
 
-Prepared 2026-09-22 after the workflow retrospective. This is the successor's
+Updated 2026-09-23 after design resolution for a Sol orchestrator. This is the successor's
 entry point; [handoff](handoff.md) owns current evidence and
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
@@ -83,13 +83,18 @@ do not waive a red check or treat it as a reason to ask for routine permission.
 Resource contention blocks dependent runtime work only. No new benchmark, model
 selection, unrelated refactor or weaker audit is part of this batch.
 
-## Batch 2: settle D1-4 composition/publication, then implement a connected slice
+## Batch 2: implement the selected D1-4 publication and lifetime protocol
 
-**First deliverable:** update the existing
-[ownership decisions](evidence/D1/reconfigure-owner-decisions-2026-09-22.md)
-with the preparation, commit, publication and teardown protocol, an affected-reader
-inventory and acceptance-to-test mapping. The earlier collaborator investigation
-returned no final proposal. The protocol is not already settled.
+The remaining solvable design has been settled by the preceding Astra task.
+Read the [decision index](evidence/design-resolution-2026-09-23.md), then the linked
+publication, generation/native/cursor and D2 composition decisions. They are
+implementation contracts, not claims that the missing production proof passed.
+No initial Astra investigation remains to dispatch. Sol owns integration and routine
+design choices; use normal bounded explorer/worker/reviewer routes when useful.
+An Astra escalation is exceptional: first record a concrete counterexample or changed
+requirement, the exact unresolved choice and blocked acceptance. Do not dispatch
+Astra for every design skill, failed test, concurrency edit or review disagreement.
+This is task guidance, not a host-enforced model budget or global configuration change.
 
 Read stage D1-4, [C2 settings transaction](evidence/C2/operations-store-design.md),
 the ownership decisions and [typed API-port plan](evidence/D1/api-port-design-2026-09-22.md).
@@ -111,13 +116,11 @@ precedes file commitment, followed by prepared reference publication and receipt
 completion. Prove how each affected reader observes a coherent configuration and
 component set: separate volatile fields or an apply lease alone are insufficient.
 
-The rejected shutdown proposal is not a starting implementation: another owner
-can release a shared freeze, and interrupting interactive work does not prove
-durable work has ended. Retain authority/dependencies through teardown; closure
-refusal must preserve required stores and the instance lock. Compare simpler
-existing ownership arrangements before adding a barrier or persistent state.
+Implement the selected monotonic closing admission and dependency-aware teardown;
+the old shared-freeze/interactive-only drain proposal is retired. Native quiescence
+controls process exit selection; embedded composition never owns process termination.
 
-Once these decisions are settled, implement the smallest connected D1-4 path
+Implement the smallest connected D1-4 path
 with its real front/runner/coordinator/readers. Map at least second-component
 failure (A/config/file/revision preserved), candidate cleanup, cancellation,
 coherent concurrent readers, post-commit outcome recovery, no-dependency changes,

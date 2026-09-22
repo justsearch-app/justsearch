@@ -4,7 +4,7 @@ Start with the [continuation brief](continuation-brief.md): the next two batches
 owner boundaries, acceptance endpoints and execution protocol. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-22)
+## Current state (2026-09-23)
 
 Continue autonomously in `.claude/worktrees/lane-f-pr1-verify`, branch
 `codex/lane-f-pr1`. Main contains unrelated work; never edit or clean it.
@@ -13,7 +13,7 @@ are authorized; merge remains at stage F. No routine owner approval is pending.
 Continue after status answers, commits and reviews. C2 is accepted; D1/D2/E/F
 remain open. Root owns all Gradle runs, stack lifecycle and integration.
 
-Handoff requested by the user after a usage-limit interruption. Do not mistake this
+Handoff requested by the user for Sol after Astra resolved the remaining design. Do not mistake this
 for scope completion. No user decision or permission is pending. Preserve the worktree;
 a lifecycle hold is recorded through2026-09-29 under the current session owner.
 No build, stack, or subagent is running. Official quick_health reports ABSENT,
@@ -68,15 +68,16 @@ Immediate continuation:
    proof exists for this candidate-context slice. Earlier215af/2434 proof is not reusable.
 4. Then continue D1-4 prepared component composition/publication and all remaining stage
    acceptance. The current coordinator ownership decisions and typed API-port design are
-   in evidence/D1. A read-only next-step collaborator investigation was interrupted and
-   returned no final proposal; do not assume D1-4 design/implementation is settled.
+   in evidence/D1. The [2026-09-23 design resolution](evidence/design-resolution-2026-09-23.md)
+   settles publication, teardown, generations/native/cursors and D2 ownership. Implement
+   those contracts; all production acceptance is still required.
 
-The apply-drain proposal is still refuted for shared-freeze release and durable-work
-survival; no teardown implementation has begun. D1/D2/E/F remain open. No scope was waived.
+The refuted shared-freeze/interactive-only drain is replaced by the selected monotonic
+closing and lifetime protocol; no teardown implementation has begun. D1/D2/E/F remain open. No scope was waived.
 Closeout sweep reaped nothing: it retained two stale ui-shot records whose PIDs no longer
 exist and reported the intentionally persistent OTLP sink. Do not force-kill these.
 
-## Remaining design obligations
+## Selected design and remaining implementation/proof
 
 D1-4 ownership decisions remain in
 [evidence/D1/reconfigure-owner-decisions-2026-09-22.md](evidence/D1/reconfigure-owner-decisions-2026-09-22.md).
@@ -87,7 +88,8 @@ their old next-run and next-action statements are not the continuation queue.
 
 D1 Flow A must reconcile streaming core.reindex versus captured core.bulk-reindex:
 abandonment cannot delete C2 evidence before terminal ownership and exact queue
-ACK. COMPLETE_WITH_GAPS/accept-gaps/live activation requires explicit design/proof.
+ACK. The generation decision now fixes COMPLETE_WITH_GAPS/accept-gaps/live activation
+ordering, approval binding and forward recovery; implementation/proof remain open.
 
 ## Active ownership
 

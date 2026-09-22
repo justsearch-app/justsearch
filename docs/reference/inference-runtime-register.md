@@ -620,6 +620,15 @@ picking up items here over inventing new experiments.
 
 ## Future Work
 
+Lane F design coordination (2026-09-23; **selected, not implemented/proven**):
+[native/generation lifetime](../design/lane-f-engine-jvm/evidence/D1/generation-native-cursor-design-2026-09-23.md)
+selects exact-instance CPU/GPU leases, serialized CPU replacement and retained
+generation capacity. [Publication/shutdown](../design/lane-f-engine-jvm/evidence/D1/publication-and-lifetime-design-2026-09-23.md)
+requires monotonic close admission and actual native quiescence before JVM exit;
+an unquiesced process uses controlled hard termination because of F-016's ORT
+shutdown hook. Embedded callers have no exit authority. Held native calls,
+stress, isolated process termination and Windows deletion proof remain due in D1.
+
 Identified improvements not yet started. Lower priority than Open
 Questions — these are "we should eventually" not "we need to know."
 

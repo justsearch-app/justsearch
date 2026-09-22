@@ -23,15 +23,16 @@ C2 settings owner. These decisions preserve the acceptance scope.
   prepared references and let the runner complete from its receipt.
 - The registry apply lease alone does not make several component-reference
   publications atomic to readers. Reconcile the existing request/admission gate
-  with a batch publication seam before claiming coherent multi-component apply.
+  with the [selected capture/publication seam](publication-and-lifetime-design-2026-09-23.md)
+  and explicit lifetimes before claiming coherent multi-component apply.
 - Drain or refuse active apply before operation-store teardown and final lock
   release. Normal and fatal close must preserve required dependencies and lock
   ownership if process-resource closure refuses. Existing shutdown ordering is
   an implementation obligation, not a reason to weaken apply guarantees.
 
 Next: close the outstanding D1-5 candidate-context integrated/installed/hosted
-proof at runtime code22800c842, then settle the prepared publication and teardown
-protocol against the actual owning code. The [continuation brief](../../continuation-brief.md)
+proof at runtime code22800c842, then implement the [selected publication and teardown
+protocol](publication-and-lifetime-design-2026-09-23.md). The [continuation brief](../../continuation-brief.md)
 defines these first two batches. Candidate/rollback code and focused proof exist;
 no D1-4 dispatch implementation or completion is claimed by this decision record.
 
@@ -59,7 +60,11 @@ separate volatile client and service-graph fields. Before implementing dispatch,
 prove how each affected reader obtains a coherent installed component/config
 pair; neither these volatile fields nor the apply lease alone provides that proof.
 
-## Teardown proposal under refutation
+## Historical teardown proposal, superseded 2026-09-23
+
+The [selected protocol](publication-and-lifetime-design-2026-09-23.md) resolves both
+failures below with monotonic closing admission and actual owner quiescence. Preserve
+the counterexamples as required regression tests, not as an open design assignment.
 
 The initial read-only apply-drain proposal is not implementation-ready. Review
 found that freezeAdmission can reuse another owner's preparation id, which that
