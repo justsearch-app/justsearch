@@ -270,6 +270,39 @@ class RuntimeActivationServiceTest {
   }
 
   @Test
+  void failedComponentPublicationReportsOwnerFailureInsteadOfPreciseObservation() throws Exception {
+    setHome(tmp);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("failure-publication-throws"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = org.mockito.Mockito.spy(
+          new ReasonRetainingComponentHandle(components.handle("generative")));
+      var publicationFailure = new IllegalStateException("component publisher closed");
+      org.mockito.Mockito.doAnswer(call -> {
+        if (call.getArgument(1) == ComponentState.UNAVAILABLE) throw publicationFailure;
+        return call.callRealMethod();
+      }).when(handle).transitionIfUnchanged(
+          org.mockito.ArgumentMatchers.any(EngineComponentSnapshot.Component.class),
+          org.mockito.ArgumentMatchers.any(ComponentState.class),
+          org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.anyString());
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          intent.settings(), null, policy, null, handle);
+
+      var attempt = service.startActivate("cuda12");
+      var completionFailure = org.junit.jupiter.api.Assertions.assertThrows(
+          java.util.concurrent.CompletionException.class,
+          () -> attempt.completion().toCompletableFuture().join());
+      org.junit.jupiter.api.Assertions.assertSame(publicationFailure, completionFailure.getCause());
+      assertEquals("RUNTIME_ACTIVATION_FAILED", service.getActivationStatus().errorCode);
+      assertEquals(ComponentState.STARTING, handle.snapshot().state());
+    }
+  }
+
+  @Test
   void policyRefusalPublishesPreciseUnavailableObservation() throws Exception {
     setHome(tmp);
     try (var intent = new RuntimeIntentTestFixture(tmp.resolve("policy-observation"), true);

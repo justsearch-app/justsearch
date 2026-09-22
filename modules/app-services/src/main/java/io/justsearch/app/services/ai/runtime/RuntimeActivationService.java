@@ -1411,19 +1411,16 @@ public final class RuntimeActivationService
     } else {
       log.warn("Runtime activation failed: {} {}", errorCode, message);
     }
-    try {
-      // A terminal status promises that the component observation is visible. Publishing it
-      // afterward lets a status reader observe "failed" while the component is still STARTING.
-      reportToComponent(errorCode, publication);
-    } finally {
-      synchronized (lock) {
-        status.state = "failed";
-        status.phase = "done";
-        status.message = safe(message);
-        status.errorCode = safe(errorCode);
-        status.updatedAtEpochMs = System.currentTimeMillis();
-        touch();
-      }
+    // A precise terminal failure follows its component observation (or intentional stale-attempt
+    // fence). If publication itself throws, the owner reports a generic activation failure.
+    reportToComponent(errorCode, publication);
+    synchronized (lock) {
+      status.state = "failed";
+      status.phase = "done";
+      status.message = safe(message);
+      status.errorCode = safe(errorCode);
+      status.updatedAtEpochMs = System.currentTimeMillis();
+      touch();
     }
   }
 
