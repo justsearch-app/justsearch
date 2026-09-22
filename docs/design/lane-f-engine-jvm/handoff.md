@@ -9,8 +9,9 @@ are authorized; merge remains at stage F. No routine owner approval is pending.
 Continue after status answers, commits and reviews. C2 is accepted; D1/D2/E/F
 remain open. Root owns all Gradle runs, stack lifecycle and integration.
 
-Latest committed/pushed checkpoint: `921053650` (captured live query feature controls),
-CI35666267869 pending/running. `51b01365d` declares schema2 wire3.0.0 migration;
+Latest committed/pushed checkpoint: `23cc8929a` (coherent applied revision),
+CI35669241131 pending/running. Previous4bec3f00b implements the complete apply register;
+921053650 connects captured live query feature controls. `51b01365d` declares schema2 wire3.0.0 migration;
 its Public claims and Windows-native passed, integration was cancelled by successor.
 `c948cf85f` registered the generated status consumer;
 its wire gate exposed the missing major declaration, now locally proved by2401.
@@ -71,7 +72,7 @@ Do not connect suppliers while retaining those double reads.
 
 ## Next coherent work
 
-1. Inspect921053650's hosted successor while continuing implementation.
+1. Inspect23cc8929a's hosted successor while continuing implementation.
 2. Completed QU/filter ConfigStore wiring with once-per-operation sampling while
    preserving KSE feature gating and retrieve-context deterministic normalization.
    The bounded plan is evidence/D1/query-reader-plan-2026-09-22.md.
@@ -95,7 +96,17 @@ Do not connect suppliers while retaining those double reads.
    fences are implemented. Evidence/D1/applied-revision-verification-2026-09-22.md
    records2416realcommits,2417actualabsence/failure33cases,2418root/static47cases,
    and2419/2420/2421independentfence-removalreds with exactsourcebytesrestored.
-   Full integrated/live proof is next; do not claim D1-3 complete yet. Next run2422.
+   Full2422 Java/static/stress/installDist passes at23cc8929a in10m31s:
+   11523 cases/zero failures/31 skips,1802 suites,34 tasks (18 reused).
+   Full log/XML/counts/15-file source inventory captured at
+   tmp/2422-applied-revision-integrated*. Installed2423 hard-disable proves
+   generative ABSENT with the other three READY. Installed2424 standard-model
+   proves all four READY, runtime contract0.4.0 smoke and real-model query
+   exact/intersection/context100%,zero errors. Both official stops confirm
+   portsClosed:true. No build or stack is running. Next free run2425.
+   Read-only discovery is active for D1-4 settings commit ownership and D1-5
+   generative apply/rollback; reconcile current full-witness C2 authority and
+   actual patch domain before implementing the dated design's narrower seam.
    Continue dependency/value projections and D1 dispatch. All D1/D2/E/F acceptance
    remains binding, including the14 identity gaps.
 4. Preserve compiling checkpoints/push authorization to PR727 and inspect hosted

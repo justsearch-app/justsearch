@@ -56,9 +56,32 @@ runs its exact regression, captures XML, and restores original bytes in finally.
 expected exception (the unsafe observation was accepted), not a compiler/fixture error.
 Exact EngineRoot and EngineKnowledgeClient bytes are restored after the series.
 
-## Remaining proof and scope
+## Integrated and installed evidence
 
-Full integrated Java/static/stress/installDist and installed live checks are pending.
-No complete D1-3 or later-stage acceptance is claimed from these focused results.
+At23cc8929a837277b76773a2f00490b8b36e1a312,2422 runs
+`./gradlew.bat spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist --continue --console=plain`.
+It passes in10m31s:11523 cases, zero failures/errors,31 recorded skips,
+1802 suites across34 test tasks. Eighteen test tasks reuse unchanged results;
+the captured counts distinguish those from fresh execution. Full log, XML,
+counts, skips and15-file source inventory are retained at
+`tmp/2422-applied-revision-integrated*`. The whole-log failure index is empty.
+
+Installed2423 uses captured LLM_ENABLED=false: schema2 reports API/index/encoders
+READY and generative ABSENT. Run62b70f4f-a8da-42b9-bee2-9530a73c760c uses API57484;
+official stop confirms portsClosed:true. Evidence: `tmp/2423-disabled-*.json`.
+
+Installed2424 uses the standard model profile and online intent: all four
+components READY, runtime-client contract0.4.0 live smoke passes. Real-model jseval
+executes one query with zero errors, exact/intersection/context accuracy100%,
+retrieve1974ms, LLM2950ms and65 completion tokens. This is plumbing/regression
+proof, not broad retrieval-quality evidence. Run c82d8056-8c3d-430b-9723-5f9f40053565
+uses API50685; official stop confirms portsClosed:true. Evidence:
+`tmp/2424-normal-*.json`, `tmp/2424-online-intent.json`,
+`tmp/2424-runtime-smoke.txt`, `tmp/2424-model-query.txt` and
+`tmp/2424-model-query/tier2-eval.json`.
+
+## Remaining scope
+
+These checks establish the implemented applied-revision boundary, not later-stage acceptance.
 D1-4 dispatch/atomic publishing, D1-12's fourteen fingerprint/model-binding gaps,
 and all remaining D1/D2/E/F work remain required.
