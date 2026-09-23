@@ -117,6 +117,14 @@ export async function exerciseMigrationRestart(c) {
         && walk.sealed_at != null && walk.acknowledged_revision === walk.revision ? { row, walk } : null;
     } finally { jobs.close(); operations.close(); }
   });
+  // The retirement reaper runs every two minutes. Publication may precede the runner's
+  // terminal receipt, so allow the first post-settlement reaper tick to perform exact deletion.
+  const retired = await waitFor('settled predecessor removed after live cutover', 150000, () => {
+    const generation = readJson(generationFile);
+    return generation?.active_generation === `g-${rebuildKey}`
+      && !generation.previous_generation
+      && !fs.existsSync(path.join(indexBase, 'indices', blue)) ? generation : null;
+  });
   requireThat(promoted.generation.active_generation === `g-${rebuildKey}`,
     'promotion did not use the accepted operation generation');
   const afterSettlement = readJson(supervisorFile);
@@ -150,6 +158,6 @@ export async function exerciseMigrationRestart(c) {
     requireThat(c.output().includes(`Engine incarnation ${incarnation} exited 4 (requested_restart`),
       `incarnation ${incarnation} did not record its own clean requested restart`);
   }
-  console.log('MIGRATION_PASS', JSON.stringify({ blue, rebuildKey, settlement,
+  console.log('MIGRATION_PASS', JSON.stringify({ blue, rebuildKey, settlement, retired,
     promoted, rollbackResponse, afterRefusal, work }));
 }

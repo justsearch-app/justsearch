@@ -268,12 +268,10 @@ final class DocumentIdentityBootImportTest {
     // the projection on every Head search. A uid that survives the migration in the index but not
     // in the served response orphans every label just the same.
     //
-    // Green is not the SERVING generation while the migration is in flight — searchLifecycle is
-    // Blue by construction — so the search has to happen after the cutover. The production cutover
-    // ends in a Worker restart (KnowledgeServerMigrationOps promotes, then calls
-    // initiateShutdownAction), so this reproduces exactly that sequence: commit Green, close, promote,
-    // boot again. Searching the in-flight server instead would have queried BLUE and passed on
-    // Blue's own uid, proving nothing about the rebuild.
+    // Green is not serving while the migration is in flight. Close after committing Green,
+    // promote its pointer while no Worker can publish a successor runtime, then boot again.
+    // This is the native pointer-before-publication crash cut: boot must serve Green and finish
+    // predecessor retirement. Searching the in-flight server would have queried Blue instead.
     server.lifecycleManagerForTests().commitOps().commitAndTrack();
     server.close();
     // server = null: if promoteBuildingGenerationToActive() below throws before the reassignment
@@ -281,7 +279,9 @@ final class DocumentIdentityBootImportTest {
     server = null;
 
     IndexGenerationManager postMigration = new IndexGenerationManager(layout.indexBase());
-    postMigration.promoteBuildingGenerationToActive();
+    var pointerCommitted = postMigration.promoteBuildingGenerationToActive();
+    assertEquals(migration.active_generation(), pointerCommitted.previous_generation(),
+        "the crash cut must retain Blue until the successor boot settles replay");
 
     server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
@@ -342,6 +342,19 @@ final class DocumentIdentityBootImportTest {
           "the served revision must be lowercase SHA-256 hex, not a truncated or upper-cased form:"
               + " " + revision);
     }
+    long retirementDeadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+    boolean retired = false;
+    while (System.nanoTime() < retirementDeadline) {
+      var state = new IndexGenerationManager(layout.indexBase()).readStateBestEffort();
+      if ((state.previous_generation() == null || state.previous_generation().isBlank())
+          && !Files.exists(layout.activePath())) {
+        retired = true;
+        break;
+      }
+      Thread.sleep(200L);
+    }
+    assertTrue(retired,
+        "native boot must delete Blue and clear its pointer after the committed successor serves");
   }
 
   /** Chunk hits of {@code parentDocId} once at least {@code minimum} are visible, else fails. */

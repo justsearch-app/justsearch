@@ -254,11 +254,47 @@ final class EngineKnowledgeClientServingViewLifetimeTest {
     }
   }
 
+  @Test
+  void subscriptionRetiresItsCapturedViewAndSignalsBridgeReconnect() throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var ingest = mock(WorkerIngestService.class);
+    doAnswer(invocation -> {
+      entered.countDown();
+      await(release);
+      return null;
+    }).when(ingest).subscribeIndexingJobs(any(), any(), any());
+    var services = services(null, ingest);
+    var closed = new AtomicInteger();
+    var retirement = new AtomicReference<Runnable>();
+    var lease = leaseFor(services, closed);
+    when(lease.onRetirement(any())).thenAnswer(invocation -> {
+      retirement.set(invocation.getArgument(0));
+      return (Runnable) () -> retirement.set(null);
+    });
+    var error = new AtomicReference<Throwable>();
+
+    try (var registry = registry();
+        var client = client(registry, services, () -> lease)) {
+      client.subscribeIndexingJobs(ignored -> {}, error::set, () -> {},
+          TestEngineContexts.FOREGROUND);
+      assertTrue(entered.await(3, TimeUnit.SECONDS));
+      retirement.get().run();
+      release.countDown();
+      awaitClosed(closed, 3);
+      assertTrue(error.get() instanceof io.justsearch.indexerworker.services.WorkerServiceException);
+      assertTrue(retirement.get() == null, "closed flow deregisters its retirement listener");
+    } finally {
+      release.countDown();
+    }
+  }
+
   private static KnowledgeServer.ServingLease leaseFor(WorkerAppServices services,
       AtomicInteger closed) {
     var lease = mock(KnowledgeServer.ServingLease.class);
     when(lease.services()).thenReturn(services);
     when(lease.fork()).thenAnswer(ignored -> leaseFor(services, closed));
+    when(lease.onRetirement(any())).thenReturn(() -> {});
     doAnswer(ignored -> {
       closed.incrementAndGet();
       return null;

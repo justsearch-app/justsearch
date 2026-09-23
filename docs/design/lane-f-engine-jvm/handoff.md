@@ -4,9 +4,52 @@ Start with the [continuation brief](continuation-brief.md): the next two batches
 owner boundaries, acceptance endpoints and execution protocol. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-23)
+## Current state (2026-09-24)
 
-### Active checkpoint `5eac4851603e` (23:14 Berlin)
+### Integrated live Blue retirement checkpoint after `449653f63bb3`
+
+The installed recorded migration exposed two issued Blue serving-view holders
+after live Green publication: the indexing-jobs subscription and its delivery
+task. Blue could retire only at shutdown; the two-holder reaper log is in the
+`tmp/3002` installed run. Long-lived streams now register a per-view retirement
+callback, release the old flow and reconnect the Head bridge to Green after
+publication locks release. Finite issued calls still drain normally. The
+focused lifetime test and install distribution passed at
+`tmp/3005-serving-stream-retirement-focused.txt`. The installed recorded
+`migration` scenario passed at `tmp/3006-migration-installed-stream-retirement.txt`:
+Green search and exact queue/operation settlement, rollback 409, Blue pointer
+clear and directory deletion while incarnation 2 remained running, and clean
+private-stack teardown. The native pointer-before-publication boot assertion
+and the fresh no-READY installer fixture are included. The coherent 358-task
+`spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist`
+sweep passed at `tmp/3007-stream-retirement-integrated.txt`. Push this
+checkpoint, then let hosted CI finish before another push.
+
+### Active checkpoint `449653f63bb3` (23:48 Berlin)
+
+Checkpoint `449653f63bb3` is pushed to PR727. Native predecessor retirement
+waits for settled replay and the last issued Blue view, and new builds refuse
+retained predecessor capacity. The corrected 358-task integrated suite passed
+at `tmp/2992-native-retirement-integrated.txt`; the retained standard-model
+installed pointer-before-settings cut passed at
+`tmp/2994-installer-standard-current-retirement.txt` with exact operation
+receipt, settings and pointer B, both search documents and private-stack stop.
+Hosted CI run `35924698949` finished SUCCESS at this SHA, including system
+integration and Windows-native jobs. An uncommitted native
+pointer-before-publication boot assertion now proves Green serves and Blue's
+pointer/directory retire after reboot; its focused Worker/static check passed
+at `tmp/2993-native-pointer-boot-focused.txt`. The installed fixture now
+explicitly requires no committed model settings and a non-READY initial AI
+manifest; it passed the same standard-model cut at
+`tmp/2995-installer-fresh-no-ready-standard.txt` and the private stack stopped.
+The retained initial manifest reports `OFFLINE` in that run. The installed
+recorded migration at `tmp/2996-migration-installed-native-current.txt` passed
+live Green publication, exact queue acknowledgement and rollback refusal. Its
+new live-retirement assertion exposed the two-holder lifetime gap at
+`tmp/2998-migration-installed-retirement-reaper.txt`; the correction and passing
+installed proof are above.
+
+### Earlier checkpoint `5eac4851603e` (23:14 Berlin)
 
 Checkpoint `5eac4851603e` is pushed to PR727. Ordinary native migration now
 uses the in-process Flow A serving-view publication: an exact A/B pointer guard,

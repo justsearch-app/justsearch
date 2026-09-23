@@ -284,6 +284,15 @@ export async function exerciseInstallerActivationFault(c) {
     'caller-selected installer activation key must be unknown before dispatch');
 
   const beforeSettings = settingsWitnessOnDisk(data);
+  requireThat(beforeSettings.witness.acceptedRevision === 0
+    && beforeSettings.witness.lastCommittedOperationKey == null
+    && !beforeSettings.settings?.embedOnnxModelPath
+    && !beforeSettings.settings?.nerModelPath
+    && !beforeSettings.settings?.spladeModelPath
+    && typeof manifest.ai?.phase === 'string' && manifest.ai.phase !== 'READY',
+  `installer activation must start without a prior READY model or committed model settings: ${JSON.stringify({
+    witness: beforeSettings.witness, ai: manifest.ai,
+  })}`);
   const headers = sessionHeaders(manifest);
   const input = { source: 'installer_model_activation' };
   const prepared = await prepareApprovedActivationDispatch({ apiPort, input, operationKey,

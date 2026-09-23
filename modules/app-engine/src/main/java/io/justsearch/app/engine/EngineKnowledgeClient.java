@@ -641,6 +641,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     void release() {
       if (released.compareAndSet(false, true) && lease != null) lease.close();
     }
+
+    Runnable onRetirement(Runnable listener) {
+      return lease == null ? () -> {} : lease.onRetirement(listener);
+    }
   }
 
   <T> T withServingLease(io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease,
@@ -1458,6 +1462,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       FlowCancelSignal cancel = new FlowCancelSignal();
       var subscriptionOwner = work.retain();
       var registration = new AtomicReference<io.justsearch.app.api.EngineWorkHandle.Registration>();
+      var retirementListener = new AtomicReference<Runnable>();
+      Runnable closedListener = () -> {};
       flow.onClose(() -> {
         try {
           cancel.cancel();
@@ -1467,14 +1473,25 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
             if (callback != null) callback.close();
           } finally {
             try { subscriptionOwner.close(); }
-            finally { view.release(); }
+            finally {
+              try {
+                Runnable remove = retirementListener.getAndSet(closedListener);
+                if (remove != null) remove.run();
+              } finally { view.release(); }
+            }
           }
         }
       });
+      Runnable removeRetirementListener = view.onRetirement(() ->
+          flow.fail(WorkerServiceException.unavailable("Index serving view retired")));
+      if (!retirementListener.compareAndSet(null, removeRetirementListener)) {
+        removeRetirementListener.run();
+      }
       var cancellation = work.onCancel(reason ->
           flow.fail(new io.justsearch.app.api.EngineWorkCancelledException(reason)));
       registration.set(cancellation);
       if (cancel.isCancelled()) cancellation.close();
+      if (cancel.isCancelled()) return flow::close;
       CallContext ctx = new CallContext(traceId, requestId, cancel,
           work.context(), enqueueProvenance(work.context()), () -> work.retain()::close);
       // If the pool refuses the PRODUCER after the flow's delivery thread was accepted, the flow

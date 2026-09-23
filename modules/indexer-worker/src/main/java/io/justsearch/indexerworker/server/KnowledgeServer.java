@@ -178,6 +178,7 @@ public final class KnowledgeServer implements Closeable {
     private volatile EncoderSet encoderSet;
     private EncoderSet.Lease encoderLease;
     private int holders;
+    private final List<Runnable> retirementListeners = new ArrayList<>();
     private boolean retiring;
     private boolean cleanupRunning;
     private Runnable retireCleanup;
@@ -226,6 +227,20 @@ public final class KnowledgeServer implements Closeable {
         captured.holders++;
         return new ServingLease(captured);
       }
+    }
+
+    /** Long-lived calls can end and reconnect when this physical view stops serving. */
+    public Runnable onRetirement(Runnable listener) {
+      Objects.requireNonNull(listener, "listener");
+      boolean alreadyRetiring;
+      synchronized (servingViewMonitor) {
+        alreadyRetiring = captured.retiring;
+        if (!alreadyRetiring) captured.retirementListeners.add(listener);
+      }
+      if (alreadyRetiring) listener.run();
+      return () -> {
+        synchronized (servingViewMonitor) { captured.retirementListeners.remove(listener); }
+      };
     }
 
     @Override public void close() {
@@ -3150,6 +3165,22 @@ public final class KnowledgeServer implements Closeable {
     for (ServingView retired : snapshot) cleanRetiredServingView(retired);
   }
 
+  /** Notify outside publication/runtime locks: listeners may close their issued work and reconnect. */
+  private void notifyServingViewRetirement(ServingView retired) {
+    if (retired == null) return;
+    List<Runnable> listeners;
+    synchronized (servingViewMonitor) {
+      listeners = List.copyOf(retired.retirementListeners);
+      retired.retirementListeners.clear();
+    }
+    for (Runnable listener : listeners) {
+      try { listener.run(); }
+      catch (RuntimeException failure) {
+        log.warn("Retiring index serving view could not notify an issued stream", failure);
+      }
+    }
+  }
+
   /** Reclaim a committed predecessor only after replay and every old view have settled. */
   private void retryCommittedGenerationRetirement() {
     if (indexGenerationManager == null || closeStarted) return;
@@ -3169,12 +3200,23 @@ public final class KnowledgeServer implements Closeable {
     if (previous.equals(active)) return;
     synchronized (servingViewMonitor) {
       if (servingView == null || servingView.retiring || !retiredServingViews.isEmpty()
-          || activeIndexPath == null || !active.equals(activeIndexPath.getFileName().toString())) return;
+          || activeIndexPath == null || !active.equals(activeIndexPath.getFileName().toString())) {
+        log.debug("Predecessor retirement waits for serving view: present={}, retiring={}, "
+                + "retiredViews={}, activePath={}, expectedActive={}",
+            servingView != null, servingView != null && servingView.retiring,
+            retiredServingViews.stream().map(view -> view.activeGenerationPath + ":holders="
+                + view.holders + ":cleanupRunning=" + view.cleanupRunning).toList(),
+            activeIndexPath, active);
+        return;
+      }
     }
     try {
       if (IndexGenerationManager.isRecordedGenerationIdentity(active)) {
         if (recordedIngestionLifecycle == null
-            || !recordedIngestionLifecycle.committedBulkTerminal(active.substring(2))) return;
+            || !recordedIngestionLifecycle.committedBulkTerminal(active.substring(2))) {
+          log.debug("Predecessor retirement waits for recorded terminal receipt: {}", active);
+          return;
+        }
       } else if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
           || !nativePredecessorReplaySettled()) {
         return;
@@ -3813,6 +3855,7 @@ public final class KnowledgeServer implements Closeable {
     AtomicBoolean published = new AtomicBoolean();
     AtomicBoolean pointerUncertain = new AtomicBoolean();
     AtomicReference<ServingView> preparedView = new AtomicReference<>();
+    AtomicReference<ServingView> retiredForNotification = new AtomicReference<>();
     AtomicReference<RecordedIngestionLifecycle.CommittedProjection>
         committedProjection = new AtomicReference<>();
     boolean requestRecovery = false;
@@ -3972,6 +4015,7 @@ public final class KnowledgeServer implements Closeable {
                       old.retiring = true;
                       old.retireCleanup = cleanup;
                       retiredServingViews.add(old);
+                      retiredForNotification.set(old);
                       activeIndexPath = successorPath;
                       buildingIndexPath = null;
                       searchLifecycle = green;
@@ -4034,6 +4078,7 @@ public final class KnowledgeServer implements Closeable {
       if (!published.get() && !pointerUncertain.get() && successor != null) successor.close();
       if (!published.get() && preparedView.get() != null) preparedView.get().releaseEncoderSet();
       runtimeSwapLock.unlock();
+      if (published.get()) notifyServingViewRetirement(retiredForNotification.get());
       if (!published.get() && !pointerUncertain.get() && preparedProjection != null) {
         try { preparedProjection.abortBeforePointer(); }
         catch (RuntimeException | Error cleanupFailure) {
