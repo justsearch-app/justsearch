@@ -2,14 +2,18 @@
 package io.justsearch.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
 
 /**
  * Tempdoc 883 §C.5c — the config the rest of boot sees is rebuilt AFTER the boot steps that write
@@ -103,5 +107,45 @@ final class HeadlessAppConfigRebuildOrderingTest {
         "C:/models/chat.gguf",
         effective.resolution("justsearch.llm.model_path").value(),
         "a rebuild that dropped ordinal 300 would silently un-set every GUI value at boot");
+  }
+
+  @Test
+  @DisplayName("boot policy publication is already present in the first settings candidate")
+  void policySnapshotDoesNotLookLikeAnEncoderChangeOnFirstApply(@TempDir Path temp) {
+    String previousHome = System.getProperty("justsearch.home");
+    String previousGpuPolicy = System.getProperty("policy.gpu_acceleration_enabled");
+    String previousExternalPolicy = System.getProperty(
+        "justsearch.policy.disallowExternalInferenceServers");
+    ConfigStore previousStore = ConfigStore.globalOrNull();
+    System.setProperty("justsearch.home", temp.toString());
+    System.clearProperty("policy.gpu_acceleration_enabled");
+    System.clearProperty("justsearch.policy.disallowExternalInferenceServers");
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(java.util.Map.of());
+    UiSettings settings = new UiSettings();
+    ResolvedConfigBuilder initial = ResolvedConfig.builder();
+    initial.contributeBaseSources();
+    io.justsearch.app.services.config.ConfigStoreRebuilder.contributeUiSettings(initial, settings);
+    ConfigStore store = new ConfigStore(initial.build());
+    try {
+      ConfigStore.setGlobal(store);
+      HeadlessApp.refreshPolicySources(store, settings);
+
+      ResolvedConfig firstCandidate =
+          io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(settings);
+      assertEquals(firstCandidate.resolution("policy.gpu_acceleration_enabled").value(),
+          store.get().resolution("policy.gpu_acceleration_enabled").value());
+      assertFalse(ConfigApplyScopes.classify(store.get(), firstCandidate)
+          .component().containsKey("encoders"));
+    } finally {
+      io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previousStore);
+      restoreProperty("justsearch.home", previousHome);
+      restoreProperty("policy.gpu_acceleration_enabled", previousGpuPolicy);
+      restoreProperty("justsearch.policy.disallowExternalInferenceServers", previousExternalPolicy);
+    }
+  }
+
+  private static void restoreProperty(String name, String value) {
+    if (value == null) System.clearProperty(name);
+    else System.setProperty(name, value);
   }
 }

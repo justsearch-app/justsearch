@@ -340,6 +340,38 @@ task counts are preserved under `tmp/2600-d1-integrated-after-review-xml` and
 The ONNX stage still requires the recorded generation owner route; no D1-4
 acceptance is claimed.
 
+Checkpoint `c876a4e85` with that recovery slice and the honest red result was
+pushed to PR727. Installed validation then found two boot-source defects. The
+dev runner publishes `JUSTSEARCH_SERVER_EXE` for its selected CUDA executable;
+activation wrongly refused even when the requested variant named that same
+file. A guarded same-path correction permits that identity and still refuses a
+different operator executable; focused app-services test/static proof is
+`tmp/2605-operator-exe-focused.txt`. Next, policy discovery in `setupInfra`
+wrote `policy.gpu_acceleration_enabled` after the initial resolved config, so
+the first settings candidate appeared to change the `encoders` component.
+Policy discovery now precedes the boot refresh and runtime selection;
+`HeadlessAppConfigRebuildOrderingTest` and UI static proof pass in
+`tmp/2609-policy-boot-focused.txt`. Diagnostic proof of the two original
+refusals is in installed runs `tmp/2604-d1-dev-runner.txt`,
+`tmp/2606-d1-dev-runner.txt` and `tmp/2608-d1-dev-runner.txt`.
+
+Installed run `a44315b6` after both corrections activated standard Qwen9B in
+10.9s, reported API/index/encoders/generative READY and passed runtime-client
+smoke (`tmp/2611-d1-runtime-smoke.txt`). A jseval query against the dev
+runner's default `.dev-data` had no cinnamon source and correctly returned
+insufficient information (`tmp/2613-model-query/tier2-eval.json`); this was
+data provenance, not model activation proof of that answer. Owned run
+`6948e84e` then used the exact retained corpus directory from prior run
+`25140142`: standard model already active, runtime-client0.4.0 smoke passed
+(`tmp/2615-retained-runtime-smoke.txt`), and the real-model jseval query
+answered Captain Mortimer Flux exactly with zero errors/anchor errors
+(`tmp/2616-retained-model-query/tier2-eval.json`). Official stop reported
+`portsClosed:true`; quick_health returned ABSENT, no foreign run/orphan. The
+local dev MCP preflight still checks the retired Worker distribution, so the
+same shared-lease `dev-runner.cjs` started/stopped these runs; MCP health and
+activation operated on their recorded run IDs. This installed proof belongs to
+the boot correction atop `c876a4e85`; full D1 remains open.
+
 Install AI's embedding, NER and SPLADE paths are generation-bound by the governed
 register. The remaining ONNX test failure is therefore an ownership gap, not a
 reason to permit ordinary reconfigure to bypass `core.bulk-reindex`. The chosen

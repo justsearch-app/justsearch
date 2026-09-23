@@ -77,8 +77,9 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
         Owner owner = owners.get(name);
         if (owner == null) {
           throw new SettingsCommitOwner.Refused(OperationResult.failure(
-              "Runtime component owner is unavailable: " + name,
-              "COMPONENT_PREPARATION_REQUIRED", Map.of("component", name), true));
+              "Runtime component owner is unavailable: " + name + " for " + affected.get(name),
+              "COMPONENT_PREPARATION_REQUIRED",
+              Map.of("component", name, "keys", affected.get(name)), true));
         }
         selected.put(name, owner);
       });

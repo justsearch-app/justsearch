@@ -206,6 +206,52 @@ final class RuntimeActivationServiceChatProfileTest {
   }
 
   @Test
+  @DisplayName("an operator executable matching the requested variant permits profile activation")
+  void matchingOperatorExecutablePermitsActivation() throws Exception {
+    setUpEnvironment();
+    Path variantExe = createVariantExe("cuda12");
+    createCompactModel();
+    setProp(SERVER_EXE_PROP, variantExe.toString());
+    UiSettingsStore store = settingsStore();
+    RecordingComponents components = new RecordingComponents(store);
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components);
+    svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
+
+    svc.startActivate("cuda12", "compact");
+    AiRuntimeActivationStatus status = awaitDone(svc);
+
+    assertEquals("completed", status.state, "message=" + status.message);
+    assertEquals(List.of(ChatModelProfile.COMPACT), components.installedProfiles);
+    assertEquals(variantExe.toString(), ConfigStore.global().get().ai().serverExe().toString());
+  }
+
+  @Test
+  @DisplayName("an operator executable differing from the requested variant blocks activation")
+  void differentOperatorExecutableBlocksActivation() throws Exception {
+    setUpEnvironment();
+    createVariantExe("cuda12");
+    createCompactModel();
+    Path operatorExe = tmp.resolve("operator-server.exe");
+    Files.writeString(operatorExe, "operator-server", StandardCharsets.UTF_8);
+    setProp(SERVER_EXE_PROP, operatorExe.toString());
+    UiSettingsStore store = settingsStore();
+    SettingsWitness before = store.inspect().witness();
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store);
+    svc.setSelfTestOverrideForTest((exe, model) -> {
+      fail("self-test must not run when the operator selected another executable");
+      return null;
+    });
+
+    svc.startActivate("cuda12", "compact");
+    AiRuntimeActivationStatus status = awaitDone(svc);
+
+    assertEquals("failed", status.state);
+    assertTrue(status.message.contains("Server executable override is locked"));
+    assertEquals(before, store.inspect().witness());
+    assertEquals(operatorExe.toString(), ConfigStore.global().get().ai().serverExe().toString());
+  }
+
+  @Test
   @DisplayName("precommit component refusal leaves original settings and config")
   void precommitComponentFailureLeavesOriginalSettingsAndConfig() throws Exception {
     setUpEnvironment();

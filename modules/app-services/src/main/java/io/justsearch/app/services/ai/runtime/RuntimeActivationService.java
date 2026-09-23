@@ -914,7 +914,7 @@ public final class RuntimeActivationService
     }
 
     UiSettingsStore.Snapshot base = settingsStore.inspect();
-    requireMutableServerExecutable();
+    requireMutableServerExecutable(exe);
     UiSettings current = base.settings();
 
     // Tempdoc 842 §2.4: a named profile selects the (model, mmproj) pair as one unit. It is
@@ -995,13 +995,13 @@ public final class RuntimeActivationService
 
   private void runDeactivate(AttemptPublication publication) {
     UiSettingsStore.Snapshot base = settingsStore.inspect();
-    requireMutableServerExecutable();
     Path baselineExe = resolveCpuBaselineExe(aiHome);
     if (baselineExe == null || !Files.isRegularFile(baselineExe)) {
       fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null,
           publication);
       return;
     }
+    requireMutableServerExecutable(baselineExe);
     UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(base.settings()), UiSettings.class);
     // A blank value would expose the remembered CUDA auto-detection source again.
     next.setServerExecutablePath(baselineExe.toAbsolutePath().toString());
@@ -1047,10 +1047,12 @@ public final class RuntimeActivationService
     return new SettingsWitness(Math.addExact(expected.acceptedRevision(), 1), result.record().key());
   }
 
-  private static void requireMutableServerExecutable() {
+  private static void requireMutableServerExecutable(Path requested) {
     ConfigStore config = ConfigStore.globalOrNull();
     var resolution = config == null ? null : config.get().resolution(SERVER_EXE_KEY);
-    if (resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400) {
+    if (resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400
+        && !Path.of(resolution.value()).toAbsolutePath().normalize()
+            .equals(requested.toAbsolutePath().normalize())) {
       throw new IllegalStateException("Server executable override is locked by operator config");
     }
   }

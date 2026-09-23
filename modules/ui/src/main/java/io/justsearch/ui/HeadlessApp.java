@@ -407,12 +407,6 @@ public class HeadlessApp {
                 io.justsearch.app.services.inference.InferenceMetricCatalog.DEFINITIONS),
             io.justsearch.telemetry.JvmMetricCatalog.catalogFor("head")));
 
-    try {
-      new EnterprisePolicyServiceImpl().snapshot();
-    } catch (Exception ignored) {
-      // best-effort
-    }
-
     // Tempdoc 518 Appendix G W4.2 â€” initialize head-side OTel tracing. Mirrors the worker
     // pattern at KnowledgeServer.java:335-347. Gated on HEAD_TRACING_LEVEL; default "none"
     // means GlobalOpenTelemetry stays no-op and the existing head-side span-authoring sites
@@ -737,6 +731,8 @@ public class HeadlessApp {
         new java.util.concurrent.locks.ReentrantReadWriteLock());
     ConfigStore.setGlobal(configStore);
 
+    refreshPolicySources(configStore, settings);
+
     Path autoServer = maybeAutoSelectCuda12Variant(settings, configStore);
     if (autoServer != null) {
       autoDetected = new java.util.HashMap<>(autoDetected);
@@ -765,6 +761,18 @@ public class HeadlessApp {
   static ResolvedConfig rebuildAfterPostBuildWrites(ConfigStore configStore, UiSettings settings) {
     io.justsearch.app.services.config.ConfigStoreRebuilder.rebuild(configStore, settings);
     return configStore.get();
+  }
+
+  /** Publishes boot policy sources before runtime selection and the first settings candidate. */
+  static void refreshPolicySources(ConfigStore configStore, UiSettings settings) {
+    // Policy discovery mirrors its effective flags into the resolver's process sources.
+    // A later settings candidate must not mistake that boot publication for an encoder change.
+    try {
+      new EnterprisePolicyServiceImpl().snapshot();
+    } catch (Exception ignored) {
+      // best-effort; policy loading itself fails closed where required.
+    }
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rebuild(configStore, settings);
   }
 
   /**
