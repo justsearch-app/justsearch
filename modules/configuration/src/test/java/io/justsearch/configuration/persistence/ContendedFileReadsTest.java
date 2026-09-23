@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.URI;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -30,6 +31,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 class ContendedFileReadsTest {
@@ -144,6 +147,47 @@ class ContendedFileReadsTest {
     assertTrue(
         TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 500,
         "a missing path must not consume the lock retry budget");
+  }
+
+  @Test
+  @EnabledOnOs(OS.LINUX)
+  void reopensAfterContentionWhenWriterRotatesThePathBeforePublishingReplacement()
+      throws Exception {
+    Path target = tempDir.resolve("state.json");
+    Path previous = tempDir.resolve("state.json.prev");
+    byte[] next = "new-authoritative-state".getBytes();
+    Files.writeString(target, "old-authoritative-state");
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    CountDownLatch readStarted = new CountDownLatch(1);
+    AtomicReference<Thread> readerThread = new AtomicReference<>();
+    try (FileChannel channel = FileChannel.open(target, StandardOpenOption.READ,
+        StandardOpenOption.WRITE)) {
+      FileLock oldStateLock = channel.lock();
+      try {
+        Future<byte[]> reader = executor.submit(() -> {
+          readerThread.set(Thread.currentThread());
+          readStarted.countDown();
+          return ContendedFileReads.readAllBytes(target, Duration.ofSeconds(2));
+        });
+        assertTrue(readStarted.await(1, TimeUnit.SECONDS));
+        assertTrue(awaitState(readerThread.get(), Thread.State.TIMED_WAITING, Duration.ofSeconds(1)),
+            "reader must be in the lock retry wait");
+        assertThrows(TimeoutException.class, () -> reader.get(100, TimeUnit.MILLISECONDS),
+            "reader must first encounter the old state's lock");
+
+        Files.move(target, previous);
+        oldStateLock.release();
+        // Keep the path absent longer than the read retry interval to exercise the exact gap.
+        Thread.sleep(100);
+        Files.write(target, next);
+        assertArrayEquals(next, reader.get(2, TimeUnit.SECONDS));
+      } finally {
+        if (oldStateLock.isValid()) oldStateLock.release();
+      }
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(2, TimeUnit.SECONDS));
+    }
   }
 
   @Test
