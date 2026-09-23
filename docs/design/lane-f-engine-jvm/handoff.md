@@ -500,6 +500,54 @@ the owner-lock regression and static checks pass at
 at a new revision, and the published model set, async streams, and side-by-side
 A/B publication remain open D1 blockers.
 
+## 2026-09-23 deferred A/B lifetime checkpoint (WIP)
+
+PR727's `3f4f6e07a` hosted run 35824997755 passed Public claims, build,
+Windows-native and platform contracts. App-ui failed four distinct cases across
+retries: three stale `ClientLease.withClient` mocks (locally corrected at
+`tmp/2682-hosted-ui-fixtures.txt`) and the real installer ONNX setting route.
+The latter correctly refuses ordinary generation-bound settings apply. The
+search-worker and system-integration hosted jobs were cancelled after the
+app-ui failure; neither is hosted acceptance proof for this checkpoint.
+
+The uncommitted lifetime slice now opens a deferred B writer beside A's live
+reader, composes B services, starts B's indexing thread behind an activation
+gate, publishes the complete B serving view, then releases the gate. A's issued
+leases continue on A until actual task/stream exit; cleanup runs outside the
+swap and publication locks. Candidate services and prepared runtime retain a
+joint retry owner on refusal. Retired cleanup is retried on the existing
+maintenance tick and at shutdown. Model initialization pins B plus any
+still-issued A under swap/publication ordering and wires both before readiness
+release. `EngineKnowledgeClient` now binds queued unary, fanout and stream work
+to the exact physical view until actual exit. The old direct
+`DeferredRuntime.upgradeWriter` API was removed; adapter tests use the
+two-step prepared owner. Canonical adapter/schema docs were updated, and docs
+regeneration plus all five docs checks passed.
+
+Evidence: the prior broad run found eight app-engine failures and a Worker
+shutdown deadlock (`tmp/2689-serving-affected-suites.txt`, thread dump
+`tmp/2690-indexer-worker-threaddump.txt`). The corrected focused behavior
+passed at `tmp/2693-focused-owners-static.txt` apart from a PMD qualifier fixed
+immediately afterward. Gated loop and abandonment tests passed with PMD and
+Spotless at `tmp/2699-gated-loop-focused.txt`; model capture and A/B startup
+tests passed at `tmp/2700-model-capture-owner.txt`; adapter migration passed at
+`tmp/2701-retire-legacy-upgrade.txt`. The latest full affected-module run,
+`tmp/2702-lifetime-integrated-affected.txt`, passed adapter, worker-services,
+indexer-worker and app-engine tests (including stress), PMD and Spotless in
+11m15s. Independent refute-first review found no remaining material race in
+this slice; its final report named missing acceptance proof below.
+
+Still required before D1 lifetime acceptance: hold a production A service
+request at model readiness through B publication and prove both views receive
+the selected model; inject retired A cleanup refusal and prove a later retry;
+run a deterministic shutdown-versus-deferred-initializer lock-order regression.
+The existing raw A-reader test does not prove model/service coherence. D1-4
+also still needs complete Head graph publication and installed concurrency
+proof. D1-8/D1-12 still need the recorded installer generation target, complete
+generation-owned `EncoderSet`, live promotion/replay/gap protocol and model
+identity. D2/E/F remain open. Shared stack has stayed stopped; no new installed
+or hosted proof has been claimed for this WIP slice.
+
 ## Evidence and owner map
 
 | Concern | Governing record |

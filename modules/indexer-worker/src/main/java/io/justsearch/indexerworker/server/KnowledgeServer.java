@@ -134,6 +134,7 @@ public final class KnowledgeServer implements Closeable {
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
   private WorkerAppServices pendingAppServices;
+  private DeferredRuntime.PreparedUpgrade pendingDeferredUpgrade;
   private final Object closeLock = new Object();
   private final ReentrantLock runtimeSwapLock = new ReentrantLock();
 
@@ -166,6 +167,7 @@ public final class KnowledgeServer implements Closeable {
   private final ReentrantReadWriteLock publicationLock;
   private final Object servingViewMonitor = new Object();
   private ServingView servingView;
+  private final List<ServingView> retiredServingViews = new ArrayList<>();
 
   private static final class ServingView {
     private final WorkerAppServices services;
@@ -174,6 +176,8 @@ public final class KnowledgeServer implements Closeable {
     private final Path activeGenerationPath;
     private int holders;
     private boolean retiring;
+    private boolean cleanupRunning;
+    private Runnable retireCleanup;
 
     private ServingView(WorkerAppServices services, LuceneRuntime searchRuntime,
         LuceneRuntime ingestRuntime, Path activeGenerationPath) {
@@ -214,6 +218,7 @@ public final class KnowledgeServer implements Closeable {
         captured.holders--;
         servingViewMonitor.notifyAll();
       }
+      cleanRetiredServingView(captured);
     }
   }
   private volatile boolean closeStarted;
@@ -925,7 +930,7 @@ public final class KnowledgeServer implements Closeable {
         //
         // Tempdoc 406 Phase 4a: deferred-writer mode is re-enabled. When the index
         // has existing segments, openDeferred() opens read-only first (fast); the
-        // background initDeferredModels later calls DeferredRuntime.upgradeWriter()
+        // background initDeferredModels later calls DeferredRuntime.prepareWriterUpgrade()
         // which returns a fresh RunningRuntime. KS reconstructs and republishes
         // appServices via reconstructAppServicesAfterDeferredUpgrade() so write
         // methods become available without restarting this server.
@@ -1385,6 +1390,7 @@ public final class KnowledgeServer implements Closeable {
       } catch (RuntimeException failure) {
         log.warn("stuck-job reaper tick failed (will retry): {}", failure.toString());
       }
+      retryRetiredServingViews();
     }, REAP_INTERVAL_MS, REAP_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
 
@@ -1401,7 +1407,7 @@ public final class KnowledgeServer implements Closeable {
 
   /**
    * How a background-model-init failure is reported. Extracted so the one decision it makes is
-   * testable: a {@code SCHEMA_MISMATCH} arriving from {@code DeferredRuntime.upgradeWriter()} means
+   * testable: a {@code SCHEMA_MISMATCH} arriving from {@code DeferredRuntime.prepareWriterUpgrade()} means
    * ingestion has STOPPED — the index cannot accept writes under this runtime's shape — and filing
    * that under the generic "non-fatal" background-init line is how it stayed invisible while the
    * automatic migration silently never ran (tempdoc 915 §C.12, open item O7).
@@ -1429,7 +1435,7 @@ public final class KnowledgeServer implements Closeable {
   /**
    * True if {@code t} or any cause in its chain is a {@code SCHEMA_MISMATCH}. Walks the chain
    * because the deferred upgrade wraps: the guard's exception arrives inside whatever
-   * {@code upgradeWriter()} threw.
+   * {@code prepareWriterUpgrade()} threw.
    */
   static boolean isSchemaMismatch(Throwable t) {
     for (Throwable c = t; c != null; c = c.getCause()) {
@@ -1488,17 +1494,31 @@ public final class KnowledgeServer implements Closeable {
    * {@link DevReloadManager}'s hot-reload path so all three observe the same wiring.
    */
   DefaultWorkerAppServices newAppServices() {
+    return newAppServices(infraCtx, ingestLifecycle);
+  }
+
+  private DefaultWorkerAppServices newAppServicesForRuntime(RunningRuntime runtime) {
+    InfraContext base = Objects.requireNonNull(infraCtx, "infraCtx");
+    InfraContext fixed = new InfraContext(base.config(), base.jobQueue(), () -> runtime,
+        () -> runtime, base.signalBus(), base.telemetry(), base.metricRegistry(),
+        base.indexBasePath(), base.activeIndexPath(), base.migrationProgressSupplier(),
+        base.migrationSwitchingMaxDurationMs(), base.pathResolutionStore(),
+        base.documentIdentityStore());
+    return newAppServices(fixed, runtime);
+  }
+
+  private DefaultWorkerAppServices newAppServices(InfraContext selected,
+      LuceneRuntime selectedIngest) {
     if (serviceConfiguration == null) {
       serviceConfiguration = WorkerServiceConfiguration.capture(
           startupConfiguration, workerExecutors.pdfOcr().spec().threadCount());
     }
-    LuceneRuntime currentIngest = this.ingestLifecycle;
-    if (currentIngest instanceof RunningRuntime runningRuntime) {
+    if (selectedIngest instanceof RunningRuntime runningRuntime) {
       bindTerminalWriterFaultSource(runningRuntime);
     }
     return new DefaultWorkerAppServices(
         workerExecutors,
-        infraCtx,
+        selected,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
         embeddingTelemetry,
         indexingPacing,
@@ -1519,7 +1539,7 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Apply post-construction wiring to {@code appServices}. Called after the initial
    * boot-time construction and again after any reconstruction (e.g., when
-   * {@link DeferredRuntime#upgradeWriter()} swaps the runtime and we need a fresh
+   * {@link DeferredRuntime#prepareWriterUpgrade()} swaps the runtime and we need a fresh
    * {@link DefaultWorkerAppServices} with non-null indexingLoop / ingestService).
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
@@ -1560,7 +1580,7 @@ public final class KnowledgeServer implements Closeable {
     }
 
     // Tempdoc 819: the ECC is now resolved BEFORE the first appServices reconstruction
-    // (DeferredRuntime.upgradeWriter -> reconstructAppServicesAfterDeferredUpgrade), which
+    // (DeferredRuntime.prepareWriterUpgrade -> reconstructAppServicesAfterDeferredUpgrade), which
     // previously ran ahead of the ECC's only wire site. Re-wire it on every reconstruction so a
     // fresh DefaultWorkerAppServices does not start its indexing loop with a null controller.
     // Null on the boot-time call (the ECC is constructed just after) — the boot path wires it
@@ -1572,7 +1592,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Tempdoc 406 Phase 4a: after {@link DeferredRuntime#upgradeWriter()} swaps the
+   * Tempdoc 406 Phase 4a: after {@link DeferredRuntime#prepareWriterUpgrade()} swaps the
    * runtime, the existing {@code appServices} captured ops from the now-closed
    * deferred runtime. Reconstruct from the current {@code infraCtx} (which sees
    * the post-upgrade {@code RunningRuntime} via supplier re-read), re-apply
@@ -1585,7 +1605,7 @@ public final class KnowledgeServer implements Closeable {
    * reason. Mirrors {@code DevReloadManager.performReload}'s swap.
    */
   private void reconstructAppServicesAfterDeferredUpgrade() {
-    log.info("Reconstructing appServices after DeferredRuntime.upgradeWriter()");
+    log.info("Reconstructing appServices after DeferredRuntime.prepareWriterUpgrade()");
     closePendingAppServices();
     WorkerAppServices oldServices = appServices;
     WorkerAppServices newServices = newAppServices();
@@ -1616,13 +1636,53 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void closePendingAppServices() {
-    if (pendingAppServices == null) return;
-    try {
-      pendingAppServices.close();
-      pendingAppServices = null;
-    } catch (IOException failure) {
-      throw new IllegalStateException("Unpublished application services still own resources", failure);
+    if (pendingAppServices != null) {
+      try {
+        pendingAppServices.close();
+        pendingAppServices = null;
+      } catch (IOException failure) {
+        throw new IllegalStateException("Unpublished application services still own resources", failure);
+      }
     }
+    if (pendingDeferredUpgrade != null) {
+      pendingDeferredUpgrade.close();
+      pendingDeferredUpgrade = null;
+    }
+  }
+
+  /** Opens and composes the deferred writer successor before changing reader admission. */
+  private void upgradeDeferredServing(DeferredRuntime deferred) {
+    ServingView retired = null;
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted || ingestLifecycle != deferred || searchLifecycle != deferred) {
+        throw new IllegalStateException("Deferred upgrade lost its runtime owner");
+      }
+      closePendingAppServices();
+      var preparation = deferred.prepareWriterUpgrade();
+      pendingDeferredUpgrade = preparation;
+      try {
+        RunningRuntime upgraded = preparation.runtime();
+        WorkerAppServices oldServices = Objects.requireNonNull(appServices, "appServices");
+        DefaultWorkerAppServices candidate = newAppServicesForRuntime(upgraded);
+        pendingAppServices = candidate;
+        wireAppServicesPostConstruction(candidate);
+        candidate.prepareIndexingLoop();
+        retired = publishDeferredSuccessor(candidate, oldServices, upgraded, preparation);
+        pendingAppServices = null;
+        pendingDeferredUpgrade = null;
+        // Only a no-throw gate opens after B is publicly selected; no jobs were claimed before it.
+        candidate.activatePreparedIndexingLoop();
+      } catch (RuntimeException | Error failure) {
+        try { closePendingAppServices(); }
+        catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        throw failure;
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+      if (retired != null) cleanRetiredServingView(retired);
+    }
+    notifyRecordedServicesPublished();
   }
 
   void retainPendingAppServices(WorkerAppServices candidate) {
@@ -1667,8 +1727,8 @@ public final class KnowledgeServer implements Closeable {
     Objects.requireNonNull(drainTimeout, "drainTimeout");
     Objects.requireNonNull(reason, "reason");
     if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
-    runtimeSwapLock.lock();
     final long elapsed;
+    runtimeSwapLock.lock();
     try {
       if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
       try {
@@ -1707,26 +1767,22 @@ public final class KnowledgeServer implements Closeable {
   @SuppressWarnings("PMD.CognitiveComplexity")
   private ModelContext initDeferredModels() {
     long bgStart = System.nanoTime();
+    List<ServingLease> modelWiringLeases = new ArrayList<>();
     if (encoderComponent != null) {
       encoderComponent.transition(io.justsearch.core.component.ComponentState.STARTING, null, null);
     }
     try {
       // Open IndexWriter (deferred from sync path so reads are answerable sooner).
-      // Phase types: DeferredRuntime.upgradeWriter() returns a fresh RunningRuntime;
+      // Phase types: DeferredRuntime.prepareWriterUpgrade() returns a fresh RunningRuntime;
       // swap the holder fields and reconstruct appServices (which captured ops from
       // the now-closed deferred session), then republish it. After this:
       //   - search continues seamlessly via the upgraded runtime
       //   - write methods stop returning UNAVAILABLE; the indexing loop starts
       if (ingestLifecycle instanceof DeferredRuntime deferred) {
-        retireServingView();
-        RunningRuntime upgraded = deferred.upgradeWriter();
-        publishIngestLifecycle(upgraded);
-        if (this.searchLifecycle == deferred) {
-          this.searchLifecycle = upgraded;
-        }
-        reconstructAppServicesAfterDeferredUpgrade();
+        upgradeDeferredServing(deferred);
         drainSwitchBufferBestEffort();
       }
+      modelWiringLeases.addAll(captureModelWiringLeases());
 
       // --- Composition root: resolve install contract + hardware profile ---
       var compositionConfig = startupConfiguration;
@@ -1789,20 +1845,20 @@ public final class KnowledgeServer implements Closeable {
         if (es.isAvailable()) {
           embeddingService = es;
           validateEmbeddingDimension();
-          appServices.wireEmbeddingProvider(es);
+          wireModelServices(modelWiringLeases, svc -> svc.wireEmbeddingProvider(es));
           // observations.md fix: null `embeddingService` on GPU-handoff unload
           // so `GpuDiagnosticSuppliers` lambdas (rebound to re-read the field)
           // stop returning data from the closed instance. The provider becomes
           // NoOpEmbeddingProvider.INSTANCE on unload (IndexingLoop:1581);
           // `instanceof` is rename-safe in a way the prior class-name string
           // match wasn't.
-          appServices.addEmbeddingProviderChangeListener(
+          wireModelServices(modelWiringLeases, svc -> svc.addEmbeddingProviderChangeListener(
               provider -> {
                 if (provider == null
                     || provider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider) {
                   this.embeddingService = null;
                 }
-              });
+              }));
           log.info("Embedding service ready (dimension={})", es.dimension());
         }
       } else if (surface.bgeM3().isEmpty()) {
@@ -1823,11 +1879,13 @@ public final class KnowledgeServer implements Closeable {
         var nerService = new io.justsearch.indexerworker.ner.NerService(
             surface.ner().get(), nerConfig);
         nerServiceInstance = nerService;
-        appServices.wireNerService(nerService);
+        wireModelServices(modelWiringLeases, svc -> svc.wireNerService(nerService));
         var nerModelPath = nerConfig.modelPath().toString();
         var nerGpuEnabled = nerConfig.gpuEnabled();
-        appServices.ingestService().setNerModelPathSupplier(() -> nerModelPath);
-        appServices.ingestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled);
+        wireModelServices(modelWiringLeases,
+            svc -> svc.ingestService().setNerModelPathSupplier(() -> nerModelPath));
+        wireModelServices(modelWiringLeases,
+            svc -> svc.ingestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled));
       } else if (nerConfig.isReady()) {
         log.info("NER: surface returned no assembly; NER will be unavailable.");
       }
@@ -1843,7 +1901,7 @@ public final class KnowledgeServer implements Closeable {
                 bgeAssembly.tokenizer(),
                 bgeConfig);
         bgeM3EncoderInstance = bgeEncoder;
-        appServices.wireBgeM3Encoder(bgeEncoder);
+        wireModelServices(modelWiringLeases, svc -> svc.wireBgeM3Encoder(bgeEncoder));
         log.info(
             "BGE-M3 encoder ready (replaces SPLADE + EmbeddingService): model={}",
             bgeConfig.modelPath());
@@ -1862,7 +1920,7 @@ public final class KnowledgeServer implements Closeable {
                 spladeAssembly.truncationEvidencePath(),
                 spladeConfig);
         spladeEncoderInstance = spladeEncoder;
-        appServices.wireSpladeEncoder(spladeEncoder);
+        wireModelServices(modelWiringLeases, svc -> svc.wireSpladeEncoder(spladeEncoder));
         log.info("SPLADE encoder ready: model={}", spladeConfig.modelPath());
 
         if (spladeConfig.isIdfQueryMode()) {
@@ -1873,7 +1931,8 @@ public final class KnowledgeServer implements Closeable {
                   new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
                       idfPath, spladeEncoder.tokenizer(), spladeEncoder.vocabulary());
               spladeIdfQueryEncoder = idfEncoder;
-              appServices.wireSpladeIdfQueryEncoder(idfEncoder);
+              wireModelServices(modelWiringLeases,
+                  svc -> svc.wireSpladeIdfQueryEncoder(idfEncoder));
               log.info("SPLADE IDF query encoder ready: {}", idfPath);
             } catch (Exception e) {
               log.warn("Failed to load IDF table (falling back to ONNX): {}", e.getMessage());
@@ -1890,7 +1949,7 @@ public final class KnowledgeServer implements Closeable {
         var ds = new io.justsearch.indexerworker.disambiguation.DisambiguationService(dataDir);
         ds.open();
         disambiguationService = ds;
-        appServices.wireDisambiguationService(ds);
+        wireModelServices(modelWiringLeases, svc -> svc.wireDisambiguationService(ds));
       } catch (Exception e) {
         log.warn("Failed to initialize disambiguation service (non-fatal): {}", e.getMessage());
         log.debug("Failed to initialize disambiguation service (stack trace)", e);
@@ -1903,7 +1962,8 @@ public final class KnowledgeServer implements Closeable {
         searchRerankerInstance =
             new io.justsearch.reranker.CrossEncoderReranker(
                 rerankAssembly.sessions(), rerankAssembly.shape(), rerankAssembly.tokenizer());
-        appServices.wireSearchReranker(searchRerankerInstance);
+        wireModelServices(modelWiringLeases,
+            svc -> svc.wireSearchReranker(searchRerankerInstance));
         // F5: Warm up ORT session at startup instead of paying 5-10s on the first user query.
         try {
           long warmStart = System.nanoTime();
@@ -1927,7 +1987,8 @@ public final class KnowledgeServer implements Closeable {
       // Head's app-services feedback layer (feature snapshots / dispositions / GPL triples).
       try {
         long searchWarmStart = System.nanoTime();
-        boolean searchWarmed = appServices.searchService().warmUpSearchPath();
+        boolean searchWarmed = modelWiringLeases.getFirst().services().searchService()
+            .warmUpSearchPath();
         long searchWarmMs = (System.nanoTime() - searchWarmStart) / 1_000_000;
         if (searchWarmed) {
           log.info("Search path ready (warm-up={}ms)", searchWarmMs);
@@ -1948,7 +2009,8 @@ public final class KnowledgeServer implements Closeable {
                 citationAssembly.sessions(),
                 citationAssembly.shape(),
                 citationAssembly.tokenizer());
-        appServices.wireCitationScorer(citationScorerInstance);
+        wireModelServices(modelWiringLeases,
+            svc -> svc.wireCitationScorer(citationScorerInstance));
       }
 
       // GPU diagnostics suppliers (post-model wiring)
@@ -1967,8 +2029,7 @@ public final class KnowledgeServer implements Closeable {
       // above) propagate to /api/status. Method-references like
       // `embeddingService::getOrtCudaStatus` would have bound the instance at
       // lambda-creation time and continued returning stale data after close.
-      appServices.wireGpuDiagnostics(
-          new GpuDiagnosticSuppliers(
+      GpuDiagnosticSuppliers diagnostics = new GpuDiagnosticSuppliers(
               sparseStatusSupplier,
               sparseModelPathSupplier,
               () -> {
@@ -1993,15 +2054,15 @@ public final class KnowledgeServer implements Closeable {
               searchRerankerInstance != null ? searchRerankerInstance::getOrtCudaStatus : null,
               nerServiceInstance != null ? nerServiceInstance::getOrtCudaStatus : null,
               citationScorerInstance != null ? citationScorerInstance::getOrtCudaStatus : null,
-              bgeM3EncoderInstance != null ? bgeM3EncoderInstance::getOrtCudaStatus : null));
+              bgeM3EncoderInstance != null ? bgeM3EncoderInstance::getOrtCudaStatus : null);
+      wireModelServices(modelWiringLeases, svc -> svc.wireGpuDiagnostics(diagnostics));
 
       // Tempdoc 394 follow-up: publish per-stage enabled state on /api/status.
       // "Enabled" here means the service is usable — config-enabled AND
       // initialization succeeded. A non-null instance satisfies both.
-      appServices.wireStageEnabled(
-          embeddingService != null,
-          spladeEncoderInstance != null,
-          nerServiceInstance != null);
+      wireModelServices(modelWiringLeases,
+          svc -> svc.wireStageEnabled(embeddingService != null,
+              spladeEncoderInstance != null, nerServiceInstance != null));
 
       publishEncoderComposition();
 
@@ -2044,6 +2105,7 @@ public final class KnowledgeServer implements Closeable {
     } finally {
       // Ensure enumerator is unblocked even if init failed partway through.
       modelReadyLatch.countDown();
+      for (ServingLease lease : modelWiringLeases) lease.close();
     }
   }
 
@@ -2152,7 +2214,7 @@ public final class KnowledgeServer implements Closeable {
    * exactly such a commit, which made the empty-index fast path unreachable on every first launch.
    *
    * <p>Both index-reading suppliers RE-READ {@code ingestLifecycle} on every call rather than
-   * binding the runtime's ops at construction time: {@code DeferredRuntime.upgradeWriter()}
+   * binding the runtime's ops at construction time: {@code DeferredRuntime.prepareWriterUpgrade()}
    * (DeferredRuntime.java:70-93) builds a NEW {@code RuntimeSession} and closes the old one, so a
    * bound method reference captured here would later read a closed session.
    *
@@ -2660,6 +2722,137 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
+  /** Installs a prepared writer successor while already-issued read-only A leases continue. */
+  private ServingView publishDeferredSuccessor(WorkerAppServices preparedServices,
+      WorkerAppServices oldServices, RunningRuntime upgraded,
+      DeferredRuntime.PreparedUpgrade preparation) {
+    ServingView successor = new ServingView(preparedServices, upgraded, upgraded, activeIndexPath);
+    Runnable cleanup = () -> {
+      try {
+        oldServices.close();
+      } catch (IOException failure) {
+        throw new IllegalStateException("Old application services still own resources", failure);
+      }
+      preparation.retireReader();
+    };
+    ServingView old;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        old = servingView;
+        if (closeStarted || old == null || old.retiring || old.services != oldServices) {
+          throw new IllegalStateException("Deferred successor lost its serving predecessor");
+        }
+        preparation.markPublished();
+        old.retiring = true;
+        old.retireCleanup = cleanup;
+        retiredServingViews.add(old);
+        searchLifecycle = upgraded;
+        ingestLifecycle = upgraded; // writer fault source was bound during candidate construction
+        appServices = preparedServices;
+        servingView = successor;
+        servingViewMonitor.notifyAll();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    return old;
+  }
+
+  /** Cleanup starts only after A's actual issued work exits, outside owner/publication monitors. */
+  private void cleanRetiredServingView(ServingView retired) {
+    Runnable cleanup;
+    synchronized (servingViewMonitor) {
+      if (retired.holders != 0 || retired.retireCleanup == null || retired.cleanupRunning) return;
+      retired.cleanupRunning = true;
+      cleanup = retired.retireCleanup;
+    }
+    try {
+      cleanup.run();
+      synchronized (servingViewMonitor) {
+        retired.retireCleanup = null;
+        retiredServingViews.remove(retired);
+        servingViewMonitor.notifyAll();
+      }
+    } catch (RuntimeException | Error failure) {
+      synchronized (servingViewMonitor) {
+        retired.cleanupRunning = false;
+        servingViewMonitor.notifyAll();
+      }
+      log.error("Retired index serving view still owns resources", failure);
+    }
+  }
+
+  /** Reattempt transient close refusals on the existing server-owned maintenance tick. */
+  private void retryRetiredServingViews() {
+    List<ServingView> snapshot;
+    synchronized (servingViewMonitor) { snapshot = List.copyOf(retiredServingViews); }
+    for (ServingView retired : snapshot) cleanRetiredServingView(retired);
+  }
+
+  /** Keep every still-issued view alive until its model dependencies are wired and released. */
+  private List<ServingLease> captureModelWiringLeases() {
+    List<ServingLease> leases = new ArrayList<>();
+    runtimeSwapLock.lock();
+    try {
+      publicationLock.readLock().lock();
+      try {
+        synchronized (servingViewMonitor) {
+          if (servingView == null || servingView.retiring) {
+            throw new IllegalStateException("No active serving view for model wiring");
+          }
+          servingView.holders++;
+          leases.add(new ServingLease(servingView));
+          for (ServingView retired : retiredServingViews) {
+            if (retired.holders > 0 && !retired.cleanupRunning) {
+              retired.holders++;
+              leases.add(new ServingLease(retired));
+            }
+          }
+        }
+      } finally {
+        publicationLock.readLock().unlock();
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    return leases;
+  }
+
+  private static void wireModelServices(List<ServingLease> leases,
+      Consumer<WorkerAppServices> wiring) {
+    for (ServingLease lease : leases) wiring.accept(lease.services());
+  }
+
+  /** Shutdown cannot release shared index owners while an older published view still survives. */
+  private void closeRetiredServingViews() throws IOException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (true) {
+      ServingView retired;
+      synchronized (servingViewMonitor) {
+        if (retiredServingViews.isEmpty()) return;
+        retired = retiredServingViews.getFirst();
+        if (retired.holders != 0 || retired.cleanupRunning) {
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0) throw new IOException("Retired index serving view still owns resources");
+          try {
+            TimeUnit.NANOSECONDS.timedWait(servingViewMonitor, remaining);
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted waiting for retired index serving view", interrupted);
+          }
+          continue;
+        }
+      }
+      cleanRetiredServingView(retired);
+      synchronized (servingViewMonitor) {
+        if (retiredServingViews.contains(retired)) {
+          throw new IOException("Retired index serving view cleanup refused; owners retained");
+        }
+      }
+    }
+  }
+
   /** Stops new captures, then waits outside publication for actual users to leave. */
   void retireServingView() throws IOException {
     runtimeSwapLock.lock();
@@ -2746,6 +2939,19 @@ public final class KnowledgeServer implements Closeable {
     synchronized (closeLock) {
       if (shutdownLatch.getCount() == 0) return;
       closeStarted = true;
+      // The initializer may be waiting to enter a runtime replacement. Join it before taking
+      // runtimeSwapLock; otherwise close owns the lock while waiting for its prospective owner.
+      if (!closePrepared) {
+        if (deferredModelExecutor != null) deferredModelExecutor.close();
+        if (deferredModelInit != null) {
+          try {
+            deferredModelInit.join();
+          } catch (java.util.concurrent.CompletionException
+              | java.util.concurrent.CancellationException e) {
+            log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
+          }
+        }
+      }
       boolean acquired;
       try {
         acquired = runtimeSwapLock.tryLock(5, TimeUnit.SECONDS);
@@ -2773,20 +2979,8 @@ public final class KnowledgeServer implements Closeable {
             stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
           }
 
-          // The initializer publishes model/runtime fields that the remaining close steps release. It
-          // must finish before those fields are closed and before the Engine exits: JVM shutdown hooks
-          // may tear down native ORT environment state concurrently with a still-running initializer.
-          if (deferredModelExecutor != null) deferredModelExecutor.close();
-          if (deferredModelInit != null) {
-            try {
-              deferredModelInit.join();
-            } catch (java.util.concurrent.CompletionException
-                | java.util.concurrent.CancellationException e) {
-              log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
-            }
-          }
-
           retireServingView();
+          closeRetiredServingViews();
 
           // Native retirement is a dependency of every later service and tokenizer close. A
           // timeout retains the exact sessions, their owners and the index root lock for retry.

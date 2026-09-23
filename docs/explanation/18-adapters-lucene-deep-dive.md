@@ -164,7 +164,7 @@ package-private), so the segment-naming counter is the readable proxy; `Director
 on an acquired searcher gives the complementary "segments currently visible" reading.
 
 **All three are per-session and reset on a session swap** — they live on `RuntimeSession`, so
-`DeferredRuntime.upgradeWriter`, a blue/green re-open and the corruption-recovery rebuild each
+`DeferredRuntime.prepareWriterUpgrade()` (which opens a new writer session), a blue/green re-open and the corruption-recovery rebuild each
 start them from zero. They are not process-monotonic. Where a reason-tagged histogram exists
 (`index.runtime.commit_ms`) it accumulates across sessions and is the more complete figure; the
 gauges are for within-run, within-session comparison.

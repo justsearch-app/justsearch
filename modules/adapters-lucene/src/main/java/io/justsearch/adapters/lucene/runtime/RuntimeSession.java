@@ -57,7 +57,7 @@ final class RuntimeSession implements AutoCloseable {
     RUNNING,
     /** Read-only. No writer. Read-side ops only. */
     READ_ONLY,
-    /** Read-only initially; transitions to read-write via {@link DeferredRuntime#upgradeWriter()}. */
+    /** Read-only initially; transitions to read-write via {@link DeferredRuntime#prepareWriterUpgrade()}. */
     DEFERRED
   }
 

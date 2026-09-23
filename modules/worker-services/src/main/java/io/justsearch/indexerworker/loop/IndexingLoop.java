@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -179,6 +180,8 @@ public class IndexingLoop implements Closeable {
 
   private volatile LoopState currentState = LoopState.IDLE;
   private Thread loopThread;
+  private final CountDownLatch activationGate = new CountDownLatch(1);
+  private final Object probePublicationMonitor = new Object();
   private long indexedSinceCommit = 0;
   private long lastCommitTime = System.currentTimeMillis();
   // Tempdoc 516 Slice 4a.1: pendingMarkDone moved into IngestionOutcomeJournal, encapsulated.
@@ -571,12 +574,14 @@ public class IndexingLoop implements Closeable {
    * Starts the background indexing loop.
    */
   public void start() {
+    prepareStart();
+    activatePreparedStart();
+  }
+
+  /** Starts the thread behind a gate so construction can fail before a successor is published. */
+  public void prepareStart() {
     if (running.compareAndSet(false, true)) {
       currentState = LoopState.IDLE;
-      // Tempdoc 798: publish the third backfill-yield signal. This loop owns the job queue, so it
-      // is the only component that can answer "is primary indexing work waiting"; BackfillScheduler
-      // reads it through the signal bus alongside shouldYieldGpuBackfill().
-      signalBus.setPendingIngestProbe(this::hasPendingIngestWork);
       loopThread = new Thread(this::runLoop, "indexing-loop");
       loopThread.setDaemon(true);
       // Tempdoc 588 F-1 defense-in-depth: if the loop thread ever dies uncaught, flip `running`
@@ -591,6 +596,11 @@ public class IndexingLoop implements Closeable {
       loopThread.start();
       log.info("IndexingLoop started");
     }
+  }
+
+  /** Opens only the prepared gate; all fallible thread construction ran before publication. */
+  public void activatePreparedStart() {
+    activationGate.countDown();
   }
 
   /**
@@ -633,6 +643,17 @@ public class IndexingLoop implements Closeable {
   }
 
   private void runLoop() {
+    try {
+      activationGate.await();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return;
+    }
+    synchronized (probePublicationMonitor) {
+      if (!running.get()) return;
+      // The probe is published only after the writer loop's generation is active.
+      signalBus.setPendingIngestProbe(this::hasPendingIngestWork);
+    }
     log.info("Indexing loop running");
 
     while (running.get() && !Thread.currentThread().isInterrupted()) {
@@ -1119,10 +1140,12 @@ public class IndexingLoop implements Closeable {
   @Override
   public void close() throws IOException {
     log.info("Stopping IndexingLoop...");
-    running.set(false);
-    // Tempdoc 798: drop the probe so a signal bus that outlives this loop can't answer from a
-    // dead queue reference.
-    signalBus.setPendingIngestProbe(null);
+    synchronized (probePublicationMonitor) {
+      running.set(false);
+      activationGate.countDown();
+      // A late gate release cannot re-publish this loop's probe after close clears it.
+      signalBus.setPendingIngestProbe(null);
+    }
 
     if (loopThread != null) {
       // Like resetForProfiling, stop cooperatively. Interrupting this owner during Lucene

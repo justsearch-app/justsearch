@@ -172,7 +172,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // If ingest is DeferredRuntime, construct in "deferred mode": indexingLoop and
     // ingestService are skipped (write side not available until upgrade); the
     // search side works against DeferredRuntime's read ops. KS reconstructs this
-    // appServices after DeferredRuntime.upgradeWriter() and swaps the
+    // appServices after DeferredRuntime.prepareWriterUpgrade() and swaps the
     // DelegatingX wrappers via setDelegate (mirrors DevReloadManager flow).
     io.justsearch.adapters.lucene.runtime.LuceneRuntime ingestLifecycle =
         ctx.ingestLifecycleSupplier().get();
@@ -252,7 +252,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // 3. Ingest service. WorkerIngestService is null-tolerant for
     // ingestLifecycle/indexingLoop — write methods report UNAVAILABLE when
     // either is null. KS reconstructs this with non-null values after
-    // DeferredRuntime.upgradeWriter(); item A9 deleted the wrapper it used to
+    // DeferredRuntime.prepareWriterUpgrade(); item A9 deleted the wrapper it used to
     // swap, so publishing the new appServices instance is the whole swap now.
     this.ingestService =
         new WorkerIngestService(
@@ -404,7 +404,17 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       indexingLoop.start();
     }
     // Else: deferred mode — KS will reconstruct appServices and start the loop
-    // after DeferredRuntime.upgradeWriter().
+    // after DeferredRuntime.prepareWriterUpgrade().
+  }
+
+  /** Constructs B's loop thread without permitting it to claim jobs before publication. */
+  public void prepareIndexingLoop() {
+    if (indexingLoop != null) indexingLoop.prepareStart();
+  }
+
+  /** Opens the already-started loop after B is selected; no thread construction remains. */
+  public void activatePreparedIndexingLoop() {
+    if (indexingLoop != null) indexingLoop.activatePreparedStart();
   }
 
   @Override

@@ -249,6 +249,10 @@ final class EngineAppliedGenerationObservationTest {
 
     static RootFixture open(WorkerAppServices owner) throws Exception {
       KnowledgeServer server = mock(KnowledgeServer.class);
+      KnowledgeServer.ServingLease lease = mock(KnowledgeServer.ServingLease.class);
+      when(lease.services()).thenReturn(owner);
+      when(lease.fork()).thenReturn(lease);
+      when(server.captureServingView()).thenReturn(lease);
       when(server.foregroundLoad()).thenReturn(new ForegroundLoad());
       when(server.appServices()).thenReturn(owner);
       when(server.awaitClosed(anyLong())).thenReturn(true);

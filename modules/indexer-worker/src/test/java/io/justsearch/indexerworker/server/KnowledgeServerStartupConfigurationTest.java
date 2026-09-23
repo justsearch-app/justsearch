@@ -8,6 +8,8 @@ import static org.mockito.Mockito.*;
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
+import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
+import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchSort;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.model.ModelPrecision;
@@ -36,6 +38,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.apache.lucene.search.MatchAllDocsQuery;
 
 @Timeout(120)
 class KnowledgeServerStartupConfigurationTest {
@@ -249,6 +252,62 @@ class KnowledgeServerStartupConfigurationTest {
         assertSame(captured, replacement.resolvedConfig());
       } finally {
         server.close();
+      }
+    } finally {
+      TestResolvedConfigHelper.restoreGlobal(previous);
+    }
+  }
+
+  @Test
+  void deferredUpgradePublishesBWhileIssuedAReaderStillWorks() throws Exception {
+    var previous = ConfigStore.globalOrNull();
+    var captured = configuration("parallel-services", "splade", "2",
+        Map.of(EnvRegistry.EXTRACTION_SANDBOX_MODE.configKey(), "in_process"));
+    ConfigStore.setGlobal(new ConfigStore(captured));
+    try {
+      // The second boot takes the deferred-reader path only after the first boot writes segments.
+      try (var seedExecutors = new TestEngineExecutors()) {
+        var seed = spy(new KnowledgeServer(seedExecutors, WorkerConfig.load(captured), null,
+            ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, null, captured));
+        doNothing().when(seed).startDeferredModelInitialization(any());
+        try {
+          seed.start();
+          ((LuceneRuntime) field(seed, "searchLifecycle")).commitOps().commitAndTrack();
+        } finally {
+          seed.close();
+        }
+      }
+      try (var executors = new TestEngineExecutors()) {
+        var server = spy(new KnowledgeServer(executors, WorkerConfig.load(captured), null,
+            ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, null, captured));
+        doNothing().when(server).startDeferredModelInitialization(any());
+        try {
+          server.start();
+          var a = server.captureServingView();
+          try {
+            assertInstanceOf(DeferredRuntime.class, a.searchRuntime());
+            var upgrade = KnowledgeServer.class.getDeclaredMethod("upgradeDeferredServing",
+                DeferredRuntime.class);
+            upgrade.setAccessible(true);
+            upgrade.invoke(server, a.searchRuntime());
+            try (var b = server.captureServingView()) {
+              assertNotSame(a.services(), b.services());
+              assertNotSame(a.searchRuntime(), b.searchRuntime());
+              assertSame(b.services(), server.appServices());
+              assertEquals(0, a.searchRuntime().readPathOps().search(new MatchAllDocsQuery(),
+                  10, Set.of(), RuntimeSearchSort.RELEVANCE, null).hits().size(),
+                  "issued A runtime remains usable after B publication");
+            }
+            a.close();
+            assertThrows(RuntimeException.class, () -> a.searchRuntime().readPathOps().search(
+                new MatchAllDocsQuery(), 10, Set.of(), RuntimeSearchSort.RELEVANCE, null),
+                "old runtime must retire after the last A lease leaves");
+          } finally {
+            a.close();
+          }
+        } finally {
+          server.close();
+        }
       }
     } finally {
       TestResolvedConfigHelper.restoreGlobal(previous);

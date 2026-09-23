@@ -438,7 +438,7 @@ public final class LuceneRuntimeTypes {
    *     reopen path (the background {@code ControlledRealTimeReopenThread}, {@code
    *     CommitOps.maybeRefresh*}, and the reopen-on-demand seam in {@code SearcherBridge}).
    *     <b>PER SESSION, not monotonic for the process:</b> it lives on {@code RuntimeSession} and
-   *     therefore RESETS whenever a new session is built — {@code DeferredRuntime.upgradeWriter},
+   *     therefore RESETS whenever a new session is built — {@code DeferredRuntime.prepareWriterUpgrade},
    *     a blue/green re-open, or the corruption-recovery rebuild. A run that swapped sessions
    *     under-reports against the reason-tagged {@code index.runtime.commit_ms} histogram, which
    *     accumulates across them (885 measured 46 here against 114 there). Prefer the histogram

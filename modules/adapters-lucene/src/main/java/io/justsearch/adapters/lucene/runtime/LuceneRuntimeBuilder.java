@@ -185,7 +185,7 @@ public final class LuceneRuntimeBuilder {
 
   /**
    * Open a deferred-writer runtime: starts read-only, transitions to
-   * read-write via {@link DeferredRuntime#upgradeWriter()} on a background
+   * read-write via {@link DeferredRuntime#prepareWriterUpgrade()} on a background
    * thread.
    */
   public DeferredRuntime openDeferred() {

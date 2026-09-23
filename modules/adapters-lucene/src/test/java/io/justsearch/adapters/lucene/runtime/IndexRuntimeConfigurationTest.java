@@ -41,7 +41,10 @@ class IndexRuntimeConfigurationTest extends RuntimeTestBase {
             .withoutRecovery()
             .openDeferred()) {
       Map<String, Object> before = deferred.appliedConfigurationValues();
-      RunningRuntime upgraded = deferred.upgradeWriter();
+      var preparation = deferred.prepareWriterUpgrade();
+      RunningRuntime upgraded = preparation.runtime();
+      preparation.markPublished();
+      preparation.retireReader();
       try (upgraded) {
         assertEquals(before, upgraded.appliedConfigurationValues());
         assertEquals(IndexRuntimeConfiguration.dependencies(), before.keySet());

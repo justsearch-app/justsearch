@@ -97,13 +97,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private final java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
       servingLeaseSupplier;
   private final ThreadLocal<WorkerAppServices> taskServices = new ThreadLocal<>();
+  private final ThreadLocal<CallView> taskServingView = new ThreadLocal<>();
   private final ThreadLocal<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
       parentServingLease = new ThreadLocal<>();
 
   /**
-   * @param services the composed index half, read per call and never cached: {@code KnowledgeServer}
-   *     REPLACES its {@code WorkerAppServices} on a deferred-runtime upgrade and on dev hot-reload,
-   *     and a client holding the old instance would keep calling services bound to a closed runtime
+   * @param services the composed index half supplier: {@code KnowledgeServer} REPLACES its
+   *     {@code WorkerAppServices} on a deferred-runtime upgrade and on dev hot-reload; each
+   *     operation captures one exact serving view before asynchronous work is queued
    * @param foregroundLoad the gate over the process-wide {@code ForegroundLoad} gauge
    * @param deadlineMs the base deadline the categories multiply
    * @param batchSize the per-batch submission clamp
@@ -572,7 +573,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   /** Resolve once per call; runtime replacement briefly publishes no composed services. */
   private <T> T requireService(Function<WorkerAppServices, T> selector) {
-    WorkerAppServices current = currentServices();
+    return requireService(currentServices(), selector);
+  }
+
+  private <T> T requireService(WorkerAppServices current, Function<WorkerAppServices, T> selector) {
     if (current == null) {
       throw translate(WorkerServiceException.unavailable("Index services are being replaced"));
     }
@@ -584,11 +588,60 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   private WorkerAppServices currentServices() {
+    CallView view = taskServingView.get();
+    if (view != null && !view.deferredServices) return view.services();
     WorkerAppServices captured = taskServices.get();
     return captured != null ? captured : services.get();
   }
 
-  private record CallView(WorkerAppServices services, Runnable release) {}
+  private <T> T withTaskView(CallView view, java.util.function.Supplier<T> action) {
+    WorkerAppServices previousServices = taskServices.get();
+    CallView previousView = taskServingView.get();
+    taskServices.set(view.services());
+    taskServingView.set(view);
+    try {
+      return action.get();
+    } finally {
+      if (previousServices == null) taskServices.remove();
+      else taskServices.set(previousServices);
+      if (previousView == null) taskServingView.remove();
+      else taskServingView.set(previousView);
+    }
+  }
+
+  /** Exact physical services captured for one logical operation or asynchronous child. */
+  private static final class CallView {
+    private final WorkerAppServices services;
+    private final io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease;
+    private final boolean deferredServices;
+    private final AtomicBoolean released = new AtomicBoolean();
+
+    private CallView(WorkerAppServices services) {
+      this(services, false);
+    }
+
+    private CallView(WorkerAppServices services, boolean deferredServices) {
+      this.services = services;
+      this.lease = null;
+      this.deferredServices = deferredServices;
+    }
+
+    private CallView(io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease) {
+      this.services = Objects.requireNonNull(lease, "lease").services();
+      this.lease = lease;
+      this.deferredServices = false;
+    }
+
+    WorkerAppServices services() { return services; }
+
+    CallView fork() {
+      return lease == null ? new CallView(services, deferredServices) : new CallView(lease.fork());
+    }
+
+    void release() {
+      if (released.compareAndSet(false, true) && lease != null) lease.close();
+    }
+  }
 
   <T> T withServingLease(io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease,
       java.util.function.Supplier<T> action) {
@@ -606,11 +659,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     var parent = parentServingLease.get();
     if (parent != null) {
       var child = parent.fork();
-      return new CallView(child.services(), child::close);
+      return new CallView(child);
     }
-    if (servingLeaseSupplier == null) return new CallView(services.get(), () -> {});
+    var task = taskServingView.get();
+    if (task != null) {
+      return task.fork();
+    }
+    if (servingLeaseSupplier == null) return new CallView(services.get());
     var lease = servingLeaseSupplier.get();
-    return new CallView(lease.services(), lease::close);
+    return new CallView(lease);
   }
 
   /** Coherent committed inputs for the composition root, with the normal call ownership/budget. */
@@ -624,7 +681,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
             throw WorkerServiceException.unavailable("Applied generation services are unavailable");
           }
           var generation = ingest.captureAppliedGeneration(budget.context());
-          if (currentServices() != owner) {
+          if (services.get() != owner) {
             throw WorkerServiceException.aborted("Index runtime changed during applied generation capture");
           }
           return generation;
@@ -674,14 +731,16 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     try {
       budget = new Budget(budgetMs, work, pending::completeExceptionally);
     } catch (RuntimeException | Error failure) {
-      view.release().run();
+      view.release();
       work.close();
       throw failure;
     }
     try {
       OwnedCallTask task = new OwnedCallTask(budget, work, () -> {
         WorkerAppServices prior = taskServices.get();
+        CallView priorView = taskServingView.get();
         taskServices.set(view.services());
+        taskServingView.set(view);
         T result = null;
         Throwable failure = null;
         try {
@@ -703,6 +762,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           } finally {
             if (prior == null) taskServices.remove();
             else taskServices.set(prior);
+            if (priorView == null) taskServingView.remove();
+            else taskServingView.set(priorView);
           }
         }
         if (budget.complete()) {
@@ -712,7 +773,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           log.error("Engine {} worker failed after caller completion", operation, failure);
         }
         if (failure instanceof Error error) throw error;
-      }, view.release());
+      }, view::release);
       ExecutorService executor = callThreads(work.context());
       budget.submitted(task);
       task.executeOn(executor);
@@ -722,7 +783,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         budget.close();
         if (task == null) {
           try { work.close(); }
-          finally { view.release().run(); }
+          finally { view.release(); }
         }
         else task.cancelBeforeStart();
         throw engineLimit();
@@ -847,9 +908,9 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
    * report.
    */
   private void submitProducerOrClose(BoundedHandoff<?> flow, Runnable producer,
-      io.justsearch.app.api.EngineWorkHandle work) {
+      io.justsearch.app.api.EngineWorkHandle work, CallView view) {
     try {
-      executeOwnedStream(work, producer, false);
+      executeOwnedStream(work, producer, false, view);
     } catch (java.util.concurrent.RejectedExecutionException e) {
       flow.close();
       throw engineLimit();
@@ -878,36 +939,66 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private CompletionStage<Void> scheduleRootWalk(ExecutorService executor, Consumer<EngineContext> body,
       EngineContext engineContext, CancelToken cancellation) {
-    var owner = admission.attach(engineContext);
-    var trace = io.opentelemetry.context.Context.current();
-    String requestId = currentRequestId();
-    var task = new OwnedStreamTask(owner, owner, () -> {
-      String previousRequest = currentRequestId();
-      try (var _ = trace.makeCurrent()) {
-        if (requestId == null) org.slf4j.MDC.remove("request_id");
-        else org.slf4j.MDC.put("request_id", requestId);
-        body.accept(owner.context());
-      } finally {
-        if (previousRequest == null) org.slf4j.MDC.remove("request_id");
-        else org.slf4j.MDC.put("request_id", previousRequest);
-      }
-    }, false);
+    CallView view = captureCallView();
     try {
-      task.armCancellation();
-      if (cancellation != null) cancellation.onCancel(() -> task.cancel(false));
-      task.executeOn(executor);
+      return scheduleRootWalk(executor, body, engineContext, cancellation, view);
     } catch (RuntimeException | Error failure) {
-      task.cancelAfterSchedulingFailure(failure);
+      view.release();
+      throw failure;
+    }
+  }
+
+  private CompletionStage<Void> scheduleRootWalk(ExecutorService executor, Consumer<EngineContext> body,
+      EngineContext engineContext, CancelToken cancellation, CallView view) {
+    io.justsearch.app.api.EngineWorkHandle owner = null;
+    OwnedStreamTask task = null;
+    try {
+      owner = admission.attach(engineContext);
+      var acceptedOwner = owner;
+      var trace = io.opentelemetry.context.Context.current();
+      String requestId = currentRequestId();
+      task = new OwnedStreamTask(owner, owner, () -> {
+        String previousRequest = currentRequestId();
+        try (var _ = trace.makeCurrent()) {
+          if (requestId == null) org.slf4j.MDC.remove("request_id");
+          else org.slf4j.MDC.put("request_id", requestId);
+          body.accept(acceptedOwner.context());
+        } finally {
+          if (previousRequest == null) org.slf4j.MDC.remove("request_id");
+          else org.slf4j.MDC.put("request_id", previousRequest);
+        }
+      }, false, view);
+      task.armCancellation();
+      var scheduledTask = task;
+      if (cancellation != null) cancellation.onCancel(() -> scheduledTask.cancel(false));
+      task.executeOn(executor);
+      return task.completion.minimalCompletionStage();
+    } catch (RuntimeException | Error failure) {
+      if (task != null) task.cancelAfterSchedulingFailure(failure);
+      else {
+        if (owner != null) owner.close();
+        view.release();
+      }
       if (failure instanceof java.util.concurrent.RejectedExecutionException) throw engineLimit();
       throw failure;
     }
-    return task.completion.minimalCompletionStage();
   }
 
   private CompletionStage<Void> executeOwnedStream(io.justsearch.app.api.EngineWorkHandle work, Runnable body,
       boolean countForeground) {
-    var owner = work.retain();
-    var task = new OwnedStreamTask(work, owner, body, countForeground);
+    return executeOwnedStream(work, body, countForeground, captureCallView());
+  }
+
+  private CompletionStage<Void> executeOwnedStream(io.justsearch.app.api.EngineWorkHandle work, Runnable body,
+      boolean countForeground, CallView view) {
+    final io.justsearch.app.api.EngineWorkHandle owner;
+    try {
+      owner = work.retain();
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+    var task = new OwnedStreamTask(work, owner, body, countForeground, view);
     try {
       ExecutorService executor = streamThreads(work.context());
       task.armCancellation();
@@ -933,6 +1024,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private final io.justsearch.app.api.EngineWorkHandle owner;
     private final Runnable body;
     private final boolean countForeground;
+    private final CallView view;
     private ExecutorService queueOwner;
     private final AtomicReference<io.justsearch.app.api.EngineWorkHandle.Registration> cancellation =
         new AtomicReference<>();
@@ -941,11 +1033,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         io.justsearch.app.api.EngineWorkHandle work,
         io.justsearch.app.api.EngineWorkHandle owner,
         Runnable body,
-        boolean countForeground) {
+        boolean countForeground,
+        CallView view) {
       this.work = work;
       this.owner = owner;
       this.body = body;
       this.countForeground = countForeground;
+      this.view = Objects.requireNonNull(view, "view");
     }
 
     synchronized void executeOn(ExecutorService executor) {
@@ -963,12 +1057,20 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     public void run() {
       if (!state.compareAndSet(QUEUED, RUNNING)) return;
       Throwable failure = null;
+      WorkerAppServices priorServices = taskServices.get();
+      CallView priorView = taskServingView.get();
+      taskServices.set(view.services());
+      taskServingView.set(view);
       try {
         if (countForeground) foregroundLoad.run(owner, body);
         else body.run();
       } catch (Throwable cause) {
         failure = cause;
       } finally {
+        if (priorServices == null) taskServices.remove();
+        else taskServices.set(priorServices);
+        if (priorView == null) taskServingView.remove();
+        else taskServingView.set(priorView);
         state.set(FINISHED);
         failure = cleanup(failure);
       }
@@ -992,6 +1094,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       }
       try {
         owner.close();
+      } catch (Throwable cause) {
+        failure = combineCleanupFailure(failure, cause);
+      }
+      try {
+        view.release();
       } catch (Throwable cause) {
         failure = combineCleanupFailure(failure, cause);
       }
@@ -1065,8 +1172,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   /** One accepted child on the existing bounded walker; completion means both owned tasks exited. */
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation) {
-    return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-        WorkerIngestService.RecordedScanMode.STREAMING);
+    CallView view = captureCallView();
+    try {
+      return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
+          WorkerIngestService.RecordedScanMode.STREAMING, view);
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
   }
 
   /** One captured epoch spans every frozen root; each stage waits for its actual walk and delivery exit. */
@@ -1075,6 +1188,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
     var owner = admission.attach(context);
+    final CallView parentView;
+    try {
+      parentView = captureCallView();
+    } catch (RuntimeException | Error failure) {
+      try { owner.close(); }
+      catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      throw failure;
+    }
     try {
       CompletionStage<JobQueue.WalkEnumerationOutcome> result = CompletableFuture.completedFuture(
           cancellation.isCancelled() ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.COMPLETE);
@@ -1084,23 +1205,34 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           if (outcome != JobQueue.WalkEnumerationOutcome.COMPLETE) return CompletableFuture.completedFuture(outcome);
           if (cancellation.isCancelled()) return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
           return enumerateRecordedRoot(singleRoot, operationKey, epoch, owner.context(), cancellation,
-              WorkerIngestService.RecordedScanMode.CAPTURED);
+              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork());
         });
       }
-      return result.whenComplete((ignored, failure) -> owner.close());
+      return result.whenComplete((ignored, failure) -> {
+        try {
+          owner.close();
+        } finally {
+          parentView.release();
+        }
+      });
     } catch (RuntimeException | Error failure) {
       try { owner.close(); }
       catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      parentView.release();
       throw failure;
     }
   }
 
   private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation,
-      WorkerIngestService.RecordedScanMode mode) {
+      WorkerIngestService.RecordedScanMode mode, CallView view) {
+    try {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
-    if (plan.roots().size() != 1) throw new IllegalArgumentException("Recorded producer requires one root");
+    if (plan.roots().size() != 1) {
+      view.release();
+      throw new IllegalArgumentException("Recorded producer requires one root");
+    }
     var root = plan.roots().getFirst();
     var builder = ScanRootRequest.newBuilder().setRootPath(root.path().toString())
         .setMode(root.force() ? ScanMode.SCAN_MODE_FORCE_REINDEX : ScanMode.SCAN_MODE_INITIAL)
@@ -1120,7 +1252,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
             : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
                 ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
       }
-    }, context, cancellation);
+    }, context, cancellation, view);
     // handle + thenCompose waits for delivery even when the walk failed; allOf with a separately
     // captured default would miss a delivery task scheduled after the producer returned.
     return walk.handle((ignored, failure) -> failure).thenCompose(walkFailure ->
@@ -1132,6 +1264,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           if (deliveryFailure != null) throw new java.util.concurrent.CompletionException(deliveryFailure);
           return outcome.get();
         }));
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
   }
 
   @Override
@@ -1139,7 +1275,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progressConsumer,
       EngineContext engineContext) {
     try (var work = admission.attach(engineContext)) {
-      return foregroundLoad.call(work, () -> scanRootWork(request, cancelToken, progressConsumer, work));
+      CallView view = captureCallView();
+      try {
+        return withTaskView(view,
+            () -> foregroundLoad.call(work,
+                () -> scanRootWork(request, cancelToken, progressConsumer, work)));
+      } finally {
+        view.release();
+      }
     }
   }
 
@@ -1270,6 +1413,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private IndexingJobsStream subscribeIndexingWork(Consumer<IndexingJobsFrame> onFrame,
       Consumer<Throwable> onError, io.justsearch.app.api.EngineWorkHandle work) {
+    // Legacy supplier-only clients may block during service selection. Do that on the producer
+    // thread, after cancellation is registered. Production serving leases are captured here.
+    CallView view = servingLeaseSupplier == null
+        ? new CallView(null, true) : captureCallView();
     String traceId = currentTraceId();
     String requestId = currentRequestId();
     // Item A7: a bounded hand-off between the change feed's dispatch thread and the SSE fan-out.
@@ -1282,13 +1429,19 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // stops the job queue outright — no enqueue, no dequeue, no markDone — so one browser tab that
     // stopped reading its SSE stream would halt indexing for the entire machine for five seconds
     // per frame. The flow fails instead; the bridge re-subscribes and gets a fresh snapshot.
-    BoundedHandoff<IndexingJobsFrame> flow =
-        refuseIfSaturated(
-            () ->
-                indexingJobsHandoff(
-                    onFrame,
-                    onError,
-                    body -> executeOwnedStream(work, body, true)));
+    final BoundedHandoff<IndexingJobsFrame> flow;
+    try {
+      flow =
+          refuseIfSaturated(
+              () ->
+                  indexingJobsHandoff(
+                      onFrame,
+                      onError,
+                      body -> executeOwnedStream(work, body, true, view.fork())));
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
     try {
       FlowCancelSignal cancel = new FlowCancelSignal();
       var subscriptionOwner = work.retain();
@@ -1297,9 +1450,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         try {
           cancel.cancel();
         } finally {
-          var callback = registration.get();
-          if (callback != null) callback.close();
-          subscriptionOwner.close();
+          try {
+            var callback = registration.get();
+            if (callback != null) callback.close();
+          } finally {
+            try { subscriptionOwner.close(); }
+            finally { view.release(); }
+          }
         }
       });
       var cancellation = work.onCancel(reason ->
@@ -1315,8 +1472,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           flow,
           () -> {
             try {
-              requireService(WorkerAppServices::ingestService)
-                  .subscribeIndexingJobs(
+              WorkerIngestService ingest = requireService(WorkerAppServices::ingestService);
+              ingest.subscribeIndexingJobs(
                       SubscribeIndexingJobsRequest.newBuilder().build(),
                       frame -> {
                         if (!flow.publish(frame)) {
@@ -1335,7 +1492,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               flow.fail(e);
               if (e instanceof Error error) throw error;
             }
-          }, work);
+          }, work, view.fork());
       // onCompleted has no producer in process, deliberately: the change-feed subscription lives
       // until it is cancelled, so "the producer closed the stream" is a wire-only event (a server
       // shutting down its call). The caller's close() is the only way this flow ends, and the caller
@@ -1346,6 +1503,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       };
     } catch (RuntimeException | Error failure) {
       flow.close();
+      view.release();
       throw failure;
     }
   }

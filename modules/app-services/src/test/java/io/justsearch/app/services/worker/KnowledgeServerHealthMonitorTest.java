@@ -120,6 +120,9 @@ final class KnowledgeServerHealthMonitorTest {
     when(bootstrap.checkHealth()).thenReturn(true);
     when(bootstrap.captureClient()).thenReturn(lease);
     when(lease.client()).thenReturn(client);
+    when(lease.withClient(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(client));
     when(bootstrap.automaticRootProducersSuppressed()).thenReturn(isolated);
 
     long[] clock = {1_000_000L};

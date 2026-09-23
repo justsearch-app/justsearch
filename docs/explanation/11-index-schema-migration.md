@@ -380,7 +380,7 @@ resolved in `ResolvedConfigBuilder` so every consumer sees the same answer. A ty
 is not a reason to refuse to boot.
 
 **A mismatch escaping the deferred writer upgrade is not "non-fatal".** When
-`DeferredRuntime.upgradeWriter()` raises `SCHEMA_MISMATCH` inside `initDeferredModels()`, that means
+`DeferredRuntime.prepareWriterUpgrade()` raises `SCHEMA_MISMATCH` inside `initDeferredModels()`, that means
 ingestion has stopped — the index cannot accept writes under this runtime's shape. It is reported at
 ERROR naming the condition and the remedy, not folded into the generic background-model-init warning
 that used to hide it. It is reported rather than propagated because that code runs on a background

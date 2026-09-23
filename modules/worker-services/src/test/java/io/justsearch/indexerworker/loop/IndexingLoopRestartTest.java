@@ -54,6 +54,40 @@ import org.mockito.junit.jupiter.MockitoExtension;
 final class IndexingLoopRestartTest {
 
   @Test
+  void preparedSuccessorCannotClaimJobsUntilActivated() throws Exception {
+    JobQueue queue = mock(JobQueue.class);
+    when(queue.pollPending(anyInt())).thenReturn(List.of());
+    var loop = newLoop(queue, mock(IndexingCoordinator.class), mock(CommitOps.class), null,
+        new EncoderBindings(), mock(DocumentFieldOps.class), mock(IndexCountOps.class),
+        mock(WorkerSignalBus.class), mock(DocumentIdentityStore.class));
+    try {
+      loop.prepareStart();
+      Thread thread = reflectThread(loop, "loopThread");
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+      while (thread.getState() != Thread.State.WAITING && System.nanoTime() < deadline) {
+        Thread.sleep(5);
+      }
+      assertEquals(Thread.State.WAITING, thread.getState());
+      verify(queue, never()).pollPending(anyInt());
+      loop.activatePreparedStart();
+      verify(queue, timeout(2_000)).pollPending(anyInt());
+    } finally {
+      loop.close();
+    }
+  }
+
+  @Test
+  void abandonedPreparedSuccessorExitsWithoutClaimingJobs() throws Exception {
+    JobQueue queue = mock(JobQueue.class);
+    var loop = newLoop(queue, mock(IndexingCoordinator.class), mock(CommitOps.class), null,
+        new EncoderBindings(), mock(DocumentFieldOps.class), mock(IndexCountOps.class),
+        mock(WorkerSignalBus.class), mock(DocumentIdentityStore.class));
+    loop.prepareStart();
+    loop.close();
+    verify(queue, never()).pollPending(anyInt());
+  }
+
+  @Test
   @DisplayName("start → idle → close cycle: state returns to IDLE; loopThread terminates")
   void singleCycleReachesIdleAndShutsDownCleanly() throws Exception {
     IndexingLoop loop = newLoopWithEmptyQueue();

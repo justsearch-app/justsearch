@@ -18,7 +18,7 @@ import java.util.function.Supplier;
  *
  * <p>Passed to {@link DefaultWorkerAppServices} as a single argument. The lifecycle
  * fields are {@link Supplier suppliers} so consumers re-read on each request and pick
- * up holder swaps (e.g., {@code DeferredRuntime.upgradeWriter()} returning a fresh
+ * up holder swaps (e.g., {@code DeferredRuntime.prepareWriterUpgrade()} returning a fresh
  * {@code RunningRuntime}).
  *
  * <p>Catalog instances live in {@code worker-services}, which {@code worker-core} cannot

@@ -195,7 +195,7 @@ public final class RunningRuntime implements LuceneRuntime {
    * outstanding writes. Resources stay owned until a later close attempt can drain them.
    *
    * @param timeout maximum time to wait for in-flight writes to drain
-   * @see DeferredRuntime#upgradeWriter for the upgrade variant from deferred mode
+   * @see DeferredRuntime#prepareWriterUpgrade for the upgrade variant from deferred mode
    */
   public void drainAndClose(Duration timeout) {
     drainAndClose(timeout, SwapReason.UNKNOWN);

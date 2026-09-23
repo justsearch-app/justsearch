@@ -282,6 +282,9 @@ final class AgentToolFactoryCompositionTest {
     when(bootstrap.publicationLock()).thenReturn(captured.publicationLock());
     when(bootstrap.acquireClientLease()).thenReturn(lease);
     when(lease.client()).thenReturn(client);
+    when(lease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(client));
     when(client.search(any(SearchRequest.class), any(EngineContext.class)))
         .thenReturn(SearchResponse.getDefaultInstance());
 
