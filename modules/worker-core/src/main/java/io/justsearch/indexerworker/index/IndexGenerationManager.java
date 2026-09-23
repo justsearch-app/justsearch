@@ -976,6 +976,79 @@ public final class IndexGenerationManager {
     }
   }
 
+  /** Holds the same pointer guard for an unrecorded migration's exact live A/B pair. */
+  public NativePromotion beginNativePromotion(String expectedSourceGeneration,
+      String expectedBuildingGeneration) {
+    Objects.requireNonNull(expectedSourceGeneration, "expectedSourceGeneration");
+    Objects.requireNonNull(expectedBuildingGeneration, "expectedBuildingGeneration");
+    return new NativePromotion(expectedSourceGeneration, expectedBuildingGeneration, stateControl());
+  }
+
+  public final class NativePromotion implements AutoCloseable {
+    private final String source;
+    private final String building;
+    private final StateControlGuard guard;
+    private final Thread owner = Thread.currentThread();
+    private boolean attempted;
+    private boolean closed;
+
+    private NativePromotion(String source, String building, StateControlGuard guard) {
+      this.source = source;
+      this.building = building;
+      this.guard = guard;
+    }
+
+    /** Commit only the already-verified building generation selected under the live fence. */
+    public State promote() throws IOException {
+      requireOwner();
+      if (attempted) throw new IllegalStateException("Native promotion already attempted");
+      attempted = true;
+      State current = strictBootLayout(readRecordedState()).state();
+      if (!source.equals(current.active_generation())
+          || !building.equals(current.building_generation())
+          || !MigrationState.SWITCHING.name().equals(current.migration_state())) {
+        throw new IOException("Native migration source or building generation changed");
+      }
+      return promoteBuildingGenerationToActive();
+    }
+
+    /** Exact durable pointer evidence after an ambiguous write; never rewinds a committed B. */
+    public RecordedPromotion.CommitWitness inspectCommitWitness() {
+      requireOwner();
+      try {
+        State observed = strictBootLayout(readRecordedState()).state();
+        if (source.equals(observed.active_generation())
+            && building.equals(observed.building_generation())
+            && MigrationState.SWITCHING.name().equals(observed.migration_state())) {
+          return RecordedPromotion.CommitWitness.UNCHANGED;
+        }
+        if (building.equals(observed.active_generation())
+            && source.equals(observed.previous_generation())
+            && (observed.building_generation() == null
+                || observed.building_generation().isBlank())
+            && MigrationState.IDLE.name().equals(observed.migration_state())) {
+          return RecordedPromotion.CommitWitness.COMMITTED;
+        }
+      } catch (IOException | RuntimeException unreadable) {
+        return RecordedPromotion.CommitWitness.UNRESOLVED;
+      }
+      return RecordedPromotion.CommitWitness.UNRESOLVED;
+    }
+
+    private void requireOwner() {
+      if (closed || owner != Thread.currentThread()) {
+        throw new IllegalStateException("Native promotion requires its owning live thread");
+      }
+    }
+
+    @Override public void close() {
+      if (closed) return;
+      requireOwner();
+      guard.close();
+      closed = true;
+    }
+  }
+
   /** Promote only the strict target/source binding validated by the recorded owner. */
   State promoteRecordedGenerationToActive(String operationKey, String source,
       String targetIndexFingerprint, String expectedSourceGeneration) throws IOException {

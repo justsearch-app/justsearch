@@ -36,19 +36,11 @@ import tools.jackson.databind.ObjectMapper;
  * Worker process only because that was the only way to reach either. All three buffered operation
  * kinds are kept here: an UPSERT, a DELETE, and a deferred SYNC_ROOT.
  *
- * <p><b>What changed, and what it cost.</b> Two things.
- *
- * <ol>
- *   <li>"The worker restarted for cutover" becomes {@link EngineTestHarness#restart()} — see
- *       {@code EngineMigrationLifecycleTest}'s javadoc for why that is the honest translation.
- *   <li>The retired test forced {@code SWITCHING} with a single-document corpus and then injected
- *       its three mutations. In one JVM that is a race it would usually lose: the cutover monitor
- *       promotes as soon as the queue is drained (KnowledgeServerMigrationOps.java:255-268), and an
- *       empty queue drains before the next call lands. So this test gives the migration a backlog
- *       to chew on — the fence stays up while the enqueued corpus drains, which is the same state
- *       the retired test was trying to catch, held open long enough to be deterministic rather than
- *       lucky. The backlog is not the subject; it is the clock.
- * </ol>
+ * <p>The retired test forced {@code SWITCHING} with a single-document corpus and then injected
+ * its three mutations. In one JVM that is a race it would usually lose: the cutover monitor
+ * promotes as soon as the queue is drained. This test gives the migration a backlog so the
+ * buffered operations can be accepted before the final fence. Replay and publication must then
+ * finish in the same Engine process, without a cutover restart.
  */
 @Timeout(900)
 final class EngineSwitchingFenceBufferingTest {
@@ -140,13 +132,7 @@ final class EngineSwitchingFenceBufferingTest {
     assertTrue(
         awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 300_000),
         "the cutover must promote the building generation");
-    engine.restart();
-
-    // Polled, and the assertions below read the SNAPSHOT THE POLL RETURNED rather than taking a
-    // fresh one. See EngineMigrationLifecycleTest#awaitMigrationState: after a restart the status
-    // projection can transiently report an empty migration state, and it can do so AGAIN on the
-    // very next call — so "poll until IDLE, then re-read and assert" is a race that fails on the
-    // second read. Asserting on the settled observation is the honest form of the same claim.
+    // Assert against the live Engine before any explicit restart.
     StatusResponse after = awaitMigrationStateSnapshot("IDLE", 60_000);
     assertEquals("IDLE", after.getMigration().getMigrationState(), "IDLE after cutover");
     assertNotEquals(
@@ -176,6 +162,11 @@ final class EngineSwitchingFenceBufferingTest {
         0L,
         engine.status().getMigration().getSwitchBufferDepth(),
         "the switch buffer must drain once every buffered operation has been replayed");
+
+    engine.restart();
+    assertTrue(engine.awaitSearchable(greenMarker, 60_000), "the replayed UPSERT must survive restart");
+    assertTrue(engine.awaitSearchable(syncMarker, 60_000), "the replayed SYNC_ROOT must survive restart");
+    assertTrue(engine.awaitNotSearchable(blueMarker, 60_000), "the replayed DELETE must survive restart");
   }
 
   // =========================================================================

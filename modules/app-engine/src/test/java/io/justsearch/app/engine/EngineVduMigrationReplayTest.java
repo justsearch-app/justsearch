@@ -34,12 +34,11 @@ import tools.jackson.databind.ObjectMapper;
  * boots the real {@code EngineRoot}/{@code KnowledgeServer} composition across a paused migration.
  * It first puts the parent into the real Green runtime, then plants a pre-C2 VDU row in the durable
  * queue. The paused-migration boot must preserve that exact row; forcing the production eligibility
- * answer true makes this assertion fail before source enumeration resumes. Only a later boot, after
- * the generation pointer has been promoted, may replay and remove it.
+ * answer true makes this assertion fail before source enumeration resumes. The final cutover fence
+ * replays it onto Green before publishing Green in the live Engine.
  *
- * <p>{@link EngineTestHarness#restart()} is an explicit test action. The assertions here establish
- * behavior after each reopen; they do not claim that the product automatically restarts at
- * cutover.
+ * <p>{@link EngineTestHarness#restart()} is an explicit test action used to verify durable replay
+ * after the live cutover.
  */
 @Timeout(900)
 final class EngineVduMigrationReplayTest {
@@ -58,7 +57,7 @@ final class EngineVduMigrationReplayTest {
 
   @Test
   @DisplayName(
-      "legacy VDU replay waits for the promoted serving generation across real Engine boots")
+      "legacy VDU replay waits for Green and settles during live cutover")
   void legacyVduReplayWaitsForPromotedServingGeneration(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
     Path watchedRoot = dataDir.resolve("watched");
@@ -143,19 +142,14 @@ final class EngineVduMigrationReplayTest {
     assertTrue(
         awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 300_000),
         "the migration must durably promote Green before VDU replay becomes eligible");
-    assertEquals(
-        seeded,
-        requireBuffered(queuePath, seeded.key()),
-        "promotion alone must not consume the row in the still-open pre-promotion runtime");
-
-    engine.restart();
     assertTrue(
         engine.awaitSearchable(replacementMarker, 120_000),
-        "enumeration must replace the Green parent before content-preserving VDU replay");
+        "live Green must serve the enumerated replacement after VDU replay");
     assertTrue(
         engine.awaitNotSearchable(blueMarker, 5_000),
         "the original seeded Green parent must have been replaced, not merely replayed onto");
-    assertEquals(0L, bufferedDepth(queuePath), "the committed VDU version must be removed");
+    assertTrue(awaitBufferedDepth(queuePath, 0L, 60_000),
+        "the committed VDU version must be removed without a restart");
     assertNotEquals(
         activeBefore,
         engine.status().getMigration().getActiveGenerationId(),
@@ -234,6 +228,16 @@ final class EngineVduMigrationReplayTest {
     try (SqliteJobQueue queue = openQueue(queuePath)) {
       return queue.switchBufferDepth();
     }
+  }
+
+  private static boolean awaitBufferedDepth(Path queuePath, long expected, long timeoutMs)
+      throws Exception {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      if (bufferedDepth(queuePath) == expected) return true;
+      Thread.sleep(100);
+    }
+    return false;
   }
 
   private static SqliteJobQueue openQueue(Path queuePath) throws Exception {

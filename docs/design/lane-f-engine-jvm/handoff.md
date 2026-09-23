@@ -6,6 +6,47 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-23)
 
+### Active checkpoint `983ad90c0507` (22:34 Berlin)
+
+Checkpoint `983ad90c0507` is pushed to PR727. It adds the operation-surface
+consumer row, corrects the installed migration fixture for live publication and
+rollback refusal, and revalidates the frozen installer candidate immediately
+before approved execution. The 358-task integrated suite passed at
+`tmp/2971-lane-f-preview-integrated.txt`; the direct installed migration run
+passed at `tmp/2976-migration-live-no-restart-rollback-refusal.txt`. Hosted run
+`35916819396` finished SUCCESS: build, public claims, Windows native, app UI,
+system integration and all other jobs completed. The corrected migration
+fixture therefore has hosted system proof at this exact checkpoint. The next
+native Flow A checkpoint can be pushed after its own local integration passes.
+
+The next uncommitted D1 slice connects ordinary, unrecorded migration to the
+same in-process Flow A serving-view publication used by recorded activation.
+`IndexGenerationManager.NativePromotion` guards the exact A/B pointer pair and
+reports unchanged, committed or unresolved durable evidence. The native
+`EngineMigrationLifecycleTest` now observes Green's distinct document count in
+the live Engine before any restart and preserves it across an explicit restart;
+focused Worker, Engine, cutover and static checks passed at
+`tmp/2979-native-flow-a-focused.txt` and
+`tmp/2980-native-flow-a-static.txt`. The first full local sweep
+`tmp/2981-native-flow-a-integrated.txt` ran 394 Engine tests and exposed two
+native activation regressions: final-fence SYNC_ROOT replay rebuffered itself
+while state remained SWITCHING, and a legacy VDU test expected the old
+restart-only replay. Exact XML is retained under `tmp/2981-native-flow-a-results/`.
+Final-fence sync now executes directly against Green while ordinary and boot
+replay retain their switching rule. The VDU and switching tests now assert live
+replay and post-restart durability; the three focused Engine tests plus static
+checks pass at `tmp/2983-native-flow-a-replay-static.txt`. The pointer-to-runtime
+identity guard is included in that focused revision. The corrected 358-task
+`spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist` sweep
+passed at `tmp/2984-native-flow-a-integrated-corrected.txt`; the
+operation-surface gate also passed. This is a coherent native live-cutover
+checkpoint, not D1-8 acceptance. The next connected defect is native
+predecessor retirement: its current callback requires a recorded terminal
+receipt, and ordinary `startMigration` can allocate a third generation while
+the old Blue still owns capacity. Add native settled-replay retirement and a
+two-generation refusal, with held Blue lease and crash-cut proof. D1/D2/E/F
+remain open.
+
 ### Active D1 state after `bab9a3ff0` (21:54 Berlin)
 
 Checkpoint `bab9a3ff0` (21:54 Berlin) is pushed. Its 358-task local integrated

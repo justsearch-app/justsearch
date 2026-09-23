@@ -71,10 +71,10 @@ final class CutoverRestartEvidenceTest {
   }
 
   @Test
-  void recordedLiveCutoverPublishesWithoutRequestingRestart(@TempDir Path tempDir)
+  void nativeLiveCutoverPublishesWithoutRequestingRestart(@TempDir Path tempDir)
       throws Exception {
     var manager = new IndexGenerationManager(tempDir.resolve("index"));
-    manager.initializeOrLoad();
+    String blue = manager.initializeOrLoad().state().active_generation();
     String green = manager.startMigration("manual").building_generation();
     manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
     var queue = mock(JobQueue.class);
@@ -85,15 +85,17 @@ final class CutoverRestartEvidenceTest {
     var context = new KnowledgeServerMigrationOps.CutoverContext(
         manager, queue, () -> true, () -> true, () -> null, 0, 60_000, -1,
         () -> runtime, () -> true, () -> {
-          throw new AssertionError("recorded live owner verifies Green under its final fence");
+          throw new AssertionError("live owner verifies Green under its final fence");
         }, () -> {}, () -> {}, () -> {
           throw new AssertionError("live publication must not request a cutover restart");
         }, tempDir, LoggerFactory.getLogger(CutoverRestartEvidenceTest.class),
         () -> {
-          throw new AssertionError("recorded live owner replaces the legacy promotion callback");
+          throw new AssertionError("live owner replaces the legacy promotion callback");
         }, () -> {}, () -> {
           live.set(true);
-          return manager.promoteBuildingGenerationToActive();
+          try (var promotion = manager.beginNativePromotion(blue, green)) {
+            return promotion.promote();
+          }
         });
 
     KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);

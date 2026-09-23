@@ -859,7 +859,8 @@ public final class KnowledgeServerMigrationOps {
 
               SyncDirectoryResponse r;
               try {
-                r = tmp.syncDirectoryForReplay(req, provenance);
+                r = exactRead ? tmp.syncDirectoryForFinalCutoverReplay(req, provenance)
+                    : tmp.syncDirectoryForReplay(req, provenance);
               } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context

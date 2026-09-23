@@ -1167,17 +1167,24 @@ public final class WorkerIngestService {
     JobQueue.EnqueueProvenance provenance =
         ctx.engineContext().clientKind() == io.justsearch.core.context.EngineContext.ClientKind.INTERNAL
             && "SYSTEM_INTERNAL".equals(ctx.provenance().transport()) ? null : ctx.provenance();
-    return syncDirectoryCommon(request, ctx, provenance);
+    return syncDirectoryCommon(request, ctx, provenance, false);
   }
 
   /** Replays a durable sync with its persisted descriptive attribution. */
   public SyncDirectoryResponse syncDirectoryForReplay(
       SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance) {
-    return syncDirectoryCommon(request, CallContext.none(), provenance);
+    return syncDirectoryCommon(request, CallContext.none(), provenance, false);
+  }
+
+  /** The final cutover fence owns SWITCHING and replays this version directly onto Green. */
+  public SyncDirectoryResponse syncDirectoryForFinalCutoverReplay(
+      SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance) {
+    return syncDirectoryCommon(request, CallContext.none(), provenance, true);
   }
 
   private SyncDirectoryResponse syncDirectoryCommon(
-      SyncDirectoryRequest request, CallContext ctx, JobQueue.EnqueueProvenance provenance) {
+      SyncDirectoryRequest request, CallContext ctx, JobQueue.EnqueueProvenance provenance,
+      boolean finalCutoverReplay) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       boolean force = request.getForce();
@@ -1190,7 +1197,7 @@ public final class WorkerIngestService {
         return blank;
       }
 
-      if (switchBufferOps.isSwitching()) {
+      if (!finalCutoverReplay && switchBufferOps.isSwitching()) {
         // During cutover, accept and durably buffer sync requests so OVERFLOW/burst events don't get lost.
         return switchBufferOps.bufferDuringSwitchingOrThrow(
             "syncDirectory",

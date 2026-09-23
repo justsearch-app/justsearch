@@ -33,21 +33,9 @@ import tools.jackson.databind.ObjectMapper;
  * ({@code modules/worker-core/.../index/IndexGenerationManager.java}). None of that needed a second
  * process; the retired tests only used one because that was the only way to reach the index at all.
  *
- * <p><b>What "the worker restarted" becomes — corrected at the stage-A checkpoint.</b> The retired
- * tests drove the restart directly: migration controls set
- * {@code restart_worker=true}, the worker exited, and the test called {@code spawnWorker()} again.
- * An earlier version of this comment said the Engine equivalent was
- * {@code KnowledgeServer#initiateShutdown} — "a latch countdown, not a {@code System.exit}" — with
- * the composition root owning what happened next. That was wrong in the way that mattered: the
- * composition root was never told, the latch had no reader, and so <em>nothing</em> happened next.
- * The migration promoted a generation and the Engine went on serving the previous one.
- *
- * <p>That callback is deleted. {@link EngineTestHarness#restart()} is now understood as a TEST
- * ACTION — close the Engine, re-open it on the same data directory — and not as a stand-in for
- * something the product does by itself. It is still the right way to assert "after a restart, X",
- * because everything the old restart re-read ({@code state.json}, the job queue, the switch buffer)
- * is on disk. It is not evidence that an operation took effect without one, and the cutover test
- * below is explicit about which of the two it is claiming at each step.
+ * <p>Promotion publishes the building generation into the live Engine before the control call
+ * completes. {@link EngineTestHarness#restart()} is an explicit test action used to verify that
+ * the promoted pointer and its recovery state remain durable after reopening the data directory.
  *
  * <p><b>One deliberate speed-up, stated rather than hidden.</b> The retired
  * {@code MigrationControlE2ETest} waited for the cutover monitor to reach its drain criteria on its
@@ -103,48 +91,16 @@ final class EngineMigrationLifecycleTest {
 
     assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");
 
-    // The cutover monitor promotes the building generation and writes state.json
-    // (KnowledgeServerMigrationOps.java, promoteBuildingGenerationToActive). The FILE is the
-    // observable — and, as the assertion below records, it is the ONLY thing that moves.
+    // The cutover monitor promotes the building generation and publishes its serving view.
     assertTrue(
         awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
         "the cutover must promote the building generation; state.json still reads " + activeBefore);
 
-    // ---- Stage-A checkpoint, blocker 1: the promotion does NOT take effect in this process. ----
-    //
-    // The cutover used to end by calling initiateShutdownAction(), which under the split
-    // architecture killed the Worker so the spawner could respawn it onto the promoted generation.
-    // In one JVM that action set a flag and counted down a latch nothing read, so the reopen simply
-    // stopped happening — and this test did not notice, because it called engine.restart()
-    // immediately afterwards and thereby performed the missing step by hand.
-    //
-    // The checkpoint asked for an assertion that the LIVE Engine still serves the OLD generation.
-    // It cannot be written against the status surface, and the reason is worth more than the
-    // assertion would have been. Measured on this branch at the point marked above:
-    //
-    //   migration_state=IDLE  active_gen=g-20260908-003731  building_gen=(empty)
-    //   activeDocCount=1  buildingDocCount=1  servingSearch=g-20260908-003731
-    //
-    // Every one of those fields derives from state.json — the file the promotion just rewrote —
-    // including the one whose NAME promises otherwise: `serving_search_generation_id` is assigned
-    // from `stateSnapshot.active_generation()` at IndexStatusOps.java:608-611, so it is a second
-    // copy of the pointer, not an observation of the reader that serves search. So the status
-    // surface reports a completed cutover — IDLE, promoted generation, "serving" the promoted
-    // generation — while the process serves the previous one, and no field disagrees.
-    //
-    // That is the real depth of the defect: it was not merely unasserted, it was unobservable, and
-    // any test written against status would have passed both before and after the fix. Making it
-    // assertable needs a status field sourced from the open runtime rather than from the file,
-    // which is a D1-shaped change and is recorded in §10 as part of the named red rather than
-    // smuggled in here.
-    //
-    // What IS asserted: the promotion is durable (above), the payload states restart_required
-    // (worker-services MigrationRestartRequiredTest), and search keeps working across the cutover
-    // rather than the Engine dropping into a half-open state.
+    StatusResponse live = awaitMigrationState("IDLE", 60_000);
+    assertNotEquals(activeBefore, live.getMigration().getActiveGenerationId());
     assertTrue(
         engine.awaitSearchable(marker, 60_000),
-        "the Engine must keep serving across the cutover — the promotion is a pointer write, and"
-            + " nothing about it may interrupt the generation currently open");
+        "the promoted generation must serve search without restarting the Engine");
 
     engine.restart();
 
@@ -167,26 +123,10 @@ final class EngineMigrationLifecycleTest {
         "the marker must still be findable on the new active generation");
   }
 
-  /**
-   * Stage-A checkpoint re-review — the cutover's effect IS observable, on the doc counts.
-   *
-   * <p>The first pass concluded the divergence was invisible through the API, having checked the
-   * fields whose names promise it — {@code active_generation_id}, {@code migration_state},
-   * {@code serving_search_generation_id} — and found all three derived from {@code state.json}. The
-   * conclusion was too broad. {@code activeDocCount} and {@code searchableDocCount} are counted on
-   * {@code searchCountOps}, the reader that SERVES search (IndexStatusOps.java:276-282, :300-305),
-   * so they describe the generation actually open. The earlier probe could not show it because the
-   * fixture held ONE document and both generations therefore held one: the counts agreed by
-   * coincidence, and agreement was read as inability to disagree.
-   *
-   * <p>So: two documents in Blue, one of them removed before the enumerator fills Green. The
-   * promoted generation then has a different count from the serving one, and the divergence is
-   * directly assertable — before the restart the live Engine reports Blue's count while
-   * {@code state.json} names Green, and after the restart it reports Green's.
-   */
+  /** Blue holds two documents; Green holds one, making live serving-view publication observable. */
   @Test
-  @DisplayName("after a cutover the live Engine still counts the OLD generation; a restart moves it")
-  void cutoverDoesNotChangeWhatThisProcessServesUntilItRestarts(@TempDir Path tempDir)
+  @DisplayName("cutover publishes Green's document count in the live Engine without a restart")
+  void cutoverActivatesTheGenerationInProcess(@TempDir Path tempDir)
       throws Exception {
     Path dataDir = tempDir.resolve("data");
     Path docsDir = dataDir.resolve("count-docs");
@@ -230,21 +170,15 @@ final class EngineMigrationLifecycleTest {
         "precondition: state.json names the promoted generation");
     long liveCount = live.getMigration().getActiveDocCount();
 
-    engine.restart();
-    long afterRestartCount = engine.status().getMigration().getActiveDocCount();
-
     assertNotEquals(
-        liveCount,
-        afterRestartCount,
-        "the whole point: if the live count and the post-restart count are equal, the two"
-            + " generations hold the same number of documents and this fixture proves nothing about"
-            + " which one was open. Fix the fixture rather than the assertion.");
-    assertEquals(
         blueCount,
         liveCount,
-        "before the restart the Engine must still be COUNTING the old generation, even though"
-            + " state.json already names the promoted one. This is the blocker-1 loss made"
-            + " observable: a cutover reports success and changes nothing this process serves.");
+        "the live Engine must leave Blue's serving count at promotion");
+    assertEquals(1L, liveCount, "the live Engine must count Green's documents");
+
+    engine.restart();
+    long afterRestartCount = engine.status().getMigration().getActiveDocCount();
+    assertEquals(liveCount, afterRestartCount, "restart must preserve the promoted view");
   }
 
   @Test

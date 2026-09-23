@@ -3747,14 +3747,12 @@ public final class KnowledgeServer implements Closeable {
                         dataDir,
                         log,
                          () -> {
-                           if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded) {
-                             throw new IOException("Recorded cutover requires its prepared live successor");
-                           }
-                           return indexGenerationManager.promoteBuildingGenerationToActive();
+                           throw new IOException("Live cutover requires its prepared serving successor");
                          },
                          this::enterSwitchingWithMutationAdmission,
                          generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
-                             ? () -> promoteRecordedServingSuccessor(recorded) : null)),
+                             ? () -> promoteServingSuccessor(recorded)
+                             : () -> promoteServingSuccessor(null))),
             "migration-cutover");
     migrationCutoverThread.setDaemon(true);
     migrationCutoverThread.start();
@@ -3783,8 +3781,8 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  /** Final recorded Flow A fence: replay, certify Green, commit the pointer and install its view. */
-  private IndexGenerationManager.State promoteRecordedServingSuccessor(
+  /** Final Flow A fence: replay, certify Green, commit the pointer and install its view. */
+  private IndexGenerationManager.State promoteServingSuccessor(
       IndexGenerationManager.BootOwnership.Recorded recorded) throws IOException, InterruptedException {
     runtimeSwapLock.lockInterruptibly();
     DefaultWorkerAppServices successor = null;
@@ -3802,12 +3800,20 @@ public final class KnowledgeServer implements Closeable {
       if (closeStarted || !(appServices instanceof DefaultWorkerAppServices current)
           || !(ingestLifecycle instanceof RunningRuntime green) || green == searchLifecycle
           || buildingIndexPath == null) {
-        throw new IOException("Recorded Green no longer has a live source and writer");
+        throw new IOException("Green no longer has a live source and writer");
       }
       incumbent = current;
       successor = prepareServingSuccessor(green);
       var switching = indexGenerationManager.readStateBestEffort();
       if (switching == null || !"SWITCHING".equals(switching.migration_state())) return null;
+      String sourceGeneration = switching.active_generation();
+      String buildingGeneration = switching.building_generation();
+      if (sourceGeneration == null || buildingGeneration == null) return null;
+      if (activeIndexPath == null
+          || !indexGenerationManager.resolveGenerationPathStrict(sourceGeneration).equals(activeIndexPath)
+          || !indexGenerationManager.resolveGenerationPathStrict(buildingGeneration).equals(buildingIndexPath)) {
+        throw new IOException("Serving runtimes do not match the migration generation pointer");
+      }
       long remainingMs = MIGRATION_SWITCHING_MAX_DURATION_MS
           - Math.max(0L, System.currentTimeMillis() - switching.updated_at_ms());
       if (remainingMs <= 0L) return null;
@@ -3854,12 +3860,13 @@ public final class KnowledgeServer implements Closeable {
         runtimeSwapLock.unlock();
         IndexGenerationManager.State result;
         try {
-          var prepared = recordedIngestionLifecycle.prepareRecordedGenerationProjection(
-              recorded.operationKey(), jobQueue);
+          var prepared = recorded == null ? null
+              : recordedIngestionLifecycle.prepareRecordedGenerationProjection(
+                  recorded.operationKey(), jobQueue);
           preparedProjection = prepared;
-          var callbacks = prepared.callbacks();
+          var callbacks = prepared == null ? null : prepared.callbacks();
           DefaultWorkerAppServices nextServices = successor;
-          result = prepared.withOwnerLocks(() -> {
+          RecordedIngestionLifecycle.CheckedPromotion publish = () -> {
             runtimeSwapLock.lock();
             try {
               if (closeStarted || heldSource.services() != current
@@ -3869,23 +3876,26 @@ public final class KnowledgeServer implements Closeable {
                   || !buildingIndexPath.equals(successorPath)
                   || !current.mutationAdmission().replayCertain()
                   || System.nanoTime() >= deadline) {
-                throw new IOException("Recorded serving source changed during settings preparation");
+                throw new IOException("Serving source changed during cutover preparation");
               }
               var counts = jobQueue.jobStateCountsStrict();
               if (counts.processingCount() != 0 || counts.pendingReadyCount() != 0
                   || counts.pendingBackoffCount() != 0
                   || (migrationCutoverMaxFailedJobs >= 0
                       && counts.failedCount() > migrationCutoverMaxFailedJobs)) {
-                throw new IOException("Recorded Green changed during settings preparation");
+                throw new IOException("Green changed during cutover preparation");
               }
               try (var transfer = current.prepareProducerTransferTo(nextServices)) {
           DefaultWorkerAppServices preparedServices = nextServices;
-          return recordedIngestionLifecycle.promoteRecordedGeneration(
-              recorded.operationKey(), jobQueue, () -> {
+          RecordedIngestionLifecycle.CheckedPromotion commit = () -> {
                 var projection = callbacks;
-                try (var promotion = indexGenerationManager.beginRecordedPromotion(
-                    recorded.operationKey(), recorded.source(), recorded.targetFingerprint(),
-                    recorded.sourceGeneration())) {
+                try (var recordedPromotion = recorded == null ? null
+                         : indexGenerationManager.beginRecordedPromotion(
+                             recorded.operationKey(), recorded.source(), recorded.targetFingerprint(),
+                             recorded.sourceGeneration());
+                     var nativePromotion = recorded == null
+                         ? indexGenerationManager.beginNativePromotion(sourceGeneration, buildingGeneration)
+                         : null) {
                   publicationLock.writeLock().lock();
                   try {
                     ServingView old;
@@ -3893,7 +3903,7 @@ public final class KnowledgeServer implements Closeable {
                       old = servingView;
                       if (closeStarted || old == null || old.retiring || old.services != current
                           || old.searchRuntime != searchLifecycle || old.ingestRuntime != green) {
-                        throw new IOException("Recorded serving source changed before pointer commitment");
+                        throw new IOException("Serving source changed before pointer commitment");
                       }
                     }
                     ServingView next = new ServingView(preparedServices, green, green, successorPath);
@@ -3901,18 +3911,22 @@ public final class KnowledgeServer implements Closeable {
                         : Objects.requireNonNull(candidateModels, "Recorded B encoder owner").owner();
                     if (successorEncoder != null) next.attachEncoderSet(successorEncoder);
                     preparedView.set(next);
-                    Runnable cleanup = () -> closeRetiredRecordedSource(old, successorEncoder);
+                    Runnable cleanup = () -> closeRetiredSource(old, successorEncoder);
                     IndexGenerationManager.State promoted;
                     try {
-                      projection.admitBeforePointer();
-                      promoted = promotion.promote();
+                      if (projection != null) projection.admitBeforePointer();
+                      promoted = recordedPromotion == null
+                          ? nativePromotion.promote() : recordedPromotion.promote();
                       // Settings are the roll-forward projection of this committed pointer.
                       // Keep capture excluded until the accepted candidate is durably installed.
-                      projection.afterPointerCommitted();
+                      if (projection != null) projection.afterPointerCommitted();
                     } catch (IOException | RuntimeException | Error ambiguous) {
                       // The held state guard lets us distinguish a precommit refusal from a
                       // post-move failure. Only a committed or unreadable pointer closes A.
-                      if (promotion.inspectCommitWitness()
+                      var witness = recordedPromotion == null
+                          ? nativePromotion.inspectCommitWitness()
+                          : recordedPromotion.inspectCommitWitness();
+                      if (witness
                           != IndexGenerationManager.RecordedPromotion.CommitWitness.UNCHANGED) {
                         pointerUncertain.set(true);
                         fence.install(preparedServices.mutationOwnerToken());
@@ -3929,7 +3943,7 @@ public final class KnowledgeServer implements Closeable {
                     pointerUncertain.set(true);
                     if (promoted == null) {
                       fence.install(preparedServices.mutationOwnerToken());
-                      throw new IOException("Recorded promotion returned no generation");
+                      throw new IOException("Live promotion returned no generation");
                     }
                     fence.install(preparedServices.mutationOwnerToken());
                     transfer.install();
@@ -3955,12 +3969,16 @@ public final class KnowledgeServer implements Closeable {
                     publicationLock.writeLock().unlock();
                   }
                 }
-               });
+               };
+          return recorded == null ? commit.promote()
+              : recordedIngestionLifecycle.promoteRecordedGeneration(
+                  recorded.operationKey(), jobQueue, commit);
               }
             } finally {
               runtimeSwapLock.unlock();
             }
-          });
+          };
+          result = prepared == null ? publish.promote() : prepared.withOwnerLocks(publish);
         } finally {
           runtimeSwapLock.lock();
         }
@@ -4019,14 +4037,14 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private void closeRetiredRecordedSource(ServingView old, EncoderSet successorEncoder) {
+  private void closeRetiredSource(ServingView old, EncoderSet successorEncoder) {
     try {
       old.services.close();
       old.releaseEncoderSet();
       if (old.encoderSet != null && old.encoderSet != successorEncoder) old.encoderSet.close();
       if (old.searchRuntime != null && old.searchRuntime != ingestLifecycle) old.searchRuntime.close();
     } catch (IOException failure) {
-      throw new IllegalStateException("Retired recorded generation still owns resources", failure);
+      throw new IllegalStateException("Retired generation still owns resources", failure);
     }
   }
 
