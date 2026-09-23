@@ -117,7 +117,7 @@ final class SettingsResetCoordinatorTest {
     var restarts = new AtomicInteger();
     var preparations = new AtomicInteger();
     try (var operations = operations()) {
-      var owner = new SettingsCommitCoordinator(settings, config(), restarts::incrementAndGet,
+      var owner = new SettingsCommitCoordinator(settings, config(settings), restarts::incrementAndGet,
           candidate -> { preparations.incrementAndGet(); return ConfigStoreRebuilder.prepare(candidate); },
           candidate -> OperationResult.success("prepared"), prepared -> {
             if (failMove.get()) throw new IOException("before move"); settings.replacePrepared(prepared);
@@ -285,9 +285,19 @@ final class SettingsResetCoordinatorTest {
     try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("operations.db").toAbsolutePath());
         var statement = connection.createStatement()) { statement.execute(sql); }
   }
-  private static ConfigStore config() { return new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings())); }
+  private static ConfigStore config(UiSettingsStore settings) {
+    // Mirror boot's serving snapshot. A normal reset keeps operator settings that are already
+    // applied; a quarantined recovery has no readable settings until the successor boots.
+    UiSettings serving;
+    try {
+      serving = settings.inspect().settings();
+    } catch (io.justsearch.configuration.persistence.CorruptDurableStoreException quarantined) {
+      serving = new UiSettings();
+    }
+    return new ConfigStore(ConfigStoreRebuilder.prepare(serving));
+  }
   private static SettingsCommitCoordinator owner(UiSettingsStore settings, Runnable restart, SettingsCommitCoordinator.Replacement replacement) {
-    return new SettingsCommitCoordinator(settings, config(), restart, ConfigStoreRebuilder::prepare,
+    return new SettingsCommitCoordinator(settings, config(settings), restart, ConfigStoreRebuilder::prepare,
         candidate -> OperationResult.success("prepared"), replacement);
   }
   private static OperationAttemptRunnerImpl runner(SqliteOperationStore operations, SettingsCommitCoordinator owner) {

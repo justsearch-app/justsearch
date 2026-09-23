@@ -1832,6 +1832,11 @@ final class LlamaServerOps {
     return owner == null ? java.util.Optional.empty() : java.util.Optional.of(owner.start());
   }
 
+  boolean activeManagedCandidateAlive(StartResult expected) {
+    ActiveServer owner = activeServer;
+    return owner != null && owner.start() == expected && ownedPhysicalServerAlive(owner);
+  }
+
   private ActiveServer installActive(
       StartResult start, Process launchedProcess, ProcessHandle adoptedHandle) {
     ActiveServer owner = new ActiveServer(start, launchedProcess, adoptedHandle);

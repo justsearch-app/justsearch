@@ -278,6 +278,38 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void externalWitnessChangeDuringPreparationRefusesBeforeReplacingSettings() throws Exception {
+    try (var operations = operations("precommit-witness-change")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          temp.resolve("precommit-witness-change.json"));
+      var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+      var config = new ConfigStore(initial);
+      String externalKey = OperationKeys.generate(CLOCK);
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          ConfigStoreRebuilder::prepare, candidate -> {
+            try {
+              settings.replacePrepared(settings.prepare(candidate("external", List.of()),
+                  new SettingsWitness(1, externalKey)));
+            } catch (IOException failure) {
+              throw new java.io.UncheckedIOException(failure);
+            }
+            return OperationResult.success("prepared");
+          }, settings::replacePrepared);
+      var runner = runner(operations, owner);
+      var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, new SettingsWitness(0, null), candidate("dark", List.of()))));
+
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("VERSION_CONFLICT", result.response().errorCode().orElseThrow());
+      assertEquals(new SettingsWitness(1, externalKey), settings.inspect().witness());
+      assertEquals("external", settings.inspect().settings().getTheme());
+      assertEquals(initial, config.get());
+    }
+  }
+
+  @Test
   void preparationFailureDoesNotWriteOrSwapAndTerminalFailureReleasesGuard() throws Exception {
     try (var operations = operations("preparation")) {
       Path settingsPath = temp.resolve("preparation-settings.json");

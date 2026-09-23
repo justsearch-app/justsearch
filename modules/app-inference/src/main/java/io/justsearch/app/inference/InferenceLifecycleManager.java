@@ -91,6 +91,7 @@ public class InferenceLifecycleManager
 
   /** Runtime view + lock + state-machine + listeners + telemetry envelope live in the runner. */
   private final TransitionRunner runner;
+  private final GenerativeRequestGate requestGate = new GenerativeRequestGate();
 
   /** One immutable configured snapshot; publication is serialized by the transition lock. */
   private volatile ConfiguredInference configured;
@@ -260,7 +261,8 @@ public class InferenceLifecycleManager
               () -> servingInference().serverPort(),
               () -> runner.view().lastKnownModelId(),
               () -> servingInference().modelPath().getFileName().toString(),
-              this.events);
+              this.events,
+              requestGate);
       openedServer =
           new LlamaServerOps(
               executorRegistrations,
@@ -300,8 +302,11 @@ public class InferenceLifecycleManager
   /** Crash-recovery callback installed on {@link LlamaServerOps}. Tempdoc 518 P1. */
   private void handleMaxCrashOffline(java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
-      if (precommitComposition
-          || !stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
+      if (precommitComposition) {
+        invalidatePreparedCandidate(stillOwned);
+        return;
+      }
+      if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
       tokenOps.clearCaches();
       InferenceFailure cleanupFailure = null;
       try {
@@ -318,9 +323,19 @@ public class InferenceLifecycleManager
   /** Serializes a captured physical server's recovery with apply, detach and close. */
   private void recoverManagedServer(java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
-      if (precommitComposition
-          || !stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
+      if (precommitComposition) {
+        invalidatePreparedCandidate(stillOwned);
+        return;
+      }
+      if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
       serverOps.recoverActiveServer();
+    }
+  }
+
+  private void invalidatePreparedCandidate(java.util.function.BooleanSupplier stillOwned) {
+    PreparedConfigApply prepared = preparedConfigApply;
+    if (prepared != null && prepared.enabled && stillOwned.getAsBoolean()) {
+      prepared.invalidated = true;
     }
   }
 
@@ -803,8 +818,10 @@ public class InferenceLifecycleManager
     private final LlamaServerOps.StartResult candidate;
     private final Mode priorMode;
     private final boolean enabled;
+    private final GenerativeRequestGate.Hold admissionHold;
     private TransitionRunner.PreparedPublication logicalPublication;
     private volatile State state = State.PREPARED;
+    private volatile boolean invalidated;
 
     private PreparedConfigApply(
         InferenceLifecycleManager owner,
@@ -813,7 +830,8 @@ public class InferenceLifecycleManager
         ConfiguredInference candidateConfiguration,
         LlamaServerOps.StartResult candidate,
         Mode priorMode,
-        boolean enabled) {
+        boolean enabled,
+        GenerativeRequestGate.Hold admissionHold) {
       this.owner = owner;
       this.incumbentConfiguration = incumbentConfiguration;
       this.incumbent = incumbent;
@@ -821,6 +839,7 @@ public class InferenceLifecycleManager
       this.candidate = candidate;
       this.priorMode = priorMode;
       this.enabled = enabled;
+      this.admissionHold = admissionHold;
     }
 
     /**
@@ -831,7 +850,9 @@ public class InferenceLifecycleManager
       if (state != State.PREPARED
           || owner.preparedConfigApply != this
           || owner.serverOps.activeStartResult().orElse(null)
-              != (enabled ? candidate : incumbent)) {
+              != (enabled ? candidate : incumbent)
+          || invalidated
+          || (enabled && !owner.serverOps.activeManagedCandidateAlive(candidate))) {
         throw new IllegalStateException("Prepared inference candidate is no longer current");
       }
       if (logicalPublication == null) {
@@ -908,6 +929,19 @@ public class InferenceLifecycleManager
     if (candidate == null) {
       throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
     }
+    final GenerativeRequestGate.Hold admissionHold;
+    try {
+      admissionHold = requestGate.closeAndDrain(Duration.ofSeconds(30));
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw modeTransition(ModeTransitionException.Reason.INTERRUPTED,
+          "Interrupted while draining generative requests", interrupted);
+    } catch (IllegalStateException unavailable) {
+      throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+          unavailable.getMessage(), unavailable);
+    }
+    boolean transferred = false;
+    try {
     synchronized (runner.lock()) {
       if (precommitComposition || preparedConfigApply != null) {
         throw modeTransition(
@@ -967,8 +1001,10 @@ public class InferenceLifecycleManager
             candidateConfiguration,
             null,
             priorMode,
-            false);
+            false,
+            admissionHold);
         preparedConfigApply = prepared;
+        transferred = true;
         return prepared;
       }
       try {
@@ -997,13 +1033,18 @@ public class InferenceLifecycleManager
             candidateConfiguration,
             started,
             priorMode,
-            true);
+            true,
+            admissionHold);
         preparedConfigApply = prepared;
+        transferred = true;
         return prepared;
       } catch (Exception candidateFailure) {
         throw rollbackPrecommitFailure(
             incumbent, incumbentConfiguration, priorMode, candidateFailure);
       }
+    }
+    } finally {
+      if (!transferred) admissionHold.close();
     }
   }
 
@@ -1093,6 +1134,7 @@ public class InferenceLifecycleManager
         preparedConfigApply = null;
         precommitComposition = false;
         prepared.state = PreparedConfigApply.State.ABORTED;
+        prepared.admissionHold.close();
         return;
       }
       var aborted = modeTransition(
@@ -1104,6 +1146,7 @@ public class InferenceLifecycleManager
           aborted);
       if (rollback != aborted) throw rollback;
       prepared.state = PreparedConfigApply.State.ABORTED;
+      prepared.admissionHold.close();
     }
   }
 
@@ -1113,6 +1156,7 @@ public class InferenceLifecycleManager
           || preparedConfigApply != prepared) {
         throw new IllegalStateException("Prepared inference candidate is not installed");
       }
+      boolean retired = false;
       try {
         prepared.logicalPublication.notifyAfterInstall();
         if (prepared.enabled
@@ -1143,9 +1187,11 @@ public class InferenceLifecycleManager
                 retirementFailure);
           }
         }
+        retired = true;
       } finally {
         preparedConfigApply = null;
         precommitComposition = false;
+        if (retired) prepared.admissionHold.close();
       }
     }
   }
@@ -1733,46 +1779,56 @@ public class InferenceLifecycleManager
 
   // ==================== Token Counting (Phase 2 RAG) — delegated to TokenEndpointOps ====================
 
+  private <T> T withGenerativeLease(java.util.function.Supplier<T> operation) {
+    var lease = requestGate.acquire();
+    try {
+      return operation.get();
+    } finally {
+      lease.close();
+    }
+  }
+
   public Optional<Integer> countTokens(String text) {
-    return tokenOps.countTokens(text);
+    return withGenerativeLease(() -> tokenOps.countTokens(text));
   }
 
   public Optional<Integer> countTokens(
       String text, io.justsearch.app.api.EngineWorkHandle work) {
-    return onlineOps.callOwned(work, () -> tokenOps.countTokens(text));
+    return onlineOps.callOwned(work, () -> withGenerativeLease(() -> tokenOps.countTokens(text)));
   }
 
   public Optional<String> applyTemplate(List<Map<String, Object>> messages) {
-    return tokenOps.applyTemplate(messages);
+    return withGenerativeLease(() -> tokenOps.applyTemplate(messages));
   }
 
   public Optional<String> applyTemplate(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return tokenOps.applyTemplate(messages, tools);
+    return withGenerativeLease(() -> tokenOps.applyTemplate(messages, tools));
   }
 
   public Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
-    return tokenOps.countPromptTokens(messages);
+    return withGenerativeLease(() -> tokenOps.countPromptTokens(messages));
   }
 
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return tokenOps.countPromptTokens(messages, tools);
+    return withGenerativeLease(() -> tokenOps.countPromptTokens(messages, tools));
   }
 
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages,
       List<Map<String, Object>> tools,
       io.justsearch.app.api.EngineWorkHandle work) {
-    return onlineOps.callOwned(work, () -> tokenOps.countPromptTokens(messages, tools));
+    return onlineOps.callOwned(work,
+        () -> withGenerativeLease(() -> tokenOps.countPromptTokens(messages, tools)));
   }
 
   public boolean supportsTokenize() {
-    return tokenOps.supportsTokenize();
+    return withGenerativeLease(tokenOps::supportsTokenize);
   }
 
   public boolean supportsApplyTemplate() {
-    return tokenOps.supportsApplyTemplate();
+    return withGenerativeLease(tokenOps::supportsApplyTemplate);
   }
 
   // ==================== Process Management — delegated to LlamaServerOps ====================

@@ -47,7 +47,7 @@ final class DefaultEngineComponentRegistryTest {
         observed.set(snapshot);
       })) {
         var desired = new EngineComponentSnapshot.Component(handle.spec(), ComponentState.READY,
-            null, Instant.now(), System.nanoTime(), "applied", "desired", null, 0, null);
+            null, Instant.EPOCH, 0L, "applied", "desired", null, 0, null);
         var prepared = registry.prepareBatch(Map.of("index", desired));
 
         assertEquals(before, handle.snapshot());
@@ -56,10 +56,29 @@ final class DefaultEngineComponentRegistryTest {
 
         prepared.commit();
 
-        assertEquals(desired, handle.snapshot());
+        assertEquals(prepared.snapshot().components().getFirst(), handle.snapshot());
+        assertNotEquals(Instant.EPOCH, handle.snapshot().stateSince());
         assertSame(prepared.snapshot(), observed.get());
         assertThrows(IllegalStateException.class, prepared::commit);
       }
+    }
+  }
+
+  @Test
+  void preparedBatchPreservesContinuousReadyEpochWhenOnlyVersionChanges() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var index = registry.register(spec("index", Set.of()));
+      index.transition(ComponentState.READY, null, "serving A");
+      var before = index.snapshot();
+      var desired = new EngineComponentSnapshot.Component(index.spec(), ComponentState.READY,
+          null, Instant.EPOCH, 0L, "version-b", "version-b", null, 0, "serving B");
+
+      registry.prepareBatch(Map.of("index", desired)).commit();
+
+      assertEquals(before.stateSince(), index.snapshot().stateSince());
+      assertEquals(before.stateSinceMonotonicNanos(),
+          index.snapshot().stateSinceMonotonicNanos());
+      assertEquals("version-b", index.snapshot().appliedVersion());
     }
   }
 

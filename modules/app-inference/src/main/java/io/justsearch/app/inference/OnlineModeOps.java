@@ -79,6 +79,7 @@ final class OnlineModeOps {
 
   // Priority queue for Online Mode (Chat > VDU)
   private final ReentrantLock onlineRequestLock = new ReentrantLock();
+  private final GenerativeRequestGate requestGate;
   private final ExecutorService foregroundRequests;
   private final ExecutorService backgroundRequests;
 
@@ -127,6 +128,20 @@ final class OnlineModeOps {
       Supplier<String> lastKnownModelId,
       Supplier<String> configModelFileName,
       InferenceTelemetryEvents events) {
+    this(executors, httpClient, objectMapper, currentMode, serverPort, lastKnownModelId,
+        configModelFileName, events, new GenerativeRequestGate());
+  }
+
+  OnlineModeOps(
+      InferenceExecutorRegistrations executors,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      Supplier<Mode> currentMode,
+      Supplier<Integer> serverPort,
+      Supplier<String> lastKnownModelId,
+      Supplier<String> configModelFileName,
+      InferenceTelemetryEvents events,
+      GenerativeRequestGate requestGate) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.currentMode = currentMode;
@@ -134,6 +149,7 @@ final class OnlineModeOps {
     this.lastKnownModelId = lastKnownModelId;
     this.configModelFileName = configModelFileName;
     this.events = events == null ? InferenceTelemetryEvents.noop() : events;
+    this.requestGate = Objects.requireNonNull(requestGate, "requestGate");
     ExecutorService foregroundRequestExecutor = null;
     ExecutorService backgroundRequestExecutor = null;
     ExecutorService foregroundCallbackExecutor = null;
@@ -265,7 +281,9 @@ final class OnlineModeOps {
           emitRequestEnqueued(RequestKind.CHAT);
           RequestOutcome outcome = RequestOutcome.ERROR;
           onlineRequestLock.lock();
+          GenerativeRequestGate.Lease lease = null;
           try {
+            lease = requestGate.acquire();
             emitRequestStarted(RequestKind.CHAT, enqueueNanos);
             String result = sendChatRequest(messages, maxTokens, sampling);
             outcome = RequestOutcome.OK;
@@ -274,6 +292,7 @@ final class OnlineModeOps {
             outcome = outcomeFromThrowable(re);
             throw re;
           } finally {
+            if (lease != null) lease.close();
             onlineRequestLock.unlock();
             emitRequestCompleted(RequestKind.CHAT, enqueueNanos, outcome);
           }
@@ -344,12 +363,15 @@ final class OnlineModeOps {
               }
             }
             emitRequestStarted(RequestKind.VISION, enqueueNanos);
+            GenerativeRequestGate.Lease lease = null;
             try {
+              lease = requestGate.acquire();
               VisionCompletionResult result =
                   sendVisionRequestDetailed(prompt, base64Image, maxTokens, sampling, seed);
               outcome = RequestOutcome.OK;
               return result;
             } finally {
+              if (lease != null) lease.close();
               onlineRequestLock.unlock();
             }
           } catch (InterruptedException e) {
@@ -520,6 +542,12 @@ final class OnlineModeOps {
               "Not in Online Mode, current mode is " + currentMode.get()));
       return;
     }
+    try {
+      requestGate.requireOpen();
+    } catch (IllegalStateException reloading) {
+      trackedOnError.accept(reloading);
+      return;
+    }
 
     var unused =
         io.justsearch.core.execution.EngineFutures.supplyAsync(
@@ -542,7 +570,9 @@ final class OnlineModeOps {
               Throwable failure = null;
 
               onlineRequestLock.lock();
+              GenerativeRequestGate.Lease lease = null;
               try {
+                lease = requestGate.acquire();
                 emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
                 body.put("model", resolveModelIdForRequests());
@@ -653,6 +683,7 @@ final class OnlineModeOps {
               } catch (Exception e) {
                 failure = e;
               } finally {
+                if (lease != null) lease.close();
                 onlineRequestLock.unlock();
               }
 
@@ -879,6 +910,14 @@ final class OnlineModeOps {
       }
       return;
     }
+    try {
+      requestGate.requireOpen();
+    } catch (IllegalStateException reloading) {
+      try (owner) {
+        owner.fail(reloading);
+      }
+      return;
+    }
 
     try {
       owner.checkCancelled();
@@ -909,10 +948,12 @@ final class OnlineModeOps {
               Throwable failure = null;
 
               boolean locked = false;
+              GenerativeRequestGate.Lease lease = null;
               try {
                 onlineRequestLock.lockInterruptibly();
                 locked = true;
                 owner.checkCancelled();
+                lease = requestGate.acquire();
                 emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
                 body.put("model", resolveModelIdForRequests());
@@ -1047,6 +1088,7 @@ final class OnlineModeOps {
               } catch (Exception e) {
                 failure = e;
               } finally {
+                if (lease != null) lease.close();
                 if (locked) onlineRequestLock.unlock();
                 pump.close();
               }
@@ -1115,6 +1157,7 @@ final class OnlineModeOps {
   // ==================== Internal Helpers ====================
 
   private void requireOnline(String operation) {
+    requestGate.requireOpen();
     if (currentMode.get() != Mode.ONLINE) {
       throw new IllegalStateException(
           operation + " requires ONLINE mode, but current mode is " + currentMode.get());

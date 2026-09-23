@@ -121,6 +121,11 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(Mode.ONLINE, manager.getCurrentMode());
       assertEquals(expectedHash(b, resolvedB), prepared.declaredConfigHash());
       assertSame(b, server.active.get().context().inference());
+      assertThrows(IllegalStateException.class, () -> manager.countTokens("held request"),
+          "token endpoints must not reach the private candidate");
+      assertThrows(IllegalStateException.class,
+          () -> manager.askQuestion("context", "question", 64),
+          "chat must refuse before it can enqueue against the private candidate");
       server.recovery.accept(() -> server.active.get() == incumbent);
       verify(server.mock(), never()).recoverActiveServer();
 
@@ -134,6 +139,48 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(8192, manager.configuredContextTokens());
       server.recovery.accept(() -> true);
       verify(server.mock(), times(1)).recoverActiveServer();
+    }
+  }
+
+  @Test
+  void preparedCandidateDeathRefusesCommitAndRestoresIncumbent() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      var prepared = manager.prepareResolvedConfig(b, resolvedB);
+      server.candidateAlive.set(false);
+      assertThrows(IllegalStateException.class,
+          () -> prepared.withLifecycleLock(prepared::validateForCommit));
+      server.candidateAlive.set(true);
+      prepared.abort();
+      assertSame(a, manager.currentConfig());
+      assertSame(a, server.active.get().context().inference());
+    }
+  }
+
+  @Test
+  void precommitCrashCallbackInvalidatesCandidateWithoutRecoveringIt() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      var prepared = manager.prepareResolvedConfig(b, resolvedB);
+      server.recovery.accept(() -> true);
+      assertThrows(IllegalStateException.class,
+          () -> prepared.withLifecycleLock(prepared::validateForCommit));
+      verify(server.mock(), never()).recoverActiveServer();
+      prepared.abort();
     }
   }
 
@@ -987,6 +1034,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
     private final ArrayDeque<ModeTransitionException> healthFailures = new ArrayDeque<>();
     private final AtomicReference<RuntimeException> stopFailure = new AtomicReference<>();
     private final AtomicBoolean wrongNextHash = new AtomicBoolean();
+    private final AtomicBoolean candidateAlive = new AtomicBoolean(true);
     private final MockedConstruction<LlamaServerOps> construction;
     private Consumer<LlamaServerOps.StartRequest> onStart = request -> {};
     private Consumer<LlamaServerOps.StartResult> onHealth = result -> {};
@@ -1030,6 +1078,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
                     .stopLlamaServer();
                 when(server.activeStartResult())
                     .thenAnswer(invocation -> Optional.ofNullable(active.get()));
+                when(server.activeManagedCandidateAlive(any()))
+                    .thenAnswer(invocation -> candidateAlive.get()
+                        && active.get() == invocation.getArgument(0));
                 doAnswer(
                         invocation -> {
                           LlamaServerOps.StartResult result = invocation.getArgument(0);

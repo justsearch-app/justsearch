@@ -46,11 +46,8 @@ final class HeadlessAppShutdownWiringTest {
   @Test
   void stalledStartupCannotHoldFatalCleanupIndefinitelyOrClaimQuiescence() {
     var stalled = new CompletableFuture<>();
-    var instanceLock = mock(AppInstanceLock.class);
     boolean quiesced = HeadlessApp.awaitIndexStartupForCleanup(stalled, java.time.Duration.ZERO);
     assertFalse(quiesced);
-    HeadlessApp.closeInstanceLockAfterIndex(quiesced, instanceLock);
-    org.mockito.Mockito.verifyNoInteractions(instanceLock);
     assertTrue(stalled.isCancelled());
     assertFalse(HeadlessApp.awaitIndexStartupForCleanup(stalled, java.time.Duration.ZERO));
     assertTrue(HeadlessApp.awaitIndexStartupForCleanup(CompletableFuture.completedFuture(null), java.time.Duration.ZERO));
@@ -66,7 +63,7 @@ final class HeadlessAppShutdownWiringTest {
     when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.FAILED, ShutdownOutcome.GRACEFUL);
     var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null, instanceLock,
         mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-        resources, () -> null, operations);
+        resources, () -> null, operations, null, null);
     var indexStep = steps.stream().filter(step -> EngineShutdownSequence.INDEX_HALF_STEP.equals(step.name())).findFirst().orElseThrow();
     var storeStep = steps.stream().filter(step -> "operations-store".equals(step.name())).findFirst().orElseThrow();
     var resourceStep = steps.stream().filter(step -> "process-resources".equals(step.name())).findFirst().orElseThrow();
@@ -104,7 +101,7 @@ final class HeadlessAppShutdownWiringTest {
     var sequence = new EngineShutdownSequence(tempDir,
         HeadlessApp.orderedShutdownSteps(null, head, null, null, null, null, null,
             instanceLock, mock(OperationLeaseService.class), admission, resources, () -> null,
-            operations, attempts), ignored -> {});
+            operations, attempts, null), ignored -> {});
 
     var result = sequence.run(Reason.QUIT);
 
@@ -128,7 +125,7 @@ final class HeadlessAppShutdownWiringTest {
     var exitCode = new AtomicInteger(-1);
     var steps = HeadlessApp.orderedShutdownSteps(null, head, null, index, null, tracing, telemetry,
         instanceLock, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-        resources, () -> null, operations);
+        resources, () -> null, operations, null, null);
     var sequence = new EngineShutdownSequence(tempDir, steps, exitCode::set);
     sequence.runAndExit(Reason.QUIT);
     var result = sequence.run(Reason.QUIT);
@@ -181,7 +178,7 @@ final class HeadlessAppShutdownWiringTest {
                 leases,
                 admission,
                 processResources,
-                () -> watcher, operations),
+                () -> watcher, operations, null, null),
             code -> {
               assertTrue(manifestCompleted.get(), "manifest completion precedes process exit");
               exitCode.set(code);
@@ -287,7 +284,7 @@ final class HeadlessAppShutdownWiringTest {
           var steps = HeadlessApp.orderedShutdownSteps(api, null, health, knowledge, null,
               null, null, null, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
               mock(io.justsearch.app.api.EngineProcessResources.class), () -> null,
-              mock(io.justsearch.app.api.operations.OperationStore.class));
+              mock(io.justsearch.app.api.operations.OperationStore.class), null, null);
           for (var step : steps) step.action().run(Reason.QUIT);
         }
       } finally {
@@ -309,7 +306,7 @@ final class HeadlessAppShutdownWiringTest {
           new EngineShutdownSequence(
               Path.of("build", "shutdown-wiring", reason.wire()),
               HeadlessApp.orderedShutdownSteps(
-                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.app.api.EngineProcessResources.class), () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
+                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.app.api.EngineProcessResources.class), () -> null, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
               code -> {});
 
       sequence.run(reason);
@@ -355,7 +352,7 @@ final class HeadlessAppShutdownWiringTest {
                   admission,
                   admission,
                   mock(io.justsearch.app.api.EngineProcessResources.class),
-                  () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
+                  () -> null, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
               ignored -> {});
 
       sequence.run(Reason.RESTART);
@@ -386,7 +383,7 @@ final class HeadlessAppShutdownWiringTest {
                 OperationLeaseService.noOp(),
                 null,
                 mock(io.justsearch.app.api.EngineProcessResources.class),
-                () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
+                () -> null, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
             ignored -> {});
 
     var result = sequence.run(Reason.QUIT);
@@ -497,7 +494,7 @@ final class HeadlessAppShutdownWiringTest {
                 OperationLeaseService.noOp(),
                 null,
                 mock(io.justsearch.app.api.EngineProcessResources.class),
-                watcherRef::get, mock(io.justsearch.app.api.operations.OperationStore.class)),
+                watcherRef::get, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
             ignored -> {});
 
     try (var _ =

@@ -251,6 +251,53 @@ at `tmp/2550-ai-pack-policy-integration.txt`. Full unit, installed native,
 physical owner and hosted proof still remain. This compiling checkpoint does
 not satisfy D1-4, D1-13, D2, E or F acceptance.
 
+Checkpoint `0b68b4e29` (109 files) was committed and pushed to PR727 after the
+first compiling build. The subsequent `./gradlew.bat test` at
+`tmp/2553-d1-checkpoint-full-test.txt` stopped after two audit failures:
+HeadlessApp retained obsolete private shutdown helpers, and the fatal startup
+`System.exit` call did not name its EngineExit constant at the call site. Full
+failed XML is retained under `tmp/2553-failed-results`. The obsolete helpers
+were removed, tests call the canonical binding, and the exit site names the
+constant. Focused audit, shutdown, compile and formatting checks passed at
+`tmp/2554-shutdown-audit-compile.txt` through
+`tmp/2557-shutdown-wiring-focused.txt`.
+
+The next full suite at `tmp/2558-d1-checkpoint-full-test-rerun.txt` passed those
+two audits and then reported 24 app-services failures. The full failed XML is
+retained under `tmp/2558-app-services-results`. Recovery-reset code had tried
+to inspect quarantined settings during D1 change classification; that path now
+uses its established successor-boot behavior and avoids the unreadable file.
+The normal-reset test fixture now constructs the same serving config as boot.
+`tmp/2561-reset-focused.txt` passes the reset class. The new `core.reconfigure`
+catalog entry now has its validator fixture binding, i18n strings and updated
+wire golden, preserving all 32 prior entries. Reset, catalog and coordinator
+focused checks passed together at `tmp/2562-settings-witness-catalog.txt`.
+
+Independent read-only review of `0b68b4e29` found four concrete D1 publication
+defects: generative requests could use B before commit; a dead prepared B could
+still validate READY; the reserved settings witness was not revalidated just
+before file replacement; and prepared READY→READY registry publication reset
+`stateSince`. The current dirty correction adds a generative admission/lease
+gate for chat, vision, stream and token endpoints, bounded drain before A stops,
+staging observation, candidate liveness/invalidation checks, final witness
+reinspection under publication write, and registry state-epoch normalization.
+Focused gate/manager tests passed at `tmp/2565-generative-candidate-death.txt`,
+settings/registry checks at `tmp/2566-publication-review-focused.txt`, and the
+full compile/static/integration `build -x test` passed at
+`tmp/2571-d1-review-checkpoint-build.txt`. The earlier `tmp/2568` and `tmp/2570`
+build attempts exposed PMD findings corrected without suppressing the rules.
+These corrections are not yet a committed checkpoint or full D1 acceptance.
+
+The remaining app-services red classes in the 2558 suite are
+`AiInstallOnnxSettingsProducerTest` and seven
+`RuntimeActivationServiceChatProfileTest` cases. Their install-time settings
+paths still expect generation-bound model paths to become serving config or
+perform a second physical inference apply after settings persistence. D1-4/D1-5
+require those paths to join the prepared owner route; do not turn the tests green
+by allowing a generation-bound reconfigure or restoring apply-then-compensate.
+The physical index/encoder owners, paired reader captures, installed held-call
+and hosted proof remain open. No stage acceptance is claimed.
+
 ## Evidence and owner map
 
 | Concern | Governing record |

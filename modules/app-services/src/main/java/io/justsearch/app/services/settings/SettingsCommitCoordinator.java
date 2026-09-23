@@ -40,6 +40,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     private final long id;
     private final String key;
     private final SettingsWitness prior;
+    private final UiSettings priorSettings;
     private Phase phase = Phase.PREPARING;
     private boolean preparationStarted;
     private boolean restartRequired;
@@ -49,10 +50,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     private boolean recoveryReset() { return quarantineFingerprint != null; }
 
     private SettingsCommitFence(long id, String key, SettingsWitness prior) {
-      this(id, key, prior, null, false);
+      this(id, key, prior, null, null, false);
     }
-    private SettingsCommitFence(long id, String key, SettingsWitness prior, String fingerprint, boolean reset) {
+    private SettingsCommitFence(long id, String key, SettingsWitness prior,
+        UiSettings priorSettings, String fingerprint, boolean reset) {
       this.id = id; this.key = key; this.prior = prior;
+      this.priorSettings = priorSettings;
       this.quarantineFingerprint = fingerprint; this.reset = reset;
     }
   }
@@ -152,17 +155,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     if (id <= 0 || expected.acceptedRevision() == Long.MAX_VALUE) {
       throw new IllegalArgumentException("Invalid settings reservation");
     }
-    final SettingsWitness prior;
-    try { prior = store.inspect().witness(); }
+    final UiSettingsStore.Snapshot snapshot;
+    try { snapshot = store.inspect(); }
     catch (RuntimeException failure) {
       block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, id));
       throw refused("SETTINGS_RECOVERY_REQUIRED", "The settings revision cannot be verified", Map.of());
     }
+    SettingsWitness prior = snapshot.witness();
     if (!prior.equals(expected)) {
       throw refused("VERSION_CONFLICT", "Settings changed since this candidate was read",
           Map.of("currentRevision", prior.acceptedRevision()));
     }
-    var reserved = new SettingsCommitFence(id, key, prior, null, reset);
+    var reserved = new SettingsCommitFence(id, key, prior, snapshot.settings(), null, reset);
     fence = reserved;
     return reserved;
   }
@@ -191,7 +195,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));
       fence = new SettingsCommitFence(row.id(), row.key(), new SettingsWitness(0, null),
-          intent.quarantineFingerprint(), true);
+          null, intent.quarantineFingerprint(), true);
       return fence;
     } finally { mutex.unlock(); publishIssue(); }
   }
@@ -240,11 +244,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       var next = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
       var prepared = store.prepare(candidate, next);
-      boolean chatComponentChanged = !Objects.equals(
-          store.inspect().settings().getChatEnabled(), prepared.settings().getChatEnabled());
+      // A recovery reset starts from quarantined bytes with no readable prior settings.
+      // Its committed defaults are applied by the already-required successor boot.
+      boolean chatComponentChanged = !active.recoveryReset() && !Objects.equals(
+          active.priorSettings.getChatEnabled(), prepared.settings().getChatEnabled());
       ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(prepared.settings()), "Prepared config");
       ResolvedConfig serving = config.get();
-      var changedKeys = ConfigApplyScopes.classify(serving, resolved);
+      var changedKeys = active.recoveryReset()
+          ? new ConfigApplyScopes.ChangedKeys(java.util.Set.of(), Map.of(),
+              java.util.Set.of(), java.util.Set.of())
+          : ConfigApplyScopes.classify(serving, resolved);
       if (!changedKeys.generationBound().isEmpty()) {
         throw refused("GENERATION_BOUND_REQUIRES_REINDEX",
             "Generation-bound settings require a separate reindex operation",
@@ -284,6 +293,22 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         publication.writeLock().lock();
         try {
           requireFence(reservation);
+          if (active.recoveryReset()) {
+            if (!matchesQuarantine(active.quarantineFingerprint)) {
+              throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings quarantine evidence changed", Map.of());
+            }
+          } else {
+            final SettingsWitness current;
+            try { current = store.inspect().witness(); }
+            catch (RuntimeException unreadable) {
+              block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, active.id));
+              throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings witness became unreadable", Map.of());
+            }
+            if (!active.prior.equals(current)) {
+              throw refused("VERSION_CONFLICT", "Settings changed during component preparation",
+                  Map.of("currentRevision", current.acceptedRevision()));
+            }
+          }
           config.validatePrepared(preparedConfig);
           if (preparedForPublish != null) preparedForPublish.validate();
           if (processClosing.getAsBoolean()) {
@@ -479,7 +504,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         if (reset != null && matchesQuarantine(reset.quarantineFingerprint())) {
           recoveredDecision = precommitFailure();
           fence = new SettingsCommitFence(row.id(), row.key(), new SettingsWitness(0, null),
-              reset.quarantineFingerprint(), true);
+              null, reset.quarantineFingerprint(), true);
         }
         block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));
         return;

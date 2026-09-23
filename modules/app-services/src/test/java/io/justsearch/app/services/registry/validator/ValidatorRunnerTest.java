@@ -192,6 +192,12 @@ final class ValidatorRunnerTest {
         CoreOperationCatalog.RESET_SETTINGS,
         new io.justsearch.app.services.registry.operations.handlers.ResetSettingsHandler(
             () -> null));
+    // D1-4: core.reconfigure is production-registered beside reset-settings. Keep the
+    // validator fixture aligned so ExecutorBindingValidator checks the complete core catalog.
+    handlers.register(
+        CoreOperationCatalog.RECONFIGURE,
+        new io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler(
+            () -> null));
     // Slice 445: TABULAR Resource item Operations + privacy resolver. Same
     // unavailable-supplier pattern (validator only checks structural shape).
     handlers.register(

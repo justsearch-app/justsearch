@@ -112,7 +112,8 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
           if (!handle.spec.equals(desired.spec())) {
             throw new IllegalArgumentException("Replacement spec does not match component: " + name);
           }
-          updates.add(new PreparedUpdate(handle, handle.snapshotLocked(), desired));
+          var before = handle.snapshotLocked();
+          updates.add(new PreparedUpdate(handle, before, withPublicationStateSince(before, desired)));
         }
 
         var byHandle = new IdentityHashMap<DefaultComponentHandle,
@@ -131,6 +132,17 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     } finally {
       publicationLock.readLock().unlock();
     }
+  }
+
+  private static EngineComponentSnapshot.Component withPublicationStateSince(
+      EngineComponentSnapshot.Component before, EngineComponentSnapshot.Component desired) {
+    boolean stateChanged = before.state() != desired.state();
+    return new EngineComponentSnapshot.Component(
+        desired.spec(), desired.state(), desired.reasonCode(),
+        stateChanged ? Instant.now() : before.stateSince(),
+        stateChanged ? System.nanoTime() : before.stateSinceMonotonicNanos(),
+        desired.appliedVersion(), desired.desiredVersion(), desired.lastCompose(),
+        desired.recoveryAttempts(), desired.evidence());
   }
 
   @Override

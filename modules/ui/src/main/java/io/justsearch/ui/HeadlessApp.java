@@ -520,11 +520,6 @@ public class HeadlessApp {
     }
   }
 
-  static void closeInstanceLockAfterIndex(boolean indexClosed, AppInstanceLock lock) {
-    // A live or unproven producer still owns the directory; physical process exit releases it.
-    if (indexClosed && lock != null) lock.close();
-  }
-
   static boolean awaitIndexStartupForCleanup(
       java.util.concurrent.CompletableFuture<?> startup, java.time.Duration budget) {
     if (startup == null) return true;
@@ -1433,7 +1428,7 @@ public class HeadlessApp {
           == io.justsearch.app.api.NativeQuiescence.UNQUIESCED) {
         Runtime.getRuntime().halt(fatalCode);
       }
-      System.exit(fatalCode);
+      System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
     }
   }
 
@@ -1523,49 +1518,6 @@ public class HeadlessApp {
    * receipt's {@code errors} list and in the log line a support session reads.
    */
   /** Canonical shutdown binding with the typed Engine admission owner. */
-  static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
-      orderedShutdownSteps(
-          LocalApiServer apiServer,
-          HeadAssembly bootstrap,
-          KnowledgeServerHealthMonitor healthMonitor,
-          KnowledgeServerBootstrap knowledgeServer,
-          RuntimeManifestPublisher manifestPublisher,
-          io.justsearch.telemetry.TracingBootstrap tracing,
-          Telemetry telemetry,
-          AppInstanceLock appInstanceLock,
-          io.justsearch.app.api.OperationLeaseService operationLeases,
-          io.justsearch.app.api.EngineAdmissionService engineAdmission,
-          io.justsearch.app.api.EngineProcessResources processResources,
-          java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
-              shutdownRequestWatcher,
-          io.justsearch.app.api.operations.OperationStore operations) {
-    return orderedShutdownSteps(apiServer, bootstrap, healthMonitor, knowledgeServer,
-        manifestPublisher, tracing, telemetry, appInstanceLock, operationLeases,
-        engineAdmission, processResources, shutdownRequestWatcher, operations, null);
-  }
-
-  static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
-      orderedShutdownSteps(
-          LocalApiServer apiServer,
-          HeadAssembly bootstrap,
-          KnowledgeServerHealthMonitor healthMonitor,
-          KnowledgeServerBootstrap knowledgeServer,
-          RuntimeManifestPublisher manifestPublisher,
-          io.justsearch.telemetry.TracingBootstrap tracing,
-          Telemetry telemetry,
-          AppInstanceLock appInstanceLock,
-          io.justsearch.app.api.OperationLeaseService operationLeases,
-          io.justsearch.app.api.EngineAdmissionService engineAdmission,
-          io.justsearch.app.api.EngineProcessResources processResources,
-          java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
-              shutdownRequestWatcher,
-          io.justsearch.app.api.operations.OperationStore operations,
-          io.justsearch.app.api.operations.OperationAttemptRunner attempts) {
-    return orderedShutdownSteps(apiServer, bootstrap, healthMonitor, knowledgeServer,
-        manifestPublisher, tracing, telemetry, appInstanceLock, operationLeases,
-        engineAdmission, processResources, shutdownRequestWatcher, operations, attempts, null);
-  }
-
   static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
       orderedShutdownSteps(
           LocalApiServer apiServer,

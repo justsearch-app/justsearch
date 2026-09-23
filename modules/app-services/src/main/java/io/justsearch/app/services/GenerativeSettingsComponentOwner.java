@@ -17,7 +17,6 @@ import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -64,10 +63,21 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
       return new AbsentPreparedOwner(preparedObservation);
     }
 
+    EngineComponentSnapshot.Component before = observation.snapshot();
+    ComponentState stagingState = before.state() == ComponentState.READY
+        ? ComponentState.RELOADING : ComponentState.STARTING;
+    if (!observation.transitionIfUnchanged(before, stagingState,
+        LifecycleReasonCode.INFERENCE_STARTING.code(), "preparing managed generative candidate")) {
+      throw refused(PREPARATION_REFUSED,
+          "Generative observation changed before candidate preparation",
+          Map.of("changedKeys", Set.copyOf(changedKeys)), null);
+    }
+    EngineComponentSnapshot.Component staging = observation.snapshot();
     try {
       var prepared = manager.prepareResolvedConfig(inference, desired, enabled);
-      return new ManagedPreparedOwner(prepared, preparedObservation);
+      return new ManagedPreparedOwner(prepared, preparedObservation, observation, before, staging);
     } catch (ModeTransitionException failure) {
+      restoreObservation(before, staging);
       throw refused(PREPARATION_REFUSED,
           "Managed generative candidate was refused before settings commit",
           Map.of(
@@ -75,6 +85,17 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
               "reason", failure.reason().name(),
               "inferenceCode", failure.failure().wireCode()),
           failure);
+    } catch (RuntimeException failure) {
+      restoreObservation(before, staging);
+      throw failure;
+    }
+  }
+
+  private void restoreObservation(EngineComponentSnapshot.Component before,
+      EngineComponentSnapshot.Component staging) {
+    if (!observation.transitionIfUnchanged(staging, before.state(),
+        before.reasonCode(), before.evidence())) {
+      throw new IllegalStateException("Generative observation changed during candidate rollback");
     }
   }
 
@@ -88,8 +109,8 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         previous.spec(),
         enabled ? ComponentState.READY : ComponentState.ABSENT,
         enabled ? null : LifecycleReasonCode.INFERENCE_DEACTIVATED.code(),
-        Instant.now(),
-        System.nanoTime(),
+        previous.stateSince(),
+        previous.stateSinceMonotonicNanos(),
         version,
         version,
         new ComposeEvidence(
@@ -122,7 +143,10 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
 
   private record ManagedPreparedOwner(
       InferenceLifecycleManager.PreparedConfigApply candidate,
-      EngineComponentSnapshot.Component observation)
+      EngineComponentSnapshot.Component observation,
+      ComponentHandle handle,
+      EngineComponentSnapshot.Component before,
+      EngineComponentSnapshot.Component staging)
       implements FixedSettingsComponentComposer.PreparedOwner {
     private ManagedPreparedOwner {
       Objects.requireNonNull(candidate, "candidate");
@@ -156,6 +180,10 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     @Override public void abort() {
       try {
         candidate.abort();
+        if (!handle.transitionIfUnchanged(staging, before.state(),
+            before.reasonCode(), before.evidence())) {
+          throw new IllegalStateException("Generative observation changed during candidate rollback");
+        }
       } catch (ModeTransitionException failure) {
         throw new IllegalStateException("Generative candidate rollback failed", failure);
       }

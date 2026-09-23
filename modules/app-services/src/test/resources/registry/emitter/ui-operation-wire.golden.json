@@ -1322,6 +1322,56 @@
   "audience" : "OPERATOR",
   "consumers" : [ ]
 }, {
+  "id" : "core.reconfigure",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.reconfigure.label",
+    "descriptionKey" : "ops.reconfigure.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "required" : [ "settings", "modeIntent" ],
+      "properties" : {
+        "settings" : {
+          "type" : "object",
+          "required" : [ "witness", "operationKey" ]
+        },
+        "modeIntent" : {
+          "type" : [ "string", "null" ]
+        }
+      }
+    },
+    "result" : {
+      "type" : "object"
+    },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "MEDIUM",
+    "confirm" : {
+      "kind" : "NONE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
   "id" : "core.cancel-indexing-job",
   "type" : "operation",
   "presentation" : {

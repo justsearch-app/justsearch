@@ -70,7 +70,7 @@ final class HeadlessAppOperationsCheckpointTest {
       });
       var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, manifest,
           null, null, null, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-          mock(EngineProcessResources.class), () -> null, store);
+          mock(EngineProcessResources.class), () -> null, store, null, null);
       var names = steps.stream().map(EngineShutdownSequence.Step::name).toList();
       assertEquals(names.indexOf(EngineShutdownSequence.INDEX_HALF_STEP) - 1,
           names.indexOf("durable-operations-checkpoint"));
@@ -111,7 +111,7 @@ final class HeadlessAppOperationsCheckpointTest {
     when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
     var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null, null,
         mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
-        mock(EngineProcessResources.class), () -> null, store);
+        mock(EngineProcessResources.class), () -> null, store, null, null);
     var result = new EngineShutdownSequence(temp, steps, ignored -> {}).run(Reason.QUIT);
     assertFalse(result.clean());
     assertEquals("GRACEFUL", result.workerOutcome());
