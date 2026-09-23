@@ -95,6 +95,14 @@ public class InferenceLifecycleManager
   /** One immutable configured snapshot; publication is serialized by the transition lock. */
   private volatile ConfiguredInference configured;
 
+  /**
+   * Owner reservation for an in-place candidate composed before the outer settings commit.
+   * While set, B is physically active but remains unavailable through the component owner and
+   * must not replace A in this manager's serving/configuration projections.
+   */
+  private volatile PreparedConfigApply preparedConfigApply;
+  private volatile boolean precommitComposition;
+
   /** A null resolved snapshot exists only for the legacy constructor before context capture. */
   private record ConfiguredInference(
       InferenceConfig inference, ResolvedConfig resolved, LlamaServerOps.AdoptionPolicy policy) {
@@ -119,6 +127,7 @@ public class InferenceLifecycleManager
   }
 
   private InferenceConfig servingInference() {
+    if (precommitComposition) return configuredInference();
     LlamaServerOps server = serverOps;
     return server == null ? configuredInference()
         : server.activeStartResult().map(start -> start.context().inference()).orElseGet(this::configuredInference);
@@ -204,11 +213,13 @@ public class InferenceLifecycleManager
         new PropsObserver() {
           @Override
           public void onModelIdObserved(String modelId, LlamaServerConfigContext context) {
+            if (precommitComposition) return;
             onModelIdUpdatedInternal(modelId, context);
           }
 
           @Override
           public void onContextTokensObserved(int contextTokens) {
+            if (precommitComposition) return;
             runner.mergeProps(null, contextTokens);
           }
 
@@ -338,6 +349,7 @@ public class InferenceLifecycleManager
   public boolean hasVisionCapability() {
     InferenceConfig cfg = servingInference();
     boolean configHasVision = cfg != null && cfg.mmprojPath() != null;
+    if (precommitComposition) return configHasVision;
     return configHasVision || serverOps.hasVisionCapabilityFromProps();
   }
 
@@ -769,6 +781,233 @@ public class InferenceLifecycleManager
   private record ApplyExecution(
       ConfigApplyDisposition disposition, String declaredConfigHash, TransitionOutcome transition) {}
 
+  /**
+   * Opaque, manager-owned result of composing a strict generative candidate before settings
+   * persistence. The outer coordinator validates this value before replacing the settings file,
+   * then invokes {@link #installAfterSettingsCommit()} as the publication-lock-held assignment.
+   * If commitment does not occur, {@link #abort()} stops B and restores the captured serving A.
+   */
+  public static final class PreparedConfigApply {
+    private enum State {
+      PREPARED,
+      INSTALLED,
+      ABORTED
+    }
+
+    private final InferenceLifecycleManager owner;
+    private final ConfiguredInference incumbentConfiguration;
+    private final LlamaServerOps.StartResult incumbent;
+    private final ConfiguredInference candidateConfiguration;
+    private final LlamaServerOps.StartResult candidate;
+    private final Mode priorMode;
+    private volatile State state = State.PREPARED;
+
+    private PreparedConfigApply(
+        InferenceLifecycleManager owner,
+        ConfiguredInference incumbentConfiguration,
+        LlamaServerOps.StartResult incumbent,
+        ConfiguredInference candidateConfiguration,
+        LlamaServerOps.StartResult candidate,
+        Mode priorMode) {
+      this.owner = owner;
+      this.incumbentConfiguration = incumbentConfiguration;
+      this.incumbent = incumbent;
+      this.candidateConfiguration = candidateConfiguration;
+      this.candidate = candidate;
+      this.priorMode = priorMode;
+    }
+
+    /**
+     * Revalidates the prepared owner and physical candidate before the settings replacement.
+     * This method performs no mutation and must run before the durable commit point.
+     */
+    public void validateForCommit() {
+      if (state != State.PREPARED
+          || owner.preparedConfigApply != this
+          || owner.serverOps.activeStartResult().orElse(null) != candidate) {
+        throw new IllegalStateException("Prepared inference candidate is no longer current");
+      }
+    }
+
+    /**
+     * Installs the already validated B references after the settings file commit. This deliberately
+     * contains assignments only: no manager lock, callback, allocation, I/O or health work belongs
+     * after the outer commit point.
+     */
+    public void installAfterSettingsCommit() {
+      owner.configured = candidateConfiguration;
+      state = State.INSTALLED;
+      owner.preparedConfigApply = null;
+      owner.precommitComposition = false;
+    }
+
+    /** Stops the private candidate and restores the captured incumbent when commit is abandoned. */
+    public void abort() throws ModeTransitionException {
+      owner.abortPreparedConfig(this);
+    }
+
+    /** Managed configuration witness established before this value was returned. */
+    public String declaredConfigHash() {
+      return candidate.declaredConfigHash();
+    }
+  }
+
+  /**
+   * Composes a strict managed candidate without publishing it as the configured or observed
+   * serving runtime. The caller must either install or abort the returned owner value.
+   */
+  public PreparedConfigApply prepareResolvedConfig(
+      InferenceConfig candidate, ResolvedConfig candidateResolved) throws ModeTransitionException {
+    Objects.requireNonNull(candidateResolved, "candidateResolved");
+    if (candidate == null) {
+      throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
+    }
+    synchronized (runner.lock()) {
+      if (precommitComposition || preparedConfigApply != null) {
+        throw modeTransition(
+            ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+            "An inference candidate is already prepared");
+      }
+      if (runner.currentMode() == Mode.TRANSITIONING) {
+        throw modeTransition(
+            ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+            "Inference runtime is transitioning; try again shortly");
+      }
+      if (serverOps.isExternalServerActive()) {
+        throw modeTransition(
+            ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT,
+            "Cannot prepare managed inference while using an external llama-server instance");
+      }
+
+      var context = new LlamaServerConfigContext(candidate, candidateResolved);
+      var request = new LlamaServerOps.StartRequest(
+          context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+      validatePrecommitCandidate(request);
+
+      ConfiguredInference incumbentConfiguration = configured;
+      Mode priorMode = runner.currentMode();
+      LlamaServerOps.StartResult incumbent = serverOps.activeStartResult().orElse(null);
+      if (priorMode == Mode.ONLINE && incumbent == null) {
+        throw modeTransition(
+            ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+            "Online inference has no captured server ownership");
+      }
+
+      precommitComposition = true;
+      try {
+        tokenOps.clearCaches();
+        serverOps.stopLlamaServer();
+      } catch (RuntimeException stopFailure) {
+        precommitComposition = false;
+        throw modeTransition(
+            ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+            "Incumbent server stop failed: " + safeMessage(stopFailure),
+            stopFailure);
+      }
+      try {
+        serverOps.resetCrashCounters();
+        LlamaServerOps.StartResult started = serverOps.startLlamaServer(request);
+        serverOps.waitForServerHealth(started);
+        verifyAppliedServer(request, started);
+        ConfiguredInference candidateConfiguration = new ConfiguredInference(
+            candidate, candidateResolved, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+        PreparedConfigApply prepared = new PreparedConfigApply(
+            this, incumbentConfiguration, incumbent, candidateConfiguration, started, priorMode);
+        preparedConfigApply = prepared;
+        return prepared;
+      } catch (Exception candidateFailure) {
+        throw rollbackPrecommitFailure(
+            incumbent, incumbentConfiguration, priorMode, candidateFailure);
+      }
+    }
+  }
+
+  private void validatePrecommitCandidate(LlamaServerOps.StartRequest request)
+      throws ModeTransitionException {
+    try {
+      request.context().inference().validate();
+      if (request.effectiveGpuLayers() <= 0) return;
+      gpuCapabilitiesService.invalidateNvidiaSmiCache();
+      Long totalVramBytes = readTotalVramBytes();
+      if (totalVramBytes == null) {
+        LOG.warn(
+            "VRAM detection unavailable; proceeding with explicitly requested GPU layers={}",
+            request.effectiveGpuLayers());
+      } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
+        throw modeTransition(
+            ModeTransitionException.Reason.INSUFFICIENT_VRAM,
+            "Insufficient VRAM for GPU Online Mode: " + formatVramDescription(totalVramBytes)
+                + " (set GPU layers to 0 for CPU mode)");
+      }
+    } catch (ModeTransitionException failure) {
+      throw failure;
+    } catch (Exception invalid) {
+      throw modeTransition(
+          ModeTransitionException.Reason.INVALID_CONFIG,
+          "Invalid inference configuration: " + safeMessage(invalid),
+          invalid);
+    }
+  }
+
+  private ModeTransitionException rollbackPrecommitFailure(
+      LlamaServerOps.StartResult incumbent,
+      ConfiguredInference incumbentConfiguration,
+      Mode priorMode,
+      Exception candidateFailure) {
+    ModeTransitionException candidate = asModeTransition(
+        candidateFailure,
+        ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+        "Failed to prepare inference config: ");
+    try {
+      serverOps.stopLlamaServer();
+      if (priorMode == Mode.ONLINE) {
+        var restore = new LlamaServerOps.StartRequest(
+            incumbent.context(), LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+        serverOps.resetCrashCounters();
+        var restored = serverOps.startLlamaServer(restore);
+        serverOps.waitForServerHealth(restored);
+        verifyAppliedServer(restore, restored);
+      }
+      configured = incumbentConfiguration;
+      preparedConfigApply = null;
+      precommitComposition = false;
+      return candidate;
+    } catch (Exception rollbackFailure) {
+      var combined = new IllegalStateException(
+          "Rollback failed: " + safeMessage(rollbackFailure), rollbackFailure);
+      combined.addSuppressed(candidate);
+      preparedConfigApply = null;
+      precommitComposition = false;
+      runner.runForceOffline(
+          TransitionReason.CONFIG_APPLY,
+          new InferenceFailure.TransitionFailure(
+              TransitionCode.CONFIG_APPLY_FAILED, combined.getMessage(), combined));
+      return modeTransition(
+          ModeTransitionException.Reason.CONFIG_APPLY_FAILED, combined.getMessage(), combined);
+    }
+  }
+
+  private void abortPreparedConfig(PreparedConfigApply prepared) throws ModeTransitionException {
+    synchronized (runner.lock()) {
+      if (prepared.state == PreparedConfigApply.State.INSTALLED
+          || prepared.state == PreparedConfigApply.State.ABORTED) {
+        return;
+      }
+      if (preparedConfigApply != prepared) {
+        throw new IllegalStateException("Prepared inference candidate is no longer current");
+      }
+      var aborted = modeTransition(
+          ModeTransitionException.Reason.INTERRUPTED, "Prepared inference candidate was aborted");
+      ModeTransitionException rollback = rollbackPrecommitFailure(
+          prepared.incumbent,
+          prepared.incumbentConfiguration,
+          prepared.priorMode,
+          aborted);
+      if (rollback != aborted) throw rollback;
+      prepared.state = PreparedConfigApply.State.ABORTED;
+    }
+  }
+
   public void applyConfig(InferenceConfig newConfig, RestartPolicy policy)
       throws ModeTransitionException {
     applyConfig(newConfig, policy, TransitionReason.CONFIG_APPLY);
@@ -804,6 +1043,12 @@ public class InferenceLifecycleManager
     }
     RestartPolicy effective = policy == null ? RestartPolicy.RESTART_IF_ONLINE : policy;
     synchronized (runner.lock()) {
+      if (precommitComposition) {
+        String message = "An inference candidate is awaiting settings commit";
+        recordApplyRefusal(
+            new InferenceFailure.ConfigFailure(ConfigCode.ALREADY_TRANSITIONING, message));
+        throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING, message);
+      }
       if (runner.currentMode() == Mode.TRANSITIONING) {
         String message = "Inference runtime is transitioning; try again shortly";
         recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.ALREADY_TRANSITIONING, message));

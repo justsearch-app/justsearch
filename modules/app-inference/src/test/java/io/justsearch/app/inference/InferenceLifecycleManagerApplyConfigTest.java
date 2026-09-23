@@ -99,6 +99,137 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
+  void preparedCandidateStaysPrivateUntilAssignmentOnlyInstallAndFencesRecovery()
+      throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      var incumbent = server.active.get();
+
+      var prepared = manager.prepareResolvedConfig(b, resolvedB);
+
+      prepared.validateForCommit();
+      assertSame(a, manager.currentConfig());
+      assertEquals(4096, manager.configuredContextTokens(),
+          "candidate B must not become the serving projection before outer commit");
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertEquals(expectedHash(b, resolvedB), prepared.declaredConfigHash());
+      assertSame(b, server.active.get().context().inference());
+      server.recovery.accept(() -> server.active.get() == incumbent);
+      verify(server.mock(), never()).recoverActiveServer();
+
+      prepared.installAfterSettingsCommit();
+
+      assertSame(b, manager.currentConfig());
+      assertEquals(8192, manager.configuredContextTokens());
+      server.recovery.accept(() -> true);
+      verify(server.mock(), times(1)).recoverActiveServer();
+    }
+  }
+
+  @Test
+  void abortPreparedCandidateStopsBAndRestoresCapturedA() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+
+      var prepared = manager.prepareResolvedConfig(b, resolvedB);
+      prepared.abort();
+
+      assertSame(a, manager.currentConfig());
+      assertSame(a, server.active.get().context().inference());
+      assertSame(resolvedA, server.active.get().context().resolved());
+      assertEquals(3, server.starts.size());
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+    }
+  }
+
+  @Test
+  void recoveryQueuedDuringPreparationCannotOvertakeTheStagedCandidate() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    var candidateHealth = new CountDownLatch(1);
+    var releaseHealth = new CountDownLatch(1);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      manager.switchToOnlineMode();
+      var incumbent = server.active.get();
+      server.onHealth = result -> {
+        if (result.context().inference() != b) return;
+        candidateHealth.countDown();
+        try {
+          if (!releaseHealth.await(5, TimeUnit.SECONDS)) {
+            throw new AssertionError("Test did not release candidate health");
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(interrupted);
+        }
+      };
+
+      var preparing = tasks.submit(() -> manager.prepareResolvedConfig(b, resolvedB));
+      assertTrue(candidateHealth.await(5, TimeUnit.SECONDS));
+      var recovery = tasks.submit(() -> server.recovery.accept(() -> server.active.get() == incumbent));
+      assertThrows(
+          TimeoutException.class,
+          () -> recovery.get(100, TimeUnit.MILLISECONDS),
+          "recovery must wait for candidate preparation to leave the lifecycle lock");
+
+      releaseHealth.countDown();
+      var prepared = preparing.get(5, TimeUnit.SECONDS);
+      recovery.get(5, TimeUnit.SECONDS);
+      verify(server.mock(), never()).recoverActiveServer();
+      prepared.abort();
+    } finally {
+      releaseHealth.countDown();
+    }
+  }
+
+  @Test
+  void failedPrecommitCandidateRestoresABeforeReturningFailure() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failNextHealth(healthFailure("candidate B failed"));
+
+      var failure = assertThrows(
+          ModeTransitionException.class, () -> manager.prepareResolvedConfig(b, resolvedB));
+
+      assertTrue(failure.getMessage().contains("candidate B failed"));
+      assertSame(a, manager.currentConfig());
+      assertSame(a, server.active.get().context().inference());
+      assertEquals(3, server.starts.size());
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+    }
+  }
+
+  @Test
   void candidateFailureRollsBackUsingActualAContextDespiteGlobalC() throws Exception {
     InferenceConfig a = config(0, 4096);
     InferenceConfig b = config(0, 8192);
