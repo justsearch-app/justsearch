@@ -108,7 +108,7 @@ final class SchemaMismatchStatusContractTest {
       engine.components().register(fixture.handle("generative").spec());
     }
     bootstrap = new KnowledgeServerBootstrap(executors, config, null,
-        engine.components(), engine.indexComponent(), engine);
+        engine.components(), engine.indexComponent(), engine, engine.publicationLock());
     try {
       // Same bounded retry the Head uses: on a loaded dev machine a transient PID-validation
       // timeout must not read as a schema-contract failure. (This test never runs in CI — see the

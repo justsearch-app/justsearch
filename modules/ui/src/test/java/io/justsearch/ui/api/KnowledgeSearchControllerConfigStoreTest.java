@@ -59,7 +59,10 @@ final class KnowledgeSearchControllerConfigStoreTest {
               return SearchResponse.getDefaultInstance();
             });
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    when(bootstrap.client()).thenReturn(client);
+    KnowledgeServerBootstrap.ClientLease lease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.publicationLock()).thenReturn(storeA.publicationLock());
+    when(bootstrap.acquireClientLease()).thenReturn(lease);
+    when(lease.client()).thenReturn(client);
 
     KnowledgeSearchController controller =
         new KnowledgeSearchController(

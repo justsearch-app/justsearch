@@ -2,6 +2,7 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -59,6 +60,24 @@ final class KnowledgeServerBootstrapFaultInjectionTest {
       assertEquals(ShutdownOutcome.GRACEFUL, bootstrap.closeForUpgrade());
       verify(lock).close();
       org.junit.jupiter.api.Assertions.assertNull(lockField.get(bootstrap));
+    }
+  }
+
+  @Test
+  void refusedStartupCleanupPreservesFirstFailureAndSkipsRetry(@TempDir Path dir)
+      throws Exception {
+    WorkerHost host = mock(WorkerHost.class);
+    when(host.start(any(), any())).thenThrow(new IOException("initial composition failed"));
+    org.mockito.Mockito.doThrow(new IllegalStateException("retained native owner"))
+        .doNothing().when(host).close();
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(config(dir, true), host)) {
+      IOException failure = assertThrows(IOException.class,
+          () -> fixture.bootstrap().startWithRetry(3, 0));
+      assertEquals("initial composition failed", failure.getMessage());
+      assertTrue(java.util.Arrays.stream(failure.getSuppressed()).anyMatch(
+          cause -> cause.getMessage().contains("Startup cleanup refused")));
+      verify(host).start(any(), any());
+      assertEquals(ShutdownOutcome.GRACEFUL, fixture.bootstrap().closeForUpgrade());
     }
   }
 

@@ -278,7 +278,10 @@ final class AgentToolFactoryCompositionTest {
 
     KnowledgeClient client = mock(KnowledgeClient.class);
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    when(bootstrap.client()).thenReturn(client);
+    var lease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.publicationLock()).thenReturn(captured.publicationLock());
+    when(bootstrap.acquireClientLease()).thenReturn(lease);
+    when(lease.client()).thenReturn(client);
     when(client.search(any(SearchRequest.class), any(EngineContext.class)))
         .thenReturn(SearchResponse.getDefaultInstance());
 

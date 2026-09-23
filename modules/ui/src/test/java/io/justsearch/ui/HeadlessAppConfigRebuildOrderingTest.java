@@ -128,7 +128,8 @@ final class HeadlessAppConfigRebuildOrderingTest {
     ConfigStore store = new ConfigStore(initial.build());
     try {
       ConfigStore.setGlobal(store);
-      HeadlessApp.refreshPolicySources(store, settings);
+      HeadlessApp.loadPolicySources();
+      HeadlessApp.rebuildAfterPostBuildWrites(store, settings);
 
       ResolvedConfig firstCandidate =
           io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(settings);

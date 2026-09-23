@@ -142,6 +142,85 @@ final class BootstrapPhysicalInitializationTest {
   }
 
   @Test
+  void closeWaitsForCapturedClientAndRefusesNewCaptures(@TempDir Path dir) throws Exception {
+    try (var fixture = new Fixture(dir);
+        var tasks = Executors.newSingleThreadExecutor()) {
+      fixture.healthy.set(true);
+      fixture.bootstrap.start();
+      var publication = fixture.bootstrap.publicationLock();
+      publication.readLock().lock();
+      KnowledgeServerBootstrap.ClientLease held;
+      try {
+        held = fixture.bootstrap.acquireClientLease();
+      } finally {
+        publication.readLock().unlock();
+      }
+      assertEquals(fixture.client, held.client());
+      var closing = tasks.submit(fixture.bootstrap::closeForUpgrade);
+      try {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        boolean refused = false;
+        while (!refused && System.nanoTime() < deadline) {
+          publication.readLock().lock();
+          try {
+            try (var ignored = fixture.bootstrap.acquireClientLease()) {
+              // The closer may not have reached the retirement boundary yet.
+            } catch (IllegalStateException retired) {
+              refused = true;
+            }
+          } finally {
+            publication.readLock().unlock();
+          }
+          if (!refused) java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L);
+        }
+        assertTrue(refused, "close must stop new leases before retiring the client");
+        verify(fixture.client, never()).close();
+        assertFalse(closing.isDone(), "close must retain a client still held by a request");
+      } finally {
+        held.close();
+      }
+      assertEquals(ShutdownOutcome.GRACEFUL, closing.get(5, TimeUnit.SECONDS));
+      verify(fixture.client).close();
+    }
+  }
+
+  @Test
+  void clientCannotBeCapturedBeforeFirstHealthyInitialization(@TempDir Path dir)
+      throws Exception {
+    try (var fixture = new Fixture(dir);
+        var tasks = Executors.newSingleThreadExecutor()) {
+      fixture.healthy.set(true);
+      var healthEntered = new CountDownLatch(1);
+      var releaseHealth = new CountDownLatch(1);
+      when(fixture.client.isHealthy(any())).thenAnswer(invocation -> {
+        healthEntered.countDown();
+        assertTrue(releaseHealth.await(5, TimeUnit.SECONDS));
+        return true;
+      });
+      var starting = tasks.submit(() -> {
+        fixture.bootstrap.start();
+        return null;
+      });
+      try {
+        assertTrue(healthEntered.await(5, TimeUnit.SECONDS));
+        var publication = fixture.bootstrap.publicationLock();
+        publication.readLock().lock();
+        try {
+          assertThrows(IllegalStateException.class, fixture.bootstrap::acquireClientLease);
+        } finally {
+          publication.readLock().unlock();
+        }
+      } finally {
+        releaseHealth.countDown();
+      }
+      starting.get(5, TimeUnit.SECONDS);
+      try (var lease = fixture.bootstrap.captureClient()) {
+        assertEquals(fixture.client, lease.client());
+      }
+    }
+  }
+
+  @Test
   void helpFailureIsBestEffortAndRetriesAfterPhysicalRecovery(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir)) {
       fixture.helpFile();
@@ -240,7 +319,8 @@ final class BootstrapPhysicalInitializationTest {
       when(client.isHealthy(any())).thenAnswer(invocation -> healthy.get());
       bootstrap =
           new KnowledgeServerBootstrap(
-              executors, config, null, components, indexComponent, host);
+              executors, config, null, components, indexComponent, host,
+              new java.util.concurrent.locks.ReentrantReadWriteLock());
       capability = bootstrap.workerCapability();
     }
 

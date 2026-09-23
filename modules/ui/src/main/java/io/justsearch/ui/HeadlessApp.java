@@ -731,7 +731,8 @@ public class HeadlessApp {
         new java.util.concurrent.locks.ReentrantReadWriteLock());
     ConfigStore.setGlobal(configStore);
 
-    refreshPolicySources(configStore, settings);
+    loadPolicySources();
+    rebuildAfterPostBuildWrites(configStore, settings);
 
     Path autoServer = maybeAutoSelectCuda12Variant(settings, configStore);
     if (autoServer != null) {
@@ -764,7 +765,7 @@ public class HeadlessApp {
   }
 
   /** Publishes boot policy sources before runtime selection and the first settings candidate. */
-  static void refreshPolicySources(ConfigStore configStore, UiSettings settings) {
+  static void loadPolicySources() {
     // Policy discovery mirrors its effective flags into the resolver's process sources.
     // A later settings candidate must not mistake that boot publication for an encoder change.
     try {
@@ -772,7 +773,6 @@ public class HeadlessApp {
     } catch (Exception ignored) {
       // best-effort; policy loading itself fails closed where required.
     }
-    io.justsearch.app.services.config.ConfigStoreRebuilder.rebuild(configStore, settings);
   }
 
   /**
@@ -1719,7 +1719,7 @@ public class HeadlessApp {
               ksConfig,
               null,
               engineRoot.components(), engineRoot.indexComponent(),
-              engineRoot, automaticRootProducers);
+              engineRoot, automaticRootProducers, engineRoot.publicationLock());
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.

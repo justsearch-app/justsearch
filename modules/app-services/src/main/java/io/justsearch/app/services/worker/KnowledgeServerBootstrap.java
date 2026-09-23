@@ -77,6 +77,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
     // by the other: hasClient() is the monitor's arm discriminator, so without volatile a reader can
     // observe a stale null client and make a needless recovery attempt against a worker that is up.
     private volatile KnowledgeClient client;
+    private final java.util.concurrent.locks.ReentrantReadWriteLock publicationLock;
+    private final Object clientLeaseMonitor = new Object();
+    private int clientHolders;
+    private boolean clientRetiring;
+    private boolean clientVerified;
 
     /**
      * Where the index half lives (lane F item A6). Required since item A11 deleted the alternative:
@@ -175,16 +180,20 @@ public final class KnowledgeServerBootstrap implements Closeable {
     public KnowledgeServerBootstrap(
         io.justsearch.core.execution.EngineExecutorRegistry executors,
         KnowledgeServerConfig config, Telemetry telemetry, EngineComponentRegistry components,
-        ComponentHandle indexComponent, WorkerHost workerHost) {
-        this(executors, config, telemetry, components, indexComponent, workerHost, true);
+        ComponentHandle indexComponent, WorkerHost workerHost,
+        java.util.concurrent.locks.ReentrantReadWriteLock publicationLock) {
+        this(executors, config, telemetry, components, indexComponent, workerHost, true,
+            publicationLock);
     }
 
     /** Installed fault fixtures isolate explicit operations from automatic root scans and watchers. */
     public KnowledgeServerBootstrap(
         io.justsearch.core.execution.EngineExecutorRegistry executors,
         KnowledgeServerConfig config, Telemetry telemetry, EngineComponentRegistry components,
-        ComponentHandle indexComponent, WorkerHost workerHost, boolean automaticRootProducers) {
+        ComponentHandle indexComponent, WorkerHost workerHost, boolean automaticRootProducers,
+        java.util.concurrent.locks.ReentrantReadWriteLock publicationLock) {
         this.automaticRootProducers = automaticRootProducers;
+        this.publicationLock = java.util.Objects.requireNonNull(publicationLock, "publicationLock");
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
         this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
@@ -271,7 +280,20 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // optional now, which is why the field is final and the constructor rejects null.
             energyPoller.start();
             try {
-                client = workerHost.start(gpuScheduling, ipcTelemetry);
+                KnowledgeClient startedClient = workerHost.start(gpuScheduling, ipcTelemetry);
+                publicationLock.writeLock().lock();
+                try {
+                    synchronized (clientLeaseMonitor) {
+                        if (client != null || clientHolders != 0) {
+                            throw new IllegalStateException("Prior client has not been retired");
+                        }
+                        client = startedClient;
+                        clientRetiring = false;
+                        clientVerified = false;
+                    }
+                } finally {
+                    publicationLock.writeLock().unlock();
+                }
             } catch (IOException | InterruptedException | RuntimeException e) {
                 throw e;
             } catch (Exception e) {
@@ -289,7 +311,14 @@ public final class KnowledgeServerBootstrap implements Closeable {
             transitionWorkerDown(
                 LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed: " + e.getMessage());
             log.error("Failed to start Knowledge Server integration", e);
-            close();
+            try {
+                if (closeForUpgrade() != ShutdownOutcome.GRACEFUL) {
+                    e.addSuppressed(new IOException(
+                        "Startup cleanup refused; the prior index owner remains retained"));
+                }
+            } catch (RuntimeException cleanup) {
+                if (cleanup != e) e.addSuppressed(cleanup);
+            }
             throw e;
         }
     }
@@ -373,6 +402,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 last = e;
                 if (e instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
+                    break;
+                }
+                if (started.get()) {
+                    log.error("Knowledge Server startup retained an incomplete owner; refusing retry", e);
                     break;
                 }
                 if (attempt < maxAttempts) {
@@ -484,6 +517,54 @@ public final class KnowledgeServerBootstrap implements Closeable {
             throw new IllegalStateException("Knowledge Server not started");
         }
         return client;
+    }
+
+    /** A short capture retains the exact client until the calling operation exits. */
+    public ClientLease acquireClientLease() {
+        if (publicationLock.getReadHoldCount() == 0
+                && !publicationLock.isWriteLockedByCurrentThread()) {
+            throw new IllegalStateException("Client capture requires the publication lock");
+        }
+        synchronized (clientLeaseMonitor) {
+            KnowledgeClient captured = client;
+            if (clientRetiring || !clientVerified || captured == null) {
+                throw new IllegalStateException("Knowledge Server client is unavailable");
+            }
+            clientHolders++;
+            return new ClientLease(captured);
+        }
+    }
+
+    /** Retains one client across an operation that does not also require a config capture. */
+    public ClientLease captureClient() {
+        publicationLock.readLock().lock();
+        try {
+            return acquireClientLease();
+        } finally {
+            publicationLock.readLock().unlock();
+        }
+    }
+
+    /** Process lock used to capture configuration and this client as one serving view. */
+    public java.util.concurrent.locks.ReentrantReadWriteLock publicationLock() {
+        return publicationLock;
+    }
+
+    public final class ClientLease implements AutoCloseable {
+        private final KnowledgeClient captured;
+        private final AtomicBoolean released = new AtomicBoolean();
+
+        private ClientLease(KnowledgeClient captured) { this.captured = captured; }
+
+        public KnowledgeClient client() { return captured; }
+
+        @Override public void close() {
+            if (!released.compareAndSet(false, true)) return;
+            synchronized (clientLeaseMonitor) {
+                clientHolders--;
+                clientLeaseMonitor.notifyAll();
+            }
+        }
     }
 
     /**
@@ -671,6 +752,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 physicalHealthy = true;
                 latchedIndexFatalVerdict = null;
                 completeHealthyInitialization();
+                synchronized (clientLeaseMonitor) {
+                    clientVerified = healthyInitializationComplete;
+                }
             } else {
                 observePhysicalLoss("Health check failed");
             }
@@ -681,6 +765,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     private void observePhysicalLoss(String detail) {
+        synchronized (clientLeaseMonitor) {
+            clientVerified = false;
+        }
         boolean wasHealthy = physicalHealthy;
         physicalHealthy = false;
         healthyInitializationComplete = false;
@@ -709,6 +796,22 @@ public final class KnowledgeServerBootstrap implements Closeable {
         log.info("Shutting down Knowledge Server integration...");
         ShutdownOutcome outcome = ShutdownOutcome.GRACEFUL;
 
+        // Close capture admission under the same writer that orders settings and serving views.
+        // Waiting for actual holders happens after releasing that writer.
+        publicationLock.writeLock().lock();
+        try {
+            synchronized (clientLeaseMonitor) {
+                clientRetiring = true;
+                clientVerified = false;
+            }
+        } finally {
+            publicationLock.writeLock().unlock();
+        }
+        if (!awaitClientDrain()) {
+            log.warn("Knowledge Server client still has active request holders; retaining index owner");
+            return ShutdownOutcome.FAILED;
+        }
+
         // Stop the energy poll before the signal bus goes: its transitional MMF write would
         // otherwise race the unmap. The poller is restartable, and the last polled state survives,
         // so a boot-recovery restart resumes without a UNKNOWN window.
@@ -723,8 +826,14 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 client.close();
             } catch (Exception e) {
                 log.warn("Error closing client", e);
+                return ShutdownOutcome.FAILED;
             }
-            client = null;
+            publicationLock.writeLock().lock();
+            try {
+                synchronized (clientLeaseMonitor) { client = null; }
+            } finally {
+                publicationLock.writeLock().unlock();
+            }
         }
 
         if (workerHost != null) {
@@ -770,6 +879,24 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
         log.info("Knowledge Server integration shutdown complete");
         return outcome;
+    }
+
+    private boolean awaitClientDrain() {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        synchronized (clientLeaseMonitor) {
+            while (clientHolders != 0) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) return false;
+                try {
+                    java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(clientLeaseMonitor,
+                        remaining);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     /** Version stamp for built-in help files. Bump when help content changes. */

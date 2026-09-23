@@ -72,6 +72,11 @@ public final class EngineRoot implements WorkerHost {
   /** Final process teardown is separate from this host's restartable index close. */
   public io.justsearch.app.api.EngineProcessResources processResources() { return processResources; }
 
+  /** Shared short publication boundary for configuration and in-process serving references. */
+  public java.util.concurrent.locks.ReentrantReadWriteLock publicationLock() {
+    return processResources.publicationLock();
+  }
+
   /** Process-owned observations shared by all four component owners and their projections. */
   public io.justsearch.core.component.EngineComponentRegistry components() { return components; }
 

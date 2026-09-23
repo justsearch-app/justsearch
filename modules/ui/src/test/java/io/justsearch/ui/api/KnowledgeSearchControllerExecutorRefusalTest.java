@@ -37,7 +37,9 @@ class KnowledgeSearchControllerExecutorRefusalTest {
             EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "engine.calls", 3)));
     var bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.isReady()).thenReturn(true);
-    when(bootstrap.client()).thenReturn(client);
+    var lease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.captureClient()).thenReturn(lease);
+    when(lease.client()).thenReturn(client);
     var controller = new KnowledgeSearchController(bootstrap, mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
     var ctx = mock(Context.class);
     when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());

@@ -706,20 +706,18 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     // Tempdoc 630: stamp the resume so /api/status can surface a brief "Catching up after sleep"
     // transient while the reconcile below runs (auto-clears after the notice window).
     bootstrap.markResumed(nowMs.getAsLong());
-    KnowledgeClient client;
+    KnowledgeServerBootstrap.ClientLease lease;
     try {
-      client = bootstrap.client();
-    } catch (RuntimeException e) {
-      // Worker not started/ready (client() throws IllegalStateException) — nothing to re-validate;
-      // the normal start/spawn path owns bringing it up. Benign on resume.
-      log.debug("Post-resume re-validation skipped — worker client not available: {}", e.getMessage());
+      lease = bootstrap.captureClient();
+    } catch (IllegalStateException unavailable) {
+      log.debug("Post-resume re-validation skipped — worker client not available: {}",
+          unavailable.getMessage());
       return;
     }
-    // Item A11: the channel reconnect that used to run here is gone. It was a no-op from item A6
-    // (an in-process client has no connection to lose) and its only reason to exist was a stale
-    // post-wake socket.
-    try {
-      client.reindexPersistedRoots(ENGINE_CONTEXT);
+    // Item A11: the channel reconnect that used to run here is gone. Hold the current in-process
+    // client until this reconcile actually returns; recovery may be retiring it concurrently.
+    try (lease) {
+      lease.client().reindexPersistedRoots(ENGINE_CONTEXT);
     } catch (RuntimeException e) {
       log.warn("Post-resume watcher re-register + reconcile failed: {}", e.getMessage());
     }

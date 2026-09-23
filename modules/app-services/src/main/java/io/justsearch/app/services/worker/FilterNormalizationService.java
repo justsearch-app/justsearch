@@ -146,10 +146,18 @@ public final class FilterNormalizationService {
       KnowledgeSearchRequest.Filters filters,
       String facetSnapshot,
       io.justsearch.core.context.EngineContext engineContext) {
+    return normalizeIfAvailable(filters, facetSnapshot, engineContext, enabled.getAsBoolean());
+  }
+
+  CompletableFuture<NormResult> normalizeIfAvailable(
+      KnowledgeSearchRequest.Filters filters,
+      String facetSnapshot,
+      io.justsearch.core.context.EngineContext engineContext,
+      boolean enabledForOperation) {
     if (filters == null) {
       return null;
     }
-    boolean llmAvailable = isAvailable(enabled.getAsBoolean());
+    boolean llmAvailable = isAvailable(enabledForOperation);
     return llmAvailable ? normalize(filters, facetSnapshot, engineContext, true) : null;
   }
 

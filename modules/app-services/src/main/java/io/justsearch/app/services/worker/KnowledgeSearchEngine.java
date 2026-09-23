@@ -523,12 +523,8 @@ final class KnowledgeSearchEngine {
   }
 
   /** 306: reads query classification enabled flag from ConfigStore (default: true). */
-  private static boolean isQueryClassificationEnabled() {
-    ConfigStore cs = ConfigStore.globalOrNull();
-    return cs == null || cs.get().search().queryClassificationEnabled();
-  }
-
   private final KnowledgeServerBootstrap knowledgeServer;
+  private final ConfigStore configStore;
   private final SearchPerSourceExecutor perSourceSearch;
   private final RerankerConfig rerankConfig;
   private final OnlineAiService onlineAiService;
@@ -537,27 +533,12 @@ final class KnowledgeSearchEngine {
   private final FilterNormalizationService normService;
   private final WorkerStatusCache statusCache;
 
-  KnowledgeSearchEngine(KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch) {
-    this(knowledgeServer, perSourceSearch, OnlineAiService.unavailable(), null);
-  }
-
-  KnowledgeSearchEngine(
-      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch, OnlineAiService onlineAiService) {
-    this(knowledgeServer, perSourceSearch, onlineAiService, null);
-  }
-
-  KnowledgeSearchEngine(
-      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
-      OnlineAiService onlineAiService,
-      RerankerService lambdaMartReranker) {
-    this(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker, null);
-  }
-
   KnowledgeSearchEngine(
       KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       OnlineAiService onlineAiService, RerankerService lambdaMartReranker,
       ConfigStore configStore) {
     this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
+    this.configStore = configStore;
     this.perSourceSearch = Objects.requireNonNull(perSourceSearch, "perSourceSearch");
     this.onlineAiService = Objects.requireNonNull(onlineAiService, "onlineAiService");
     this.lambdaMartReranker = lambdaMartReranker; // nullable
@@ -611,8 +592,9 @@ final class KnowledgeSearchEngine {
                 (long) (req.query() == null ? 0 : req.query().length()))
             .startSpan();
     Scope searchScope = searchSpan.makeCurrent();
-    try {
-      KnowledgeSearchResponse resp = doSearch(req, searchSpan, engineContext);
+    try (SearchCapture captured = captureSearch()) {
+      KnowledgeSearchResponse resp = doSearch(req, searchSpan, engineContext,
+          captured.client(), captured.config());
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
       return resp;
@@ -626,15 +608,37 @@ final class KnowledgeSearchEngine {
     }
   }
 
+  private SearchCapture captureSearch() {
+    ConfigStore source = configStore;
+    if (source == null || source.publicationLock() != knowledgeServer.publicationLock()) {
+      throw new IllegalStateException("Search requires the shared publication owner");
+    }
+    var publication = source.publicationLock();
+    publication.readLock().lock();
+    try {
+      var config = source.get();
+      var lease = Objects.requireNonNull(knowledgeServer.acquireClientLease(), "client lease");
+      return new SearchCapture(config, lease);
+    } finally {
+      publication.readLock().unlock();
+    }
+  }
+
+  private record SearchCapture(
+      io.justsearch.configuration.resolved.ResolvedConfig config,
+      KnowledgeServerBootstrap.ClientLease lease) implements AutoCloseable {
+    KnowledgeClient client() { return lease.client(); }
+    @Override public void close() { lease.close(); }
+  }
+
   private KnowledgeSearchResponse doSearch(
-      KnowledgeSearchRequest req, Span searchSpan, EngineContext engineContext) {
+      KnowledgeSearchRequest req, Span searchSpan, EngineContext engineContext,
+      KnowledgeClient client, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig) {
     long doSearchStartNs = System.nanoTime();
     RerankerConfig rerankConfig = RerankerConfig.fromEnv();
 
     // 363: Refresh facet snapshot for QU grounding (non-blocking, cached with TTL)
-    statusCache.refreshFacetSnapshotIfStale(engineContext);
-
-    KnowledgeClient client = knowledgeServer.client();
+    statusCache.refreshFacetSnapshotIfStale(engineContext, client);
 
     int requestedLimit = req.limit() == null ? 10 : Math.max(1, req.limit());
     // When reranking is enabled, fetch more candidates to improve reranking quality
@@ -663,7 +667,7 @@ final class KnowledgeSearchEngine {
     // 306: Pre-retrieval query classification for CE/expansion gating.
     // Gated by config for A/B eval. When disabled, all queries are INFORMATIONAL (full pipeline).
     // Only apply query-type gating for preset pipelines — explicit PipelineConfig bypasses gating.
-    boolean classificationEnabled = isQueryClassificationEnabled();
+    boolean classificationEnabled = capturedConfig.search().queryClassificationEnabled();
     boolean explicitPipeline = req.pipeline() != null;
     QueryType queryType = classificationEnabled
         ? QueryClassifier.classify(queryText) : QueryType.INFORMATIONAL;
@@ -723,13 +727,15 @@ final class KnowledgeSearchEngine {
         && (req.cursor() == null || req.cursor().isBlank())
         && effectiveQueryType != QueryType.NAVIGATIONAL
         && effectiveQueryType != QueryType.EXACT_MATCH) {
-      quFuture = quService.extractIfAvailable(queryText, statusCache.getCachedFacetSnapshot(), engineContext);
+      quFuture = quService.extractIfAvailable(queryText, statusCache.getCachedFacetSnapshot(),
+          engineContext, capturedConfig.search().queryUnderstandingEnabled());
     }
 
     // 366: Fire filter normalization async when explicit filters are present (mutually exclusive with QU)
     CompletableFuture<FilterNormalizationService.NormResult> normFuture = null;
     if (hasExplicitFilters) {
-      normFuture = normService.normalizeIfAvailable(req.filters(), statusCache.getCachedFacetSnapshot(), engineContext);
+      normFuture = normService.normalizeIfAvailable(req.filters(), statusCache.getCachedFacetSnapshot(),
+          engineContext, capturedConfig.search().filterNormalizationEnabled());
     }
 
     // 256-G3: PipelineConfig is the sole pipeline control on wire. Deprecated mode field no longer set.
@@ -1007,7 +1013,7 @@ final class KnowledgeSearchEngine {
         Span ceSpan =
             tracer.spanBuilder("search/cross_encoder").setParent(Context.current()).startSpan();
         try (Scope ceScope = ceSpan.makeCurrent()) { // NOPMD - scope used for auto-close
-          reranked = knowledgeServer.client().rerank(
+          reranked = client.rerank(
               req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext);
           // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored
           // output — the reranked docs (id + CE score + content), in the cross-encoder's chosen
@@ -1217,7 +1223,7 @@ final class KnowledgeSearchEngine {
         // record. The canonical `introspection` trace (built below from the same `resp` proto via
         // KnowledgeIntrospectionMapper + buildHeadStages) is now the single source.
         .entityFacetVariants(variantsOut)
-        .indexCapabilities(buildIndexCapabilities())
+        .indexCapabilities(buildIndexCapabilities(client))
         // Tempdoc 549 Phase E3: pipelineExecution retired — per-stage timing + component statuses
         // are on the unified trace (TraceStage.ms / status), composed below in mapSearchTrace.
         .queryUnderstanding(buildQueryUnderstanding(quResultForResponse, answerTypeName))
@@ -1399,11 +1405,11 @@ final class KnowledgeSearchEngine {
    * Builds an IndexCapabilities snapshot from the cached Worker operational view. Returns null if
    * no cached view is available yet (before first status poll).
    */
-  private KnowledgeSearchResponse.IndexCapabilities buildIndexCapabilities() {
+  private KnowledgeSearchResponse.IndexCapabilities buildIndexCapabilities(KnowledgeClient client) {
     if (!statusCache.isWorkerReady()) {
       return null;
     }
-    var view = knowledgeServer.client().cachedOperationalView();
+    var view = client.cachedOperationalView();
     if (view == null) {
       return null;
     }

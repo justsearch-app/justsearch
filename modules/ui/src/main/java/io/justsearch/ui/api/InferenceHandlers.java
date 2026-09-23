@@ -822,11 +822,12 @@ final class InferenceHandlers {
    * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
    */
   private int countPendingEmbeddings(EngineContext engineContext) {
-    if (knowledgeServer == null || !knowledgeServer.isReady()) {
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server == null || !server.isReady()) {
       return 0;
     }
-    try {
-      return knowledgeServer.client().countPendingEmbeddings(engineContext);
+    try (var lease = server.captureClient()) {
+      return lease.client().countPendingEmbeddings(engineContext);
     } catch (Exception e) {
       log.debug("Failed to count pending embeddings", e);
       return 0;
@@ -839,11 +840,12 @@ final class InferenceHandlers {
    * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
    */
   private int countPendingVdu(EngineContext engineContext) {
-    if (knowledgeServer == null || !knowledgeServer.isReady()) {
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server == null || !server.isReady()) {
       return 0;
     }
-    try {
-      return knowledgeServer.client().countPendingVdu(engineContext);
+    try (var lease = server.captureClient()) {
+      return lease.client().countPendingVdu(engineContext);
     } catch (Exception e) {
       log.debug("Failed to count pending VDU", e);
       return 0;

@@ -113,8 +113,10 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
           Map.of());
     }
 
-    KnowledgeClient client = knowledgeServer.client();
-    StatusResponse s = client.getStatus(engineContext);
+    StatusResponse s;
+    try (var lease = knowledgeServer.captureClient()) {
+      s = lease.client().getStatus(engineContext);
+    }
 
     // Include embedding compatibility status in extras
     Map<String, Object> extras = new HashMap<>();
@@ -197,6 +199,13 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
    * snapshot is a text block listing top facet values per field.
    */
   void refreshFacetSnapshotIfStale(EngineContext engineContext) {
+    try (var lease = knowledgeServer.captureClient()) {
+      refreshFacetSnapshotIfStale(engineContext, lease.client());
+    }
+  }
+
+  /** Search operations pass their already captured client so refresh cannot rebind mid-request. */
+  void refreshFacetSnapshotIfStale(EngineContext engineContext, KnowledgeClient client) {
     long now = System.currentTimeMillis();
     if (now - facetSnapshotTimestampMs < FACET_SNAPSHOT_TTL_MS) return;
     if (!isWorkerReady()) return;
@@ -205,7 +214,6 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
     facetSnapshotTimestampMs = now;
 
     try {
-      KnowledgeClient client = knowledgeServer.client();
       SearchRequest facetReq =
           SearchRequest.newBuilder()
               .setQuery("*:*")

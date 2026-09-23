@@ -382,6 +382,67 @@ only live config, and the installer has no generation-owner port, so that path
 is not yet implemented or verified. It must preserve staged install merging,
 whole-stage conflict refusal, and no global property promotion.
 
+The first D1-4 paired HTTP search slice is in progress after the installed proof.
+`KnowledgeSearchEngine` now captures one ConfigStore snapshot and the exact
+`KnowledgeClient` under their shared publication lock; its query classification,
+QU/filter normalization, retrieval, rerank and capability projection retain that
+view through the synchronous search. `KnowledgeServerBootstrap` owns a counted
+client lease and refuses close while requests hold it; close stops new captures
+under publication write, waits outside that lock, and retains the owner on
+timeout/close failure. Suggest, folder browse and status probes now use client
+leases. Focused pipeline/controller tests passed at `tmp/2621-search-capture-focused.txt`;
+the physical close interleaving passed at `tmp/2622-bootstrap-lease-focused.txt`;
+the concurrent config-change search passed at `tmp/2628-search-config-interleaving.txt`.
+Static/compile/integration `build -x test` passed at `tmp/2629-search-lease-build.txt`.
+The first app-services suite exposed four stale mocks plus the already known ONNX
+failure (`tmp/2624-app-services-lease-tests.txt`, XML at
+`tmp/2624-app-services-results`); after correcting those mocks, the suite ran
+3,087 tests, one failure, three skips (`tmp/2630-app-services-lease-rerun.txt`,
+XML at `tmp/2630-app-services-results`). The sole failure remains the ONNX
+generation-owner gap. This slice is still under independent review and not D1-4
+acceptance: HeadAssembly graph publication, other raw client paths, async readers,
+physical generation owners and installed concurrency proof remain.
+
+Independent refute-first review then found four blocking lifetime defects in this
+first slice. (1) A unary Engine call can return at its deadline while its worker
+task continues, so the caller's lease ends before actual work exit. (2) The
+`EngineKnowledgeClient` wrapper re-reads mutable `WorkerAppServices` on each call;
+retaining the wrapper does not retain the serving generation or prevent
+`KnowledgeServer` from closing A during a multi-leg request. (3) The current
+bootstrap close stops lease admission without publishing index unavailability,
+so a timed-out drain can leave READY advertised while all new leases refuse.
+(4) Startup publishes the client before physical health/initialization verifies
+it, allowing a direct capture of an unready candidate. These are design-contract
+failures, not test waivers. The next correction must bind the owner-local serving
+view and actual asynchronous work lifetime under the selected generation protocol,
+then add the paused-worker/deadline, base-to-rerank swap, retirement-readiness and
+paused-startup interleavings before claiming this path.
+The first correction removes the search-time global ConfigStore fallback, keeps
+startup retry on the original cause when teardown refuses, and gates new client
+leases until the first healthy initialization. Focused startup and retry tests
+pass at `tmp/2631-lease-owner-corrections.txt` and
+`tmp/2633-bootstrap-private-start.txt`; `build -x test` passes at
+`tmp/2634-owner-capture-build.txt`. These corrections do not resolve the
+reviewer's asynchronous, physical serving-view, readiness or raw-reader defects.
+Resume reconciliation, debug state, pending inference counts and the index-drift
+probe now use captured client leases. The first UI suite found the existing boot
+policy refresh bypassed the settings-writer architecture guard and one suggest
+test still mocked the raw getter (`tmp/2635-ui-reader-lease-tests.txt`, XML at
+`tmp/2635-ui-results`). Policy discovery now runs before the exact authorized
+`rebuildAfterPostBuildWrites` call in `resolveConfig`; the suggest fixture uses
+the captured lease. The focused architectural and behavioral checks pass at
+`tmp/2636-ui-reader-corrections.txt`; full UI tests pass at
+`tmp/2637-ui-reader-lease-rerun.txt`: 1,348 tests, zero failures, one skip,
+206 suites. Remaining raw clients and physical serving-view replacement still
+block D1-4.
+The resumed health-monitor fixture was recut to retain a client lease
+(`tmp/2639-resume-lease-focused.txt`). Latest `build -x test` is green at
+`tmp/2640-d1-reader-wip-build.txt`. Latest full app-services run is
+`tmp/2641-app-services-wip-tests.txt`: 3,089 tests, one failure, three skips;
+XML at `tmp/2641-app-services-results`. Its only failure is the unchanged ONNX
+recorded-generation route. This is a WIP checkpoint, not D1-4 acceptance;
+the independent review's physical view and async lifetime blockers remain.
+
 ## Evidence and owner map
 
 | Concern | Governing record |

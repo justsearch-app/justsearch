@@ -258,13 +258,15 @@ final class CoreApiAssembly {
               healthSub.changes(),
               healthSub.headSource(),
               java.time.Clock.systemUTC(),
-              () ->
-                  b.knowledgeServer != null
-                      ? b.knowledgeServer.client().getWatchedRoots(
-                          io.justsearch.app.services.intent.EngineProvenance.internal(
-                              "index-drift-health-tap", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-                              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND))
-                      : java.util.List.of()));
+              () -> {
+                if (b.knowledgeServer == null) return java.util.List.of();
+                try (var lease = b.knowledgeServer.captureClient()) {
+                  return lease.client().getWatchedRoots(
+                      io.justsearch.app.services.intent.EngineProvenance.internal(
+                          "index-drift-health-tap", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+                }
+              }));
       // Tempdoc 629 (FLOOR): wire the at-rest-protection condition tap + the shared disk-encryption
       // probe (one PowerShell shell-property read of the data-dir volume, cached 5s, fed to both the
       // /api/status View and the at-rest.unprotected condition).

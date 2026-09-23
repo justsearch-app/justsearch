@@ -53,7 +53,8 @@ final class KnowledgeServerBootstrapTestFixture implements AutoCloseable {
             components,
             indexComponent,
             workerHost,
-            automaticRootProducers);
+            automaticRootProducers,
+            new java.util.concurrent.locks.ReentrantReadWriteLock());
   }
 
   KnowledgeServerBootstrap bootstrap() {

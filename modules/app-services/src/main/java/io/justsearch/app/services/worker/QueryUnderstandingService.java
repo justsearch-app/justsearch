@@ -145,7 +145,14 @@ public final class QueryUnderstandingService {
       String query,
       String indexSnapshot,
       io.justsearch.core.context.EngineContext engineContext) {
-    boolean enabledForOperation = enabled.getAsBoolean();
+    return extractIfAvailable(query, indexSnapshot, engineContext, enabled.getAsBoolean());
+  }
+
+  CompletableFuture<QuResult> extractIfAvailable(
+      String query,
+      String indexSnapshot,
+      io.justsearch.core.context.EngineContext engineContext,
+      boolean enabledForOperation) {
     if (!isAvailable(enabledForOperation)) {
       return null;
     }

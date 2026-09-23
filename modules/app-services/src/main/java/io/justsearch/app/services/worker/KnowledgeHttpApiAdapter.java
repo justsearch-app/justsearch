@@ -49,7 +49,8 @@ public final class KnowledgeHttpApiAdapter {
       KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       OnlineAiService onlineAiService,
       RerankerService lambdaMartReranker) {
-    this(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker, null);
+    this(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker,
+        io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
   }
 
   public KnowledgeHttpApiAdapter(
@@ -88,15 +89,18 @@ public final class KnowledgeHttpApiAdapter {
   }
 
   public List<String> suggest(String query, int limit, EngineContext engineContext) {
-    KnowledgeClient client = knowledgeServer.client();
-    return client.suggest(query, limit, engineContext).getSuggestionsList();
+    try (var lease = knowledgeServer.captureClient()) {
+      return lease.client().suggest(query, limit, engineContext).getSuggestionsList();
+    }
   }
 
   public FolderBrowseResponse listFolders(FolderBrowseRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
-    KnowledgeClient client = knowledgeServer.client();
-    int maxFolders = req.maxFolders() == null ? 0 : req.maxFolders();
-    ListFoldersResponse proto = client.listFolders(req.parentPath(), maxFolders, engineContext);
+    ListFoldersResponse proto;
+    try (var lease = knowledgeServer.captureClient()) {
+      int maxFolders = req.maxFolders() == null ? 0 : req.maxFolders();
+      proto = lease.client().listFolders(req.parentPath(), maxFolders, engineContext);
+    }
 
     List<FolderBrowseResponse.Folder> folders = new ArrayList<>();
     for (FolderEntry entry : proto.getFoldersList()) {
@@ -112,10 +116,12 @@ public final class KnowledgeHttpApiAdapter {
 
   public FolderFilesResponse listFolderFiles(FolderFilesRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
-    KnowledgeClient client = knowledgeServer.client();
-    int limit = req.limit() == null ? 0 : req.limit();
-    ListFolderFilesResponse proto = client.listFolderFiles(
-        req.folderPath(), limit, req.projection(), engineContext);
+    ListFolderFilesResponse proto;
+    try (var lease = knowledgeServer.captureClient()) {
+      int limit = req.limit() == null ? 0 : req.limit();
+      proto = lease.client().listFolderFiles(
+          req.folderPath(), limit, req.projection(), engineContext);
+    }
 
     List<FolderFilesResponse.FileEntry> files = new ArrayList<>();
     for (FolderFileEntry entry : proto.getFilesList()) {

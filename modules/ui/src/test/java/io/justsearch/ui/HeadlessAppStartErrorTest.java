@@ -40,7 +40,8 @@ final class HeadlessAppStartErrorTest {
   private KnowledgeServerBootstrap bootstrap(Path dir) {
     return new KnowledgeServerBootstrap(executors, configFor(dir), null, components,
         new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(components.handle("index")),
-        io.justsearch.app.services.worker.WorkerHost.unavailable());
+        io.justsearch.app.services.worker.WorkerHost.unavailable(),
+        new java.util.concurrent.locks.ReentrantReadWriteLock());
   }
 
 

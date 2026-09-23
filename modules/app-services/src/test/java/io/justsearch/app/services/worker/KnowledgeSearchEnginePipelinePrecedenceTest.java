@@ -40,7 +40,11 @@ final class KnowledgeSearchEnginePipelinePrecedenceTest {
   void requestPipelineThenModeThenCapabilityAutoDetermineActualWorkerRequest() {
     KnowledgeClient client = mock(KnowledgeClient.class);
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    when(bootstrap.client()).thenReturn(client);
+    var publicationLock = ConfigStore.global().publicationLock();
+    KnowledgeServerBootstrap.ClientLease lease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.publicationLock()).thenReturn(publicationLock);
+    when(bootstrap.acquireClientLease()).thenReturn(lease);
+    when(lease.client()).thenReturn(client);
     List<SearchRequest> sent = new ArrayList<>();
     when(client.search(any(SearchRequest.class), any()))
         .thenAnswer(
@@ -49,7 +53,8 @@ final class KnowledgeSearchEnginePipelinePrecedenceTest {
               return SearchResponse.getDefaultInstance();
             });
     KnowledgeSearchEngine engine =
-        new KnowledgeSearchEngine(bootstrap, mock(SearchPerSourceExecutor.class));
+        new KnowledgeSearchEngine(bootstrap, mock(SearchPerSourceExecutor.class),
+            io.justsearch.app.api.OnlineAiService.unavailable(), null, ConfigStore.global());
 
     PipelineConfig explicit =
         new PipelineConfig(false, true, true, "cc", false, false, 7, false, false);

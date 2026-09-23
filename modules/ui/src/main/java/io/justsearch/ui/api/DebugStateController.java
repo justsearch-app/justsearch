@@ -77,12 +77,13 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
   /** Returns the raw Lucene commit user data map from the Worker. */
   public void handleGetCommitMetadata(Context ctx) {
     var engineContext = RequestEngineContext.get(ctx);
-    if (knowledgeServer == null || !knowledgeServer.isReady()) {
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server == null || !server.isReady()) {
       ctx.status(503).json(Map.of("error", "Worker not available"));
       return;
     }
-    try {
-      Map<String, String> commitMetadata = knowledgeServer.client().getCommitMetadata(engineContext);
+    try (var lease = server.captureClient()) {
+      Map<String, String> commitMetadata = lease.client().getCommitMetadata(engineContext);
       ctx.json(commitMetadata);
     } catch (Exception e) {
       log.debug("Failed to fetch commit metadata: {}", e.getMessage());
@@ -110,9 +111,10 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
 
     // Worker
     ObjectNode worker = root.putObject("worker");
-    if (knowledgeServer != null && knowledgeServer.isReady()) {
-      try {
-        var snapshot = knowledgeServer.client().getDebugWorkerState(engineContext);
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server != null && server.isReady()) {
+      try (var lease = server.captureClient()) {
+        var snapshot = lease.client().getDebugWorkerState(engineContext);
         ObjectNode snapNode = (ObjectNode) mapper.valueToTree(snapshot);
         worker.setAll(snapNode);
         // Lane F stage A item A11 deleted the Worker process: the index half now runs inside this
@@ -129,14 +131,14 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
       }
     } else {
       worker.put("status", "UNAVAILABLE");
-      if (knowledgeServer == null) {
+      if (server == null) {
           worker.put("reason", "Not configured");
       } else {
           worker.put("reason", "Not ready");
           // Item A11: the "if a spawner exists" guard becomes "if a client is bound" — the same
           // question ("is there an index half at all?") now that the half is composed in-process.
           // Same reasoning as the ready arm: our pid, and no `port` key.
-          if (knowledgeServer.hasClient()) {
+          if (server.hasClient()) {
             worker.put("pid", ProcessHandle.current().pid());
             worker.put("inProcess", true);
           }

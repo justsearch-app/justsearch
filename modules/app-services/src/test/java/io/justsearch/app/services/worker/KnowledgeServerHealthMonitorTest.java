@@ -75,7 +75,7 @@ final class KnowledgeServerHealthMonitorTest {
         new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // first tick: no prior wall stamp → never a resume
 
-    verify(bootstrap, never()).client();
+    verify(bootstrap, never()).captureClient();
     verify(client, never()).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
   }
 
@@ -115,9 +115,11 @@ final class KnowledgeServerHealthMonitorTest {
   void largeGapTriggersReconcileAndNoReconnectUnlessFaultFixtureIsolated(boolean isolated) {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeServerBootstrap.ClientLease lease = mock(KnowledgeServerBootstrap.ClientLease.class);
     when(bootstrap.hasClient()).thenReturn(true);
     when(bootstrap.checkHealth()).thenReturn(true);
-    when(bootstrap.client()).thenReturn(client);
+    when(bootstrap.captureClient()).thenReturn(lease);
+    when(lease.client()).thenReturn(client);
     when(bootstrap.automaticRootProducersSuppressed()).thenReturn(isolated);
 
     long[] clock = {1_000_000L};
@@ -133,15 +135,15 @@ final class KnowledgeServerHealthMonitorTest {
 
   @Test
   void resumeReValidationSurvivesUnavailableClient() {
-    // A resume while the worker client is not available (client() throws) must not abort the tick or
+    // A resume while the worker client is not available (captureClient() throws) must not abort the tick or
     // flip the capability to DEGRADED. Post-825 this is the narrow race rather than the steady state:
-    // hasClient() and client() are two reads of the same volatile field, so a concurrent
+    // hasClient() and captureClient() can straddle a concurrent
     // closeForUpgrade can null it between them. The steady "no client at all" state is the
     // boot-recovery arm's, tested over a real bootstrap.
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.hasClient()).thenReturn(true);
     when(bootstrap.checkHealth()).thenReturn(true);
-    when(bootstrap.client()).thenThrow(new IllegalStateException("Knowledge Server not started"));
+    when(bootstrap.captureClient()).thenThrow(new IllegalStateException("Knowledge Server not started"));
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
