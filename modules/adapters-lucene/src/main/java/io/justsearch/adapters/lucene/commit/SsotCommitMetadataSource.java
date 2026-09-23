@@ -43,25 +43,64 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
   private final SsotAnalyzerRegistry analyzerRegistry;
   private final SsotAnalyzerRegistry.AnalyzerFingerprintingService fingerprintingService;
   private final ResolvedConfig resolvedConfigSnapshot;
+  private final RuntimeFingerprintInputs runtimeFingerprintInputs;
   private volatile String cachedAnalyzerFingerprint;
 
   public SsotCommitMetadataSource() {
-    this(null, false);
+    this(null, false, null);
   }
 
   /** Builds metadata from one captured configuration snapshot. */
   public SsotCommitMetadataSource(ResolvedConfig snapshot) {
-    this(snapshot, true);
+    this(snapshot, true, null);
   }
 
-  private SsotCommitMetadataSource(ResolvedConfig snapshot, boolean requireSnapshot) {
+  /**
+   * Builds metadata for one runtime from captured configuration and model inputs.
+   *
+   * <p>The supplied inputs belong to this source for its lifetime. This lets co-resident Lucene
+   * runtimes commit and check parity against their own encoder generation while legacy callers can
+   * continue using the process-wide providers through the older constructors.
+   */
+  public SsotCommitMetadataSource(
+      ResolvedConfig snapshot, RuntimeFingerprintInputs runtimeFingerprintInputs) {
+    this(
+        snapshot,
+        true,
+        Objects.requireNonNull(runtimeFingerprintInputs, "runtimeFingerprintInputs"));
+  }
+
+  private SsotCommitMetadataSource(
+      ResolvedConfig snapshot,
+      boolean requireSnapshot,
+      RuntimeFingerprintInputs runtimeFingerprintInputs) {
     if (requireSnapshot) {
       Objects.requireNonNull(snapshot, "snapshot");
     }
     this.resolvedConfigSnapshot = snapshot;
+    this.runtimeFingerprintInputs = runtimeFingerprintInputs;
     this.repoRoot = resolveRepoRoot();
     this.analyzerRegistry = new SsotAnalyzerRegistry();
     this.fingerprintingService = new SsotAnalyzerRegistry.AnalyzerFingerprintingService();
+  }
+
+  /**
+   * Immutable runtime-owned inputs that are not derivable from {@link ResolvedConfig}.
+   *
+   * <p>A {@code null} vector dimension means the field catalog's declaration is effective. Model
+   * fingerprints remain tri-state so an unavailable digest stays distinct from an unconfigured
+   * role.
+   */
+  public record RuntimeFingerprintInputs(
+      Integer effectiveVectorDimension,
+      IndexFingerprint.ModelFingerprint embeddingModel,
+      IndexFingerprint.ModelFingerprint spladeModel,
+      IndexFingerprint.ModelFingerprint nerModel) {
+    public RuntimeFingerprintInputs {
+      Objects.requireNonNull(embeddingModel, "embeddingModel");
+      Objects.requireNonNull(spladeModel, "spladeModel");
+      Objects.requireNonNull(nerModel, "nerModel");
+    }
   }
 
   private static File resolveRepoRoot() {
@@ -190,11 +229,48 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
    * edits each falsely demanded a reindex (tempdoc 804).
    */
   private IndexFingerprint.Inputs fingerprintInputs(ResolvedConfig resolved) throws IOException {
+    RuntimeFingerprintInputs runtimeInputs = runtimeFingerprintInputs;
+    if (runtimeInputs == null) {
+      runtimeInputs =
+          new RuntimeFingerprintInputs(
+              IndexFingerprint.effectiveVectorDimension(),
+              IndexFingerprint.embeddingModel(),
+              IndexFingerprint.spladeModel(),
+              IndexFingerprint.nerModel());
+    }
+    return fingerprintInputs(resolved, runtimeInputs);
+  }
+
+  /** Worker candidate capture uses explicit identities without installing process-wide providers. */
+  public IndexFingerprint.Inputs fingerprintInputs(ResolvedConfig resolved,
+      Integer effectiveVectorDimension, IndexFingerprint.ModelFingerprint embeddingModel,
+      IndexFingerprint.ModelFingerprint spladeModel, IndexFingerprint.ModelFingerprint nerModel)
+      throws IOException {
+    return fingerprintInputs(resolved, new RuntimeFingerprintInputs(effectiveVectorDimension,
+        embeddingModel, spladeModel, nerModel));
+  }
+
+  /**
+   * Assembles the physical index fingerprint inputs for one captured runtime.
+   *
+   * <p>The legacy metadata path reads the process-wide Worker providers. The runtime-bound
+   * constructor supplies these values directly so a generation-changing producer can prepare a
+   * different candidate while the serving runtime continues to use its own identity.
+   *
+   * @param resolved the candidate's captured resolved configuration, or {@code null} to preserve
+   *     the no-configuration defaults used by {@link #build()}
+   * @param runtimeInputs the runtime's captured vector dimension and model identities
+   * @return the complete inputs used by {@link IndexFingerprint#compute}
+   * @throws IOException when the SSOT catalog cannot be read
+   */
+  private IndexFingerprint.Inputs fingerprintInputs(
+      ResolvedConfig resolved, RuntimeFingerprintInputs runtimeInputs)
+      throws IOException {
     JsonNode catalog = M.readTree(file("SSOT/catalogs/fields.v1.json"));
 
     return new IndexFingerprint.Inputs(
             catalog.path("version").asText(),
-            projectFields(catalog, IndexFingerprint.effectiveVectorDimension()),
+            projectFields(catalog, runtimeInputs.effectiveVectorDimension()),
             analyzerFingerprint(),
             vectorFormat(resolved),
             new IndexFingerprint.Hnsw(
@@ -214,9 +290,9 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
             new IndexFingerprint.Analysis(
                 majorMinor(org.apache.lucene.util.Version.LATEST.toString()),
                 majorMinor(com.ibm.icu.util.VersionInfo.ICU_VERSION.toString())),
-            IndexFingerprint.embeddingModel(),
-            IndexFingerprint.spladeModel(),
-            IndexFingerprint.nerModel());
+            runtimeInputs.embeddingModel(),
+            runtimeInputs.spladeModel(),
+            runtimeInputs.nerModel());
   }
 
   /**

@@ -305,6 +305,36 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void promotedBulkWaitsForReplaySettlementBeforeCompletingExactlyOnce() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("promoted-replay-settlement"))) {
+      harness.completeOneCapturedClaim();
+      assertEquals(BulkReindexProgress.Phase.SETTLED, harness.progress().phase());
+      var queueCounts = harness.queue.jobStateCountsStrict();
+      assertEquals(0, queueCounts.processingCount());
+      assertEquals(0, queueCounts.pendingReadyCount());
+      assertEquals(0, queueCounts.pendingBackoffCount());
+
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, false));
+      harness.coordinator.maintain();
+      assertEquals(OperationState.RUNNING, harness.operations.find(harness.key).orElseThrow().state(),
+          "a promoted row cannot finish before replay settlement is observed");
+
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
+      harness.coordinator.maintain();
+      OperationRecord completed = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.COMPLETE, completed.state());
+      assertEquals("SUCCESS", completed.receipt().code());
+
+      harness.coordinator.maintain();
+      OperationRecord stillCompleted = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.COMPLETE, stillCompleted.state());
+      assertEquals("SUCCESS", stillCompleted.receipt().code());
+      assertEquals(1, stillCompleted.unitsCompleted());
+      assertAcknowledged(harness.queue, harness.key);
+    }
+  }
+
+  @Test
   void exhaustedBulkRecoveryPersistsRefusalAndExactAcknowledgementWithoutAnotherAttempt() throws Exception {
     try (var harness = new BulkHarness(temp.resolve("exhausted-recovery"))) {
       OperationRecord firstAttempt = harness.operations.find(harness.key).orElseThrow();
@@ -618,8 +648,10 @@ final class RecordedBulkIngestionCoordinatorTest {
               Thread.currentThread().interrupt();
               throw new java.io.IOException("promotion test interrupted", interrupted);
             }
-            harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key));
-            return null;
+            harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, false));
+            return new IndexGenerationManager.State(1, "g-" + harness.key, null,
+                SERVING_GENERATION, "IDLE", false, null, null, System.currentTimeMillis(),
+                null, null, null);
           });
         } catch (Throwable failure) {
           threadFailure.compareAndSet(null, failure);
@@ -653,21 +685,42 @@ final class RecordedBulkIngestionCoordinatorTest {
       canceller.join(5_000);
       assertNull(threadFailure.get());
       assertEquals(1, effects.get(), "the entered physical promotion completes exactly once");
-      OperationRecord cancelled = harness.operations.find(harness.key).orElseThrow();
-      assertEquals(OperationState.CANCELLED, cancelled.state(),
-          "overlapping cancellation terminalizes after the committed effect instead of claiming success");
-      assertEquals("cancelled", cancelled.receipt().code());
-      assertEquals(1, cancelled.unitsCompleted());
+      OperationRecord committed = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.RUNNING, committed.state(),
+          "committed B waits for replay settlement despite a late cancellation");
       assertEquals(BulkReindexProgress.Phase.SETTLED, harness.progress().phase());
-      assertEquals("cancelled", harness.progress().refusalCode());
+      assertNull(harness.progress().refusalCode());
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
+      harness.coordinator.maintain();
+      committed = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.COMPLETE, committed.state());
+      assertEquals("SUCCESS", committed.receipt().code());
+      assertEquals(1, committed.unitsCompleted());
       assertFalse(harness.coordinator.recordedCutoverReady(harness.key));
       AtomicInteger repeatedEffect = new AtomicInteger();
       assertNull(harness.coordinator.promoteRecordedGeneration(harness.key, harness.queue, () -> {
         repeatedEffect.incrementAndGet();
         return null;
       }));
-      assertEquals(0, repeatedEffect.get(), "terminal cancellation cannot promote again");
+      assertEquals(0, repeatedEffect.get(), "terminal committed activation cannot promote again");
       assertAcknowledged(harness.queue, harness.key);
+    }
+  }
+
+  @Test
+  void committedPointerReconcilesAfterWatchedRootAuthorityChanges() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("committed-policy-change"))) {
+      harness.completeOneCapturedClaim();
+      harness.closeOwner();
+      Files.writeString(harness.authorityDirectory.resolve("watched_roots.json"),
+          "{\"schemaVersion\":1,\"roots\":[]}");
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
+      harness.openOwner(true, false, false);
+
+      OperationRecord committed = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.COMPLETE, committed.state());
+      assertEquals("SUCCESS", committed.receipt().code());
+      assertEquals(1, harness.migrationStarts.get(), "committed recovery cannot start another build");
     }
   }
 
@@ -750,10 +803,15 @@ final class RecordedBulkIngestionCoordinatorTest {
     }
 
     private void openOwner(boolean recovered, boolean refusalPersisted) throws Exception {
+      openOwner(recovered, refusalPersisted, true);
+    }
+
+    private void openOwner(boolean recovered, boolean refusalPersisted,
+        boolean expectCurrentAuthorization) throws Exception {
       authority = OperationAuthority.load(authorityDirectory);
       admission = new EngineAdmissionController(4, 8, 1);
       operations = new SqliteOperationStore(directory.resolve("operations.db"));
-      if (recovered) {
+      if (recovered && expectCurrentAuthorization) {
         OperationRecord accepted = operations.find(key).orElseThrow();
         var acceptedPreparation = operations.acceptedPreparation(accepted.id()).orElseThrow();
         assertInstanceOf(OperationAuthority.RecordedBulkRecoveryDecision.Authorized.class,
@@ -773,9 +831,17 @@ final class RecordedBulkIngestionCoordinatorTest {
           suppressWalkNotifications), failRetirement);
       coordinator = new RecordedIngestionCoordinator(operationOwner, attempts, admission, authority);
       coordinatorRef.set(coordinator);
+      if (recovered && !expectCurrentAuthorization) {
+        var ownership = assertInstanceOf(IndexGenerationManager.BootOwnership.Recorded.class,
+            coordinator.bootOwnership(queue));
+        assertFalse(ownership.continuationAuthorized(),
+            "current scope revocation fences only an uncommitted continuation");
+      }
       if (recovered && refusalPersisted) {
-        assertInstanceOf(IndexGenerationManager.BootOwnership.Fenced.class, coordinator.bootOwnership(queue),
-            "a durable cancellation marker fences restart even while current policy allows the accepted plan");
+        var ownership = assertInstanceOf(IndexGenerationManager.BootOwnership.Recorded.class,
+            coordinator.bootOwnership(queue));
+        assertFalse(ownership.continuationAuthorized(),
+            "a durable cancellation marker fences a precommit rebuild while retaining pointer identity");
       }
       attachment = coordinator.attach(queue, () -> Optional.of(SERVING_GENERATION), () -> true,
           () -> Optional.of(runtime.get()));
@@ -986,8 +1052,13 @@ final class RecordedBulkIngestionCoordinatorTest {
 
   private static RecordedIngestionLifecycle.BulkRuntime promotedRuntime(String key,
       boolean promotedBoot, String writableGeneration) {
+    return promotedRuntime(key, promotedBoot, writableGeneration, true);
+  }
+
+  private static RecordedIngestionLifecycle.BulkRuntime promotedRuntime(String key,
+      boolean promotedBoot, String writableGeneration, boolean promotedReplaySettled) {
     return new RecordedIngestionLifecycle.BulkRuntime(IndexGenerationManager.BootDisposition.PROMOTED,
-        "g-" + key, null, "IDLE", writableGeneration, promotedBoot);
+        "g-" + key, null, "IDLE", writableGeneration, promotedBoot, promotedReplaySettled);
   }
 
   private static JobQueue acknowledgeGate(JobQueue delegate, AtomicBoolean rejectAcknowledgement) {

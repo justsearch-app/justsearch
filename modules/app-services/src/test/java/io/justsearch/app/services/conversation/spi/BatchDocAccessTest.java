@@ -11,10 +11,14 @@ import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.DocumentService.DocumentRecord;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -153,13 +157,47 @@ final class BatchDocAccessTest {
     assertFalse(ctx.attributes().containsKey("batch.fileCount"));
   }
 
+  @Test
+  @DisplayName("D1: summary limit uses the work-bound config after the live store changes")
+  void summaryLimitUsesWorkBoundConfig() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of("justsearch.summary.max_tokens", "2")));
+    Map<UUID, ResolvedConfig> captured = new HashMap<>();
+    ConversationConfigProvider provider =
+        context ->
+            captured.computeIfAbsent(context.workId().orElseThrow(), ignored -> store.get());
+    var engineContext =
+        io.justsearch.app.services.TestEngineContexts.internal().withWorkId(UUID.randomUUID());
+    provider.resolve(engineContext);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(
+            Map.of("justsearch.summary.max_tokens", "20000")));
+    String source = "dense-source".repeat(20);
+    var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", source, Map.of())));
+
+    InjectorResult result =
+        new BatchDocAccess(docs, provider)
+            .inject(stubCtx(Map.of("docIds", List.of("doc")), engineContext));
+
+    var error = result.terminalError().orElseThrow();
+    assertEquals("CONTEXT_TOO_LARGE", error.payload().get("errorCode"));
+    assertEquals(2, error.payload().get("maxTokens"));
+  }
+
   // ---- fixtures ----
 
   private static ConversationContext stubCtx(Map<String, Object> body) {
+    return stubCtx(body, io.justsearch.app.services.TestEngineContexts.internal());
+  }
+
+  private static ConversationContext stubCtx(
+      Map<String, Object> body, io.justsearch.core.context.EngineContext engineContext) {
     return new ConversationContext() {
       @Override
       public io.justsearch.core.context.EngineContext engineContext() {
-        return io.justsearch.app.services.TestEngineContexts.internal();
+        return engineContext;
       }
 
       private final Map<String, Object> attrs = new HashMap<>();

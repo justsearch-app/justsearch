@@ -1509,6 +1509,17 @@ export class BrainSurface extends JfElement {
     });
   }
 
+  /** Activate the accepted staged model candidate through the real HIGH-risk operation surface. */
+  private async activateInstalledModels(): Promise<void> {
+    await this.withBusy('install-activation', async () => {
+      this.runtimeError = null;
+      await this.invokeOp('core.activate-installed-models', {
+        source: 'installer_model_activation',
+      });
+      await this.refreshAll();
+    });
+  }
+
   /**
    * Cancelling used to destroy every downloaded byte, so it (wrongly) needed no gate to be honest.
    * `DownloadExecutor.cancel()` now SUSPENDS the BITS job instead of removing it and `ResumableFetch`
@@ -1751,6 +1762,7 @@ export class BrainSurface extends JfElement {
     // old 5-source ladder).
     const aiVerdict = this.deriveAiEngineVerdict();
     const aiState = aiVerdict.kind;
+    const activationRequired = this.installStatus?.phase === 'activation_required';
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
     const repairRemedy = deriveRepairRemedy(this.installStatus);
@@ -1841,7 +1853,13 @@ export class BrainSurface extends JfElement {
       },
       connecting: { dot: 'starting', label: 'Connecting…', sub: 'Checking AI status…' },
     };
-    const sc = statusConfig[aiState] ?? statusConfig.offline!;
+    const sc = activationRequired
+      ? {
+          dot: 'starting',
+          label: 'Downloaded — activation required',
+          sub: 'Activate the downloaded models to rebuild affected indexes.',
+        }
+      : statusConfig[aiState] ?? statusConfig.offline!;
 
     const bytesDone = this.installStatus?.downloadedBytes ?? 0;
     const bytesTotal = this.installStatus?.totalBytes ?? 0;
@@ -1853,6 +1871,17 @@ export class BrainSurface extends JfElement {
     // native-disabled-equivalent tier, not a soft "unavailable{reason}", since there is no reason beyond
     // "wait" to show).
     const primaryAction = (() => {
+      if (activationRequired) {
+        return {
+          label: 'Activate downloaded models',
+          iconName: 'check-circle-2' as const,
+          onClick: () => void this.activateInstalledModels(),
+          availability: this.busy['install-activation']
+            ? ({ kind: 'blocked' } as const)
+            : AVAILABLE,
+          primary: true,
+        };
+      }
       switch (aiState) {
         // `paused` shares the install action but not its label: "Install AI" over a half-downloaded
         // 10 GB reads as "start over", which is the very fear the pause dialog set out to remove.
@@ -2999,6 +3028,7 @@ export class BrainSurface extends JfElement {
     // the primary affordance only while it can still succeed: once a file has failed three
     // consecutive passes at transport, presenting Repair as THE action is the round-16 defect.
     const repairRemedy = deriveRepairRemedy(this.installStatus);
+    const activationRequired = this.installStatus?.phase === 'activation_required';
     const repairNeeded = repairRemedy.kind === 'repair' || repairRemedy.kind === 'repair-soft';
     const manualFallback = repairRemedy.kind === 'manual' ? repairRemedy.packages : [];
     const optionalGaps = this.installStatus?.optionalGaps ?? [];
@@ -3064,9 +3094,30 @@ export class BrainSurface extends JfElement {
               </div>`
             : nothing}
         </div>
+        ${activationRequired
+          ? html`<div
+              data-testid="install-activation-required"
+              style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 0.75rem"
+            >
+              Downloaded — activation required. Activation rebuilds affected indexes and publishes
+              the downloaded models.
+            </div>`
+          : nothing}
         <div class="row">
+          ${activationRequired
+            ? html`<jf-button
+                variant="primary"
+                label="Activate downloaded models"
+                .availability=${this.busy['install-activation']
+                  ? ({ kind: 'blocked' } as const)
+                  : AVAILABLE}
+                .onActivate=${() => void this.activateInstalledModels()}
+              >
+                Activate downloaded models
+              </jf-button>`
+            : nothing}
           <jf-button
-            variant=${repairNeeded || manualFallback.length > 0 ? 'secondary' : 'primary'}
+            variant=${activationRequired || repairNeeded || manualFallback.length > 0 ? 'secondary' : 'primary'}
             label="Install"
             .availability=${installing
               ? unavailableBecause('Already installing.')

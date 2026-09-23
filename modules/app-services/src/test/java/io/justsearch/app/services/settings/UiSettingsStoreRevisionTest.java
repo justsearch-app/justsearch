@@ -47,6 +47,20 @@ class UiSettingsStoreRevisionTest {
   }
 
   @Test
+  void exactProjectionPreservesAcceptedCandidateRatherThanStampingTransientWindowTime()
+      throws Exception {
+    UiSettingsStore store = new UiSettingsStore(READ_WRITE, directory.resolve("settings.json"));
+    UiSettings candidate = new UiSettings();
+    candidate.setEmbedOnnxModelPath(directory.resolve("candidate").toString());
+    var prepared = store.prepareExact(candidate, new SettingsWitness(1, KEY));
+    assertEquals(candidate.getWindow().getLastShownAt(), prepared.settings().getWindow().getLastShownAt());
+    store.replacePrepared(prepared);
+    assertEquals(candidate.getWindow().getLastShownAt(),
+        store.inspect().settings().getWindow().getLastShownAt());
+    assertEquals(candidate.getEmbedOnnxModelPath(), store.inspect().settings().getEmbedOnnxModelPath());
+  }
+
+  @Test
   void legacyTwoStartsAtZeroAndOldReaderRefusesThree() throws Exception {
     Path path = directory.resolve("settings.json");
     Files.writeString(path, "{\"schemaVersion\":2,\"settings\":{\"contextLength\":4096}}");

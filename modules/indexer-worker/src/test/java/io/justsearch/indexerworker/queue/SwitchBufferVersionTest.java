@@ -82,7 +82,7 @@ final class SwitchBufferVersionTest {
         var statement = connection.createStatement();
         var version = statement.executeQuery("PRAGMA user_version")) {
       assertTrue(version.next());
-      assertEquals(19, version.getInt(1));
+      assertEquals(20, version.getInt(1));
     }
   }
 

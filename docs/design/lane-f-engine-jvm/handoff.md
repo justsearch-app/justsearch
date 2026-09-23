@@ -6,6 +6,95 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-23)
 
+### Active D1 checkpoint after `a3039517c` (20:45 Berlin)
+
+Worktree `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` remains on
+`codex/lane-f-pr1`. `a3039517c` is the current HEAD; the Flow A and installer
+activation edits below are uncommitted. Do not push another checkpoint until one
+coherent hosted verification can finish. Prior pushes cancelled hosted system
+integration twice. PR727 checkpoint pushes are authorized; merge is conditional
+on stage F acceptance. Keep main and other sessions' files untouched, stage
+explicit paths, and exclude `modules/app-inference/logs/`.
+
+The corrected candidate-context integrated, installed standard-model and hosted
+verification finished before this WIP. The last completed hosted run
+`35846791699` found the known ordinary-settings installer refusal and an old
+system-fault fixture selector; other completed jobs passed. Preserve that proof
+at its tested revision. The [installer generation design](evidence/D1/generation-native-cursor-design-2026-09-23.md#7-installer-produced-generation-candidate-2026-09-23-amendment)
+is selected: acquisition says “Downloaded — activation required”; a distinct
+approved HIGH/DURABLE/REINDEX activation freezes candidate settings and model
+identity. Ordinary settings still refuses generation-bound changes. The
+publication decision records the settings projection and pointer-first
+roll-forward rule. Do not route activation through ordinary `BulkReindexHandler`
+or complete a row from the settings witness alone.
+
+Current WIP has an isolated B model/producer surface and candidate-specific
+embedding compatibility metadata, strict switch-buffer replay and mutation
+fence, live Green/Head publication, typed v2 activation preparation and runner
+settings marker, boot pointer/settings roll-forward, and installer candidate
+placement/status UI. Its focused owner tests and the app-services full module
+passed (`tmp/2877-app-services-full.txt`); the Worker full module passed before
+the latest recovery edits (`tmp/2878-worker-full.txt`). The full static build
+passed at `tmp/2886-full-build-static.txt`. The full test run at
+`tmp/2870-full-test-live-head.txt` found failures since fixed locally; a new
+full suite is due. Frontend typecheck and focused activation UI tests passed at
+`tmp/2844-ui-typecheck.txt` and `tmp/2845-ui-activation-test.txt`. No hosted
+checkpoint has been started for this WIP.
+
+Direct installed standard-model verification reached and passed the first
+composite crash cut, `installer-before-arm`, at
+`tmp/2910-installer-before-arm14.txt`: the real approved v2 activation retained
+one accepted row and frozen preparation across an exact Engine kill, promoted B,
+committed its settings witness, returned both indexed documents in search,
+completed the row and preserved it on same-key replay. Earlier direct runs
+found and fixed a genuine candidate fingerprint comparison against global A
+(`tmp/2900-green-target-install.txt`), boot's already-held installer settings
+reservation, and the already-armed exact revision marker. Focused recovery and
+store tests passed at `tmp/2906-resume-marker-tests.txt`. The separate
+before-marker crash boundary and focused gate tests passed locally at
+`tmp/2911-premarker-tests.txt`; its installed run passed at
+`tmp/2913-installer-before-marker.txt` with the durable marker absent at the
+cut and one terminal row after recovery. The before-pointer cut also passed at
+`tmp/2915-installer-before-pointer2.txt`. The committed pointer-before-settings
+cut passed at `tmp/2917-installer-pointer-before-settings2.txt`: boot projected
+settings B and completed the same attempt-2 row without retrying the committed
+effect. The settings-before-publication cut passed at
+`tmp/2918-installer-settings-before-publication.txt`. The final pre-result cut
+passed at `tmp/2923-installer-before-receipt.txt`. The first final-cut run found
+a real publication-order bug: a reconciliation notification completed the row
+before the recorded projection callback. `KnowledgeServer` now invokes that
+callback first; `tmp/2921-post-order-producer-dist.txt` built the installed
+distribution used for the successful rerun. All six cuts use a real installed
+Engine, exact process kill, the same accepted row and preparation on recovery,
+pointer/settings B, and both indexed documents in search. The cut fixture now
+distinguishes the already sealed queue receipt from the later operation result.
+Each direct fixture stops its owned private stack.
+
+The chat-turn capture now handles Worker-independent free chat and explicit
+document overrides, binds a per-work immutable config, uses stable nested work
+identity and routes hierarchical retrieval through the captured facade. The
+full local/static/stress/installDist sweep passed at `tmp/2930-lane-f-coherent-full.txt`
+(358 tasks, 12m05s). The previously red EngineRoot test used a Mockito service
+that swallowed its producer encoder lease; its ownership-aware fixture and
+focused rerun passed at `tmp/2929-engine-close-lease-fixture.txt`. Frontend
+typecheck and unit tests passed at `tmp/2931-ui-typecheck.txt` and
+`tmp/2932-ui-unit.txt`. The current installed standard-model
+`installer-pointer-before-settings` cut passed at
+`tmp/2933-current-installer-pointer-settings.txt`: exact Engine kill, same
+accepted row and frozen preparation, pointer/settings B, two search hits and
+owned-stack stop. This refreshes one of the six earlier successful cuts at the
+current dirty source; it does not replace their individual evidence.
+
+Open D1 acceptance includes fresh activation without a READY encoder, retained
+old-model assets, held A query, settings conflict/model drift, cancellation and
+duplicate RUNNING activation, then full Head request capture, A/B encoder
+retirement and installed live no-restart Flow A proof. D1-4 through D1-17 must
+be reconciled against their stage clauses; D2/E/F remain open. One coherent
+hosted checkpoint is next. Do not push another commit while its system job runs.
+Root owns Gradle, shared stack and integration; bounded agents do not run
+builds. The older record below is historical context and does not supersede
+these live facts.
+
 ### Continuation in progress after `b90005e2e` (09:00 UTC)
 
 Hosted run `35840851483` finished red at `b90005e2e`: app-ui confirmed the

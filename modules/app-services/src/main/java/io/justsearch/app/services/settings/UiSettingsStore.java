@@ -361,10 +361,20 @@ public final class UiSettingsStore {
   }
 
   public PreparedSettings prepare(UiSettings settings, SettingsWitness witness) {
+    return prepareInternal(settings, witness, true);
+  }
+
+  /** Preserves every accepted candidate field for a generation-bound roll-forward projection. */
+  public PreparedSettings prepareExact(UiSettings settings, SettingsWitness witness) {
+    return prepareInternal(settings, witness, false);
+  }
+
+  private PreparedSettings prepareInternal(UiSettings settings, SettingsWitness witness,
+      boolean stampLastShown) {
     if (!mode.isWritable()) throw new IllegalStateException("Settings store is read-only");
     UiSettings candidate = copy(Objects.requireNonNull(settings, "settings"));
     Objects.requireNonNull(witness, "witness");
-    candidate.getWindow().stampLastShown();
+    if (stampLastShown) candidate.getWindow().stampLastShown();
     byte[] bytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
         new PersistedSettings(CURRENT_SCHEMA_VERSION, candidate,
             witness.acceptedRevision(), witness.lastCommittedOperationKey()));

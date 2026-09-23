@@ -70,7 +70,7 @@ final class EngineMigrationRestartDispatchTest {
   }
 
   @Test
-  void realClientDispatchesAcceptedStartAndRollbackButNotCutoverRequest(@TempDir Path dataDir)
+  void realClientDispatchesStartAndRefusesDirectoryRollback(@TempDir Path dataDir)
       throws Exception {
     EngineTestHarness.publishConfig(dataDir, dataDir.resolve("index"), Map.of());
     var restarts = new AtomicInteger();
@@ -87,13 +87,13 @@ final class EngineMigrationRestartDispatchTest {
       assertEquals(1, restarts.get(), "the production client consumes the requirement");
       assertTrue(client.requestCutover(true, TestEngineContexts.FOREGROUND).restartRequired());
       assertEquals(1, restarts.get(), "requesting cutover is not promotion");
-      // This fixture observes dispatch without terminating its JVM. Seed a genuine rollback
-      // target; automatic promotion/reopen is proved separately under a process supervisor.
+      // This fixture observes dispatch without terminating its JVM. Seed a real predecessor so
+      // the refusal proves that pointer-only rollback is retired even when A still exists.
       new IndexGenerationManager(dataDir.resolve("index")).promoteBuildingGenerationToActive();
       var rollback = client.rollbackMigration(TestEngineContexts.FOREGROUND);
-      assertTrue(rollback.accepted());
-      assertTrue(rollback.restartRequired());
-      assertEquals(2, restarts.get());
+      assertFalse(rollback.accepted());
+      assertFalse(rollback.restartRequired());
+      assertEquals(1, restarts.get());
     }
   }
 }

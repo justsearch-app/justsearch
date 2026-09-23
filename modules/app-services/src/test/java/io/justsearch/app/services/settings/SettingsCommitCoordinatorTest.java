@@ -11,6 +11,9 @@ import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationRecord;
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsCandidateContext;
@@ -24,6 +27,9 @@ import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -107,6 +113,208 @@ final class SettingsCommitCoordinatorTest {
       assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
       assertSame(initial, config.get());
     }
+  }
+
+  @Test
+  void maskedInstallerDesiredPathStillCommitsThroughOrdinarySettingsOwner() throws Exception {
+    String key = "justsearch.embed.onnx.model_path";
+    String prior = System.getProperty(key);
+    System.setProperty(key, temp.resolve("operator-model").toString());
+    try {
+      Path settingsPath = temp.resolve("masked-installer-settings.json");
+      try (var operations = operations("masked-installer")) {
+        var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+        var config = new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()));
+        var runner = runner(operations, coordinator(settings, config));
+        UiSettings candidate = settings.load();
+        String desired = temp.resolve("installed-model").toString();
+        candidate.setEmbedOnnxModelPath(desired);
+        var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
+
+        var result = runner.start(attempt, handle -> OperationExecution.finished(
+            runner.applySettings(handle, currentWitness(settings), candidate)));
+
+        assertEquals(OperationState.COMPLETE, result.record().state());
+        assertEquals(desired, settings.inspect().settings().getEmbedOnnxModelPath());
+        assertEquals(new SettingsWitness(1, attempt.accepted().key()), settings.inspect().witness());
+      }
+    } finally {
+      if (prior == null) System.clearProperty(key); else System.setProperty(key, prior);
+    }
+  }
+
+  @Test
+  void installerGenerationRecoveryWaitsForCompositeOwnerOnBothSidesOfSettingsMove()
+      throws Exception {
+    for (boolean settingsMoved : List.of(false, true)) {
+      Path settingsPath = temp.resolve("activation-recovery-" + settingsMoved + ".json");
+      try (var operations = operations("activation-recovery-" + settingsMoved)) {
+        var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+        var owner = coordinator(settings, new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings())));
+        OperationRecord accepted = row(operations, OperationKind.REINDEX);
+        OperationRecord armed = new OperationRecord(accepted.id(), accepted.key(),
+            new OperationDescriptor(OperationKind.REINDEX,
+                RecordedInstallerGenerationPlan.OPERATION_ID, "{}"), accepted.context(),
+            accepted.executor(), accepted.initiator(), accepted.correlationId(),
+            OperationState.RUNNING, accepted.phase(), accepted.checkpointCursor(),
+            accepted.unitsCompleted(), accepted.unitsFailed(), accepted.attempts(),
+            accepted.acceptedAt(), accepted.startedAt(), accepted.updatedAt(),
+            accepted.completedAt(), accepted.failureReason(), accepted.receipt(),
+            accepted.historyMode(), accepted.provenanceOccurredAt(), 0L);
+        if (settingsMoved) writeWitness(settings, 1, armed.key());
+
+        owner.inspectRecovery(List.of(new SettingsCommitOwner.RecoveryInput(armed, Optional.empty())));
+
+        assertInstanceOf(OperationAttemptRunner.Reconciliation.Wait.class, owner.reconcile(armed),
+            "settings alone cannot complete or fail a pointer-committed activation");
+        assertThrows(SettingsCommitOwner.Refused.class,
+            () -> owner.reserve(armed.id() + 1, OperationKeys.generate(CLOCK), settings.inspect().witness()));
+        if (!settingsMoved) {
+          var resumed = owner.reserve(armed.id(), armed.key(), new SettingsWitness(0, null));
+          assertNotNull(resumed, "the same armed installer row must reuse its boot reservation");
+          assertThrows(SettingsCommitOwner.Refused.class,
+              () -> owner.reserve(armed.id(), armed.key(), new SettingsWitness(1, armed.key())),
+              "a successor witness cannot be re-prepared as the source");
+        } else {
+          assertThrows(SettingsCommitOwner.Refused.class,
+              () -> owner.reserve(armed.id(), armed.key(), new SettingsWitness(0, null)),
+              "a committed successor witness must be reconciled by the composite owner");
+        }
+      }
+    }
+  }
+
+  @Test
+  void installerProjectionKeepsSettingsAtAUntilItsPointerCallback() throws Exception {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("installer-projection.json"));
+    var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+    var config = new ConfigStore(initial);
+    var owner = coordinator(settings, config);
+    owner.inspectRecovery(List.of());
+    String key = OperationKeys.generate(CLOCK);
+    UiSettings candidate = new UiSettings();
+    candidate.setEmbedOnnxModelPath(temp.resolve("candidate-embedding.onnx").toString());
+    var control = new ProjectionControl();
+    var reservation = owner.reserve(71, key, currentWitness(settings));
+    var projection = owner.prepareInstallerGenerationProjection(reservation, candidate, control);
+
+    assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    assertSame(initial, config.get());
+    config.publicationLock().writeLock().lock();
+    try {
+      projection.admitBeforePointer();
+      assertTrue(control.admitted);
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      projection.afterPointerCommitted();
+    } finally { config.publicationLock().writeLock().unlock(); }
+    assertTrue(control.committed);
+    assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
+    assertEquals(candidate.getEmbedOnnxModelPath(), settings.inspect().settings().getEmbedOnnxModelPath());
+    projection.afterRuntimePublished();
+    owner.releaseAfterTerminal(71);
+  }
+
+  @Test
+  void installerProjectionRefusesFullWitnessConflictBeforePointer() throws Exception {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("installer-projection-conflict.json"));
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+    var owner = coordinator(settings, config);
+    owner.inspectRecovery(List.of());
+    String key = OperationKeys.generate(CLOCK);
+    var reservation = owner.reserve(72, key, currentWitness(settings));
+    var projection = owner.prepareInstallerGenerationProjection(reservation, new UiSettings(),
+        new ProjectionControl());
+    writeWitness(settings, 1, OperationKeys.generate(CLOCK));
+
+    config.publicationLock().writeLock().lock();
+    try { assertThrows(SettingsCommitOwner.Refused.class, projection::admitBeforePointer); }
+    finally { config.publicationLock().writeLock().unlock(); }
+    projection.abortBeforePointer();
+    assertEquals(1L, settings.inspect().witness().acceptedRevision());
+    owner.releaseAfterTerminal(72);
+  }
+
+  @Test
+  void installerPostmoveFailureWithMatchingWitnessButDifferentBytesRequiresRecovery() throws Exception {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("installer-postmove-drift.json"));
+    var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+    var config = new ConfigStore(initial);
+    var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+        ConfigStoreRebuilder::prepare, candidate -> OperationResult.success("prepared"), prepared -> {
+          settings.replacePrepared(settings.prepareExact(new UiSettings(), prepared.witness()));
+          throw new IOException("move reported failure after installing different bytes");
+        });
+    owner.inspectRecovery(List.of());
+    String key = OperationKeys.generate(CLOCK);
+    UiSettings candidate = new UiSettings();
+    candidate.setEmbedOnnxModelPath(temp.resolve("accepted-model").toString());
+    var reservation = owner.reserve(73, key, currentWitness(settings));
+    AtomicBoolean uncertain = new AtomicBoolean();
+    var control = new SettingsCommitOwner.AttemptControl() {
+      @Override public boolean admitCommit(SettingsCommitOwner.Receipt receipt) { return true; }
+      @Override public void committed(SettingsCommitOwner.Receipt receipt) {
+        throw new AssertionError("different settings bytes cannot commit");
+      }
+      @Override public void uncertain() { uncertain.set(true); }
+    };
+    var projection = owner.prepareInstallerGenerationProjection(reservation, candidate, control);
+
+    config.publicationLock().writeLock().lock();
+    try {
+      projection.admitBeforePointer();
+      assertThrows(IOException.class, projection::afterPointerCommitted);
+    } finally { config.publicationLock().writeLock().unlock(); }
+    assertTrue(uncertain.get());
+    assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
+    assertEquals("", settings.inspect().settings().getEmbedOnnxModelPath());
+    assertSame(initial, config.get(), "failed exact projection cannot publish a candidate runtime");
+  }
+
+  @Test
+  void installerTerminalGuardRequiresBothSuccessorWitnessAndExactCandidate() throws Exception {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("installer-terminal-guard.json"));
+    var owner = coordinator(settings, new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings())));
+    String key = OperationKeys.generate(CLOCK);
+    UiSettings candidate = new UiSettings();
+    candidate.setEmbedOnnxModelPath(temp.resolve("candidate-model").toString());
+    String json = tools.jackson.databind.json.JsonMapper.builder().build()
+        .writeValueAsString(candidate);
+    String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+        .digest("{}".getBytes(StandardCharsets.UTF_8)));
+    String assetHash = "0".repeat(64);
+    var provenance = new RecordedInstallerGenerationPlan.AcquisitionProvenance(
+        RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.REGISTRY, "registry", assetHash);
+    Path asset = temp.resolve("candidate-model.onnx");
+    var plan = new RecordedInstallerGenerationPlan(key, "g-source",
+        new RecordedRootPlan("g-source", List.of()), new IndexTargetSnapshot(digest, "{}"),
+        new SettingsWitness(0, null),
+        RecordedInstallerGenerationPlan.CandidateSettings.fromJson(json),
+        List.of(new RecordedInstallerGenerationPlan.ModelIdentity("embedding", "model.onnx",
+            asset, assetHash, 1, provenance)),
+        List.of(new RecordedInstallerGenerationPlan.AssetIdentity("embedding/model.onnx",
+            asset, assetHash, 1, provenance)), provenance);
+
+    assertFalse(owner.installerGenerationProjected(plan));
+    settings.replacePrepared(settings.prepareExact(candidate, new SettingsWitness(1, key)));
+    assertTrue(owner.installerGenerationProjected(plan));
+    settings.replacePrepared(settings.prepareExact(new UiSettings(), new SettingsWitness(1, key)));
+    assertFalse(owner.installerGenerationProjected(plan),
+        "matching revision and operation key cannot certify different settings bytes");
+  }
+
+  private static final class ProjectionControl implements SettingsCommitOwner.AttemptControl {
+    private boolean admitted;
+    private boolean committed;
+    @Override public boolean admitCommit(SettingsCommitOwner.Receipt receipt) {
+      admitted = true;
+      return true;
+    }
+    @Override public void committed(SettingsCommitOwner.Receipt receipt) { committed = true; }
+    @Override public void uncertain() { throw new AssertionError("Projection unexpectedly became uncertain"); }
   }
 
   @Test

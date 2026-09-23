@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationPreparedPayload;
+import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
@@ -18,6 +20,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -88,6 +91,56 @@ class OperationSettingsMarkerTest {
       assertThrows(IllegalArgumentException.class, () -> store.armSettingsRevision(row.id(), -1));
       assertThrows(IllegalArgumentException.class, () -> store.armSettingsRevision(row.id(), Long.MAX_VALUE));
       assertNull(store.find(row.key()).orElseThrow().expectedSettingsRevision());
+    }
+  }
+
+  @Test
+  void installerGenerationHasAnExactSeparateMarker() throws Exception {
+    Path path = directory.resolve("operations.db");
+    var activation = new OperationDescriptor(OperationKind.REINDEX,
+        "core.activate-installed-models", "{}");
+    var ordinary = new OperationDescriptor(OperationKind.REINDEX, "core.bulk-reindex", "{}");
+    try (var store = new SqliteOperationStore(path)) {
+      var unprepared = store.accept(OperationKeys.generate(CLOCK), activation, CONTEXT, null).record();
+      store.start(unprepared.id());
+      assertFalse(store.armInstallerGenerationSettingsRevision(unprepared.id(), 4));
+
+      var other = store.accept(OperationKeys.generate(CLOCK), ordinary, CONTEXT, null).record();
+      store.start(other.id());
+      assertFalse(store.armInstallerGenerationSettingsRevision(other.id(), 4));
+
+      String wrongSchemaKey = OperationKeys.generate(CLOCK);
+      var wrongSchema = new OperationStore.Preparation(UUID.randomUUID(), new OperationPreparedPayload(false,
+          "{\"preparation\":{\"replaySchema\":\"recorded-bulk-v1\"}}"));
+      store.savePreparation(wrongSchemaKey, activation, wrongSchema);
+      var wrongRow = store.acceptPrepared(wrongSchemaKey, activation, CONTEXT, null,
+          wrongSchema.nonce()).record();
+      store.start(wrongRow.id());
+      assertFalse(store.armInstallerGenerationSettingsRevision(wrongRow.id(), 4));
+
+      String key = OperationKeys.generate(CLOCK);
+      var prepared = new OperationStore.Preparation(UUID.randomUUID(), new OperationPreparedPayload(false,
+          "{\"preparation\":{\"replaySchema\":\"recorded-installer-generation-v2\"}}"));
+      store.savePreparation(key, activation, prepared);
+      var row = store.acceptPrepared(key, activation, CONTEXT, null, prepared.nonce()).record();
+      assertFalse(store.armInstallerGenerationSettingsRevision(row.id(), 4));
+      store.start(row.id());
+      assertFalse(store.armSettingsRevision(row.id(), 4));
+      assertTrue(store.armInstallerGenerationSettingsRevision(row.id(), 4));
+      assertTrue(store.armInstallerGenerationSettingsRevision(row.id(), 4),
+          "the same durable marker must survive a resumed activation attempt");
+      assertFalse(store.armInstallerGenerationSettingsRevision(row.id(), 5));
+    }
+    try (var reopened = new SqliteOperationStore(path)) {
+      var row = reopened.openRecords().stream()
+          .filter(candidate -> "core.activate-installed-models".equals(candidate.descriptor().operationRef())
+              && candidate.expectedSettingsRevision() != null)
+          .findFirst().orElseThrow();
+      assertEquals(4L, row.expectedSettingsRevision());
+      assertTrue(reopened.armInstallerGenerationSettingsRevision(row.id(), 4),
+          "the same revision must re-arm after process restart");
+      reopened.finish(row.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null));
+      assertFalse(reopened.armInstallerGenerationSettingsRevision(row.id(), 5));
     }
   }
 

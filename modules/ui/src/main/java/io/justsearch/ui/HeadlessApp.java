@@ -692,19 +692,12 @@ public class HeadlessApp {
     }
   }
 
-  private static ConfigPhaseResult resolveConfig() throws Exception {
+  private static ConfigPhaseResult resolveConfig(
+      io.justsearch.app.api.operations.OperationStore operations) throws Exception {
     var mode = io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.resolveMode();
     var settingsStore = new io.justsearch.app.services.settings.UiSettingsStore(mode);
     UiSettings settings = settingsStore.load();
 
-    if (settings.getLlamaLibPath() != null && !settings.getLlamaLibPath().isBlank()) {
-      // The last remaining settingsâ†’sysprop promotion, and a different shape from the ones retired:
-      // `llama.lib.path` is not a JustSearch config key at all (no EnvRegistry entry, no resolver
-      // key, no `.source` marker) â€” it is read by the llama.cpp JNI loader out of the raw system
-      // properties, so there is no ResolvedConfig for it to ride. Retiring it means giving it a
-      // config key first, which is a different change from this one.
-      SystemPropertyUtils.setSysPropIfBlank("llama.lib.path", settings.getLlamaLibPath());
-    }
     // Tempdoc 883 decision 4 + its Â§C.5c residue: there is no settingsâ†’sysprop promotion left here
     // for a resolver-backed key â€” not context-size (slice 1), not server.exe / exclude-patterns /
     // gpu.layers (slice 2), and no longer index.base_path or llm.model_path. Every one of those
@@ -713,6 +706,7 @@ public class HeadlessApp {
     // the ordinal chain, not by a sysprop write that made a GUI value report as `jvm_arg` and then
     // needed a `.source` marker to un-tell it.
 
+    loadPolicySources();
     ResolvedConfigBuilder rcBuilder = ResolvedConfig.builder();
     Path detectionRoot = io.justsearch.configuration.RepoRootLocator.findRepoRootOrNull();
     Map<String, String> autoDetected = io.justsearch.ort.GpuAutoDetection.probe(detectionRoot);
@@ -725,13 +719,30 @@ public class HeadlessApp {
     rcBuilder.contributeBaseSources();
     io.justsearch.app.services.config.ConfigStoreRebuilder.contributeUiSettings(rcBuilder, settings);
     ResolvedConfig resolvedConfig = rcBuilder.build();
+    // A committed recorded generation pointer owns settings roll-forward. Resolve it before any
+    // process-wide configuration or native/model path is installed for this incarnation.
+    UiSettings reconciled = io.justsearch.app.engine.EngineRoot.reconcileInstallerGenerationBoot(
+        operations, settingsStore, settings, resolvedConfig);
+    if (reconciled != settings) {
+      settings = reconciled;
+      autoDetected = augmentDerivedContextWindow(autoDetected, settings.configuredGpuLayers());
+      io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(autoDetected);
+      rcBuilder = ResolvedConfig.builder();
+      rcBuilder.contributeAutoDetected(autoDetected);
+      rcBuilder.contributeBaseSources();
+      io.justsearch.app.services.config.ConfigStoreRebuilder.contributeUiSettings(rcBuilder, settings);
+      resolvedConfig = rcBuilder.build();
+    }
+    if (settings.getLlamaLibPath() != null && !settings.getLlamaLibPath().isBlank()) {
+      // llama.lib.path is consumed directly by the JNI loader rather than the config resolver.
+      SystemPropertyUtils.setSysPropIfBlank("llama.lib.path", settings.getLlamaLibPath());
+    }
     // One process publication boundary is shared by configuration, component observations,
     // admission close, and the Engine owners composed later in this boot.
     var configStore = new ConfigStore(resolvedConfig,
         new java.util.concurrent.locks.ReentrantReadWriteLock());
     ConfigStore.setGlobal(configStore);
 
-    loadPolicySources();
     rebuildAfterPostBuildWrites(configStore, settings);
 
     Path autoServer = maybeAutoSelectCuda12Variant(settings, configStore);
@@ -1006,8 +1017,25 @@ public class HeadlessApp {
       // This validator uses System.exit on failure. Run it before any native-capable
       // asynchronous startup, while that exit is still safe for this incarnation.
       BootContractRunner.validateAll();
+      // The composite generation/settings recovery may replace settings before any model or
+      // Worker configuration is built. Hold the single-instance lock before opening its durable
+      // operation row or touching that settings file.
+      Path bootDataDir = PlatformPaths.resolveDataDir();
+      try {
+        appInstanceLock = new AppInstanceLock(bootDataDir);
+        appInstanceLock.acquire();
+      } catch (AppInstanceLock.AppInstanceLockException e) {
+        log.error("=== DATA DIRECTORY LOCKED ===");
+        log.error("Another JustSearch instance is already running for dataDir={}", bootDataDir);
+        log.error("Refusing to start. Stop the other instance first.");
+        log.error("Lock file: {}/app.lock", bootDataDir);
+        System.exit(io.justsearch.app.engine.EngineExit.DATA_DIR_LOCKED);
+        return;
+      }
+      operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
+          bootDataDir.resolve("operations.db"));
       // Phase 0: resolve config (tempdoc 502 Â§3.3)
-      ConfigPhaseResult configPhase = resolveConfig();
+      ConfigPhaseResult configPhase = resolveConfig(operations);
       settingsStore = configPhase.settingsStore();
       configStore = configPhase.configStore();
       // Tempdoc 882 item 24: snapshot the quarantine record NOW. buildApi() can save settings
@@ -1018,26 +1046,6 @@ public class HeadlessApp {
               io.justsearch.app.services.settings.UiSettingsStore.RecoveredFromCorrupt>
           settingsRecovery = settingsStore.lastRecovery();
 
-      // Tempdoc 501 Phase 3: acquire AppInstanceLock at the Head BEFORE binding HTTP or
-      // spawning the Worker. The lock is OS-level (FileChannel.tryLock) with PID+startedAt
-      // diagnostic metadata; only the OS lock decides exclusion â€” see AppInstanceLock.java.
-      // Acquiring here lifts the invariant from the Worker-only path into the producer,
-      // catching duplicate launches regardless of who started them (dev-runner, bare
-      // gradle run, manual java -cp, production launcher). KnowledgeServerBootstrap
-      // continues to call AppInstanceLock for the standalone-test paths but skips the
-      // acquire when this system property is set.
-      try {
-        appInstanceLock = new AppInstanceLock(configPhase.dataDir());
-        appInstanceLock.acquire();
-      } catch (AppInstanceLock.AppInstanceLockException e) {
-        log.error("=== DATA DIRECTORY LOCKED ===");
-        log.error("Another JustSearch instance is already running for dataDir={}",
-            configPhase.dataDir());
-        log.error("Refusing to start. Stop the other instance first.");
-        log.error("Lock file: {}/app.lock", configPhase.dataDir());
-        System.exit(io.justsearch.app.engine.EngineExit.DATA_DIR_LOCKED);
-        return;
-      }
 
       // Clear only the predecessor's request, while the instance lock proves no current Engine can
       // be writing one. Failure is fatal: publishing readiness with a stale live request would let
@@ -1090,8 +1098,6 @@ public class HeadlessApp {
       processResources = runtimeResources;
       var settingsComponents = new io.justsearch.app.services.settings.FixedSettingsComponentComposer(
           runtimeResources.components());
-      operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
-          configPhase.dataDir().resolve("operations.db"));
       final var resetSettingsStore = settingsStore;
       var settingsOwner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(
           resetSettingsStore, configStore, requestedRestartAction, candidate -> {

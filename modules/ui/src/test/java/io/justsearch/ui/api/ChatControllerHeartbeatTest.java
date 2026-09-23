@@ -77,7 +77,7 @@ final class ChatControllerHeartbeatTest {
               return null;
             })
         .when(engine)
-        .run(any(), any(), any(), any(), any());
+        .runScoped(any(), any(), any(), any(), any(), any());
 
     scheduler = Executors.newSingleThreadScheduledExecutor();
     ChatController controller =

@@ -28,13 +28,13 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p><b>What survives the collapse.</b> Blue/Green migration is a property of the <em>index</em>,
  * not of the process pair: a building generation is created, the enumerator fills it, the pointer
- * in {@code state.json} is promoted, the previous generation is remembered, and a rollback puts the
- * pointer back — all of it inside {@code IndexGenerationManager}
+ * in {@code state.json} is promoted and the previous generation is remembered until retired —
+ * all of it inside {@code IndexGenerationManager}
  * ({@code modules/worker-core/.../index/IndexGenerationManager.java}). None of that needed a second
  * process; the retired tests only used one because that was the only way to reach the index at all.
  *
  * <p><b>What "the worker restarted" becomes — corrected at the stage-A checkpoint.</b> The retired
- * tests drove the restart directly: {@code startMigration}/{@code rollbackMigration} set
+ * tests drove the restart directly: migration controls set
  * {@code restart_worker=true}, the worker exited, and the test called {@code spawnWorker()} again.
  * An earlier version of this comment said the Engine equivalent was
  * {@code KnowledgeServer#initiateShutdown} — "a latch countdown, not a {@code System.exit}" — with
@@ -160,7 +160,7 @@ final class EngineMigrationLifecycleTest {
     assertEquals(
         activeBefore,
         after.getMigration().getPreviousGenerationId(),
-        "the old active generation must be remembered as previous — this is what rollback needs");
+        "the old active generation must be remembered until its serving holders retire");
 
     assertTrue(
         engine.awaitSearchable(marker, 120_000),
@@ -248,8 +248,8 @@ final class EngineMigrationLifecycleTest {
   }
 
   @Test
-  @DisplayName("rollback returns the active generation to the previous one and search still works")
-  void rollbackRevertsTheGenerationPointer(@TempDir Path tempDir) throws Exception {
+  @DisplayName("directory rollback is refused while the promoted generation keeps serving")
+  void rollbackCannotRevertThePublishedGeneration(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
     Path docsDir = dataDir.resolve("rollback-root");
     Files.createDirectories(docsDir);
@@ -287,22 +287,15 @@ final class EngineMigrationLifecycleTest {
         afterCutover.getMigration().getPreviousGenerationId(),
         "previous must be the old active generation");
 
-    assertTrue(engine.client().rollbackMigration(TestEngineContexts.FOREGROUND).accepted(), "rollback must be accepted");
-    engine.restart();
-
-    StatusResponse afterRollback = awaitActiveGeneration(activeBefore, 60_000);
-    assertEquals(
-        activeBefore,
-        afterRollback.getMigration().getActiveGenerationId(),
-        "rollback must put the active pointer back to the pre-cutover generation");
-    assertEquals(
-        activeAfterCutover,
-        afterRollback.getMigration().getPreviousGenerationId(),
-        "and the two pointers must have swapped, not merely reset");
+    assertFalse(engine.client().rollbackMigration(TestEngineContexts.FOREGROUND).accepted(),
+        "a published generation cannot be rolled back by pointer-only control");
+    StatusResponse afterRollback = awaitActiveGeneration(activeAfterCutover, 60_000);
+    assertEquals(activeAfterCutover, afterRollback.getMigration().getActiveGenerationId(),
+        "refused rollback must preserve the published pointer");
 
     assertTrue(
         engine.awaitSearchable(marker, 120_000),
-        "the marker must still be findable after the rollback");
+        "the marker must still be findable after the refused rollback");
   }
 
   @Test

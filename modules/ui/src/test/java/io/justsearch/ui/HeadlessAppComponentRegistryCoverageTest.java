@@ -158,6 +158,8 @@ final class HeadlessAppComponentRegistryCoverageTest {
       var workerCapability = new RegistryBackedCapability(root.components(), "index", "worker");
       io.justsearch.ui.api.BootstrapLeaseFixtures.bind(knowledgeServer, client);
       org.mockito.Mockito.when(knowledgeServer.hasClient()).thenReturn(true);
+      org.mockito.Mockito.when(knowledgeServer.publicationLock())
+          .thenReturn(store.publicationLock());
       org.mockito.Mockito.when(knowledgeServer.workerCapability()).thenReturn(workerCapability);
       org.mockito.Mockito.when(knowledgeServer.gpuScheduling())
           .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());

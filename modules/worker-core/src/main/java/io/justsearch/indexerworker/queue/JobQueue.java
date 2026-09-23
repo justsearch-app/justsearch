@@ -956,6 +956,11 @@ public interface JobQueue extends Closeable {
     return new JobStateCounts(depth, depth, 0L, completed, fs.failedCount());
   }
 
+  /** Exact final-cutover count; an implementation without a strict read cannot certify drain. */
+  default JobStateCounts jobStateCountsStrict() {
+    throw new UnsupportedOperationException("Strict job-state counts are unavailable");
+  }
+
   // --- Targeted delete operations ---
 
   /**

@@ -131,6 +131,7 @@ final class McpErrorLegibilityTest {
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
+    McpAnswerCaptureFixture.bind(facade, documents);
     McpToolSurface surface =
         new McpToolSurface(
             List.of(OperationCatalog.of("core", List.of())),
@@ -273,6 +274,7 @@ final class McpErrorLegibilityTest {
           .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(asyncFailure));
       HeadAssembly facade = mock(HeadAssembly.class);
       when(facade.workers()).thenReturn(new WorkerServices(null, documents, null, null, null));
+      McpAnswerCaptureFixture.bind(facade, documents);
       McpToolSurface surface = new McpToolSurface(
           List.of(OperationCatalog.of("core", List.of())), mock(OperationDispatcher.class),
           () -> null, () -> facade, FIXED_CLOCK);

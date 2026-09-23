@@ -5,6 +5,7 @@ import io.justsearch.app.api.AiInstallService;
 import io.justsearch.app.api.BrainInstallService;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -23,6 +24,12 @@ public final class BrainInstallServiceImpl implements BrainInstallService {
 
   public BrainInstallServiceImpl(AiInstallService helper) {
     this.helper = Objects.requireNonNull(helper, "helper");
+  }
+
+  @Override
+  public Optional<AiInstallService.InstalledGenerationCandidate>
+      prepareInstalledGenerationCandidate() {
+    return helper.prepareInstalledGenerationCandidate();
   }
 
   @Override

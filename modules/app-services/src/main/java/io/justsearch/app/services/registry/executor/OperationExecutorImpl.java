@@ -437,7 +437,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         throw preparationUnavailable();
       }
       if (pending.isPresent()) return persistedPlan(op, stable, pending.get());
-      PreparedInvocation invocation = prepareInvocation(op, argumentsJson, provenance, context, undoId);
+      PreparedInvocation invocation = prepareInvocation(
+          op, argumentsJson, provenance, context, undoId, stable.key());
       if (invocation.value() == null || invocation.value().replaySchema() == null) {
         return new InvocationPlan(stable, invocation, null, false);
       }
@@ -467,8 +468,15 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     }
     var execution = new OperationAttemptRunner.Request(request.key(), request.descriptor(), origin, envelope.provenance(), request.historyMode());
     var handler = resolveHandler(op);
-    handler.validatePreparation(envelope.preparation());
-    return new InvocationPlan(execution, new PreparedInvocation(handler, envelope.preparation(), null, null), pending, false);
+    OperationPreparation preparation = envelope.preparation();
+    if (io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.SCHEMA.equals(
+        preparation.replaySchema())
+        && !io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.continuationPreparation(
+            op, preparation, request.key())) {
+      throw preparationUnavailable();
+    }
+    handler.validatePreparation(preparation);
+    return new InvocationPlan(execution, new PreparedInvocation(handler, preparation, null, null), pending, false);
   }
 
   private static io.justsearch.app.api.operations.OperationStoreException preparationUnavailable() {
@@ -598,7 +606,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   }
 
   private PreparedInvocation prepareInvocation(Operation op, String argumentsJson,
-      InvocationProvenance provenance, EngineContext context, String undoId) {
+      InvocationProvenance provenance, EngineContext context, String undoId, String operationKey) {
     try {
       if (undoId == null) {
         var invalid = inputValidator.validate(op, argumentsJson);
@@ -615,6 +623,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       if (!argumentsJson.equals(value.argumentsJson())) {
         throw new IllegalArgumentException("Preparation must retain the public arguments unchanged");
       }
+      value = io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.bindOperationKey(
+          op, value, operationKey);
       handler.validatePreparation(value);
       return new PreparedInvocation(handler, value, null, null);
     } catch (OperationPreparationRefused refusal) {
@@ -953,7 +963,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
           publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED));
           if (preparationNonce != null
-              && io.justsearch.app.api.operations.RecordedBulkPlan.continuationPreparation(op, prepared)) {
+              && continuationPreparation(op, prepared, operationKey)) {
             return new OperationAuthorizationBasis.PreparedContinuation(operationKey, preparationNonce);
           }
           return new OperationAuthorizationBasis.EphemeralCapsule();
@@ -970,6 +980,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       }
     }
     throw new IllegalStateException("Unhandled trust gate");
+  }
+
+  private static boolean continuationPreparation(Operation operation,
+      OperationPreparation preparation, String operationKey) {
+    return io.justsearch.app.api.operations.RecordedBulkPlan.continuationPreparation(
+        operation, preparation)
+        || io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.continuationPreparation(
+            operation, preparation, operationKey);
   }
 
   /**

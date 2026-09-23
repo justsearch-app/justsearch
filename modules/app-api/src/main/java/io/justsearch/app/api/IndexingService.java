@@ -222,6 +222,12 @@ public interface IndexingService {
     throw new UnsupportedOperationException("Index target capture unavailable");
   }
 
+  /** Worker-owned physical target for a detached configuration while the current view serves. */
+  default IndexTargetSnapshot captureCandidateIndexTarget(
+      io.justsearch.configuration.resolved.ResolvedConfig candidate, EngineContext engineContext) {
+    throw new UnsupportedOperationException("Candidate index target capture unavailable");
+  }
+
   /**
    * Tempdoc 626 §Recency (Move C) — verify/reconcile a SINGLE watched root identified by its {@code
    * pathHash} (the privacy-safe wire identifier — ADR-0028; raw paths never cross the wire). The

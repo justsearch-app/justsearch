@@ -53,6 +53,16 @@ import org.slf4j.Logger;
 public final class KnowledgeServerMigrationOps {
   private KnowledgeServerMigrationOps() {}
 
+  @FunctionalInterface
+  public interface CheckedSwitchingTransition {
+    void run() throws IOException, InterruptedException;
+  }
+
+  @FunctionalInterface
+  public interface CheckedLiveCutover {
+    IndexGenerationManager.State promote() throws IOException, InterruptedException;
+  }
+
   public record CutoverContext(
       IndexGenerationManager indexGenerationManager,
       JobQueue jobQueue,
@@ -78,7 +88,41 @@ public final class KnowledgeServerMigrationOps {
       Runnable requestedRestartAction,
       Path dataDir,
       Logger log,
-      io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion) {
+      io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion,
+      CheckedSwitchingTransition switchingTransition,
+      CheckedLiveCutover liveCutover) {
+    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
+        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
+        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
+        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
+        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
+        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
+        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
+        io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion,
+        CheckedSwitchingTransition switchingTransition) {
+      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
+          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
+          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
+          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
+          flushTelemetryAction, requestedRestartAction, dataDir, log, promotion,
+          switchingTransition, null);
+    }
+    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
+        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
+        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
+        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
+        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
+        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
+        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
+        io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion) {
+      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
+          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
+          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
+          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
+          flushTelemetryAction, requestedRestartAction, dataDir, log, promotion,
+          () -> indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING), null);
+    }
+
     public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
         BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
         Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
@@ -90,7 +134,8 @@ public final class KnowledgeServerMigrationOps {
           migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
           migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
           finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
-          flushTelemetryAction, requestedRestartAction, dataDir, log, indexGenerationManager::promoteBuildingGenerationToActive);
+          flushTelemetryAction, requestedRestartAction, dataDir, log,
+          indexGenerationManager::promoteBuildingGenerationToActive);
     }
   }
 
@@ -108,7 +153,17 @@ public final class KnowledgeServerMigrationOps {
       // time a buffered VDU_UPDATE regenerates chunks — a drain can span a config change.
       BooleanSupplier chunkSpladeEnabledSupplier,
       BooleanSupplier vduReplayAllowed,
-      Logger log) {}
+      Logger log,
+      long deadlineNanos) {
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          Long.MAX_VALUE);
+    }
+  }
 
   public record EnqueueContext(
       List<Path> roots,
@@ -176,9 +231,7 @@ public final class KnowledgeServerMigrationOps {
           context.log().info(
               "Migration nearing completion (queueDepth={}). Entering SWITCHING cutover fence...",
               depth);
-          context
-              .indexGenerationManager()
-              .updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+          context.switchingTransition().run();
           Thread.sleep(250);
           continue;
         }
@@ -264,6 +317,17 @@ public final class KnowledgeServerMigrationOps {
           continue;
         }
 
+        if (context.liveCutover() != null) {
+          IndexGenerationManager.State promoted = context.liveCutover().promote();
+          if (promoted == null) {
+            Thread.sleep(250);
+            continue;
+          }
+          context.log().info("Migration promoted generation {} without restarting the Engine",
+              promoted.active_generation());
+          return;
+        }
+
         try {
           // Tempdoc 598 review Fix E: finalize the embedding rebuild on this (drained) green BEFORE
           // the COMPLETE commit. This deterministically flips the ECC to COMPATIBLE iff the green is
@@ -347,6 +411,12 @@ public final class KnowledgeServerMigrationOps {
    */
   public static boolean verifyGreenCommitMetadataBestEffort(
       LuceneRuntime ingestLifecycle, String expectedEmbeddingFp, Logger log) {
+    return verifyGreenCommitMetadataBestEffort(ingestLifecycle, null, expectedEmbeddingFp, log);
+  }
+
+  /** A recorded Green verifies against its frozen candidate target, not A's global providers. */
+  public static boolean verifyGreenCommitMetadataBestEffort(
+      LuceneRuntime ingestLifecycle, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
     try {
       if (ingestLifecycle == null) {
         return false;
@@ -356,7 +426,7 @@ public final class KnowledgeServerMigrationOps {
         return true;
       }
       return verifyGreenMetadata(
-          ingestLifecycle.latestCommitUserDataBestEffort(), expectedEmbeddingFp, log);
+          ingestLifecycle.latestCommitUserDataBestEffort(), expectedIndexFp, expectedEmbeddingFp, log);
     } catch (Exception e) {
       log.warn("Green verification failed (best-effort): {}", e.getMessage());
       return false;
@@ -369,14 +439,16 @@ public final class KnowledgeServerMigrationOps {
    * index-fingerprint / embedding-fp rules can be unit-tested without a (sealed) {@link LuceneRuntime} double.
    */
   static boolean verifyGreenMetadata(
-      Map<String, String> ud, String expectedEmbeddingFp, Logger log) {
+      Map<String, String> ud, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
     String buildState = ud.get("build_state");
     if (!"COMPLETE".equalsIgnoreCase(buildState)) {
       log.warn("Green verification failed: build_state={} (expected COMPLETE)", buildState);
       return false;
     }
     String committedFingerprint = ud.get(IndexFingerprint.COMMIT_META_KEY);
-    Object expectedRaw = new SsotCommitMetadataSource().build().get(IndexFingerprint.COMMIT_META_KEY);
+    Object expectedRaw = expectedIndexFp == null
+        ? new SsotCommitMetadataSource().build().get(IndexFingerprint.COMMIT_META_KEY)
+        : expectedIndexFp;
     String expectedFingerprint = expectedRaw == null ? null : String.valueOf(expectedRaw);
     if (committedFingerprint == null || committedFingerprint.isBlank()) {
       log.warn("Green verification failed: committed index_fingerprint is missing");
@@ -461,14 +533,76 @@ public final class KnowledgeServerMigrationOps {
   }
 
   public static void drainSwitchBufferBestEffort(DrainSwitchBufferContext context) {
+    drainSwitchBuffer(context, false, true);
+  }
+
+  /** The final fence must observe an exact, wholly applied replay before it may promote. */
+  public static boolean drainSwitchBufferStrict(DrainSwitchBufferContext context) {
+    return drainSwitchBuffer(context, true, true).applied();
+  }
+
+  /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
+  public record StrictReplay(List<SwitchBufferCapableQueue.SwitchBufferOp> versions) {
+    public StrictReplay { versions = List.copyOf(versions); }
+  }
+
+  private record ReplayOutcome(boolean applied, List<SwitchBufferCapableQueue.SwitchBufferOp> versions) {}
+
+  public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
+      DrainSwitchBufferContext context) {
+    var result = drainSwitchBuffer(context, true, false);
+    return result.applied() ? java.util.Optional.of(new StrictReplay(result.versions()))
+        : java.util.Optional.empty();
+  }
+
+  /** Remove only the exact applied versions after B is durably committed. */
+  public static boolean finishPromotedSwitchReplay(JobQueue queue, StrictReplay replay) {
+    if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
+    if (replay.versions().isEmpty()) return true;
+    try { return sbq.removeReplayedSwitchBufferOps(replay.versions()) == replay.versions().size(); }
+    catch (RuntimeException unavailable) { return false; }
+  }
+
+  /**
+   * A strict PROMOTED boot proves the pre-pointer replay and Green commit already completed.
+   * Admission stayed fenced until cleanup was certified, so retained versions need only exact
+   * deletion; re-enqueueing them would create new, untracked work after the recorded settlement.
+   */
+  public static boolean finishCommittedBootSwitchReplay(JobQueue queue) {
+    if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
+    try {
+      return finishPromotedSwitchReplay(queue, new StrictReplay(sbq.listSwitchBufferOpsStrict()))
+          && switchBufferEmptyStrict(queue);
+    } catch (RuntimeException unreadable) {
+      return false;
+    }
+  }
+
+  /** No post-snapshot versions may remain while the final mutation admission fence is held. */
+  public static boolean switchBufferEmptyStrict(JobQueue queue) {
+    if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
+    try { return sbq.listSwitchBufferOpsStrict().isEmpty(); }
+    catch (RuntimeException unreadable) { return false; }
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay) {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
-      return;
+      return new ReplayOutcome(false, List.of());
     }
     boolean allowVdu = context.vduReplayAllowed().getAsBoolean();
-    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = sbq.listSwitchBufferOps().stream()
+    List<SwitchBufferCapableQueue.SwitchBufferOp> allOps;
+    try {
+      allOps = exactRead ? sbq.listSwitchBufferOpsStrict() : sbq.listSwitchBufferOps();
+    } catch (RuntimeException unreadable) {
+      context.log().warn("Switch buffer cannot certify final replay", unreadable);
+      return new ReplayOutcome(false, List.of());
+    }
+    boolean deferredVdu = !allowVdu && allOps.stream().anyMatch(op -> isVduBufferKind(op.op()));
+    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = allOps.stream()
         .filter(op -> allowVdu || !isVduBufferKind(op.op())).toList();
     if (ops.isEmpty()) {
-      return;
+      return new ReplayOutcome(!deferredVdu, List.of());
     }
     context.log().info("Draining {} buffered ops from durable switch buffer...", ops.size());
 
@@ -483,6 +617,17 @@ public final class KnowledgeServerMigrationOps {
       }
       String kind = op.op().trim().toUpperCase(Locale.ROOT);
       String payload = op.payload();
+      // Enqueue a preceding UPSERT before applying a later delete or prefix mutation. The
+      // switch buffer is version ordered; delaying every UPSERT until the end resurrects paths
+      // that a later DELETE_PREFIX removed.
+      if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
+        if (!enqueueBufferedUpserts(context, toEnqueue)
+            || (exactRead && !awaitQueuedUpserts(context))) {
+          context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
+          return new ReplayOutcome(false, List.of());
+        }
+        toEnqueue.clear();
+      }
       if (payload.isBlank() || (!"UPSERT".equals(kind) && context.ingestLifecycle() == null)) {
         allApplied = false;
         continue;
@@ -736,6 +881,12 @@ public final class KnowledgeServerMigrationOps {
                         r.getError());
               } else {
                 context.log().info("Replayed buffered SYNC_ROOT: root={} force={}", rootPath, force);
+                // Enumeration may enqueue a file that the Green loop has already claimed. A
+                // subsequent direct DELETE_PREFIX must wait for that writer, not merely remove its
+                // queue row while it can still publish a late Lucene write.
+                if (exactRead && !awaitQueuedUpserts(context)) {
+                  return new ReplayOutcome(false, List.of());
+                }
               }
             } catch (Exception e) {
               allApplied = false;
@@ -783,16 +934,7 @@ public final class KnowledgeServerMigrationOps {
       }
     }
 
-    if (!toEnqueue.isEmpty()) {
-      int enqueued = 0;
-      for (var upsert : toEnqueue) {
-        int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
-        enqueued += accepted;
-        // A refused enqueue must leave the durable buffer available for the next replay.
-        if (accepted != 1) allApplied = false;
-      }
-      context.log().info("Enqueued {} buffered UPSERT ops back into the job queue", enqueued);
-    }
+    if (!toEnqueue.isEmpty()) allApplied &= enqueueBufferedUpserts(context, toEnqueue);
 
     if (mutatedLucene && context.ingestLifecycle() != null) {
       try {
@@ -816,16 +958,59 @@ public final class KnowledgeServerMigrationOps {
       allApplied = false;
       context.log().warn("Serving generation changed during VDU replay; retaining snapshot for retry");
     }
-    if (allApplied) {
+    boolean removed = false;
+    if (allApplied && removeAfterReplay) {
       try {
         int cleared = sbq.removeReplayedSwitchBufferOps(ops);
         context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
+        removed = cleared == ops.size();
       } catch (IllegalStateException failure) {
         context.log().warn("Failed to remove committed buffer versions; retaining for retry", failure);
       }
-    } else {
+    } else if (!allApplied) {
       context.log().warn("Not clearing switch buffer because one or more buffered ops failed to replay");
     }
+    return new ReplayOutcome(allApplied && (removed || !removeAfterReplay) && !deferredVdu,
+        allApplied ? ops : List.of());
+  }
+
+  /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */
+  private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context) {
+    // All replay barriers consume the same SWITCHING budget. Returning early would re-enqueue
+    // retained UPSERT versions on the next attempt, possibly resetting a claimed write.
+    long deadline = context.deadlineNanos();
+    try {
+      while (true) {
+        JobQueue.JobStateCounts counts = context.jobQueue().jobStateCountsStrict();
+        if (counts.processingCount() == 0 && counts.pendingCount() == 0) return true;
+        if (System.nanoTime() >= deadline) return false;
+        Thread.sleep(50);
+      }
+    } catch (RuntimeException unavailable) {
+      context.log().warn("Cannot certify buffered UPSERT settlement", unavailable);
+      return false;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
+
+  private static boolean enqueueBufferedUpserts(DrainSwitchBufferContext context,
+      List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> upserts) {
+    boolean complete = true;
+    int enqueued = 0;
+    for (var upsert : upserts) {
+      try {
+        int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
+        enqueued += accepted;
+        if (accepted != 1) complete = false;
+      } catch (RuntimeException unavailable) {
+        complete = false;
+        context.log().warn("Buffered UPSERT enqueue failed; retaining replay versions", unavailable);
+      }
+    }
+    context.log().info("Enqueued {} buffered UPSERT ops back into the job queue", enqueued);
+    return complete;
   }
 
   private static boolean isVduBufferKind(String kind) {

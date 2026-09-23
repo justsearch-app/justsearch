@@ -6,6 +6,7 @@ import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import java.io.IOException;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.agent.api.registry.OperationKind;
@@ -156,7 +157,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       if (!this.ownedKinds.containsAll(Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE))) {
         throw new IllegalArgumentException("Settings owner requires both settings kinds");
       }
-      var settingsRows = interrupted.stream().filter(row -> settingsKind(row.descriptor().kind())).toList();
+      var settingsRows = interrupted.stream().filter(OperationAttemptRunnerImpl::settingsOwned).toList();
       // More than one armed row is already unresolved; do not load up to the entire row cap's
       // private payloads merely to reach that verdict. Only the sole armed row can need decoding.
       boolean soleArmed = settingsRows.stream().filter(row -> row.expectedSettingsRevision() != null).limit(2).count() == 1;
@@ -381,9 +382,90 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     String phase = switch (boundary) {
       case PARTIAL_CAPTURE -> "bulk-partial-capture";
       case AFTER_PROMOTION -> "bulk-after-promotion";
+      case INSTALLER_BEFORE_MARKER -> "installer-before-marker";
+      case INSTALLER_BEFORE_ARM -> "installer-before-arm";
+      case INSTALLER_BEFORE_POINTER -> "installer-before-pointer";
+      case INSTALLER_POINTER_BEFORE_SETTINGS -> "installer-pointer-before-settings";
+      case INSTALLER_SETTINGS_BEFORE_PUBLICATION -> "installer-settings-before-publication";
+      case INSTALLER_BEFORE_RECEIPT -> "installer-before-receipt";
     };
     faultHook.accept(new FaultBoundary(phase, control.kind, control.key, control.key,
         control.id, null, 0, 0));
+  }
+
+  @Override
+  public SettingsCommitOwner.PreparedGenerationProjection prepareInstallerGenerationProjection(
+      OperationRecordHandle handle,
+      io.justsearch.app.api.operations.RecordedInstallerGenerationPlan plan,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    Objects.requireNonNull(plan, "plan");
+    Objects.requireNonNull(work, "work");
+    if (settingsOwner == null || !(handle instanceof OperationAttemptRunnerImpl.Control control)
+        || control.owner != this || control.kind != OperationKind.REINDEX
+        || !control.started.get() || control.done.isDone() || active.get(control.id) != control) {
+      throw new IllegalArgumentException("Installer projection requires this runner's live reindex capability");
+    }
+    OperationRecord row = current(control);
+    if (row.state() != OperationState.RUNNING
+        || !io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.OPERATION_ID
+            .equals(row.descriptor().operationRef())
+        || !row.key().equals(plan.operationKey())) {
+      throw new IllegalArgumentException("Installer projection differs from its running operation");
+    }
+    if (!control.settingsStarted.compareAndSet(false, true)) {
+      throw new IllegalStateException("Installer settings projection already attempted");
+    }
+    var cancellation = work.onCancel(ignored -> {
+      synchronized (control) { control.settingsCancellationRequested = true; }
+    });
+    SettingsCommitOwner.PreparedGenerationProjection prepared = null;
+    try {
+      settingsOwner.verifyInstallerGenerationPreparation(row, store.acceptedPreparation(row.id()), plan);
+      var reservation = settingsOwner.reserve(row.id(), row.key(), plan.settingsWitness());
+      long expectedRevision = reservation.expectedRevision();
+      if (expectedRevision != plan.settingsWitness().acceptedRevision()) {
+        throw new IllegalArgumentException("Installer settings reservation differs from its accepted witness");
+      }
+      control.settingsExpected = expectedRevision;
+      io.justsearch.app.api.UiSettings candidate = tools.jackson.databind.json.JsonMapper.builder().build()
+          .readValue(plan.candidateSettings().canonicalJson(), io.justsearch.app.api.UiSettings.class);
+      prepared = settingsOwner.prepareInstallerGenerationProjection(
+          reservation, candidate, control.settingsControl);
+      observeBulkBoundary(handle, BulkBoundary.INSTALLER_BEFORE_MARKER);
+      if (!store.armInstallerGenerationSettingsRevision(row.id(), expectedRevision)) {
+        throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+      }
+      var projection = prepared;
+      return new SettingsCommitOwner.PreparedGenerationProjection() {
+        @Override public void withOwnerLocks(Runnable publication) { projection.withOwnerLocks(publication); }
+        @Override public void admitBeforePointer() { projection.admitBeforePointer(); }
+        @Override public void afterPointerCommitted() throws IOException {
+          try { projection.afterPointerCommitted(); }
+          finally { cancellation.close(); }
+        }
+        @Override public void afterRuntimePublished() { projection.afterRuntimePublished(); }
+        @Override public void abortBeforePointer() {
+          try { projection.abortBeforePointer(); }
+          finally { cancellation.close(); }
+        }
+      };
+    } catch (RuntimeException | Error failure) {
+      cancellation.close();
+      if (prepared != null) {
+        try { prepared.abortBeforePointer(); }
+        catch (RuntimeException | Error cleanupFailure) {
+          control.settingsUncertain = true;
+          failure.addSuppressed(cleanupFailure);
+        }
+      }
+      if (control.settingsUncertain) fatalSettings(control, failure);
+      throw failure;
+    }
+  }
+
+  @Override public boolean installerGenerationProjected(
+      io.justsearch.app.api.operations.RecordedInstallerGenerationPlan plan) {
+    return settingsOwner != null && settingsOwner.installerGenerationProjected(plan);
   }
 
   @Override
@@ -665,6 +747,12 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     return kind == OperationKind.SETTINGS_APPLY || kind == OperationKind.RECONFIGURE;
   }
 
+  private static boolean settingsOwned(OperationRecord row) {
+    return settingsKind(row.descriptor().kind()) || row.descriptor().kind() == OperationKind.REINDEX
+        && io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.OPERATION_ID
+            .equals(row.descriptor().operationRef());
+  }
+
   private static OperationResult settingsResponse(SettingsCommitOwner.Receipt receipt) {
     return receipt.response();
   }
@@ -769,7 +857,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     try {
       OperationRecord row = store.finish(control.id, state, receipt).orElseThrow(
           () -> new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null));
-      if (settingsOwner != null && settingsKind(row.descriptor().kind())) {
+      if (settingsOwner != null && settingsOwned(row)) {
         settingsOwner.releaseAfterTerminal(control.id);
       }
       publishIfTerminal(control, row);
@@ -839,7 +927,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     Map<String, Object> data = new java.util.LinkedHashMap<>(Map.of("operationKey", row.key(),
         "operationRecordId", row.id(), "state", row.state().name(),
         "unitsCompleted", row.unitsCompleted(), "unitsFailed", row.unitsFailed()));
-    if (row.state() == OperationState.COMPLETE && settingsKind(row.descriptor().kind())
+    if (row.state() == OperationState.COMPLETE && settingsOwned(row)
         && row.expectedSettingsRevision() != null) {
       data.put("acceptedRevision", Math.addExact(row.expectedSettingsRevision(), 1));
       data.put("witness", new SettingsWitness(Math.addExact(row.expectedSettingsRevision(), 1), row.key()));
@@ -920,7 +1008,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     private volatile Runnable releaseBody;
     private Control(OperationRecord row) {
       id = row.id(); key = row.key(); kind = row.descriptor().kind();
-      settingsRecovery = settingsKind(row.descriptor().kind()) && row.expectedSettingsRevision() != null;
+      settingsRecovery = settingsOwned(row) && row.expectedSettingsRevision() != null;
     }
     @Override public long id() { return id; }
     @Override public String key() { return key; }

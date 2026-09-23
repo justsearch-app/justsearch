@@ -3,6 +3,8 @@ package io.justsearch.indexerworker.server;
 
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
@@ -13,6 +15,21 @@ public interface RecordedIngestionLifecycle {
   /** Observe application authority once, before generation fallback or any writable runtime opens. */
   default IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) throws IOException {
     return new IndexGenerationManager.BootOwnership.Native();
+  }
+
+  /**
+   * The accepted installer candidate for an exact recorded boot. Empty means an ordinary bulk
+   * plan. A malformed or drifting installer plan must throw and fence boot rather than select A.
+   */
+  default Optional<RecordedCandidate> recordedCandidate(String operationKey) throws IOException {
+    return Optional.empty();
+  }
+
+  record RecordedCandidate(ResolvedConfig configuration, IndexTargetSnapshot target) {
+    public RecordedCandidate {
+      java.util.Objects.requireNonNull(configuration, "configuration");
+      java.util.Objects.requireNonNull(target, "target");
+    }
   }
 
   /** Bounded owner readiness before recorded cutover can advance phase or commit Green. */
@@ -28,14 +45,57 @@ public interface RecordedIngestionLifecycle {
     IndexGenerationManager.State promote() throws IOException;
   }
 
+  /** Prepared settings projection for a typed activation. Physical publication calls it in order. */
+  @FunctionalInterface
+  interface CommittedProjection {
+    default void admitBeforePointer() {}
+    void afterPointerCommitted() throws IOException;
+    default void afterRuntimePublished() {}
+    default void abortBeforePointer() {}
+  }
+
+  /** Settings owner locks wrap only the short physical pointer/publication cut. */
+  interface PreparedCompositeProjection {
+    IndexGenerationManager.State withOwnerLocks(CheckedPromotion promotion) throws IOException;
+    CommittedProjection callbacks();
+    void abortBeforePointer();
+  }
+
+  /** Prepare outside runtime/generation/publication locks after Green's final replay. */
+  default PreparedCompositeProjection prepareRecordedGenerationProjection(
+      String operationKey, JobQueue queue) throws IOException {
+    return new PreparedCompositeProjection() {
+      private final CommittedProjection empty = () -> {};
+      @Override public IndexGenerationManager.State withOwnerLocks(CheckedPromotion promotion)
+          throws IOException { return promotion.promote(); }
+      @Override public CommittedProjection callbacks() { return empty; }
+      @Override public void abortBeforePointer() {}
+    };
+  }
+
+  @FunctionalInterface
+  interface CheckedCompositePromotion {
+    IndexGenerationManager.State promote(CommittedProjection projection) throws IOException;
+  }
+
   /** The application owner serializes cancellation, settlement and the supplied exact promotion. */
   default IndexGenerationManager.State promoteRecordedGeneration(String operationKey, JobQueue queue,
       CheckedPromotion promotion) throws IOException {
     return null;
   }
 
+  /** Legacy bulk uses an empty projection; the installer owner supplies its accepted settings. */
+  default IndexGenerationManager.State promoteRecordedGenerationWithProjection(
+      String operationKey, JobQueue queue, CheckedCompositePromotion promotion) throws IOException {
+    return promoteRecordedGeneration(operationKey, queue,
+        () -> promotion.promote(() -> {}));
+  }
+
   /** Bounded current permission check under the queue lock; never call jobs or operation storage. */
   JobQueue.RecordedClaimDecision recordedClaimDecision(String operationKey);
+
+  /** Terminal committed generation evidence; used only to retire its closed predecessor. */
+  default boolean committedBulkTerminal(String operationKey) { return false; }
 
   /**
    * Called after runtime/services/compatibility initialization and before recovery or polling.
@@ -48,7 +108,14 @@ public interface RecordedIngestionLifecycle {
 
   /** Dynamic strict state plus the actual runtime binding; it does not grant application authority. */
   record BulkRuntime(IndexGenerationManager.BootDisposition disposition, String activeGeneration,
-      String buildingGeneration, String migrationState, String writableGeneration, boolean promotedBoot) {}
+      String buildingGeneration, String migrationState, String writableGeneration, boolean promotedBoot,
+      boolean promotedReplaySettled) {
+    public BulkRuntime(IndexGenerationManager.BootDisposition disposition, String activeGeneration,
+        String buildingGeneration, String migrationState, String writableGeneration, boolean promotedBoot) {
+      this(disposition, activeGeneration, buildingGeneration, migrationState, writableGeneration,
+          promotedBoot, true);
+    }
+  }
 
   @FunctionalInterface
   interface CheckedBulkRuntime {

@@ -88,6 +88,19 @@ final class WorkerIngestCalls implements IngestServiceCalls {
     return service.captureIndexTarget(ctx);
   }
 
+  @Override public io.justsearch.app.api.operations.IndexTargetSnapshot captureCandidateIndexTarget(
+      io.justsearch.configuration.resolved.ResolvedConfig candidate) {
+    if (ctx.cancelled()) throw io.justsearch.indexerworker.services.WorkerServiceException.cancelled(
+        "Candidate target capture cancelled");
+    try {
+      return io.justsearch.indexerworker.services.CandidateIndexTargetCapture.capture(candidate);
+    } catch (java.io.IOException unavailable) {
+      throw new io.justsearch.indexerworker.services.WorkerServiceException(
+          io.justsearch.indexerworker.services.WorkerServiceException.Status.UNAVAILABLE,
+          "Candidate target inputs cannot be read", unavailable);
+    }
+  }
+
   @Override
   public io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request) {
     return service.markVduProcessing(request, ctx);

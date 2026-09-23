@@ -40,6 +40,11 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
   List<SwitchBufferOp> listSwitchBufferOps();
 
+  /** Final cutover requires an exact read; implementations without one refuse promotion. */
+  default List<SwitchBufferOp> listSwitchBufferOpsStrict() {
+    throw new UnsupportedOperationException("Strict switch-buffer listing is unavailable");
+  }
+
   /**
    * Removes only unchanged versions from a successfully committed replay snapshot.
    * Concurrent insertions/replacements survive, including identical payloads/timestamps.

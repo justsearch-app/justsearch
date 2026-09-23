@@ -171,6 +171,12 @@ final class ValidatorRunnerTest {
         new io.justsearch.app.services.registry.operations.handlers.StartAiInstallHandler(
             () -> null));
     handlers.register(
+        CoreOperationCatalog.ACTIVATE_INSTALLED_MODELS,
+        new io.justsearch.app.services.registry.operations.handlers.ActivateInstalledModelsHandler(
+            () -> null,
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            ignored -> List.of(), io.justsearch.app.api.IndexingService::unavailable, List::of));
+    handlers.register(
         CoreOperationCatalog.CANCEL_AI_INSTALL,
         new io.justsearch.app.services.registry.operations.handlers.CancelAiInstallHandler(
             () -> null));

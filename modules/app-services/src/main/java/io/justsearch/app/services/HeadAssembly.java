@@ -33,6 +33,7 @@ import io.justsearch.configuration.AppliedConfigurationVersion;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.app.services.worker.RemoteDocumentService;
 import io.justsearch.core.search.SearchPort;
 import io.justsearch.telemetry.Telemetry;
 import com.sun.net.httpserver.HttpHandler;
@@ -1081,7 +1082,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.recordedIngestion = io.justsearch.app.api.operations.RecordedIngestionService.unavailable();
-    this.publicationLock = ConfigStore.global().publicationLock();
+    this.publicationLock = new java.util.concurrent.locks.ReentrantReadWriteLock();
     Objects.requireNonNull(searchPort, "searchPort");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
     try {
@@ -1505,6 +1506,11 @@ public final class HeadAssembly implements AutoCloseable {
       }
       KnowledgeServerBootstrap.ClientLease lease = bootstrap.acquireClientLease();
       try {
+        ConfigStore configSource = ConfigStore.global();
+        if (configSource.publicationLock() != publicationLock) {
+          throw new IllegalStateException("Head config and serving view have different owners");
+        }
+        ResolvedConfig capturedConfig = configSource.get();
         KnowledgeClient client = lease.client();
         SearchPort capturedSearch = this.searchPort;
         io.justsearch.app.api.ServiceGraph capturedServices = this.services;
@@ -1512,7 +1518,7 @@ public final class HeadAssembly implements AutoCloseable {
           throw new IllegalStateException("Head serving references are not coherently published");
         }
         return new ServingCapture(
-            capturedSearch, client, bootstrap, capturedServices, lease);
+            capturedSearch, client, bootstrap, capturedServices, capturedConfig, lease);
       } catch (RuntimeException | Error failure) {
         lease.close();
         throw failure;
@@ -1528,6 +1534,7 @@ public final class HeadAssembly implements AutoCloseable {
     private final KnowledgeClient knowledgeClient;
     private final KnowledgeServerBootstrap knowledgeServer;
     private final io.justsearch.app.api.ServiceGraph services;
+    private final ResolvedConfig config;
     private final KnowledgeServerBootstrap.ClientLease clientLease;
 
     private ServingCapture(
@@ -1535,11 +1542,13 @@ public final class HeadAssembly implements AutoCloseable {
         KnowledgeClient knowledgeClient,
         KnowledgeServerBootstrap knowledgeServer,
         io.justsearch.app.api.ServiceGraph services,
+        ResolvedConfig config,
         KnowledgeServerBootstrap.ClientLease clientLease) {
       this.searchPort = Objects.requireNonNull(searchPort, "searchPort");
       this.knowledgeClient = Objects.requireNonNull(knowledgeClient, "knowledgeClient");
       this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
       this.services = Objects.requireNonNull(services, "services");
+      this.config = Objects.requireNonNull(config, "config");
       this.clientLease = Objects.requireNonNull(clientLease, "clientLease");
     }
 
@@ -1550,6 +1559,23 @@ public final class HeadAssembly implements AutoCloseable {
     public KnowledgeServerBootstrap knowledgeServer() { return knowledgeServer; }
 
     public io.justsearch.app.api.ServiceGraph services() { return services; }
+
+    public ResolvedConfig config() { return config; }
+
+    /** Worker document facade bound to this exact Head/physical view for its whole operation. */
+    public DocumentService documents() {
+      DocumentService selected = services.worker().documents();
+      if (!(selected instanceof RemoteDocumentService remote)) {
+        throw new IllegalStateException("Head document service cannot bind the serving capture");
+      }
+      return remote.boundTo(new RemoteDocumentService.ClientCapture() {
+        @Override public KnowledgeClient client() { return knowledgeClient; }
+        @Override public <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
+          return ServingCapture.this.withClient(action);
+        }
+        @Override public void close() { /* The enclosing capture owns this lease. */ }
+      });
+    }
 
     public <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
       return clientLease.withClient(action);
@@ -1581,7 +1607,17 @@ public final class HeadAssembly implements AutoCloseable {
     IndexingService newIndexing = client;
     DocumentService newDocuments =
         io.justsearch.app.services.bootstrap.phases.BootstrapDocumentService.create(
-            foregroundDocuments, backgroundDocuments, () -> client, telemetry);
+            foregroundDocuments, backgroundDocuments, () -> client, telemetry,
+            () -> {
+              var lease = ks.captureClient();
+              return new RemoteDocumentService.ClientCapture() {
+                @Override public KnowledgeClient client() { return lease.client(); }
+                @Override public <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
+                  return lease.withClient(action);
+                }
+                @Override public void close() { lease.close(); }
+              };
+            });
     AutoCloseable bridgeHandle =
         this.substrateOut.indexingJobsBridge() == null ? null : (AutoCloseable) this.substrateOut.indexingJobsBridge()::stop;
     io.justsearch.app.api.SearchService newSearch =

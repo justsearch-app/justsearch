@@ -611,10 +611,10 @@ public final class McpToolSurface {
   @SuppressWarnings("unchecked")
   private Map<String, Object> callAnswer(Map<String, Object> args, EngineContext engineContext) {
     HeadAssembly facade = appFacadeLookup.get();
-    if (facade == null || facade.workers().documents() == null) {
+    if (facade == null) {
       return errorContent(KNOWLEDGE_SERVER_UNAVAILABLE_MESSAGE, ApiErrorCode.SERVICE_UNAVAILABLE);
     }
-    try {
+    try (HeadAssembly.ServingCapture capture = facade.captureServingView()) {
       String query = (String) args.getOrDefault("query", "");
       int topK = ((Number) args.getOrDefault("top_k", 5)).intValue();
       Map<String, Object> rawFilters = (Map<String, Object>) args.get("filters");
@@ -652,8 +652,7 @@ public final class McpToolSurface {
               toStringList(rawFilters, "collection"));
 
       DocumentService.ContextResult result =
-          facade
-              .workers()
+          capture
               .documents()
               .retrieveContext(params, engineContext)
               .toCompletableFuture()
@@ -664,7 +663,7 @@ public final class McpToolSurface {
       // renderer, so the two tiers cannot silently diverge (735 G3).
       // Tempdoc 789 Phase 2: framing flags resolved once per call, defaulting to OFF when the
       // config store is not initialized — an unconfigured process delivers exactly the pre-789 text.
-      McpDeliveryFraming.Settings framing = McpDeliveryFraming.resolveSettings();
+      McpDeliveryFraming.Settings framing = McpDeliveryFraming.resolveSettings(capture.config());
       McpAnswerResponseContent content = buildAnswerContent(result, query, framing, engineContext);
       String text = renderAnswerText(result, content, concise, query);
 

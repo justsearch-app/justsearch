@@ -12,6 +12,7 @@ import io.justsearch.app.api.PolicyService;
 import io.justsearch.app.api.RuntimeVariantService;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
+import io.justsearch.app.services.registry.operations.handlers.ActivateInstalledModelsHandler;
 import io.justsearch.app.services.registry.operations.handlers.ActivateRuntimeVariantHandler;
 import io.justsearch.app.services.registry.operations.handlers.AddWatchedRootHandler;
 import io.justsearch.app.services.registry.operations.handlers.AllowlistAddDigestHandler;
@@ -169,6 +170,14 @@ public final class OperationHandlerRegistrations {
     handlers.register(
         CoreOperationCatalog.START_AI_INSTALL,
         new StartAiInstallHandler(brainInstallServiceSupplier));
+    handlers.register(
+        CoreOperationCatalog.ACTIVATE_INSTALLED_MODELS,
+        new ActivateInstalledModelsHandler(
+            brainInstallServiceSupplier,
+            recordedIngestion,
+            context -> recordedRoots.snapshotBindings(),
+            indexingServiceSupplier,
+            io.justsearch.app.services.worker.KnowledgeClient::captureRecordedExcludePatterns));
     handlers.register(
         CoreOperationCatalog.CANCEL_AI_INSTALL,
         new CancelAiInstallHandler(brainInstallServiceSupplier));

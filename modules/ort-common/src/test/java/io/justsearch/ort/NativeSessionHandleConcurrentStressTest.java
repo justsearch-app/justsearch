@@ -136,6 +136,7 @@ final class NativeSessionHandleConcurrentStressTest {
     AtomicInteger postCloseAcquires = new AtomicInteger();
     AtomicInteger postRetirementLeasesIssued = new AtomicInteger();
     AtomicInteger retirementRefusals = new AtomicInteger();
+    AtomicInteger acquisitionDeadlines = new AtomicInteger();
     List<Throwable> uncaught = new CopyOnWriteArrayList<>();
 
     int totalThreads =
@@ -146,9 +147,8 @@ final class NativeSessionHandleConcurrentStressTest {
     Thread.UncaughtExceptionHandler handler = (t, e) -> uncaught.add(e);
     int idx = 0;
 
-    // Acquire threads: tight lease loop. Before retirement, a refusal is a defect. Once the
-    // typed retirement state leaves ACTIVE, acquisition must refuse; after close returns no lease
-    // may be issued at all.
+    // Acquire threads: tight lease loop. A bounded deadline can refuse during native CPU
+    // recreation. Other ACTIVE-state failures are defects; retirement must refuse new leases.
     for (int i = 0; i < ACQUIRE_THREADS; i++) {
       threads[idx] = new Thread(() -> {
         try {
@@ -170,6 +170,8 @@ final class NativeSessionHandleConcurrentStressTest {
               } finally {
                 leasesClosed.incrementAndGet();
               }
+            } catch (SessionAcquireDeadlineExceededException deadline) {
+              acquisitionDeadlines.incrementAndGet();
             } catch (RuntimeException rex) {
               if (handle.retirementStatus() != SessionHandle.RetirementStatus.ACTIVE) {
                 retirementRefusals.incrementAndGet();
@@ -252,8 +254,8 @@ final class NativeSessionHandleConcurrentStressTest {
     idx++;
 
     // R4 — Delayed-close thread: fires close() at CLOSE_AT_MS so acquire threads overlap the
-    // close window. Post-close, other threads must not crash with NPE; they may throw or return
-    // closed-session leases, both of which are tolerated.
+    // close window. Post-close, other threads must refuse acquisition without an NPE or a
+    // newly issued lease.
     threads[idx] = new Thread(() -> {
       try {
         startLatch.await();
@@ -286,7 +288,8 @@ final class NativeSessionHandleConcurrentStressTest {
             + summarize(leasesAcquired, leasesClosed, cpuFailuresReported, releaseGpuCalls,
                 metadataReads, postCloseAcquires));
 
-    assertTrue(uncaught.isEmpty(), "Uncaught exceptions in stress threads: " + uncaught);
+    assertTrue(uncaught.isEmpty(), "Uncaught exceptions in stress threads: " + uncaught
+        + "; bounded acquisition refusals=" + acquisitionDeadlines.get());
 
     assertEquals(
         leasesAcquired.get(),
@@ -325,11 +328,12 @@ final class NativeSessionHandleConcurrentStressTest {
 
     System.out.printf(
         "Stress test OK: %d ms | %d leases (acquired == closed) | %d cpu-failures | %d release-gpu "
-            + "| %d metadata-reads | %d post-close acquires%n",
+            + "| %d acquisition deadlines | %d metadata-reads | %d post-close acquires%n",
         DURATION_MS,
         leasesAcquired.get(),
         cpuFailuresReported.get(),
         releaseGpuCalls.get(),
+        acquisitionDeadlines.get(),
         metadataReads.get(),
         postCloseAcquires.get());
   }

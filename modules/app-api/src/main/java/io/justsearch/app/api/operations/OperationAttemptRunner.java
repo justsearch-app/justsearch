@@ -115,8 +115,29 @@ public interface OperationAttemptRunner {
     throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
   }
 
+  /**
+   * Prepare and arm the exact accepted installer-generation settings projection at its final
+   * cutover boundary. The returned collaborator is non-terminal; the recorded owner decides from
+   * the generation pointer and the runner remains the only terminal row writer.
+   */
+  default io.justsearch.app.api.settings.SettingsCommitOwner.PreparedGenerationProjection
+      prepareInstallerGenerationProjection(OperationRecordHandle handle,
+          RecordedInstallerGenerationPlan plan, io.justsearch.app.api.EngineWorkHandle work) {
+    throw new UnsupportedOperationException("Installer generation settings are unavailable");
+  }
+
+  /** The recorded owner asks its fixed settings collaborator for exact roll-forward evidence. */
+  default boolean installerGenerationProjected(RecordedInstallerGenerationPlan plan) {
+    return false;
+  }
+
   /** Physical bulk boundaries observed by the existing installed recovery harness. */
-  enum BulkBoundary { PARTIAL_CAPTURE, AFTER_PROMOTION }
+  enum BulkBoundary {
+    PARTIAL_CAPTURE, AFTER_PROMOTION,
+    INSTALLER_BEFORE_MARKER, INSTALLER_BEFORE_ARM, INSTALLER_BEFORE_POINTER,
+    INSTALLER_POINTER_BEFORE_SETTINGS, INSTALLER_SETTINGS_BEFORE_PUBLICATION,
+    INSTALLER_BEFORE_RECEIPT
+  }
 
   /** Observe an already committed effect; this does not persist progress or grant authority. */
   default void observeBulkBoundary(OperationRecordHandle handle, BulkBoundary boundary) {}

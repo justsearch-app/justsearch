@@ -15,12 +15,14 @@ import static org.mockito.Mockito.verify;
 
 import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +36,52 @@ import org.junit.jupiter.api.io.TempDir;
 /** Regression coverage for deferred serving-owner cleanup and shutdown lock ordering. */
 @Timeout(30)
 final class KnowledgeServerDeferredRetirementTest {
+
+  @Test
+  void failedDeferredPublicationReleasesPreparedEncoderHold(@TempDir Path tempDir)
+      throws Exception {
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(
+          executors, WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+      var oldServices = mock(WorkerAppServices.class);
+      var successorServices = mock(WorkerAppServices.class);
+      var oldRuntime = mock(RunningRuntime.class);
+      var successorRuntime = mock(RunningRuntime.class);
+      var preparation = mock(DeferredRuntime.PreparedUpgrade.class);
+      var surface = mock(InferenceSurface.class);
+      var model = IndexFingerprint.ModelFingerprint.present("a");
+      var encoder = new EncoderSet(surface,
+          new EncoderSet.ModelIdentity(model, model, model, false, 768), Duration.ZERO);
+      try {
+        setField(server, "searchLifecycle", oldRuntime);
+        setField(server, "ingestLifecycle", oldRuntime);
+        server.publishServingView(oldServices);
+        Field selected = KnowledgeServer.class.getDeclaredField("servingView");
+        selected.setAccessible(true);
+        Object oldView = selected.get(server);
+        Method attach = oldView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+        attach.setAccessible(true);
+        attach.invoke(oldView, encoder);
+        doThrow(new IllegalStateException("upgrade was abandoned"))
+            .when(preparation).markPublished();
+
+        assertThrows(IllegalStateException.class, () -> invoke(
+            server, "publishDeferredSuccessor",
+            new Class<?>[] {WorkerAppServices.class, WorkerAppServices.class,
+                RunningRuntime.class, DeferredRuntime.PreparedUpgrade.class},
+            successorServices, oldServices, successorRuntime, preparation));
+        assertTrue(retiredServingViews(server).isEmpty(),
+            "a rejected publication must not register a retired predecessor");
+        Method release = oldView.getClass().getDeclaredMethod("releaseEncoderSet");
+        release.setAccessible(true);
+        release.invoke(oldView);
+        encoder.close();
+        verify(surface).close();
+      } finally {
+        server.close();
+      }
+    }
+  }
 
   @Test
   void refusedRetiredViewCleanupRetainsOwnerForReaperRetry(@TempDir Path tempDir) throws Exception {

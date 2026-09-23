@@ -67,6 +67,21 @@ public final class BatchDocAccess implements ContextInjector {
     this(documents, DEFAULT_FETCH_TIMEOUT, maxInputTokens);
   }
 
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public BatchDocAccess(DocumentService documents, ConversationConfigProvider configProvider) {
+    this(documents, DEFAULT_FETCH_TIMEOUT, configProvider);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public BatchDocAccess(
+      DocumentService documents,
+      Duration fetchTimeout,
+      ConversationConfigProvider configProvider) {
+    this.documents = Objects.requireNonNull(documents, "documents");
+    this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
+    this.inputLimit = new SummaryInputLimit(configProvider);
+  }
+
   public BatchDocAccess(
       DocumentService documents, Duration fetchTimeout, IntSupplier maxInputTokens) {
     this.documents = Objects.requireNonNull(documents, "documents");
@@ -107,7 +122,7 @@ public final class BatchDocAccess implements ContextInjector {
       return InjectorResult.terminalError(new SseEvent("error", err));
     }
 
-    SseEvent rejection = inputLimit.rejection(concatenated);
+    SseEvent rejection = inputLimit.rejection(concatenated, engineContext);
     if (rejection != null) return InjectorResult.terminalError(rejection);
 
     // Publish batch metadata only after the request is accepted. A refused request never reaches

@@ -114,7 +114,9 @@ export async function exerciseOperationFault(c) {
   const reached = await waitFor(`operation fault marker ${scenario}`, 170000, () => {
     const value = readJson(reachedFile);
     if (value) return value;
-    if (prematureOutcome) {
+    // Recorded ingestion returns an accepted parent response while its durable child keeps
+    // running. The after-effect barrier belongs to that child, so the parent may settle first.
+    if (prematureOutcome && !(selected.parentKind === 'ingest' && selected.phase === 'after-effect')) {
       throw new Error(`operation request settled before fault marker ${scenario}: `
         + JSON.stringify(prematureOutcome));
     }
@@ -128,6 +130,13 @@ export async function exerciseOperationFault(c) {
     requireThat(operationRows(operationPath, operationKey).length === 0,
       'before-accept hook must stop before a durable operation row exists');
   } else if (selected.phase === 'after-effect' && selected.parentKind === 'ingest') {
+    const parentOutcome = await held.settled;
+    requireThat(parentOutcome.response?.status === 200,
+      `recorded parent must return accepted while its child is held: ${JSON.stringify(parentOutcome)}`);
+    const acceptedResponse = parseJson(parentOutcome.response, 'recorded parent acceptance');
+    requireThat(acceptedResponse.success === true
+      && acceptedResponse.structuredData?.operationKey === operationKey,
+    `recorded parent acceptance must retain the caller key: ${parentOutcome.response.text}`);
     acceptedParent = operationRow(operationPath, operationKey);
     const child = operationRow(operationPath, reached.operationKey);
     requireThat(acceptedParent?.kind === 'ingest' && child?.id === reached.operationRecordId
@@ -320,14 +329,15 @@ export async function exerciseOperationFault(c) {
       requireThat(historyResponse.status === 200, `public settings history read failed: ${historyResponse.text}`);
       const settingsHistory = parseJson(historyResponse, 'public settings history').entries
         .filter(entry => entry.operationKey === unrelatedSettings.input.operationKey);
-      requireThat(settingsHistory.length === 1 && settingsHistory[0].operationId === 'core.apply-settings',
+      requireThat(settingsHistory.length === 1 && settingsHistory[0].operationId === 'core.reconfigure'
+        && settingsHistory[0].outcome === 'SUCCESS',
         `public settings must project one typed history entry: ${JSON.stringify(settingsHistory)}`);
       await waitFor('public settings history delivery acknowledgement', 30000, () => {
         const database = new DatabaseSync(operationPath, { readOnly: true });
         try {
           const row = database.prepare('SELECT operation_ref, history_pending FROM operations WHERE operation_key = ?')
             .get(unrelatedSettings.input.operationKey);
-          requireThat(row?.operation_ref === 'settings.apply-public', 'history must retain the original settings retry identity');
+          requireThat(row?.operation_ref === 'core.reconfigure', 'history must retain the accepted reconfigure identity');
           return row.history_pending === 0 ? row : null;
         } finally { database.close(); }
       });

@@ -103,6 +103,10 @@ final class EngineForegroundPacingTest {
   @AfterEach
   void tearDown() {
     if (root != null) {
+      root.admission().beginClosing();
+      root.admission().cancelInteractive("foreground pacing test completed");
+      assertTrue(root.admission().awaitDrained(java.time.Duration.ofSeconds(30)),
+          "all foreground calls must leave before the index owner closes");
       root.close();
       root = null;
     }
@@ -235,7 +239,8 @@ final class EngineForegroundPacingTest {
     } finally {
       loadRunning.set(false);
       loadPool.shutdownNow();
-      loadPool.awaitTermination(10, TimeUnit.SECONDS);
+      assertTrue(loadPool.awaitTermination(30, TimeUnit.SECONDS),
+          "foreground load threads must exit before the Engine closes");
     }
 
     assertTrue(queriesIssued.get() > 0, "the foreground load must actually have run");

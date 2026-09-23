@@ -315,14 +315,10 @@ final class KnowledgeServerRecordedIngestionTest {
       assertEquals(Optional.of(layout.genManager().initializeOrLoad().activeGenerationId()),
           server.currentRecordedServingGeneration(),
           "the published started replacement restores recorded writer authority");
-      assertEquals(1, lifecycle.publications.get(),
-          "successful publication must notify the same recorded attachment exactly once");
+      assertEquals(0, lifecycle.publications.get(),
+          "the private reconstruction helper must not notify under the runtime swap lock");
       assertTrue(lifecycle.publicationFailure.get() == null,
           String.valueOf(lifecycle.publicationFailure.get()));
-      assertSame(replacement, lifecycle.publishedServices.get(),
-          "the notification must observe the replacement, not the closed incumbent");
-      assertEquals(server.currentRecordedServingGeneration(), lifecycle.publishedGeneration.get(),
-          "the notification must observe the newly available generation");
       var order = org.mockito.Mockito.inOrder(deferred, replacement);
       order.verify(deferred).close();
       order.verify(replacement).startIndexingLoop();

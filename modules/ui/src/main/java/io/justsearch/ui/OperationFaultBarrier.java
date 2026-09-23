@@ -38,7 +38,10 @@ final class OperationFaultBarrier {
     }
     boolean bulk = "reindex".equals(kind);
     Set<String> phases = bulk
-        ? Set.of("bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion")
+        ? Set.of("bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion",
+            "installer-before-marker", "installer-before-arm", "installer-before-pointer",
+            "installer-pointer-before-settings", "installer-settings-before-publication",
+            "installer-before-receipt")
         : Set.of("before-accept", "after-accept", "after-effect");
     if (phase == null || !phases.contains(phase)
         || key == null || kind == null || !Set.of("ingest", "settings-apply", "reconfigure", "reindex").contains(kind)) {

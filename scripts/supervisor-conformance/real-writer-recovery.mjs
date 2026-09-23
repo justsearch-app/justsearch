@@ -8,7 +8,10 @@ import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
 import { exerciseOperationResume } from './operation-resume-scenario.mjs';
 import { exerciseOperationFault } from './operation-fault-scenario.mjs';
-import { exerciseBulkFault, BULK_FAULT_CASES } from './bulk-fault-scenario.mjs';
+import {
+  exerciseBulkFault, BULK_FAULT_CASES,
+  exerciseInstallerActivationFault, INSTALLER_FAULT_CASES, writeRetainedInstallerCandidate,
+} from './bulk-fault-scenario.mjs';
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 
 const repo = process.cwd();
@@ -18,7 +21,8 @@ const operationFault = new Set(['ingest-before-accept', 'settings-before-accept'
   'ingest-after-effect-before-checkpoint', 'settings-after-effect-before-checkpoint',
   'ingest-client-disconnect']).has(scenario);
 const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
-const operationKey = operationFault || bulkFault ? createOperationKey() : null;
+const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
+const operationKey = operationFault || bulkFault || installerFault ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
   : path.join(repo, 'tmp', 'lane-f-takeover', `writer-live-${Date.now()}`);
@@ -75,7 +79,7 @@ if (['writer', 'processing', 'operation'].includes(scenario) || scenario === und
     schemaVersion: 1, roots: [{ path: corpus }],
   }));
 }
-if (['processing', 'operation'].includes(scenario) || operationFault || bulkFault) {
+if (['processing', 'operation'].includes(scenario) || operationFault || bulkFault || installerFault) {
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
@@ -96,6 +100,25 @@ if (bulkFault) {
   delete env.JUSTSEARCH_AI_EMBED_ENABLED;
   delete env.AI_OFFLINE;
 }
+if (installerFault) {
+  env.JUSTSEARCH_EMBED_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_NER_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_SPLADE_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = INSTALLER_FAULT_CASES[scenario].phase;
+  const roots = ['installer-root-a', 'installer-root-b'].map(name => ({ path: path.join(work, name) }));
+  for (const root of roots) fs.mkdirSync(root.path, { recursive: true });
+  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({ schemaVersion: 1, roots }));
+  delete env.JUSTSEARCH_AI_EMBED_ENABLED;
+  delete env.JUSTSEARCH_NER_ENABLED;
+  delete env.JUSTSEARCH_SPLADE_ENABLED;
+  delete env.JUSTSEARCH_NER_MODEL_PATH;
+  delete env.JUSTSEARCH_SPLADE_MODEL_PATH;
+  delete env.AI_OFFLINE;
+}
+const installerCandidate = installerFault
+  ? writeRetainedInstallerCandidate({ data, requireThat }) : null;
 delete env.JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND;
 if (aiEnabled) {
   delete env.JUSTSEARCH_AI_EMBED_ENABLED;
@@ -142,18 +165,18 @@ async function waitFor(label, timeoutMs, probe) {
 async function waitUntil(label, deadline, probe) {
   return waitFor(label, Math.max(1, deadline - Date.now()), probe);
 }
-async function request(apiPort, endpoint, options = {}) {
+async function request(apiPort, endpoint, options = {}, timeoutMs = 5000) {
   const response = await fetch(`http://127.0.0.1:${apiPort}${endpoint}`, {
     ...options,
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const text = await response.text();
   return { status: response.status, text };
 }
-async function post(apiPort, endpoint, body) {
+async function post(apiPort, endpoint, body, timeoutMs = 5000) {
   return request(apiPort, endpoint, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-  });
+  }, timeoutMs);
 }
 function filesBelow(root, predicate) {
   const found = [];
@@ -241,6 +264,11 @@ try {
   if (bulkFault) {
     await exerciseBulkFault({ work, data, indexBase, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit,
+      scenario, operationKey, output: () => output });
+  } else if (installerFault) {
+    await exerciseInstallerActivationFault({ work, data, indexBase, first, manifest, apiPort,
+      candidate: installerCandidate,
+      readJson, waitFor, request, post, requireThat, requireOperationSuccess, matchingHit,
       scenario, operationKey, output: () => output });
   } else if (operationFault) {
     await exerciseOperationFault({ work, data, first, manifest, apiPort, readJson, waitFor,

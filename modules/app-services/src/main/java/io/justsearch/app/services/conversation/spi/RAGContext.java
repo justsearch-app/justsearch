@@ -186,6 +186,7 @@ public final class RAGContext implements ContextInjector {
    * wins, so wiring config cannot override a caller that asked for a specific value.
    */
   private final IntSupplier defaultTopK;
+  private final ConversationConfigProvider configProvider;
 
   public RAGContext(DocumentService documents) {
     this(documents, DEFAULT_TIMEOUT, DEFAULT_TOP_K);
@@ -228,9 +229,36 @@ public final class RAGContext implements ContextInjector {
       Duration timeout,
       IntSupplier defaultTopK,
       Supplier<OnlineAiService> onlineAi) {
+    this(documents, timeout, defaultTopK, null, onlineAi);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public RAGContext(
+      DocumentService documents,
+      ConversationConfigProvider configProvider,
+      Supplier<OnlineAiService> onlineAi) {
+    this(documents, DEFAULT_TIMEOUT, () -> DEFAULT_TOP_K, configProvider, onlineAi);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public RAGContext(
+      DocumentService documents,
+      Duration timeout,
+      ConversationConfigProvider configProvider,
+      Supplier<OnlineAiService> onlineAi) {
+    this(documents, timeout, () -> DEFAULT_TOP_K, configProvider, onlineAi);
+  }
+
+  private RAGContext(
+      DocumentService documents,
+      Duration timeout,
+      IntSupplier defaultTopK,
+      ConversationConfigProvider configProvider,
+      Supplier<OnlineAiService> onlineAi) {
     this.documents = Objects.requireNonNull(documents, "documents");
     this.timeout = Objects.requireNonNull(timeout, "timeout");
     this.defaultTopK = Objects.requireNonNull(defaultTopK, "defaultTopK");
+    this.configProvider = configProvider;
     this.onlineAi = onlineAi;
   }
 
@@ -327,7 +355,7 @@ public final class RAGContext implements ContextInjector {
     if (question == null || question.isBlank()) {
       return InjectorResult.terminalError(errorEvent("No question provided", "NO_QUESTION"));
     }
-    int topK = extractTopK(body, budget);
+    int topK = extractTopK(body, budget, engineContext);
     // Stash docIds + fileCount for the done enricher (set even on retrieval failure).
     ctx.attributes().put(ATTR_DOC_IDS, docIds);
     ctx.attributes().put(ATTR_FILE_COUNT, docIds.size());
@@ -858,7 +886,8 @@ public final class RAGContext implements ContextInjector {
    * passages nobody wants; the derivation is what stops a SMALL window asking for five it cannot
    * hold, which is the shape tempdoc 845's trimmer existed to clean up after.
    */
-  private int extractTopK(Map<String, Object> body, ContextBudget budget) {
+  private int extractTopK(
+      Map<String, Object> body, ContextBudget budget, EngineContext engineContext) {
     Object raw = body == null ? null : body.get("topK");
     if (raw instanceof Number n) {
       int v = n.intValue();
@@ -867,7 +896,10 @@ public final class RAGContext implements ContextInjector {
       }
     }
     int affordable = budget.inputBudget() / ChunkSplitter.DEFAULT_CHUNK_TOKENS;
-    int configured = defaultTopK.getAsInt();
+    int configured =
+        configProvider == null
+            ? defaultTopK.getAsInt()
+            : configProvider.resolve(engineContext).rag().ragTopK();
     int effectiveDefault = configured > 0 ? configured : DEFAULT_TOP_K;
     return Math.max(1, Math.min(effectiveDefault, affordable));
   }

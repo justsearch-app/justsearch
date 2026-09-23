@@ -71,6 +71,38 @@ final class CutoverRestartEvidenceTest {
   }
 
   @Test
+  void recordedLiveCutoverPublishesWithoutRequestingRestart(@TempDir Path tempDir)
+      throws Exception {
+    var manager = new IndexGenerationManager(tempDir.resolve("index"));
+    manager.initializeOrLoad();
+    String green = manager.startMigration("manual").building_generation();
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+    var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.failureSummary())
+        .thenReturn(new JobQueue.FailureSummary(0, null, null, null, null));
+    var runtime = mock(RunningRuntime.class);
+    var live = new AtomicBoolean();
+    var context = new KnowledgeServerMigrationOps.CutoverContext(
+        manager, queue, () -> true, () -> true, () -> null, 0, 60_000, -1,
+        () -> runtime, () -> true, () -> {
+          throw new AssertionError("recorded live owner verifies Green under its final fence");
+        }, () -> {}, () -> {}, () -> {
+          throw new AssertionError("live publication must not request a cutover restart");
+        }, tempDir, LoggerFactory.getLogger(CutoverRestartEvidenceTest.class),
+        () -> {
+          throw new AssertionError("recorded live owner replaces the legacy promotion callback");
+        }, () -> {}, () -> {
+          live.set(true);
+          return manager.promoteBuildingGenerationToActive();
+        });
+
+    KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);
+
+    assertTrue(live.get());
+    assertEquals(green, manager.readStateBestEffort().active_generation());
+  }
+
+  @Test
   void thePromotedGenerationIsMarkedCleanAndTheMetricsAreFlushedBeforeTheRestart(
       @TempDir Path tempDir) throws Exception {
     IndexGenerationManager genManager = new IndexGenerationManager(tempDir.resolve("index"));

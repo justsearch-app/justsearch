@@ -47,6 +47,16 @@ import org.slf4j.LoggerFactory;
  * Nothing else in the repo may construct an implementation of a port.
  */
 public final class EngineRoot implements WorkerHost {
+  /** Reconcile a committed installer generation before boot composes any model or Worker view. */
+  public static io.justsearch.app.api.UiSettings reconcileInstallerGenerationBoot(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      io.justsearch.app.api.UiSettings loadedSettings,
+      io.justsearch.configuration.resolved.ResolvedConfig preliminaryConfig) throws IOException {
+    return RecordedIngestionCoordinator.reconcileInstallerGenerationBoot(
+        operations, settingsStore, loadedSettings, preliminaryConfig);
+  }
+
   private final io.justsearch.app.services.bootstrap.OperationAuthority authority;
 
   /** Preloaded process authority shared with Head; independent of index restarts. */

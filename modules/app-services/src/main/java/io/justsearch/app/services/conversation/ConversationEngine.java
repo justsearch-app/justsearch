@@ -227,16 +227,62 @@ public final class ConversationEngine {
     run(shapeId, body, audience, sink, engineContext, false);
   }
 
+  /**
+   * Runs one externally owned conversation turn with an explicit scope opened after admission.
+   *
+   * <p>Admission may replace the caller's context with its work-id-bearing form. Opening here makes
+   * that exact immutable context available to resources used across executor boundaries, while the
+   * try-with-resources lifetime covers the complete blocking shape run.
+   */
+  public void runScoped(
+      ConversationShapeRef shapeId,
+      Map<String, Object> body,
+      Audience audience,
+      Consumer<SseEvent> sink,
+      EngineContext engineContext,
+      OperationScopeFactory scopeFactory) {
+    run(shapeId, body, audience, sink, engineContext, false, scopeFactory);
+  }
+
   /** Server-owned non-interactive posture, carried by nested workflow delegation. */
   public void run(ConversationShapeRef shapeId, Map<String, Object> body, Audience audience,
       Consumer<SseEvent> sink, EngineContext engineContext, boolean background) {
+    run(shapeId, body, audience, sink, engineContext, background, OperationScopeFactory.none());
+  }
+
+  private void run(
+      ConversationShapeRef shapeId,
+      Map<String, Object> body,
+      Audience audience,
+      Consumer<SseEvent> sink,
+      EngineContext engineContext,
+      boolean background,
+      OperationScopeFactory scopeFactory) {
+    Objects.requireNonNull(scopeFactory, "scopeFactory");
     try (var work = admission == null ? null : admission.attach(engineContext)) {
       EngineContext context = work == null ? engineContext : work.context();
       if (work != null) work.cancellationReason().ifPresent(reason -> {
         throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
       });
-      runAdmitted(shapeId, body, audience, sink, context, work, background);
+      try (OperationScope ignored = scopeFactory.open(shapeId, context)) {
+        runAdmitted(shapeId, body, audience, sink, context, work, background);
+      }
     }
+  }
+
+  @FunctionalInterface
+  public interface OperationScopeFactory {
+    OperationScope open(ConversationShapeRef shapeId, EngineContext engineContext);
+
+    static OperationScopeFactory none() {
+      return (shapeId, context) -> () -> {};
+    }
+  }
+
+  @FunctionalInterface
+  public interface OperationScope extends AutoCloseable {
+    @Override
+    void close();
   }
 
   private void runAdmitted(

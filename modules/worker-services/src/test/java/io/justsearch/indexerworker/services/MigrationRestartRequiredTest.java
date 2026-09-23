@@ -111,8 +111,8 @@ final class MigrationRestartRequiredTest {
   }
 
   @Test
-  @DisplayName("rollback carries the same contract")
-  void rollbackReportsRestartRequired(@TempDir Path tempDir) throws Exception {
+  @DisplayName("directory rollback is refused after a published generation")
+  void rollbackCannotRewriteThePublishedPointer(@TempDir Path tempDir) throws Exception {
     Path indexBase = tempDir.resolve("index");
     IndexGenerationManager seed = new IndexGenerationManager(indexBase);
     seed.initializeOrLoad();
@@ -125,9 +125,10 @@ final class MigrationRestartRequiredTest {
     MigrationRollbackResponse response =
         ops.rollbackMigration(MigrationRollbackRequest.newBuilder().setRestartWorker(true).build());
 
-    assertTrue(response.getAccepted(), "fixture has a real previous generation to roll back to");
-    assertTrue(response.getRestartRequired(),
-        "an accepted rollback that was asked to restart must report restart_required");
+    assertFalse(response.getAccepted(), "a live serving view cannot be reverted by pointer only");
+    assertFalse(response.getRestartRequired());
+    assertEquals(seed.readStateBestEffort().active_generation(),
+        new IndexGenerationManager(indexBase).readStateBestEffort().active_generation());
   }
 
   @Test

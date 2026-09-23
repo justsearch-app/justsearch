@@ -275,6 +275,14 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef("core.start-ai-install");
 
   /**
+   * D1 installer-generation amendment: activate the staged model candidate through the recorded
+   * generation owner. Download/acquisition remains owned by {@link #START_AI_INSTALL}; this
+   * operation is the separately approved durable activation boundary.
+   */
+  public static final OperationRef ACTIVATE_INSTALLED_MODELS =
+      new OperationRef("core.activate-installed-models");
+
+  /**
    * Slice 3a-2-c BrainInstallSection Cancel Install. MEDIUM risk (cancels
    * a running install). No args. Idempotent if no install is running.
    */
@@ -365,6 +373,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
       preflightAiPack(),
       importAiPack(),
       startAiInstall(),
+      activateInstalledModels(),
       cancelAiInstall(),
       repairAiInstall(),
       createUserPolicy(),
@@ -410,7 +419,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
 
   private static String bulkArgumentsSchema(boolean corpusLabels) {
     var sources = java.util.Arrays.stream(io.justsearch.app.api.status.MigrationSource.values())
-        .filter(source -> source != io.justsearch.app.api.status.MigrationSource.UNKNOWN)
+        .filter(source -> source != io.justsearch.app.api.status.MigrationSource.UNKNOWN
+            && source != io.justsearch.app.api.status.MigrationSource.INSTALLER_MODEL_ACTIVATION)
         .map(source -> "\"" + source.wire() + "\"")
         .collect(java.util.stream.Collectors.joining(","));
     return "{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{"
@@ -1066,6 +1076,33 @@ public final class CoreOperationCatalog implements OperationCatalog {
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(START_AI_INSTALL),
+        Provenance.core("1.0"),
+        Set.of(ExecutorTag.UI));
+  }
+
+  private static Operation activateInstalledModels() {
+    String source = io.justsearch.app.api.status.MigrationSource.INSTALLER_MODEL_ACTIVATION.wire();
+    String argumentsSchema =
+        "{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{"
+            + "\"source\":{\"type\":\"string\",\"enum\":[\""
+            + source
+            + "\"]}},\"required\":[\"source\"]}";
+    return new Operation(
+        ACTIVATE_INSTALLED_MODELS,
+        Presentation.forId(ACTIVATE_INSTALLED_MODELS),
+        Interface.inputsOnly(argumentsSchema),
+        new OperationPolicy(
+            RiskTier.HIGH,
+            ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY,
+            RetryPolicy.noRetry(),
+            Set.of(RequiredCapability.WorkerOnline.INSTANCE),
+            false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(),
+        OperationLineage.empty(),
+        Binding.of(ACTIVATE_INSTALLED_MODELS),
         Provenance.core("1.0"),
         Set.of(ExecutorTag.UI));
   }

@@ -318,6 +318,19 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V18 to V19: Captured source plans and immutable sealed members");
       }
+      case 20 -> {
+        try (Statement stmt = conn.createStatement()) {
+          if (!columnExists(conn, "switch_buffer", "accepted_order")) {
+            stmt.execute(SqliteSchema.MIGRATE_V19_TO_V20_SWITCH_ORDER);
+          }
+          // The old rowid table's INSERT OR REPLACE order is the only surviving order witness.
+          // Persist it before any future VACUUM INTO backup can renumber implicit rowids.
+          stmt.execute("UPDATE switch_buffer SET accepted_order = rowid WHERE accepted_order = 0");
+          stmt.execute(SqliteSchema.CREATE_SWITCH_BUFFER_ORDER_INDEX);
+          stmt.execute("DROP INDEX IF EXISTS idx_switch_buffer_updated");
+        }
+        log.info("V19 to V20: Persisted exact switch-buffer admission order");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

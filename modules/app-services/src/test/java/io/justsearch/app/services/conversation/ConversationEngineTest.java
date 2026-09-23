@@ -17,6 +17,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
@@ -70,6 +71,66 @@ final class ConversationEngineTest {
 
     assertEquals(1, capturedRequest.get().messages().size());
     assertEquals("hi", capturedRequest.get().messages().get(0).get("content"));
+  }
+
+  @Test
+  @DisplayName("An explicit operation scope closes exactly once on success, error, and cancellation")
+  void operationScopeClosesOnEveryTerminalPath() {
+    var opens = new AtomicInteger();
+    var closes = new AtomicInteger();
+    ConversationEngine.OperationScopeFactory scopes =
+        (shapeId, context) -> {
+          opens.incrementAndGet();
+          return closes::incrementAndGet;
+        };
+    Map<String, Object> body =
+        Map.of(
+            "messages", List.of(Map.of("role", "user", "content", "hi")),
+            "tools", List.of(),
+            "maxIterations", 1);
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+
+    var success =
+        new ConversationEngine(
+            CoreConversationShapeCatalog.catalog(),
+            List.of(
+                new ToolIteratingShapeRunner(
+                    () ->
+                        new StubAgentService(
+                            (request, sink) ->
+                                sink.accept(new AgentEvent.AgentDone("ok", 1, 0, 1))))));
+    success.runScoped(AgentRunShape.ID, body, Audience.USER, ignored -> {}, context, scopes);
+
+    assertThrows(
+        ConversationEngine.ShapeNotFoundException.class,
+        () ->
+            success.runScoped(
+                new ConversationShapeRef("core.missing"),
+                Map.of(),
+                Audience.USER,
+                ignored -> {},
+                context,
+                scopes));
+
+    var cancelled =
+        new ConversationEngine(
+            CoreConversationShapeCatalog.catalog(),
+            List.of(
+                new ToolIteratingShapeRunner(
+                    () ->
+                        new StubAgentService(
+                            (request, sink) -> {
+                              throw new io.justsearch.app.api.EngineWorkCancelledException(
+                                  "test_cancelled");
+                            }))));
+    assertThrows(
+        io.justsearch.app.api.EngineWorkCancelledException.class,
+        () ->
+            cancelled.runScoped(
+                AgentRunShape.ID, body, Audience.USER, ignored -> {}, context, scopes));
+
+    assertEquals(3, opens.get());
+    assertEquals(3, closes.get(), "each opened scope must release its serving capture exactly once");
   }
 
   @Test

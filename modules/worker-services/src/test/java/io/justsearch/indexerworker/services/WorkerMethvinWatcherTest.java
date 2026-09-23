@@ -55,6 +55,26 @@ final class WorkerMethvinWatcherTest {
   @TempDir Path tempDir;
 
   @Test
+  void failedWatcherRoutesInvalidateTheFinalReplayCertificate() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("failed-route"));
+    Path child = Files.writeString(root.resolve("child.txt"), "data");
+    var admission = new WorkerMutationAdmission(new Object());
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        new RecordingQueue(), null,
+        ignored -> { throw new IllegalStateException("delete route lost"); },
+        (ignored, force) -> {},
+        (collection, path) -> { throw new IllegalStateException("upsert route lost"); },
+        ignored -> admission.markReplayUncertain())) {
+      assertTrue(admission.replayCertain());
+      watcher.handleUpsert(root, "docs", child);
+      assertFalse(admission.replayCertain());
+      watcher.handleDelete(root, child);
+      assertFalse(admission.replayCertain());
+    }
+  }
+
+  @Test
   @Timeout(15)
   void deliversCreateEventToJobQueue() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("watched"));

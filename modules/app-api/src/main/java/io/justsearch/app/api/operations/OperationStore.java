@@ -123,6 +123,15 @@ public interface OperationStore extends AutoCloseable {
    */
   boolean armSettingsRevision(long id, long expectedRevision);
 
+  /**
+   * Runner-only marker for an accepted installer-generation REINDEX. The runner must first resolve
+   * the exact v2 preparation and full settings witness. This separate method cannot widen ordinary
+   * settings commitment to arbitrary reindex operations.
+   */
+  default boolean armInstallerGenerationSettingsRevision(long id, long expectedRevision) {
+    return false;
+  }
+
   /** A reconciler has revalidated a recoverable open attempt before scheduling its next body. */
   boolean resume(long id);
 

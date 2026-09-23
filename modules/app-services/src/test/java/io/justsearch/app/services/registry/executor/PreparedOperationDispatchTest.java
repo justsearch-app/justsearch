@@ -92,6 +92,19 @@ class PreparedOperationDispatchTest {
         Provenance.core("1.0"), Set.of(ExecutorTag.UI));
   }
 
+  private static Operation installerActivationOperation() {
+    var id = new OperationRef(RecordedInstallerGenerationPlan.OPERATION_ID);
+    return new Operation(id,
+        Presentation.of(new I18nKey("test.activate"), new I18nKey("test.activate.desc")),
+        Interface.of("{\"type\":\"object\"}", "{\"type\":\"object\"}"),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
+            .withRecordKind(OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(id),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI));
+  }
+
   private static String bulkArguments(RecordedBulkPlan.Profile profile) {
     return profile == RecordedBulkPlan.Profile.USER_BULK ? "{\"corpusIds\":[\"docs\"]}" : "{}";
   }
@@ -152,6 +165,62 @@ class PreparedOperationDispatchTest {
       usedContext.set(context);
       assertNotNull(record);
       return OperationExecution.finished(OperationResult.success("recorded bulk accepted"));
+    }
+
+    HandlerRegistry registry() {
+      var handlers = new HandlerRegistry();
+      handlers.register(operation.id(), this);
+      return handlers;
+    }
+  }
+
+  private static final class RecordedInstallerFixture implements OperationHandler {
+    final Operation operation = installerActivationOperation();
+    final Path root;
+    final AtomicReference<EngineContext> usedContext = new AtomicReference<>();
+    final AtomicReference<OperationPreparation> usedPreparation = new AtomicReference<>();
+
+    RecordedInstallerFixture(Path root) { this.root = root.toAbsolutePath().normalize(); }
+
+    @Override public OperationResult execute(String args, EngineContext context) {
+      throw new AssertionError("Installer activation must execute its frozen preparation");
+    }
+
+    @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
+        EngineContext context) {
+      var acquisition = new RecordedInstallerGenerationPlan.AcquisitionProvenance(
+          RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.REGISTRY,
+          "manifest-1", "a".repeat(64));
+      var scope = new RecordedRootPlan("serving-generation", List.of(
+          new RecordedRootPlan.Root(root, "documents", true, false, List.of(), List.of())));
+      String inputs = "{\"dimension\":768}";
+      var plan = new RecordedInstallerGenerationPlan("serving-generation", scope,
+          new IndexTargetSnapshot(sha256(inputs), inputs),
+          new io.justsearch.app.api.settings.SettingsWitness(3, OperationKeys.generate(CLOCK)),
+          RecordedInstallerGenerationPlan.CandidateSettings.fromJson("{\"models\":{}}"),
+          List.of(new RecordedInstallerGenerationPlan.ModelIdentity("embedding", "fp32",
+              root.resolve("embedding.onnx"), "a".repeat(64), 1, acquisition)),
+          List.of(new RecordedInstallerGenerationPlan.AssetIdentity("embedding",
+              root.resolve("embedding.bin"), "a".repeat(64), 1, acquisition)), acquisition);
+      return new OperationPreparation(args, RecordedInstallerGenerationPlan.SCHEMA,
+          plan.toReplayPayload(), OperationPreparation.Content.METADATA);
+    }
+
+    @Override public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+      return new OperationApprovalPreview("Activate the downloaded model");
+    }
+
+    @Override public void validatePreparation(OperationPreparation prepared) {
+      if (!RecordedInstallerGenerationPlan.continuationPreparation(operation, prepared)) {
+        throw new IllegalArgumentException("Invalid installer activation preparation");
+      }
+    }
+
+    @Override public OperationExecution executePrepared(OperationPreparation prepared,
+        InvocationProvenance provenance, EngineContext context, OperationRecordHandle record) {
+      usedPreparation.set(prepared);
+      usedContext.set(context);
+      return OperationExecution.finished(OperationResult.success("activated"));
     }
 
     HandlerRegistry registry() {
@@ -360,6 +429,44 @@ class PreparedOperationDispatchTest {
               Optional.of(validToken), caller, replayKey, secondGate.preparationNonce()));
       assertTrue(store.find(replayKey).isEmpty(), "A consumed capsule cannot authorize a copied operation key");
       assertEquals(1, fixture.effects.get());
+    }
+  }
+
+  @Test
+  void installerCandidateIsBoundToTheRunnerKeyBeforeApprovalAndContinuation() throws Exception {
+    var fixture = new RecordedInstallerFixture(directory.resolve("installer-root"));
+    var capsules = new ConsentCapsuleService();
+    String key = OperationKeys.generate(CLOCK);
+    InvocationProvenance provenance = bulkProvenance(ORIGIN);
+    try (var store = new SqliteOperationStore(directory.resolve("installer-operations.db"))) {
+      var executor = bulkExecutor(store, fixture.registry(), capsules);
+      var gated = assertThrows(ConfirmationRequiredException.class,
+          () -> invokeBulk(executor, fixture.operation, "{}", provenance, Optional.empty(), ORIGIN,
+              key, null));
+      UUID nonce = gated.preparationNonce();
+      var pending = store.pendingPreparation(key,
+          OperationDescriptor.invocation(OperationKind.REINDEX, fixture.operation.id().value(), "{}", false))
+          .orElseThrow();
+      var pendingEnvelope = new PreparedInvocationCodec(
+          io.justsearch.agent.api.encryption.StoreCipher.disabled())
+          .decode(pending.payload(), key, nonce,
+              OperationDescriptor.invocation(OperationKind.REINDEX,
+                  fixture.operation.id().value(), "{}", false));
+      assertTrue(RecordedInstallerGenerationPlan.continuationPreparation(
+          fixture.operation, pendingEnvelope.preparation(), key));
+
+      String token = capsules.mintPrepared(fixture.operation.id().value(), "{}",
+          SourceTier.UNTRUSTED, key, nonce);
+      assertTrue(invokeBulk(executor, fixture.operation, "{}", provenance, Optional.of(token),
+          ORIGIN, key, nonce).success());
+      var usedPlan = RecordedInstallerGenerationPlan.fromReplayPayload(
+          fixture.usedPreparation.get().replayPayloadJson());
+      assertEquals(key, usedPlan.operationKey());
+      var basis = assertInstanceOf(OperationAuthorizationBasis.PreparedContinuation.class,
+          OperationAuthorizationBasis.decode(
+              fixture.usedContext.get().grantReference().orElseThrow()));
+      assertEquals(key, basis.operationKey());
+      assertEquals(nonce, basis.preparationNonce());
     }
   }
 

@@ -61,6 +61,7 @@ final class McpAnswerLegibilityTest {
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
+    McpAnswerCaptureFixture.bind(facade, documents);
 
     McpToolSurface surface =
         new McpToolSurface(

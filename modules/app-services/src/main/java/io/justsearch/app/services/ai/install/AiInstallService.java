@@ -10,8 +10,10 @@ import io.justsearch.app.api.OpCriticality;
 import io.justsearch.app.api.OpLeaseOutcome;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.SystemPropertyUtils;
 import io.justsearch.configuration.model.CapabilityTier;
@@ -29,6 +31,7 @@ import io.justsearch.configuration.model.ModelRegistryLoader;
 import io.justsearch.configuration.model.ModelVariant;
 import io.justsearch.configuration.model.SkipCause;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.app.api.EffectivePolicy;
 import io.justsearch.app.api.EnterprisePolicyService;
@@ -36,14 +39,20 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.LinkOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +60,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +81,11 @@ import org.slf4j.LoggerFactory;
 public final class AiInstallService implements io.justsearch.app.api.AiInstallService {
   private static final Logger log = LoggerFactory.getLogger(AiInstallService.class);
   private static final String REGISTRY_RESOURCE = "ai/model-registry.v2.json";
+  private static final JsonMapper JSON = JsonMapper.builder()
+      .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
+  /** ONNX packages whose selected model directory is installer-owned. Scope decides the apply path. */
+  private static final Set<String> INSTALLER_ONNX_PACKAGES =
+      Set.of("embedding", "reranker", "ner", "splade", "citation-scorer");
 
   private final OnlineAiService onlineAi;
   private final UiSettingsStore settingsStore;
@@ -126,6 +142,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
   private final AtomicBoolean cancelFlag = new AtomicBoolean(false);
   private final AiInstallStatus status = new AiInstallStatus();
+  private volatile boolean activationDownloadComplete;
   private volatile DownloadExecutor downloadExecutor;
 
   /**
@@ -356,6 +373,18 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   public AiInstallStatus getStatus() {
     maybeRecomputeInstalledFromDisk();
+    boolean checkActivation;
+    synchronized (lock) { checkActivation = "activation_required".equals(status.phase); }
+    if (checkActivation && !activationStillRequiredForStatus()) {
+      synchronized (lock) {
+        if ("activation_required".equals(status.phase)) {
+          status.phase = "done";
+          status.message = "Downloaded models activated.";
+          status.installedFully = activationDownloadComplete;
+          touch();
+        }
+      }
+    }
     Map<String, String> observed = observedFunctionalStatus();
     Set<String> declined = declinedPackages();
     synchronized (lock) {
@@ -595,6 +624,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       // cancelled run left staged. Without this the first post-restart poll reports 0 staged bytes.
       recordResumableBytes(plan);
       if (applyInstalledFromPlan(plan, registry)) {
+        if (hasPendingActivationFromDurableCandidate()) {
+          markActivationRequired();
+        }
         log.info(
             "AiInstall: recomputed installedFully=true from on-disk model presence after restart (tempdoc 562).");
       }
@@ -680,6 +712,208 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       return null;
     }
   }
+
+  /**
+   * Reconstructs the download-only activation state after a restart. The install contract records
+   * the retained candidate assets; the serving settings record what the running generation actually
+   * points at. A mismatch means the candidate is present on disk but has not been published yet.
+   */
+  private boolean hasPendingActivationFromDurableCandidate() {
+    return hasPendingActivationFromDurableCandidate(getManifest());
+  }
+
+  boolean hasPendingActivationFromDurableCandidate(ModelRegistry registry) {
+    return prepareInstalledGenerationCandidate(registry)
+        .map(candidate -> !candidate.generationBoundKeys().isEmpty())
+        .orElse(false);
+  }
+
+  /**
+   * Builds the installer activation candidate from durable facts only.
+   *
+   * <p>The contract is the acquisition boundary: package status and planner intent are not
+   * sufficient after a restart, and a directory left by a cancelled run must not become a model
+   * identity. Every returned identity is therefore read from a non-symbolic regular file and
+   * hashed before the candidate is returned. The method deliberately stops before settings or
+   * {@link ConfigStore} publication; the activation handler owns the later witness check and
+   * commitment.
+   */
+  @Override
+  public Optional<io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate>
+      prepareInstalledGenerationCandidate() {
+    return prepareInstalledGenerationCandidate(getManifest());
+  }
+
+  /** Registry-injecting seam for producer tests; the public path always uses the shipped registry. */
+  Optional<io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate>
+      prepareInstalledGenerationCandidate(ModelRegistry registry) {
+    if (settingsStore == null) return Optional.empty();
+    InstallContract contract = readInstallContractBestEffort();
+    if (contract == null || contract.models().isEmpty()
+        || contract.downloadProfile() == null) return Optional.empty();
+
+    UiSettingsStore.Snapshot snapshot = settingsStore.inspect();
+    UiSettings candidate = snapshot.settings();
+    String originalSettingsJson = JSON.writeValueAsString(candidate);
+    Path root = contract.modelsDir() == null ? modelsDir : contract.modelsDir();
+    if (root == null) return Optional.empty();
+    root = root.toAbsolutePath().normalize();
+
+    RecordedInstallerGenerationPlan.AcquisitionProvenance provenance =
+        registryProvenance();
+    List<RecordedInstallerGenerationPlan.ModelIdentity> models = new ArrayList<>();
+    List<RecordedInstallerGenerationPlan.AssetIdentity> assets = new ArrayList<>();
+    packageLoop: for (String packageId : INSTALLER_ONNX_PACKAGES) {
+      InstallContract.InstalledModel installed = contract.getModel(packageId);
+      ModelPackage pkg = registry.findPackage(packageId);
+      if (installed == null || installed.skipped() || pkg == null
+          || installed.variantFilename() == null || installed.targetDir() == null) {
+        continue;
+      }
+      ModelVariant selected = pkg.selectVariant(contract.downloadProfile());
+      if (selected == null || !selected.filename().equals(installed.variantFilename())
+          || !selected.sha256().equalsIgnoreCase(installed.sha256())) {
+        continue;
+      }
+      String candidateDir = InstallPlanner.effectiveTargetDir(pkg, selected);
+      if (!installed.targetDir().equals(candidateDir)
+          && !installed.targetDir().equals(pkg.targetDir())) continue;
+      AiInstallStatus.PackageStatus packageStatus = findPackageStatus(packageId);
+      if (packageStatus != null && ("failed".equals(packageStatus.state)
+          || "pending".equals(packageStatus.state)
+          || "downloading".equals(packageStatus.state)
+          || "verifying".equals(packageStatus.state))) {
+        continue;
+      }
+      Path modelPath = contract.resolveModelPath(packageId, root);
+      if (modelPath == null || !modelPath.toAbsolutePath().normalize().startsWith(root)) continue;
+      FileIdentity model = readFileIdentity(modelPath, selected.sha256());
+      if (model == null || model.size() != selected.sizeBytes()) continue;
+
+      for (var required : pkg.supportingFiles()) {
+        if (!required.required()) continue;
+        if (!installed.installedFiles().contains(required.filename())
+            || readFileIdentity(model.path().getParent().resolve(required.filename()),
+                required.sha256()) == null) {
+          continue packageLoop;
+        }
+      }
+
+      setOnnxCandidatePath(candidate, packageId,
+          modelPath.getParent().toAbsolutePath().normalize().toString());
+      models.add(new RecordedInstallerGenerationPlan.ModelIdentity(
+          packageId, selected.filename(), model.path(), model.sha256(), model.size(),
+          provenance));
+      assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(
+          packageId + "/" + installed.variantFilename(), model.path(), model.sha256(),
+          model.size(), provenance));
+
+      for (String fileName : installed.installedFiles()) {
+        if (fileName == null || fileName.isBlank() || fileName.equals(installed.variantFilename())) {
+          continue;
+        }
+        Path assetPath = model.path().getParent().resolve(fileName).normalize();
+        String expectedAssetSha = pkg.supportingFiles().stream()
+            .filter(file -> fileName.equals(file.filename()))
+            .map(io.justsearch.configuration.model.SupportingFile::sha256)
+            .findFirst().orElse(null);
+        FileIdentity asset = readFileIdentity(assetPath, expectedAssetSha);
+        if (asset == null) continue;
+        assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(
+            packageId + "/" + fileName, asset.path(), asset.sha256(), asset.size(), provenance));
+      }
+    }
+    if (models.isEmpty() || assets.isEmpty()) return Optional.empty();
+
+    ResolvedConfig serving = ConfigStore.globalOrNull() == null
+        ? ConfigStoreRebuilder.prepare(snapshot.settings())
+        : ConfigStore.globalOrNull().get();
+    ResolvedConfig prepared = ConfigStoreRebuilder.prepare(candidate);
+    ConfigApplyScopes.ChangedKeys changed = ConfigApplyScopes.classify(serving, prepared);
+    // A mixed install must freeze the chat path in the same full settings candidate. A query-only
+    // ONNX candidate deliberately leaves chat to the ordinary settings owner.
+    if (!changed.generationBound().isEmpty()) {
+      setChatCandidatePath(candidate, contract, root);
+      prepared = ConfigStoreRebuilder.prepare(candidate);
+      changed = ConfigApplyScopes.classify(serving, prepared);
+    }
+    try {
+      String json = JSON.writeValueAsString(candidate);
+      // An operator override can mask the effective component change while the desired settings
+      // path still changes. Keep that candidate for the ordinary settings owner; only an unchanged
+      // desired candidate is a true no-op.
+      if (changed.isNoOp() && json.equals(originalSettingsJson)) return Optional.empty();
+      return Optional.of(new io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate(
+          candidate, snapshot.witness(),
+          RecordedInstallerGenerationPlan.CandidateSettings.fromJson(json),
+          changed.hot(), changed.component(), changed.generationBound(), changed.restartRequired(),
+          models, assets, provenance));
+    } catch (RuntimeException failure) {
+      throw new IllegalStateException("Failed to encode installer activation candidate", failure);
+    }
+  }
+
+  private static void setOnnxCandidatePath(UiSettings settings, String packageId, String path) {
+    switch (packageId) {
+      case "embedding" -> settings.setEmbedOnnxModelPath(path);
+      case "reranker" -> settings.setRerankerModelPath(path);
+      case "ner" -> settings.setNerModelPath(path);
+      case "splade" -> settings.setSpladeModelPath(path);
+      case "citation-scorer" -> settings.setCitationScorerModelPath(path);
+      default -> throw new IllegalArgumentException("Unsupported ONNX package: " + packageId);
+    }
+  }
+
+  private static void setChatCandidatePath(
+      UiSettings settings, InstallContract contract, Path root) {
+    InstallContract.InstalledModel chat = contract.getModel("chat");
+    if (chat == null || chat.skipped() || chat.variantFilename() == null) return;
+    Path model = contract.resolveModelPath("chat", root);
+    if (model != null && Files.isRegularFile(model, LinkOption.NOFOLLOW_LINKS)) {
+      settings.setLlmModelPath(model.toAbsolutePath().normalize().toString());
+    }
+  }
+
+  private static RecordedInstallerGenerationPlan.AcquisitionProvenance registryProvenance() {
+    try (InputStream input = ModelRegistryLoader.class.getClassLoader()
+        .getResourceAsStream(REGISTRY_RESOURCE)) {
+      if (input == null) throw new IllegalStateException("Missing registry: " + REGISTRY_RESOURCE);
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      input.transferTo(new java.io.OutputStream() {
+        @Override public void write(int b) { digest.update((byte) b); }
+        @Override public void write(byte[] b, int off, int len) { digest.update(b, off, len); }
+      });
+      return new RecordedInstallerGenerationPlan.AcquisitionProvenance(
+          RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.REGISTRY,
+          REGISTRY_RESOURCE, HexFormat.of().formatHex(digest.digest()));
+    } catch (IOException | NoSuchAlgorithmException failure) {
+      throw new IllegalStateException("Unable to hash installer registry", failure);
+    }
+  }
+
+  private static FileIdentity readFileIdentity(Path path, String expectedSha256) {
+    if (path == null) return null;
+    Path normalized = path.toAbsolutePath().normalize();
+    try {
+      if (!Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS)) return null;
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      long size = 0;
+      try (InputStream input = Files.newInputStream(normalized, LinkOption.NOFOLLOW_LINKS)) {
+        byte[] buffer = new byte[64 * 1024];
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+          if (read > 0) { digest.update(buffer, 0, read); size += read; }
+        }
+      }
+      String sha = HexFormat.of().formatHex(digest.digest());
+      if (expectedSha256 != null && !sha.equalsIgnoreCase(expectedSha256)) return null;
+      return new FileIdentity(normalized, sha, size);
+    } catch (IOException | NoSuchAlgorithmException failure) {
+      return null;
+    }
+  }
+
+  private record FileIdentity(Path path, String sha256, long size) {}
 
   /**
    * Reclaim stale status only when no install owner holds the running guard. Progress age is
@@ -1086,19 +1320,35 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
+      // Query-only ONNX paths use the ordinary settings owner. A mixed candidate stays entirely
+      // deferred for recorded activation, including its chat path.
+      applyQueryOnlyCandidateIfNeeded();
+
       // ---- Stage 4: validate ---------------------------------------------------------------
+      // A generation-changing acquisition has deliberately not published the new ONNX paths yet,
+      // so a smoke test here would either exercise the old candidate or fail on a fresh install.
+      // Recorded activation owns runtime validation for that candidate.
       ValidationStage.Verdict verdict =
           new ValidationStage(
                   cancelFlag::get,
                   this::cancelled,
                   () -> updateState("running", "smoke_test", "Running smoke test..."),
                   this::smokeTestBestEffort)
-              .run(profile.includesGguf() && isPolicyOnlineAiAllowed());
+              .run(
+                  profile.includesGguf()
+                      && isPolicyOnlineAiAllowed()
+                      && !hasGenerationChangingAcquisition());
       if (!verdict.allowsCompletion()) {
         return;
       }
 
       applyCompletionState();
+      // Generation-changing ONNX assets are staged successfully, but their paths must be
+      // published by the separately approved recorded activation operation. Keep the acquisition
+      // result truthful and leave the ordinary settings owner untouched until that operation runs.
+      if (hasGenerationChangingAcquisition()) {
+        markActivationRequired();
+      }
     } finally {
       if (acquisitionProcedure) {
         reconciler.endProcedure(RuntimeStatus.ProcedureKind.INSTALL_ACQUISITION);
@@ -1119,11 +1369,12 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * every step already guards on ITS OWN inputs being on disk, which is a strictly better stage
    * selector than a tier mapping could be, because it is disk truth rather than plan truth.
    * {@code applySettings} falls out unless the chat GGUF is a regular file; {@code applyOrtNativePath}
-   * unless the cuda12 dir holds every CUDA runtime DLL; {@code applyCudaServerExe} unless the cuda12
-   * llama-server binary exists; {@code applyOnnxSettings} writes a path only for a package that is
-   * present and neither skipped nor failed. So the core stage applies the ORT native path (its
-   * RUNTIME tier just delivered the DLLs) and silently does not apply the chat settings, and the
-   * chat stage applies them. Re-running an already-applied step is a no-op by construction:
+   * unless the cuda12 dir holds every CUDA runtime DLL; and {@code applyCudaServerExe} unless the
+   * cuda12 llama-server binary exists. The ONNX settings step is deliberately a no-op during
+   * acquisition because those generation-bound paths belong to the separately approved recorded
+   * activation. So the core stage applies the ORT native path (its RUNTIME tier just delivered the
+   * DLLs) and silently does not apply the chat settings, while the chat stage applies them.
+   * Re-running an already-applied step is a no-op by construction:
    * {@code setSysPropIfBlank} is first-writer-wins, and the settings writes are the same absolute
    * paths.
    *
@@ -1151,12 +1402,13 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // Run-scoped, so they outlive one stage's configuration pass. These three write process-wide
     // latches (a system property, the selected server binary, the engine's runtime overrides) whose
-    // work is done the first time it succeeds; applyOnnxSettings is deliberately NOT among them
-    // because its work is incremental — each stage that lands an encoder gives it one more path to
-    // write.
+    // work is done the first time it succeeds. ONNX settings are intentionally absent from this
+    // acquisition tail: generation-bound paths are published by recorded activation.
     BooleanSupplier cudaServerExeOnce = StagedAcquisition.applyOncePerRun(this::applyCudaServerExe);
     BooleanSupplier llmSettingsOnce =
-        StagedAcquisition.applyOncePerRun(() -> applySettings(registry, plan));
+        StagedAcquisition.applyOncePerRun(
+            () -> !hasPotentialGenerationBoundAcquisition(plan)
+                && applySettings(registry, plan));
     BooleanSupplier ortNativePathOnce = StagedAcquisition.applyOncePerRun(this::applyOrtNativePath);
 
     boolean completed =
@@ -1178,7 +1430,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
                     ConfigurationStage.forInstall(
                             cudaServerExeOnce,
                             llmSettingsOnce,
-                            () -> applyOnnxSettings(registry, plan),
+                            // ONNX model paths are generation-bound. The accepted recorded
+                            // activation owns their settings projection after this acquisition.
+                            () -> false,
                             ortNativePathOnce,
                             StagedAcquisition.restartGate(acquired, this::tryRestartWorkerBestEffort),
                             cancelFlag::get,
@@ -1191,7 +1445,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
                     ConfigurationStage.forInstall(
                             cudaServerExeOnce,
                             llmSettingsOnce,
-                            () -> applyOnnxSettings(registry, plan),
+                            // ONNX model paths are generation-bound. The accepted recorded
+                            // activation owns their settings projection after this acquisition.
+                            () -> false,
                             ortNativePathOnce,
                             this::tryRestartWorkerBestEffort,
                             cancelFlag::get,
@@ -1807,6 +2063,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         continue;
       }
 
+      // The contract survives a restart and must describe what acquisition actually finished.
+      // A planned file with a failed or pending package is not an installed activation candidate.
+      AiInstallStatus.PackageStatus acquired = findPackageStatus(pkg.id());
+      if (acquired != null && !"installed".equals(acquired.state)) {
+        models.put(pkg.id(), InstallContract.InstalledModel.skipped(
+            pkg.id(), "Acquisition did not complete"));
+        continue;
+      }
+
       ModelVariant variant = pkg.selectVariant(plan.profile());
       if (variant == null && pkg.supportingFiles().isEmpty()) {
         // Nothing to record: no variant AND no supporting files.
@@ -1834,7 +2099,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
               variant == null ? null : variant.filename(),
               variant == null ? null : variant.precision(),
               variant == null ? null : variant.targetEP(),
-              pkg.targetDir(),
+              InstallPlanner.effectiveTargetDir(pkg, variant),
               variant == null ? null : variant.sha256(),
               installedFiles,
               false,
@@ -1876,7 +2141,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     var snapshot = settingsStore.inspect();
     UiSettings s = snapshot.settings();
     s.setLlmModelPath(chatModelPath.toAbsolutePath().toString());
-    Path effectiveModel = io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(s)
+    Path effectiveModel = ConfigStoreRebuilder.prepare(s)
         .ai().llmModelPath();
     boolean refreshServingModel = effectiveModel != null
         && effectiveModel.toAbsolutePath().normalize().equals(chatModelPath.toAbsolutePath().normalize());
@@ -1887,43 +2152,109 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     return true;
   }
 
-  /** Commits installed ONNX paths once per acquisition stage, before its runtime effects. */
-  private boolean applyOnnxSettings(ModelRegistry registry, InstallPlan plan) {
-    if (settingsStore == null) return false;
+  /**
+   * Returns true only when this acquisition downloaded an eligible generation-changing package.
+   * Packages that were already present, skipped, failed, or left pending do not create an
+   * activation obligation.
+   */
+  private boolean hasGenerationChangingAcquisition() {
+    return prepareInstalledGenerationCandidate()
+        .map(candidate -> !candidate.generationBoundKeys().isEmpty())
+        .orElse(false);
+  }
 
-    var snapshot = settingsStore.inspect();
-    UiSettings s = snapshot.settings();
-    boolean dirty = false;
+  private void applyQueryOnlyCandidateIfNeeded() {
+    Optional<io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate> candidate =
+        prepareInstalledGenerationCandidate();
+    if (candidate.isEmpty()) return;
+    var prepared = candidate.orElseThrow();
+    if (!prepared.generationBoundKeys().isEmpty()) return;
+    commitSettings(prepared.candidateSettings(), prepared.settingsWitness(), "ai-install-onnx-models");
+  }
 
-    record OnnxFeature(String pkgId, String current, java.util.function.Consumer<String> setter) {}
-    List<OnnxFeature> features = List.of(
-        new OnnxFeature("embedding", s.getEmbedOnnxModelPath(), s::setEmbedOnnxModelPath),
-        new OnnxFeature("reranker", s.getRerankerModelPath(), s::setRerankerModelPath),
-        new OnnxFeature("ner", s.getNerModelPath(), s::setNerModelPath),
-        new OnnxFeature("splade", s.getSpladeModelPath(), s::setSpladeModelPath),
-        new OnnxFeature("citation-scorer", s.getCitationScorerModelPath(), s::setCitationScorerModelPath));
-
-    for (OnnxFeature feature : features) {
-      ModelPackage pkg = registry.findPackage(feature.pkgId());
-      if (pkg == null) continue;
-      // Skip if Install AI didn't actually install this package.
-      if (isPackageSkippedOrFailed(pkg.id(), plan)) continue;
-      // A directory left by an earlier interrupted run does not prove this stage acquired it.
-      if (isPackageAwaitingItsStage(pkg.id())) continue;
-
-      Path modelDir = modelsDir.resolve(pkg.targetDir());
-      if (!Files.isDirectory(modelDir)) continue;
-
-      String absolute = modelDir.toAbsolutePath().toString();
-      if (absolute.equals(feature.current())) continue;
-      feature.setter().accept(absolute);
-      dirty = true;
+  /**
+   * Admission check used before the durable contract exists. It only considers packages this run
+   * actually planned to fetch, then applies the same effective scope register as the durable
+   * candidate. This keeps a mixed chat download from committing ordinary settings first.
+   */
+  private boolean hasPotentialGenerationBoundAcquisition(InstallPlan plan) {
+    if (settingsStore == null || plan == null) return false;
+    Set<String> planned = plan.downloads().stream()
+        .map(InstallPlan.PlannedDownload::packageId).collect(java.util.stream.Collectors.toSet());
+    UiSettingsStore.Snapshot snapshot = settingsStore.inspect();
+    UiSettings candidate = snapshot.settings();
+    synchronized (lock) {
+      for (String packageId : INSTALLER_ONNX_PACKAGES) {
+        if (!planned.contains(packageId)) continue;
+        var packageStatus = findPackageStatus(packageId);
+        if (packageStatus == null || !"installed".equals(packageStatus.state)) continue;
+        ModelPackage pkg = getManifest().findPackage(packageId);
+        if (pkg == null || pkg.targetDir() == null) continue;
+        Path modelDir = modelsDir.resolve(InstallPlanner.effectiveTargetDir(
+            pkg, pkg.selectVariant(plan.profile())));
+        if (Files.isDirectory(modelDir)) {
+          setOnnxCandidatePath(candidate, packageId,
+              modelDir.toAbsolutePath().normalize().toString());
+        }
+      }
     }
+    ResolvedConfig serving = ConfigStore.globalOrNull() == null
+        ? ConfigStoreRebuilder.prepare(snapshot.settings()) : ConfigStore.globalOrNull().get();
+    ConfigApplyScopes.ChangedKeys changed = ConfigApplyScopes.classify(
+        serving, ConfigStoreRebuilder.prepare(candidate));
+    return !changed.generationBound().isEmpty();
+  }
 
-    if (dirty) {
-      commitSettings(s, snapshot.witness(), "ai-install-onnx-models");
+  /** Publish the download-only terminal state until the separately approved activation runs. */
+  private void markActivationRequired() {
+    synchronized (lock) {
+      activationDownloadComplete = status.installedFully;
+      status.phase = "activation_required";
+      status.message = "Downloaded — activation required.";
+      // The files are present, but the generation has not been published. Keep this false so the
+      // observed runtime verdict cannot claim that the newly downloaded model is active.
+      status.installedFully = false;
+      touch();
     }
-    return dirty;
+  }
+
+  /** Cheap status projection; file hashes and authority remain in accepted activation preparation. */
+  private boolean activationStillRequiredForStatus() {
+    if (settingsStore == null) return true;
+    try {
+      InstallContract contract = readInstallContractBestEffort();
+      if (contract == null) return true;
+      UiSettings snapshot = settingsStore.inspect().settings();
+      UiSettings candidate = JSON.readValue(JSON.writeValueAsString(snapshot), UiSettings.class);
+      Path root = (contract.modelsDir() == null ? modelsDir : contract.modelsDir())
+          .toAbsolutePath().normalize();
+      boolean found = false;
+      for (String packageId : INSTALLER_ONNX_PACKAGES) {
+        var installed = contract.getModel(packageId);
+        if (installed == null || installed.skipped() || installed.variantFilename() == null) continue;
+        Path model = contract.resolveModelPath(packageId, root);
+        if (model == null || !Files.isRegularFile(model, LinkOption.NOFOLLOW_LINKS)) return true;
+        setOnnxCandidatePath(candidate, packageId,
+            model.getParent().toAbsolutePath().normalize().toString());
+        found = true;
+      }
+      if (!found) return true;
+      ResolvedConfig desired = ConfigStoreRebuilder.prepare(candidate);
+      ConfigStore published = ConfigStore.globalOrNull();
+      if (published == null) {
+        return !ConfigApplyScopes.classify(ConfigStoreRebuilder.prepare(snapshot), desired)
+            .generationBound().isEmpty();
+      }
+      published.publicationLock().readLock().lock();
+      try {
+        return !ConfigApplyScopes.classify(published.get(), desired)
+            .generationBound().isEmpty();
+      } finally {
+        published.publicationLock().readLock().unlock();
+      }
+    } catch (RuntimeException unavailable) {
+      return true;
+    }
   }
 
   /**
@@ -2084,32 +2415,6 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // a newer configuration already published by the accepted settings owner.
     log.info("alpha.14 fix B: ORT native path set to {}", absPath);
     return true;
-  }
-
-  /**
-   * True when this run tracks the package but has not finished with it — its files are still
-   * pending, downloading or verifying.
-   *
-   * <p>Deliberately answers false for a package this run has no status entry for, so a package the
-   * plan never mentioned behaves exactly as it did before staging existed.
-   */
-  private boolean isPackageAwaitingItsStage(String pkgId) {
-    synchronized (lock) {
-      var ps = findPackageStatus(pkgId);
-      if (ps == null) return false;
-      return "pending".equals(ps.state)
-          || "downloading".equals(ps.state)
-          || "verifying".equals(ps.state);
-    }
-  }
-
-  /** True if the package was in plan.skipped() OR a per-package status reports failed. */
-  private boolean isPackageSkippedOrFailed(String pkgId, InstallPlan plan) {
-    for (var sp : plan.skipped()) {
-      if (pkgId.equals(sp.packageId())) return true;
-    }
-    return status.packages.stream()
-        .anyMatch(ps -> pkgId.equals(ps.packageId) && "failed".equals(ps.state));
   }
 
   // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 package io.justsearch.app.services.intent;
 
 import io.justsearch.app.api.operations.RecordedBulkPlan;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationPreparation;
@@ -145,6 +146,19 @@ public final class IndexedRootGrantScope implements DurableGrantScope {
       EngineContext engineContext) {
     if (op == null || plan == null || !governedOperations.contains(op.id())
         || !op.id().value().equals(plan.profile().operationRef())) return false;
+    var supplier = indexedRoots;
+    if (supplier == null) return false;
+    final List<Path> watchedRoots;
+    try { watchedRoots = List.copyOf(supplier.apply(engineContext)); }
+    catch (RuntimeException unavailable) { return false; }
+    return plan.scope().roots().isEmpty() || coversRoots(plan.scope(), watchedRoots);
+  }
+
+  /** Revalidate the installer's frozen rebuild scope against the current watched roots. */
+  public boolean coversInstallerGenerationPlan(Operation op, RecordedInstallerGenerationPlan plan,
+      EngineContext engineContext) {
+    if (op == null || plan == null || !governedOperations.contains(op.id())
+        || !RecordedInstallerGenerationPlan.OPERATION_ID.equals(op.id().value())) return false;
     var supplier = indexedRoots;
     if (supplier == null) return false;
     final List<Path> watchedRoots;

@@ -81,7 +81,10 @@ final class OperationFaultBarrierTest {
   @Test
   void phaseFamiliesAreAcceptedOnlyForTheirOperationKinds() {
     var bulkPhases = java.util.List.of(
-        "bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion");
+        "bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion",
+        "installer-before-marker", "installer-before-arm", "installer-before-pointer",
+        "installer-pointer-before-settings", "installer-settings-before-publication",
+        "installer-before-receipt");
     var ordinaryPhases = java.util.List.of("before-accept", "after-accept", "after-effect");
     for (String phase : bulkPhases) {
       assertNotSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK,
@@ -138,7 +141,10 @@ final class OperationFaultBarrierTest {
   @Test
   void eachBulkBoundaryPublishesExactEvidenceOnceAcrossSuccessorHook() throws Exception {
     for (String phase : java.util.List.of(
-        "bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion")) {
+        "bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion",
+        "installer-before-marker", "installer-before-arm", "installer-before-pointer",
+        "installer-pointer-before-settings", "installer-settings-before-publication",
+        "installer-before-receipt")) {
       Path scenarioData = data.resolve(phase);
       var selector = selection(phase, "reindex");
       var hook = OperationFaultBarrier.fromEnvironment(scenarioData, selector::get);

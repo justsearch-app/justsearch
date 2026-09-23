@@ -2,8 +2,10 @@
 package io.justsearch.app.services.settings;
 
 import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationRecord;
@@ -11,6 +13,7 @@ import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.app.services.registry.executor.RecordedInstallerGenerationPlanResolver;
 import io.justsearch.configuration.resolved.ConfigChangedEvent;
 import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -29,6 +32,49 @@ import java.util.function.BooleanSupplier;
 /** One physical settings-file/config owner; the operation runner alone terminalizes its row. */
 public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(SettingsCommitCoordinator.class);
+
+  /** Boot's exact file-only roll-forward before a ConfigStore or native model can be constructed. */
+  public static UiSettings rollForwardInstallerBoot(UiSettingsStore store, UiSettings candidate,
+      SettingsWitness successor, RecordedInstallerGenerationPlan plan) throws IOException {
+    Objects.requireNonNull(store, "store");
+    Objects.requireNonNull(candidate, "candidate");
+    Objects.requireNonNull(successor, "successor");
+    Objects.requireNonNull(plan, "plan");
+    var prepared = store.prepareExact(candidate, successor);
+    try { store.replacePrepared(prepared); }
+    catch (IOException | RuntimeException moveFailure) {
+      try {
+        var after = store.inspect();
+        if (!successor.equals(after.witness())) {
+          throw new IOException("Committed installer generation settings roll-forward failed", moveFailure);
+        }
+        requireAcceptedInstallerSettings(plan, after.settings());
+      } catch (RuntimeException unreadable) {
+        throw new IOException("Committed installer generation settings roll-forward is uncertain", unreadable);
+      }
+    }
+    var after = store.inspect();
+    if (!successor.equals(after.witness())) {
+      throw new IOException("Committed installer generation settings roll-forward lost its witness");
+    }
+    requireAcceptedInstallerSettings(plan, after.settings());
+    return after.settings();
+  }
+
+  /** The already-moved boot branch must match the accepted full candidate exactly. */
+  public static void requireAcceptedInstallerSettings(RecordedInstallerGenerationPlan plan,
+      UiSettings settings) throws IOException {
+    try {
+      var actual = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+          tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(settings));
+      if (!plan.candidateSettings().equals(actual)) {
+        throw new IOException("Installer generation successor settings differ from the accepted candidate");
+      }
+    } catch (RuntimeException invalid) {
+      throw new IOException("Installer generation successor settings are unreadable", invalid);
+    }
+  }
+
   @FunctionalInterface
   interface Replacement {
     void replace(UiSettingsStore.PreparedSettings prepared) throws IOException;
@@ -149,7 +195,13 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   /** Shared reservation checks; both public entry points hold the physical mutex. */
   private SettingsCommitFence reserveOwned(long id, String key, SettingsWitness expected, boolean reset) {
     if (!inspected || blocked) throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery is unresolved", Map.of());
-    if (fence != null) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    // Keep the existing in-progress precedence for all contenders. Only the armed installer
+    // row recovered at boot may proceed to the exact-witness check below.
+    if (fence != null && (reset || !Objects.equals(recoveredId, id) || fence.id != id
+        || !fence.key.equals(key) || fence.phase != Phase.PREPARING
+        || fence.preparationStarted)) {
+      throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    }
     if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
     OperationKeys.timestampMillis(key);
     Objects.requireNonNull(expected, "expected settings witness");
@@ -166,6 +218,15 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     if (!prior.equals(expected)) {
       throw refused("VERSION_CONFLICT", "Settings changed since this candidate was read",
           Map.of("currentRevision", prior.acceptedRevision()));
+    }
+    // Recovery reserves an armed installer row before the runner resumes it. Reuse that
+    // reservation only for the exact same row and source witness; another operation must
+    // still be refused, and a successor settings witness cannot be re-prepared as A.
+    if (fence != null) {
+      if (fence.prior.equals(prior)) {
+        return fence;
+      }
+      throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
     }
     var reserved = new SettingsCommitFence(id, key, prior, snapshot.settings(), null, reset);
     fence = reserved;
@@ -212,6 +273,220 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     }
     if (preparedRow && !context.equals(SettingsCandidatePreparation.decode(row, accepted.orElseThrow()))) {
       throw new IllegalArgumentException("Settings candidate preparation changed after acceptance");
+    }
+  }
+
+  @Override
+  public void verifyInstallerGenerationPreparation(OperationRecord row,
+      java.util.Optional<OperationStore.Preparation> accepted,
+      RecordedInstallerGenerationPlan plan) {
+    Objects.requireNonNull(plan, "plan");
+    RecordedInstallerGenerationPlan exact = new RecordedInstallerGenerationPlanResolver()
+        .resolve(row, accepted.orElseThrow(
+            () -> new IllegalArgumentException("Installer activation preparation disappeared")));
+    if (!exact.equals(plan)) {
+      throw new IllegalArgumentException("Installer activation settings differ from the accepted row");
+    }
+  }
+
+  @Override
+  public PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
+      UiSettings candidate, AttemptControl control) {
+    Objects.requireNonNull(candidate, "candidate");
+    Objects.requireNonNull(control, "control");
+    SettingsComponentComposer.Prepared preparedComponents = null;
+    mutex.lock();
+    try {
+      SettingsCommitFence active = requireFence(reservation);
+      if (active.reset || active.preparationStarted) {
+        throw new IllegalStateException("Installer generation settings preparation already started");
+      }
+      active.preparationStarted = true;
+      var successor = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
+      // Exact bytes matter: the accepted generation plan already froze this detached settings
+      // candidate, including ordinary settings that accompanied the model paths.
+      var preparedSettings = store.prepareExact(candidate, successor);
+      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(preparedSettings.settings()),
+          "Prepared installer configuration");
+      ResolvedConfig serving = config.get();
+      var changed = ConfigApplyScopes.classify(serving, desired);
+      if (!changed.restartRequired().isEmpty()
+          && !java.util.Set.of("justsearch.api.port").containsAll(changed.restartRequired())) {
+        throw refused("RESTART_SOURCE_DRIFT", "A process source changed during model activation",
+            Map.of("keys", List.copyOf(changed.restartRequired())));
+      }
+      boolean restartRequired = !changed.restartRequired().isEmpty();
+      ResolvedConfig published = restartRequired ? desired.retainingApiPortFrom(serving) : desired;
+      if (!changed.component().isEmpty()) {
+        preparedComponents = Objects.requireNonNull(components.prepare(preparedSettings.settings(),
+            desired, changed.component()), "Prepared installer components");
+      }
+      ConfigStore.PreparedSwap preparedConfig = config.prepareSwap(published);
+      OperationResult response = prepareResponse.apply(preparedSettings.settings());
+      if (restartRequired) response = withRestartScheduled(response);
+      var receipt = new Receipt(active.key, successor.acceptedRevision(), response);
+      return new InstallerGenerationProjection(active, control, preparedSettings, preparedConfig,
+          preparedComponents, receipt, restartRequired);
+    } catch (RuntimeException | Error failure) {
+      if (preparedComponents != null) {
+        try { preparedComponents.abort(); }
+        catch (RuntimeException | Error cleanup) {
+          control.uncertain();
+          failure.addSuppressed(cleanup);
+        }
+      }
+      throw failure;
+    } finally { mutex.unlock(); publishIssue(); }
+  }
+
+  @Override public boolean installerGenerationProjected(RecordedInstallerGenerationPlan plan) {
+    Objects.requireNonNull(plan, "plan");
+    try {
+      var snapshot = store.inspect();
+      var expected = new SettingsWitness(
+          Math.addExact(plan.settingsWitness().acceptedRevision(), 1), plan.operationKey());
+      if (!expected.equals(snapshot.witness())) return false;
+      var actual = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+          tools.jackson.databind.json.JsonMapper.builder().build()
+              .writeValueAsString(snapshot.settings()));
+      return plan.candidateSettings().equals(actual);
+    } catch (RuntimeException unavailable) {
+      return false;
+    }
+  }
+
+  // The fixed settings owner alone reports this composite projection to the runner. Keeping
+  // these calls on the outer owner also preserves the architecture gate for nested helpers.
+  private void committedInstallerGeneration(AttemptControl control, Receipt receipt) {
+    control.committed(receipt);
+  }
+
+  private void uncertainInstallerGeneration(AttemptControl control) {
+    control.uncertain();
+  }
+
+  private final class InstallerGenerationProjection implements PreparedGenerationProjection {
+    private final SettingsCommitFence active;
+    private final AttemptControl control;
+    private final UiSettingsStore.PreparedSettings settings;
+    private final ConfigStore.PreparedSwap configSwap;
+    private final SettingsComponentComposer.Prepared componentSwap;
+    private final Receipt receipt;
+    private final boolean restartRequired;
+    private boolean admitted;
+    private boolean committed;
+    private boolean retired;
+
+    private InstallerGenerationProjection(SettingsCommitFence active, AttemptControl control,
+        UiSettingsStore.PreparedSettings settings, ConfigStore.PreparedSwap configSwap,
+        SettingsComponentComposer.Prepared componentSwap, Receipt receipt, boolean restartRequired) {
+      this.active = active;
+      this.control = control;
+      this.settings = settings;
+      this.configSwap = configSwap;
+      this.componentSwap = componentSwap;
+      this.receipt = receipt;
+      this.restartRequired = restartRequired;
+    }
+
+    @Override public void withOwnerLocks(Runnable publication) {
+      if (componentSwap == null) publication.run();
+      else componentSwap.withOwnerLocks(publication);
+    }
+
+    @Override public void admitBeforePointer() {
+      // The caller holds the shared publication writer after its runtime and generation guards.
+      // The logical reservation excludes other official settings commits throughout this cut.
+      if (active != fence || active.phase != Phase.PREPARING || admitted || processClosing.getAsBoolean()) {
+        throw refused("ENGINE_CLOSING", "Model activation settings can no longer commit", Map.of());
+      }
+      SettingsWitness current = store.inspect().witness();
+      if (!active.prior.equals(current)) {
+        throw refused("VERSION_CONFLICT", "Settings changed before model activation",
+            Map.of("currentRevision", current.acceptedRevision()));
+      }
+      config.validatePrepared(configSwap);
+      if (componentSwap != null) componentSwap.validate();
+      if (!control.admitCommit(receipt)) {
+        throw new CancellationException("Model activation was cancelled before pointer commitment");
+      }
+      admitted = true;
+    }
+
+    @Override public void afterPointerCommitted() throws IOException {
+      if (!admitted || committed || active != fence) {
+        throw new IllegalStateException("Installer projection has no admitted pointer commitment");
+      }
+      try { replacement.replace(settings); }
+      catch (IOException | RuntimeException moveFailure) {
+        final UiSettingsStore.Snapshot observed;
+        try { observed = store.inspect(); }
+        catch (RuntimeException unreadable) {
+          uncertainInstallerGeneration(control);
+          throw new IOException("Committed generation has unreadable settings projection", unreadable);
+        }
+        final boolean exactCandidate;
+        try {
+          var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+          var observedCandidate = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+              mapper.writeValueAsString(observed.settings()));
+          var preparedCandidate = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+              mapper.writeValueAsString(settings.settings()));
+          exactCandidate = preparedCandidate.equals(observedCandidate);
+        } catch (RuntimeException invalid) {
+          uncertainInstallerGeneration(control);
+          throw new IOException("Committed generation has unreadable settings candidate", invalid);
+        }
+        if (!receipt.operationKey().equals(observed.witness().lastCommittedOperationKey())
+            || observed.witness().acceptedRevision() != receipt.acceptedRevision()
+            || !exactCandidate) {
+          uncertainInstallerGeneration(control);
+          throw new IOException("Committed generation awaits exact settings roll-forward", moveFailure);
+        }
+        // An atomic move may report failure after it has installed the exact accepted candidate.
+      }
+      committed = true;
+      active.phase = Phase.COMMITTED;
+      active.restartRequired = restartRequired;
+      committedInstallerGeneration(control, receipt);
+      try {
+        config.installPrepared(configSwap);
+        if (componentSwap != null) componentSwap.install();
+      } catch (RuntimeException | Error publicationFailure) {
+        uncertainInstallerGeneration(control);
+        throw publicationFailure;
+      }
+    }
+
+    @Override public void afterRuntimePublished() {
+      if (!committed || retired) return;
+      Throwable notificationFailure = null;
+      try {
+        config.notifyListeners(configSwap.event());
+        if (componentSwap != null) componentSwap.notifyObservers();
+      } catch (RuntimeException | Error failure) {
+        notificationFailure = failure;
+      }
+      if (componentSwap != null) {
+        try { componentSwap.retire(); }
+        catch (RuntimeException | Error retirementFailure) {
+          uncertainInstallerGeneration(control);
+          if (notificationFailure == null) notificationFailure = retirementFailure;
+          else notificationFailure.addSuppressed(retirementFailure);
+        }
+      }
+      if (notificationFailure == null) retired = true;
+      if (notificationFailure instanceof RuntimeException runtime) throw runtime;
+      if (notificationFailure instanceof Error error) throw error;
+    }
+
+    @Override public void abortBeforePointer() {
+      if (committed) {
+        throw new IllegalStateException("Committed generation projection cannot be abandoned");
+      }
+      // The generation owner calls this only after its strict promotion witness proves A stayed
+      // unchanged. Admission alone cannot turn that proven precommit failure into commitment.
+      if (componentSwap != null) componentSwap.abort();
     }
   }
 
@@ -552,6 +827,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       long expected = row.expectedSettingsRevision();
       if (expected < 0 || expected == Long.MAX_VALUE) {
         block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, row.id()));
+        return;
+      }
+      if (RecordedInstallerGenerationPlan.OPERATION_ID.equals(row.descriptor().operationRef())) {
+        if (row.descriptor().kind() != OperationKind.REINDEX) {
+          block(new RecoveryIssue(RecoveryReason.INVALID_PREPARATION, row.id()));
+          return;
+        }
+        // This REINDEX commits at the generation pointer. The settings file may still be A
+        // after that pointer moved, or may already be B before runtime publication. Neither
+        // witness alone decides its terminal outcome; the recorded-ingestion owner must inspect
+        // the accepted candidate, pointer, settings projection and reconstructed runtime.
+        fence = new SettingsCommitFence(row.id(), row.key(), witness);
         return;
       }
       if (row.key().equals(witness.lastCommittedOperationKey()) && witness.acceptedRevision() == expected + 1) {

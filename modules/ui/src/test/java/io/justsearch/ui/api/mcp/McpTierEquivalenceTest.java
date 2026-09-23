@@ -345,6 +345,7 @@ final class McpTierEquivalenceTest {
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
+    McpAnswerCaptureFixture.bind(facade, documents);
     // Tempdoc 770 §F.5: a non-null knowledgeLookup is wired so the removed facet sidecar WOULD
     // have fired here — the never() verification below is the regression guard against the second
     // full hybrid search returning.
@@ -403,6 +404,7 @@ final class McpTierEquivalenceTest {
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
+    McpAnswerCaptureFixture.bind(facade, documents);
 
     // Low embedding coverage (< 100) is the enrichment-hint trigger (McpToolSurface#enrichmentHint).
     KnowledgeStatus lowCoverageStatus =

@@ -19,7 +19,10 @@ final class OperationResumeE2ETest {
       "ingest-after-accept-before-effect", "settings-after-accept-before-effect",
       "ingest-after-effect-before-checkpoint", "settings-after-effect-before-checkpoint",
       "ingest-client-disconnect", "bulk-partial-capture", "bulk-state-before-binding",
-      "bulk-promotion-before-terminal"})
+      "bulk-promotion-before-terminal", "installer-before-marker", "installer-before-arm",
+      "installer-before-pointer",
+      "installer-pointer-before-settings", "installer-settings-before-publication",
+      "installer-before-receipt"})
   void installedOperationSurvivesItsExactFaultBoundary(String scenario) throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario(scenario);
   }

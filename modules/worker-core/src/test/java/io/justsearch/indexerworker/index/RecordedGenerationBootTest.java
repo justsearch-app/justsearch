@@ -84,6 +84,8 @@ final class RecordedGenerationBootTest {
     try (var promotion = manager.beginRecordedPromotion(
         KEY, SOURCE, OTHER_FINGERPRINT, started.sourceGeneration())) {
       assertThrows(IOException.class, promotion::promote);
+      assertEquals(IndexGenerationManager.RecordedPromotion.CommitWitness.UNCHANGED,
+          promotion.inspectCommitWitness());
     }
     assertUnchanged(started.base(), before);
   }
@@ -100,10 +102,30 @@ final class RecordedGenerationBootTest {
     try (var promotion = manager.beginRecordedPromotion(
         KEY, SOURCE, FINGERPRINT, started.sourceGeneration())) {
       assertEquals(started.targetGeneration(), promotion.promote().active_generation());
+      assertEquals(IndexGenerationManager.RecordedPromotion.CommitWitness.COMMITTED,
+          promotion.inspectCommitWitness());
     }
     var boot = new IndexGenerationManager(started.base()).initializeForBoot(
         recorded(started, true), FINGERPRINT);
     assertEquals(IndexGenerationManager.BootDisposition.PROMOTED, boot.disposition());
+  }
+
+  @Test
+  void revokedContinuationFencesUncommittedBuildButRecoversCommittedPointer() throws Exception {
+    Started started = startRecorded(temp.resolve("revoked-after-commit"));
+    var denied = new IndexGenerationManager.BootOwnership.Recorded(
+        KEY, started.sourceGeneration(), SOURCE, FINGERPRINT, true, false);
+    var manager = new IndexGenerationManager(started.base());
+    assertEquals(IndexGenerationManager.BootDisposition.FENCED,
+        manager.initializeForBoot(denied, FINGERPRINT).disposition());
+
+    try (var promotion = manager.beginRecordedPromotion(
+        KEY, SOURCE, FINGERPRINT, started.sourceGeneration())) {
+      assertEquals(started.targetGeneration(), promotion.promote().active_generation());
+    }
+    assertEquals(IndexGenerationManager.BootDisposition.PROMOTED,
+        new IndexGenerationManager(started.base()).initializeForBoot(denied, FINGERPRINT)
+            .disposition());
   }
 
   @ParameterizedTest
@@ -162,6 +184,41 @@ final class RecordedGenerationBootTest {
     assertEquals(active, boot.layout().activeGenerationId());
     assertEquals(active, JSON.readTree(Files.readAllBytes(current)).path("active_generation").asText());
     assertFalse(Files.exists(base.resolve("indices").resolve("g-" + KEY)));
+  }
+
+  @Test
+  void strictBootInspectionDistinguishesAbsentFromMalformedWithoutRepairing() throws Exception {
+    Path absentBase = temp.resolve("strict-inspection-absent");
+    assertTrue(
+        new IndexGenerationManager(absentBase).inspectCurrentLayoutForBoot().isEmpty(),
+        "a missing state.json is an absent store, not a malformed state");
+    assertFalse(Files.exists(absentBase), "inspection must not create the index base");
+
+    Path base = temp.resolve("strict-inspection-malformed");
+    var manager = new IndexGenerationManager(base);
+    var initialized = manager.initializeOrLoad();
+    Snapshot valid = snapshot(base);
+    var inspected = manager.inspectCurrentLayoutForBoot();
+    assertTrue(inspected.isPresent(), "a current state.json must produce a layout");
+    assertEquals(initialized.activeGenerationId(), inspected.orElseThrow().activeGenerationId());
+    assertUnchanged(base, valid);
+
+    manager.setMigrationPaused(true, "retain a valid previous state");
+    Path state = base.resolve("state.json");
+    Files.writeString(state, "{malformed state", StandardCharsets.UTF_8);
+    Snapshot malformed = snapshot(base);
+    assertThrows(
+        IOException.class,
+        () -> new IndexGenerationManager(base).inspectCurrentLayoutForBoot(),
+        "a malformed current pointer must remain distinct from absent state");
+    assertUnchanged(base, malformed);
+
+    Files.delete(state);
+    Snapshot absentWithBackup = snapshot(base);
+    assertTrue(
+        new IndexGenerationManager(base).inspectCurrentLayoutForBoot().isEmpty(),
+        "an absent current pointer stays absent even when state.json.prev exists");
+    assertUnchanged(base, absentWithBackup);
   }
 
   @Test

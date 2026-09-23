@@ -95,6 +95,7 @@ public final class EmbeddingCompatibilityController {
   private final Supplier<Map<String, String>> storedMetadataSupplier;
   private final LongSupplier docCountSupplier;
   private final java.util.function.IntSupplier completedEmbeddingCountSupplier;
+  private final Supplier<Optional<String>> currentFingerprintSupplier;
   private final AtomicReference<State> state = new AtomicReference<>(State.UNAVAILABLE);
   private final AtomicReference<String> currentFingerprint = new AtomicReference<>();
   private final AtomicReference<String> storedFingerprint = new AtomicReference<>();
@@ -169,10 +170,22 @@ public final class EmbeddingCompatibilityController {
       Supplier<Map<String, String>> storedMetadataSupplier,
       LongSupplier docCountSupplier,
       java.util.function.IntSupplier completedEmbeddingCountSupplier) {
+    this(storedMetadataSupplier, docCountSupplier, completedEmbeddingCountSupplier,
+        EmbeddingFingerprint::get);
+  }
+
+  /** Uses one generation's captured model identity instead of the process-wide serving model. */
+  public EmbeddingCompatibilityController(
+      Supplier<Map<String, String>> storedMetadataSupplier,
+      LongSupplier docCountSupplier,
+      java.util.function.IntSupplier completedEmbeddingCountSupplier,
+      Supplier<Optional<String>> currentFingerprintSupplier) {
     this.storedMetadataSupplier = Objects.requireNonNull(storedMetadataSupplier, "storedMetadataSupplier");
     this.docCountSupplier = Objects.requireNonNull(docCountSupplier, "docCountSupplier");
     this.completedEmbeddingCountSupplier =
         Objects.requireNonNull(completedEmbeddingCountSupplier, "completedEmbeddingCountSupplier");
+    this.currentFingerprintSupplier = Objects.requireNonNull(currentFingerprintSupplier,
+        "currentFingerprintSupplier");
   }
 
   /**
@@ -196,7 +209,7 @@ public final class EmbeddingCompatibilityController {
       return;
     }
 
-    Optional<String> current = EmbeddingFingerprint.get();
+    Optional<String> current = currentFingerprintSupplier.get();
     currentFingerprint.set(current.orElse(null));
 
     if (current.isEmpty()) {

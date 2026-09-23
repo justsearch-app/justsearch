@@ -53,7 +53,7 @@ final class IndexGenerationVduEligibilityTest {
     assertNotEquals(
         initial.activeGenerationId(),
         promoted.active_generation(),
-        "promotion must advance the active pointer before the rollback check");
+        "promotion must advance the active pointer");
     Path promotedPath = manager.resolveGenerationPathStrict(promoted.active_generation());
     assertFalse(
         manager.isIdleActiveGeneration(capturedActive),
@@ -65,14 +65,8 @@ final class IndexGenerationVduEligibilityTest {
         manager.isIdleActiveGeneration(promotedPath),
         "the promoted active generation is eligible after the transition completes");
 
-    IndexGenerationManager.State rolledBack = manager.rollbackToPreviousGeneration();
-    assertNotNull(rolledBack, "rollback produces a state");
-    assertTrue(
-        manager.isIdleActiveGeneration(capturedActive),
-        "rollback restores eligibility for the previous active generation");
-    assertFalse(
-        manager.isIdleActiveGeneration(promotedPath),
-        "rollback makes the former promoted generation ineligible");
+    assertFalse(manager.isIdleActiveGeneration(capturedActive),
+        "the retired predecessor stays ineligible after publication");
   }
 
   @Test

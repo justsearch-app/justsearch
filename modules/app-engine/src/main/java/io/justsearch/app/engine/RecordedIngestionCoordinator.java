@@ -10,9 +10,12 @@ import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.IndexingService;
+import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.operations.BulkReindexProgress;
 import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
+import io.justsearch.app.services.registry.executor.RecordedInstallerGenerationPlanResolver;
+import io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifier;
 import io.justsearch.app.api.operations.CanonicalOperationArguments;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationAttemptRunner.Reconciliation;
@@ -24,14 +27,18 @@ import io.justsearch.app.api.operations.RecordedIngestChild;
 import io.justsearch.app.api.operations.RecordedIngestionService;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.api.operations.RecordedBulkPlan;
+import io.justsearch.app.api.operations.RecordedGenerationPlan;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.app.services.bootstrap.OperationAuthority;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.bootstrap.OperationAuthority.RecordedIngestRecoveryDecision;
 import io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver;
 import io.justsearch.app.services.worker.CancelToken;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.server.RecordedIngestionLifecycle;
+import io.justsearch.indexerworker.services.CandidateIndexTargetCapture;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -57,6 +64,97 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private static final Set<String> DURABLE_REFUSALS = Set.of("RECOVERY_BINDING_INVALID",
       "RECOVERY_SCOPE_REFUSED", "RECOVERY_AUTHORIZATION_REFUSED", "RECOVERY_GENERATION_MISMATCH",
       RecordedIngestionSettlement.EXHAUSTED);
+
+  /**
+   * Boot's pre-runtime half of the recorded activation. The generation pointer is the irreversible
+   * commitment: once B is active, only the exact accepted settings successor may be installed.
+   * This runs under the process instance lock, before a ConfigStore or native model exists.
+   */
+  static UiSettings reconcileInstallerGenerationBoot(OperationStore operations,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      UiSettings loadedSettings,
+      io.justsearch.configuration.resolved.ResolvedConfig preliminaryConfig) throws IOException {
+    Objects.requireNonNull(operations, "operations");
+    Objects.requireNonNull(settingsStore, "settingsStore");
+    Objects.requireNonNull(loadedSettings, "loadedSettings");
+    Objects.requireNonNull(preliminaryConfig, "preliminaryConfig");
+    var activations = operations.openRecords().stream()
+        .filter(row -> RecordedInstallerGenerationPlan.OPERATION_ID.equals(
+            row.descriptor().operationRef())).toList();
+    if (activations.isEmpty()) return loadedSettings;
+    if (activations.size() != 1) {
+      throw new IOException("Multiple unfinished installer generations cannot own boot");
+    }
+    OperationRecord row = activations.getFirst();
+    final RecordedInstallerGenerationPlan plan;
+    try {
+      var stored = operations.acceptedPreparation(row.id()).orElseThrow();
+      plan = new RecordedInstallerGenerationPlanResolver().resolve(row, stored);
+    } catch (RuntimeException invalid) {
+      throw new IOException("Installer generation boot preparation is invalid", invalid);
+    }
+    io.justsearch.app.services.settings.UiSettingsStore.Snapshot snapshot;
+    try { snapshot = settingsStore.inspect(); }
+    catch (RuntimeException unreadable) {
+      throw new IOException("Installer generation boot settings witness is unreadable", unreadable);
+    }
+    var prior = plan.settingsWitness();
+    var successor = new io.justsearch.app.api.settings.SettingsWitness(
+        Math.addExact(prior.acceptedRevision(), 1), row.key());
+    var generations = new IndexGenerationManager(preliminaryConfig.paths().indexBasePath());
+    var observed = generations.inspectCurrentLayoutForBoot();
+    String targetId = IndexGenerationManager.recordedGenerationId(row.key());
+    boolean pointerCommitted = observed.isPresent()
+        && targetId.equals(observed.orElseThrow().activeGenerationId());
+    if (!pointerCommitted) {
+      if (observed.isPresent()
+          && !plan.sourceGeneration().equals(observed.orElseThrow().activeGenerationId())) {
+        throw new IOException("Installer generation boot pointer has an unrelated source");
+      }
+      if (snapshot.witness().equals(successor)) {
+        throw new IOException("Installer generation settings committed before its pointer");
+      }
+      return loadedSettings;
+    }
+    if (!snapshot.witness().equals(prior) && !snapshot.witness().equals(successor)) {
+      throw new IOException("Committed installer generation settings witness is unrelated");
+    }
+    try { RecordedInstallerAssetVerifier.verify(plan); }
+    catch (RuntimeException invalid) {
+      throw new IOException("Committed installer generation assets changed", invalid);
+    }
+    final UiSettings candidate;
+    try {
+      candidate = tools.jackson.databind.json.JsonMapper.builder().build()
+          .readValue(plan.candidateSettings().canonicalJson(), UiSettings.class);
+    } catch (RuntimeException invalid) {
+      throw new IOException("Installer generation boot candidate settings are invalid", invalid);
+    }
+    var candidateConfig = ConfigStoreRebuilder.prepare(candidate);
+    if (!preliminaryConfig.paths().indexBasePath().equals(candidateConfig.paths().indexBasePath())
+        || !plan.target().equals(CandidateIndexTargetCapture.capture(candidateConfig))) {
+      throw new IOException("Installer generation boot candidate target changed");
+    }
+    if (row.expectedSettingsRevision() == null
+        || row.expectedSettingsRevision() != prior.acceptedRevision()
+        || operations.openRecords().stream().filter(
+            open -> open.expectedSettingsRevision() != null).limit(2).count() != 1) {
+      throw new IOException("Committed installer generation lacks its sole settings marker");
+    }
+    var boot = generations.initializeForBoot(
+        new IndexGenerationManager.BootOwnership.Recorded(row.key(), plan.sourceGeneration(),
+            plan.source(), plan.target().fingerprint(), true), plan.target().fingerprint());
+    if (boot.disposition() != IndexGenerationManager.BootDisposition.PROMOTED) {
+      throw new IOException("Installer generation pointer is not the accepted promoted target");
+    }
+    if (snapshot.witness().equals(successor)) {
+      io.justsearch.app.services.settings.SettingsCommitCoordinator
+          .requireAcceptedInstallerSettings(plan, snapshot.settings());
+      return snapshot.settings();
+    }
+    return io.justsearch.app.services.settings.SettingsCommitCoordinator
+        .rollForwardInstallerBoot(settingsStore, candidate, successor, plan);
+  }
   /** Completion is actual producer exit, including cancellation/deadline cleanup, not caller release. */
   @FunctionalInterface
   interface Producer {
@@ -97,34 +195,94 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (pending.size() != 1) return new IndexGenerationManager.BootOwnership.Fenced();
       var row = pending.getFirst();
       Bulk owner = bulks.get(row.key());
-      if (owner != null && owner.cancelled) return new IndexGenerationManager.BootOwnership.Fenced();
       try {
-        if (operations.bulkReindexProgress(row.id()).map(progress -> progress.refusalCode() != null).orElse(false)) {
-          return new IndexGenerationManager.BootOwnership.Fenced();
-        }
-        var decision = authority.evaluateRecordedBulk(row, preparation(row));
-        if (!(decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Authorized authorized)) {
-          return new IndexGenerationManager.BootOwnership.Fenced();
-        }
-        RecordedBulkPlan plan = authorized.plan();
+        var stored = preparation(row);
+        RecordedGenerationPlan plan = resolveGenerationPlan(row, stored);
+        boolean continuationAuthorized = (owner == null || !owner.cancelled)
+            && operations.bulkReindexProgress(row.id())
+                .map(progress -> progress.refusalCode() == null).orElse(true)
+            && generationRefusal(row, stored, plan) == null
+            && installerAssetsValid(plan);
         var walk = queue.recordedWalk(row.key());
         boolean complete = walk.isPresent() && walk.orElseThrow().capturedPlan()
             && plan.planHash().equals(walk.orElseThrow().planHash())
             && walk.orElseThrow().enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE;
         return new IndexGenerationManager.BootOwnership.Recorded(row.key(), plan.scope().generation(),
-            plan.source(), plan.target().fingerprint(), complete);
+            plan.source(), plan.target().fingerprint(), complete, continuationAuthorized);
       } catch (IllegalArgumentException | JobQueue.RecordedWalkGapException invalid) {
         return new IndexGenerationManager.BootOwnership.Fenced();
       }
     }
   }
 
+  @Override
+  public Optional<RecordedCandidate> recordedCandidate(String operationKey) throws IOException {
+    synchronized (lock) {
+      OperationRecord row = operations.find(operationKey).orElseThrow(
+          () -> new IOException("Recorded generation operation is missing"));
+      if (!isBulk(row)) throw new IOException("Recorded generation operation has a different kind");
+      final RecordedGenerationPlan resolved;
+      try {
+        resolved = resolveGenerationPlan(row, preparation(row));
+      }
+      catch (IllegalArgumentException invalid) { throw new IOException("Recorded candidate binding is invalid", invalid); }
+      if (!(resolved instanceof RecordedInstallerGenerationPlan installer)) return Optional.empty();
+      if (!installerAssetsValid(installer)) throw new IOException("Recorded candidate assets changed");
+      final io.justsearch.configuration.resolved.ResolvedConfig configuration;
+      try {
+        UiSettings settings = tools.jackson.databind.json.JsonMapper.builder().build()
+            .readValue(installer.candidateSettings().canonicalJson(), UiSettings.class);
+        configuration = ConfigStoreRebuilder.prepare(settings);
+      } catch (RuntimeException invalid) {
+        throw new IOException("Recorded candidate configuration is invalid", invalid);
+      }
+      var actual = CandidateIndexTargetCapture.capture(configuration);
+      if (!installer.target().equals(actual)) {
+        throw new IOException("Recorded candidate target changed since acceptance");
+      }
+      return Optional.of(new RecordedCandidate(configuration, actual));
+    }
+  }
+
   private static boolean isBulk(OperationRecord row) {
     if (row.descriptor().kind() != OperationKind.REINDEX) return false;
+    if (RecordedInstallerGenerationPlan.OPERATION_ID.equals(row.descriptor().operationRef())) return true;
     for (RecordedBulkPlan.Profile profile : RecordedBulkPlan.Profile.values()) {
       if (profile.operationRef().equals(row.descriptor().operationRef())) return true;
     }
     return false;
+  }
+
+  private static RecordedGenerationPlan resolveGenerationPlan(OperationRecord row,
+      OperationStore.Preparation stored) {
+    return RecordedInstallerGenerationPlan.OPERATION_ID.equals(row.descriptor().operationRef())
+        ? new RecordedInstallerGenerationPlanResolver().resolve(row, stored)
+        : new RecordedBulkPlanResolver().resolve(row, stored);
+  }
+
+  private String generationRefusal(OperationRecord row, OperationStore.Preparation stored,
+      RecordedGenerationPlan plan) {
+    if (plan instanceof RecordedInstallerGenerationPlan installer) {
+      var decision = authority.evaluateInstallerGeneration(row, stored);
+      if (decision instanceof OperationAuthority.InstallerGenerationDecision.Refused refused) {
+        return refused.receipt().code();
+      }
+      var authorized = (OperationAuthority.InstallerGenerationDecision.Authorized) decision;
+      if (!installer.equals(authorized.plan())) return "RECOVERY_BINDING_INVALID";
+      return null;
+    }
+    var decision = authority.evaluateRecordedBulk(row, stored);
+    if (decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Refused refused) {
+      return refused.receipt().code();
+    }
+    var authorized = (OperationAuthority.RecordedBulkRecoveryDecision.Authorized) decision;
+    return plan.equals(authorized.plan()) ? null : "RECOVERY_BINDING_INVALID";
+  }
+
+  private static boolean installerAssetsValid(RecordedGenerationPlan plan) {
+    if (!(plan instanceof RecordedInstallerGenerationPlan installer)) return true;
+    try { RecordedInstallerAssetVerifier.verify(installer); return true; }
+    catch (IllegalArgumentException invalid) { return false; }
   }
 
   @Override
@@ -149,12 +307,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           return OperationExecution.finished(OperationResult.failure("Another bulk rebuild owns the index",
               "BULK_GENERATION_CONFLICT", Map.of(), false));
         }
-        var decision = authority.evaluateRecordedBulk(row, stored);
-        if (!(decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Authorized authorized)) {
+        RecordedGenerationPlan plan = resolveGenerationPlan(row, stored);
+        if (generationRefusal(row, stored, plan) != null || !installerAssetsValid(plan)) {
           return OperationExecution.finished(OperationResult.failure("Bulk authorization refused",
               "RECOVERY_AUTHORIZATION_REFUSED", Map.of(), false));
         }
-        var bulk = new Bulk(row, stored, authorized.plan(), handle, true);
+        var bulk = new Bulk(row, stored, plan, handle, true);
         bulk.work = admitted.retain();
         observeBulkCancellation(bulk);
         bulks.put(row.key(), bulk);
@@ -205,6 +363,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     } catch (IOException unavailableGeneration) {
       return JobQueue.RecordedClaimDecision.DENY;
     }
+  }
+
+  @Override public boolean committedBulkTerminal(String operationKey) {
+    return operations.find(operationKey).filter(RecordedIngestionCoordinator::isBulk)
+        .filter(row -> row.receipt() != null
+            && ((row.state() == OperationState.COMPLETE && "SUCCESS".equals(row.receipt().code()))
+                || (row.state() == OperationState.FAILED
+                    && "PROMOTED_WITH_GAPS".equals(row.receipt().code()))))
+        .isPresent();
   }
 
   @Override
@@ -1006,10 +1173,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     if (bulk.refusalCode != null) return bulk.refusalCode;
     if (bulk.cancelled || (bulk.work != null && bulk.work.cancellationReason().isPresent())) return "cancelled";
     if (bulk.work == null) return "RECOVERY_AUTHORIZATION_REFUSED";
-    var decision = authority.evaluateRecordedBulk(bulk.row, bulk.preparation);
-    if (decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Refused refused) return refused.receipt().code();
-    var authorized = (OperationAuthority.RecordedBulkRecoveryDecision.Authorized) decision;
-    return bulk.plan.equals(authorized.plan()) ? null : "RECOVERY_BINDING_INVALID";
+    return generationRefusal(bulk.row, bulk.preparation, bulk.plan);
   }
 
   private boolean bulkAuthorized(Bulk bulk) {
@@ -1039,7 +1203,98 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (bulk == null || physical == null || physical.queue != queue || !bulkClaimAllowed(bulk)) return false;
       if (bulkProgress(bulk).refusalCode() != null) return false;
       if (!checkpointBulkSettlement(bulk, physical)) return false;
-      return bulkAuthorized(bulk) && bulkClaimAllowed(bulk);
+      return bulkAuthorized(bulk) && installerAssetsValid(bulk.plan) && bulkClaimAllowed(bulk);
+    }
+  }
+
+  @Override public PreparedCompositeProjection prepareRecordedGenerationProjection(
+      String operationKey, JobQueue queue) throws IOException {
+    final Bulk bulk;
+    synchronized (lock) {
+      if (!beforeRecordedPromotion(operationKey, queue)) {
+        throw new IOException("Recorded promotion lost its accepted settlement");
+      }
+      bulk = bulks.get(operationKey);
+      if (!(bulk.plan instanceof RecordedInstallerGenerationPlan)) {
+        return RecordedIngestionLifecycle.super.prepareRecordedGenerationProjection(
+            operationKey, queue);
+      }
+      if (bulk.work == null || bulk.cancelled) {
+        throw new IOException("Installer activation has no live admitted work");
+      }
+    }
+    var installer = (RecordedInstallerGenerationPlan) bulk.plan;
+    final io.justsearch.app.api.settings.SettingsCommitOwner.PreparedGenerationProjection projection;
+    try {
+      projection = attempts.prepareInstallerGenerationProjection(bulk.handle, installer, bulk.work);
+    } catch (RuntimeException | Error failure) {
+      // Preparation may have reserved the one-shot settings witness before it failed. A proven
+      // pre-pointer failure must settle this accepted row; retrying that projection would retain
+      // the settings fence indefinitely.
+      try { refuseInstallerPrecommit(bulk, queue, failure); }
+      catch (RuntimeException | Error settlementFailure) { failure.addSuppressed(settlementFailure); }
+      throw failure;
+    }
+    return new PreparedCompositeProjection() {
+      private final java.util.concurrent.atomic.AtomicBoolean aborted =
+          new java.util.concurrent.atomic.AtomicBoolean();
+      private void abort() {
+        if (!aborted.compareAndSet(false, true)) return;
+        projection.abortBeforePointer();
+        refuseInstallerPrecommit(bulk, queue,
+            new IllegalStateException("Installer activation did not commit its pointer"));
+      }
+      private final CommittedProjection callbacks = new CommittedProjection() {
+        @Override public void admitBeforePointer() {
+          attempts.observeBulkBoundary(bulk.handle,
+              OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_ARM);
+          projection.admitBeforePointer();
+          attempts.observeBulkBoundary(bulk.handle,
+              OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_POINTER);
+        }
+        @Override public void afterPointerCommitted() throws IOException {
+          attempts.observeBulkBoundary(bulk.handle,
+              OperationAttemptRunner.BulkBoundary.INSTALLER_POINTER_BEFORE_SETTINGS);
+          projection.afterPointerCommitted();
+          attempts.observeBulkBoundary(bulk.handle,
+              OperationAttemptRunner.BulkBoundary.INSTALLER_SETTINGS_BEFORE_PUBLICATION);
+        }
+        @Override public void afterRuntimePublished() {
+          projection.afterRuntimePublished();
+          attempts.observeBulkBoundary(bulk.handle,
+              OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_RECEIPT);
+        }
+        @Override public void abortBeforePointer() { abort(); }
+      };
+
+      @Override public IndexGenerationManager.State withOwnerLocks(CheckedPromotion promotion)
+          throws IOException {
+        var result = new java.util.concurrent.atomic.AtomicReference<IndexGenerationManager.State>();
+        var checkedFailure = new java.util.concurrent.atomic.AtomicReference<IOException>();
+        projection.withOwnerLocks(() -> {
+          try { result.set(promotion.promote()); }
+          catch (IOException failure) { checkedFailure.set(failure); }
+        });
+        if (checkedFailure.get() != null) throw checkedFailure.get();
+        return result.get();
+      }
+
+      @Override public CommittedProjection callbacks() { return callbacks; }
+      @Override public void abortBeforePointer() { abort(); }
+    };
+  }
+
+  private void refuseInstallerPrecommit(Bulk bulk, JobQueue queue, Throwable cause) {
+    synchronized (lock) {
+      Attached physical = attached;
+      if (physical == null || physical.queue != queue || bulk.physical != physical) {
+        throw new IllegalStateException("Installer activation precommit owner detached", cause);
+      }
+      String reason = cause instanceof CancellationException ? "cancelled"
+          : cause instanceof io.justsearch.app.api.settings.SettingsCommitOwner.Refused refused
+              ? refused.response().errorCode().orElse("ACTIVATION_PRECOMMIT_REFUSED")
+              : "ACTIVATION_PRECOMMIT_REFUSED";
+      refuseBulk(bulk, physical, reason);
     }
   }
 
@@ -1057,26 +1312,30 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private Reconciliation reconcileBulk(OperationRecord row, Attached physical) {
     if (physical.stopping || physical.bulkProducer == null || bulks.containsKey(row.key())) return new Reconciliation.Wait();
     OperationStore.Preparation stored;
-    RecordedBulkPlan plan;
+    RecordedGenerationPlan plan;
     try {
       stored = preparation(row);
-      plan = new RecordedBulkPlanResolver().resolve(row, stored);
+      plan = resolveGenerationPlan(row, stored);
       var progress = operations.bulkReindexProgress(row.id());
+      var runtime = physical.bulkRuntime.current();
+      // A committed generation pointer is the irreversible boundary. Current authority or an
+      // earlier refusal marker cannot turn that published generation into a failed operation.
+      if (promotedGeneration(row.key(), runtime)) {
+        if (progress.isPresent() && progress.orElseThrow().phase() == BulkReindexProgress.Phase.SETTLED
+            && promotedTarget(row.key(), runtime)) {
+          requireBulkSettlement(row, plan, physical, progress.orElseThrow());
+          if (!installerProjectionCommitted(plan)) return new Reconciliation.Wait();
+          return progress.orElseThrow().settlement().gaps().isEmpty()
+              ? new Reconciliation.Complete(new OperationReceipt("SUCCESS", null))
+              : failed("PROMOTED_WITH_GAPS");
+        }
+        return new Reconciliation.Wait();
+      }
       if (progress.isPresent() && progress.orElseThrow().refusalCode() != null) {
         return reconcileBulkRefusal(row, plan, physical, progress.orElseThrow().refusalCode());
       }
-      var decision = authority.evaluateRecordedBulk(row, stored);
-      if (decision instanceof OperationAuthority.RecordedBulkRecoveryDecision.Refused refused) {
-        return reconcileBulkRefusal(row, plan, physical, refused.receipt().code());
-      }
-      var runtime = physical.bulkRuntime.current();
-      if (progress.isPresent() && progress.orElseThrow().phase() == BulkReindexProgress.Phase.SETTLED
-          && promotedTarget(row.key(), runtime)) {
-        requireBulkSettlement(row, plan, physical, progress.orElseThrow());
-        return progress.orElseThrow().settlement().gaps().isEmpty()
-            ? new Reconciliation.Complete(new OperationReceipt("SUCCESS", null))
-            : failed("PROMOTED_WITH_GAPS");
-      }
+      String refusal = generationRefusal(row, stored, plan);
+      if (refusal != null) return reconcileBulkRefusal(row, plan, physical, refusal);
     } catch (IOException unavailable) { return new Reconciliation.Wait(); }
     catch (IllegalArgumentException | JobQueue.RecordedWalkGapException invalid) {
       return physical.queue.hasIssuedRecordedClaims(row.key()) ? new Reconciliation.Wait()
@@ -1094,7 +1353,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     });
   }
 
-  private Reconciliation reconcileBulkRefusal(OperationRecord row, RecordedBulkPlan plan,
+  private Reconciliation reconcileBulkRefusal(OperationRecord row, RecordedGenerationPlan plan,
       Attached physical, String reason) {
     physical.bulkRefusalRestartKeys.add(row.key());
     if (physical.queue.hasIssuedRecordedClaims(row.key())) return new Reconciliation.Wait();
@@ -1188,6 +1447,24 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     try {
       var progress = bulkProgress(bulk);
       bulk.refusalCode = progress.refusalCode();
+      var runtime = physical.bulkRuntime.current();
+      if (progress.phase() == BulkReindexProgress.Phase.SETTLED
+          && promotedGeneration(row.key(), runtime)) {
+        // The pointer has committed B. A cancellation racing with replay cleanup cannot turn the
+        // accepted operation into a precommit refusal or leave a CANCELLED row serving B.
+        bulkPermissions.remove(row.key());
+        bulk.ready = false;
+        if (promotedTarget(row.key(), runtime)) {
+          requireBulkSettlement(row, bulk.plan, physical, progress);
+          if (!installerProjectionCommitted(bulk.plan)) return;
+          if (progress.settlement().gaps().isEmpty()) {
+            bulk.completion.complete(OperationResult.success("Bulk rebuild completed"));
+          } else {
+            finish(bulk.completion, new OperationReceipt("PROMOTED_WITH_GAPS", null));
+          }
+        }
+        return;
+      }
       String refusal = bulkRefusalReason(bulk);
       if (refusal != null) {
         refuseBulk(bulk, physical, refusal);
@@ -1197,14 +1474,6 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       // CAPTURING boot witness cannot authorize the Green it just created, so re-observing that
       // witness would turn our own asynchronous restart into a durable generation refusal.
       if (bulk.started) return;
-      var runtime = physical.bulkRuntime.current();
-      if (progress.phase() == BulkReindexProgress.Phase.SETTLED && promotedTarget(row.key(), runtime)) {
-        requireBulkSettlement(row, bulk.plan, physical, progress);
-        bulkPermissions.remove(row.key());
-        if (progress.settlement().gaps().isEmpty()) bulk.completion.complete(OperationResult.success("Bulk rebuild completed"));
-        else finish(bulk.completion, new OperationReceipt("PROMOTED_WITH_GAPS", null));
-        return;
-      }
       if (progress.phase() == BulkReindexProgress.Phase.SETTLED && runtime.isPresent()
           && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
           && progress.generationId().equals(runtime.orElseThrow().activeGeneration())
@@ -1257,7 +1526,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     if (bulk.restartRequested || !physical.online.getAsBoolean()) return;
     var context = bulk.work.context();
     if (!bulk.plan.scope().generation().equals(physical.bulkIndexing.captureRebuildGeneration(context))
-        || !bulk.plan.target().equals(physical.bulkIndexing.captureIndexTarget(context))) {
+        || !bulk.plan.target().equals(capturePlanTarget(bulk.plan, physical.bulkIndexing, context))) {
       refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
       return;
     }
@@ -1295,11 +1564,21 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     if (!bulkAuthorized(bulk)) { refuseBulk(bulk, physical, "RECOVERY_AUTHORIZATION_REFUSED"); return; }
     if (!bulk.plan.scope().generation().equals(physical.bulkIndexing.captureRebuildGeneration(context))
-        || !bulk.plan.target().equals(physical.bulkIndexing.captureIndexTarget(context))) {
+        || !bulk.plan.target().equals(capturePlanTarget(bulk.plan, physical.bulkIndexing, context))) {
       refuseBulk(bulk, physical, "BULK_GENERATION_REFUSED");
       return;
     }
     finishBulkStart(bulk, physical, walk);
+  }
+
+  private static io.justsearch.app.api.operations.IndexTargetSnapshot capturePlanTarget(
+      RecordedGenerationPlan plan, IndexingService indexing, EngineContext context) {
+    if (plan instanceof RecordedInstallerGenerationPlan installer) {
+      UiSettings settings = tools.jackson.databind.json.JsonMapper.builder().build()
+          .readValue(installer.candidateSettings().canonicalJson(), UiSettings.class);
+      return indexing.captureCandidateIndexTarget(ConfigStoreRebuilder.prepare(settings), context);
+    }
+    return indexing.captureIndexTarget(context);
   }
 
   private void finishBulkStart(Bulk bulk, Attached physical, JobQueue.WalkProgress walk) {
@@ -1371,7 +1650,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     return true;
   }
 
-  private static BulkReindexProgress settlementProgress(String key, RecordedBulkPlan plan,
+  private static BulkReindexProgress settlementProgress(String key, RecordedGenerationPlan plan,
       JobQueue.CapturedWalkSettlement settlement) {
     var gaps = settlement.gaps().stream().map(unit -> new OperationOutcomeView.Gap(unit.pathHash(), unit.reasonCode())).toList();
     var history = settlement.processingHistory().stream().map(unit -> new BulkReindexProgress.ProcessingEvent(
@@ -1383,7 +1662,16 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
             settlement.supersededEvents(), gaps, history));
   }
 
+  private boolean installerProjectionCommitted(RecordedGenerationPlan plan) {
+    return !(plan instanceof RecordedInstallerGenerationPlan installer)
+        || attempts.installerGenerationProjected(installer);
+  }
+
   private static boolean promotedTarget(String key, Optional<BulkRuntime> runtime) {
+    return promotedGeneration(key, runtime) && runtime.orElseThrow().promotedReplaySettled();
+  }
+
+  private static boolean promotedGeneration(String key, Optional<BulkRuntime> runtime) {
     return runtime.isPresent() && runtime.orElseThrow().promotedBoot()
         && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
         && ("g-" + key).equals(runtime.orElseThrow().activeGeneration())
@@ -1391,7 +1679,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         && "IDLE".equals(runtime.orElseThrow().migrationState());
   }
 
-  private static void requireBulkSettlement(OperationRecord row, RecordedBulkPlan plan,
+  private static void requireBulkSettlement(OperationRecord row, RecordedGenerationPlan plan,
       Attached physical, BulkReindexProgress progress) {
     var walk = physical.queue.recordedWalk(row.key()).orElseThrow(
         () -> new JobQueue.RecordedWalkGapException("Bulk settlement walk disappeared"));
@@ -1409,6 +1697,16 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   private void refuseBulk(Bulk bulk, Attached physical, String reason) {
+    try {
+      if (promotedGeneration(bulk.row.key(), physical.bulkRuntime.current())) {
+        bulkPermissions.remove(bulk.row.key());
+        bulk.ready = false;
+        return;
+      }
+    } catch (IOException unreadable) {
+      // A possibly committed pointer cannot be classified as a precommit refusal.
+      return;
+    }
     bulkPermissions.remove(bulk.row.key());
     bulk.ready = false;
     var progress = bulkProgress(bulk);
@@ -1437,7 +1735,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     finish(bulk.completion, new OperationReceipt(reason, null));
   }
 
-  private void acknowledgeBulk(OperationRecord row, RecordedBulkPlan plan, Attached physical) {
+  private void acknowledgeBulk(OperationRecord row, RecordedGenerationPlan plan, Attached physical) {
     if (!row.state().terminal()) return;
     var walk = physical.queue.recordedWalk(row.key());
     if (walk.isEmpty()) return;
@@ -1497,7 +1795,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       var row = operations.find(key);
       if (row.isEmpty() || !row.orElseThrow().state().terminal() || !isBulk(row.orElseThrow())) continue;
       try {
-        var plan = new RecordedBulkPlanResolver().resolve(row.orElseThrow(), preparation(row.orElseThrow()));
+        var plan = resolveGenerationPlan(row.orElseThrow(), preparation(row.orElseThrow()));
         acknowledgeBulk(row.orElseThrow(), plan, physical);
       } catch (IllegalArgumentException | JobQueue.RecordedWalkGapException mismatch) {
         log.warn("Retaining contradictory terminal bulk acknowledgement evidence for {}", key, mismatch);
@@ -1511,7 +1809,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private static final class Bulk {
     final OperationRecord row;
     final OperationStore.Preparation preparation;
-    final RecordedBulkPlan plan;
+    final RecordedGenerationPlan plan;
     final OperationRecordHandle handle;
     final CompletableFuture<OperationResult> completion = new CompletableFuture<>();
     volatile Attached physical;
@@ -1527,7 +1825,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     volatile CancelToken cancellation;
     CompletableFuture<JobQueue.WalkEnumerationOutcome> exit;
     CompletableFuture<Void> notification;
-    Bulk(OperationRecord row, OperationStore.Preparation preparation, RecordedBulkPlan plan,
+    Bulk(OperationRecord row, OperationStore.Preparation preparation, RecordedGenerationPlan plan,
         OperationRecordHandle handle, boolean createIfMissing) {
       this.row = row; this.preparation = preparation; this.plan = plan; this.handle = handle;
       this.createIfMissing = createIfMissing;

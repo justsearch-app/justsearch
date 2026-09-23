@@ -41,7 +41,7 @@ final class AdmissionRevisionTest {
     Map<String, Admission> migrated;
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
-      assertEquals(19, schemaVersion(db));
+      assertEquals(20, schemaVersion(db));
       migrated = readAdmissions(db);
     }
 

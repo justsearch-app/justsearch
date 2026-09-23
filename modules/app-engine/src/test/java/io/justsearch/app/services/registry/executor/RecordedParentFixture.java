@@ -13,10 +13,15 @@ public final class RecordedParentFixture {
   private RecordedParentFixture() {}
 
   public static OperationStore.Preparation prepare(OperationAttemptRunner.Request request, RecordedRootPlan plan) {
-    var codec = new PreparedInvocationCodec(StoreCipher.disabled());
     UUID nonce = UUID.randomUUID();
     var preparation = new OperationPreparation("{}", RecordedRootPlan.SCHEMA,
         plan.toReplayPayload(), OperationPreparation.Content.METADATA);
+    return prepare(request, nonce, preparation);
+  }
+
+  public static OperationStore.Preparation prepare(OperationAttemptRunner.Request request,
+      UUID nonce, OperationPreparation preparation) {
+    var codec = new PreparedInvocationCodec(StoreCipher.disabled());
     return new OperationStore.Preparation(nonce, codec.encode(codec.freeze(request.key(), nonce,
         request.descriptor(), preparation, request.context(), request.provenance())));
   }

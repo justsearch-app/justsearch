@@ -2,6 +2,7 @@
 package io.justsearch.app.services.conversation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.DocumentService;
@@ -13,6 +14,7 @@ import io.justsearch.app.api.DocumentService.ScorerKind;
 import io.justsearch.app.api.DocumentService.TextSource;
 import io.justsearch.app.api.DocumentService.VerificationSource;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
@@ -132,6 +134,85 @@ final class LazyDocumentServiceCitationForwardTest {
     assertEquals(1, page.totalCount());
   }
 
+  @Test
+  @DisplayName("one operation keeps its bound Worker through retrieval, fallback, and citation")
+  void operationBindingDoesNotFollowLateBoundReplacement() {
+    var calls = new java.util.ArrayList<String>();
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+    DocumentService generationA = new GenerationDocs("A", calls, context);
+    DocumentService generationB = new GenerationDocs("B", calls, context);
+    AtomicReference<DocumentService> current = new AtomicReference<>(generationA);
+    var documents = new LazyDocumentService(current::get);
+
+    try (var ignored = documents.bind(context, generationA)) {
+      current.set(generationB);
+      CompletableFuture.runAsync(
+              () -> {
+                documents
+                    .retrieveContext(
+                        io.justsearch.app.api.RetrieveContextParams.of(
+                            "question",
+                            3,
+                            256,
+                            java.util.Set.of("doc"),
+                            List.of(),
+                            List.of()),
+                        context)
+                    .toCompletableFuture()
+                    .join();
+                documents.fetchBatch(List.of("doc"), context).toCompletableFuture().join();
+                documents
+                    .matchCitationsAgainst(
+                        "answer",
+                        List.of(new VerificationSource(CITATION, "text")),
+                        0.5,
+                        context)
+                    .toCompletableFuture()
+                    .join();
+              })
+          .join();
+    }
+
+    documents.fetch("doc", context).toCompletableFuture().join();
+    assertEquals(
+        List.of("A:retrieve", "A:fallback", "A:citation", "B:fetch"),
+        calls,
+        "publication may replace the late-bound service, but an accepted turn stays on A");
+  }
+
+  @Test
+  void rebasedNestedContextRetainsTheAdmittedWorkBinding() {
+    var initial = io.justsearch.app.services.TestEngineContexts.internal()
+        .withWorkId(java.util.UUID.randomUUID());
+    var nested = new io.justsearch.core.context.EngineContext(
+        initial.clientKind(), initial.clientId(), java.util.Optional.of("nested"),
+        initial.grantReference(), initial.sourceTier(), "WORKFLOW", initial.survival(),
+        initial.urgency(), initial.workId());
+    var calls = new java.util.ArrayList<String>();
+    DocumentService a = new DocumentService() {
+      @Override public CompletionStage<DocumentRecord> fetch(String id,
+          io.justsearch.core.context.EngineContext context) {
+        calls.add("A");
+        return CompletableFuture.completedFuture(null);
+      }
+    };
+    DocumentService b = new DocumentService() {
+      @Override public CompletionStage<DocumentRecord> fetch(String id,
+          io.justsearch.core.context.EngineContext context) {
+        calls.add("B");
+        return CompletableFuture.completedFuture(null);
+      }
+    };
+    var current = new AtomicReference<>(a);
+    var documents = new LazyDocumentService(current::get);
+    try (var ignored = documents.bind(initial, a)) {
+      current.set(b);
+      documents.fetch("doc", nested).toCompletableFuture().join();
+    }
+    documents.fetch("doc", nested).toCompletableFuture().join();
+    assertEquals(List.of("A", "B"), calls);
+  }
+
   private record RecordingDocs(
       AtomicReference<List<VerificationSource>> seen, CitationMatchResult result)
       implements DocumentService {
@@ -147,6 +228,52 @@ final class LazyDocumentServiceCitationForwardTest {
         io.justsearch.core.context.EngineContext engineContext) {
       seen.set(sources);
       return CompletableFuture.completedFuture(result);
+    }
+  }
+
+  private record GenerationDocs(
+      String generation,
+      List<String> calls,
+      io.justsearch.core.context.EngineContext expectedContext)
+      implements DocumentService {
+    @Override
+    public CompletionStage<DocumentRecord> fetch(
+        String docId, io.justsearch.core.context.EngineContext engineContext) {
+      assertSame(expectedContext, engineContext);
+      calls.add(generation + ":fetch");
+      return CompletableFuture.completedFuture(new DocumentRecord(docId, "text", Map.of()));
+    }
+
+    @Override
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(
+        List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
+      assertSame(expectedContext, engineContext);
+      calls.add(generation + ":fallback");
+      return CompletableFuture.completedFuture(
+          Map.of("doc", new DocumentRecord("doc", "text", Map.of())));
+    }
+
+    @Override
+    public CompletionStage<ContextResult> retrieveContext(
+        io.justsearch.app.api.RetrieveContextParams params,
+        io.justsearch.core.context.EngineContext engineContext) {
+      assertSame(expectedContext, engineContext);
+      calls.add(generation + ":retrieve");
+      return CompletableFuture.completedFuture(
+          new ContextResult(
+              "text", 1, 1, 1, List.of(CITATION), "test", "ok", false, List.of()));
+    }
+
+    @Override
+    public CompletionStage<CitationMatchResult> matchCitationsAgainst(
+        String answerText,
+        List<VerificationSource> sources,
+        double threshold,
+        io.justsearch.core.context.EngineContext engineContext) {
+      assertSame(expectedContext, engineContext);
+      calls.add(generation + ":citation");
+      return CompletableFuture.completedFuture(
+          new CitationMatchResult(List.of(), 1, 0, 0, 1, ScorerKind.NONE, List.of()));
     }
   }
 }

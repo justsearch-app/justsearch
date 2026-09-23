@@ -2,9 +2,11 @@
 package io.justsearch.app.services.bootstrap;
 
 import io.justsearch.app.api.operations.RecordedBulkPlan;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
+import io.justsearch.app.services.registry.executor.RecordedInstallerGenerationPlanResolver;
 import io.justsearch.agent.api.registry.IntentSourceCatalog;
 import io.justsearch.agent.api.registry.TrustEvaluator;
 import io.justsearch.app.services.intent.ConsentCapsuleService;
@@ -55,7 +57,8 @@ public final class OperationAuthority {
     this.roots = Objects.requireNonNull(roots, "roots");
     this.grants = Objects.requireNonNull(grants, "grants");
     scope = new IndexedRootGrantScope(Set.of(AgentToolsOperationCatalog.INGEST_FILES, CoreOperationCatalog.REINDEX,
-        CoreOperationCatalog.BULK_REINDEX, CoreOperationCatalog.REBUILD_INDEX));
+        CoreOperationCatalog.BULK_REINDEX, CoreOperationCatalog.REBUILD_INDEX,
+        CoreOperationCatalog.ACTIVATE_INSTALLED_MODELS));
     scope.bindIndexedRoots(context -> roots.watchedPaths());
     evaluator.setHardStopSignal(hardStop::isEngaged);
     hardStop.setOnEngage(() -> {
@@ -272,6 +275,55 @@ public final class OperationAuthority {
 
   private static RecordedBulkRecoveryDecision.Refused bulkRefused(String code) {
     return new RecordedBulkRecoveryDecision.Refused(new OperationReceipt(code, null));
+  }
+
+  /** Exact accepted installer activation, separately bound from legacy v1 bulk plans. */
+  public sealed interface InstallerGenerationDecision {
+    record Authorized(RecordedInstallerGenerationPlan plan) implements InstallerGenerationDecision {
+      public Authorized { Objects.requireNonNull(plan, "plan"); }
+    }
+    record Refused(OperationReceipt receipt) implements InstallerGenerationDecision {
+      public Refused { Objects.requireNonNull(receipt, "receipt"); }
+    }
+  }
+
+  /** Revalidate a v2 activation before a fresh effect or resumed generation claim. */
+  public InstallerGenerationDecision evaluateInstallerGeneration(
+      OperationRecord row, OperationStore.Preparation stored) {
+    final RecordedInstallerGenerationPlan plan;
+    final Operation operation;
+    final TransportTag transport;
+    try {
+      if (row.state() != OperationState.ACCEPTED && row.state() != OperationState.RUNNING) {
+        return installerRefused("RECOVERY_OPERATION_INACTIVE");
+      }
+      plan = new RecordedInstallerGenerationPlanResolver().resolve(row, stored);
+      operation = coreOperations.findByIdValue(row.descriptor().operationRef()).orElseThrow();
+      if (!RecordedInstallerGenerationPlan.continuationPolicy(operation)
+          || !operation.executors().contains(ExecutorTag.valueOf(row.executor()))
+          || !(OperationAuthorizationBasis.decode(row.context().grantReference().orElse(null))
+              instanceof OperationAuthorizationBasis.PreparedContinuation)) {
+        return installerRefused("RECOVERY_AUTHORIZATION_REFUSED");
+      }
+      transport = TransportTag.valueOf(row.context().transport());
+      if (sources.findByTransport(transport).isEmpty()) {
+        return installerRefused("RECOVERY_BINDING_INVALID");
+      }
+      EngineProvenance.sourceTier(row.context());
+    } catch (IllegalArgumentException | NullPointerException | java.util.NoSuchElementException invalid) {
+      return installerRefused("RECOVERY_BINDING_INVALID");
+    }
+    if (evaluator.evaluate(operation.policy().risk(), transport).gateBehavior() == GateBehavior.DENY) {
+      return installerRefused("RECOVERY_AUTHORIZATION_REFUSED");
+    }
+    if (!scope.coversInstallerGenerationPlan(operation, plan, row.context())) {
+      return installerRefused("RECOVERY_SCOPE_REFUSED");
+    }
+    return new InstallerGenerationDecision.Authorized(plan);
+  }
+
+  private static InstallerGenerationDecision.Refused installerRefused(String code) {
+    return new InstallerGenerationDecision.Refused(new OperationReceipt(code, null));
   }
 
   public WatchedRootsState roots() { return roots; }

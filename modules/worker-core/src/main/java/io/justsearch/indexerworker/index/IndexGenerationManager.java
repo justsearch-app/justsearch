@@ -248,7 +248,12 @@ public final class IndexGenerationManager {
     record Native() implements BootOwnership {}
     record Fenced() implements BootOwnership {}
     record Recorded(String operationKey, String sourceGeneration, String source,
-        String targetFingerprint, boolean captureComplete) implements BootOwnership {
+        String targetFingerprint, boolean captureComplete, boolean continuationAuthorized)
+        implements BootOwnership {
+      public Recorded(String operationKey, String sourceGeneration, String source,
+          String targetFingerprint, boolean captureComplete) {
+        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete, true);
+      }
       public Recorded {
         Objects.requireNonNull(operationKey, "operationKey");
         Objects.requireNonNull(sourceGeneration, "sourceGeneration");
@@ -312,6 +317,7 @@ public final class IndexGenerationManager {
             && recorded.sourceGeneration().equals(state.previous_generation())
             ? BootDisposition.PROMOTED : BootDisposition.FENCED);
       }
+      if (!recorded.continuationAuthorized()) return new BootLayout(layout, BootDisposition.FENCED);
       if (!recorded.sourceGeneration().equals(layout.activeGenerationId())) {
         return new BootLayout(layout, BootDisposition.FENCED);
       }
@@ -356,6 +362,28 @@ public final class IndexGenerationManager {
       throw new IOException("Authoritative active generation directory is unavailable");
     }
     return new IndexLayout(basePath, indicesDir, statePath, state, active, activePath);
+  }
+
+  /**
+   * Inspects the current generation pointer for boot recovery without repairing it.
+   *
+   * <p>An absent {@code state.json} is represented by {@link java.util.Optional#empty()} so a
+   * caller can distinguish a store that has never published state from a damaged store. A present
+   * but malformed or structurally invalid state is reported as {@link IOException}; {@code
+   * state.json.prev} is never consulted and no directory or state file is created or rewritten.
+   * When present and valid, the returned layout has passed the same current-format, pointer and
+   * active-directory checks used by strict recorded boot recovery.
+   */
+  public java.util.Optional<IndexLayout> inspectCurrentLayoutForBoot() throws IOException {
+    try (var ignored = stateControl()) {
+      if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        return java.util.Optional.empty();
+      }
+      if (!Files.isRegularFile(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Authoritative generation state is not a regular file: " + statePath);
+      }
+      return java.util.Optional.of(strictBootLayout(readRecordedState()));
+    }
   }
 
   private static boolean isRecordedIdentity(String generation) {
@@ -546,6 +574,7 @@ public final class IndexGenerationManager {
       if (phase != MigrationState.IDLE || building != null && !building.isBlank()) {
         throw new IOException("Recorded generation conflicts with the current migration state");
       }
+      requireRecordedBuildCapacity(current, target);
       if (Files.exists(targetPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, true);
       } else {
@@ -862,6 +891,9 @@ public final class IndexGenerationManager {
   }
 
   public final class RecordedPromotion implements AutoCloseable {
+    /** Exact pointer witness while this lease still excludes competing generation writers. */
+    public enum CommitWitness { UNCHANGED, COMMITTED, UNRESOLVED }
+
     private final String operationKey;
     private final String source;
     private final String targetIndexFingerprint;
@@ -903,6 +935,33 @@ public final class IndexGenerationManager {
       }
     }
 
+    /** Resolve a failed promotion before the caller changes admission or serving references. */
+    public CommitWitness inspectCommitWitness() {
+      requireOwner();
+      try {
+        // A failed target/manifest validation can leave the exact source pointer untouched,
+        // even though initializeForBoot quite correctly calls the *candidate* fenced. Read the
+        // pointer first so that refusal does not unnecessarily close the healthy source view.
+        IndexLayout layout = strictBootLayout(readRecordedState());
+        if (expectedSourceGeneration.equals(layout.activeGenerationId())) {
+          return CommitWitness.UNCHANGED;
+        }
+        if (!recordedGenerationId(operationKey).equals(layout.activeGenerationId())) {
+          return CommitWitness.UNRESOLVED;
+        }
+        var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
+            expectedSourceGeneration, source, targetIndexFingerprint, true),
+            targetIndexFingerprint);
+        return switch (observed.disposition()) {
+          case BUILDING -> CommitWitness.UNCHANGED;
+          case PROMOTED -> CommitWitness.COMMITTED;
+          default -> CommitWitness.UNRESOLVED;
+        };
+      } catch (IOException | RuntimeException unreadable) {
+        return CommitWitness.UNRESOLVED;
+      }
+    }
+
     private void requireOwner() {
       if (closed || owner != Thread.currentThread()) {
         throw new IllegalStateException("Recorded promotion requires its owning live thread");
@@ -918,7 +977,7 @@ public final class IndexGenerationManager {
   }
 
   /** Promote only the strict target/source binding validated by the recorded owner. */
-  public State promoteRecordedGenerationToActive(String operationKey, String source,
+  State promoteRecordedGenerationToActive(String operationKey, String source,
       String targetIndexFingerprint, String expectedSourceGeneration) throws IOException {
     try (var ignored = stateControl()) {
       var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
@@ -974,45 +1033,256 @@ public final class IndexGenerationManager {
   }
 
   /**
-   * Rolls back {@code active_generation} to {@code previous_generation} (if present) and swaps
-   * {@code previous_generation} to the current active generation.
+   * Retires one exact predecessor after its process resources have been closed by the caller.
    *
-   * <p>This is an operator control used after a cutover when Green is unhealthy and we want to
-   * revert to the last known-good generation.
-   *
-   * <p>This method does not delete any generations; it only updates {@code state.json}.
-   *
-   * @return the updated normalized state, or null if no state exists
+   * <p>The predecessor remains capacity-owning until its original directory and any exact
+   * {@code .del-*} representation are both absent. A repeated call completes either crash cut:
+   * deletion with the pointer still present, or pointer removal with deletion still incomplete.
    */
-  public State rollbackToPreviousGeneration() throws IOException {
+  public State retirePreviousGeneration(String expectedActive, String expectedPrevious)
+      throws IOException {
     try (var ignored = stateControl()) {
-      State current = readStateBestEffort();
-      if (current == null) {
-        return null;
+      String active = requireSafeGenerationId(expectedActive, "expected active generation");
+      String previous =
+          requireSafeGenerationId(expectedPrevious, "expected previous generation");
+      if (active.equals(previous)) {
+        throw new IOException("Active and previous generation identities must be distinct");
       }
-      State normalized = normalizeAndUpgradeStateIfNeeded(current);
-      String prev = normalized.previous_generation();
-      if (prev == null || prev.isBlank()) {
-        return normalized;
+
+      State current = requireExactIdleRetirementState(active);
+      String observedPrevious = current.previous_generation();
+      if (observedPrevious != null
+          && !observedPrevious.isBlank()
+          && !previous.equals(
+              requireSafeGenerationId(
+                  observedPrevious, "state.json previous_generation"))) {
+        throw new IOException("Previous generation differs from the expected retirement target");
       }
-      String nextActive = requireSafeGenerationId(prev, "state.json previous_generation");
-      String curActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
+
+      boolean pointerBindsRetirement =
+          observedPrevious != null && !observedPrevious.isBlank();
+      deleteExactRetiredRepresentation(previous, pointerBindsRetirement);
+      if (observedPrevious == null || observedPrevious.isBlank()) {
+        return current;
+      }
+
       State next =
           new State(
               STATE_FORMAT_VERSION,
-              nextActive,
-              null, // clear building on rollback (operators can start a new migration explicitly)
-              curActive,
+              active,
+              null,
+              null,
               MigrationState.IDLE.name(),
-              false,
-              null,
-              null,
+              current.migration_paused(),
+              current.pause_reason(),
+              current.paused_at_ms(),
               System.currentTimeMillis(),
-              normalized.auto_rebuild_key(),
-              normalized.auto_rebuild_count(),
-              normalized.auto_rebuild_first_ms());
-      writeState(next);
-      return next;
+              current.auto_rebuild_key(),
+              current.auto_rebuild_count(),
+              current.auto_rebuild_first_ms());
+      try {
+        writeState(next);
+        return next;
+      } catch (IOException ambiguous) {
+        try {
+          State observed = requireExactIdleRetirementState(active);
+          if (observed.previous_generation() == null
+              || observed.previous_generation().isBlank()) {
+            return observed;
+          }
+        } catch (IOException unresolved) {
+          ambiguous.addSuppressed(unresolved);
+        }
+        throw ambiguous;
+      }
+    }
+  }
+
+  private State requireExactIdleRetirementState(String expectedActive) throws IOException {
+    State state = strictBootLayout(readRecordedState()).state();
+    if (!expectedActive.equals(state.active_generation())
+        || !MigrationState.IDLE.name().equals(state.migration_state())
+        || state.building_generation() != null && !state.building_generation().isBlank()) {
+      throw new IOException("Generation state changed before predecessor retirement");
+    }
+    return state;
+  }
+
+  private void deleteExactRetiredRepresentation(
+      String generationId, boolean pointerBindsRetirement) throws IOException {
+    Path original = resolveGenerationPathReadOnly(generationId);
+    if (Files.exists(original, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      requireOwnedRetirementDirectory(original, generationId, false, false);
+      SafeIndexPathOps.MarkResult marked = SafeIndexPathOps.markForDeletion(original, indicesDir);
+      Path effective = normalize(marked.effectivePath());
+      requireOwnedRetirementDirectory(
+          effective,
+          generationId,
+          !effective.getFileName().toString().equals(generationId),
+          false);
+    }
+
+    for (Path retired :
+        exactRetirementRepresentations(generationId, pointerBindsRetirement)) {
+      deleteRetirementPayloadBeforeOwnership(retired);
+      io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(retired, log);
+    }
+    if (!exactRetirementRepresentations(generationId, pointerBindsRetirement).isEmpty()) {
+      throw new IOException(
+          "Exact predecessor directory remains after deletion: " + generationId);
+    }
+  }
+
+  private List<Path> exactRetirementRepresentations(
+      String generationId, boolean pointerBindsRetirement) throws IOException {
+    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      return List.of();
+    }
+    List<Path> exact = new ArrayList<>();
+    try (var entries = Files.list(indicesDir)) {
+      for (Path entry : entries.toList()) {
+        String name = entry.getFileName().toString();
+        if (!name.equals(generationId) && !isMarkedRetirementName(name, generationId)) {
+          continue;
+        }
+        boolean markedName = !name.equals(generationId);
+        requireOwnedRetirementDirectory(
+            entry,
+            generationId,
+            markedName,
+            markedName && pointerBindsRetirement);
+        exact.add(entry);
+      }
+    }
+    exact.sort(Comparator.comparing(Path::toString));
+    return exact;
+  }
+
+  private void requireOwnedRetirementDirectory(
+      Path directory,
+      String generationId,
+      boolean markedName,
+      boolean allowPointerBoundPartialMetadata)
+      throws IOException {
+    Path exact = normalize(directory);
+    Path root = normalize(indicesDir);
+    String name = exact.getFileName().toString();
+    boolean exactName =
+        markedName ? isMarkedRetirementName(name, generationId) : name.equals(generationId);
+    if (!exact.startsWith(root)
+        || exact.equals(root)
+        || !exactName
+        || !Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Refusing unsafe predecessor retirement path: " + exact);
+    }
+    Path sentinel = exact.resolve(GENERATION_SENTINEL);
+    Path manifestPath = exact.resolve(GENERATION_MANIFEST);
+    boolean sentinelExists = Files.exists(sentinel, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    boolean manifestExists = Files.exists(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    // FileOps historically could delete both metadata files before a locked payload. In that
+    // recovery shape the strict previous_generation pointer plus SafeIndexPathOps' exact encoded
+    // rename is the durable ownership proof. Any surviving metadata must still agree.
+    if ((!sentinelExists || !manifestExists) && !allowPointerBoundPartialMetadata) {
+      throw new IOException("Predecessor ownership metadata is unavailable: " + exact);
+    }
+    if (sentinelExists) {
+      requireRetirementSentinel(sentinel, generationId, exact);
+    }
+    if (manifestExists) {
+      requireRetirementManifest(manifestPath, generationId, exact);
+    }
+  }
+
+  private static boolean isMarkedRetirementName(String name, String generationId) {
+    String prefix = generationId + ".del-";
+    if (!name.startsWith(prefix)) {
+      return false;
+    }
+    String suffix = name.substring(prefix.length());
+    return suffix.matches("[0-9]{8}-[0-9]{6}");
+  }
+
+  private static void requireRetirementSentinel(
+      Path sentinel, String generationId, Path directory) throws IOException {
+    if (!Files.isRegularFile(sentinel, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(sentinel) > 1_024) {
+      throw new IOException("Predecessor sentinel is invalid: " + directory);
+    }
+    String body =
+        new String(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinel),
+            StandardCharsets.UTF_8);
+    if (body.lines().noneMatch(line -> line.equals("generation_id=" + generationId))) {
+      throw new IOException("Predecessor sentinel identifies another generation: " + directory);
+    }
+  }
+
+  private static void requireRetirementManifest(
+      Path manifestPath, String generationId, Path directory) throws IOException {
+    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(manifestPath) > 16_384) {
+      throw new IOException("Predecessor manifest is invalid: " + directory);
+    }
+    final GenerationManifest manifest;
+    try {
+      manifest =
+          JSON.readValue(
+              io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(
+                  manifestPath),
+              GenerationManifest.class);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Predecessor manifest is invalid: " + directory, malformed);
+    }
+    if (manifest == null || !generationId.equals(manifest.generation_id())) {
+      throw new IOException("Predecessor manifest identifies another generation: " + directory);
+    }
+  }
+
+  private static void deleteRetirementPayloadBeforeOwnership(Path directory)
+      throws IOException {
+    List<Path> payload;
+    try (var entries = Files.list(directory)) {
+      payload =
+          entries
+              .filter(
+                  path ->
+                      !Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST)
+                          .contains(path.getFileName().toString()))
+              .sorted(Comparator.comparing(Path::toString))
+              .toList();
+    }
+    for (Path entry : payload) {
+      io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(entry, log);
+    }
+    for (Path entry : payload) {
+      if (Files.exists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException(
+            "Predecessor payload remains locked after deletion: " + directory);
+      }
+    }
+  }
+
+  private void requireRecordedBuildCapacity(State state, String acceptedTarget)
+      throws IOException {
+    String active =
+        requireSafeGenerationId(state.active_generation(), "state.json active_generation");
+    if (state.previous_generation() != null && !state.previous_generation().isBlank()) {
+      throw new IOException("Previous generation still occupies recorded build capacity");
+    }
+    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      return;
+    }
+    try (var entries = Files.list(indicesDir)) {
+      for (Path entry : entries.toList()) {
+        if (!Files.isDirectory(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+        String name = entry.getFileName().toString();
+        if (!name.equals(active) && !name.equals(acceptedTarget)) {
+          throw new IOException(
+              "A retained generation representation still occupies recorded build capacity");
+        }
+      }
     }
   }
 

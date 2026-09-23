@@ -59,8 +59,9 @@ final class IngestSwitchBufferOps {
         return false;
       }
       return "SWITCHING".equalsIgnoreCase(s.migration_state());
-    } catch (Exception ignored) {
-      return false;
+    } catch (Exception unavailable) {
+      log.warn("Cannot establish migration state for a mutation", unavailable);
+      throw switchingUnavailable();
     }
   }
 

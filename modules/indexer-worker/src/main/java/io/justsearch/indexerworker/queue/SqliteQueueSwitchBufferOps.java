@@ -68,6 +68,15 @@ final class SqliteQueueSwitchBufferOps {
 
   /** Returns best-effort counts for PENDING/PROCESSING/DONE/FAILED and PENDING runnable subset. */
   JobQueue.JobStateCounts stateCounts() {
+    try { return stateCountsStrict(); }
+    catch (IllegalStateException unreadable) {
+      log.debug("Failed to get job state counts (best-effort): {}", unreadable.getMessage());
+      return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
+    }
+  }
+
+  /** Exact drain count; SQLite read failures must block generation promotion. */
+  JobQueue.JobStateCounts stateCountsStrict() {
     lock.lock();
     try {
       Connection conn = connSupplier.get();
@@ -96,10 +105,9 @@ final class SqliteQueueSwitchBufferOps {
           return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
         }
       }
-    } catch (Exception e) {
+    } catch (SQLException e) {
       errorRecorder.run();
-      log.debug("Failed to get job state counts (best-effort): {}", e.getMessage());
-      return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
+      throw new IllegalStateException("Failed to get job state counts", e);
     } finally {
       lock.unlock();
     }
@@ -162,8 +170,10 @@ final class SqliteQueueSwitchBufferOps {
       Connection conn = connSupplier.get();
       String sql =
           """
-          INSERT OR REPLACE INTO switch_buffer (key, op, payload, last_updated, revision)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT OR REPLACE INTO switch_buffer
+            (key, op, payload, last_updated, revision, accepted_order)
+          VALUES (?, ?, ?, ?, ?,
+            (SELECT COALESCE(MAX(accepted_order), 0) + 1 FROM switch_buffer))
           """;
       try (PreparedStatement stmt = conn.prepareStatement(sql)) {
         stmt.setString(1, key);
@@ -225,21 +235,40 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
-  /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
+  /** Returns retained buffered ops in SQLite's serialized admission order (best-effort). */
   List<SwitchBufferCapableQueue.SwitchBufferOp> listAll() {
+    try { return listAllStrict(); }
+    catch (IllegalStateException unreadable) {
+      log.error("Failed to read switch buffer ops", unreadable);
+      return List.of();
+    }
+  }
+
+  /**
+   * Exact final-cutover read; an unreadable table cannot mean an empty buffer. The explicit order
+   * is assigned by SQLite in the same write statement as each accepted replacement, so equal wall
+   * timestamps and VACUUM INTO backup/restore cannot reorder retained admissions.
+   */
+  List<SwitchBufferCapableQueue.SwitchBufferOp> listAllStrict() {
     lock.lock();
     try {
       Connection conn = connSupplier.get();
       String sql =
           """
-          SELECT key, op, payload, last_updated, revision
+          SELECT key, op, payload, last_updated, revision, accepted_order
           FROM switch_buffer
-          ORDER BY last_updated ASC
+          ORDER BY accepted_order ASC
           """;
       List<SwitchBufferCapableQueue.SwitchBufferOp> out = new ArrayList<>();
       try (Statement stmt = conn.createStatement();
           ResultSet rs = stmt.executeQuery(sql)) {
+        long previousOrder = 0;
         while (rs.next()) {
+          long order = rs.getLong(6);
+          if (order <= previousOrder) {
+            throw new IllegalStateException("Switch buffer admission order is not strictly increasing");
+          }
+          previousOrder = order;
           out.add(
               new SwitchBufferCapableQueue.SwitchBufferOp(
                   rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5)));
@@ -248,8 +277,7 @@ final class SqliteQueueSwitchBufferOps {
       return out;
     } catch (SQLException e) {
       errorRecorder.run();
-      log.error("Failed to read switch buffer ops", e);
-      return List.of();
+      throw new IllegalStateException("Failed to read switch buffer ops", e);
     } finally {
       lock.unlock();
     }

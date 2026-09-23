@@ -169,39 +169,13 @@ final class MigrationControlOps {
   }
 
   MigrationRollbackResponse rollbackMigration(MigrationRollbackRequest request) {
-    boolean restart = request.getRestartWorker();
-    try {
-      if (indexGenerationManager == null) {
-        return MigrationRollbackResponse.newBuilder()
-            .setAccepted(false)
-            .setError("Index generation manager not available")
-            .build();
-      }
-      IndexGenerationManager.State next = indexGenerationManager.rollbackToPreviousGeneration();
-      if (next == null) {
-        return MigrationRollbackResponse.newBuilder()
-            .setAccepted(false)
-            .setError("No index state available")
-            .build();
-      }
-      MigrationRollbackResponse response =
-          MigrationRollbackResponse.newBuilder()
-              .setAccepted(true)
-              .setError("")
-              .setActiveGenerationId(
-                  next.active_generation() == null ? "" : next.active_generation())
-              .setPreviousGenerationId(
-                  next.previous_generation() == null ? "" : next.previous_generation())
-              .setRestartRequired(restart)
-              .build();
-
-      return response;
-    } catch (Exception e) {
-      return MigrationRollbackResponse.newBuilder()
-          .setAccepted(false)
-          .setError(e.getMessage() == null ? "Failed to rollback migration" : e.getMessage())
-          .build();
-    }
+    // A published ServingView cannot be reverted by writing state.json alone: issued requests,
+    // the producer and the Head graph still hold that view. A new recorded rebuild is the
+    // supported rollback. Keep this transport projection as a truthful refusal for old clients.
+    return MigrationRollbackResponse.newBuilder()
+        .setAccepted(false)
+        .setError("Generation rollback requires a new recorded rebuild")
+        .build();
   }
 
   IndexGcResponse runIndexGc(IndexGcRequest request) {

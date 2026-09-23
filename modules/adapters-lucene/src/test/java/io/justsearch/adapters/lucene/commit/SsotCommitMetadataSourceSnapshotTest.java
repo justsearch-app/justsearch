@@ -65,6 +65,77 @@ final class SsotCommitMetadataSourceSnapshotTest {
     assertThrows(NullPointerException.class, () -> new SsotCommitMetadataSource(null));
   }
 
+  @Test
+  void runtimeBoundSourcesKeepIndependentModelInputsWhileProvidersChange() throws Exception {
+    IndexFingerprint.installEffectiveVectorDimension(() -> 768);
+    IndexFingerprint.installModelFingerprintProviders(
+        () -> IndexFingerprint.ModelFingerprint.present("a".repeat(64)),
+        IndexFingerprint.ModelFingerprint::notConfigured,
+        IndexFingerprint.ModelFingerprint::notConfigured);
+    try {
+      ResolvedConfig blueConfig = config(16, 100, false, 0.7, 0.2, "{\"title\":1.0}");
+      ResolvedConfig greenConfig = config(48, 320, true, 1.2, 0.7, "{\"body\":2.0}");
+      var blue =
+          new SsotCommitMetadataSource(
+              blueConfig,
+              new SsotCommitMetadataSource.RuntimeFingerprintInputs(
+                  768,
+                  IndexFingerprint.ModelFingerprint.present("a".repeat(64)),
+                  IndexFingerprint.ModelFingerprint.notConfigured(),
+                  IndexFingerprint.ModelFingerprint.notConfigured()));
+      var green =
+          new SsotCommitMetadataSource(
+              greenConfig,
+              new SsotCommitMetadataSource.RuntimeFingerprintInputs(
+                  1024,
+                  IndexFingerprint.ModelFingerprint.present("b".repeat(64)),
+                  IndexFingerprint.ModelFingerprint.present("c".repeat(64)),
+                  IndexFingerprint.ModelFingerprint.notConfigured()));
+
+      Map<String, Object> blueBeforeProviderChange = blue.build();
+      Map<String, Object> greenBeforeProviderChange = green.build();
+
+      IndexFingerprint.installEffectiveVectorDimension(() -> 384);
+      IndexFingerprint.installModelFingerprintProviders(
+          () -> IndexFingerprint.ModelFingerprint.present("d".repeat(64)),
+          () -> IndexFingerprint.ModelFingerprint.present("e".repeat(64)),
+          () -> IndexFingerprint.ModelFingerprint.present("f".repeat(64)));
+
+      Map<String, Object> blueAfterProviderChange = blue.build();
+      Map<String, Object> greenAfterProviderChange = green.build();
+      assertEquals(blueBeforeProviderChange, blueAfterProviderChange);
+      assertEquals(greenBeforeProviderChange, greenAfterProviderChange);
+      assertNotEquals(
+          blueBeforeProviderChange.get(IndexFingerprint.COMMIT_META_KEY),
+          greenBeforeProviderChange.get(IndexFingerprint.COMMIT_META_KEY));
+
+      JsonNode blueInputs =
+          MAPPER.readTree(
+              (String) blueBeforeProviderChange.get(IndexFingerprint.COMMIT_META_INPUTS_KEY));
+      JsonNode greenInputs =
+          MAPPER.readTree(
+              (String) greenBeforeProviderChange.get(IndexFingerprint.COMMIT_META_INPUTS_KEY));
+      assertEquals(768, blueInputs.path("fields").findValue("dimension").asInt());
+      assertEquals("a".repeat(64), blueInputs.path("embedding_model_sha256").asText());
+      assertEquals(1024, greenInputs.path("fields").findValue("dimension").asInt());
+      assertEquals("b".repeat(64), greenInputs.path("embedding_model_sha256").asText());
+      assertEquals("c".repeat(64), greenInputs.path("splade_model_sha256").asText());
+
+      JsonNode legacyInputs =
+          MAPPER.readTree(
+              (String)
+                  new SsotCommitMetadataSource(blueConfig)
+                      .build()
+                      .get(IndexFingerprint.COMMIT_META_INPUTS_KEY));
+      assertEquals(384, legacyInputs.path("fields").findValue("dimension").asInt());
+      assertEquals("d".repeat(64), legacyInputs.path("embedding_model_sha256").asText());
+      assertEquals("e".repeat(64), legacyInputs.path("splade_model_sha256").asText());
+      assertEquals("f".repeat(64), legacyInputs.path("ner_model_sha256").asText());
+    } finally {
+      IndexFingerprint.resetModelFingerprintProviders();
+    }
+  }
+
   private static ResolvedConfig config(
       int hnswM,
       int efConstruction,

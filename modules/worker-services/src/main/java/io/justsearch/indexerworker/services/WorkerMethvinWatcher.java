@@ -67,7 +67,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   /** Delay before a burst-triggered reconcile, so a spike coalesces into one walk. */
   static final int BURST_RECONCILE_DELAY_SECONDS = 5;
 
-  private final JobQueue jobQueue;
+  private final BiConsumer<String, Path> upsertPathSink;
+  private final Consumer<RuntimeException> routingFailureSink;
   private final Consumer<String> deletePathSink;
   private final WorkerWatcherMetricCatalog watcherCatalog;
   // Tempdoc 626 §Axis-A — overflow/burst recovery relocated onto the Worker watcher so the Head
@@ -104,7 +105,34 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       WorkerWatcherMetricCatalog watcherCatalog,
       Consumer<String> deletePathSink,
       BiConsumer<Path, Boolean> reconcileSink) {
-    this.jobQueue = Objects.requireNonNull(jobQueue, "jobQueue");
+    this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
+        (collection, path) -> jobQueue.enqueueEntries(List.of(entryForLiveEvent(path)), collection));
+  }
+
+  /** The composed Worker supplies an admission-aware sink across generation cutover. */
+  public WorkerMethvinWatcher(
+      EngineExecutorRegistry.Registration reconcileRegistration,
+      JobQueue jobQueue,
+      WorkerWatcherMetricCatalog watcherCatalog,
+      Consumer<String> deletePathSink,
+      BiConsumer<Path, Boolean> reconcileSink,
+      BiConsumer<String, Path> upsertPathSink) {
+    this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
+        upsertPathSink, ignored -> {});
+  }
+
+  /** Production cutover refuses promotion after any watcher event failed to reach its route. */
+  public WorkerMethvinWatcher(
+      EngineExecutorRegistry.Registration reconcileRegistration,
+      JobQueue jobQueue,
+      WorkerWatcherMetricCatalog watcherCatalog,
+      Consumer<String> deletePathSink,
+      BiConsumer<Path, Boolean> reconcileSink,
+      BiConsumer<String, Path> upsertPathSink,
+      Consumer<RuntimeException> routingFailureSink) {
+    Objects.requireNonNull(jobQueue, "jobQueue");
+    this.upsertPathSink = Objects.requireNonNull(upsertPathSink, "upsertPathSink");
+    this.routingFailureSink = Objects.requireNonNull(routingFailureSink, "routingFailureSink");
     this.deletePathSink = Objects.requireNonNull(deletePathSink, "deletePathSink");
     this.watcherCatalog = watcherCatalog == null ? WorkerWatcherMetricCatalog.noop() : watcherCatalog;
     this.reconcileSink = reconcileSink == null ? (root, force) -> {} : reconcileSink;
@@ -214,8 +242,9 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    */
   void handleUpsert(Path root, String collection, Path path) {
     try {
-      jobQueue.enqueueEntries(List.of(entryForLiveEvent(path)), collection);
+      upsertPathSink.accept(collection, path);
     } catch (RuntimeException e) {
+      routingFailureSink.accept(e);
       log.warn("Worker watcher enqueue failed for {}: {}", path, e.getMessage());
     }
     maybeScheduleBurstReconcile(root);
@@ -318,6 +347,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
                 try {
                   reconcileSink.accept(root, force);
                 } catch (RuntimeException e) {
+                  routingFailureSink.accept(e);
                   log.warn(
                       "Worker watcher reconcile failed for {} (force={}): {}",
                       root,
@@ -379,7 +409,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       String normalizedPath = PathNormalizer.normalizePath(path.toAbsolutePath().toString());
       deletePathSink.accept(normalizedPath);
     } catch (RuntimeException e) {
-      // Best-effort drop: file may already be gone, coordinator may be draining, etc.
+      routingFailureSink.accept(e);
       log.debug("Worker watcher delete sink failed for {}: {}", path, e.getMessage());
     }
   }

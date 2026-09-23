@@ -134,6 +134,8 @@ public final class WorkerIngestService {
   private final IndexStatusOps statusOps;
   private final SyncDirectoryOps syncOps;
   private final IngestSwitchBufferOps switchBufferOps;
+  private WorkerMutationAdmission mutationAdmission;
+  private Object mutationOwner;
   private final MigrationControlOps migrationOps;
   private final WorkerUpgradeQuiescence upgradeQuiescence;
   private final IndexSettleOps settleOps;
@@ -229,6 +231,51 @@ public final class WorkerIngestService {
         new ConfirmedDeletionMarker(() -> this.documentIdentityStore));
     this.switchBufferOps =
         new IngestSwitchBufferOps(jobQueue, this.indexGenerationManager, metrics);
+  }
+
+  /** Bound once by the composing Worker owner before any request is published. */
+  public void setMutationAdmission(WorkerMutationAdmission admission, Object owner) {
+    if (mutationAdmission != null) throw new IllegalStateException("Mutation admission already bound");
+    mutationAdmission = java.util.Objects.requireNonNull(admission, "admission");
+    mutationOwner = java.util.Objects.requireNonNull(owner, "owner");
+  }
+
+  private WorkerMutationAdmission.Lease mutationLease() {
+    if (mutationAdmission == null) return null; // isolated service fixtures
+    try { return mutationAdmission.enter(mutationOwner); }
+    catch (IllegalStateException retired) {
+      throw WorkerServiceException.unavailable("Mutation producer belongs to a retired generation");
+    }
+  }
+
+  /** Watcher events share RPC mutation admission and the existing durable switch buffer. */
+  public void acceptWatcherUpsert(String collection, Path path) {
+    try (var ignoredMutation = mutationLease()) {
+      if (switchBufferOps.isSwitching()) {
+        if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
+          switchBufferOps.bufferSubmitBatchDuringSwitching(sbq, List.of(path), 1, 0,
+              collection, CallContext.none().provenance());
+          return;
+        }
+        throw IngestSwitchBufferOps.switchingUnavailable();
+      }
+      jobQueue.enqueueEntries(List.of(WorkerMethvinWatcher.entryForLiveEvent(path)), collection);
+    }
+  }
+
+  /** The watcher owns its deletion marker; this method owns its routing and effect fence. */
+  public void acceptWatcherDelete(String normalizedPath, Runnable directEffect) {
+    java.util.Objects.requireNonNull(directEffect, "directEffect");
+    try (var ignoredMutation = mutationLease()) {
+      if (switchBufferOps.isSwitching()) {
+        if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
+          switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
+          return;
+        }
+        throw IngestSwitchBufferOps.switchingUnavailable();
+      }
+      directEffect.run();
+    }
   }
 
   public UpgradeQuiescenceResponse prepareUpgrade(
@@ -482,7 +529,7 @@ public final class WorkerIngestService {
   }
 
   public BatchResponse submitBatch(BatchRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       List<String> filePaths = request.getFilePathsList();
 
       // Validate: empty batch
@@ -862,7 +909,7 @@ public final class WorkerIngestService {
 
   public UpdateVduResultResponse updateVduResult(
       UpdateVduResultRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String docId = request.getDocId();
       try {
         VduResultWriter.validate(request);
@@ -888,7 +935,7 @@ public final class WorkerIngestService {
   }
 
   public DeleteByPathResponse deleteByPath(DeleteByPathRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
     String pathPrefix = request.getPath();
     log.info("deleteByPath RPC called for prefix: {}", pathPrefix);
 
@@ -949,7 +996,7 @@ public final class WorkerIngestService {
    */
   public DeleteByCollectionResponse deleteByCollection(
       DeleteByCollectionRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String collection = request.getCollection();
       log.info("deleteByCollection RPC called for collection: {}", collection);
 
@@ -991,7 +1038,7 @@ public final class WorkerIngestService {
   }
 
   public DeleteByIdResponse deleteById(DeleteByIdRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
     String docId = request.getDocId();
     log.info("deleteById RPC called for doc_id: {}", docId);
 
@@ -1044,7 +1091,7 @@ public final class WorkerIngestService {
   }
 
   public PruneResponse pruneMissing(PruneRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
     String pathPrefix = request.getPathPrefix();
     log.info("pruneMissing RPC called for prefix: {}", pathPrefix);
 
@@ -1131,7 +1178,7 @@ public final class WorkerIngestService {
 
   private SyncDirectoryResponse syncDirectoryCommon(
       SyncDirectoryRequest request, CallContext ctx, JobQueue.EnqueueProvenance provenance) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       boolean force = request.getForce();
       log.info("syncDirectory RPC called for root: {} (force={})", rootPath, force);
@@ -1171,27 +1218,27 @@ public final class WorkerIngestService {
    * dropped; the periodic sync remains the backstop.
    */
   public void reconcileRoot(Path root, boolean force) {
+    try { reconcileRootStrict(root, force); }
+    catch (RuntimeException e) {
+      log.warn("In-process reconcile failed for {} (force={}): {}", root, force,
+          e.getMessage());
+    }
+  }
+
+  /** Watcher-owned route: a swallowed failure would make final cutover miss this root. */
+  public void reconcileRootStrict(Path root, boolean force) {
     if (root == null) {
       return;
     }
     SyncDirectoryRequest request =
         SyncDirectoryRequest.newBuilder().setRootPath(root.toString()).setForce(force).build();
-    try {
-      SyncDirectoryResponse value = syncDirectory(request, CallContext.none());
-      log.debug(
-          "In-process reconcile for {} (force={}): {} added, {} deleted, skipped={}",
-          root.toString(),
-          force,
-          value.getFilesAdded(),
-          value.getFilesDeleted(),
-          value.getSkipped());
-    } catch (RuntimeException e) {
-      // Best-effort by contract: a reconcile failure is logged and dropped, never propagated to
-      // the watcher thread that called us.
-      log.warn(
-          "In-process reconcile failed for {} (force={}): {}", root.toString(), force,
-          e.getMessage());
+    SyncDirectoryResponse value = syncDirectory(request, CallContext.none());
+    if (!value.getError().isBlank()) {
+      throw WorkerServiceException.unavailable("In-process reconcile was not accepted: " + value.getError());
     }
+    log.debug(
+        "In-process reconcile for {} (force={}): {} added, {} deleted, skipped={}",
+        root.toString(), force, value.getFilesAdded(), value.getFilesDeleted(), value.getSkipped());
   }
 
   public QueryPendingVduResponse queryPendingVdu(
@@ -1261,7 +1308,7 @@ public final class WorkerIngestService {
 
   public MarkVduProcessingResponse markVduProcessing(
       MarkVduProcessingRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
     String docId = request.getDocId();
     int maxRetries = resolveMaxRetries(request.getMaxRetries());
 
@@ -1382,7 +1429,7 @@ public final class WorkerIngestService {
 
   public RecoverVduProcessingResponse recoverVduProcessing(
       RecoverVduProcessingRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
     log.info("recoverVduProcessing RPC called");
 
     requireEnrichmentReader(ctx);
@@ -1428,7 +1475,7 @@ public final class WorkerIngestService {
 
   public UpdatePathsResponse updateDocumentPaths(
       UpdatePathsRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
     log.info("updateDocumentPaths RPC called with {} mappings", request.getMappingsCount());
 
     if (request.getMappingsCount() == 0) {
@@ -1602,7 +1649,7 @@ public final class WorkerIngestService {
 
   public ClearFailedJobsResponse clearFailedJobs(
       ClearFailedJobsRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       int deleted = jobQueue.clearFailedJobs();
       return ClearFailedJobsResponse.newBuilder().setDeletedCount(deleted).build();
     }
@@ -1892,7 +1939,8 @@ public final class WorkerIngestService {
     // log entries from this scan correlate via MDC.
     String scanId = recorded == null ? java.util.UUID.randomUUID().toString() : recorded.operationKey();
     try (var ignored = openRequestMdc(ctx);
-        var ignored2 = MdcContext.scan(scanId)) {
+        var ignored2 = MdcContext.scan(scanId);
+        var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       if (rootPath.isBlank()) {
         throw WorkerServiceException.invalidArgument("ScanRootRequest.root_path is required");
@@ -1944,7 +1992,7 @@ public final class WorkerIngestService {
 
   public io.justsearch.ipc.WatchRootResponse watchRoot(
       io.justsearch.ipc.WatchRootRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       if (rootPath.isBlank()) {
         throw WorkerServiceException.invalidArgument("WatchRootRequest.root_path is required");
@@ -1960,14 +2008,14 @@ public final class WorkerIngestService {
 
   public io.justsearch.ipc.UnwatchRootResponse unwatchRoot(
       io.justsearch.ipc.UnwatchRootRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
       return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
     }
   }
 
   public ResetIndexResponse resetIndex(ResetIndexRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       log.info("resetIndex: starting profiling reset");
 
       indexingLoop.resetForProfiling(
@@ -2156,7 +2204,7 @@ public final class WorkerIngestService {
    */
   public io.justsearch.ipc.CancelIndexingJobResponse cancelIndexingJob(
       io.justsearch.ipc.CancelIndexingJobRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String pathHash = request.getPathHash();
       if (pathHash.isBlank()) {
         throw WorkerServiceException.invalidArgument(
@@ -2207,7 +2255,7 @@ public final class WorkerIngestService {
    */
   public io.justsearch.ipc.RetryIndexingJobResponse retryIndexingJob(
       io.justsearch.ipc.RetryIndexingJobRequest request, CallContext ctx) {
-    try (var ignored = openRequestMdc(ctx)) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String pathHash = request.getPathHash();
       if (pathHash.isBlank()) {
         throw WorkerServiceException.invalidArgument(

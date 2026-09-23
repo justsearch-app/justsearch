@@ -76,6 +76,21 @@ public final class DocAccess implements ContextInjector {
     this(documents, DEFAULT_FETCH_TIMEOUT, maxInputTokens);
   }
 
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public DocAccess(DocumentService documents, ConversationConfigProvider configProvider) {
+    this(documents, DEFAULT_FETCH_TIMEOUT, configProvider);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public DocAccess(
+      DocumentService documents,
+      Duration fetchTimeout,
+      ConversationConfigProvider configProvider) {
+    this.documents = Objects.requireNonNull(documents, "documents");
+    this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
+    this.inputLimit = new SummaryInputLimit(configProvider);
+  }
+
   public DocAccess(
       DocumentService documents, Duration fetchTimeout, IntSupplier maxInputTokens) {
     this.documents = Objects.requireNonNull(documents, "documents");
@@ -110,7 +125,7 @@ public final class DocAccess implements ContextInjector {
       return InjectorResult.empty();
     }
 
-    SseEvent rejection = inputLimit.rejection(fullContent);
+    SseEvent rejection = inputLimit.rejection(fullContent, engineContext);
     if (rejection != null) return InjectorResult.terminalError(rejection);
 
     String truncated = fullContent.length() > MAX_CONTENT_CHARS

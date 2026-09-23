@@ -619,7 +619,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       stmt.execute(SqliteSchema.CREATE_JOBS_STATE_INDEX);
       stmt.execute(SqliteSchema.CREATE_JOBS_STATE_UPDATED_INDEX);
       stmt.execute(SqliteSchema.CREATE_SWITCH_BUFFER_TABLE);
-      stmt.execute(SqliteSchema.CREATE_SWITCH_BUFFER_INDEX);
     }
 
     // Run versioned migrations
@@ -633,6 +632,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   /** Returns best-effort counts for PENDING/PROCESSING/DONE/FAILED and PENDING runnable subset. */
   @Override
   public JobQueue.JobStateCounts jobStateCounts() { return switchBufferOps.stateCounts(); }
+
+  @Override
+  public JobQueue.JobStateCounts jobStateCountsStrict() { return switchBufferOps.stateCountsStrict(); }
 
   /** Byte weight of remaining PENDING/PROCESSING work; unknown sizes counted, not summed. */
   @Override
@@ -658,6 +660,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public List<SwitchBufferCapableQueue.SwitchBufferOp> listSwitchBufferOps() {
     return switchBufferOps.listAll();
+  }
+
+  @Override
+  public List<SwitchBufferCapableQueue.SwitchBufferOp> listSwitchBufferOpsStrict() {
+    return switchBufferOps.listAllStrict();
   }
 
   @Override

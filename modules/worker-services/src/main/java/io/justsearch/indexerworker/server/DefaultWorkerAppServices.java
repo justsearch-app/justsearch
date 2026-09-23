@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server;
 
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -26,6 +27,7 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.services.WorkerHealthService;
 import io.justsearch.indexerworker.services.WorkerIngestService;
+import io.justsearch.indexerworker.services.WorkerMutationAdmission;
 import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
@@ -54,6 +56,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   private static final Logger log = LoggerFactory.getLogger(DefaultWorkerAppServices.class);
 
   private final IndexingLoop indexingLoop;
+  /** Runtime already owned by {@link #indexingLoop}; null for a deferred/read-only bundle. */
+  private final RunningRuntime producerRuntime;
   /**
    * Tempdoc 885 item 3: the one pacing policy every indexing/backfill site throttles against.
    * Owned by {@code KnowledgeServer}, not by this class: the app services are reconstructed on a
@@ -65,6 +69,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   private final IndexingPacing indexingPacing;
   private final WorkerSearchService searchService;
   private final WorkerIngestService ingestService;
+  /** Shared by A and its prepared B; final cutover drains admitted mutation effects. */
+  private final WorkerMutationAdmission mutationAdmission;
+  private final Object mutationOwnerToken;
   private final WorkerHealthService healthService;
   private final ResolvedConfig resolvedConfig;
   private final ExtractionConfiguration extractionConfiguration;
@@ -73,9 +80,157 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   private final CitationScorerConfig citationScorerConfig;
   // W7.2: shared registry held by both IndexingLoop and SearchOrchestrator.
   private final EncoderBindings encoderBindings;
+  /** Green's index-time bindings when an accepted candidate differs from serving A. */
+  private final EncoderBindings producerEncoderBindings;
+  private final WorkerServiceConfiguration candidateConfiguration;
   // Tempdoc 418 Phase B — Worker-side filesystem watcher. Owned by appServices so its lifecycle
   // matches the service set's; closed during {@link #close()}.
   private final io.justsearch.indexerworker.services.WorkerMethvinWatcher workerWatcher;
+  /**
+   * The Blue/Green successor borrows the incumbent's producer until durable promotion commits.
+   * Access is serialized by KnowledgeServer's runtime-swap owner lock.
+   */
+  private final SharedProducerOwnership producerOwnership;
+  private final EmbeddingProviderTarget embeddingProviderTarget;
+  private final WatcherCallbacks watcherCallbacks;
+  private final WatcherCallbacks.Target preparedWatcherTarget;
+  private final DefaultWorkerAppServices borrowedFrom;
+
+  // Query/status-only model bindings that are not carried by the shared EncoderBindings.
+  private SpladeIdfQueryEncoder spladeIdfQueryEncoder;
+  private CrossEncoderReranker searchReranker;
+  private io.justsearch.reranker.CitationScorer citationScorer;
+  private GpuDiagnosticSuppliers gpuDiagnostics;
+  private StageAvailability stageAvailability;
+  private java.util.function.Supplier<java.util.concurrent.CountDownLatch> modelReadyLatchSupplier;
+  private java.util.function.Supplier<io.justsearch.ort.PolicySnapshot> policySnapshotSupplier;
+
+  private record StageAvailability(boolean embedding, boolean splade, boolean ner) {}
+
+  /** Exact close owner for the loop/extractor/watcher bundle shared during Green preparation. */
+  static final class SharedProducerOwnership {
+    private boolean owned;
+    private boolean closed;
+    private Runnable modelLeaseRelease;
+
+    SharedProducerOwnership(boolean owned) {
+      this.owned = owned;
+    }
+
+    boolean ownsProducer() {
+      return owned && !closed;
+    }
+
+    boolean closed() { return closed; }
+
+    synchronized void replaceModelLease(Runnable release) {
+      if (!owned || closed) throw new IllegalStateException("No live producer owns the model lease");
+      Runnable previous = modelLeaseRelease;
+      modelLeaseRelease = java.util.Objects.requireNonNull(release, "release");
+      if (previous != null) previous.run();
+    }
+
+    synchronized void transferTo(SharedProducerOwnership successor) {
+      if (!owned || closed || successor.closed || successor.owned
+          || successor.modelLeaseRelease != null) {
+        throw new IllegalStateException("Producer model lease cannot be transferred");
+      }
+      successor.modelLeaseRelease = modelLeaseRelease;
+      modelLeaseRelease = null;
+      owned = false;
+      successor.owned = true;
+    }
+
+    synchronized void close(
+        io.justsearch.indexerworker.services.WorkerMethvinWatcher watcher,
+        IndexingLoop loop) throws IOException {
+      if (closed) return;
+      if (owned) {
+        if (watcher != null) watcher.close();
+        if (loop != null) loop.close();
+      }
+      if (modelLeaseRelease != null) {
+        modelLeaseRelease.run();
+        modelLeaseRelease = null;
+      }
+      closed = true;
+    }
+  }
+
+  /** Stable loop listener whose selected query view changes with producer ownership. */
+  private static final class EmbeddingProviderTarget
+      implements java.util.function.Consumer<EmbeddingProvider> {
+    private final java.util.concurrent.locks.ReentrantLock lock =
+        new java.util.concurrent.locks.ReentrantLock();
+    private DefaultWorkerAppServices target;
+
+    private EmbeddingProviderTarget(DefaultWorkerAppServices target) {
+      this.target = target;
+    }
+
+    @Override
+    public void accept(EmbeddingProvider provider) {
+      lock.lock();
+      try {
+        target.searchService.setEmbeddingProvider(provider);
+        target.healthService.setEmbeddingProvider(provider);
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+
+  /** The existing watcher follows the selected writer service without retaining a Blue view. */
+  private static final class WatcherCallbacks {
+    private volatile Target target;
+
+    private record Target(RunningRuntime runtime, WorkerIngestService ingest,
+        io.justsearch.indexerworker.services.ConfirmedDeletionMarker deletionMarker) {}
+
+    private WatcherCallbacks(Target initial) { target = initial; }
+
+    private void upsert(String collection, Path path) {
+      Target selected = target;
+      if (selected.runtime() == null) return;
+      try {
+        selected.ingest().acceptWatcherUpsert(collection, path);
+      } catch (RuntimeException stale) {
+        Target successor = target;
+        if (successor == selected || successor.runtime() == null) throw stale;
+        successor.ingest().acceptWatcherUpsert(collection, path);
+      }
+    }
+
+    private void delete(String path) {
+      Target selected = target;
+      if (selected.runtime() == null) return;
+      try { deleteAt(selected, path); }
+      catch (RuntimeException stale) {
+        Target successor = target;
+        if (successor == selected || successor.runtime() == null) throw stale;
+        deleteAt(successor, path);
+      }
+    }
+
+    private static void deleteAt(Target selected, String path) {
+      selected.ingest().acceptWatcherDelete(path, () -> {
+        if (!selected.runtime().isAcceptingWrites()) return;
+        selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
+        selected.deletionMarker().markIfAbsent(path);
+      });
+    }
+
+    private void reconcile(Path root, boolean force) {
+      Target selected = target;
+      if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) return;
+      try { selected.ingest().reconcileRootStrict(root, force); }
+      catch (RuntimeException stale) {
+        Target successor = target;
+        if (successor == selected || successor.runtime() == null) throw stale;
+        successor.ingest().reconcileRootStrict(root, force);
+      }
+    }
+  }
 
   /**
    * Back-compat ctor — defaults migrationActiveSupplier + embeddingTelemetryEvents to null.
@@ -147,9 +302,24 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       IndexingPacing indexingPacing,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       WorkerServiceConfiguration configuration) {
+    this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
+        childRegistry, configuration, null);
+  }
+
+  /** A serves with its own bindings while a detached candidate drives Green's producer. */
+  public DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      WorkerServiceConfiguration configuration,
+      WorkerServiceConfiguration candidateConfiguration) {
     java.util.Objects.requireNonNull(executors, "executors");
     java.util.Objects.requireNonNull(childRegistry, "childRegistry");
     this.resolvedConfig = configuration.snapshot();
+    this.candidateConfiguration = candidateConfiguration;
     this.extractionConfiguration = configuration.extraction();
     this.detailedTracing =
         !"none".equalsIgnoreCase(resolvedConfig.index().tracingLevel());
@@ -176,13 +346,21 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // DelegatingX wrappers via setDelegate (mirrors DevReloadManager flow).
     io.justsearch.adapters.lucene.runtime.LuceneRuntime ingestLifecycle =
         ctx.ingestLifecycleSupplier().get();
-    io.justsearch.adapters.lucene.runtime.RunningRuntime ingestRunning =
-        ingestLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime r ? r : null;
+    RunningRuntime ingestRunning =
+        ingestLifecycle instanceof RunningRuntime r ? r : null;
+    this.producerRuntime = ingestRunning;
+    this.borrowedFrom = null;
+    this.mutationOwnerToken = new Object();
+    this.mutationAdmission = new WorkerMutationAdmission(mutationOwnerToken);
 
     // Tempdoc 516 P3 / Slice 5 (W7.2): single shared EncoderBindings registry held by both
     // IndexingLoop and SearchOrchestrator. wire* methods below bind once on it instead of
     // fanning out across peer setters.
     this.encoderBindings = new EncoderBindings();
+    this.producerEncoderBindings = candidateConfiguration == null
+        ? encoderBindings : new EncoderBindings();
+    // Even a deferred bundle owns its watcher; ordinary close semantics remain unchanged.
+    this.producerOwnership = new SharedProducerOwnership(true);
 
     if (ingestRunning != null) {
       // Extraction owns an executor, a shutdown hook and (after first routed file) child-process
@@ -226,7 +404,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
                 extractionCatalog,
                 ingestionOutcomeCatalog,
                 contentExtractor,
-                encoderBindings,
+                producerEncoderBindings,
                 loopOptions);
       } catch (RuntimeException | Error failure) {
         try {
@@ -271,6 +449,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // constructed it; we just inject so the LookupPathByHash gRPC handler returns real data.
     this.ingestService.setPathResolutionStore(ctx.pathResolutionStore());
     this.ingestService.setDocumentIdentityStore(ctx.documentIdentityStore());
+    this.ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
 
     // Tempdoc 400 §22 Issue D / LR2-e.4 (Phase 6 / 6.7): wire the
     // active-generation supplier from the ingest service's
@@ -310,7 +489,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setRuntimeGaugesSupplier(
         () -> {
           var rt = ctx.ingestLifecycleSupplier().get();
-          if (rt instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime r) {
+          if (rt instanceof RunningRuntime r) {
             return r.runtimeGaugesSnapshot();
           }
           return io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeGaugesSnapshot.EMPTY;
@@ -337,24 +516,252 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     var watcherDeletionMarker =
         new io.justsearch.indexerworker.services.ConfirmedDeletionMarker(
             ctx.documentIdentityStore());
-    java.util.function.Consumer<String> deletePathSink =
-        ingestRunning != null
-            ? path -> {
-              ingestRunning.indexingCoordinator().deleteByIdAndChunks(path);
-              watcherDeletionMarker.markIfAbsent(path);
-            }
-            : path -> {};
+    this.preparedWatcherTarget =
+        new WatcherCallbacks.Target(ingestRunning, ingestService, watcherDeletionMarker);
+    this.watcherCallbacks = new WatcherCallbacks(preparedWatcherTarget);
     var workerWatcherCatalog =
         new io.justsearch.indexerworker.services.WorkerWatcherMetricCatalog(ctx.metricRegistry());
     // Tempdoc 626 §Axis-A — OVERFLOW/burst recovery is now Worker-owned (in-process reconcile),
     // so the redundant Head watcher can be retired without dropping these safety nets.
-    java.util.function.BiConsumer<Path, Boolean> reconcileSink =
-        this.ingestService::reconcileRoot;
     this.workerWatcher = new io.justsearch.indexerworker.services.WorkerMethvinWatcher(
-        executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog, deletePathSink,
-        reconcileSink);
+        executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog,
+        watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
+        ignored -> mutationAdmission.markReplayUncertain());
     this.ingestService.setRootWatcherRegistry(
         new io.justsearch.indexerworker.services.RootWatcherRegistry(this.workerWatcher));
+    this.embeddingProviderTarget = new EmbeddingProviderTarget(this);
+  }
+
+  /**
+   * Prepares the post-promotion Green service view without opening another runtime or producer.
+   *
+   * <p>During a Blue/Green rebuild this bundle already owns the writer side: its indexing loop,
+   * extractor, watcher, and encoder registry all target Green while its search service still
+   * targets Blue. The successor therefore creates only fresh search/ingest/health views over the
+   * already-open Green runtime and borrows those existing producer objects. Closing an aborted
+   * successor cannot close the shared producer.
+   */
+  public DefaultWorkerAppServices prepareServingSuccessor(InfraContext greenContext) {
+    java.util.Objects.requireNonNull(greenContext, "greenContext");
+    var search = greenContext.searchLifecycleSupplier().get();
+    var ingest = greenContext.ingestLifecycleSupplier().get();
+    if (producerRuntime == null
+        || indexingLoop == null
+        || workerWatcher == null
+        || !producerOwnership.ownsProducer()) {
+      throw new IllegalStateException("Incumbent does not own a running producer");
+    }
+    if (search != producerRuntime || ingest != producerRuntime) {
+      throw new IllegalArgumentException(
+          "Successor context must bind search and ingest to the incumbent Green runtime");
+    }
+    return new DefaultWorkerAppServices(this, greenContext, producerRuntime);
+  }
+
+  /** Builds only the runtime-bound service view; all producer resources remain borrowed. */
+  private DefaultWorkerAppServices(
+      DefaultWorkerAppServices incumbent, InfraContext greenContext, RunningRuntime greenRuntime) {
+    this.candidateConfiguration = incumbent.candidateConfiguration;
+    this.resolvedConfig = candidateConfiguration == null
+        ? incumbent.resolvedConfig : candidateConfiguration.snapshot();
+    this.extractionConfiguration = candidateConfiguration == null
+        ? incumbent.extractionConfiguration : candidateConfiguration.extraction();
+    this.detailedTracing = !"none".equalsIgnoreCase(resolvedConfig.index().tracingLevel());
+    this.chunkRerankerConfig = candidateConfiguration == null
+        ? incumbent.chunkRerankerConfig : candidateConfiguration.chunkReranker();
+    this.citationScorerConfig = candidateConfiguration == null
+        ? incumbent.citationScorerConfig : candidateConfiguration.citationScorer();
+    this.indexingPacing = incumbent.indexingPacing;
+    this.indexingLoop = incumbent.indexingLoop;
+    this.producerRuntime = greenRuntime;
+    this.borrowedFrom = incumbent;
+    this.mutationOwnerToken = new Object();
+    this.mutationAdmission = incumbent.mutationAdmission;
+    this.encoderBindings = incumbent.producerEncoderBindings;
+    this.producerEncoderBindings = incumbent.producerEncoderBindings;
+    this.workerWatcher = incumbent.workerWatcher;
+    this.watcherCallbacks = incumbent.watcherCallbacks;
+    this.producerOwnership = new SharedProducerOwnership(false);
+
+    EmbeddingProvider provider = indexingLoop.getEmbeddingLifecycle().embeddingProvider();
+    this.searchService = new WorkerSearchService(greenRuntime, provider, encoderBindings);
+    this.embeddingProviderTarget = incumbent.embeddingProviderTarget;
+    this.ingestService =
+        new WorkerIngestService(
+            greenContext.jobQueue(),
+            indexingLoop,
+            greenContext.signalBus(),
+            indexingPacing,
+            greenContext.indexBasePath(),
+            greenContext.activeIndexPath(),
+            greenRuntime,
+            greenRuntime,
+            greenContext.migrationProgressSupplier(),
+            greenContext.migrationSwitchingMaxDurationMs());
+    this.preparedWatcherTarget = new WatcherCallbacks.Target(
+        greenRuntime, this.ingestService, incumbent.preparedWatcherTarget.deletionMarker());
+    ingestService.setPathResolutionStore(greenContext.pathResolutionStore());
+    ingestService.setDocumentIdentityStore(greenContext.documentIdentityStore());
+    ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
+    searchService.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
+
+    this.healthService =
+        new WorkerHealthService(
+            greenContext.config().serviceVersion(),
+            greenContext.jobQueue(),
+            greenRuntime.indexCountOps(),
+            provider,
+            this::indexingLoopState,
+            candidateConfiguration == null ? incumbent.healthService.discoveredModels()
+                : candidateConfiguration.discoveredModels());
+
+    searchService.setChunkRerankerConfig(chunkRerankerConfig);
+    searchService.setCitationScorerConfig(citationScorerConfig);
+    ingestService.setOrtCudaStatusSupplier(searchService::getOrtCudaStatus);
+    Path rerankerModelPath = chunkRerankerConfig.modelPath();
+    ingestService.setRerankerModelPathSupplier(
+        () -> rerankerModelPath != null ? rerankerModelPath.toString() : "");
+    ingestService.setRuntimeGaugesSupplier(greenRuntime::runtimeGaugesSnapshot);
+    healthService.setModelActiveSupplier("reranker", () -> {
+      var status = searchService.getOrtCudaStatus();
+      return status != null && status.available();
+    });
+    healthService.setModelActiveSupplier("citation-scorer", searchService::isCitationScorerActive);
+    ingestService.setRootWatcherRegistry(
+        new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher));
+
+    var lifecycle = indexingLoop.getEmbeddingLifecycle();
+    var ecc = lifecycle.embeddingCompatController();
+    if (ecc != null) {
+      searchService.setEmbeddingCompatController(ecc);
+      ingestService.setEmbeddingCompatController(ecc);
+    }
+    var bindings = encoderBindings.snapshot();
+    if (bindings.bgeM3Encoder() != null) healthService.setBgeM3Encoder(bindings.bgeM3Encoder());
+    if (bindings.disambiguationService() != null) {
+      searchService.setClusterSnapshotSupplier(bindings.disambiguationService()::snapshot);
+    }
+    this.spladeIdfQueryEncoder = incumbent.spladeIdfQueryEncoder;
+    if (spladeIdfQueryEncoder != null) {
+      searchService.setSpladeIdfQueryEncoder(spladeIdfQueryEncoder);
+    }
+    this.searchReranker = incumbent.searchReranker;
+    if (searchReranker != null) searchService.setSearchReranker(searchReranker);
+    this.citationScorer = incumbent.citationScorer;
+    if (citationScorer != null) searchService.setCitationScorer(citationScorer);
+    this.gpuDiagnostics = incumbent.gpuDiagnostics;
+    if (gpuDiagnostics != null) wireGpuDiagnostics(gpuDiagnostics);
+    this.stageAvailability = incumbent.stageAvailability;
+    if (stageAvailability != null) {
+      ingestService.setStageEnabled(
+          stageAvailability.embedding(), stageAvailability.splade(), stageAvailability.ner());
+    }
+    this.modelReadyLatchSupplier = incumbent.modelReadyLatchSupplier;
+    if (modelReadyLatchSupplier != null) {
+      searchService.setModelReadyLatchSupplier(modelReadyLatchSupplier);
+    }
+    this.policySnapshotSupplier = incumbent.policySnapshotSupplier;
+    if (policySnapshotSupplier != null) {
+      ingestService.setPolicySnapshotSupplier(policySnapshotSupplier);
+    }
+  }
+
+  /**
+   * Validates the exact successor and freezes provider notifications before durable promotion.
+   * The owner closes the returned lease after publication or precommit abandonment.
+   */
+  public ProducerTransfer prepareProducerTransferTo(DefaultWorkerAppServices successor) {
+    java.util.Objects.requireNonNull(successor, "successor");
+    if (successor == this) throw new IllegalArgumentException("Successor must be distinct");
+    embeddingProviderTarget.lock.lock();
+    try {
+      if (!producerOwnership.ownsProducer() || successor.producerOwnership.closed()
+          || successor.producerOwnership.ownsProducer() || successor.borrowedFrom != this) {
+        throw new IllegalStateException("Producer ownership is not transferable");
+      }
+      if (producerRuntime == null
+          || successor.producerRuntime != producerRuntime
+          || successor.indexingLoop != indexingLoop
+          || successor.encoderBindings != producerEncoderBindings
+          || successor.workerWatcher != workerWatcher
+          || successor.watcherCallbacks != watcherCallbacks
+          || successor.indexingPacing != indexingPacing
+          || successor.resolvedConfig != (candidateConfiguration == null
+              ? resolvedConfig : candidateConfiguration.snapshot())) {
+        throw new IllegalArgumentException("Successor does not borrow this exact Green producer");
+      }
+      EmbeddingProvider current = indexingLoop.getEmbeddingLifecycle().embeddingProvider();
+      successor.searchService.setEmbeddingProvider(current);
+      successor.healthService.setEmbeddingProvider(current);
+      return new ProducerTransfer(successor);
+    } catch (RuntimeException | Error failure) {
+      embeddingProviderTarget.lock.unlock();
+      throw failure;
+    }
+  }
+
+  public WorkerMutationAdmission mutationAdmission() { return mutationAdmission; }
+
+  /** Retains the exact native model set until this producer's actual exit or ownership transfer. */
+  public void replaceProducerModelLease(Runnable release) {
+    producerOwnership.replaceModelLease(release);
+  }
+
+  /** Physical producer identity shared by wrappers of this exact service view. */
+  public Object mutationOwnerToken() { return mutationOwnerToken; }
+
+  /** Parks the already-running Green writer after its current batch, without replacing it. */
+  public boolean pauseProducerForCutover(long timeoutMs) {
+    if (!producerOwnership.ownsProducer() || indexingLoop == null) {
+      throw new IllegalStateException("Cutover requires the live Green producer");
+    }
+    return indexingLoop.pauseForCutover(timeoutMs);
+  }
+
+  public void resumeProducerAfterCutover() {
+    if (indexingLoop != null) indexingLoop.resumeAfterCutover();
+  }
+
+  /** Exact prepared producer transfer; install is assignment-only after pointer commitment. */
+  public final class ProducerTransfer implements AutoCloseable {
+    private final DefaultWorkerAppServices successor;
+    private final Thread ownerThread;
+    private boolean installed;
+    private boolean released;
+
+    private ProducerTransfer(DefaultWorkerAppServices successor) {
+      this.successor = successor;
+      this.ownerThread = Thread.currentThread();
+    }
+
+    public void install() {
+      requireOwnerThread();
+      if (released) {
+        throw new IllegalStateException("Producer transfer lease is already released");
+      }
+      if (installed) return;
+      producerOwnership.transferTo(successor.producerOwnership);
+      embeddingProviderTarget.target = successor;
+      watcherCallbacks.target = successor.preparedWatcherTarget;
+      if (candidateConfiguration != null) {
+        indexingLoop.getEmbeddingLifecycle()
+            .setEmbeddingProviderChangeListener(embeddingProviderTarget);
+      }
+      installed = true;
+    }
+
+    @Override public void close() {
+      requireOwnerThread();
+      if (released) return;
+      released = true;
+      embeddingProviderTarget.lock.unlock();
+    }
+
+    private void requireOwnerThread() {
+      if (Thread.currentThread() != ownerThread) {
+        throw new IllegalStateException("Producer transfer lease belongs to its preparing thread");
+      }
+    }
   }
 
   // ==================== Service accessors ====================
@@ -440,23 +847,42 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireEmbeddingProvider(EmbeddingProvider provider) {
-    if (indexingLoop != null) {
+    if (indexingLoop != null && candidateConfiguration == null) {
       indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
     }
-    searchService.setEmbeddingProvider(provider);
-    healthService.setEmbeddingProvider(provider);
+    embeddingProviderTarget.accept(provider);
     // 309 §33: Propagate future GPU-transition embedding reloads to SearchOrchestrator.
-    if (indexingLoop != null) {
+    if (indexingLoop != null && candidateConfiguration == null) {
       indexingLoop
           .getEmbeddingLifecycle()
-          .setEmbeddingProviderChangeListener(searchService::setEmbeddingProvider);
+          .setEmbeddingProviderChangeListener(embeddingProviderTarget);
     }
+  }
+
+  /** Publish B's complete index-time encoders without changing A's query bindings. */
+  public void wireCandidateProducer(EmbeddingProvider provider, EncoderBindings.Snapshot bindings) {
+    if (candidateConfiguration == null || indexingLoop == null
+        || producerEncoderBindings == encoderBindings) {
+      throw new IllegalStateException("No detached candidate producer is available");
+    }
+    producerEncoderBindings.publish(java.util.Objects.requireNonNull(bindings, "bindings"));
+    indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
+  }
+
+  /** Bind B's write-side compatibility proof without changing A's query admission. */
+  public void wireCandidateEmbeddingCompatController(EmbeddingCompatibilityController candidate) {
+    if (candidateConfiguration == null || indexingLoop == null
+        || producerEncoderBindings == encoderBindings) {
+      throw new IllegalStateException("No detached candidate producer is available");
+    }
+    indexingLoop.getEmbeddingLifecycle().setEmbeddingCompatController(
+        java.util.Objects.requireNonNull(candidate, "candidate"));
   }
 
   @Override
   public void addEmbeddingProviderChangeListener(
       java.util.function.Consumer<EmbeddingProvider> listener) {
-    if (indexingLoop != null && listener != null) {
+    if (indexingLoop != null && candidateConfiguration == null && listener != null) {
       indexingLoop.getEmbeddingLifecycle().addEmbeddingProviderChangeListener(listener);
     }
   }
@@ -465,11 +891,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireEmbeddingCompatController(EmbeddingCompatibilityController ecc) {
-    if (indexingLoop != null) {
+    if (indexingLoop != null && candidateConfiguration == null) {
       indexingLoop.getEmbeddingLifecycle().setEmbeddingCompatController(ecc);
     }
     searchService.setEmbeddingCompatController(ecc);
-    ingestService.setEmbeddingCompatController(ecc);
+    if (candidateConfiguration == null) ingestService.setEmbeddingCompatController(ecc);
   }
 
   // 516 P3 FINAL CUT: wireMigrationActiveSupplier removed — pre-wired via DWAS 2-arg ctor.
@@ -490,6 +916,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireSpladeIdfQueryEncoder(SpladeIdfQueryEncoder idfEnc) {
+    this.spladeIdfQueryEncoder = idfEnc;
     // Query-side IDF helper — stays as a SearchOrchestrator-only path (no EncoderBindings
     // symmetry; the indexing-side encoder is the SPLADE one bound above).
     searchService.setSpladeIdfQueryEncoder(idfEnc);
@@ -511,6 +938,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireGpuDiagnostics(GpuDiagnosticSuppliers suppliers) {
+    this.gpuDiagnostics = suppliers;
     if (suppliers.spladeOrtCudaStatus() != null) {
       ingestService.setSpladeOrtCudaStatusSupplier(suppliers.spladeOrtCudaStatus());
     }
@@ -544,6 +972,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireStageEnabled(boolean embedding, boolean splade, boolean ner) {
+    this.stageAvailability = new StageAvailability(embedding, splade, ner);
     ingestService.setStageEnabled(embedding, splade, ner);
   }
 
@@ -551,6 +980,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireSearchReranker(CrossEncoderReranker reranker) {
+    this.searchReranker = reranker;
     searchService.setSearchReranker(reranker);
   }
 
@@ -558,6 +988,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireCitationScorer(io.justsearch.reranker.CitationScorer scorer) {
+    this.citationScorer = scorer;
     searchService.setCitationScorer(scorer);
   }
 
@@ -566,6 +997,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public void wireModelReadyLatch(
       java.util.function.Supplier<java.util.concurrent.CountDownLatch> latchSupplier) {
+    this.modelReadyLatchSupplier = latchSupplier;
     searchService.setModelReadyLatchSupplier(latchSupplier);
   }
 
@@ -574,6 +1006,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public void wirePolicySnapshotSupplier(
       java.util.function.Supplier<io.justsearch.ort.PolicySnapshot> supplier) {
+    this.policySnapshotSupplier = supplier;
     ingestService.setPolicySnapshotSupplier(supplier);
   }
 
@@ -588,12 +1021,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void close() throws IOException {
-    if (workerWatcher != null) {
-      workerWatcher.close();
-    }
-    if (indexingLoop != null) {
-      indexingLoop.close();
-    }
+    producerOwnership.close(workerWatcher, indexingLoop);
   }
 
   // ==================== Sandbox seam (tempdoc 410) ====================

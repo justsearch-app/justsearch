@@ -53,7 +53,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Real Engine and SQLite proof for one prepared bulk operation across both required restarts. */
+/** Real Engine and SQLite proof for prepared bulk with live final promotion. */
 @Timeout(360)
 final class RecordedBulkEngineRestartTest {
   private static final Clock CLOCK = Clock.systemUTC();
@@ -62,7 +62,7 @@ final class RecordedBulkEngineRestartTest {
   @TempDir Path temporaryDirectory;
 
   @Test
-  void preparedBulkSurvivesBothEngineRestartsAndServesItsExactPromotedGeneration()
+  void preparedBulkSurvivesBuildRestartAndActivatesInProcess()
       throws Exception {
     Path dataDirectory = Files.createDirectories(temporaryDirectory.resolve("data"));
     Path watchedRoot = Files.createDirectories(temporaryDirectory.resolve("watched"));
@@ -142,14 +142,16 @@ final class RecordedBulkEngineRestartTest {
       first.requestedRestartHandoff();
     }
 
-    CountDownLatch secondRestart = new CountDownLatch(1);
-    try (EngineEpoch second = openEpoch(dataDirectory, modelsDirectory, secondRestart)) {
-      assertTrue(secondRestart.await(WAIT_MS, TimeUnit.MILLISECONDS),
-          "drained recorded bulk never requested its post-promotion Engine restart");
-      var running = second.operations().find(operationKey).orElseThrow();
-      assertEquals(OperationState.RUNNING, running.state(),
-          "promotion must precede the successor's terminal receipt");
-      BulkReindexProgress settled = second.operations().bulkReindexProgress(running.id()).orElseThrow();
+    CountDownLatch unexpectedCutoverRestart = new CountDownLatch(1);
+    try (EngineEpoch second = openEpoch(dataDirectory, modelsDirectory, unexpectedCutoverRestart)) {
+      assertTrue(await(() -> second.operations().find(operationKey)
+              .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
+          "the live promoted successor never wrote terminal success");
+      var complete = second.operations().find(operationKey).orElseThrow();
+      assertEquals(OperationState.COMPLETE, complete.state());
+      assertNotNull(complete.receipt());
+      assertEquals("SUCCESS", complete.receipt().code());
+      BulkReindexProgress settled = second.operations().bulkReindexProgress(complete.id()).orElseThrow();
       assertEquals(BulkReindexProgress.Phase.SETTLED, settled.phase());
       assertEquals(targetGeneration, settled.generationId());
       assertEquals(capturedPlan.target(), settled.target());
@@ -162,20 +164,26 @@ final class RecordedBulkEngineRestartTest {
       assertEquals(targetGeneration, generationState.active_generation());
       assertTrue(generationState.building_generation() == null
           || generationState.building_generation().isBlank());
-      second.requestedRestartHandoff();
+      assertTrue(awaitSearchable(second.client(), marker, WAIT_MS),
+          "the live Engine did not serve the captured document after promotion");
+      assertEquals(targetGeneration,
+          second.client().getStatus(TestEngineContexts.BACKGROUND)
+              .getMigration().getServingSearchGenerationId());
+      assertFalse(unexpectedCutoverRestart.await(250, TimeUnit.MILLISECONDS),
+          "live final promotion requested an Engine restart");
     }
 
     CountDownLatch unexpectedRestart = new CountDownLatch(1);
     try (EngineEpoch third = openEpoch(dataDirectory, modelsDirectory, unexpectedRestart)) {
       assertTrue(await(() -> third.operations().find(operationKey)
               .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
-          "the promoted successor never wrote terminal success");
+          "the promoted successor did not retain terminal success after reboot");
       var complete = third.operations().find(operationKey).orElseThrow();
       assertEquals(OperationState.COMPLETE, complete.state());
       assertNotNull(complete.receipt());
       assertEquals("SUCCESS", complete.receipt().code());
       assertTrue(awaitSearchable(third.client(), marker, WAIT_MS),
-          "the actual reopened target generation did not serve the captured document");
+          "the reopened target generation did not serve the captured document");
       assertEquals(targetGeneration,
           third.client().getStatus(TestEngineContexts.BACKGROUND)
               .getMigration().getServingSearchGenerationId());

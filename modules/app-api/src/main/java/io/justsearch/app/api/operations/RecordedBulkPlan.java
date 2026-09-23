@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** Frozen finite source scope and physical target; per-file capture follows durable acceptance. */
 public record RecordedBulkPlan(Profile profile, String source, RecordedRootPlan scope,
-    IndexTargetSnapshot target) {
+    IndexTargetSnapshot target) implements RecordedGenerationPlan {
   public static final String SCHEMA = "recorded-bulk-reindex-v1";
   private static final JsonMapper JSON = JsonMapper.builder()
       .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)

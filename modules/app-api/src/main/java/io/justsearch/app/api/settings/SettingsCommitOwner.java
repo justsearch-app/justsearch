@@ -5,6 +5,8 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
+import java.io.IOException;
 import java.util.Optional;
 import io.justsearch.agent.api.registry.OperationResult;
 import java.util.List;
@@ -81,6 +83,44 @@ public interface SettingsCommitOwner {
   /** Compare transient physical intent with this row's accepted private preparation. */
   void verifyCandidatePreparation(OperationRecord row,
       Optional<OperationStore.Preparation> accepted, SettingsCandidateContext context);
+
+  /** Validate the exact accepted installer plan before its runner may arm a settings marker. */
+  default void verifyInstallerGenerationPreparation(OperationRecord row,
+      Optional<OperationStore.Preparation> accepted, RecordedInstallerGenerationPlan plan) {
+    throw new UnsupportedOperationException("Installer generation settings are unavailable");
+  }
+
+  /**
+   * A non-terminal file/config projection owned by the recorded generation operation. The
+   * generation pointer is its commitment witness; this collaborator never completes the row.
+   */
+  interface PreparedGenerationProjection {
+    /** Establish prepared component owner locks before the runtime/state/publication lock order. */
+    default void withOwnerLocks(Runnable publication) { publication.run(); }
+
+    /** Final witness, shutdown and cancellation arbitration while publication excludes captures. */
+    void admitBeforePointer();
+
+    /** Roll the accepted settings and prepared config forward after the pointer is committed. */
+    void afterPointerCommitted() throws IOException;
+
+    /** Deliver observations and retire superseded components after runtime publication unlocks. */
+    default void afterRuntimePublished() {}
+
+    /** Dispose only while the exact generation pointer is proven unchanged. */
+    void abortBeforePointer();
+  }
+
+  /** Build all fallible settings work privately from an already reserved installer candidate. */
+  default PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
+      UiSettings candidate, AttemptControl control) {
+    throw new UnsupportedOperationException("Installer generation settings are unavailable");
+  }
+
+  /** Read-only terminal guard for the generation owner after B is serving. */
+  default boolean installerGenerationProjected(RecordedInstallerGenerationPlan plan) {
+    return false;
+  }
 
   /** Build the fixed reset candidate only after reservation and durable SQL arming. */
   void applyReset(Reservation reservation, AttemptControl control);

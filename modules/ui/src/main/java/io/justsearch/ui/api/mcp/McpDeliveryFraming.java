@@ -95,10 +95,15 @@ final class McpDeliveryFraming {
    */
   static Settings resolveSettings() {
     ConfigStore store = ConfigStore.globalOrNull();
-    if (store == null) {
+    return resolveSettings(store == null ? null : store.get());
+  }
+
+  /** Resolves framing from the same immutable config captured with the serving operation. */
+  static Settings resolveSettings(ResolvedConfig snapshot) {
+    if (snapshot == null) {
       return Settings.OFF;
     }
-    ResolvedConfig.Search.McpFraming framing = store.get().search().mcpFraming();
+    ResolvedConfig.Search.McpFraming framing = snapshot.search().mcpFraming();
     if (framing == null) {
       return Settings.OFF;
     }

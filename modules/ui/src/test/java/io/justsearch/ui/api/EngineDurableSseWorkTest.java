@@ -148,7 +148,7 @@ final class EngineDurableSseWorkTest {
                 return null;
               })
           .when(engine)
-          .run(any(), anyMap(), any(), any(), any());
+          .runScoped(any(), anyMap(), any(), any(), any(), any());
 
       runs =
           new RunStreamController(

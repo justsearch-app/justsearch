@@ -71,6 +71,7 @@ final class CoreOperationCatalogTest {
             "core.preflight-ai-pack",
             "core.import-ai-pack",
             "core.start-ai-install",
+            "core.activate-installed-models",
             "core.cancel-ai-install",
             "core.repair-ai-install",
             "core.create-user-policy",
@@ -113,6 +114,9 @@ final class CoreOperationCatalogTest {
     assertEquals(AuditPolicy.METADATA_ONLY, op.policy().audit());
     assertEquals(Set.of(ExecutorTag.UI, ExecutorTag.AGENT), op.executors());
     assertFalse(op.policy().undoSupported());
+    assertFalse(
+        op.intf().inputs().contains("installer_model_activation"),
+        "installer activation source belongs only to its distinct operation");
   }
 
   @Test
@@ -368,6 +372,22 @@ final class CoreOperationCatalogTest {
     Operation op = catalog.findById(CoreOperationCatalog.START_AI_INSTALL).orElseThrow();
     assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertEquals(OperationKind.OPERATION, op.policy().recordKind());
+    assertTrue(op.policy().declaredSurvival().isEmpty());
+  }
+
+  @Test
+  void activateInstalledModelsHasHighRiskInlineConfirmDurableReindexPolicy() {
+    Operation op = catalog.findById(CoreOperationCatalog.ACTIVATE_INSTALLED_MODELS).orElseThrow();
+    assertEquals(RiskTier.HIGH, op.policy().risk());
+    assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertEquals(OperationKind.REINDEX, op.policy().recordKind());
+    assertEquals(
+        EngineContext.Survival.DURABLE, op.policy().declaredSurvival().orElseThrow());
+    assertEquals(Set.of(ExecutorTag.UI), op.executors());
+    assertTrue(
+        op.intf().inputs().contains("\"enum\":[\"installer_model_activation\"]"));
+    assertTrue(op.intf().inputs().contains("\"required\":[\"source\"]"));
   }
 
   @Test

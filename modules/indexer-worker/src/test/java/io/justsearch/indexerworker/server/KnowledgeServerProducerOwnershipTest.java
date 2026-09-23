@@ -13,6 +13,7 @@ import io.justsearch.core.execution.EngineExecutorSnapshot;
 import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.services.WorkerMutationAdmission;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -85,6 +86,11 @@ final class KnowledgeServerProducerOwnershipTest {
       var queueField = KnowledgeServer.class.getDeclaredField("jobQueue");
       queueField.setAccessible(true);
       queueField.set(server, queue);
+      var mutationOwner = mock(DefaultWorkerAppServices.class);
+      var token = new Object();
+      when(mutationOwner.mutationOwnerToken()).thenReturn(token);
+      when(mutationOwner.mutationAdmission()).thenReturn(new WorkerMutationAdmission(token));
+      server.appServices = mutationOwner;
       server.startStuckJobReaper(queue);
       CompletableFuture<Void> closed = null;
       try {

@@ -749,6 +749,30 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
+  public boolean armInstallerGenerationSettingsRevision(long id, long expectedRevision) {
+    if (expectedRevision < 0 || expectedRevision == Long.MAX_VALUE) {
+      throw new IllegalArgumentException("Expected settings revision cannot advance");
+    }
+    return locked(() -> {
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET accepted_settings_revision = ?, updated_at = ?
+          WHERE id = ? AND state = 'RUNNING' AND kind = 'reindex'
+            AND operation_ref = 'core.activate-installed-models'
+            AND preparation_nonce IS NOT NULL AND preparation_sealed = 0
+            AND preparation_payload IS NOT NULL
+            AND json_valid(preparation_payload)
+            AND json_extract(preparation_payload, '$.preparation.replaySchema')
+                = 'recorded-installer-generation-v2'
+            AND (accepted_settings_revision IS NULL OR accepted_settings_revision = ?)
+          """)) {
+        update.setLong(1, expectedRevision); update.setLong(2, clock.millis()); update.setLong(3, id);
+        update.setLong(4, expectedRevision);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
   public boolean resume(long id) {
     return locked(() -> {
       try (var update = connection.prepareStatement("""
@@ -863,7 +887,8 @@ public final class SqliteOperationStore implements OperationStore {
     return row.descriptor().kind() == OperationKind.REINDEX
         && row.context().survival() == EngineContext.Survival.DURABLE
         && ("core.bulk-reindex".equals(row.descriptor().operationRef())
-            || "core.rebuild-index".equals(row.descriptor().operationRef()));
+            || "core.rebuild-index".equals(row.descriptor().operationRef())
+            || "core.activate-installed-models".equals(row.descriptor().operationRef()));
   }
 
   /** Versioned projection in the existing counts column; the queue retains the underlying ledger. */

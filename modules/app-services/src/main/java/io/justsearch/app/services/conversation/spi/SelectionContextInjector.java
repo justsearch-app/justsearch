@@ -104,6 +104,26 @@ public final class SelectionContextInjector implements ContextInjector {
     this(documents, DEFAULT_FETCH_TIMEOUT, onlineAi, summaryMaxInputTokens);
   }
 
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public SelectionContextInjector(
+      DocumentService documents,
+      Supplier<OnlineAiService> onlineAi,
+      ConversationConfigProvider configProvider) {
+    this(documents, DEFAULT_FETCH_TIMEOUT, onlineAi, configProvider);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public SelectionContextInjector(
+      DocumentService documents,
+      Duration fetchTimeout,
+      Supplier<OnlineAiService> onlineAi,
+      ConversationConfigProvider configProvider) {
+    this.documents = Objects.requireNonNull(documents, "documents");
+    this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
+    this.onlineAi = onlineAi;
+    this.summaryInputLimit = new SummaryInputLimit(configProvider);
+  }
+
   /**
    * Composition-root constructor (tempdoc 883 decision 3) — takes the same
    * {@code Supplier<OnlineAiService>} {@link RAGContext} gets, so a selected passage is cut against
@@ -502,7 +522,7 @@ public final class SelectionContextInjector implements ContextInjector {
 
   private InjectorResult summaryLimitRejection(ConversationContext ctx, String source) {
     if (!SUMMARIZE_SHAPE_ID.equals(ctx.shapeId())) return null;
-    SseEvent rejection = summaryInputLimit.rejection(source);
+    SseEvent rejection = summaryInputLimit.rejection(source, ctx.engineContext());
     return rejection == null ? null : InjectorResult.terminalError(rejection);
   }
 

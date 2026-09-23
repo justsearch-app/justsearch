@@ -56,6 +56,7 @@ public final class StreamingCitationMatcher implements StreamConsumer {
   private final DocumentService documents;
   private final Duration timeout;
   private final DoubleSupplier threshold;
+  private final ConversationConfigProvider configProvider;
 
   public StreamingCitationMatcher(DocumentService documents) {
     this(documents, MATCH_TIMEOUT, DEFAULT_THRESHOLD);
@@ -73,6 +74,12 @@ public final class StreamingCitationMatcher implements StreamConsumer {
     this(documents, MATCH_TIMEOUT, threshold);
   }
 
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public StreamingCitationMatcher(
+      DocumentService documents, ConversationConfigProvider configProvider) {
+    this(documents, MATCH_TIMEOUT, configProvider);
+  }
+
   public StreamingCitationMatcher(
       DocumentService documents, Duration timeout, double threshold) {
     this(documents, timeout, () -> threshold);
@@ -83,6 +90,18 @@ public final class StreamingCitationMatcher implements StreamConsumer {
     this.documents = Objects.requireNonNull(documents, "documents");
     this.timeout = Objects.requireNonNull(timeout, "timeout");
     this.threshold = Objects.requireNonNull(threshold, "threshold");
+    this.configProvider = null;
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public StreamingCitationMatcher(
+      DocumentService documents,
+      Duration timeout,
+      ConversationConfigProvider configProvider) {
+    this.documents = Objects.requireNonNull(documents, "documents");
+    this.timeout = Objects.requireNonNull(timeout, "timeout");
+    this.threshold = () -> DEFAULT_THRESHOLD;
+    this.configProvider = Objects.requireNonNull(configProvider, "configProvider");
   }
 
   @Override
@@ -143,7 +162,10 @@ public final class StreamingCitationMatcher implements StreamConsumer {
     }
     try {
       double effectiveThreshold =
-          DocumentService.effectiveCitationThreshold(threshold.getAsDouble());
+          DocumentService.effectiveCitationThreshold(
+              configProvider == null
+                  ? threshold.getAsDouble()
+                  : configProvider.resolve(engineContext).rag().citationMatchThreshold());
       CitationMatchResult result =
           documents
               .matchCitationsAgainst(fullText, sources, effectiveThreshold, engineContext)

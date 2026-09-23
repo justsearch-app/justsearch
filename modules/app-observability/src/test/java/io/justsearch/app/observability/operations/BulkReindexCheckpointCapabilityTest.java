@@ -38,6 +38,20 @@ final class BulkReindexCheckpointCapabilityTest {
   @TempDir Path temp;
 
   @Test
+  void installerActivationUsesTheDurableGenerationCheckpoint() throws Exception {
+    try (var store = new SqliteOperationStore(temp.resolve("installer-generation.db"), clock, ignored -> {})) {
+      var request = request(OperationKind.REINDEX, "core.activate-installed-models");
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(row.id()));
+      var progress = capturing(row.key(), target("{\"installer\":\"candidate\"}"));
+
+      assertTrue(store.checkpointBulkReindex(row.id(), progress));
+      assertEquals(Optional.of(progress), store.bulkReindexProgress(row.id()));
+      assertEquals(OperationState.RUNNING, store.find(row.key()).orElseThrow().state());
+    }
+  }
+
+  @Test
   void onlyTheIssuingRunnerCanCheckpointItsLiveHandle() throws Exception {
     try (var store = new SqliteOperationStore(temp.resolve("capabilities.db"), clock, ignored -> {})) {
       var owner = new OperationAttemptRunnerImpl(store, clock, Set.of(OperationKind.REINDEX));
@@ -128,11 +142,27 @@ final class BulkReindexCheckpointCapabilityTest {
 
       owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.PARTIAL_CAPTURE);
       owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.AFTER_PROMOTION);
+      owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_MARKER);
+      owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_ARM);
+      owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_POINTER);
+      owner.observeBulkBoundary(ownerHandle,
+          OperationAttemptRunner.BulkBoundary.INSTALLER_POINTER_BEFORE_SETTINGS);
+      owner.observeBulkBoundary(ownerHandle,
+          OperationAttemptRunner.BulkBoundary.INSTALLER_SETTINGS_BEFORE_PUBLICATION);
+      owner.observeBulkBoundary(ownerHandle, OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_RECEIPT);
 
       assertEquals(java.util.List.of("bulk-partial-capture", "bulk-after-promotion"),
           emittedBoundaries.stream()
               .map(OperationAttemptRunnerImpl.FaultBoundary::phase)
               .filter(phase -> phase.startsWith("bulk-"))
+              .toList());
+      assertEquals(java.util.List.of(
+          "installer-before-marker", "installer-before-arm", "installer-before-pointer",
+          "installer-pointer-before-settings", "installer-settings-before-publication",
+          "installer-before-receipt"),
+          emittedBoundaries.stream()
+              .map(OperationAttemptRunnerImpl.FaultBoundary::phase)
+              .filter(phase -> phase.startsWith("installer-"))
               .toList());
       assertEquals(runningBefore, store.find(ownerHandle.key()).orElseThrow());
       assertEquals(Optional.of(progress), store.bulkReindexProgress(ownerHandle.id()));

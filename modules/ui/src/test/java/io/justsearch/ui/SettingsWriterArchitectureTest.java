@@ -39,9 +39,10 @@ class SettingsWriterArchitectureTest {
       for (var call : item.getCodeUnitAccessesFromSelf()) {
         String origin = item.getFullName();
         String method = call.getOrigin().getName();
-        boolean owner = origin.equals(OWNER);
+        boolean owner = origin.equals(OWNER) || origin.startsWith(OWNER + "$");
         boolean physical = call.getTargetOwner().isAssignableTo(UiSettingsStore.class)
-            && Set.of("prepare", "replacePrepared", "notifyRecoveryCleared", "save").contains(call.getName());
+            && Set.of("prepare", "prepareExact", "replacePrepared", "notifyRecoveryCleared", "save")
+                .contains(call.getName());
         boolean config = call.getTargetOwner().isAssignableTo(ConfigStore.class)
             && Set.of("update", "swap", "notifyListeners").contains(call.getName());
         boolean rebuild = call.getTargetOwner().isAssignableTo(ConfigStoreRebuilder.class)
@@ -81,7 +82,7 @@ class SettingsWriterArchitectureTest {
     var result = SETTINGS_PUBLICATION.evaluate(imported);
     assertTrue(result.hasViolation());
     var details = result.getFailureReport().getDetails();
-    for (String target : new String[] {"prepare(", "replacePrepared(", "notifyRecoveryCleared(",
+    for (String target : new String[] {"prepare(", "prepareExact(", "replacePrepared(", "notifyRecoveryCleared(",
         "update(", "swap(", "notifyListeners(", "rebuild("}) {
       assertTrue(details.stream().anyMatch(line -> line.contains("UnauthorizedWriter") && line.contains(target)),
           () -> "Missing negative control for " + target + ": " + details);
@@ -104,6 +105,9 @@ class SettingsWriterArchitectureTest {
   static final class UnauthorizedWriter {
     void prepare(UiSettingsStore store, UiSettings settings) {
       store.prepare(settings, new SettingsWitness(0, null));
+    }
+    void prepareExact(UiSettingsStore store, UiSettings settings) {
+      store.prepareExact(settings, new SettingsWitness(0, null));
     }
     void replace(UiSettingsStore store, UiSettingsStore.PreparedSettings prepared) throws IOException {
       store.replacePrepared(prepared);

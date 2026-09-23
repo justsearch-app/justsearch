@@ -237,10 +237,21 @@ final class EngineRootTerminalWriterFailureTest {
       return servers[0];
     }
 
-    void useCheapReplacementServices() {
+    void useCheapReplacementServices() throws IOException {
       var incumbent = (DefaultWorkerAppServices) server().appServices();
       var replacement = org.mockito.Mockito.mock(
           DefaultWorkerAppServices.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+      var modelRelease = new AtomicReference<Runnable>();
+      org.mockito.Mockito.doAnswer(invocation -> {
+        Runnable previous = modelRelease.getAndSet(invocation.getArgument(0));
+        if (previous != null) previous.run();
+        return null;
+      }).when(replacement).replaceProducerModelLease(org.mockito.ArgumentMatchers.any());
+      org.mockito.Mockito.doAnswer(invocation -> {
+        Runnable release = modelRelease.getAndSet(null);
+        if (release != null) release.run();
+        return null;
+      }).when(replacement).close();
       org.mockito.Mockito.when(replacement.extractionConfiguration())
           .thenReturn(incumbent.extractionConfiguration());
       org.mockito.Mockito.when(replacement.chunkRerankerConfig())

@@ -2,6 +2,7 @@
 package io.justsearch.app.api;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * AI install lifecycle surface exposed to the AppFacade.
@@ -18,6 +19,12 @@ import java.util.Map;
  * <p>Stability: stable (API contract).
  */
 public interface BrainInstallService {
+
+  /** Prepare the durable installed-model candidate without publishing it. */
+  default Optional<AiInstallService.InstalledGenerationCandidate>
+      prepareInstalledGenerationCandidate() {
+    return Optional.empty();
+  }
 
   /**
    * Begin a fresh AI install. Returns the post-start install status snapshot

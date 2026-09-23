@@ -340,7 +340,7 @@ final class KnowledgeServerCloseCompletionTest {
   }
 
   @Test
-  void refusedNativeRetirementRetainsServicesAndIndexLockUntilRetry(@TempDir Path tempDir)
+  void refusedNativeRetirementStopsProducersAndRetainsIndexLockUntilRetry(@TempDir Path tempDir)
       throws Exception {
     var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
         WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
@@ -369,7 +369,9 @@ final class KnowledgeServerCloseCompletionTest {
 
     assertThrows(java.io.IOException.class, server::close);
     assertFalse(server.awaitClosed(0));
-    org.mockito.Mockito.verify(services, org.mockito.Mockito.never()).close();
+    var closeOrder = org.mockito.Mockito.inOrder(services, handle);
+    closeOrder.verify(services).close();
+    closeOrder.verify(handle).close();
     org.mockito.Mockito.verify(rootLock, org.mockito.Mockito.never()).close();
     org.junit.jupiter.api.Assertions.assertEquals(
         io.justsearch.app.api.NativeQuiescence.UNQUIESCED, server.nativeQuiescence());
@@ -377,6 +379,7 @@ final class KnowledgeServerCloseCompletionTest {
     server.close();
     assertTrue(server.awaitClosed(0));
     org.mockito.Mockito.verify(handle, org.mockito.Mockito.times(2)).close();
+    org.mockito.Mockito.verify(services, org.mockito.Mockito.times(1)).close();
     org.mockito.Mockito.verify(rootLock).close();
     org.junit.jupiter.api.Assertions.assertEquals(
         io.justsearch.app.api.NativeQuiescence.QUIESCED, server.nativeQuiescence());

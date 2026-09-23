@@ -19,9 +19,40 @@ export const BULK_FAULT_CASES = Object.freeze({
   }),
 });
 
+// The activation operation has its own durable operation identity and plan assertions below. The
+// The marker cut plus the five installed coordinator callbacks cover the composite crash sequence;
+// the legacy bulk migration cases remain unchanged above.
+export const INSTALLER_FAULT_CASES = Object.freeze({
+  'installer-before-marker': Object.freeze({
+    phase: 'installer-before-marker', finalIncarnation: 3, faultIncarnation: 2,
+    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 3,
+  }),
+  'installer-before-arm': Object.freeze({
+    phase: 'installer-before-arm', finalIncarnation: 3, faultIncarnation: 2,
+    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 3,
+  }),
+  'installer-before-pointer': Object.freeze({
+    phase: 'installer-before-pointer', finalIncarnation: 3, faultIncarnation: 2,
+    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 3,
+  }),
+  'installer-pointer-before-settings': Object.freeze({
+    phase: 'installer-pointer-before-settings', finalIncarnation: 3, faultIncarnation: 2,
+    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 2,
+  }),
+  'installer-settings-before-publication': Object.freeze({
+    phase: 'installer-settings-before-publication', finalIncarnation: 3, faultIncarnation: 2,
+    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 2,
+  }),
+  'installer-before-receipt': Object.freeze({
+    phase: 'installer-before-receipt', finalIncarnation: 3, faultIncarnation: 2,
+    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 2,
+  }),
+});
+
 const OPERATION_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SESSION_HEADER = 'X-JustSearch-Session';
 const START_ROUTE = '/api/indexing/migration/start';
+const ACTIVATION_ROUTE = '/api/operations/core.activate-installed-models/invoke';
 
 /** Installed-process proof for the three recorded bulk crash boundaries. */
 export async function exerciseBulkFault(c) {
@@ -199,6 +230,202 @@ export async function exerciseBulkFault(c) {
     members: final.jobs, search: searchEvidence };
 }
 
+/** Installed-process proof for activation of a retained installer candidate. */
+export async function exerciseInstallerActivationFault(c) {
+  const { work, data, indexBase, first, manifest, apiPort, readJson, post, candidate,
+    requireThat, requireOperationSuccess, matchingHit, scenario, operationKey } = c;
+  const selected = INSTALLER_FAULT_CASES[scenario];
+  requireThat(selected, `unknown installer activation fault scenario: ${scenario}`);
+  requireThat(OPERATION_KEY.test(operationKey),
+    `installer activation fault key must be a caller-selected UUIDv7: ${operationKey}`);
+  requireThat(first.pid === manifest.pid && first.instanceId === manifest.instanceId,
+    'fixture may fault only an admitted Engine it launched');
+  requireThat(first.incarnation === 1,
+    `installer activation fixture must begin at incarnation 1: ${JSON.stringify(first)}`);
+
+  const deadline = Date.now() + 300000;
+  const waitFor = (label, budget, probe) =>
+    c.waitFor(label, Math.max(1, Math.min(budget, deadline - Date.now())), probe);
+  const runtime = path.join(data, 'runtime');
+  const reachedFile = path.join(runtime, 'operation-fault-reached.json');
+  const releaseFile = path.join(runtime, 'operation-fault-release');
+  requireThat(!fs.existsSync(reachedFile) && !fs.existsSync(releaseFile),
+    'installer activation fixture must start without a reached or release marker');
+
+  const registry = readJson(path.join(data, 'watched_roots.json'));
+  const roots = (registry?.roots ?? []).map(root => root.path);
+  requireThat(registry?.schemaVersion === 1 && roots.length > 0
+    && roots.every(root => typeof root === 'string' && fs.statSync(root).isDirectory()),
+  `installer activation requires prebooted watched roots: ${JSON.stringify(registry)}`);
+  const files = roots.slice(0, 2).map((root, index) => path.join(root, `installer-${index}.txt`));
+  const markers = files.map((_, index) =>
+    `installeractivation${scenario.replaceAll('-', '')}${index === 0 ? 'alpha' : 'bravo'}`);
+  files.forEach((file, index) => fs.writeFileSync(file,
+    `${markers[index]} durable installer activation recovery quokka\n`));
+  const hashes = files.map(file => sha256(fs.readFileSync(file)));
+  const operationPath = path.join(data, 'operations.db');
+  const jobsPath = path.join(data, 'jobs.db');
+  const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
+  requireThat(typeof sourceGeneration === 'string' && sourceGeneration.length > 0,
+    'installer activation requires an authoritative pre-dispatch active generation');
+  requireThat(operationRows(operationPath, operationKey).length === 0,
+    'caller-selected installer activation key must be unknown before dispatch');
+
+  const beforeSettings = settingsWitnessOnDisk(data);
+  const headers = sessionHeaders(manifest);
+  const input = { source: 'installer_model_activation' };
+  const prepared = await prepareApprovedActivationDispatch({ apiPort, input, operationKey,
+    post, requireThat });
+  const dispatched = startHeldPost(apiPort, ACTIVATION_ROUTE, {
+    args: input, idempotencyKey: operationKey,
+    confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
+  }, headers);
+
+  const reached = await waitFor(`installer activation fault marker ${scenario}`, 170000,
+    () => readJson(reachedFile) ?? null);
+  requireThat(reached.phase === selected.phase && reached.parentKind === 'reindex'
+    && reached.parentKey === operationKey && reached.operationKey === operationKey
+    && Number.isSafeInteger(reached.operationRecordId) && reached.operationRecordId > 0,
+  `installer activation hook reached the wrong boundary: ${JSON.stringify(reached)}`);
+
+  const faulted = await waitFor('admitted Engine that emitted the installer activation marker', 10000, () => {
+    const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+    const currentManifest = readJson(path.join(runtime, 'manifest.json'));
+    return supervisor?.state === 'running' && supervisor.pid === reached.pid
+      && supervisor.runId === first.runId
+      && supervisor.incarnation === selected.faultIncarnation
+      && currentManifest?.pid === supervisor.pid
+      && currentManifest.instanceId === supervisor.instanceId
+      ? { supervisor, manifest: currentManifest } : null;
+  });
+  const processRecord = captureEngineIdentity(faulted.supervisor, data, requireThat);
+  const cooldown = await killOwnedEngineAndObserveCooldown({
+    record: processRecord, engine: faulted.supervisor, data, readJson, waitFor, requireThat,
+  });
+  await dispatched.settled;
+
+  const cut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+  cut.settings = settingsWitnessOnDisk(data);
+  fs.writeFileSync(path.join(work, 'installer-cut.json'), JSON.stringify({
+    scenario, operationKey, reached, cooldown, candidate, cut,
+  }, null, 2));
+  assertInstallerCut({ cut, reached, prepared, operationKey, selected, sourceGeneration,
+    roots, beforeSettings, candidate, requireThat });
+  assertInstallerSelectedCut({ selected, cut, operationKey, requireThat });
+
+  const expectedIncarnation = first.incarnation + selected.finalIncarnation - 1;
+  const recovered = await waitFor('installer activation successor reaches its final physical incarnation', 180000, () => {
+    const operation = operationRows(operationPath, operationKey)[0];
+    if (operation?.state === 'FAILED' || operation?.state === 'CANCELLED') {
+      throw new Error(`installer activation recovery terminated before final incarnation: ${operation.state} ${operation.failure_reason}`);
+    }
+    const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+    const currentManifest = readJson(path.join(runtime, 'manifest.json'));
+    return supervisor?.state === 'running' && supervisor.runId === first.runId
+      && supervisor.incarnation === expectedIncarnation
+      && currentManifest?.pid === supervisor.pid
+      && currentManifest.instanceId === supervisor.instanceId
+      ? { supervisor, manifest: currentManifest } : null;
+  });
+  requireThat(recovered.supervisor.restartCount === 1,
+    `installer activation crash must spend exactly one supervisor restart: ${JSON.stringify(recovered.supervisor)}`);
+  for (const incarnation of selected.requestedRestartIncarnations) {
+    requireThat(c.output().includes(`Engine incarnation ${incarnation} exited 4 (requested_restart`),
+      `incarnation ${incarnation} did not record its own requested restart`);
+  }
+
+  const final = await waitFor('installer activation terminal success and exact settings witness', 90000, () => {
+    const observed = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+    observed.settings = settingsWitnessOnDisk(data);
+    return observed.operations.length === 1
+      && observed.operation?.state === 'COMPLETE'
+      && observed.operation.phase === 'settled'
+      && observed.walk?.sealed_at != null
+      && observed.walk.acknowledged_revision === observed.walk.revision
+      ? observed : null;
+  });
+  fs.writeFileSync(path.join(work, 'installer-final.json'), JSON.stringify(final, null, 2));
+  assertInstallerFinal({ final, cut, prepared, files, hashes, operationKey, selected,
+    sourceGeneration, beforeSettings, candidate, requireThat });
+
+  const searchEvidence = [];
+  for (let index = 0; index < files.length; index++) {
+    const search = await waitFor(`installer promoted target search ${index + 1}`, 60000, async () => {
+      try {
+        const response = await post(recovered.manifest.head.apiPort, '/api/knowledge/search', {
+          query: markers[index], limit: 10, mode: 'text',
+        });
+        return response.status === 200 && matchingHit(response, files[index], markers[index])
+          ? response : null;
+      } catch { return null; }
+    });
+    const matching = JSON.parse(search.text).results.filter(hit => samePath(hit?.fields?.path, files[index]));
+    requireThat(matching.length === 1,
+      `installer target must contain exactly one hit for ${files[index]}: ${search.text}`);
+    searchEvidence.push({ path: files[index], matches: matching.length });
+  }
+
+  const stableOperation = final.operation;
+  const retry = await preparedActivationPost({ apiPort: recovered.manifest.head.apiPort, input,
+    operationKey, post, requireThat });
+  const retryReceipt = requireOperationSuccess(retry, 'installer activation same-key replay');
+  requireThat(retryReceipt.operationKey === operationKey
+    && retryReceipt.operationRecordId === stableOperation.id
+    && retryReceipt.body.structuredData.state === 'COMPLETE',
+  `same-key replay changed installer activation identity: ${retry.text}`);
+  const afterRetry = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+  afterRetry.settings = settingsWitnessOnDisk(data);
+  requireThat(sameJson(afterRetry.operation, stableOperation)
+    && sameJson(afterRetry.settings, final.settings),
+  'same-key replay changed the activation row or settings witness');
+
+  console.log('INSTALLER_ACTIVATION_FAULT_PASS', JSON.stringify({
+    scenario, operationKey, phase: selected.phase,
+    faulted: compactSupervisor(faulted.supervisor), cooldown: compactSupervisor(cooldown),
+    recovered: compactSupervisor(recovered.supervisor), operation: {
+      id: final.operation.id, operation_key: final.operation.operation_key,
+      state: final.operation.state, phase: final.operation.phase,
+      attempts: final.operation.attempts,
+    }, pointer: final.state?.active_generation, settings: final.settings,
+    search: searchEvidence,
+    preparationSha256: sha256(Buffer.from(final.operation.preparation_payload, 'utf8')),
+  }));
+  return { reached, cooldown, recovered, operation: final.operation,
+    settings: final.settings, search: searchEvidence };
+}
+
+async function prepareApprovedActivationDispatch({ apiPort, input, operationKey, post, requireThat }) {
+  const response = await post(apiPort, ACTIVATION_ROUTE,
+    { args: input, idempotencyKey: operationKey }, 90000);
+  requireThat(response.status === 428,
+    `installer activation must exercise prepared approval: HTTP ${response.status} ${response.text}`);
+  const pending = parseJson(response, 'installer activation preparation');
+  requireThat(typeof pending.pendingId === 'string' && typeof pending.preparationNonce === 'string'
+    && pending.operationKey === operationKey,
+  `installer activation preparation omitted exact key/nonce binding: ${response.text}`);
+  const approval = await post(apiPort, '/api/authorizations/approve', { pendingId: pending.pendingId });
+  const approved = parseJson(approval, 'installer activation approval');
+  requireThat(approval.status === 200 && typeof approved.capsule === 'string',
+    `installer activation approval failed: ${approval.text}`);
+  return { nonce: pending.preparationNonce, capsule: approved.capsule };
+}
+
+async function preparedActivationPost({ apiPort, input, operationKey, post, requireThat }) {
+  const response = await post(apiPort, ACTIVATION_ROUTE,
+    { args: input, idempotencyKey: operationKey }, 90000);
+  if (response.status !== 428) return response;
+  const pending = parseJson(response, 'installer activation replay preparation');
+  requireThat(pending.operationKey === operationKey
+    && typeof pending.pendingId === 'string' && typeof pending.preparationNonce === 'string',
+  `installer activation replay preparation lost its identity: ${response.text}`);
+  const approval = await post(apiPort, '/api/authorizations/approve', { pendingId: pending.pendingId });
+  const approved = parseJson(approval, 'installer activation replay approval');
+  requireThat(approval.status === 200 && typeof approved.capsule === 'string',
+    `installer activation replay approval failed: ${approval.text}`);
+  return post(apiPort, ACTIVATION_ROUTE, { args: input, idempotencyKey: operationKey,
+    confirmationToken: approved.capsule, preparationNonce: pending.preparationNonce });
+}
+
 async function prepareApprovedDispatch({ apiPort, input, post, requireThat }) {
   const response = await post(apiPort, START_ROUTE, input);
   requireThat(response.status === 428,
@@ -347,6 +574,209 @@ function assertFinal({ final, cut, prepared, files, hashes, operationKey, select
     `bulk recovery created more than its one operation-derived target: ${JSON.stringify(final.recordedGenerations)}`);
 }
 
+function assertInstallerCut({ cut, reached, prepared, operationKey, selected, sourceGeneration,
+  roots, beforeSettings, candidate, requireThat }) {
+  requireThat(cut.operations.length === 1 && cut.reindexOperations.length === 1,
+    `installer fault cut must retain exactly one reindex row: ${JSON.stringify(cut.reindexOperations)}`);
+  const row = cut.operation;
+  requireThat(selected.phase === 'installer-before-marker'
+      ? row.accepted_settings_revision == null
+      : row.accepted_settings_revision === beforeSettings.witness.acceptedRevision,
+  `activation fault cut has the wrong settings marker: ${row.accepted_settings_revision}`);
+  requireThat(row.id === reached.operationRecordId && row.operation_key === operationKey
+    && row.kind === 'reindex' && row.operation_ref === 'core.activate-installed-models'
+    && ['RUNNING', 'COMPLETE'].includes(row.state) && row.attempts >= selected.cutAttempts
+    && row.preparation_nonce === prepared.nonce,
+  `installer fault cut lost its accepted prepared operation: ${JSON.stringify(row)}`);
+  const plan = preparationPlan(row.preparation_payload);
+  requireThat(plan.profile === 'INSTALLER_GENERATION'
+    && plan.source === 'installer_model_activation'
+    && plan.operationId === 'core.activate-installed-models'
+    && plan.sourceGeneration === sourceGeneration
+    && plan.scope?.roots?.length === roots.length
+    && plan.scope.roots.every((root, index) => samePath(root.path, roots[index])),
+  `accepted activation preparation is not the original frozen installer plan: ${JSON.stringify(plan)}`);
+  requireThat(Array.isArray(plan.models) && plan.models.length > 0
+    && Array.isArray(plan.assets) && plan.assets.length > 0
+    && plan.models.some(model => samePath(model.path, candidate.modelPath)),
+  `accepted activation preparation did not retain the staged model identity: ${JSON.stringify(plan)}`);
+  const target = `g-${operationKey}`;
+  const pointerPublished = selected.phase === 'installer-pointer-before-settings'
+    || selected.phase === 'installer-settings-before-publication'
+    || selected.phase === 'installer-before-receipt';
+  const settingsPublished = selected.phase === 'installer-settings-before-publication'
+    || selected.phase === 'installer-before-receipt';
+  requireThat(pointerPublished ? cut.state.active_generation === target
+      : cut.state.active_generation !== target,
+  `activation fault cut has the wrong pointer witness: ${JSON.stringify(cut.state)}`);
+  requireThat(settingsPublished
+      ? cut.settings.witness.acceptedRevision === beforeSettings.witness.acceptedRevision + 1
+        && cut.settings.witness.lastCommittedOperationKey === operationKey
+      : cut.settings.witness.acceptedRevision === beforeSettings.witness.acceptedRevision
+        && cut.settings.witness.lastCommittedOperationKey === beforeSettings.witness.lastCommittedOperationKey,
+  `activation fault cut has the wrong settings witness: ${JSON.stringify(cut.settings)}`);
+}
+
+function assertInstallerSelectedCut({ selected, cut, operationKey, requireThat }) {
+  const target = `g-${operationKey}`;
+  const row = cut.operation;
+  if (selected.phase === 'installer-before-marker') {
+    requireThat(row.phase === 'settled' && row.building_generation_id === target
+      && row.accepted_settings_revision == null && cut.state.active_generation !== target,
+    `before-marker cut must retain settled B without the durable settings marker: ${row.phase}/${row.accepted_settings_revision}/${cut.state.active_generation}`);
+    return;
+  }
+  if (selected.phase === 'installer-before-arm') {
+    requireThat(row.phase === 'settled' && row.building_generation_id === target
+      && row.units_failed === 0 && row.checkpoint_cursor?.startsWith('bulk-receipt:'),
+    `before-arm cut must retain settled B before pointer commitment: ${row.phase}/${row.building_generation_id}/${row.checkpoint_cursor}`);
+    requireThat(cut.state.active_generation !== target,
+      `before-arm cut must retain source pointer: ${JSON.stringify(cut.state)}`);
+    return;
+  }
+  if (selected.phase === 'installer-before-pointer') {
+    requireThat(cut.state.active_generation !== target,
+      `before-pointer cut must retain source pointer: ${JSON.stringify(cut.state)}`);
+    return;
+  }
+  if (selected.phase === 'installer-pointer-before-settings') {
+    requireThat(cut.state.active_generation === target
+      && cut.settings.witness.lastCommittedOperationKey == null,
+    `pointer-before-settings cut must expose pointer B with settings A: ${JSON.stringify(cut)}`);
+    return;
+  }
+  if (selected.phase === 'installer-settings-before-publication') {
+    requireThat(cut.state.active_generation === target
+      && cut.settings.witness.lastCommittedOperationKey === operationKey,
+    `settings-before-publication cut must expose pointer B and settings B: ${JSON.stringify(cut)}`);
+    return;
+  }
+  requireThat(cut.state.active_generation === target
+    && cut.settings.witness.lastCommittedOperationKey === operationKey
+    && cut.walk?.receipt_json != null && row.result_json == null,
+  `before-receipt cut must retain committed pointer/settings and the queue settlement before the operation result: ${cut.state.active_generation}/${cut.settings.witness.lastCommittedOperationKey}/${Boolean(cut.walk?.receipt_json)}/${Boolean(row.result_json)}`);
+}
+
+function assertInstallerFinal({ final, cut, prepared, files, hashes, operationKey, selected,
+  sourceGeneration, beforeSettings, candidate, requireThat }) {
+  const target = `g-${operationKey}`;
+  const row = final.operation;
+  const receipt = parseStoredJson(row.result_json, 'installer activation result');
+  const plan = preparationPlan(row.preparation_payload);
+  requireThat(final.operations.length === 1 && final.reindexOperations.length === 1
+    && row.id === cut.operation.id && row.operation_key === operationKey
+    && row.kind === 'reindex' && row.operation_ref === 'core.activate-installed-models'
+    && row.state === 'COMPLETE' && row.phase === 'settled'
+    && row.building_generation_id === target && row.attempts === selected.finalAttempts
+    && row.units_failed === 0 && receipt.code === 'SUCCESS',
+  `installer activation terminal row mismatch: ${row.state}/${row.phase}/${row.attempts}/${row.units_failed}`);
+  requireThat(row.preparation_nonce === prepared.nonce
+    && row.preparation_payload === cut.operation.preparation_payload,
+  'installer activation changed the accepted nonce or frozen preparation');
+  requireThat(final.state.active_generation === target && !final.state.building_generation
+    && final.state.migration_state === 'IDLE',
+  `installer activation did not serve the exact target: ${JSON.stringify(final.state)}`);
+  requireThat(final.settings.witness.acceptedRevision === beforeSettings.witness.acceptedRevision + 1
+    && final.settings.witness.lastCommittedOperationKey === operationKey
+    && final.settings.settings?.embedOnnxModelPath === candidate.modelDir,
+  `installer activation did not commit the exact settings witness: ${JSON.stringify(final.settings)}`);
+  requireThat(final.walk.acknowledged_revision === final.walk.revision
+    && final.walk.sealed_at != null && final.walk.receipt_json,
+  `installer activation did not seal and acknowledge its queue receipt: ${JSON.stringify(final.walk)}`);
+  requireThat(plan.profile === 'INSTALLER_GENERATION'
+    && plan.source === 'installer_model_activation'
+    && plan.sourceGeneration === sourceGeneration
+    && plan.models.some(model => samePath(model.path, candidate.modelPath)),
+  `installer activation final plan lost the retained candidate: ${JSON.stringify(plan)}`);
+  requireExactMembers(final.jobs, files, hashes, true, requireThat);
+  requireThat(final.recordedGenerations.length === 1 && final.recordedGenerations[0] === target,
+    `installer activation created more than its one operation-derived target: ${JSON.stringify(final.recordedGenerations)}`);
+}
+
+export function writeRetainedInstallerCandidate({ data, requireThat }) {
+  const modelsRoot = findRetainedModelsRoot();
+  requireThat(modelsRoot, 'installer activation requires retained real model bytes under a models/ root');
+  // Stage one coherent standard-model candidate. The local embedding manifest is generated for
+  // runtime use and differs from the installer asset, so restore its registry bytes only in this
+  // private fixture. Hard links retain the large model bytes without touching another checkout.
+  const candidateRoot = path.join(path.dirname(data), 'installer-models');
+  const registry = JSON.parse(fs.readFileSync(path.join(process.cwd(),
+    'modules', 'configuration', 'src', 'main', 'resources', 'ai', 'model-registry.v2.json'), 'utf8'));
+  const registryManifest = [
+    '{',
+    '  "cpu": "model.onnx",',
+    '  "gpu": "model_fp16.onnx",',
+    '  "tokenizer": "tokenizer.json",',
+    '  "pooling_config": "pooling_config.json"',
+    '}',
+    '',
+  ].join('\n');
+  requireThat(sha256(Buffer.from(registryManifest))
+    === '9df8c6ed2d15a686eeb15e080971670919966de2812daf440b4469576b33157d',
+  'embedded installer fixture manifest differs from the shipped registry');
+  const installedModels = {};
+  for (const packageId of ['embedding', 'ner', 'splade']) {
+    const pkg = registry.packages.find(entry => entry.id === packageId);
+    const variant = pkg?.variants.find(entry => entry.targetEP === 'CPU');
+    requireThat(pkg && variant, `installer fixture lacks CPU registry variant for ${packageId}`);
+    const sourceDir = path.join(modelsRoot, pkg.targetDir);
+    const stagedDir = path.join(candidateRoot, pkg.targetDir);
+    fs.mkdirSync(stagedDir, { recursive: true });
+    const required = pkg.supportingFiles.filter(file => file.required !== false);
+    for (const file of [{ filename: variant.filename, sha256: variant.sha256,
+      sizeBytes: variant.sizeBytes }, ...required]) {
+      const staged = path.join(stagedDir, file.filename);
+      if (packageId === 'embedding' && file.filename === 'model_manifest.json') {
+        fs.writeFileSync(staged, registryManifest);
+      } else {
+        fs.linkSync(path.join(sourceDir, file.filename), staged);
+      }
+      requireThat(fs.statSync(staged).size === file.sizeBytes
+        && sha256(fs.readFileSync(staged)) === file.sha256.toLowerCase(),
+      `retained installer ${packageId}/${file.filename} differs from the shipped registry`);
+    }
+    // Runtime manifest selection is separate from the install contract's required assets.
+    const runtimeManifest = path.join(sourceDir, 'model_manifest.json');
+    if (packageId !== 'embedding' && fs.existsSync(runtimeManifest)) {
+      fs.linkSync(runtimeManifest, path.join(stagedDir, 'model_manifest.json'));
+    }
+    installedModels[packageId] = {
+      packageId, variantFilename: variant.filename, precision: variant.precision,
+      targetEP: variant.targetEP, targetDir: pkg.targetDir, sha256: variant.sha256,
+      installedFiles: [variant.filename, ...required.map(file => file.filename)],
+      skipped: false, skipReason: null, skipCause: null,
+    };
+  }
+  const modelDir = path.join(candidateRoot, 'onnx', 'gte-multilingual-base');
+  const modelPath = path.join(modelDir, 'model.onnx');
+  const installedFiles = installedModels.embedding.installedFiles;
+  const contract = {
+    schemaVersion: 2,
+    installedAtEpochMs: Date.now(),
+    hardwareProfile: { gpuDetected: false, cudaFunctional: false, vramBytes: -1 },
+    downloadProfile: 'CPU',
+    modelsDir: path.resolve(candidateRoot),
+    models: installedModels,
+  };
+  const contractPath = path.join(data, 'install-contract.v2.json');
+  fs.writeFileSync(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+  return { contractPath, modelsRoot: path.resolve(candidateRoot), modelPath,
+    modelDir: path.resolve(modelDir), installedFiles };
+}
+
+function findRetainedModelsRoot() {
+  const candidates = [];
+  let current = path.resolve(process.cwd());
+  for (;;) {
+    candidates.push(path.join(current, 'models'));
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return candidates.find(candidate => fs.existsSync(path.join(candidate,
+    'onnx', 'gte-multilingual-base', 'model.onnx')));
+}
+
 function requireExactMembers(members, files, hashes, terminal, requireThat) {
   requireThat(members.length === files.length
     && members.every((member, index) => samePath(member.path, files[index])
@@ -384,7 +814,7 @@ function operationRows(dbPath, operationKey) {
   return readRows(dbPath, `SELECT id, operation_key, kind, state, phase, operation_ref,
     identity_json, checkpoint_cursor, units_completed, units_failed, attempts,
     accepted_at, started_at, updated_at, completed_at, failure_reason, failure_detail,
-    result_json, building_generation_id, target_settings_json, gaps_json,
+    result_json, accepted_settings_revision, building_generation_id, target_settings_json, gaps_json,
     processing_history_json, processing_history_counts_json,
     preparation_nonce, preparation_sealed, preparation_payload
     FROM operations WHERE operation_key = ?`, operationKey);
@@ -469,6 +899,17 @@ function readJsonFile(file) {
     if (error.code === 'ENOENT') return null;
     throw error;
   }
+}
+
+function settingsWitnessOnDisk(data) {
+  const value = readJsonFile(path.join(data, 'ui', 'settings.json'));
+  return {
+    witness: {
+      acceptedRevision: value?.acceptedRevision ?? 0,
+      lastCommittedOperationKey: value?.lastCommittedOperationKey ?? null,
+    },
+    settings: value?.settings ?? null,
+  };
 }
 
 function parseJson(response, label) {

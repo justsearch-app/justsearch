@@ -6,7 +6,11 @@ import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.model.InstallPlan;
 import io.justsearch.configuration.model.InstallPlanner;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,11 +47,51 @@ final class PlacementStage {
    *     the package failed and moves to the next item.
    */
   String place(InstallPlan.PlannedDownload dl) {
-    Path targetFile = modelsDir.resolve(dl.targetPath());
+    if (dl == null || dl.targetPath() == null || dl.targetPath().isBlank()) {
+      return "Failed to finalize: missing target path";
+    }
+    if (dl.sha256() == null || dl.sha256().isBlank()) {
+      return "Failed to finalize: missing expected SHA-256";
+    }
+    Path targetFile = modelsDir.resolve(dl.targetPath()).normalize();
     Path partialFile = InstallPlanner.partialPathFor(targetFile);
     try {
-      DownloadExecutor.moveAtomicBestEffort(partialFile, targetFile);
-    } catch (IOException e) {
+      if (Files.exists(targetFile, LinkOption.NOFOLLOW_LINKS)) {
+        if (Files.isSymbolicLink(targetFile)
+            || !Files.isRegularFile(targetFile, LinkOption.NOFOLLOW_LINKS)) {
+          return "Failed to finalize: refusing to replace non-regular target " + targetFile;
+        }
+        // A serving generation may still own this path. Reuse only a target whose complete
+        // identity matches the verified download; a same-size byte change is not safe to replace.
+        boolean replacedCandidate = false;
+        try {
+          DownloadExecutor.verify(targetFile, dl.sizeBytes(), dl.sha256());
+        } catch (Exception mismatch) {
+          if (!isCandidateOwnedTarget(targetFile)) {
+            return "Failed to finalize: refusing to replace existing target with different bytes";
+          }
+          // A retained candidate is disposable preparation. Verify the replacement before the
+          // move, then replace only this candidate path; serving assets never enter this branch.
+          if (Files.isSymbolicLink(partialFile)) {
+            return "Failed to finalize: refusing symbolic-link staging file " + partialFile;
+          }
+          DownloadExecutor.verify(partialFile, dl.sizeBytes(), dl.sha256());
+          replaceCandidateTarget(partialFile, targetFile);
+          replacedCandidate = true;
+        }
+        if (!replacedCandidate) {
+          Files.deleteIfExists(partialFile);
+        }
+      } else {
+        if (Files.isSymbolicLink(partialFile)) {
+          return "Failed to finalize: refusing symbolic-link staging file " + partialFile;
+        }
+        // The fetch path verifies the partial before calling us. Verify again at this ownership
+        // boundary, then move without REPLACE_EXISTING so a concurrent target can never be lost.
+        DownloadExecutor.verify(partialFile, dl.sizeBytes(), dl.sha256());
+        moveIntoEmptyTarget(partialFile, targetFile);
+      }
+    } catch (Exception e) {
       return "Failed to finalize: " + e.getMessage();
     }
 
@@ -63,6 +107,57 @@ final class PlacementStage {
       }
     }
     return null;
+  }
+
+  private static void moveIntoEmptyTarget(Path from, Path to) throws IOException {
+    try {
+      Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
+    } catch (AtomicMoveNotSupportedException e) {
+      Files.move(from, to);
+    }
+  }
+
+  private static void replaceCandidateTarget(Path from, Path to) throws IOException {
+    try {
+      Files.move(from, to, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (AtomicMoveNotSupportedException e) {
+      Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
+    }
+  }
+
+  /** The planner's retained ONNX shape: models/.../candidates/<full SHA-256>/<file>. */
+  private boolean isCandidateOwnedTarget(Path target) {
+    Path root = modelsDir.toAbsolutePath().normalize();
+    Path normalized = target.toAbsolutePath().normalize();
+    if (!normalized.startsWith(root) || Files.isSymbolicLink(root)) {
+      return false;
+    }
+    Path relative = root.relativize(normalized);
+    Path cursor = root;
+    for (Path component : relative) {
+      cursor = cursor.resolve(component);
+      if (Files.isSymbolicLink(cursor)) {
+        return false;
+      }
+    }
+    Path candidateDir = normalized.getParent();
+    Path candidatesDir = candidateDir == null ? null : candidateDir.getParent();
+    if (candidateDir == null
+        || candidatesDir == null
+        || !"candidates".equals(candidatesDir.getFileName().toString())) {
+      return false;
+    }
+    String identity = candidateDir.getFileName().toString();
+    if (identity.length() != 64) {
+      return false;
+    }
+    for (int i = 0; i < identity.length(); i++) {
+      char c = identity.charAt(i);
+      if (!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f')) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

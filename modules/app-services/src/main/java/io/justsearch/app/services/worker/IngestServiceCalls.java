@@ -64,6 +64,12 @@ public interface IngestServiceCalls {
   /** Captures the current physical index target's opaque canonical fingerprint and inputs. */
   io.justsearch.app.api.operations.IndexTargetSnapshot captureIndexTarget();
 
+  /** In-process Worker target for a private candidate configuration. */
+  default io.justsearch.app.api.operations.IndexTargetSnapshot captureCandidateIndexTarget(
+      io.justsearch.configuration.resolved.ResolvedConfig candidate) {
+    throw new UnsupportedOperationException("Candidate target capture unavailable");
+  }
+
   /** {@code IngestService/MarkVduProcessing}. */
   io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request);
 

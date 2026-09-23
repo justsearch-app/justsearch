@@ -1092,6 +1092,51 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
+  "id" : "core.activate-installed-models",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.activate-installed-models.label",
+    "descriptionKey" : "ops.activate-installed-models.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "source" : {
+          "type" : "string",
+          "enum" : [ "installer_model_activation" ]
+        }
+      },
+      "required" : [ "source" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
   "id" : "core.cancel-ai-install",
   "type" : "operation",
   "presentation" : {

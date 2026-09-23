@@ -10,6 +10,7 @@ import io.justsearch.agent.api.conversation.InjectorResult;
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.app.api.DocumentService.CitationMatchResult;
 import io.justsearch.app.api.DocumentService.ContextCitation;
 import io.justsearch.app.api.DocumentService.ContextInclusion;
 import io.justsearch.app.api.DocumentService.ContextResult;
@@ -26,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -88,6 +90,70 @@ final class RAGContextTest {
     injector.inject(stubCtx(Map.of("question", "explicit", "topK", 3)));
     assertEquals(3, docs.lastTopK);
     assertEquals(2, reads.get(), "an explicit request must not consult the configured default");
+  }
+
+  @Test
+  @DisplayName("D1: retrieval and citation matching use one work-bound config after a live swap")
+  void retrievalAndCitationUseOneWorkBoundConfig() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of(
+                    "justsearch.rag.top_k", "7",
+                    "justsearch.citation.match_threshold", "0.61")));
+    Map<UUID, io.justsearch.configuration.resolved.ResolvedConfig> captured = new HashMap<>();
+    AtomicInteger providerReads = new AtomicInteger();
+    ConversationConfigProvider provider =
+        context -> {
+          providerReads.incrementAndGet();
+          return captured.computeIfAbsent(context.workId().orElseThrow(), ignored -> store.get());
+        };
+    var docs = new TrackingDocs();
+    docs.retrieveResult =
+        new ContextResult(
+            "[1] supported text",
+            1,
+            1,
+            1,
+            List.of(
+                new ContextCitation(
+                    "doc-1", 0, 1, 0, 14, 1.0f, "supported text", 0, 14, "", 0,
+                    ContextInclusion.included(14))),
+            "BM25",
+            "",
+            false,
+            List.of(new ContextSection("[doc-1]", "supported text", false, 0, 0)));
+    var engineContext =
+        io.justsearch.app.services.TestEngineContexts.internal().withWorkId(UUID.randomUUID());
+    var ctx = stubCtx(Map.of("question", "what?"), engineContext);
+
+    new RAGContext(docs, provider, () -> stubAi(32768, 32768)).inject(ctx);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(
+            Map.of(
+                "justsearch.rag.top_k", "11",
+                "justsearch.citation.match_threshold", "0.79")));
+    new StreamingCitationMatcher(docs, provider).onDone("supported text", ctx);
+
+    assertEquals(7, docs.lastTopK, "retrieval must use the turn's captured top-K");
+    assertEquals(0.61, docs.lastCitationThreshold, 1e-9,
+        "citation matching must retain the retrieval turn's captured cutoff");
+    assertEquals(2, providerReads.get(), "each consumer resolves through the same turn binding");
+  }
+
+  @Test
+  @DisplayName("D1: explicit body top-K does not consult the turn config provider")
+  void bodyTopKSkipsTurnConfigProvider() {
+    var docs = new TrackingDocs();
+    ConversationConfigProvider unexpected =
+        context -> {
+          throw new AssertionError("explicit topK must win before config resolution");
+        };
+
+    new RAGContext(docs, unexpected, null)
+        .inject(stubCtx(Map.of("question", "what?", "topK", 3)));
+
+    assertEquals(3, docs.lastTopK);
   }
 
   @Test
@@ -1011,10 +1077,15 @@ final class RAGContextTest {
   }
 
   private static ConversationContext stubCtx(Map<String, Object> body) {
+    return stubCtx(body, io.justsearch.app.services.TestEngineContexts.internal());
+  }
+
+  private static ConversationContext stubCtx(
+      Map<String, Object> body, io.justsearch.core.context.EngineContext engineContext) {
     return new ConversationContext() {
       @Override
       public io.justsearch.core.context.EngineContext engineContext() {
-        return io.justsearch.app.services.TestEngineContexts.internal();
+        return engineContext;
       }
 
       private final Map<String, Object> a = new HashMap<>();
@@ -1089,6 +1160,7 @@ final class RAGContextTest {
     int retrieveCalls = 0;
     int fetchBatchCalls = 0;
     int lastTopK = -1;
+    double lastCitationThreshold = -1.0;
     ContextResult retrieveResult =
         new ContextResult("", 0, 0, 0, List.of(), "BM25", "", false, List.of());
 
@@ -1109,6 +1181,16 @@ final class RAGContextTest {
       retrieveCalls++;
       lastTopK = topK;
       return CompletableFuture.completedFuture(retrieveResult);
+    }
+
+    @Override
+    public CompletionStage<CitationMatchResult> matchCitationsAgainst(
+        String answerText,
+        List<DocumentService.VerificationSource> sources,
+        double threshold,
+        io.justsearch.core.context.EngineContext engineContext) {
+      lastCitationThreshold = threshold;
+      return CompletableFuture.completedFuture(null);
     }
   }
 

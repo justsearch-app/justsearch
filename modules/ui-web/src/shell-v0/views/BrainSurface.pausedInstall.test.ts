@@ -73,6 +73,12 @@ const PAUSED: InstallStatus = {
 };
 
 const FRESH: InstallStatus = { state: 'idle', phase: 'idle', installedFully: false };
+const ACTIVATION_REQUIRED: InstallStatus = {
+  state: 'completed',
+  phase: 'activation_required',
+  message: 'Downloaded — activation required.',
+  installedFully: false,
+};
 
 describe('BrainSurface — idle panel over a paused download', () => {
   it('acknowledges the retained bytes instead of claiming "Not Installed"', async () => {
@@ -93,6 +99,13 @@ describe('BrainSurface — idle panel over a paused download', () => {
     expect(text).toContain('Not Installed');
     expect(text).toContain('Install AI models to get started');
     expect(text).not.toContain('Download Paused');
+  });
+
+  it('shows the retained download and the explicit activation CTA', async () => {
+    const text = await renderFor(ACTIVATION_REQUIRED);
+    expect(text).toContain('Downloaded — activation required');
+    expect(text).toContain('Activate downloaded models');
+    expect(text).not.toContain('Not Installed');
   });
 });
 

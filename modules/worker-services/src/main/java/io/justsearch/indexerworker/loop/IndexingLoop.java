@@ -182,6 +182,9 @@ public class IndexingLoop implements Closeable {
   private Thread loopThread;
   private final CountDownLatch activationGate = new CountDownLatch(1);
   private final Object probePublicationMonitor = new Object();
+  private final Object cutoverPauseMonitor = new Object();
+  private boolean cutoverPauseRequested;
+  private boolean cutoverPaused;
   private long indexedSinceCommit = 0;
   private long lastCommitTime = System.currentTimeMillis();
   // Tempdoc 516 Slice 4a.1: pendingMarkDone moved into IngestionOutcomeJournal, encapsulated.
@@ -658,6 +661,9 @@ public class IndexingLoop implements Closeable {
 
     while (running.get() && !Thread.currentThread().isInterrupted()) {
       try {
+        awaitCutoverResume();
+        if (!running.get()) break;
+
         // CRITICAL: Handle GPU state transitions for Hybrid Inference
         // Must unload embedding model when Main claims GPU, reload when released
         embeddingLifecycle.handleGpuStateTransition();
@@ -1052,6 +1058,71 @@ public class IndexingLoop implements Closeable {
   }
 
   /**
+   * Parks the existing loop thread at its next iteration boundary.
+   *
+   * <p>A successful return means any batch claimed before this request completed its normal
+   * processing and commit path, and the loop cannot poll the queue again until {@link
+   * #resumeAfterCutover()}. A timeout or interruption withdraws the request before returning, so
+   * the loop is never left parked by an unsuccessful caller.
+   */
+  public boolean pauseForCutover(long timeoutMs) {
+    long timeoutNanos = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(1L, timeoutMs));
+    long deadline = System.nanoTime() + timeoutNanos;
+    synchronized (cutoverPauseMonitor) {
+      if (!isRunning()) return true;
+      cutoverPauseRequested = true;
+      cutoverPauseMonitor.notifyAll();
+      while (!cutoverPaused && isRunning()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0L) {
+          withdrawCutoverPauseRequest();
+          return false;
+        }
+        try {
+          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(cutoverPauseMonitor, remaining);
+        } catch (InterruptedException interrupted) {
+          withdrawCutoverPauseRequest();
+          Thread.currentThread().interrupt();
+          return false;
+        }
+      }
+      if (cutoverPaused) return true;
+      withdrawCutoverPauseRequest();
+      return false;
+    }
+  }
+
+  /** Releases a successful cutover pause without creating or submitting another loop thread. */
+  public void resumeAfterCutover() {
+    synchronized (cutoverPauseMonitor) {
+      withdrawCutoverPauseRequest();
+    }
+  }
+
+  private void awaitCutoverResume() throws InterruptedException {
+    synchronized (cutoverPauseMonitor) {
+      if (!cutoverPauseRequested) return;
+      cutoverPaused = true;
+      transitionToPaused();
+      cutoverPauseMonitor.notifyAll();
+      try {
+        while (cutoverPauseRequested && running.get()) {
+          cutoverPauseMonitor.wait();
+        }
+      } finally {
+        cutoverPaused = false;
+        if (running.get()) transitionToIdle();
+        cutoverPauseMonitor.notifyAll();
+      }
+    }
+  }
+
+  private void withdrawCutoverPauseRequest() {
+    cutoverPauseRequested = false;
+    cutoverPauseMonitor.notifyAll();
+  }
+
+  /**
    * Stop intake processing at a batch boundary and wait for the loop's existing shutdown commit.
    * Unlike {@link #close()}, this preserves owned services and can be reversed by
    * {@link #resumeAfterUpgradePreparation()}.
@@ -1145,6 +1216,9 @@ public class IndexingLoop implements Closeable {
       activationGate.countDown();
       // A late gate release cannot re-publish this loop's probe after close clears it.
       signalBus.setPendingIngestProbe(null);
+    }
+    synchronized (cutoverPauseMonitor) {
+      withdrawCutoverPauseRequest();
     }
 
     if (loopThread != null) {

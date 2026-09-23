@@ -76,6 +76,7 @@ public final class ChatController {
    * {@code onlineAi} is: the agent capability is constructed lazily and may be unavailable.
    */
   private final Supplier<AgentService> agentService;
+  private final ConversationEngine.OperationScopeFactory turnCaptures;
 
   /**
    * Tempdoc 859 D live-defect D2 — the SAME out-of-band liveness heartbeat {@link AgentController}
@@ -97,6 +98,7 @@ public final class ChatController {
       Supplier<OnlineAiService> onlineAi,
       Supplier<AgentService> agentService) {
     this(engine, sseWriter, telemetry, conversationStore, onlineAi, agentService,
+        ConversationEngine.OperationScopeFactory.none(),
         // A lambda, not a method reference: the reference would bind (and null-check) the writer at
         // construction, and this controller has constructors that legitimately pass nothing useful.
         new SseHeartbeat(
@@ -114,13 +116,57 @@ public final class ChatController {
       Supplier<OnlineAiService> onlineAi,
       Supplier<AgentService> agentService,
       SseHeartbeat heartbeat) {
+    this(
+        engine,
+        sseWriter,
+        telemetry,
+        conversationStore,
+        onlineAi,
+        agentService,
+        ConversationEngine.OperationScopeFactory.none(),
+        heartbeat);
+  }
+
+  ChatController(
+      ConversationEngine engine,
+      SseWriter sseWriter,
+      Telemetry telemetry,
+      ConversationStore conversationStore,
+      Supplier<OnlineAiService> onlineAi,
+      Supplier<AgentService> agentService,
+      ConversationEngine.OperationScopeFactory turnCaptures,
+      SseHeartbeat heartbeat) {
     this.engine = engine;
     this.sseWriter = sseWriter;
     this.telemetry = telemetry;
     this.conversationStore = conversationStore;
     this.onlineAi = onlineAi;
     this.agentService = agentService;
+    this.turnCaptures = turnCaptures;
     this.heartbeat = heartbeat;
+  }
+
+  ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      ConversationEngine engine,
+      SseWriter sseWriter,
+      Telemetry telemetry,
+      ConversationStore conversationStore,
+      Supplier<OnlineAiService> onlineAi,
+      Supplier<AgentService> agentService,
+      ConversationEngine.OperationScopeFactory turnCaptures) {
+    this(
+        engine,
+        sseWriter,
+        telemetry,
+        conversationStore,
+        onlineAi,
+        agentService,
+        turnCaptures,
+        new SseHeartbeat(
+            executors,
+            (ctx, event, payload) -> sseWriter.writeEvent(ctx, event, payload),
+            "chat-stream-heartbeat"));
   }
 
   /** Stops the heartbeat scheduler. Call on shutdown (tempdoc 638 PE's asymmetry, not repeated). */
@@ -282,7 +328,7 @@ public final class ChatController {
       Audience audience,
       java.util.function.Consumer<SseEvent> sink, EngineContext engineContext) {
     try {
-      engine.run(shapeId, body, audience, sink, engineContext);
+      engine.runScoped(shapeId, body, audience, sink, engineContext, turnCaptures);
     } catch (ConversationEngine.AudienceDeniedException denied) {
       LOG.info("Audience denied for shape {}: {}", shapeId.value(), denied.getMessage());
       sink.accept(errorEvent(denied.getMessage(), ApiErrorCode.INVALID_REQUEST));
@@ -292,6 +338,9 @@ public final class ChatController {
     } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
       sink.accept(new SseEvent("error", Map.of("message", cancelled.getMessage(),
           "errorCode", ApiErrorCode.SERVICE_UNAVAILABLE.name(), "reasonCode", cancelled.reasonCode())));
+    } catch (io.justsearch.app.api.DocumentService.UnavailableException unavailable) {
+      LOG.warn("Chat document service unavailable for shape {}", shapeId.value(), unavailable);
+      sink.accept(errorEvent(message(unavailable), ApiErrorCode.SERVICE_UNAVAILABLE));
     } catch (Exception e) {
       LOG.error("Chat dispatch failed for shape {}", shapeId.value(), e);
       sink.accept(errorEvent(message(e), ApiErrorCode.BAD_REQUEST));

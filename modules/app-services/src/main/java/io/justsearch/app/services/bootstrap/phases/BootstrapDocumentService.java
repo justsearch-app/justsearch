@@ -30,6 +30,16 @@ public final class BootstrapDocumentService {
       Executor backgroundExecutor,
       Supplier<KnowledgeClient> clientSupplier,
       Telemetry telemetry) {
+    return create(foregroundExecutor, backgroundExecutor, clientSupplier, telemetry, null);
+  }
+
+  /** Construct a service whose async work retains the exact captured Worker view. */
+  public static DocumentService create(
+      Executor foregroundExecutor,
+      Executor backgroundExecutor,
+      Supplier<KnowledgeClient> clientSupplier,
+      Telemetry telemetry,
+      RemoteDocumentService.ClientCaptureSupplier captureSupplier) {
     log.info(
         "Using RemoteDocumentService (gRPC, supplier-aware) for document fetching - avoids index"
             + " locking");
@@ -37,6 +47,9 @@ public final class BootstrapDocumentService {
         telemetry instanceof LocalTelemetry lt
             ? new RagMetricCatalog(lt.registry())
             : RagMetricCatalog.noop();
-    return new RemoteDocumentService(foregroundExecutor, backgroundExecutor, clientSupplier, ragCatalog);
+    return captureSupplier == null
+        ? new RemoteDocumentService(foregroundExecutor, backgroundExecutor, clientSupplier, ragCatalog)
+        : new RemoteDocumentService(foregroundExecutor, backgroundExecutor, clientSupplier,
+            ragCatalog, captureSupplier);
   }
 }
