@@ -86,13 +86,13 @@ final class OperationFaultBarrierTest {
     for (String phase : bulkPhases) {
       assertNotSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK,
           OperationFaultBarrier.fromEnvironment(data.resolve(phase), selection(phase, "reindex")::get));
-      for (String ordinaryKind : java.util.List.of("ingest", "settings-apply")) {
+      for (String ordinaryKind : java.util.List.of("ingest", "settings-apply", "reconfigure")) {
         assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(
             data.resolve(phase + "-" + ordinaryKind), selection(phase, ordinaryKind)::get));
       }
     }
     for (String phase : ordinaryPhases) {
-      for (String ordinaryKind : java.util.List.of("ingest", "settings-apply")) {
+      for (String ordinaryKind : java.util.List.of("ingest", "settings-apply", "reconfigure")) {
         assertNotSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK,
             OperationFaultBarrier.fromEnvironment(data.resolve(phase + "-" + ordinaryKind),
                 selection(phase, ordinaryKind)::get));

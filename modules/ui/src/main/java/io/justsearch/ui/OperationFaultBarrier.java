@@ -41,7 +41,7 @@ final class OperationFaultBarrier {
         ? Set.of("bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion")
         : Set.of("before-accept", "after-accept", "after-effect");
     if (phase == null || !phases.contains(phase)
-        || key == null || kind == null || !Set.of("ingest", "settings-apply", "reindex").contains(kind)) {
+        || key == null || kind == null || !Set.of("ingest", "settings-apply", "reconfigure", "reindex").contains(kind)) {
       throw new IllegalArgumentException("Invalid operation fault selection");
     }
     OperationKeys.timestampMillis(key);

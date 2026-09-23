@@ -4,6 +4,7 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.registry.ExecutorTag;
@@ -136,6 +137,9 @@ final class RecordedBulkEngineRestartTest {
       assertNotNull(generationState);
       assertEquals(sourceGeneration, generationState.active_generation());
       assertEquals(targetGeneration, generationState.building_generation());
+      assertThrows(IllegalStateException.class, first.root()::close,
+          "direct index close must retain a live durable owner for ordered shutdown");
+      first.requestedRestartHandoff();
     }
 
     CountDownLatch secondRestart = new CountDownLatch(1);
@@ -158,6 +162,7 @@ final class RecordedBulkEngineRestartTest {
       assertEquals(targetGeneration, generationState.active_generation());
       assertTrue(generationState.building_generation() == null
           || generationState.building_generation().isBlank());
+      second.requestedRestartHandoff();
     }
 
     CountDownLatch unexpectedRestart = new CountDownLatch(1);
@@ -245,6 +250,17 @@ final class RecordedBulkEngineRestartTest {
 
   private record EngineEpoch(EngineRoot root, SqliteOperationStore operations,
       KnowledgeClient client) implements AutoCloseable {
+    void requestedRestartHandoff() {
+      root.admission().beginClosing();
+      root.operationAttempts().beginClosing();
+      root.admission().cancelInteractive("requested restart");
+      root.quiesceProducers();
+      assertEquals(0, root.admission().activeWorkCount(),
+          "the old Engine must release durable admitted work after producer exit");
+      assertTrue(root.operationAttempts().awaitDrained(java.time.Duration.ZERO),
+          "pending durable rows must relinquish in-memory runner bodies");
+    }
+
     @Override public void close() throws java.io.IOException {
       try {
         root.close();

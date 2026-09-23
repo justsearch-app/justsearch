@@ -276,9 +276,11 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   /** Revoke and request actual producer exit before closing its client; preserve pending parent work. */
   void stopProducers(long timeoutMillis) throws IOException {
     CompletableFuture<?>[] exits;
+    Attached stopping;
     synchronized (lock) {
       Attached physical = attached;
       if (physical == null) return;
+      stopping = physical;
       physical.stopping = true;
       permissions.clear();
       bulkPermissions.clear();
@@ -308,7 +310,55 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     } catch (java.util.concurrent.ExecutionException | TimeoutException incomplete) {
       throw new IOException("Recorded ingestion producer drain is incomplete", incomplete);
     }
+    if (!attempts.isClosing()) return; // Same-process attachment replacement retains its attempts.
+    // Durable rows survive a requested restart. Their producer futures have now exited, so
+    // relinquish this process's live attempt and admitted-work references without terminalizing
+    // those rows. The successor reconstructs them from the existing recorded queue and progress.
+    // Do this outside the coordinator lock: runner completion observers can call maintain().
+    List<PendingHandoff> handoffs = new ArrayList<>();
+    synchronized (lock) {
+      if (attached != stopping) throw new IOException("Recorded ingestion attachment changed during drain");
+      for (Bulk bulk : bulks.values()) {
+        handoffs.add(new PendingHandoff(List.of(new PendingAttempt(bulk.handle, bulk.completion)), bulk.work,
+            bulk.cancellationSubscription));
+      }
+      for (Parent parent : parents.values()) {
+        List<PendingAttempt> pending = new ArrayList<>();
+        if (parent.child != null) {
+          pending.add(new PendingAttempt(parent.child.handle, parent.child.completion));
+        }
+        pending.add(new PendingAttempt(parent.handle, parent.completion));
+        handoffs.add(new PendingHandoff(List.copyOf(pending), parent.work,
+            parent.cancellationSubscription));
+      }
+    }
+    IOException failure = null;
+    for (PendingHandoff handoff : handoffs) {
+      try {
+        for (PendingAttempt pending : handoff.attempts()) {
+          if (attempts.handoffPendingForShutdown(pending.handle())) {
+            // This private stage also owns the executor's retained admission reference. The
+            // runner has already detached its callback, so completing it only releases local
+            // owners; it cannot turn the durable RUNNING row into a terminal result.
+            pending.completion().completeExceptionally(
+                new CancellationException("durable attempt handed off for shutdown"));
+          }
+        }
+        if (handoff.cancellationSubscription() != null) handoff.cancellationSubscription().close();
+        if (handoff.work() != null) handoff.work().close();
+      } catch (RuntimeException handoffFailure) {
+        if (failure == null) failure = new IOException("Recorded ingestion handoff is incomplete", handoffFailure);
+        else failure.addSuppressed(handoffFailure);
+      }
+    }
+    if (failure != null) throw failure;
   }
+
+  private record PendingAttempt(OperationRecordHandle handle,
+      CompletableFuture<OperationResult> completion) {}
+
+  private record PendingHandoff(List<PendingAttempt> attempts, EngineWorkHandle work,
+      EngineWorkHandle.Registration cancellationSubscription) {}
 
   @Override
   public void maintain() {

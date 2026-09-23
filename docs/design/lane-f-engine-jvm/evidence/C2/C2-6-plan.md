@@ -579,6 +579,15 @@ publication investigation; all remain required within C2-6.
 
 ## 2026-09-14 installer model and pack producer cut
 
+**2026-09-23 D1 supersession for generation-bound ONNX paths:** This section
+records the accepted C2 producer behavior and its original proof. D1's governed
+apply classification subsequently made the direct ONNX settings apply refuse.
+The current target flow is [download followed by an independently approved
+recorded generation activation](../D1/generation-native-cursor-design-2026-09-23.md#7-installer-produced-generation-candidate-2026-09-23-amendment).
+Its accepted candidate preserves the atomicity, precedence and conflict intent
+below at the activation boundary. Ordinary non-generation updates still use the
+settings owner; this historical direct ONNX write is no longer the D1 target.
+
 At693d01314, all five model construction paths already read ConfigStore:
 EmbeddingConfig:61-79, RerankerConfig:102-114, NerConfig:39-49,
 SpladeConfig:50-60 and CitationScorerConfig:52-63. The embedding helper's

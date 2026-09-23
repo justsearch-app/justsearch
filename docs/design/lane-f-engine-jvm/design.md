@@ -29,6 +29,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-23: D1 adopts a separate approved Install AI generation activation after download. The ordinary settings refusal remains; the accepted REINDEX candidate freezes settings, models and source identity, and a committed generation pointer requires settings roll-forward under the existing composite owner. This supersedes C2's direct ONNX path write for generation-bound candidates and changes the user-visible activation flow. [Owning generation protocol](evidence/D1/generation-native-cursor-design-2026-09-23.md#7-installer-produced-generation-candidate-2026-09-23-amendment); [C2 producer inventory](evidence/C2/C2-6-plan.md#2026-09-14-installer-model-and-pack-producer-cut).
+
 - 2026-09-23: [Remaining design resolution](evidence/design-resolution-2026-09-23.md) selects publication/lifetime, generation/native/cursor, production composition, fairness and durable-write protocols. Owning sections and D1/D2 checklists are amended; runtime code and acceptance evidence are unchanged.
 
 - 2026-09-21: The launcher remains a CLI/smoke facade without an index runtime. Its unavailable recorded-ingestion port must omit INGEST/REINDEX from the existing composed operation-catalog projection and stop claiming those recovery kinds. The live Engine retains both declarations and its existing coordinator. No second Engine host or temporary-readiness gate is introduced. [Owning admission correction](evidence/C2/declared-survival-admission.md).

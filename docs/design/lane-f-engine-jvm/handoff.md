@@ -6,6 +6,103 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-23)
 
+### Continuation in progress after `b90005e2e` (09:00 UTC)
+
+Hosted run `35840851483` finished red at `b90005e2e`: app-ui confirmed the
+installer generation-bound settings regression, and system integration exceeded
+its 35-minute job limit. No push occurred during that run. Retained log and
+artifact: `tmp/2748-hosted-system-job.txt` and
+`tmp/2749-hosted-integration-results`. The system log also recorded the old
+revision's migration live-work-drain failure. Six operation fault cases failed;
+the settings cases waited 170 seconds each for a legacy `settings-apply` hook,
+while the current settings route records `reconfigure`. A direct installed run
+proved the request returned HTTP 200 without a hook (`tmp/2751-settings-fault-direct.txt`).
+The fixture now selects `reconfigure` exactly and reports a premature HTTP
+outcome immediately. Installed crash cuts before acceptance, after acceptance,
+and after settings commitment passed at the current uncommitted source in
+`tmp/2754-settings-fault-direct.txt`, `tmp/2756-settings-fault-direct.txt`,
+and `tmp/2757-settings-fault-direct.txt`. The uncommitted durable shutdown handoff
+passed installed migration promotion, rollback, and requested restarts in
+`tmp/2755-migration-direct.txt` and bulk post-promotion crash recovery in
+`tmp/2758-bulk-direct.txt`. Each fixture used the real installed frontend and
+Engine, checked the exact durable row/manifest state, and reported owned stop
+with closed ports. Other bulk cuts and hosted replay remain due.
+
+`b90005e2e` is the latest pushed checkpoint. The preceding `d010e63cf` unreadable failed-job-count
+regression passed seven focused cutover tests (`tmp/2719-unreadable-cutover-count-fixed.txt`)
+and affected static checks (`tmp/2720-unreadable-count-static.txt`). Hosted run
+`35836534083` at that SHA finished red: build, Windows-native, search-worker,
+platform-contracts and other completed fact lanes passed; app-ui failed the
+generation-bound ONNX installer path, and system integration recorded migration
+and installed settings/bulk recovery failures before cancellation. Logs and the
+downloaded integration artifact are `tmp/2735-hosted-system-job.txt` and
+`tmp/2736-hosted-integration-results`. These failures are open; the earlier green
+candidate-context hosted run remains evidence for its cited revision only.
+Read-only triage found the migration/bulk failure is a durable pending-owner
+shutdown leak: producer exit did not release the accepted runner body and its
+retained admission references, so live-work-drain refused the requested restart.
+The settings fixture did not reach its fault marker in that earlier run. The
+later direct run above identifies the stale operation-kind selector as the
+cause; compact-model warnings were incidental.
+
+Partial D1-4 checkpoint `b90005e2e` prepares a paired Head serving capture with a
+physical client lease, installs its graph/orchestration under the shared publication
+lock, restores them on precommit failure, and visibly degrades agent-tool registration
+after a committed connect failure. The complete focused Head/UI and static
+checkpoint check passed in `tmp/2737-head-publication-checkpoint.txt`; throwing
+registration and rollback proof are also in `tmp/2731-head-registration-throw.txt`
+and `tmp/2734-head-rollback.txt`. The uncommitted worker-services edit prepares a Green service view
+borrowing the incumbent producer with an exact transfer lease and transferable
+provider/watcher callbacks. It compiled and passed existing focused service tests
+in `tmp/2725-publication-substrate-focused.txt`; static checks passed in
+`tmp/2726-publication-substrate-static.txt` except one Head test-fixture PMD issue,
+subsequently fixed. `KnowledgeServer.prepareServingSuccessor` now wires the
+candidate through the canonical post-construction owner; it is not production
+cutover wiring or composed activation proof. The untracked
+`modules/app-inference/logs/` directory is not Lane F source and must not be staged.
+
+Independent review found the earlier Head prepublication bridge/orchestration
+side effects and hidden postpublication registration failure; the edits above
+address those bounded defects. The selected D1-4 reader migration is still open:
+production HTTP search/RAG/chat, MCP and async document paths do not yet use the
+capture. The worker final mutation fence is also open: the existing SWITCHING
+state check is best effort and watcher events bypass it. A correct fence needs
+the `KnowledgeServer` cutover owner to close admission, drain accepted effects,
+replay exact switch-buffer revisions, promote and publish Green, replay later
+revisions, and reopen routing; abort must preserve/replay accepted mutations to
+Blue. No Flow A live activation, stage D1, D2, E or F acceptance is claimed.
+
+The uncommitted shutdown correction separates durable attempt handoff from
+terminal row completion. After recorded producer exit, the runner detaches its
+live body while retaining RUNNING; the coordinator completes only its private
+stage so the executor releases its exact admission reference. The real three-
+epoch bulk restart test now calls this drain at both requested cuts and passes
+(`tmp/2741-shutdown-stage-release.txt`). Runner and Worker producer-transfer
+focused tests/static checks passed in `tmp/2740-shutdown-handoff-and-producer-focused.txt`;
+that run predates the final stage-release correction. Refute-first review and
+wider integrated/hosted proof remain due. The separate Worker pause and Green
+producer substrate are also uncommitted. Bounded pause tests/static passed at
+`tmp/2738-worker-cutover-pause-focused.txt` and transfer ownership tests at
+`tmp/2740-shutdown-handoff-and-producer-focused.txt`; neither connects the
+final mutation fence or activates Green.
+
+The final shutdown-handoff staged slice received a clear independent refute-first
+review on 2026-09-23. The reviewer checked runner handle/callback serialization,
+child-before-parent drain, admission release and root close ownership; no
+actionable defect was found. The frozen affected rerun at `tmp/2759-shutdown-handoff-broad-rerun.txt`
+passed app-engine and app-observability tests (991 cases, zero failures/errors/skips,
+157 suites), affected PMD and repository Spotless. This is local proof of the
+staged source; hosted evidence for its eventual commit remains due.
+
+The [installer-generation amendment](evidence/D1/generation-native-cursor-design-2026-09-23.md#7-installer-produced-generation-candidate-2026-09-23-amendment)
+is the selected D1 contract. Acquisition reports “Downloaded — activation
+required”; a distinct approved HIGH/DURABLE/REINDEX row freezes the candidate,
+full SettingsWitness, model identities, source and scope. The recorded coordinator
+owns pointer-committed settings roll-forward through the existing runner. Ordinary
+generation-bound settings refusal remains. This changes the activation flow and
+supersedes the direct ONNX settings-write expectation; implementation, real-front,
+fresh-index, retained-asset and pointer/settings crash-cut proof are open.
+
 Continue autonomously in `.claude/worktrees/lane-f-pr1-verify`, branch
 `codex/lane-f-pr1`. Main contains unrelated work; never edit or clean it.
 Existing checkpoint commits/pushes to [PR727](https://github.com/justsearch-app/justsearch/pull/727)

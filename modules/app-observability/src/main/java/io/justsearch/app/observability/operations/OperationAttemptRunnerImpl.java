@@ -67,6 +67,10 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     }
   }
 
+  @Override public boolean isClosing() {
+    synchronized (executionLock) { return closing; }
+  }
+
   @Override
   public boolean awaitDrained(Duration timeout) {
     Objects.requireNonNull(timeout, "timeout");
@@ -85,6 +89,34 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
           return false;
         }
       }
+      return true;
+    }
+  }
+
+  @Override
+  public boolean handoffPendingForShutdown(OperationRecordHandle handle) {
+    if (!(handle instanceof Control control) || control.owner != this) {
+      throw new IllegalArgumentException("Durable handoff requires this runner's exact attempt");
+    }
+    synchronized (control) {
+      synchronized (executionLock) {
+        if (!closing) throw new IllegalStateException("Durable handoff requires process closing");
+      }
+      if (control.handedOff) return true;
+      if (control.done.isDone()) return false;
+      if (active.get(control.id) != control || !control.bodyExited
+          || control.releaseBody == null) {
+        throw new IllegalStateException("Durable attempt body has not relinquished its owner");
+      }
+      OperationRecord row = current(control);
+      if (row.state() != OperationState.RUNNING
+          || row.context().survival() != EngineContext.Survival.DURABLE
+          || (control.kind != OperationKind.INGEST && control.kind != OperationKind.REINDEX)) {
+        throw new IllegalStateException("Only a pending durable ingestion body can be handed off");
+      }
+      control.handedOff = true;
+      active.remove(control.id, control);
+      control.releaseBody.run();
       return true;
     }
   }
@@ -396,21 +428,22 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       if (closing) throw new IllegalStateException("Operation execution refused during process shutdown");
       liveExecutions++;
     }
-    var methodExited = new AtomicBoolean();
     var released = new AtomicBoolean();
     Runnable release = () -> {
-      if (methodExited.get() && control.done.isDone() && released.compareAndSet(false, true)) {
+      if (control.bodyExited && (control.done.isDone() || control.handedOff)
+          && released.compareAndSet(false, true)) {
         synchronized (executionLock) {
           liveExecutions--;
           executionLock.notifyAll();
         }
       }
     };
+    control.releaseBody = release;
     control.done.whenComplete((ignored, failure) -> release.run());
     try {
       return executeOwned(control, body, resume);
     } finally {
-      methodExited.set(true);
+      control.bodyExited = true;
       release.run();
     }
   }
@@ -494,6 +527,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       return new Result(current(control), refusal, control.done.minimalCompletionStage());
     }
     execution.completion().whenComplete((outcome, failure) -> {
+      synchronized (control) {
+      if (control.handedOff) return;
       Throwable cause = failure instanceof CompletionException ? failure.getCause() : failure;
       if (cause instanceof Error) {
         // Fatal errors are not a failure receipt. The durable RUNNING row is reconciled at boot.
@@ -515,6 +550,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       } catch (RuntimeException storageFailure) {
         if (cause != null && cause != storageFailure) storageFailure.addSuppressed(cause);
         persistenceFailed(control, intendedState, storageFailure);
+      }
       }
     });
     // Synchronous adapters finish before start returns. Do not return their successful effect
@@ -879,6 +915,9 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       @Override public void uncertain() { settingsUncertain = true; }
     };
     private final CompletableFuture<OperationRecord> done = new CompletableFuture<>();
+    private volatile boolean bodyExited;
+    private volatile boolean handedOff;
+    private volatile Runnable releaseBody;
     private Control(OperationRecord row) {
       id = row.id(); key = row.key(); kind = row.descriptor().kind();
       settingsRecovery = settingsKind(row.descriptor().kind()) && row.expectedSettingsRevision() != null;

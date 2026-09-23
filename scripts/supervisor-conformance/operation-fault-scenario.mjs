@@ -5,16 +5,16 @@ import identity from '../dev/lib/process-identity.cjs';
 
 const CASES = Object.freeze({
   'ingest-before-accept': { parentKind: 'ingest', phase: 'before-accept', recovery: 'retry' },
-  'settings-before-accept': { parentKind: 'settings-apply', phase: 'before-accept', recovery: 'retry' },
+  'settings-before-accept': { parentKind: 'reconfigure', phase: 'before-accept', recovery: 'retry' },
   'ingest-after-accept-before-effect': { parentKind: 'ingest', phase: 'after-accept', recovery: 'resume' },
   'settings-after-accept-before-effect': {
-    parentKind: 'settings-apply', phase: 'after-accept', recovery: 'fail-before-commit',
+    parentKind: 'reconfigure', phase: 'after-accept', recovery: 'fail-before-commit',
   },
   'ingest-after-effect-before-checkpoint': {
     parentKind: 'ingest', phase: 'after-effect', recovery: 'resume',
   },
   'settings-after-effect-before-checkpoint': {
-    parentKind: 'settings-apply', phase: 'after-effect', recovery: 'resume',
+    parentKind: 'reconfigure', phase: 'after-effect', recovery: 'resume',
   },
   'ingest-client-disconnect': { parentKind: 'ingest', phase: 'after-accept', recovery: 'disconnect' },
 });
@@ -109,9 +109,16 @@ export async function exerciseOperationFault(c) {
     ? { paths: [file], idempotencyKey: operationKey }
     : settingsInput;
   const held = startHeldPost(apiPort, endpoint, body, headers);
+  let prematureOutcome = null;
+  void held.settled.then(outcome => { prematureOutcome = outcome; });
   const reached = await waitFor(`operation fault marker ${scenario}`, 170000, () => {
     const value = readJson(reachedFile);
-    return value ?? null;
+    if (value) return value;
+    if (prematureOutcome) {
+      throw new Error(`operation request settled before fault marker ${scenario}: `
+        + JSON.stringify(prematureOutcome));
+    }
+    return null;
   });
   verifyReached(reached, { selected, operationKey, first, requireThat });
   let acceptedParent = null;
@@ -479,7 +486,7 @@ function assertCooldownState({ selected, operationKey, reached, duringCooldown, 
   if (selected.phase === 'before-accept') {
     requireThat(operation === null && jobs.length === 0 && ledger.length === 0 && walk === null,
       `before-accept death must leave no operation or effect: ${JSON.stringify(duringCooldown)}`);
-    if (selected.parentKind === 'settings-apply') {
+    if (selected.parentKind === 'reconfigure') {
       requireThat(sameJson(settings.witness, originalWitness),
         'settings before acceptance must leave the committed witness unchanged');
     }
@@ -497,7 +504,7 @@ function assertCooldownState({ selected, operationKey, reached, duringCooldown, 
       `after-accept boundary must precede start/body: ${JSON.stringify(operation)}`);
     requireThat(jobs.length === 0 && ledger.length === 0 && walk === null,
       `after-accept boundary must precede ingest queue effects: ${JSON.stringify(duringCooldown)}`);
-    if (selected.parentKind === 'settings-apply') {
+    if (selected.parentKind === 'reconfigure') {
       requireThat(sameJson(settings.witness, originalWitness),
         'after-accept/before-effect settings must not arm or commit a revision');
     }

@@ -112,6 +112,19 @@ that does not allocate a snapshot or call observers after the commitment point.
 Retain ordinary startup/health publication through the same lock; no shadow path.
 The no-fallible-postcommit claim covers application operations, not JVM failure.
 
+**Installer generation amendment (2026-09-23):** The rule above governs ordinary
+RECONFIGURE. An approved, typed installer-generation REINDEX has two durable
+projections and uses the strict generation pointer as its commitment witness.
+Its non-terminal settings projection is prepared by this settings owner, while
+RecordedIngestionCoordinator owns execution and reconciliation and the existing
+runner alone terminalizes. After pointer B commits, settings replacement is a
+required fallible roll-forward step under the same publication exclusion; failure
+closes affected captures and enters recovery rather than reporting ordinary
+precommit failure. The ordinary settings recovery branch must recognize that
+typed row and delegate the joint pointer/settings/asset/replay verdict. A settings
+witness by itself never completes it. The exact sequence and crash cuts are in
+the [generation decision](generation-native-cursor-design-2026-09-23.md#7-installer-produced-generation-candidate-2026-09-23-amendment).
+
 ## 3. Reader migration and lock order
 
 Inventory every consumer pairing configuration with mutable runtime references.

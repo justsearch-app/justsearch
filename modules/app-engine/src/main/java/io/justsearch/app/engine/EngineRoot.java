@@ -460,6 +460,12 @@ public final class EngineRoot implements WorkerHost {
 
   @Override
   public synchronized void close() {
+    // Ordered shutdown closes admission and drains physical users before this index owner.
+    // A direct close with live work cannot safely destroy its client/queue dependencies.
+    if (admission.activeWorkCount() != 0
+        || (attempts.isClosing() && !attempts.awaitDrained(java.time.Duration.ZERO))) {
+      throw new IllegalStateException("Live Engine work retains the index owner");
+    }
     clientReady = false;
     KnowledgeServer s;
     synchronized (terminalWriterFaultOwnerLock) {

@@ -77,6 +77,72 @@ final class OperationAttemptRunnerTest {
   }
 
   @Test
+  void durableIngestionHandoffReleasesOnlyTheOldBodyAndPreservesTheRunningRow()
+      throws Exception {
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.REINDEX));
+      var effect = new CompletableFuture<OperationResult>();
+      var handle = new java.util.concurrent.atomic.AtomicReference<
+          io.justsearch.agent.api.registry.OperationRecordHandle>();
+      var attempt = runner.accept(request(OperationKind.REINDEX, EngineContext.Survival.DURABLE));
+      runner.start(attempt, issued -> {
+        handle.set(issued);
+        return new OperationExecution(OperationResult.success("started"), effect);
+      });
+
+      runner.beginClosing();
+      assertFalse(runner.awaitDrained(Duration.ZERO));
+      runner.handoffPendingForShutdown(handle.get());
+      assertTrue(runner.awaitDrained(Duration.ZERO));
+      assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+      assertFalse(attempt.completion().toCompletableFuture().isDone());
+
+      // An abandoned physical owner must not write a late terminal result into the durable row.
+      effect.complete(OperationResult.success("late result"));
+      assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+      assertFalse(attempt.completion().toCompletableFuture().isDone());
+    }
+  }
+
+  @Test
+  void durableHandoffRefusesWhileThePhysicalBodyIsStillExecuting() throws Exception {
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.REINDEX));
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var handle = new java.util.concurrent.atomic.AtomicReference<
+          io.justsearch.agent.api.registry.OperationRecordHandle>();
+      var effect = new CompletableFuture<OperationResult>();
+      var attempt = runner.accept(request(OperationKind.REINDEX, EngineContext.Survival.DURABLE));
+      var body = new Thread(() -> runner.start(attempt, issued -> {
+        handle.set(issued);
+        entered.countDown();
+        try {
+          assertTrue(release.await(5, TimeUnit.SECONDS));
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException("Test body interrupted", interrupted);
+        }
+        return new OperationExecution(OperationResult.success("started"), effect);
+      }));
+      body.start();
+      try {
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        runner.beginClosing();
+        assertThrows(IllegalStateException.class,
+            () -> runner.handoffPendingForShutdown(handle.get()));
+      } finally {
+        release.countDown();
+        body.join(5_000);
+      }
+      assertFalse(body.isAlive());
+      assertTrue(runner.handoffPendingForShutdown(handle.get()));
+      assertTrue(runner.awaitDrained(Duration.ZERO));
+      assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+    }
+  }
+
+  @Test
   void acceptancePrecedesBodyAndStartedResponseDoesNotCompleteAsyncWork() throws Exception {
     try (var store = store()) {
       var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());

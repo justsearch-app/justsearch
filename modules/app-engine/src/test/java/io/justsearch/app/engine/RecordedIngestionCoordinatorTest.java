@@ -1661,6 +1661,38 @@ final class RecordedIngestionCoordinatorTest {
     } finally { release.countDown(); }
   }
 
+  @Test
+  void processShutdownHandsOffPendingIngestParentAndChildAfterProducerExit() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var producerEntered = new java.util.concurrent.CountDownLatch(1);
+      var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      f.coordinator.bindProducer((plan, key, epoch, context, token) -> {
+        token.onCancel(() -> producerExit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
+        producerEntered.countDown();
+        return producerExit;
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      String childKey;
+      try (var work = f.admission.admit(request.context(), false)) {
+        var started = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        assertTrue(producerEntered.await(3, java.util.concurrent.TimeUnit.SECONDS));
+        childKey = f.operations.openRecords().stream()
+            .filter(row -> row.descriptor().operationRef() == null)
+            .map(OperationRecord::key).findFirst().orElseThrow();
+        f.admission.beginClosing();
+        f.runner.beginClosing();
+        f.coordinator.stopProducers(1_000);
+        assertFalse(started.completion().toCompletableFuture().isDone(),
+            "handoff must keep the accepted durable result pending for the next process");
+      }
+      assertEquals(0, f.admission.activeWorkCount());
+      assertTrue(f.runner.awaitDrained(java.time.Duration.ZERO));
+      assertEquals(OperationState.RUNNING, f.operations.find(request.key()).orElseThrow().state());
+      assertEquals(OperationState.RUNNING, f.operations.find(childKey).orElseThrow().state());
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore operations;
     final SqliteJobQueue queue;

@@ -45,6 +45,9 @@ final class EngineIndexingJobsFlowTest {
   @AfterEach
   void tearDown() {
     if (root != null) {
+      root.admission().beginClosing();
+      root.quiesceProducers();
+      assertTrue(root.admission().awaitDrained(java.time.Duration.ofSeconds(30)));
       root.close();
       root = null;
     }

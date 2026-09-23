@@ -82,7 +82,7 @@ if (['processing', 'operation'].includes(scenario) || operationFault || bulkFaul
 }
 if (operationFault) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
-  env.JUSTSEARCH_OPERATION_FAULT_KIND = scenario.startsWith('settings-') ? 'settings-apply' : 'ingest';
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = scenario.startsWith('settings-') ? 'reconfigure' : 'ingest';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = scenario.endsWith('before-accept') ? 'before-accept'
     : scenario.endsWith('before-checkpoint') ? 'after-effect' : 'after-accept';
 }

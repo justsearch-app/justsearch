@@ -27,11 +27,23 @@ public interface OperationAttemptRunner {
   /** Permanently refuse new effect bodies for this process incarnation. */
   void beginClosing();
 
+  /** Monotonic process-close state; a same-process producer replacement preserves pending bodies. */
+  default boolean isClosing() { return false; }
+
   /** Boot-only fixed settings recovery after component owners exist and before request admission. */
   boolean reconcileSettingsAfterComposition();
 
   /** Wait for executing bodies and their durable completion callbacks to leave the store. */
   boolean awaitDrained(Duration timeout);
+
+  /**
+   * Relinquish one durable pending body after its physical producer has stopped and checkpointed.
+   * The RUNNING row and its completion observation remain for successor recovery; this only
+   * releases this process's live body ownership. The exact runner-issued handle is required.
+   */
+  default boolean handoffPendingForShutdown(OperationRecordHandle handle) {
+    throw new UnsupportedOperationException("Durable attempt handoff is unavailable");
+  }
 
   record Request(String key, OperationDescriptor descriptor, EngineContext context,
       InvocationProvenance provenance, OperationHistoryMode historyMode) {

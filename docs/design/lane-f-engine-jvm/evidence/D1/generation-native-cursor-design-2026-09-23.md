@@ -209,7 +209,65 @@ Retiring the disk generation requires all reader/page/encoder holds gone and
 close/deletion proof. This amends any interpretation that activation immediately
 closes Blue or that a pinned reader alone makes old semantic search safe.
 
-## 7. Acceptance and remaining empirical questions
+## 7. Installer-produced generation candidate (2026-09-23 amendment)
+
+The ordinary settings owner's `GENERATION_BOUND_REQUIRES_REINDEX` refusal remains
+binding. Install AI now separates acquisition from activation when its effective
+candidate changes generation-bound inputs. Acquisition reports **Downloaded —
+activation required**; a distinct `core.activate-installed-models` operation is
+HIGH risk, inline-confirmed, DURABLE and REINDEX. It uses the existing recorded
+ingestion runner and strict generation owner with a typed `INSTALLER_GENERATION`
+bulk profile. The installer row neither grants durable authority nor silently
+starts a rebuild. The real front supplies its own provenance and mutation token.
+This explicitly supersedes the old automatic ONNX settings write and restart text.
+An effective ordinary/no-op candidate stays with the settings owner and does not
+force a generation rebuild.
+
+Before activation acceptance, freeze one operation key, exact source generation
+and roots, full `SettingsWitness`, detached desired settings candidate, canonical
+index target/replay inputs, validated model content identities, staged asset
+ownership and acquisition provenance in a versioned recorded preparation. Retain
+decoding of prior v1 bulk plans. The approval and continuation bind that exact
+candidate; duplicate calls observe one row and changed assets, witness, roots or
+target require a refreshed preview. Only installer-owned path fields may be
+changed. Prepare the resolved config in memory; do not serialize credentials or
+capture the currently serving target through ordinary `BulkReindexHandler`.
+Assets serving A stay at their original bytes while B builds; replacement bytes
+have candidate-owned placement and remain retained through accepted recovery and
+issued/retired views. Fresh installation may use the actual bootstrap/recorded
+source identity and an empty target without requiring a READY prior model.
+
+`RecordedIngestionCoordinator` owns composite execution and reconciliation;
+`OperationAttemptRunner` remains its only terminal writer. The settings owner
+supplies a narrow non-terminal prepared projection and logical reservation at
+the final boundary, rather than a nested RECONFIGURE. After fenced exact replay,
+recheck the full settings witness and model identities, arm the existing runner's
+settings marker only for this typed authorized REINDEX preparation, then take
+runtime swap → generation state → publication locks. The strict generation
+pointer is this transaction's commitment witness. An unchanged A pointer permits
+precommit refusal; a proven B pointer requires roll-forward of the accepted
+settings bytes/witness and B runtime/Head publication, including after restart.
+Pointer or settings ambiguity fails closed until exact witnesses resolve it.
+No ordinary settings reconciliation may COMPLETE this row from a successor
+settings witness alone. Boot jointly validates preparation, pointer binding,
+asset identity, settings witness, settled replay and reconstructed serving B
+before the runner completes the row. An unrelated witness or missing asset is a
+recovery refusal. The old pointer is never rolled back as ordinary failure.
+
+The approved mixed stage changes eligible paths together at activation;
+pending/failed packages and unchanged paths are excluded. Acquisition releases
+its lease before activation admission; the accepted activation owns its assets
+and restart recovery. Download cancellation does not cancel an accepted
+activation, and postcommit cancellation cannot undo the generation. Preserve
+earlier completed activations if a later attempt fails. Required proof includes
+actual front approval, precedence/conflict/atomicity, no property promotion,
+duplicate activation, invalid provenance/continuation, held A queries, fresh
+empty index, model drift and settings conflict, plus kill cuts before arming,
+before pointer, between pointer/settings, between settings/publication and before
+terminal receipt. Errors after either successful move need exact witness rereads.
+Local, installed standard-model and completed hosted evidence remain required.
+
+## 8. Acceptance and remaining empirical questions
 
 Keep all stage tests and add mutation-controlled interleavings for: mixed
 runtime/encoder captures; post-promotion outcome recovery; accepted writes during
