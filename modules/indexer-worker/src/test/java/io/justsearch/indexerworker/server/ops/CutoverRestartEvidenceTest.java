@@ -49,8 +49,11 @@ final class CutoverRestartEvidenceTest {
     var restarted = new AtomicBoolean();
     var drainChecks = new java.util.concurrent.atomic.AtomicInteger();
     var runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
+    var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.failureSummary())
+        .thenReturn(new JobQueue.FailureSummary(0, null, null, null, null));
     var context = new KnowledgeServerMigrationOps.CutoverContext(
-        manager, mock(JobQueue.class), () -> true, () -> true, () -> null, 0, 60_000, -1,
+        manager, queue, () -> true, () -> true, () -> null, 0, 60_000, -1,
         () -> runtime, () -> drainChecks.incrementAndGet() > 1, () -> {
           assertTrue(drainChecks.get() > 1, "unfinished embeddings cannot reach final verification");
           return verified;
@@ -151,6 +154,52 @@ final class CutoverRestartEvidenceTest {
       monitor.interrupt();
       monitor.join(5_000);
     }
+  }
+
+  @Test
+  void unreadableFailedJobsCountRefusesCutoverAndKeepsBlue(@TempDir Path data) throws Exception {
+    var manager = new IndexGenerationManager(data.resolve("index"));
+    String blue = manager.initializeOrLoad().state().active_generation();
+    manager.startMigration("manual");
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+
+    var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.queueDepth()).thenReturn(0L);
+    org.mockito.Mockito.when(queue.failureSummary())
+        .thenThrow(new IllegalStateException("failed jobs table is unreadable"));
+    var drained = new AtomicBoolean();
+    var context = new KnowledgeServerMigrationOps.CutoverContext(
+        manager,
+        queue,
+        () -> true,
+        () -> true,
+        () -> null,
+        0,
+        60_000,
+        0,
+        () -> {
+          throw new AssertionError("unreadable failed-job count must refuse before cutover");
+        },
+        () -> {
+          throw new AssertionError("unreadable failed-job count must refuse before finalization");
+        },
+        () -> {
+          throw new AssertionError("unreadable failed-job count must refuse before verification");
+        },
+        () -> drained.set(true),
+        () -> {},
+        () -> {
+          throw new AssertionError("unreadable failed-job count must not restart");
+        },
+        data,
+        LoggerFactory.getLogger(CutoverRestartEvidenceTest.class));
+
+    KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);
+
+    assertEquals(IndexGenerationManager.MigrationState.FAILED.name(),
+        manager.readStateBestEffort().migration_state());
+    assertEquals(blue, manager.readStateBestEffort().active_generation());
+    assertTrue(drained.get(), "a failed cutover must drain the switch buffer");
   }
 
   private static KnowledgeServerMigrationOps.CutoverContext context(

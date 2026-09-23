@@ -220,13 +220,18 @@ public final class KnowledgeServerMigrationOps {
             "Migration drain criteria met in SWITCHING (queueDepth={}). Finalizing cutover...",
             depth);
 
-        long failedJobs = 0L;
+        long failedJobs;
         try {
           failedJobs = context.jobQueue().failureSummary().failedCount();
         } catch (Exception e) {
           context.log().warn(
-              "Failed to query failed jobs count for cutover guardrail (proceeding with 0): {}",
+              "Migration cutover blocked: failed jobs count is unreadable (keeping Blue active): {}",
               e.getMessage());
+          context
+              .indexGenerationManager()
+              .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+          context.drainSwitchBufferAction().run();
+          return;
         }
         if (context.migrationCutoverMaxFailedJobs() >= 0
             && failedJobs > context.migrationCutoverMaxFailedJobs()) {

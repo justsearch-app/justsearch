@@ -607,6 +607,16 @@ This API is not yet connected to
 mutation intake fence, prepared Green publication, no-restart cutover and
 installed evidence remain open. Do not claim D1-8 from this seam.
 
+D1-9's failed-job-count guard no longer treats an unreadable failure summary
+as zero. It now leaves Blue active, marks the migration FAILED and drains the
+switch buffer. The new refusal regression and the existing cutover evidence
+tests passed at `tmp/2719-unreadable-cutover-count-fixed.txt` (7 tests), with
+Indexer Worker Spotless and PMD at `tmp/2720-unreadable-count-static.txt`. The
+first focused run at `tmp/2718-unreadable-cutover-count.txt` exposed two old
+tests whose mock queue returned a null summary; their fixture now supplies an
+explicit zero-failure summary. This is a focused local proof only. The exact
+final mutation fence and replay certification are still open.
+
 ## Evidence and owner map
 
 | Concern | Governing record |
