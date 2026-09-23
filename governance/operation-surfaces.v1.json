@@ -902,6 +902,15 @@
       "note": "C2-10 validates the sole accepted operation row and prepared envelope, including the exact continuation key and nonce, to recover its frozen bulk plan. It owns no lifecycle state, admission or execution permission."
     },
     {
+      "id": "recorded-installer-generation-plan-resolver",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/RecordedInstallerGenerationPlanResolver.java",
+      "guard": "test:RecordedInstallerGenerationPlanResolverTest",
+      "consumesProjection": "operation-record-type",
+      "note": "D1 installer activation binds the accepted durable operation row to its frozen candidate and settings witness. It owns no operation lifecycle write, admission, or independent recovery authority."
+    },
+    {
       "id": "recorded-ingestion-receipt",
       "kind": "consumer",
       "lang": "java",

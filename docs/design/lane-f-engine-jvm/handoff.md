@@ -6,7 +6,38 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-23)
 
-### Active D1 checkpoint after `756567096` (21:30 Berlin)
+### Active D1 state after `bab9a3ff0` (21:54 Berlin)
+
+Checkpoint `bab9a3ff0` (21:54 Berlin) is pushed. Its 358-task local integrated
+suite passed at `tmp/2963-lane-f-capture-integrated-green.txt`; an installed
+standard-model pointer-before-settings crash cut passed at
+`tmp/2964-installer-current-checkpoint.txt` with pointer/settings B, exact
+operation receipt, both search documents and clean private-stack teardown.
+Hosted run `35912460674` finished all jobs: build, app-ui, search-worker,
+platform, Windows-native and other jobs passed. Public claims failed solely
+because `RecordedInstallerGenerationPlanResolver` lacked an operation-surface
+consumer row; the added row passes `node scripts/governance/run.mjs --gate
+operation-surface --mode gate` locally. System integration finished its full
+suite (113 tests, 48 skipped) and identified three retries of one stale
+`migration` fixture. The hosted artifacts show the accepted rebuild row
+`COMPLETE`, pointer Green and same Engine incarnation after the legitimate
+start restart. The fixture still waited for a promotion restart and then a
+pointer-only rollback restart. It now asserts live Green publication and the
+existing rollback 409 refusal; its direct installed run passed at
+`tmp/2976-migration-live-no-restart-rollback-refusal.txt` with exact queue
+acknowledgement and clean teardown. The installer standard-model cases were
+skipped only on the hosted runner without retained bytes; local installed proof
+remains above and in the prior six-cut evidence.
+
+The next local D1 change revalidates the frozen installer candidate at the
+approved execution boundary and refuses a changed settings witness, scope or
+Worker target before the recorded ingestion owner starts. Witness and target
+regressions passed at `tmp/2969-activation-fresh-preview-focused.txt`; PMD,
+formatting and the architecture gate passed at `tmp/2970-activation-static.txt`.
+The full 358-task suite passed at `tmp/2971-lane-f-preview-integrated.txt`.
+These fixes and the migration fixture correction are not yet pushed. After
+the next checkpoint, let hosted integration reach its terminal result before
+another push.
 
 Worktree `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` is on
 `codex/lane-f-pr1`; PR727 has pushed checkpoint `756567096`. The approved

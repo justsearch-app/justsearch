@@ -134,6 +134,23 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
     if (plan.operationKey() != null && !record.key().equals(plan.operationKey())) {
       throw new IllegalArgumentException("Installed activation operation identity mismatch");
     }
+    final RecordedInstallerGenerationPlan current;
+    try {
+      current = frozenPlan(prepare(prepared.argumentsJson(), provenance, context));
+    } catch (OperationPreparationRefused stale) {
+      return OperationExecution.finished(stale.refusal());
+    }
+    // The approval names one frozen candidate. A new download, settings revision, roots or
+    // Worker target requires a new preview before this accepted attempt may start effects.
+    if (!plan.equals(new RecordedInstallerGenerationPlan(
+        current.operationId(), current.profile(), current.source(), plan.operationKey(),
+        current.sourceGeneration(), current.scope(), current.target(),
+        current.settingsWitness(), current.candidateSettings(), current.models(),
+        current.assets(), current.acquisition()))) {
+      return OperationExecution.finished(OperationResult.failure(
+          "Installed activation candidate changed; request a fresh preview",
+          "ACTIVATION_PREVIEW_STALE", Map.of(), false));
+    }
     return ingestion.execute(record, context);
   }
 

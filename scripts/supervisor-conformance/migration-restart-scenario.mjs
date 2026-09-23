@@ -82,19 +82,19 @@ export async function exerciseMigrationRestart(c) {
   console.log('MIGRATION_START_RESPONSE', JSON.stringify(startResponse));
   const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
   const manifestFile = path.join(data, 'runtime', 'manifest.json');
-  const promoted = await waitFor('start and promotion requested restarts', 180000, async () => {
+  const promoted = await waitFor('live promotion after the start restart', 180000, async () => {
     const s = readJson(supervisorFile);
     const m = readJson(manifestFile);
     const g = readJson(generationFile);
-    return s?.state === 'running' && s.incarnation === first.incarnation + 2
+    return s?.state === 'running' && s.incarnation === first.incarnation + 1
       && m?.instanceId === s.instanceId && m?.pid === s.pid
       && g?.active_generation !== blue && g?.migration_state === 'IDLE'
       ? { supervisor: s, manifest: m, generation: g } : null;
   });
   requireThat(promoted.supervisor.restartCount === 0, 'voluntary restarts consumed crash budget');
   requireThat(promoted.supervisor.lastExit?.code === 4
-    && promoted.supervisor.lastExit?.counted === false, 'promotion did not use clean requested restart');
-  requireThat(promoted.manifest.instanceId !== manifest.instanceId, 'Engine was not replaced');
+    && promoted.supervisor.lastExit?.counted === false, 'start did not use clean requested restart');
+  requireThat(promoted.manifest.instanceId !== manifest.instanceId, 'start did not replace the Engine');
   await waitFor('promoted generation is actually served', 60000, async () => {
     try {
       const kept = await search(promoted.manifest.head.apiPort, 'migrationretainedmarker');
@@ -119,32 +119,37 @@ export async function exerciseMigrationRestart(c) {
   });
   requireThat(promoted.generation.active_generation === `g-${rebuildKey}`,
     'promotion did not use the accepted operation generation');
-  // Keep the source scope empty on rollback; B exists outside it and remains distinguishable.
-
-  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({ roots: [] }));
+  const afterSettlement = readJson(supervisorFile);
+  requireThat(afterSettlement?.state === 'running'
+    && afterSettlement.instanceId === promoted.supervisor.instanceId
+    && afterSettlement.incarnation === promoted.supervisor.incarnation
+    && afterSettlement.restartCount === promoted.supervisor.restartCount,
+  'recorded promotion restarted the serving Engine after terminal settlement');
+  // A pointer-only rollback would leave issued Green views and their producers live. The
+  // old rollback route must refuse; a new recorded rebuild is the supported reversal.
   const rollbackResponse = await post(promoted.manifest.head.apiPort,
     '/api/indexing/migration/rollback', {}).catch(error => ({ deliveryUnknown: String(error) }));
-  if (rollbackResponse.status !== undefined) requireThat(rollbackResponse.status === 202
-    && JSON.parse(rollbackResponse.text).restartRequired === true, 'rollback requirement was not projected');
   console.log('MIGRATION_ROLLBACK_RESPONSE', JSON.stringify(rollbackResponse));
-  const rolledBack = await waitFor('rollback requested restart', 90000, async () => {
-    const s = readJson(supervisorFile);
-    const m = readJson(manifestFile);
-    return s?.state === 'running' && s.incarnation === first.incarnation + 3
-      && s.instanceId === m?.instanceId && m?.pid === s.pid
-      && readJson(generationFile)?.active_generation === blue ? { supervisor: s, manifest: m } : null;
-  });
-  requireThat(rolledBack.supervisor.restartCount === 0 && rolledBack.supervisor.lastExit?.code === 4
-    && rolledBack.supervisor.lastExit?.counted === false, 'rollback did not use free requested restart');
-  await waitFor('rollback really reopened Blue', 60000, async () => {
+  requireThat(rollbackResponse.status === 409,
+    `pointer-only rollback was not refused: ${JSON.stringify(rollbackResponse)}`);
+  const afterRefusal = readJson(supervisorFile);
+  requireThat(afterRefusal?.state === 'running'
+    && afterRefusal.instanceId === promoted.supervisor.instanceId
+    && afterRefusal.incarnation === promoted.supervisor.incarnation
+    && readJson(generationFile)?.active_generation === `g-${rebuildKey}`,
+  'refused rollback changed the committed generation or restarted its Engine');
+  await waitFor('refused rollback keeps Green served', 60000, async () => {
     try {
-      return matchingHit(await search(rolledBack.manifest.head.apiPort, 'migrationblueonlymarker'),
-        b, 'migrationblueonlymarker');
+      const kept = await search(promoted.manifest.head.apiPort, 'migrationretainedmarker');
+      const removed = await search(promoted.manifest.head.apiPort, 'migrationblueonlymarker');
+      return matchingHit(kept, a, 'migrationretainedmarker') && removed.status === 200
+        && !matchingHit(removed, b, 'migrationblueonlymarker');
     } catch { return false; }
   });
-  for (const incarnation of [first.incarnation, first.incarnation + 1, first.incarnation + 2]) {
+  for (const incarnation of [first.incarnation]) {
     requireThat(c.output().includes(`Engine incarnation ${incarnation} exited 4 (requested_restart`),
       `incarnation ${incarnation} did not record its own clean requested restart`);
   }
-  console.log('MIGRATION_PASS', JSON.stringify({ blue, rebuildKey, settlement, promoted, rolledBack, work }));
+  console.log('MIGRATION_PASS', JSON.stringify({ blue, rebuildKey, settlement,
+    promoted, rollbackResponse, afterRefusal, work }));
 }

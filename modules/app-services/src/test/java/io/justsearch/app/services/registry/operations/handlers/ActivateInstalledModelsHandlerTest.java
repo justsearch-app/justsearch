@@ -102,6 +102,51 @@ final class ActivateInstalledModelsHandlerTest {
     verify(ingestion).execute(record, CONTEXT);
   }
 
+  @Test
+  void changedSettingsWitnessAfterApprovalRequiresFreshPreviewBeforeIngestion() {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    InstalledGenerationCandidate first = candidate(true);
+    InstalledGenerationCandidate changed = new InstalledGenerationCandidate(
+        first.candidateSettings(), new SettingsWitness(5, OPERATION_KEY),
+        first.encodedSettings(), first.hotKeys(), first.componentKeys(),
+        first.generationBoundKeys(), first.restartRequiredKeys(), first.models(),
+        first.assets(), first.provenance());
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(
+        Optional.of(first), Optional.of(changed));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
+    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target());
+    ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
+    OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
+
+    OperationExecution result = handler.executePrepared(
+        approved, PROVENANCE, CONTEXT, mock(OperationRecordHandle.class));
+
+    assertEquals("ACTIVATION_PREVIEW_STALE", result.response().errorCode().orElseThrow());
+    verify(ingestion, org.mockito.Mockito.never()).execute(any(), any());
+  }
+
+  @Test
+  void changedWorkerTargetAfterApprovalRequiresFreshPreviewBeforeIngestion() {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
+    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target(),
+        new IndexTargetSnapshot(
+            "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb", "a"));
+    ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
+    OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
+
+    OperationExecution result = handler.executePrepared(
+        approved, PROVENANCE, CONTEXT, mock(OperationRecordHandle.class));
+
+    assertEquals("ACTIVATION_PREVIEW_STALE", result.response().errorCode().orElseThrow());
+    verify(ingestion, org.mockito.Mockito.never()).execute(any(), any());
+  }
+
   private static ActivateInstalledModelsHandler handler(
       BrainInstallService install, IndexingService indexing, RecordedIngestionService ingestion) {
     return new ActivateInstalledModelsHandler(() -> install, ingestion,
