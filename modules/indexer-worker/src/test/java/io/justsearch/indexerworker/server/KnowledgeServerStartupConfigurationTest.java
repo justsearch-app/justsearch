@@ -235,6 +235,9 @@ class KnowledgeServerStartupConfigurationTest {
         assertEquals(modelDir, initial.chunkRerankerConfig().modelPath());
         Files.delete(model);
         ConfigStore.setGlobal(new ConfigStore(configuration("changed-services", "splade", "9")));
+        // Production retires the incumbent before this private reconstruction seam. Reflection
+        // must establish that owner precondition while testing captured configuration reuse.
+        server.retireServingView();
         var reconstruct = KnowledgeServer.class.getDeclaredMethod("reconstructAppServicesAfterDeferredUpgrade");
         reconstruct.setAccessible(true);
         reconstruct.invoke(server);

@@ -71,6 +71,43 @@ final class KnowledgeServerCloseCompletionTest {
     }
   }
 
+  @Test
+  void interruptedRetirementRestoresUndestroyedServingView(@TempDir Path tempDir)
+      throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var services = org.mockito.Mockito.mock(WorkerAppServices.class);
+    server.publishServingView(services);
+    var held = server.captureServingView();
+    var failure = new AtomicReference<Throwable>();
+    Thread waiter = new Thread(() -> {
+      try { server.retireServingView(); }
+      catch (Throwable refused) { failure.set(refused); }
+    });
+    try {
+      waiter.start();
+      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      boolean admissionClosed = false;
+      while (!admissionClosed && System.nanoTime() < deadline) {
+        try (var ignored = server.captureServingView()) { Thread.onSpinWait(); }
+        catch (IllegalStateException expected) { admissionClosed = true; }
+      }
+      assertTrue(admissionClosed, "retirement must first fence new captures");
+      waiter.interrupt();
+      waiter.join(2_000);
+      assertFalse(waiter.isAlive(), "retirement must finish after interruption");
+      assertTrue(failure.get() instanceof java.io.IOException,
+          "interrupted holder drain must refuse before destroying A");
+      try (var restored = server.captureServingView()) {
+        org.junit.jupiter.api.Assertions.assertSame(services, restored.services());
+      }
+    } finally {
+      waiter.interrupt();
+      held.close();
+      server.close();
+    }
+  }
+
   @BeforeAll
   static void ensureGlobalConfig() {
     if (ConfigStore.globalOrNull() == null) {

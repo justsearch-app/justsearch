@@ -839,6 +839,15 @@
       "note": "Lane F C2-6 serializes the settings-file witness and projects recovery verdicts from the existing operation row. It never writes operation state; the runner terminalizes before releasing the fence."
     },
     {
+      "id": "settings-candidate-preparation",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCandidatePreparation.java",
+      "guard": "test:SettingsCommitCoordinatorTest",
+      "consumesProjection": "operation-record-type",
+      "note": "Lane F D1 private prepared-payload codec binds the candidate intent to the accepted settings operation row. It stores no separate lifecycle state and has no terminal-write authority."
+    },
+    {
       "id": "runtime-intent-settings-producer",
       "kind": "consumer",
       "lang": "java",

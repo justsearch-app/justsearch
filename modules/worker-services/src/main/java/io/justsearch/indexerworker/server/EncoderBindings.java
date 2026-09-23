@@ -5,6 +5,7 @@ import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
+import java.util.Objects;
 
 /**
  * Typed registry for the async-loaded encoders/services that {@link
@@ -17,9 +18,10 @@ import io.justsearch.indexerworker.splade.SpladeEncoder;
  * one instance and passes it to both ctors; the {@code wireX} methods become single
  * {@code bindings.bindX(...)} calls instead of fanning out across peer setters.
  *
- * <p>Fields are volatile so the async-load thread that publishes (typically the gRPC
- * incoming-RPC thread or the deferred-init worker thread) can safely hand off to the
- * indexing-loop thread and any search-handling threads without external synchronization.
+ * <p>The complete encoder set is held in one volatile immutable snapshot. The async-load thread
+ * that publishes (typically the gRPC incoming-RPC thread or the deferred-init worker thread) can
+ * therefore hand off a coherent set to the indexing-loop thread and any search-handling threads
+ * without external synchronization.
  *
  * <p>Concurrency contract — bind operations are publication actions; reads see either the
  * prior reference or the new one. Null is the unbound state and means "the corresponding
@@ -30,44 +32,85 @@ import io.justsearch.indexerworker.splade.SpladeEncoder;
  */
 public final class EncoderBindings {
 
-  private volatile SpladeEncoder spladeEncoder;
-  private volatile BgeM3Encoder bgeM3Encoder;
-  private volatile NerService nerService;
-  private volatile DisambiguationService disambiguationService;
+  /** Immutable, atomically published view of all encoder and service bindings. */
+  public record Snapshot(
+      SpladeEncoder spladeEncoder,
+      BgeM3Encoder bgeM3Encoder,
+      NerService nerService,
+      DisambiguationService disambiguationService) {
+
+    public static Snapshot empty() {
+      return new Snapshot(null, null, null, null);
+    }
+  }
+
+  private volatile Snapshot snapshot = Snapshot.empty();
 
   public EncoderBindings() {
-    // All fields start null; bind* publishes when async load completes.
+    // The empty snapshot is the unbound state.
   }
 
-  public void bindSpladeEncoder(SpladeEncoder encoder) {
-    this.spladeEncoder = encoder;
+  /**
+   * Publishes a complete encoder set as one atomic owner action.
+   *
+   * <p>Callers that load several related services should construct one snapshot and publish it
+   * once. Readers obtaining {@link #snapshot()} then see either the old complete set or the new
+   * complete set, never a field-by-field transition.
+   */
+  public synchronized void publish(Snapshot next) {
+    this.snapshot = Objects.requireNonNull(next, "next");
   }
 
-  public void bindBgeM3Encoder(BgeM3Encoder encoder) {
-    this.bgeM3Encoder = encoder;
+  /** Backward-compatible single-slot publication for existing model wiring callers. */
+  public synchronized void bindSpladeEncoder(SpladeEncoder encoder) {
+    Snapshot current = this.snapshot;
+    this.snapshot =
+        new Snapshot(encoder, current.bgeM3Encoder(), current.nerService(),
+            current.disambiguationService());
   }
 
-  public void bindNerService(NerService service) {
-    this.nerService = service;
+  /** Backward-compatible single-slot publication for existing model wiring callers. */
+  public synchronized void bindBgeM3Encoder(BgeM3Encoder encoder) {
+    Snapshot current = this.snapshot;
+    this.snapshot =
+        new Snapshot(current.spladeEncoder(), encoder, current.nerService(),
+            current.disambiguationService());
   }
 
-  public void bindDisambiguationService(DisambiguationService service) {
-    this.disambiguationService = service;
+  /** Backward-compatible single-slot publication for existing model wiring callers. */
+  public synchronized void bindNerService(NerService service) {
+    Snapshot current = this.snapshot;
+    this.snapshot =
+        new Snapshot(current.spladeEncoder(), current.bgeM3Encoder(), service,
+            current.disambiguationService());
+  }
+
+  /** Backward-compatible single-slot publication for existing model wiring callers. */
+  public synchronized void bindDisambiguationService(DisambiguationService service) {
+    Snapshot current = this.snapshot;
+    this.snapshot =
+        new Snapshot(current.spladeEncoder(), current.bgeM3Encoder(), current.nerService(),
+            service);
+  }
+
+  /** Returns the coherent encoder set currently published by the owner. */
+  public Snapshot snapshot() {
+    return snapshot;
   }
 
   public SpladeEncoder spladeEncoder() {
-    return spladeEncoder;
+    return snapshot.spladeEncoder();
   }
 
   public BgeM3Encoder bgeM3Encoder() {
-    return bgeM3Encoder;
+    return snapshot.bgeM3Encoder();
   }
 
   public NerService nerService() {
-    return nerService;
+    return snapshot.nerService();
   }
 
   public DisambiguationService disambiguationService() {
-    return disambiguationService;
+    return snapshot.disambiguationService();
   }
 }

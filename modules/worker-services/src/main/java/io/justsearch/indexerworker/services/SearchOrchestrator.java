@@ -100,15 +100,16 @@ public final class SearchOrchestrator {
     this.indexCountOps = lifecycle.indexCountOps();
   }
 
-  /** Reads the 6 volatile slots once per request into a SearchInputCapture snapshot. */
+  /** Captures the encoder pair from one owner publication for this request. */
   private SearchInputCapture.EncoderSnapshot encoderSnapshot() {
+    EncoderBindings.Snapshot encoders = encoderBindings.snapshot();
     return new SearchInputCapture.EncoderSnapshot(
         embeddingProvider,
         clusterSnapshotSupplier != null ? clusterSnapshotSupplier : () -> null,
         activeGenerationSupplier,
-        encoderBindings.spladeEncoder(),
+        encoders.spladeEncoder(),
         spladeIdfQueryEncoder,
-        encoderBindings.bgeM3Encoder());
+        encoders.bgeM3Encoder());
   }
 
   // === Deferred-injection setters (preserved for WorkerSearchService wiring) ===

@@ -483,6 +483,23 @@ Their source-level corrections passed affected PMD at
 `tmp/2666-serving-wip-spotless.txt`. Neither build is a full test suite or D1
 acceptance proof.
 
+Hosted run 35824174175 for `efa50aa21` passed its build but failed Public claims
+on `operation-surface/undeclared-surface` for the private settings candidate
+preparation codec. It is an accepted-row consumer, not a lifecycle fork; the
+register now declares it and the local gate passes. The hosted search-worker
+job failed three retries of one reflection test: it invoked private service
+reconstruction without production's preceding retirement. The test now supplies
+that owner precondition; the focused rerun passes at
+`tmp/2674-hosted-reconstruction-regression.txt`. The new `EncoderBindings` uses
+one immutable publication snapshot; `SearchOrchestrator` reads the encoder pair
+from one snapshot. Focused test and static checks pass at
+`tmp/2670-encoder-snapshot-test.txt` and `tmp/2671-encoder-snapshot-static.txt`.
+Interrupted pre-destruction retirement now restores capture admission to live A;
+the owner-lock regression and static checks pass at
+`tmp/2673-serving-retire-owner-test.txt`. These corrections are not yet hosted
+at a new revision, and the published model set, async streams, and side-by-side
+A/B publication remain open D1 blockers.
+
 ## Evidence and owner map
 
 | Concern | Governing record |

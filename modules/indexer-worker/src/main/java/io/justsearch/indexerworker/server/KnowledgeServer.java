@@ -2662,6 +2662,15 @@ public final class KnowledgeServer implements Closeable {
 
   /** Stops new captures, then waits outside publication for actual users to leave. */
   void retireServingView() throws IOException {
+    runtimeSwapLock.lock();
+    try {
+      retireServingViewOwned();
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  private void retireServingViewOwned() throws IOException {
     ServingView retiring;
     publicationLock.writeLock().lock();
     try {
@@ -2674,19 +2683,38 @@ public final class KnowledgeServer implements Closeable {
       publicationLock.writeLock().unlock();
     }
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    IOException refusal = null;
     synchronized (servingViewMonitor) {
       while (retiring.holders != 0) {
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0) {
-          throw new IOException("Index serving view still has active holders; owner retained");
+          refusal = new IOException("Index serving view still has active holders; owner retained");
+          break;
         }
         try {
           TimeUnit.NANOSECONDS.timedWait(servingViewMonitor, remaining);
         } catch (InterruptedException interrupted) {
           Thread.currentThread().interrupt();
-          throw new IOException("Interrupted waiting for index serving holders", interrupted);
+          refusal = new IOException("Interrupted waiting for index serving holders", interrupted);
+          break;
         }
       }
+    }
+    if (refusal != null) {
+      restoreServingViewAfterRefusedRetirement(retiring);
+      throw refusal;
+    }
+  }
+
+  /** No destructive step has started when the holder drain refuses; A remains usable. */
+  private void restoreServingViewAfterRefusedRetirement(ServingView retiring) {
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        if (!closeStarted && servingView == retiring) retiring.retiring = false;
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
     }
   }
 
