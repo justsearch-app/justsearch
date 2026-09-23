@@ -122,6 +122,22 @@ final class ConfigStoreRebuilderTest {
   }
 
   @Test
+  @DisplayName("desired API port contributes zero at the settings ordinal")
+  void explicitEphemeralApiPortContributesAtSettingsOrdinal() {
+    ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
+    builder.contributeEnvRegistry();
+    UiSettings settings = new UiSettings();
+    settings.setApiPort(0);
+
+    ConfigStoreRebuilder.contributeUiSettings(builder, settings);
+    ConfigResolution resolution = builder.build().resolution("justsearch.api.port");
+
+    assertEquals("0", resolution.value());
+    assertEquals("settings.json", resolution.sourceName());
+    assertEquals(ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON, resolution.sourceOrdinal());
+  }
+
+  @Test
   @DisplayName("rebuild re-contributes the remembered hardware probe at ordinal 150")
   void rebuildPreservesTheDerivedWindow() {
     try {

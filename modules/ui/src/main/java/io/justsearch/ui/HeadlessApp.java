@@ -445,7 +445,8 @@ public class HeadlessApp {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       io.justsearch.ui.api.UpgradeShutdownBridge upgradeShutdownBridge,
       io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge,
-      io.justsearch.app.engine.EngineRoot engineRoot)
+      io.justsearch.app.engine.EngineRoot engineRoot,
+      io.justsearch.app.services.settings.FixedSettingsComponentComposer settingsComponents)
       throws Exception {
     Telemetry telemetry = infraPhase.telemetry();
     ResolvedConfig resolvedConfig = infraPhase.config().resolvedConfig();
@@ -458,6 +459,9 @@ public class HeadlessApp {
             engineRoot.recordedIngestion(), engineRoot.components());
     LocalApiServer constructedApi = null;
     try {
+      // Register fixed physical owners before the API can admit a settings transaction.
+      settingsComponents.register("generative", bootstrap.generativeSettingsOwner());
+      settingsComponents.seal();
       log.info("HeadAssembly started (degraded â€” Worker connecting in background).");
 
       var headInfra = bootstrap.headInfraRegistry();
@@ -465,8 +469,6 @@ public class HeadlessApp {
       tools.jackson.databind.JsonNode configRoot =
           io.justsearch.configuration.JustSearchConfigurationLoader.loadYamlRoot().orElse(null);
       Path indexBasePath = resolvedConfig.paths().indexBasePath();
-
-      BootContractRunner.validateAll();
 
       boolean prodMode = configStore.get().policy().prodMode();
       String sessionToken = prodMode ? LocalApiServer.generateSessionToken() : null;
@@ -730,7 +732,10 @@ public class HeadlessApp {
     rcBuilder.contributeBaseSources();
     io.justsearch.app.services.config.ConfigStoreRebuilder.contributeUiSettings(rcBuilder, settings);
     ResolvedConfig resolvedConfig = rcBuilder.build();
-    var configStore = new ConfigStore(resolvedConfig);
+    // One process publication boundary is shared by configuration, component observations,
+    // admission close, and the Engine owners composed later in this boot.
+    var configStore = new ConfigStore(resolvedConfig,
+        new java.util.concurrent.locks.ReentrantReadWriteLock());
     ConfigStore.setGlobal(configStore);
 
     Path autoServer = maybeAutoSelectCuda12Variant(settings, configStore);
@@ -958,15 +963,9 @@ public class HeadlessApp {
   @SuppressWarnings("PMD.SystemPrintln")
   public static void main(String[] args) {
     // Install crash reporter before anything else - catches uncaught exceptions on any thread.
-    Thread.setDefaultUncaughtExceptionHandler(
-        (thread, throwable) -> {
-          io.justsearch.telemetry.CrashReporter.writeCrashReport(
-              io.justsearch.telemetry.CrashReporter.defaultCrashDir(),
-              "head",
-              thread,
-              throwable);
-          System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
-        });
+    Thread.setDefaultUncaughtExceptionHandler(fatalUncaughtHandler(
+        io.justsearch.telemetry.CrashReporter.defaultCrashDir(),
+        code -> Runtime.getRuntime().halt(code)));
     io.justsearch.telemetry.CrashReporter.pruneOldCrashReports(
         io.justsearch.telemetry.CrashReporter.defaultCrashDir(), 30);
 
@@ -977,6 +976,7 @@ public class HeadlessApp {
 
     io.justsearch.app.api.operations.OperationStore operations = null;
     io.justsearch.app.engine.EngineRoot processRoot = null;
+    io.justsearch.app.engine.DefaultEngineProcessResources processResources = null;
     java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> pendingIndexStartup = null;
     boolean fatalStartup = false;
     Telemetry telemetry = null;
@@ -996,6 +996,9 @@ public class HeadlessApp {
         terminalWriterShutdown = new java.util.concurrent.CompletableFuture<>();
 
     try {
+      // This validator uses System.exit on failure. Run it before any native-capable
+      // asynchronous startup, while that exit is still safe for this incarnation.
+      BootContractRunner.validateAll();
       // Phase 0: resolve config (tempdoc 502 Â§3.3)
       ConfigPhaseResult configPhase = resolveConfig();
       settingsStore = configPhase.settingsStore();
@@ -1075,6 +1078,11 @@ public class HeadlessApp {
 
       // Compose the work owner before either asynchronous Engine startup or API construction.
       var ksConfig = io.justsearch.app.services.worker.KnowledgeServerConfig.load();
+      var runtimeResources = new io.justsearch.app.engine.DefaultEngineProcessResources(
+          configStore.publicationLock());
+      processResources = runtimeResources;
+      var settingsComponents = new io.justsearch.app.services.settings.FixedSettingsComponentComposer(
+          runtimeResources.components());
       operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
           configPhase.dataDir().resolve("operations.db"));
       final var resetSettingsStore = settingsStore;
@@ -1082,10 +1090,12 @@ public class HeadlessApp {
           resetSettingsStore, configStore, requestedRestartAction, candidate -> {
             var response = io.justsearch.app.services.settings.SettingsV2Projection.toSettingsV2(
                 candidate, resetSettingsStore.mode());
-            return io.justsearch.agent.api.registry.OperationResult.success("Settings committed", Map.of(
+            var data = new java.util.LinkedHashMap<String, Object>(Map.of(
                 "ui", response.ui(), "llm", response.llm(), "indexPaths", response.indexPaths(),
                 "settingsMode", response.settingsMode()));
-          });
+            if (response.apiPort() != null) data.put("apiPort", response.apiPort());
+            return io.justsearch.agent.api.registry.OperationResult.success("Settings committed", data);
+          }, runtimeResources.admission()::isClosing, settingsComponents);
       var operationFaultHook = OperationFaultBarrier.fromEnvironment(configPhase.dataDir(), SystemAccess::rawEnvVar);
       var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
           operations, java.time.Clock.systemUTC(), java.util.Set.of(
@@ -1100,7 +1110,8 @@ public class HeadlessApp {
       var operationAuthority = io.justsearch.app.services.bootstrap.OperationAuthority.load(configPhase.dataDir());
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
-          childRegistry, requestedRestartAction, operationAuthority, configPhase.configStore());
+          childRegistry, requestedRestartAction, operationAuthority, configPhase.configStore(),
+          runtimeResources);
       processRoot = engineRoot;
 
       // Phase 1: infrastructure (telemetry, policy)
@@ -1148,7 +1159,7 @@ public class HeadlessApp {
               manifestPublisher,
               childRegistry,
               upgradeShutdownBridge,
-              lifecycleShutdownBridge, engineRoot);
+              lifecycleShutdownBridge, engineRoot, settingsComponents);
       bootstrap = apiPhase.bootstrap();
       apiServer = apiPhase.apiServer();
 
@@ -1267,8 +1278,11 @@ public class HeadlessApp {
                   operationLeasesRef,
                   engineAdmissionRef,
                   engineRoot.processResources(),
-                  shutdownRequestWatcherRef::get, engineRoot.operations()),
+                  shutdownRequestWatcherRef::get, engineRoot.operations(),
+                  engineRoot.operationAttempts(), engineRoot::quiesceProducers),
               System::exit,
+              code -> Runtime.getRuntime().halt(code),
+              engineRoot::nativeQuiescence,
               preliminary ->
                   manifestPublisherRef.completeShutdown(
                       preliminary.reason().wire(),
@@ -1295,7 +1309,8 @@ public class HeadlessApp {
                     // The hook fires DURING an exit the endpoint or the watcher may already have
                     // started; run() is memoised, so this joins that shutdown rather than starting
                     // a second one.
-                    shutdownSequence.run(io.justsearch.app.engine.ShutdownRequest.Reason.QUIT);
+                    shutdownSequence.runFromJvmShutdownHook(
+                        io.justsearch.app.engine.ShutdownRequest.Reason.QUIT);
                     latch.countDown();
                   },
                    "justsearch-headless-shutdown"));
@@ -1316,15 +1331,31 @@ public class HeadlessApp {
       e.printStackTrace(System.err);
       fatalStartup = true;
     } finally {
+      boolean workCleanupComplete = processRoot == null;
+      if (processRoot != null) {
+        try {
+          processRoot.admission().beginClosing();
+          processRoot.operationAttempts().beginClosing();
+          processRoot.admission().cancelInteractive("shutdown");
+          processRoot.quiesceProducers();
+          boolean admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
+          boolean bodies = processRoot.operationAttempts().awaitDrained(java.time.Duration.ofSeconds(5));
+          workCleanupComplete = admitted && bodies;
+        } catch (RuntimeException failure) {
+          log.warn("Live work drain incomplete; retaining its dependencies", failure);
+        }
+      }
       try {
         stopRecoveryAndApi(healthMonitor, apiServer);
       } catch (Exception failure) {
         log.warn("Recovery/API cleanup failed", failure);
       }
-      boolean headCleanupComplete = bootstrap == null;
+      boolean headCleanupComplete = workCleanupComplete && bootstrap == null;
       try {
-        if (bootstrap != null) bootstrap.close();
-        headCleanupComplete = true;
+        if (workCleanupComplete) {
+          if (bootstrap != null) bootstrap.close();
+          headCleanupComplete = true;
+        }
       } catch (Exception failure) {
         log.warn("Head cleanup incomplete; retaining index and operation dependencies", failure);
       }
@@ -1347,8 +1378,12 @@ public class HeadlessApp {
       } catch (Exception ignored) {
         // best effort
       }
+      boolean operationsCleanupComplete = operations == null;
       try {
-        if (operations != null && indexCleanupComplete) operations.close();
+        if (operations != null && workCleanupComplete && headCleanupComplete && indexCleanupComplete) {
+          operations.close();
+          operationsCleanupComplete = true;
+        }
       } catch (java.io.IOException closeFailure) {
         log.warn("Failed to close operations store during cleanup", closeFailure);
       }
@@ -1359,8 +1394,15 @@ public class HeadlessApp {
       } catch (Exception ignored) {
         // best effort
       }
-      if (processRoot != null && headCleanupComplete && indexCleanupComplete) {
-        processRoot.processResources().close();
+      boolean processResourcesCleanupComplete = processResources == null;
+      if (processResources != null && workCleanupComplete && headCleanupComplete
+          && indexCleanupComplete && operationsCleanupComplete) {
+        try {
+          processResources.close();
+          processResourcesCleanupComplete = true;
+        } catch (RuntimeException failure) {
+          log.warn("Process resources cleanup incomplete; retaining instance lock", failure);
+        }
       }
       // Tempdoc 501 Phase 1: idempotent manifest cleanup. The shutdown hook above already
       // closed the publisher under SIGTERM/clean-exit; this finally block covers the path
@@ -1376,14 +1418,37 @@ public class HeadlessApp {
       // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
       // (AppInstanceLock.close() returns silently if already closed).
       try {
-        closeInstanceLockAfterIndex(indexCleanupComplete, appInstanceLock);
+        if (workCleanupComplete && headCleanupComplete && indexCleanupComplete
+            && operationsCleanupComplete && processResourcesCleanupComplete
+            && appInstanceLock != null) appInstanceLock.close();
       } catch (Exception e) {
         log.debug("AppInstanceLock close failed in finally (non-fatal)", e);
       }
       // Tempdoc 501 Phase 18: api-port.txt is gone, the manifest publisher's
       // close() (above) handles its own file cleanup.
     }
-    if (fatalStartup) System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+    if (fatalStartup) {
+      int fatalCode = io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT;
+      if (processRoot != null && processRoot.nativeQuiescence()
+          == io.justsearch.app.api.NativeQuiescence.UNQUIESCED) {
+        Runtime.getRuntime().halt(fatalCode);
+      }
+      System.exit(fatalCode);
+    }
+  }
+
+  static Thread.UncaughtExceptionHandler fatalUncaughtHandler(
+      Path crashDir, java.util.function.IntConsumer hardStop) {
+    return (thread, throwable) -> {
+      try {
+        io.justsearch.telemetry.CrashReporter.writeCrashReport(
+            crashDir, "head", thread, throwable);
+      } finally {
+        // An uncaught thread failure may leave an issued ORT lease alive. JVM shutdown would
+        // run ORT's hook concurrently with that call; stop without starting shutdown hooks.
+        hardStop.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+      }
+    };
   }
 
   /** Fatal-startup cleanup uses the same recovery-before-API lifetime order as normal shutdown. */
@@ -1474,8 +1539,57 @@ public class HeadlessApp {
           java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
               shutdownRequestWatcher,
           io.justsearch.app.api.operations.OperationStore operations) {
+    return orderedShutdownSteps(apiServer, bootstrap, healthMonitor, knowledgeServer,
+        manifestPublisher, tracing, telemetry, appInstanceLock, operationLeases,
+        engineAdmission, processResources, shutdownRequestWatcher, operations, null);
+  }
+
+  static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
+      orderedShutdownSteps(
+          LocalApiServer apiServer,
+          HeadAssembly bootstrap,
+          KnowledgeServerHealthMonitor healthMonitor,
+          KnowledgeServerBootstrap knowledgeServer,
+          RuntimeManifestPublisher manifestPublisher,
+          io.justsearch.telemetry.TracingBootstrap tracing,
+          Telemetry telemetry,
+          AppInstanceLock appInstanceLock,
+          io.justsearch.app.api.OperationLeaseService operationLeases,
+          io.justsearch.app.api.EngineAdmissionService engineAdmission,
+          io.justsearch.app.api.EngineProcessResources processResources,
+          java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
+              shutdownRequestWatcher,
+          io.justsearch.app.api.operations.OperationStore operations,
+          io.justsearch.app.api.operations.OperationAttemptRunner attempts) {
+    return orderedShutdownSteps(apiServer, bootstrap, healthMonitor, knowledgeServer,
+        manifestPublisher, tracing, telemetry, appInstanceLock, operationLeases,
+        engineAdmission, processResources, shutdownRequestWatcher, operations, attempts, null);
+  }
+
+  static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
+      orderedShutdownSteps(
+          LocalApiServer apiServer,
+          HeadAssembly bootstrap,
+          KnowledgeServerHealthMonitor healthMonitor,
+          KnowledgeServerBootstrap knowledgeServer,
+          RuntimeManifestPublisher manifestPublisher,
+          io.justsearch.telemetry.TracingBootstrap tracing,
+          Telemetry telemetry,
+          AppInstanceLock appInstanceLock,
+          io.justsearch.app.api.OperationLeaseService operationLeases,
+          io.justsearch.app.api.EngineAdmissionService engineAdmission,
+          io.justsearch.app.api.EngineProcessResources processResources,
+          java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
+              shutdownRequestWatcher,
+          io.justsearch.app.api.operations.OperationStore operations,
+          io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+          Runnable producerDrain) {
     var indexClosed = new java.util.concurrent.atomic.AtomicBoolean();
     var headClosed = new java.util.concurrent.atomic.AtomicBoolean();
+    var workDrained = new java.util.concurrent.atomic.AtomicBoolean(attempts == null);
+    var operationsClosed = new java.util.concurrent.atomic.AtomicBoolean();
+    var processResourcesClosed = new java.util.concurrent.atomic.AtomicBoolean();
+    var producersQuiesced = new java.util.concurrent.atomic.AtomicBoolean(producerDrain == null);
     return List.of(
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "runtime-manifest",
@@ -1486,6 +1600,8 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "operation-admission",
             reason -> {
+              if (engineAdmission != null) engineAdmission.beginClosing();
+              if (attempts != null) attempts.beginClosing();
               operationLeases.freezeAdmission(reason.wire());
               return null;
             }),
@@ -1493,6 +1609,31 @@ public class HeadlessApp {
             "interactive-work",
             reason -> {
               if (engineAdmission != null) engineAdmission.cancelInteractive(reason.wire());
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "recorded-producers",
+            reason -> {
+              if (producerDrain != null) {
+                producerDrain.run();
+                producersQuiesced.set(true);
+              }
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "live-work-drain",
+            reason -> {
+              if (!producersQuiesced.get()) throw new IllegalStateException(
+                  "Live work drain requires recorded producer quiescence");
+              if (attempts != null) {
+                boolean admitted = engineAdmission == null
+                    || engineAdmission.awaitDrained(java.time.Duration.ofSeconds(5));
+                boolean bodies = attempts.awaitDrained(java.time.Duration.ofSeconds(5));
+                if (!admitted || !bodies) {
+                  throw new IllegalStateException("Live Engine work did not relinquish its dependencies");
+                }
+                workDrained.set(true);
+              }
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
@@ -1519,6 +1660,8 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "head-assembly",
             reason -> {
+              if (!workDrained.get()) throw new IllegalStateException(
+                  "Head retained until admitted work and operation bodies finish");
               if (bootstrap != null) {
                 bootstrap.setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
                 bootstrap.close();
@@ -1529,6 +1672,8 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "durable-operations-checkpoint",
             reason -> {
+              if (!workDrained.get()) throw new IllegalStateException(
+                  "Durable checkpoint retained until live operation users finish");
               operations.checkpointDurableOperations();
               return null;
             }),
@@ -1546,9 +1691,10 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "operations-store",
             reason -> {
-              if (!indexClosed.get()) throw new IllegalStateException(
-                  "Operations store retained until the index drain completes");
+              if (!workDrained.get() || !headClosed.get() || !indexClosed.get()) throw new IllegalStateException(
+                  "Operations store retained until work, Head and index finish");
               operations.close();
+              operationsClosed.set(true);
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
@@ -1570,15 +1716,21 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "process-resources",
             reason -> {
-              if (!headClosed.get() || !indexClosed.get()) throw new IllegalStateException(
-                  "Process resources retained until Head and index termination");
+              if (!workDrained.get() || !headClosed.get() || !indexClosed.get()
+                  || !operationsClosed.get()) throw new IllegalStateException(
+                  "Process resources retained until work, Head, index and operations finish");
               processResources.close();
+              processResourcesClosed.set(true);
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "app-instance-lock",
             reason -> {
-              closeInstanceLockAfterIndex(indexClosed.get(), appInstanceLock);
+              if (!workDrained.get() || !headClosed.get() || !indexClosed.get()
+                  || !operationsClosed.get() || !processResourcesClosed.get()) {
+                throw new IllegalStateException("Instance lock retained until stateful owners close");
+              }
+              if (appInstanceLock != null) appInstanceLock.close();
               return null;
             }));
   }

@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-21.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-23.
 
 Precedence note:
 1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.
@@ -19,7 +19,7 @@ Apply scopes are classified in `governance/config-apply.v1.json`. Its entry coun
 
 The per-row notes above cover only the sources this table can derive from `EnvRegistry` / `ConfigKey`. The full ordinal chain in `ResolvedConfigBuilder` has more: `jvm_arg` 500 > `worker_snapshot` 450 > `env_var` 400 > `ci_profile` 350 > `settings.json` 300 > `yaml` 200 > `auto_detected` 150 > `default` 100. Two of those contributors are invisible here because they are written by callers rather than declared as keys:
 
-- **`settings.json` (300)** — `ConfigStoreRebuilder.contributeUiSettings` forwards a handful of `UiSettings` fields, including `justsearch.gpu.layers`, `justsearch.context.size`, `justsearch.server.exe`, `justsearch.ui.exclude_patterns`, `justsearch.index.base_path` and `justsearch.llm.model_path`.
+- **`settings.json` (300)** — `ConfigStoreRebuilder.contributeUiSettings` forwards a handful of `UiSettings` fields, including `justsearch.gpu.layers`, `justsearch.context.size`, `justsearch.server.exe`, `justsearch.ui.exclude_patterns`, `justsearch.index.base_path` and `justsearch.llm.model_path`. Its typed nullable `apiPort` contributes `justsearch.api.port` only when configured; `0` is an ephemeral listener policy, while the positive bound port remains runtime-manifest evidence.
 - **`auto_detected` (150, detail `hardware_probe`)** — the Head's startup probe contributes GPU detection results (including the VRAM-tier `justsearch.gpu.layers`) and, since tempdoc 883, the DERIVED `justsearch.context.size` window rung.
 
 Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearch.context.size` (slice 1) and `justsearch.gpu.layers`, `justsearch.server.exe`, `justsearch.ui.exclude_patterns` (slice 2), and its §C.5c residue deleted the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, along with every `*.source=ui_settings` marker property. Each of those keys now resolves `settings.json` when the user set one and `auto_detected` / `default` otherwise — never `jvm_arg` merely because the value came from the GUI, which is what the promotions used to make them report. The runtime GPU executable switch also uses resolver provenance: boot auto-detection at150, accepted settings at300, and environment/JVM sources at400/500. Its `justsearch.server.exe.source` marker is retired. The model-path marker has no current writer; its compatibility reader remains for the separately designed profile persistence path.
@@ -126,7 +126,7 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.AGENT_SEARCH_DEFAULT_MODE | permanent | - | JUSTSEARCH_AGENT_SEARCH_DEFAULT_MODE | justsearch.agent.search.default_mode | AGENT_SEARCH_DEFAULT_MODE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.AI_DISABLED | permanent | - | JUSTSEARCH_AI_DISABLED | justsearch.ai.disabled | AI_DISABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.AI_EMBED_ENABLED | permanent | - | JUSTSEARCH_AI_EMBED_ENABLED | justsearch.ai.embed.enabled | AI_EMBED_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.API_PORT | permanent | - | JUSTSEARCH_API_PORT | justsearch.api.port | API_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.API_PORT | permanent | - | JUSTSEARCH_API_PORT | justsearch.api.port | API_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > settings.json > default; bound port is runtime evidence |
 | EnvRegistry.APP_VERSION | permanent | - | JUSTSEARCH_APP_VERSION | justsearch.app.version | APP_VERSION | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.BACKFILL_BGE_M3_BATCH_SIZE | permanent | - | JUSTSEARCH_BACKFILL_BGE_M3_BATCH_SIZE | justsearch.backfill.bge_m3_batch_size | BACKFILL_BGE_M3_BATCH_SIZE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.BACKFILL_BGE_M3_INTERLEAVE_BATCH_SIZE | permanent | - | JUSTSEARCH_BACKFILL_BGE_M3_INTERLEAVE_BATCH_SIZE | justsearch.backfill.bge_m3_interleave_batch_size | BACKFILL_BGE_M3_INTERLEAVE_BATCH_SIZE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

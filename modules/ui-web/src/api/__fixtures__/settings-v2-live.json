@@ -27,5 +27,7 @@
     "lastCommittedOperationKey" : null
   },
   "operationKey" : null,
-  "state" : null
+  "state" : null,
+  "apiPort" : null,
+  "restartScheduled" : null
 }

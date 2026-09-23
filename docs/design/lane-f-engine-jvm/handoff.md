@@ -13,18 +13,17 @@ are authorized; merge remains at stage F. No routine owner approval is pending.
 Continue after status answers, commits and reviews. C2 is accepted; D1/D2/E/F
 remain open. Root owns all Gradle runs, stack lifecycle and integration.
 
-Handoff requested by the user for Sol after Astra resolved the remaining design. Do not mistake this
-for scope completion. No user decision or permission is pending. Preserve the worktree;
-a lifecycle hold is recorded through2026-09-29 under the current session owner.
-No build, stack, or subagent is running. Official quick_health reports ABSENT,
-no foreign runs and no inference orphan. Next free verification run2466.
+The user resumed this lane after Astra resolved the remaining design. This is not
+scope completion. No user decision or permission is pending. Preserve the worktree;
+a lifecycle hold is recorded through2026-09-29. The owned installed run was
+officially stopped: quick_health reports ABSENT, no foreign runs and no inference
+orphan. The latest corrected hosted run passed; the next unused verification label
+must be checked against retained `tmp` artifacts before allocation.
 
-Candidate-context checkpoint78fca2b67 and correction22800c842 are pushed.
-The correction retires audit residue; its Java state is the next tested candidate.
-Retrospective checkpointf38c9eebb and the subsequent continuation-brief checkpoint
-change documentation/evidence only; they do not add runtime verification.
-Resolve actual HEAD at startup and verify equivalence to the22800c842 runtime code.
-Root now owns all files; previous subagents are no longer active. Main remains untouched.
+Candidate-context checkpoint78fca2b67, audit correction22800c842, ordering
+corrections79c63e9b0/358af2cb4, Windows test-clock correction22b76b850,
+and strict state-read gap correctione3b7b6d3c are pushed to PR727.
+Root owns runtime integration. Main remains untouched.
 
 Implemented: captured inference/resolved configuration and strict adoption policy;
 logical versus physical server ownership; publication after health/hash proof; rollback
@@ -56,24 +55,54 @@ Evidence:
 -2462 passed94 audit cases but inference tests did not compile due to one missed method
  reference. Fixed;2464 passes453 cases/zero failures/errors/skips,58 suites:359 fresh
  inference cases plus94 audit cases reused from2462. Spotless/PMD pass. Complete evidence
- is tmp/2464-candidate-residue-focused*. This is NOT a corrected full integrated pass.
+ is tmp/2464-candidate-residue-focused*.
+-2466 full static/stress/installDist at docs HEAD2e7f1e1f6 with runtime code22800c842:
+ 11559 cases,zero failures/errors,31 skips,1805 suites; complete log/XML/counts and
+ source inventory are `tmp/2466-candidate-corrected-integrated*`.
+-Hosted CI35793788189 at2e7f1e1f6 failed only the app-ui lane's app-services
+ `RuntimeActivationServiceTest` at line226 (3043 cases, one failure). The terminal
+ status was visible before component failure publication. Focused2468 passes28 cases;
+ deterministic negative2469 fails on pre-fix production bytes exactly because it
+ observes `failed` while publication is blocked.
+-2470 at79c63e9b0 passes the full static/stress/installDist command:11560 cases,
+ zero failures/errors,31 skips,1805 suites; logs/XML/counts/source inventory retained.
+-Installed owned run191bb413 at79c63e9b0 used retained data and standard Qwen
+ model. All four health components READY; runtime-client0.4.0 smoke passed;
+ jseval one-query answer was exactly Captain Mortimer Flux with zero errors and
+ zero anchor errors. Official stop reports portsClosed:true; post-stop health
+ ABSENT with no foreign runs/orphan. `tmp/2472-runtime-smoke.txt` and
+ `tmp/2473-model-query/tier2-eval.json` retain query evidence. The full account
+ is [candidate-context proof](evidence/D1/candidate-context-plan-2026-09-22.md).
+-2475 at358af2cb4 passes the full static/stress/installDist command:11561 cases,
+ zero failures/errors,31 skips,1805 suites. Owned installed standard-model run
+ 25140142 at that commit passes four-component READY, runtime-client0.4.0 smoke
+ and a real Qwen9B query with exact Captain Mortimer Flux, zero errors/anchors;
+ official stop closed ports and left no foreign/orphan process. Logs and source
+ inventory are `tmp/2475-candidate-publication-integrated*`,
+ `tmp/2477-runtime-smoke.txt`, and `tmp/2478-model-query/tier2-eval.json`.
+-Hosted CI35797331099 failed only a cold Windows parser-test deadline. Test-only
+ commit22b76b850 made that bound accommodate cold bootstrap; focused2483 passed.
+ CI35799156920 then passed Windows-native, app-ui and system integration, but
+ search-worker failed once on the strict state reader reopening during the
+ generation writer's temporary `state.json` rename gap. Narrow retry commit
+ e3b7b6d3c preserves immediate missing-file failure and passed local focused
+ 2491/2492 plus static2499. Hosted CI35800678462 passed all13 jobs. Downloaded
+ search-worker XML under `tmp/2506-hosted-search-worker-results` confirms the
+ formerly failing strict reader and Linux replacement-gap cases both passed.
 
 Immediate continuation:
-1. Run `./gradlew.bat spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist
-   --continue --console=plain` on corrected HEAD. Preserve complete generation with
-   tmp/c2-capture-generation.py and source inventory before any targeted rerun.
-2. Check the correction commit's hosted CI; fix any real failure without audit exemptions.
-3. Official dev-stack start using existing retained data, standard profile; runtime-client
-   smoke and jseval real-model query; official stop and verify portsClosed. No installed
-   proof exists for this candidate-context slice. Earlier215af/2434 proof is not reusable.
-4. Then continue D1-4 prepared component composition/publication and all remaining stage
-   acceptance. The current coordinator ownership decisions and typed API-port design are
-   in evidence/D1. The [2026-09-23 design resolution](evidence/design-resolution-2026-09-23.md)
-   settles publication, teardown, generations/native/cursors and D2 ownership. Implement
-   those contracts; all production acceptance is still required.
+1. Candidate-context integrated, installed standard-model, and hosted proof is
+   complete at the cited revisions. Preserve the evidence and avoid replaying
+   completed verification without a changed assumption.
+2. Continue D1-4 prepared component composition/publication and all remaining
+   stage acceptance. The coordinator ownership decisions and typed API-port design
+   are in evidence/D1. The [2026-09-23 design resolution](evidence/design-resolution-2026-09-23.md)
+   settles publication, teardown, generations/native/cursors and D2 ownership.
+   All production acceptance is still required.
 
 The refuted shared-freeze/interactive-only drain is replaced by the selected monotonic
-closing and lifetime protocol; no teardown implementation has begun. D1/D2/E/F remain open. No scope was waived.
+closing and lifetime protocol. Monotonic admission closing is implemented locally;
+teardown quiescence and native disposition remain open. D1/D2/E/F remain open. No scope was waived.
 Closeout sweep reaped nothing: it retained two stale ui-shot records whose PIDs no longer
 exist and reported the intentionally persistent OTLP sink. Do not force-kill these.
 
@@ -93,8 +122,134 @@ ordering, approval binding and forward recovery; implementation/proof remain ope
 
 ## Active ownership
 
-No subagents remain active. The successor owns continuation in the retained worktree;
-root integrated all worker files and preserves commit/push authorization to PR727.
+Root owns Gradle, stack, integration, and the retained worktree. Native exact-instance
+leases and the generative precommit seam were committed and pushed as partial D1
+checkpoints `4db845fdd` and `933f903bb`; neither is connected D1 acceptance. The
+read-only composition trace located the physical index/encoder owners in
+`KnowledgeServer` and identified their current mutable rebuild paths. A separate
+generative owner trace is pending. Check live ownership before changing a delegated path.
+
+The partial D1 review found five defects. Root fixed exact runner commit admission,
+retained the current serving API-port resolution until restart, translated closing at
+accepted-work attachment, and mapped malformed envelopes to HTTP 400. Component keys
+currently fail closed with `COMPONENT_PREPARATION_REQUIRED` until the fixed production
+composition collaborator is connected; this is a safe interim state, not D1-4 acceptance.
+Focused `tmp/2509-serving-port-config-tests.txt` (3 cases) and
+`tmp/2510-runner-admission-tests.txt` (37 runner, 7 app-api cases) pass. Native focused
+`tmp/2511-native-lease-focused.txt` passed 25 cases; full ort-common/stress
+`tmp/2512-native-lease-suite.txt` ran 175 and failed one stress oracle because retirement
+started while CPU creation was in progress before the test's post-close flag. Its full
+suite XML is retained under `tmp/2512-native-lease-results`. The native
+owner corrected the oracle, retained exact-instance native leases and added a typed
+retirement disposition. Root's `tmp/2515-d1-focused-integration.txt` passed the full
+ort-common suite plus opt-in stress: 176 cases, zero failures/errors. The same combined
+run passed targeted app-inference preparation, app-engine admission and UI compilation,
+but app-services had four failures. One new test asserted the wrong exception type and
+was corrected; three existing admission tests needed an explicit test-only component
+composer. `tmp/2517-settings-composer-tests.txt` then passed 26 coordinator and five
+public-admission cases, zero failures/errors. The other D1 checks from 2515 were not
+rerun at the new dirty revision. `tmp/2518-fixed-composer-compile.txt` compiled the
+new fixed composer; it is not yet wired to the physical production owners.
+
+Native lifetime follow-up at dirty revision after `933f903bb`: the connected
+shutdown suite in `tmp/2525-native-shutdown-connected.txt` passed 53 cases
+covering surface retirement, KnowledgeServer close/retry, bootstrap lock
+retention, exit selection and HeadlessApp binding. The exit selection includes
+an isolated child JVM: its shutdown hook runs only for confirmed native
+quiescence. The first child invocation (`tmp/2522-native-exit-child-tests.txt`)
+hit the Windows command-line length limit; the corrected argfile invocation
+passed in `tmp/2523-native-exit-child-tests.txt`. Relevant module Spotless checks
+passed in `tmp/2526-native-shutdown-spotless.txt`. This is local focused proof,
+not installed native held-call or D1-13 acceptance. `NativeSessionHandle`'s
+full 176-case suite including opt-in stress passed at the 2515 revision;
+later surface/shutdown changes did not alter that committed handle.
+
+The local D1-13 continuation added monotonic runner body/receipt tracking and a
+bounded drain. `HeadlessApp` now closes admission, stops recorded ingestion
+producers through `EngineRoot`, waits admitted work and runner bodies, then
+guards Head, checkpoint, index, operations, process resources and instance-lock
+closure with observed completion. Fatal-startup `finally` applies the same
+work/owner dependency guards. A refused drain retains dependencies and produces
+an unclean result. `tmp/2529-live-drain-focused.txt` passed 21 runner and 14
+shutdown wiring cases; `tmp/2531-producer-drain-focused.txt` passed the same
+focused runner/shutdown coverage plus recorded bulk ingestion coverage. A
+partial native initializer with no published surface is now conservatively
+UNQUIESCED; `tmp/2532-native-null-surface.txt` passed the KnowledgeServer
+close-completion cases. Relevant Spotless passed at `tmp/2530-d1-lifetime-spotless.txt`
+before the latest producer/null-surface additions and must be rerun. These
+dirty changes are not yet a checkpoint or full D1-13 proof; real installed
+native held-call, broader store-user/reader inventory, integrated and hosted
+checks remain outstanding.
+
+Independent lifetime review found that externally initiated JVM shutdown starts
+hooks concurrently; HeadlessApp's late hook cannot order ahead of ORT's hook.
+The selected design now limits native race exclusion to controlled exit selection
+before JVM shutdown. The hook's conditional hard stop remains mitigation only.
+`tmp/2537-jvm-competing-hook.txt` passed an isolated adversarial two-hook case
+which proves the competing hook can run during cleanup. The product-owned
+uncaught handler now writes its crash report and hard-stops directly; boot
+contract validation moved before asynchronous native-capable startup. Focused
+exit authority tests passed at `tmp/2538-exit-authority-focused.txt`.
+The UI-web typecheck passed at `tmp/2539-ui-web-typecheck.txt` and its unit
+suite passed 6,598 tests across 490 files at `tmp/2540-ui-web-unit.txt`; the
+Happy DOM teardown emitted AbortError diagnostics despite exit code zero.
+The same review found D1-13 still lacks an explicit deadline/cancellation input
+for CPU recreation and typed retired/unavailable outcomes; zero-argument
+`acquireCpu()` can wait indefinitely behind a held failed instance. Treat this
+as an open defect, not covered by the 176-case native stress pass.
+
+Generative candidate preparation now has manager-local managed enable,
+disable and reconfigure values plus a lifecycle guard callback. Root wired the
+fixed composer/coordinator so owner guards nest before publication write;
+focused manager tests passed at `tmp/2534-generative-prepared.txt` and
+coordinator/composer tests at `tmp/2535-owner-lock-coordinator.txt` and
+`tmp/2536-owner-lock-order.txt`. Production HeadlessApp now uses the fixed
+composer with a registered generative owner. Physical index and encoder
+owners, paired captures and owner-level installed checks remain open.
+
+The coordinator now invokes opaque owner preparation before file replacement, validates
+under publication write, installs after the proven witness and delivers callbacks/retirement
+outside physical locks. A fixed composer can serialize owner preparation and prebuild one
+registry observation batch. Production still uses the unavailable default, so affected
+component settings safely refuse. Index and encoder candidate construction, generative
+desired-state handling, paired reader capture/leases and shutdown dependency closure
+remain open. Do not describe the current focused test pass as D1-4 acceptance.
+
+At the next dirty D1 slice, `SessionHandle` requires an explicit monotonic acquisition
+request and returns typed retired, unavailable and deadline outcomes; CPU replacement
+waits are bounded. Root's `tmp/2543-ort-acquisition-focused.txt` passed all 180
+ort-common tests after correcting a stale assertion to the new unavailable type.
+`tmp/2542-ort-inference-prepared.txt` also ran 367 app-inference tests with zero
+failures; its aggregate Gradle exit was red solely because that earlier native
+assertion still expected `IllegalStateException`. These are local module proofs
+at the dirty revision, not D1-13 installed native held-call or D2 fairness proof.
+Worker encoder, reranker, citation and benchmark call sites now pass explicit
+finite requests. `tmp/2544-native-callers-compile.txt` compiled the affected
+callers. The broader `tmp/2545-native-caller-focused.txt` run found one stale
+indexer-worker mock close/status fixture; the corrected fixture passed its
+focused class at `tmp/2546-indexer-fixture-focused.txt`. Broader native-caller
+unit coverage remains to be rerun at the next integrated test boundary.
+
+The fixed settings composer now builds the registry observation batch under the
+final publication writer, before file replacement, so unrelated precommit
+component transitions cannot stale a batch prepared earlier. A failed owner abort
+or retirement retains the apply permit; the coordinator marks failed abort as
+uncertain for ordered recovery and requests a successor after committed retirement
+failure. A postcommit prepared-install exception also retains the committed file
+witness for ordered boot reconstruction. Focused coordinator and composer tests
+passed at `tmp/2547-component-owner-coordinator.txt`.
+
+The first dirty D1 compiling checkpoint passed `./gradlew.bat build -x test`
+at `tmp/2552-d1-checkpoint-build.txt` (333 tasks, successful). It includes UI
+and app-services integration tests and static checks, but skips ordinary unit
+tests. Earlier attempts `tmp/2548-d1-checkpoint-compile.txt` and
+`tmp/2551-d1-checkpoint-build.txt` exposed PMD findings, corrected without
+relaxing the gate. `tmp/2549-d1-checkpoint-compile.txt` found a UI integration
+fixture that still used the unavailable composer. The fixture now uses the
+production manager-absent generative owner, and the focused policy class passed
+at `tmp/2550-ai-pack-policy-integration.txt`. Full unit, installed native,
+physical owner and hosted proof still remain. This compiling checkpoint does
+not satisfy D1-4, D1-13, D2, E or F acceptance.
 
 ## Evidence and owner map
 

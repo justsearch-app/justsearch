@@ -528,8 +528,9 @@ final class OperationSettingsRunnerTest {
   }
 
   @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.EnumSource(value = ApplyMode.class, names = {"NULL_RECEIPT", "NO_RECEIPT"})
-  void missingCommittedReceiptIsUncertainRatherThanPrecommitFailure(ApplyMode mode) throws Exception {
+  @org.junit.jupiter.params.provider.EnumSource(value = ApplyMode.class,
+      names = {"NULL_RECEIPT", "NO_RECEIPT", "SKIP_ADMISSION", "MISMATCH_ADMISSION"})
+  void invalidCommittedReceiptIsUncertainRatherThanPrecommitFailure(ApplyMode mode) throws Exception {
     try (var store = store("missing-receipt-" + mode.name())) {
       var owner = new FakeOwner(store, mode);
       var runner = runner(store, owner);
@@ -704,7 +705,7 @@ final class OperationSettingsRunnerTest {
 
   private enum ApplyMode {
     COMMIT, COMMIT_THEN_THROW, THROW_BEFORE_COMMIT, THROW_ERROR, UNCERTAIN_THEN_THROW,
-    TYPED_REFUSAL, NULL_RECEIPT, NO_RECEIPT
+    TYPED_REFUSAL, NULL_RECEIPT, NO_RECEIPT, SKIP_ADMISSION, MISMATCH_ADMISSION
   }
 
   private enum PendingSettingsOutcome {
@@ -756,6 +757,13 @@ final class OperationSettingsRunnerTest {
             Map.of("currentRevision", token.expected().acceptedRevision() + 1), false));
         case NULL_RECEIPT -> control.committed(null);
         case NO_RECEIPT -> { /* Simulate a defective owner returning without a commitment verdict. */ }
+        case SKIP_ADMISSION -> control.committed(new Receipt(token.key(),
+            Math.addExact(token.expected().acceptedRevision(), 1)));
+        case MISMATCH_ADMISSION -> {
+          var admitted = new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1));
+          if (!control.admitCommit(admitted)) throw new IllegalStateException("Cancelled before commit");
+          control.committed(new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1)));
+        }
         case THROW_BEFORE_COMMIT -> throw new IllegalStateException("before commit");
         case THROW_ERROR -> throw new AssertionError("fatal after reservation");
         case UNCERTAIN_THEN_THROW -> {
@@ -763,12 +771,18 @@ final class OperationSettingsRunnerTest {
           throw new IllegalStateException("uncertain owner");
         }
         case COMMIT_THEN_THROW -> {
-          control.committed(new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1),
-              OperationResult.success("Prepared settings result", Map.of("restartScheduled", true, "ui", Map.of("theme", "dark")))));
+          var receipt = new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1),
+              OperationResult.success("Prepared settings result", Map.of("restartScheduled", true, "ui", Map.of("theme", "dark"))));
+          if (!control.admitCommit(receipt)) throw new IllegalStateException("Cancelled before commit");
+          control.committed(receipt);
           throw new IllegalStateException("after commit");
         }
-        case COMMIT -> control.committed(new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1),
-              OperationResult.success("Prepared settings result", Map.of("restartScheduled", true, "ui", Map.of("theme", "dark")))));
+        case COMMIT -> {
+          var receipt = new Receipt(token.key(), Math.addExact(token.expected().acceptedRevision(), 1),
+              OperationResult.success("Prepared settings result", Map.of("restartScheduled", true, "ui", Map.of("theme", "dark"))));
+          if (!control.admitCommit(receipt)) throw new IllegalStateException("Cancelled before commit");
+          control.committed(receipt);
+        }
       }
     }
 

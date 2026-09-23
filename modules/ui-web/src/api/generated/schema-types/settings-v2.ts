@@ -11,6 +11,7 @@
 import { z } from 'zod';
 
 export interface SettingsV2 {
+  apiPort?: number | null;
   indexPaths?: string[] | null;
   llm?: {
     contextWindow?: number | null;
@@ -21,6 +22,7 @@ export interface SettingsV2 {
     serverExecutable?: string | null;
   } | null;
   operationKey?: string | null;
+  restartScheduled?: boolean | null;
   settingsMode?: string | null;
   state?: string | null;
   ui?: {
@@ -42,6 +44,7 @@ export interface SettingsV2 {
   } | null;
 }
 export const settingsV2Schema = z.strictObject({
+  "apiPort": z.number().int().nullable().optional(),
   "indexPaths": z.array(z.string()).nullable().optional(),
   "llm": z.strictObject({
     "contextWindow": z.number().int().nullable().optional(),
@@ -52,6 +55,7 @@ export const settingsV2Schema = z.strictObject({
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
   "operationKey": z.string().nullable().optional(),
+  "restartScheduled": z.boolean().nullable().optional(),
   "settingsMode": z.string().nullable().optional(),
   "state": z.string().nullable().optional(),
   "ui": z.strictObject({

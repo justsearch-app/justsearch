@@ -856,9 +856,14 @@ final class RecordedBulkIngestionCoordinatorTest {
           return work;
         }
         @Override public void cancelInteractive(String reason) { admission.cancelInteractive(reason); }
+        @Override public void beginClosing() { admission.beginClosing(); }
+        @Override public boolean isClosing() { return admission.isClosing(); }
         @Override public int retryAfterSeconds() { return admission.retryAfterSeconds(); }
         @Override public Limits limits() { return admission.limits(); }
         @Override public int activeWorkCount() { return admission.activeWorkCount(); }
+        @Override public boolean awaitDrained(java.time.Duration timeout) {
+          return admission.awaitDrained(timeout);
+        }
       };
     }
 

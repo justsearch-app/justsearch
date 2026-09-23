@@ -38,3 +38,11 @@ tasks.named<Test>("test") {
   inputs.file(rootProject.layout.projectDirectory.file("governance/config-apply.v1.json"))
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+// D1-3 runtime projection: the governed apply register is the only source of apply scope
+// classification. Package the exact repository file so production and tests parse the same bytes.
+tasks.named<ProcessResources>("processResources") {
+  from(rootProject.layout.projectDirectory.file("governance/config-apply.v1.json")) {
+    into("governance")
+  }
+}

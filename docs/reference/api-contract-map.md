@@ -509,11 +509,13 @@ Resume contract notes:
 
 `GET /api/settings/v2`:
 
-- Returns the current settings object including a `settingsMode` field (`"read_write"` | `"in_memory"`) that signals whether saves will persist.
+- Returns the current settings object including a `settingsMode` field (`"read_write"` | `"in_memory"`) that signals whether saves will persist. The top-level nullable `apiPort` field is the persisted desired API listener policy: null means no persisted override, `0` requests an ephemeral listener on the next process incarnation, and `1..65535` requests that fixed port.
 
 `POST /api/settings/v2`:
 
 - Persists updated settings. Returns 409 `SETTINGS_READ_ONLY` when `settingsMode` is `in_memory` (eval mode) — saves are silently discarded in this mode without the 409.
+- `apiPort` is validated in the inclusive range `0..65535`; in a partial patch, null or omission preserves the incumbent value. The desired policy is resolved through the normal precedence chain, while the positive endpoint bound by the current process is observed separately in the runtime manifest (`head.apiPort`) and in `process.apiPort` within effective-config diagnostics.
+- A completed write that changes the API port returns `restartScheduled: true` with its committed witness. The requested successor is scheduled after the operation row reaches `COMPLETE`; the current process retains its serving API-port resolution and reports its actually bound endpoint until it closes. The persisted `apiPort` is the desired value for the successor.
 - Shell mode writes include `X-JustSearch-UI-Mode-Intent: <client-id>:<sequence>`. The client ID and
   Web-Lock-allocated sequence are durable in origin storage, putting reloads and concurrent shell
   windows in one monotonic ordering domain. The server ignores only the `ui.mode` field of an older

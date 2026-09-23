@@ -133,3 +133,21 @@ test("matrix projects canonical declaration and lifecycle without copying values
     assert.match(renderMatrixMarkdown(model), /\| EnvRegistry\.EXPERIMENT \| experimental \|/);
   });
 });
+
+test("API-port row projects the typed settings contributor and separates bound-port evidence", () => {
+  withFixture(({ root, envRegistryPath, configKeyPath, builderPath, configApplyPath }) => {
+    writeFileSync(envRegistryPath,
+      `enum EnvRegistry {
+        API_PORT("justsearch.api.port", "JUSTSEARCH_API_PORT", LifecycleStage.PERMANENT);
+      }`);
+    const uiSettingsContributorPath = path.join(root, "ConfigStoreRebuilder.java");
+    writeFileSync(uiSettingsContributorPath,
+      `builder.putSettings("justsearch.api.port", String.valueOf(settings.configuredApiPort()));`);
+    const model = buildMatrixModel({ repoRoot: root, envRegistryPath, configKeyPath,
+      builderPath, configApplyPath, uiSettingsContributorPath });
+    const row = model.rows.find((item) => item.declaration === "EnvRegistry.API_PORT");
+    assert.match(row.precedenceNotes, /settings\.json > default/);
+    assert.match(row.precedenceNotes, /bound port is runtime evidence/);
+    assert.match(renderMatrixMarkdown(model), /typed nullable `apiPort` contributes/);
+  });
+});

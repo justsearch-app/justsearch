@@ -2569,6 +2569,19 @@ public final class KnowledgeServer implements Closeable {
             }
           }
 
+          // Native retirement is a dependency of every later service and tokenizer close. A
+          // timeout retains the exact sessions, their owners and the index root lock for retry.
+          // SessionHandle.close() may report REFUSED without throwing; InferenceSurface checks
+          // every handle's typed disposition after attempting the whole set.
+          if (inferenceSurface != null) {
+            try {
+              inferenceSurface.close();
+            } catch (RuntimeException refusal) {
+              throw new IOException("Native inference retirement incomplete; server retained for retry",
+                  refusal);
+            }
+          }
+
           // Both an incumbent and a failed candidate may still own resources. Attempt both
           // before propagating; a successful close is cleared so retries do not repeat teardown.
           Throwable serviceCloseFailure = null;
@@ -2648,18 +2661,6 @@ public final class KnowledgeServer implements Closeable {
               searchRerankerInstance.close();
             } catch (Exception e) {
               log.warn("Error closing search reranker", e);
-            }
-          }
-
-          // Tempdoc 397 §14.26 T2-C1/C2: close any surface-owned SessionHandle that wasn't covered
-          // by the encoder closes above (e.g., citation scorer's handle, which is wired to
-          // appServices rather than owned by a local encoder instance). Handle closes are
-          // idempotent, so double-closing the encoder-owned handles is safe.
-          if (inferenceSurface != null) {
-            try {
-              inferenceSurface.close();
-            } catch (Exception e) {
-              log.warn("Error closing inference surface handles", e);
             }
           }
 
@@ -2817,6 +2818,26 @@ public final class KnowledgeServer implements Closeable {
         runtimeSwapLock.unlock();
       }
     }
+  }
+
+  /** Native owner disposition used by the process exit authority after ordered close. */
+  public io.justsearch.app.api.NativeQuiescence nativeQuiescence() {
+    CompletableFuture<ModelContext> initialization = deferredModelInit;
+    if (initialization != null && !initialization.isDone()) {
+      return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    InferenceSurface surface = inferenceSurface;
+    // A started initializer with no published surface may have failed after opening a native
+    // candidate. No owner can prove its retirement from a null field, so exit conservatively.
+    if (surface == null) {
+      return initialization == null ? io.justsearch.app.api.NativeQuiescence.QUIESCED
+          : io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    if (surface.retirementStatus()
+        == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED) {
+      return io.justsearch.app.api.NativeQuiescence.QUIESCED;
+    }
+    return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
   }
 
   /**

@@ -11,11 +11,13 @@ import io.justsearch.core.context.RetainedStateBudget;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 /** Default process-owned implementation of the Engine component registry. */
@@ -28,14 +30,27 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
   private final Map<String, DefaultComponentHandle> components = new LinkedHashMap<>();
   private final List<ListenerSubscription> listeners = new ArrayList<>();
   private final ReentrantLock applyLock = new ReentrantLock();
+  private final ReentrantReadWriteLock publicationLock;
   private final RetainedStateBudget retainedState;
   private long revision;
   private ApplyLeaseImpl outstandingLease;
   private boolean closed;
 
   public DefaultEngineComponentRegistry(RetainedStateBudget retainedState) {
+    this(retainedState, new ReentrantReadWriteLock());
+  }
+
+  /** Creates a registry sharing the process publication lock with ConfigStore and runtime owners. */
+  public DefaultEngineComponentRegistry(RetainedStateBudget retainedState,
+      ReentrantReadWriteLock publicationLock) {
     this.retainedState = Objects.requireNonNull(retainedState, "retainedState");
+    this.publicationLock = Objects.requireNonNull(publicationLock, "publication lock");
     retainedState.activate(ATTEMPTED_CONFIGURATIONS);
+  }
+
+  /** Returns the process publication lock shared with configuration and runtime owners. */
+  public ReentrantReadWriteLock publicationLock() {
+    return publicationLock;
   }
 
   @Override
@@ -44,16 +59,22 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     EngineComponentSnapshot published;
     List<Consumer<EngineComponentSnapshot>> observers;
     DefaultComponentHandle handle;
-    synchronized (monitor) {
-      ensureOpen();
-      if (components.containsKey(spec.name())) {
-        throw new IllegalArgumentException("Component name is already registered: " + spec.name());
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (monitor) {
+        ensureOpen();
+        if (components.containsKey(spec.name())) {
+          throw new IllegalArgumentException(
+              "Component name is already registered: " + spec.name());
+        }
+        handle = new DefaultComponentHandle(spec, Instant.now(), System.nanoTime());
+        components.put(spec.name(), handle);
+        revision++;
+        published = snapshotLocked();
+        observers = listenersLocked();
       }
-      handle = new DefaultComponentHandle(spec, Instant.now(), System.nanoTime());
-      components.put(spec.name(), handle);
-      revision++;
-      published = snapshotLocked();
-      observers = listenersLocked();
+    } finally {
+      publicationLock.writeLock().unlock();
     }
     publish(observers, published);
     return handle;
@@ -61,8 +82,54 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
 
   @Override
   public EngineComponentSnapshot snapshot() {
-    synchronized (monitor) {
-      return snapshotLocked();
+    publicationLock.readLock().lock();
+    try {
+      synchronized (monitor) {
+        return snapshotLocked();
+      }
+    } finally {
+      publicationLock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public PreparedBatch prepareBatch(Map<String, EngineComponentSnapshot.Component> replacements) {
+    Objects.requireNonNull(replacements, "replacements");
+    publicationLock.readLock().lock();
+    try {
+      synchronized (monitor) {
+        ensureOpen();
+        var requested = Map.copyOf(replacements);
+        var updates = new ArrayList<PreparedUpdate>(requested.size());
+        for (var entry : requested.entrySet()) {
+          String name = Objects.requireNonNull(entry.getKey(), "replacement name");
+          var desired = Objects.requireNonNull(entry.getValue(),
+              "replacement for " + name);
+          var handle = components.get(name);
+          if (handle == null) {
+            throw new IllegalArgumentException("Component is not registered: " + name);
+          }
+          if (!handle.spec.equals(desired.spec())) {
+            throw new IllegalArgumentException("Replacement spec does not match component: " + name);
+          }
+          updates.add(new PreparedUpdate(handle, handle.snapshotLocked(), desired));
+        }
+
+        var byHandle = new IdentityHashMap<DefaultComponentHandle,
+            EngineComponentSnapshot.Component>();
+        for (var update : updates) byHandle.put(update.handle, update.desired);
+        boolean changed = updates.stream().anyMatch(update -> !update.before.equals(update.desired));
+        long nextRevision = changed ? revision + 1 : revision;
+        var rows = components.values().stream()
+            .map(handle -> byHandle.getOrDefault(handle, handle.snapshotLocked()))
+            .sorted(Comparator.comparing(row -> row.spec().name()))
+            .toList();
+        var preparedSnapshot = new EngineComponentSnapshot(nextRevision, rows);
+        var observers = changed ? listenersLocked() : List.<Consumer<EngineComponentSnapshot>>of();
+        return new PreparedBatchImpl(revision, updates, preparedSnapshot, observers, changed);
+      }
+    } finally {
+      publicationLock.readLock().unlock();
     }
   }
 
@@ -111,15 +178,20 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
 
   @Override
   public void close() {
-    synchronized (monitor) {
-      if (closed) return;
-      if (outstandingLease != null) {
-        throw new IllegalStateException(
-            "Cannot close component registry while apply lease is held");
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (monitor) {
+        if (closed) return;
+        if (outstandingLease != null) {
+          throw new IllegalStateException(
+              "Cannot close component registry while apply lease is held");
+        }
+        closed = true;
+        listeners.forEach(ListenerSubscription::closeLocked);
+        listeners.clear();
       }
-      closed = true;
-      listeners.forEach(ListenerSubscription::closeLocked);
-      listeners.clear();
+    } finally {
+      publicationLock.writeLock().unlock();
     }
   }
 
@@ -137,14 +209,19 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
       Mutation mutation) {
     EngineComponentSnapshot published;
     List<Consumer<EngineComponentSnapshot>> observers;
-    synchronized (monitor) {
-      ensureOpen();
-      if (expectedRegistry != null && !expectedRegistry.equals(snapshotLocked())) return false;
-      if (expected != null && !expected.equals(handle.snapshotLocked())) return false;
-      if (!mutation.apply(handle)) return true;
-      revision++;
-      published = snapshotLocked();
-      observers = listenersLocked();
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (monitor) {
+        ensureOpen();
+        if (expectedRegistry != null && !expectedRegistry.equals(snapshotLocked())) return false;
+        if (expected != null && !expected.equals(handle.snapshotLocked())) return false;
+        if (!mutation.apply(handle)) return true;
+        revision++;
+        published = snapshotLocked();
+        observers = listenersLocked();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
     }
     publish(observers, published);
     return true;
@@ -177,12 +254,100 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     if (closed) throw new IllegalStateException("Engine component registry is closed");
   }
 
+  private void requireWriteLock() {
+    if (!publicationLock.isWriteLockedByCurrentThread()) {
+      throw new IllegalStateException("publication write lock must be held by the caller");
+    }
+  }
+
   private static String optionalNonBlank(String value, String field) {
     if (value != null && value.isBlank()) {
       throw new IllegalArgumentException(field + " must be null or non-blank");
     }
     return value;
   }
+
+  private final class PreparedBatchImpl implements PreparedBatch {
+    private final long baseRevision;
+    private final List<PreparedUpdate> updates;
+    private final EngineComponentSnapshot preparedSnapshot;
+    private final List<Consumer<EngineComponentSnapshot>> observers;
+    private final boolean changed;
+    private boolean installed;
+
+    private PreparedBatchImpl(long baseRevision, List<PreparedUpdate> updates,
+        EngineComponentSnapshot preparedSnapshot,
+        List<Consumer<EngineComponentSnapshot>> observers, boolean changed) {
+      this.baseRevision = baseRevision;
+      this.updates = List.copyOf(updates);
+      this.preparedSnapshot = preparedSnapshot;
+      this.observers = List.copyOf(observers);
+      this.changed = changed;
+    }
+
+    @Override
+    public EngineComponentSnapshot snapshot() {
+      return preparedSnapshot;
+    }
+
+    @Override
+    public void validate() {
+      requireWriteLock();
+      synchronized (monitor) {
+        ensureOpen();
+        if (installed) {
+          throw new IllegalStateException("prepared component batch was already installed");
+        }
+        if (revision != baseRevision) {
+          throw new IllegalStateException("prepared component batch is stale");
+        }
+        for (var update : updates) {
+          if (!update.before.equals(update.handle.snapshotLocked())) {
+            throw new IllegalStateException("prepared component batch is stale");
+          }
+        }
+      }
+    }
+
+    @Override
+    public void install() {
+      requireWriteLock();
+      // The coordinator must call validate while the same write lock is held before its durable
+      // commit point. Keep this post-commit operation assignment-only.
+      synchronized (monitor) {
+        if (changed) {
+          for (int i = 0; i < updates.size(); i++) {
+            var update = updates.get(i);
+            update.handle.installPrepared(update.desired);
+          }
+          revision = preparedSnapshot.revision();
+        }
+        installed = true;
+      }
+    }
+
+    @Override
+    public void notifyObservers() {
+      // Listener delivery intentionally follows physical publication and never runs while either
+      // the shared publication lock or the registry monitor is held.
+      publish(observers, preparedSnapshot);
+    }
+
+    @Override
+    public void commit() {
+      publicationLock.writeLock().lock();
+      try {
+        validate();
+        install();
+      } finally {
+        publicationLock.writeLock().unlock();
+      }
+      notifyObservers();
+    }
+  }
+
+  private record PreparedUpdate(DefaultComponentHandle handle,
+      EngineComponentSnapshot.Component before, EngineComponentSnapshot.Component desired) {}
 
   @FunctionalInterface
   private interface Mutation {
@@ -215,8 +380,13 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
 
     @Override
     public EngineComponentSnapshot.Component snapshot() {
-      synchronized (monitor) {
-        return snapshotLocked();
+      publicationLock.readLock().lock();
+      try {
+        synchronized (monitor) {
+          return snapshotLocked();
+        }
+      } finally {
+        publicationLock.readLock().unlock();
       }
     }
 
@@ -303,6 +473,18 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
       return new EngineComponentSnapshot.Component(spec, state, reasonCode, stateSince,
           stateSinceMonotonicNanos, appliedVersion, desiredVersion, lastCompose,
           recoveryAttempts, evidence);
+    }
+
+    private void installPrepared(EngineComponentSnapshot.Component desired) {
+      state = desired.state();
+      reasonCode = desired.reasonCode();
+      stateSince = desired.stateSince();
+      stateSinceMonotonicNanos = desired.stateSinceMonotonicNanos();
+      appliedVersion = desired.appliedVersion();
+      desiredVersion = desired.desiredVersion();
+      lastCompose = desired.lastCompose();
+      recoveryAttempts = desired.recoveryAttempts();
+      evidence = desired.evidence();
     }
   }
 

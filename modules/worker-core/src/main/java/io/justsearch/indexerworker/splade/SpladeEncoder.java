@@ -10,14 +10,16 @@ import ai.onnxruntime.OnnxValue;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import io.justsearch.configuration.resolved.ConfigStore;
 
-import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.NativeSessionHandle;
+import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import java.io.Closeable;
 import java.io.IOException;
@@ -535,7 +537,8 @@ public final class SpladeEncoder implements Closeable {
   private List<Map<String, Float>> runOnnxInference(
       long[][] allInputIds, long[][] allAttentionMask, long[][] allTokenTypeIds, int batch, int len)
       throws OrtException {
-    try (var lease = sessions.acquire()) {
+    var acquisition = LocalSessionAcquisition.background();
+    try (var lease = sessions.acquire(acquisition)) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
@@ -548,7 +551,7 @@ public final class SpladeEncoder implements Closeable {
 
       if (outputFormat == OutputFormat.PRESPARSE) {
         return runSparseOutputInference(
-            lease, allInputIds, allAttentionMask, allTokenTypeIds, batch);
+            lease, allInputIds, allAttentionMask, allTokenTypeIds, batch, acquisition);
       }
 
       // When using pinned outputs, pad inputs to the bucketed seqLen so model output shape matches
@@ -608,7 +611,7 @@ public final class SpladeEncoder implements Closeable {
               // Tempdoc 400 LR2-c: emit cpu_fallback.triggered event on the
               // active encoder.ort_run span.
               EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-              try (var cpuLease = sessions.acquireCpu()) {
+              try (var cpuLease = sessions.acquireCpu(acquisition)) {
                 buf = runHeapFallback(cpuLease, inputs, batch, inferLen);
               }
             } else {
@@ -630,7 +633,7 @@ public final class SpladeEncoder implements Closeable {
               // Tempdoc 400 LR2-c: emit cpu_fallback.triggered event on the
               // active encoder.ort_run span.
               EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-              try (var cpuLease = sessions.acquireCpu()) {
+              try (var cpuLease = sessions.acquireCpu(acquisition)) {
                 buf = runHeapFallback(cpuLease, inputs, batch, inferLen);
               }
             } else {
@@ -689,7 +692,8 @@ public final class SpladeEncoder implements Closeable {
    */
   private Map<String, Float> runOnnxInferenceSingle(
       long[] inputIds, long[] attentionMask, long[] tokenTypeIds) throws OrtException {
-    try (var lease = sessions.acquire()) {
+    var acquisition = LocalSessionAcquisition.foreground();
+    try (var lease = sessions.acquire(acquisition)) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
@@ -732,7 +736,7 @@ public final class SpladeEncoder implements Closeable {
                 seqLen);
             // Tempdoc 400 LR2-c.
             EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-            try (var cpuLease = sessions.acquireCpu()) {
+            try (var cpuLease = sessions.acquireCpu(acquisition)) {
               buf = runHeapFallback(cpuLease, inputs, 1, seqLen);
             }
           } else {
@@ -782,7 +786,8 @@ public final class SpladeEncoder implements Closeable {
       long[][] allInputIds,
       long[][] allAttentionMask,
       long[][] allTokenTypeIds,
-      int batch)
+      int batch,
+      SessionAcquisitionRequest acquisition)
       throws OrtException {
     if (batch == 0) {
       return new ArrayList<>(0);
@@ -900,9 +905,9 @@ public final class SpladeEncoder implements Closeable {
             batch, maxLen, e.getMessage());
         // Tempdoc 400 LR2-c.
         EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-        try (var cpuLease = sessions.acquireCpu()) {
+        try (var cpuLease = sessions.acquireCpu(acquisition)) {
           return runSparseOutputInference(
-              cpuLease, allInputIds, allAttentionMask, allTokenTypeIds, batch);
+              cpuLease, allInputIds, allAttentionMask, allTokenTypeIds, batch, acquisition);
         }
       }
       throw e;

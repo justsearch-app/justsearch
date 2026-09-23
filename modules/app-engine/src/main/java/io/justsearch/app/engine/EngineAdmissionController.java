@@ -8,6 +8,7 @@ import io.justsearch.app.api.OpCriticality;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.OperationLeaseSnapshot;
+import io.justsearch.app.api.OperationAdmissionClosedException;
 import io.justsearch.app.services.lease.OperationLeaseServiceImpl;
 import io.justsearch.core.context.EngineContext;
 import java.util.ArrayList;
@@ -20,6 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,9 +38,11 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private final int aggregateLimit;
   private final int retryAfterSeconds;
   private final OperationLeaseService leases;
+  private final ReentrantReadWriteLock publication;
   private final Map<UUID, Work> active = new LinkedHashMap<>();
   private final Map<Bucket, Integer> counts = new HashMap<>();
   private String preparationId;
+  private boolean closing;
 
   /** Explicit standalone-launcher provider; the full Engine root supplies its already-loaded policy. */
   public EngineAdmissionController() {
@@ -46,17 +50,22 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   }
 
   EngineAdmissionController(EngineResourcePolicy policy) {
+    this(policy, new ReentrantReadWriteLock());
+  }
+
+  EngineAdmissionController(EngineResourcePolicy policy, ReentrantReadWriteLock publication) {
     this(policy.execution().get("perContextLimit"), policy.execution().get("aggregateLimit"),
-        policy.execution().get("retryAfterSeconds"), new OperationLeaseServiceImpl());
+        policy.execution().get("retryAfterSeconds"), new OperationLeaseServiceImpl(), publication);
   }
 
   /** Explicit policy seam for deterministic admission and transport acceptance tests. */
   public EngineAdmissionController(int perContextLimit, int aggregateLimit, int retryAfterSeconds) {
-    this(perContextLimit, aggregateLimit, retryAfterSeconds, OperationLeaseServiceImpl.processLocal());
+    this(perContextLimit, aggregateLimit, retryAfterSeconds, OperationLeaseServiceImpl.processLocal(),
+        new ReentrantReadWriteLock());
   }
 
   private EngineAdmissionController(int perContextLimit, int aggregateLimit, int retryAfterSeconds,
-      OperationLeaseService leases) {
+      OperationLeaseService leases, ReentrantReadWriteLock publication) {
     if (perContextLimit < 1 || aggregateLimit < 1 || retryAfterSeconds < 1) {
       throw new IllegalArgumentException("Engine admission limits must be positive");
     }
@@ -64,18 +73,23 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     this.aggregateLimit = aggregateLimit;
     this.retryAfterSeconds = retryAfterSeconds;
     this.leases = Objects.requireNonNull(leases, "leases");
+    this.publication = Objects.requireNonNull(publication, "publication");
   }
 
   @Override
   public OperationLeaseHandle register(String opClass, OpCriticality criticality,
       long expectedDurationSec, Map<String, Object> metadata) {
-    synchronized (lock) { return leases.register(opClass, criticality, expectedDurationSec, metadata); }
+    synchronized (lock) {
+      if (closing) throw closedRegistration();
+      return leases.register(opClass, criticality, expectedDurationSec, metadata);
+    }
   }
 
   @Override
   public OperationLeaseHandle register(String opClass, OpCriticality criticality,
       long expectedDurationSec, Map<String, Object> metadata, Runnable cancellationRequest) {
     synchronized (lock) {
+      if (closing) throw closedRegistration();
       return leases.register(opClass, criticality, expectedDurationSec, metadata, cancellationRequest);
     }
   }
@@ -92,7 +106,11 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
 
   @Override
   public OperationLeaseSnapshot snapshot() {
-    synchronized (lock) { return leases.snapshot(); }
+    synchronized (lock) {
+      OperationLeaseSnapshot observed = leases.snapshot();
+      return closing ? new OperationLeaseSnapshot(true, "process-closing", "shutdown",
+          observed.activeLeases(), observed.cancellationRequestedOpIds()) : observed;
+    }
   }
 
   @Override
@@ -114,6 +132,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     Objects.requireNonNull(context, "context");
     if (context.workId().isPresent()) throw new IllegalArgumentException("Work is already attached");
     synchronized (lock) {
+      if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       if (preparationId != null && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
       Bucket bucket = Bucket.of(context);
       if (active.size() >= aggregateLimit) refuse(EngineAdmissionException.Reason.ENGINE_LIMIT);
@@ -133,6 +152,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     Objects.requireNonNull(context, "context");
     if (context.workId().isEmpty()) return admit(context, false);
     synchronized (lock) {
+      if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       Work work = active.get(context.workId().orElseThrow());
       if (work == null || !work.bucket.equals(Bucket.of(context))) {
         throw new EngineAdmissionException(EngineAdmissionException.Reason.WORK_FINISHED, retryAfterSeconds);
@@ -140,6 +160,25 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       work.references++;
       return new Reference(work, context);
     }
+  }
+
+  @Override
+  public void beginClosing() {
+    publication.writeLock().lock();
+    try {
+      synchronized (lock) { closing = true; }
+    } finally {
+      publication.writeLock().unlock();
+    }
+  }
+
+  /** Monotonic process-closing observation, sampled under the shared publication write lock. */
+  @Override public boolean isClosing() {
+    synchronized (lock) { return closing; }
+  }
+
+  private static OperationAdmissionClosedException closedRegistration() {
+    return new OperationAdmissionClosedException("process-closing", "shutdown");
   }
 
   private void freeze(String id, String reason) {
@@ -181,6 +220,28 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   @Override
   public int activeWorkCount() {
     synchronized (lock) { return active.size(); }
+  }
+
+  @Override
+  public boolean awaitDrained(java.time.Duration timeout) {
+    Objects.requireNonNull(timeout, "timeout");
+    long budget = timeout.toNanos();
+    if (budget < 0) throw new IllegalArgumentException("Drain timeout must be nonnegative");
+    long deadline = System.nanoTime() + budget;
+    synchronized (lock) {
+      if (!closing) throw new IllegalStateException("Drain requires process closing");
+      while (!active.isEmpty()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) return false;
+        try {
+          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(lock, remaining);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return false;
+        }
+      }
+      return true;
+    }
   }
 
   private void refuse(EngineAdmissionException.Reason reason) {
@@ -324,6 +385,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
           work.completed = true;
           active.remove(work.initial.workId().orElseThrow());
           counts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);
+          lock.notifyAll();
           callbacks = new ArrayList<>(work.completion);
           work.completion.clear();
           work.cancellation.clear();

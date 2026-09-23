@@ -69,6 +69,40 @@ final class TransitionRunnerTest {
     assertEquals(0L, runner.generation());
   }
 
+  @Test
+  @DisplayName("prepared publication installs mode/view/generation before deferred side effects")
+  void preparedPublicationSeparatesInstallFromNotification() {
+    RecordingListener listener = new RecordingListener();
+    runner.addListener(listener);
+    TransitionRunner.PreparedPublication prepared;
+    synchronized (lock) {
+      prepared = runner.preparePublication(
+          Mode.ONLINE,
+          runner.view().withPhase(Mode.ONLINE).withStartupDuration(17L),
+          TransitionReason.CONFIG_APPLY);
+      prepared.validate();
+      prepared.install();
+    }
+
+    assertEquals(Mode.ONLINE, runner.currentMode());
+    assertEquals(Mode.ONLINE, runner.view().phase());
+    assertEquals(17L, runner.view().lastStartupDurationMs());
+    assertEquals(1L, runner.generation());
+    assertTrue(listener.calls.isEmpty());
+    assertTrue(events.transitions.isEmpty());
+    assertTrue(runner.recentTransitions(10).isEmpty());
+
+    prepared.notifyAfterInstall();
+
+    assertEquals(2, listener.calls.size());
+    assertEquals(Mode.OFFLINE, listener.calls.get(0)[0]);
+    assertEquals(Mode.TRANSITIONING, listener.calls.get(0)[1]);
+    assertEquals(Mode.TRANSITIONING, listener.calls.get(1)[0]);
+    assertEquals(Mode.ONLINE, listener.calls.get(1)[1]);
+    assertEquals(1, events.transitions.size());
+    assertEquals(1, runner.recentTransitions(10).size());
+  }
+
   // ==================== Success path ====================
 
   @Test

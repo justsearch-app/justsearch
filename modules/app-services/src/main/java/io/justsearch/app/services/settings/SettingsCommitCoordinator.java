@@ -12,6 +12,7 @@ import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ConfigChangedEvent;
+import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.io.IOException;
@@ -20,8 +21,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
+import java.util.function.BooleanSupplier;
 
 /** One physical settings-file/config owner; the operation runner alone terminalizes its row. */
 public final class SettingsCommitCoordinator implements SettingsCommitOwner {
@@ -39,6 +42,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     private final SettingsWitness prior;
     private Phase phase = Phase.PREPARING;
     private boolean preparationStarted;
+    private boolean restartRequired;
     private final String quarantineFingerprint;
     private final boolean reset;
     @Override public long expectedRevision() { return prior.acceptedRevision(); }
@@ -59,6 +63,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private final Function<UiSettings, ResolvedConfig> prepareConfig;
   private final Function<UiSettings, OperationResult> prepareResponse;
   private final Replacement replacement;
+  private final BooleanSupplier processClosing;
+  private final SettingsComponentComposer components;
   private final ReentrantLock mutex = new ReentrantLock();
   private final CompletableFuture<RecoveryIssue> recoveryIssue = new CompletableFuture<>();
   private volatile SettingsCommitFence fence;
@@ -71,19 +77,56 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   public SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
       Function<UiSettings, OperationResult> prepareResponse) {
-    this(store, config, restart, ConfigStoreRebuilder::prepare, prepareResponse, store::replacePrepared);
+    this(store, config, restart, prepareResponse, () -> false);
+  }
+
+  public SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      Function<UiSettings, OperationResult> prepareResponse, BooleanSupplier processClosing) {
+    this(store, config, restart, prepareResponse, processClosing, unavailableComponents());
+  }
+
+  public SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      Function<UiSettings, OperationResult> prepareResponse, BooleanSupplier processClosing,
+      SettingsComponentComposer components) {
+    this(store, config, restart, ConfigStoreRebuilder::prepare, prepareResponse,
+        store::replacePrepared, processClosing, components);
   }
 
   /** Fault seams stay package-private; production always uses the strict store replacement. */
   SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
       Function<UiSettings, ResolvedConfig> prepareConfig,
       Function<UiSettings, OperationResult> prepareResponse, Replacement replacement) {
+    this(store, config, restart, prepareConfig, prepareResponse, replacement, () -> false);
+  }
+
+  SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      Function<UiSettings, ResolvedConfig> prepareConfig,
+      Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
+      BooleanSupplier processClosing) {
+    this(store, config, restart, prepareConfig, prepareResponse, replacement, processClosing,
+        unavailableComponents());
+  }
+
+  SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      Function<UiSettings, ResolvedConfig> prepareConfig,
+      Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
+      BooleanSupplier processClosing, SettingsComponentComposer components) {
     this.store = Objects.requireNonNull(store, "store");
     this.config = Objects.requireNonNull(config, "config");
     this.restart = Objects.requireNonNull(restart, "restart");
     this.prepareConfig = Objects.requireNonNull(prepareConfig, "prepareConfig");
     this.prepareResponse = Objects.requireNonNull(prepareResponse, "prepareResponse");
     this.replacement = Objects.requireNonNull(replacement, "replacement");
+    this.processClosing = Objects.requireNonNull(processClosing, "processClosing");
+    this.components = Objects.requireNonNull(components, "components");
+  }
+
+  private static SettingsComponentComposer unavailableComponents() {
+    return (candidate, desired, affected) -> {
+      throw refused("COMPONENT_PREPARATION_REQUIRED",
+          "The affected runtime components cannot yet be committed atomically",
+          Map.of("components", affected));
+    };
   }
 
   @Override public CompletionStage<RecoveryIssue> recoveryIssue() { return recoveryIssue.minimalCompletionStage(); }
@@ -165,7 +208,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   private void applyOwned(Reservation reservation, UiSettings candidate, AttemptControl control, boolean reset) {
     Objects.requireNonNull(control, "control");
-    ConfigChangedEvent event;
+    ConfigChangedEvent[] event = new ConfigChangedEvent[1];
+    SettingsComponentComposer.Prepared preparedComponents = null;
+    boolean[] committed = {false};
+    Throwable failed = null;
     mutex.lock();
     try {
       SettingsCommitFence active = requireFence(reservation);
@@ -194,37 +240,143 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       var next = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
       var prepared = store.prepare(candidate, next);
+      boolean chatComponentChanged = !Objects.equals(
+          store.inspect().settings().getChatEnabled(), prepared.settings().getChatEnabled());
       ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(prepared.settings()), "Prepared config");
-      var receipt = new Receipt(active.key, next.acceptedRevision(), prepareResponse.apply(prepared.settings()));
-      try {
-        replacement.replace(prepared);
-      } catch (IOException | RuntimeException failure) {
-        final SettingsWitness observed;
-        try { observed = store.inspect().witness(); }
-        catch (RuntimeException inspectionFailure) {
-          if (active.recoveryReset() && matchesQuarantine(active.quarantineFingerprint)) {
-            throw new IllegalStateException("Settings recovery replacement did not commit", failure);
-          }
-          if (failure != inspectionFailure) failure.addSuppressed(inspectionFailure);
-          uncertain(active, control, RecoveryReason.UNREADABLE_WITNESS);
-          throw new IllegalStateException("Settings replacement has no readable witness", failure);
-        }
-        if (!next.equals(observed)) {
-          if (!active.recoveryReset() && active.prior.equals(observed)) throw new IllegalStateException("Settings replacement did not commit", failure);
-          uncertain(active, control, RecoveryReason.CONTRADICTORY_WITNESS);
-          throw new IllegalStateException("Settings replacement has a contradictory witness", failure);
-        }
-        // A move may report failure after committing. The exact file witness resolves that ambiguity.
+      ResolvedConfig serving = config.get();
+      var changedKeys = ConfigApplyScopes.classify(serving, resolved);
+      if (!changedKeys.generationBound().isEmpty()) {
+        throw refused("GENERATION_BOUND_REQUIRES_REINDEX",
+            "Generation-bound settings require a separate reindex operation",
+            Map.of("keys", List.copyOf(changedKeys.generationBound()),
+                "operation", "core.bulk-reindex"));
       }
-      active.phase = Phase.COMMITTED;
-      control.committed(receipt);
-      event = config.swap(resolved);
+      boolean restartRequired = !changedKeys.restartRequired().isEmpty();
+      // API_PORT is the only restart-required value this settings candidate can write. If an
+      // unrelated process source drifted since boot, refuse before touching a component owner.
+      if (!java.util.Set.of("justsearch.api.port").containsAll(changedKeys.restartRequired())) {
+        throw refused("RESTART_SOURCE_DRIFT",
+            "A restart-required process source changed; restart before applying settings",
+            Map.of("keys", List.copyOf(changedKeys.restartRequired())));
+      }
+      ResolvedConfig servingResolved = changedKeys.restartRequired().contains("justsearch.api.port")
+          ? resolved.retainingApiPortFrom(serving) : resolved;
+      if (!changedKeys.component().isEmpty() || chatComponentChanged) {
+        var affected = new java.util.TreeMap<String, java.util.Set<String>>(changedKeys.component());
+        if (chatComponentChanged) {
+          affected.merge("generative", java.util.Set.of("ui.chatEnabled"), (left, right) -> {
+            var keys = new java.util.TreeSet<>(left);
+            keys.addAll(right);
+            return java.util.Set.copyOf(keys);
+          });
+        }
+        preparedComponents = Objects.requireNonNull(
+            components.prepare(prepared.settings(), resolved, Map.copyOf(affected)),
+            "Prepared component transaction");
+      }
+      OperationResult preparedResponse = prepareResponse.apply(prepared.settings());
+      if (restartRequired) preparedResponse = withRestartScheduled(preparedResponse);
+      var receipt = new Receipt(active.key, next.acceptedRevision(), preparedResponse);
+      ConfigStore.PreparedSwap preparedConfig = config.prepareSwap(servingResolved);
+      var publication = config.publicationLock();
+      SettingsComponentComposer.Prepared preparedForPublish = preparedComponents;
+      Runnable publish = () -> {
+        publication.writeLock().lock();
+        try {
+          requireFence(reservation);
+          config.validatePrepared(preparedConfig);
+          if (preparedForPublish != null) preparedForPublish.validate();
+          if (processClosing.getAsBoolean()) {
+            throw refused("ENGINE_CLOSING", "Engine shutdown has closed settings admission", Map.of());
+          }
+          if (!control.admitCommit(receipt)) {
+            throw new CancellationException("Settings apply was cancelled before commit admission");
+          }
+          try {
+            replacement.replace(prepared);
+          } catch (IOException | RuntimeException failure) {
+            final SettingsWitness observed;
+            try { observed = store.inspect().witness(); }
+            catch (RuntimeException inspectionFailure) {
+              if (active.recoveryReset() && matchesQuarantine(active.quarantineFingerprint)) {
+                throw new IllegalStateException("Settings recovery replacement did not commit", failure);
+              }
+              if (failure != inspectionFailure) failure.addSuppressed(inspectionFailure);
+              uncertain(active, control, RecoveryReason.UNREADABLE_WITNESS);
+              throw new IllegalStateException("Settings replacement has no readable witness", failure);
+            }
+            if (!next.equals(observed)) {
+              if (!active.recoveryReset() && active.prior.equals(observed)) throw new IllegalStateException("Settings replacement did not commit", failure);
+              uncertain(active, control, RecoveryReason.CONTRADICTORY_WITNESS);
+              throw new IllegalStateException("Settings replacement has a contradictory witness", failure);
+            }
+            // A move may report failure after committing. The exact file witness resolves that ambiguity.
+          }
+          active.phase = Phase.COMMITTED;
+          committed[0] = true;
+          active.restartRequired = restartRequired;
+          control.committed(receipt);
+          try {
+            config.installPrepared(preparedConfig);
+            if (preparedForPublish != null) preparedForPublish.install();
+          } catch (RuntimeException | Error publicationFailure) {
+            // The durable witness already names B. A broken prepared installer must not be
+            // reported as a clean serving commit; boot reconstructs from that witness.
+            control.uncertain();
+            throw publicationFailure;
+          }
+          event[0] = preparedConfig.event();
+        } finally {
+          publication.writeLock().unlock();
+        }
+      };
+      if (preparedForPublish == null) publish.run();
+      else preparedForPublish.withOwnerLocks(publish);
+    } catch (RuntimeException | Error failure) {
+      failed = failure;
+      throw failure;
     } finally {
       mutex.unlock();
       publishIssue();
+      if (!committed[0] && preparedComponents != null) {
+        SettingsCommitFence active = fence;
+        if (active != null && active.phase == Phase.PREPARING) {
+          try { preparedComponents.abort(); }
+          catch (RuntimeException | Error cleanupFailure) {
+            // A refused close leaves a physical owner alive. Preserve the armed row for boot
+            // reconciliation and ask the runner for ordered recovery instead of reporting a
+            // clean precommit failure while the registry permit remains held.
+            control.uncertain();
+            if (failed != null) failed.addSuppressed(cleanupFailure);
+            else LOG.error("Prepared component abort failed without a commit failure", cleanupFailure);
+          }
+        }
+      }
     }
     // Arbitrary notification code is outside the physical mutex, with the logical fence retained.
-    config.notifyListeners(event);
+    Throwable postCommitFailure = null;
+    try {
+      config.notifyListeners(event[0]);
+      if (preparedComponents != null) preparedComponents.notifyObservers();
+    } catch (RuntimeException | Error notificationFailure) {
+      postCommitFailure = notificationFailure;
+    }
+    if (preparedComponents != null) {
+      try { preparedComponents.retire(); }
+      catch (RuntimeException | Error retirementFailure) {
+        // The file and service publication are committed. Keep that receipt authoritative,
+        // retain the apply permit, and schedule an ordered successor after the row completes.
+        mutex.lock();
+        try {
+          SettingsCommitFence active = fence;
+          if (active != null && active.phase == Phase.COMMITTED) active.restartRequired = true;
+        } finally { mutex.unlock(); }
+        if (postCommitFailure == null) postCommitFailure = retirementFailure;
+        else postCommitFailure.addSuppressed(retirementFailure);
+      }
+    }
+    if (postCommitFailure instanceof RuntimeException runtime) throw runtime;
+    if (postCommitFailure instanceof Error error) throw error;
   }
 
   private SettingsCommitFence requireFence(Reservation reservation) {
@@ -253,9 +405,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     try {
       if (fence != null && fence.id == id && fence.phase != Phase.UNCERTAIN) {
         clear = fence.phase == Phase.COMMITTED;
-        if (clear && fence.recoveryReset()) {
-          blocked = false;
-          if (!restartIssued) { restartIssued = true; request = true; }
+        if (clear && fence.recoveryReset()) blocked = false;
+        if (clear && (fence.recoveryReset() || fence.restartRequired) && !restartIssued) {
+          restartIssued = true;
+          request = true;
         }
         fence = null;
         if (Objects.equals(recoveredId, id)) recoveredId = null;
@@ -407,5 +560,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   private static Refused refused(String code, String message, Map<String, Object> details) {
     return new Refused(OperationResult.failure(message, code, details, false));
+  }
+
+  private static OperationResult withRestartScheduled(OperationResult response) {
+    var data = new java.util.LinkedHashMap<String, Object>(response.structuredData());
+    data.put("restartScheduled", true);
+    return new OperationResult(response.success(), response.message(), response.executionId(), data,
+        response.errorCode(), response.errorDetails(), response.retryable());
   }
 }

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
+import io.justsearch.app.api.NativeQuiescence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import java.nio.file.Path;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
@@ -82,18 +84,21 @@ public final class EngineShutdownSequence {
   /** The outcome of one ordered close. */
   public record Result(
       boolean clean, String workerOutcome, List<String> errors, Reason reason,
-      Map<String, String> outcomes) {
+      Map<String, String> outcomes, NativeQuiescence nativeQuiescence) {
 
     public Result {
       workerOutcome = workerOutcome == null ? "UNKNOWN" : workerOutcome;
       errors = errors == null ? List.of() : List.copyOf(errors);
       outcomes = outcomes == null ? Map.of() : Map.copyOf(outcomes);
+      Objects.requireNonNull(nativeQuiescence, "nativeQuiescence");
     }
   }
 
   private final Path receiptPath;
   private final List<Step> steps;
   private final IntConsumer exit;
+  private final IntConsumer hardStop;
+  private final Supplier<NativeQuiescence> nativeQuiescence;
   private final CompletionAction completion;
   private final AtomicReference<Result> result = new AtomicReference<>();
   private final Object exitAuthority = new Object();
@@ -112,9 +117,18 @@ public final class EngineShutdownSequence {
 
   public EngineShutdownSequence(
       Path dataDir, List<Step> steps, IntConsumer exit, CompletionAction completion) {
+    this(dataDir, steps, exit, exit, () -> NativeQuiescence.QUIESCED, completion);
+  }
+
+  /** Process composition supplies a separate hard stop for unquiesced native ownership. */
+  public EngineShutdownSequence(Path dataDir, List<Step> steps, IntConsumer exit,
+      IntConsumer hardStop, Supplier<NativeQuiescence> nativeQuiescence,
+      CompletionAction completion) {
     this.receiptPath = dataDir.resolve("upgrade").resolve(RECEIPT_FILE);
     this.steps = List.copyOf(steps);
-    this.exit = exit;
+    this.exit = Objects.requireNonNull(exit, "exit");
+    this.hardStop = Objects.requireNonNull(hardStop, "hardStop");
+    this.nativeQuiescence = Objects.requireNonNull(nativeQuiescence, "nativeQuiescence");
     this.completion = Objects.requireNonNull(completion, "completion");
   }
 
@@ -138,6 +152,16 @@ public final class EngineShutdownSequence {
         result.set(existing);
       }
       return existing;
+    }
+  }
+
+  /** A JVM-initiated exit is already in progress; never request System.exit again from its hook. */
+  public void runFromJvmShutdownHook(Reason reason) {
+    Result shutdown = run(reason);
+    if (shutdown.nativeQuiescence() != NativeQuiescence.QUIESCED) {
+      // Other JVM hooks (including ORT's) may already be running concurrently. A late halt
+      // shortens this unsafe interval and sets a fatal exit code; it cannot undo an earlier race.
+      hardStop.accept(EngineExit.FATAL_OR_UNCAUGHT);
     }
   }
 
@@ -165,8 +189,17 @@ public final class EngineShutdownSequence {
     if (!"GRACEFUL".equals(workerOutcome) && !"UNKNOWN".equals(workerOutcome)) {
       errors.add("worker-" + workerOutcome.toLowerCase(Locale.ROOT));
     }
+    NativeQuiescence nativeStatus;
+    try {
+      nativeStatus = Objects.requireNonNull(nativeQuiescence.get(), "native quiescence result");
+    } catch (RuntimeException statusFailure) {
+      log.warn("Native quiescence could not be read", statusFailure);
+      nativeStatus = NativeQuiescence.UNQUIESCED;
+    }
+    outcomes.put("native-quiescence", nativeStatus.name());
+    if (nativeStatus != NativeQuiescence.QUIESCED) errors.add("native-unquiesced");
     boolean clean = errors.isEmpty();
-    Result preliminary = new Result(clean, workerOutcome, errors, reason, outcomes);
+    Result preliminary = new Result(clean, workerOutcome, errors, reason, outcomes, nativeStatus);
     try {
       completion.complete(preliminary);
     } catch (Exception e) {
@@ -176,7 +209,7 @@ public final class EngineShutdownSequence {
     }
     log.info(
         "Ordered shutdown complete (reason={}, clean={}, errors={})", reason.wire(), clean, errors);
-    return new Result(clean, workerOutcome, errors, reason, outcomes);
+    return new Result(clean, workerOutcome, errors, reason, outcomes, nativeStatus);
   }
 
   /**
@@ -192,7 +225,7 @@ public final class EngineShutdownSequence {
     Result shutdown = run(reason);
     int completedCode =
         shutdown.reason() == Reason.RESTART ? EngineExit.REQUESTED_RESTART : EngineExit.OK;
-    exit.accept(selectExitCode(shutdown.clean() ? completedCode : EngineExit.FATAL_OR_UNCAUGHT));
+    terminate(shutdown, selectExitCode(shutdown.clean() ? completedCode : EngineExit.FATAL_OR_UNCAUGHT));
   }
 
   /**
@@ -207,8 +240,8 @@ public final class EngineShutdownSequence {
     if (!claimExit(true)) {
       return;
     }
-    run(reason);
-    exit.accept(selectExitCode(EngineExit.FATAL_OR_UNCAUGHT));
+    Result shutdown = run(reason);
+    terminate(shutdown, selectExitCode(EngineExit.FATAL_OR_UNCAUGHT));
   }
 
   /**
@@ -241,7 +274,12 @@ public final class EngineShutdownSequence {
     } catch (Exception e) {
       log.warn("Could not write the shutdown receipt: {}", e.toString());
     }
-    exit.accept(selectedExitCode);
+    terminate(shutdown, selectedExitCode);
+  }
+
+  private void terminate(Result shutdown, int code) {
+    if (shutdown.nativeQuiescence() == NativeQuiescence.QUIESCED) exit.accept(code);
+    else hardStop.accept(code);
   }
 
   private boolean claimExit(boolean fatal) {

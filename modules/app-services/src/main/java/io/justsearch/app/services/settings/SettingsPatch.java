@@ -46,13 +46,18 @@ final class SettingsPatch {
         && llm.llamaLibPath() == null) llm = null;
     List<String> paths = input.indexPaths();
     paths = paths == null || paths.isEmpty() ? null : List.of(normalized.getIndexBasePath());
-    return new SettingsV2(ui, llm, paths, null, input.witness(), null, null);
+    return new SettingsV2(ui, llm, paths, null, input.witness(), null, null,
+        input.apiPort() == null ? null : normalized.configuredApiPort());
   }
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
   static UiSettings merge(UiSettings base, SettingsV2 incoming, boolean applyMode) {
     if (incoming == null) {
       return base;
+    }
+
+    if (incoming.apiPort() != null) {
+      base.setApiPort(incoming.apiPort());
     }
 
     UiSettingsV2 ui = incoming.ui();

@@ -11,6 +11,7 @@ import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.api.settings.SettingsWitness;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
+import java.time.Duration;
 
 /** Shared acceptance/effect/completion owner for dispatch, ingestion, settings and scheduled work. */
 public interface OperationAttemptRunner {
@@ -22,6 +23,12 @@ public interface OperationAttemptRunner {
 
   /** Sticky degradation signal; late Health subscribers still observe the first failure. */
   CompletionStage<PersistenceFailure> persistenceFailure();
+
+  /** Permanently refuse new effect bodies for this process incarnation. */
+  void beginClosing();
+
+  /** Wait for executing bodies and their durable completion callbacks to leave the store. */
+  boolean awaitDrained(Duration timeout);
 
   record Request(String key, OperationDescriptor descriptor, EngineContext context,
       InvocationProvenance provenance, OperationHistoryMode historyMode) {
@@ -135,6 +142,12 @@ public interface OperationAttemptRunner {
    */
   OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
       io.justsearch.app.api.UiSettings candidate);
+
+  /** Bind cancellation of the exact admitted effect to precommit arbitration. */
+  default OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
+      io.justsearch.app.api.UiSettings candidate, io.justsearch.app.api.EngineWorkHandle work) {
+    return applySettings(handle, expected, candidate);
+  }
 
   /** Fixed reset from this executing attempt's persisted server preparation; no caller authority flags. */
   OperationResult applySettingsReset(OperationRecordHandle handle);

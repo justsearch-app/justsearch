@@ -218,9 +218,12 @@ public final class EffectiveConfigController {
   // ---------------------------------------------------------------------------
 
   private Map<String, Object> keyJustsearchApiPortConfigured() {
+    ConfigResolution resolution = configStore != null
+        ? configStore.get().resolution(EnvRegistry.API_PORT.configKey()) : null;
+    Integer parsed = resolution != null && resolution.isResolved()
+        ? parseInt(resolution.value()) : null;
     String sys = sysProp(EnvRegistry.API_PORT.sysProp());
     String env = envVar(EnvRegistry.API_PORT.envVar());
-    Integer parsed = parseInt(sys != null ? sys : env);
 
     Map<String, Object> details = new LinkedHashMap<>();
     details.put("sysprop", EnvRegistry.API_PORT.sysProp());
@@ -229,7 +232,11 @@ public final class EffectiveConfigController {
     if (env != null) details.put("envValue", env);
 
     String source;
-    if (sys != null) source = "system_property";
+    if (resolution != null && resolution.isResolved()) {
+      source = resolution.sourceName();
+      details.put("sourceOrdinal", resolution.sourceOrdinal());
+      if (resolution.sourceDetail() != null) details.put("sourceDetail", resolution.sourceDetail());
+    } else if (sys != null) source = "system_property";
     else if (env != null) source = "environment_variable";
     else source = "default";
 

@@ -21,6 +21,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,8 +35,8 @@ import org.slf4j.LoggerFactory;
  * <p>Owns the CPU session, GPU session, GPU RunOptions, and OrtCudaStatus. Consumers delegate
  * all session selection, GPU arbitration, retry, and teardown to it.
  *
- * <p>Thread-safe: multiple threads may call {@link #acquire()} concurrently. GPU session
- * creation uses double-checked locking with a dedicated lock object.
+ * <p>Thread-safe: multiple threads may call {@link #acquire(SessionAcquisitionRequest)}
+ * concurrently. GPU session creation uses double-checked locking with a dedicated lock object.
  *
  * <p>Construction is internal (§14.19 Phase 4): external callers must route through
  * {@link OrtSessionAssembler#buildManager}. {@link Builder} is package-private and only reachable
@@ -120,8 +121,8 @@ public final class NativeSessionHandle implements SessionHandle {
   private final Semaphore gpuInferenceSemaphore = new Semaphore(1);
 
   // Mutable state (volatile, guarded by locks)
-  private final Object gpuSessionLock = new Object();
-  private final Object cpuSessionLock = new Object();
+  private final ReentrantLock gpuSessionLock = new ReentrantLock();
+  private final ReentrantLock cpuSessionLock = new ReentrantLock();
   private final Object lifecycleLock = new Object();
   private final Object closeLock = new Object();
   private final IdentityHashMap<OrtSession, SessionInstance> sessionInstances =
@@ -144,6 +145,7 @@ public final class NativeSessionHandle implements SessionHandle {
   private int nativeActionsInProgress;
 
   private static final long RETIRE_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(5);
+  private static final long CANCELLATION_POLL_NANOS = TimeUnit.MILLISECONDS.toNanos(10);
 
   /** Lease accounting belongs to one exact native session identity. Guarded by lifecycleLock. */
   private static final class SessionInstance {
@@ -233,30 +235,35 @@ public final class NativeSessionHandle implements SessionHandle {
    *
    * @return the session to use for this inference call (never null)
    */
-  private OrtSession selectSession() {
+  private OrtSession selectSession(SessionAcquisitionRequest request) {
+    request.remainingNanos();
     // Fast path: GPU session being released, use CPU for graceful degradation
     if (gpuSessionReleasing) {
-      return getCpuSession();
+      return getCpuSession(request);
     }
 
     // Fast path: GPU not configured or arbitration says use CPU
     if (gpuConfig == null || !shouldUseGpu.getAsBoolean()) {
-      return getCpuSession();
+      return getCpuSession(request);
     }
 
     // Lazy GPU session initialization (double-checked locking)
     if (!gpuSessionAttempted) {
-      synchronized (gpuSessionLock) {
+      acquireOwnerLock(gpuSessionLock, request, "GPU session creation");
+      try {
         if (!gpuSessionAttempted) {
           tryCreateGpuSession();
         }
+      } finally {
+        gpuSessionLock.unlock();
       }
     }
 
     // GPU retry: if creation failed >60s ago, allow one re-attempt
     if (gpuRetryEnabled && gpuSessionAttempted && !gpuAvailable && gpuFailedAtMs > 0
         && System.currentTimeMillis() - gpuFailedAtMs > gpuRetryIntervalMs) {
-      synchronized (gpuSessionLock) {
+      acquireOwnerLock(gpuSessionLock, request, "GPU session retry");
+      try {
         if (gpuSessionAttempted && !gpuAvailable) {
           long sinceFailureMs = System.currentTimeMillis() - gpuFailedAtMs;
           log.info(
@@ -268,10 +275,13 @@ public final class NativeSessionHandle implements SessionHandle {
           gpuFailedAtMs = 0;
           tryCreateGpuSession();
         }
+      } finally {
+        gpuSessionLock.unlock();
       }
     }
 
-    return gpuAvailable ? gpuSession : getCpuSession();
+    request.remainingNanos();
+    return gpuAvailable ? gpuSession : getCpuSession(request);
   }
 
   // ---------------------------------------------------------------------------
@@ -294,7 +304,8 @@ public final class NativeSessionHandle implements SessionHandle {
    * @return a lease that provides the session, RunOptions, and auto-releases the semaphore
    */
   @Override
-  public Lease acquire() {
+  public Lease acquire(SessionAcquisitionRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
     // Tempdoc 400 LR2-b: lease.acquire span captures semaphore wait vs run
     // split. Span becomes a child of whatever OTel context is current when
     // acquire() is called (encoder.ort_run in backfill; enrichment.batch or
@@ -302,7 +313,7 @@ public final class NativeSessionHandle implements SessionHandle {
     Span leaseSpan = maybeLeaseSpan();
     try {
       ensureNotRetired();
-      OrtSession session = selectSession();
+      OrtSession session = selectSession(request);
       if (session == gpuSession && session != null) {
         leaseSpan.setAttribute("lease.wait_queue_depth", (long) gpuInferenceSemaphore.getQueueLength());
         // Tempdoc 414 A1: time only the semaphore acquire — that's what
@@ -312,7 +323,7 @@ public final class NativeSessionHandle implements SessionHandle {
         boolean acquired = false;
         try {
           try {
-            gpuInferenceSemaphore.acquire();
+            acquireGpuPermit(request);
             acquired = true;
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -321,6 +332,7 @@ public final class NativeSessionHandle implements SessionHandle {
             cancellation.initCause(interrupted);
             throw cancellation;
           }
+          request.remainingNanos();
           // An interrupt can race with a successful acquire. Do not construct a lease for a
           // cancelled caller; the finally block releases this permit, while an already-issued
           // lease remains responsible for its own permit until its native call has exited.
@@ -329,6 +341,7 @@ public final class NativeSessionHandle implements SessionHandle {
           }
           long waitUs = (System.nanoTime() - waitStartNs) / 1_000L;
           events.onSemaphoreWait(consumerName, waitUs);
+          request.remainingNanos();
           if (Thread.currentThread().isInterrupted()) {
             throw new CancellationException("GPU lease acquisition interrupted");
           }
@@ -343,7 +356,7 @@ public final class NativeSessionHandle implements SessionHandle {
             leaseSpan.setAttribute("lease.mode", "cpu");
             // Tempdoc 414: silent line-260 fallback now first-class.
             events.onTransition(new TransitionReason.GpuFallbackTaken(consumerName));
-            return acquireCpuLease();
+            return acquireCpuLease(request);
           }
           leaseSpan.setAttribute("lease.mode", "gpu");
           Lease lease =
@@ -364,7 +377,7 @@ public final class NativeSessionHandle implements SessionHandle {
         }
       }
       leaseSpan.setAttribute("lease.mode", "cpu");
-      return acquireCpuLease(session);
+      return acquireCpuLease(request, session);
     } finally {
       leaseSpan.end();
     }
@@ -377,6 +390,29 @@ public final class NativeSessionHandle implements SessionHandle {
     return LEASE_TRACER.spanBuilder("lease.acquire").startSpan();
   }
 
+  private void acquireGpuPermit(SessionAcquisitionRequest request) throws InterruptedException {
+    while (true) {
+      long waitNanos = Math.min(request.remainingNanos(), CANCELLATION_POLL_NANOS);
+      if (gpuInferenceSemaphore.tryAcquire(waitNanos, TimeUnit.NANOSECONDS)) return;
+    }
+  }
+
+  private static void acquireOwnerLock(
+      ReentrantLock lock, SessionAcquisitionRequest request, String action) {
+    while (true) {
+      long waitNanos = Math.min(request.remainingNanos(), CANCELLATION_POLL_NANOS);
+      try {
+        if (lock.tryLock(waitNanos, TimeUnit.NANOSECONDS)) return;
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        CancellationException cancellation =
+            new CancellationException("native session acquisition interrupted during " + action);
+        cancellation.initCause(interrupted);
+        throw cancellation;
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // GPU lifecycle management
   // ---------------------------------------------------------------------------
@@ -384,8 +420,8 @@ public final class NativeSessionHandle implements SessionHandle {
   /**
    * Releases the GPU session to free VRAM (called when Main claims GPU).
    *
-   * <p>Thread-safe: concurrent {@link #selectSession()} calls will gracefully fall back to CPU
-   * during release.
+   * <p>Thread-safe: concurrent {@link #acquire(SessionAcquisitionRequest)} calls will gracefully
+   * fall back to CPU during release.
    */
   @Override
   public void releaseGpu() {
@@ -481,8 +517,8 @@ public final class NativeSessionHandle implements SessionHandle {
 
   /**
    * Reports that the CPU session experienced an inference failure (e.g., OOM from quadratic
-   * attention on long inputs). The next call to {@link #selectSession()} will close the failed
-   * session and create a fresh one, releasing the dead BFCArena allocations.
+   * attention on long inputs). The next call to {@link #acquire(SessionAcquisitionRequest)} will
+   * close the failed session and create a fresh one, releasing the dead BFCArena allocations.
    *
    * <p>This uses a deferred-recreation pattern to avoid threading races: the old session stays
    * alive until the next {@code selectSession()} call replaces it under the lock. No thread can
@@ -542,9 +578,10 @@ public final class NativeSessionHandle implements SessionHandle {
    * Returns the active CPU session, or null if deferred and not yet created. Package-private
    * since §14.21 (tempdoc 397): same-package tests use it to assert deferred-CPU invariants;
    * external callers must observe deferred semantics behaviourally (e.g., via
-   * {@link #acquire()} materialising the session on first call).
+   * {@link #acquire(SessionAcquisitionRequest)} materialising the session on first call).
    *
-   * <p>WARNING: Do not use this for inference — use {@link #acquire()} instead.
+   * <p>WARNING: Do not use this for inference — use {@link
+   * #acquire(SessionAcquisitionRequest)} instead.
    */
   OrtSession peekCpuSession() {
     return cpuSession;
@@ -556,16 +593,17 @@ public final class NativeSessionHandle implements SessionHandle {
    * CPU session after a GPU BFCArena failure.
    *
    * <p>If the CPU session has been deferred (and not yet materialised via prior
-   * {@link #selectSession()} / {@link #acquire()} calls on the CPU path), this method
-   * force-materialises it via the private {@code getCpuSession()} before returning the lease.
+   * {@link #acquire(SessionAcquisitionRequest)} calls on the CPU path), this method
+   * force-materialises it before returning the lease.
    * The lazy double-checked-locking handles concurrent materialisation safely. If materialisation
    * fails, {@code getCpuSession()} wraps the {@link OrtException} in
    * {@link IllegalStateException}; callers that want typed ORT failures should call
    * {@link OrtSessionAssembler#probeModelNames} on the model path first to surface the probe error.
    */
   @Override
-  public Lease acquireCpu() {
-    return acquireCpuLease();
+  public Lease acquireCpu(SessionAcquisitionRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
+    return acquireCpuLease(request);
   }
 
   /** Returns the OrtEnvironment (shared, thread-safe singleton). */
@@ -659,8 +697,10 @@ public final class NativeSessionHandle implements SessionHandle {
    * Gets or lazily creates the CPU session. Handles both deferred creation (first call) and
    * recreation after a reported failure (D9: dead BFCArena allocations).
    */
-  private OrtSession getCpuSession() {
-    synchronized (cpuSessionLock) {
+  private OrtSession getCpuSession(SessionAcquisitionRequest request) {
+    acquireOwnerLock(cpuSessionLock, request, "CPU session ownership");
+    try {
+      request.remainingNanos();
       ensureNotRetired();
       OrtSession session = cpuSession;
       if (session != null && !cpuSessionFailed) return session;
@@ -678,7 +718,9 @@ public final class NativeSessionHandle implements SessionHandle {
             oldInstance.unavailable = true;
             while (oldInstance.leases != 0) {
               try {
-                lifecycleLock.wait();
+                long waitNanos =
+                    Math.min(request.remainingNanos(), CANCELLATION_POLL_NANOS);
+                TimeUnit.NANOSECONDS.timedWait(lifecycleLock, waitNanos);
               } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 CancellationException cancellation =
@@ -706,12 +748,14 @@ public final class NativeSessionHandle implements SessionHandle {
             }
           }
           if (!closedOld) {
-            throw new IllegalStateException(consumerName + ": failed CPU session could not close");
+            throw new SessionTemporarilyUnavailableException(
+                consumerName + ": failed CPU session could not close");
           }
           cpuSession = null;
         }
         cpuSessionFailed = false;
         cpuFailureCause = CpuRecreateCause.UNKNOWN;
+        request.remainingNanos();
       }
       session = cpuSession;
       if (session != null) return session;
@@ -719,9 +763,8 @@ public final class NativeSessionHandle implements SessionHandle {
         ensureNotRetiredLocked();
         nativeActionsInProgress++;
       }
-      OrtSession created = null;
       try {
-        created = createCpuSession();
+        OrtSession created = createCpuSession();
         synchronized (lifecycleLock) {
           if (!retired) {
             cpuSession = created;
@@ -732,7 +775,8 @@ public final class NativeSessionHandle implements SessionHandle {
         if (created != null) {
           retainPrivateCandidate(created);
           closePrivateCandidate(created);
-          throw new IllegalStateException(consumerName + ": session handle retired during CPU creation");
+          throw new SessionRetiredException(
+              consumerName + ": session handle retired during CPU creation");
         }
         if (recreatingAfterFailure) {
           // Tempdoc 414: F-009 NaN-on-CPU-OOM / BFCArena-failure recovery is now first-class.
@@ -741,7 +785,7 @@ public final class NativeSessionHandle implements SessionHandle {
         }
         return cpuSession;
       } catch (OrtException e) {
-        throw new IllegalStateException(
+        throw new SessionTemporarilyUnavailableException(
             consumerName + ": CPU session creation failed", e);
       } finally {
         synchronized (lifecycleLock) {
@@ -749,6 +793,8 @@ public final class NativeSessionHandle implements SessionHandle {
           lifecycleLock.notifyAll();
         }
       }
+    } finally {
+      cpuSessionLock.unlock();
     }
   }
 
@@ -759,13 +805,14 @@ public final class NativeSessionHandle implements SessionHandle {
     }
   }
 
-  private Lease acquireCpuLease() {
-    return acquireCpuLease(getCpuSession());
+  private Lease acquireCpuLease(SessionAcquisitionRequest request) {
+    return acquireCpuLease(request, getCpuSession(request));
   }
 
-  private Lease acquireCpuLease(OrtSession candidate) {
+  private Lease acquireCpuLease(SessionAcquisitionRequest request, OrtSession candidate) {
     OrtSession session = candidate;
     while (true) {
+      request.remainingNanos();
       synchronized (lifecycleLock) {
         ensureNotRetiredLocked();
         SessionInstance instance = retainIfAvailable(session, session == cpuSession && !cpuSessionFailed);
@@ -778,7 +825,7 @@ public final class NativeSessionHandle implements SessionHandle {
               ortRunRecorder);
         }
       }
-      session = getCpuSession();
+      session = getCpuSession(request);
     }
   }
 
@@ -817,7 +864,7 @@ public final class NativeSessionHandle implements SessionHandle {
   }
 
   private void ensureNotRetiredLocked() {
-    if (retired) throw new IllegalStateException(consumerName + ": session handle is retired");
+    if (retired) throw new SessionRetiredException(consumerName + ": session handle is retired");
   }
 
   private boolean allLeasesReleased() {

@@ -277,9 +277,12 @@ class SearchPerSourceExecutorOwnershipTest {
     }
 
     @Override public void cancelInteractive(String reason) { cancel(reason); }
+    @Override public void beginClosing() {}
+    @Override public boolean isClosing() { return false; }
     @Override public int retryAfterSeconds() { return 1; }
     @Override public Limits limits() { return new Limits(4, 4, 1); }
     @Override public int activeWorkCount() { return references(); }
+    @Override public boolean awaitDrained(java.time.Duration timeout) { return references() == 0; }
 
     private final class Handle implements EngineWorkHandle {
       private final EngineContext context;

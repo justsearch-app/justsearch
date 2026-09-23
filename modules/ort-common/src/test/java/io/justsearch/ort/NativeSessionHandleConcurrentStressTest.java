@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -121,7 +122,7 @@ final class NativeSessionHandleConcurrentStressTest {
 
     // Warm-up: one acquire before threads start so the initial CPU session is materialised and
     // the cpuSessionLock's first contention moment isn't timed against cold initialisation.
-    try (SessionHandle.Lease warm = handle.acquire()) {
+    try (SessionHandle.Lease warm = handle.acquire(request())) {
       assertTrue(warm.isCpu());
     }
 
@@ -154,7 +155,7 @@ final class NativeSessionHandleConcurrentStressTest {
           startLatch.await();
           while (running.get()) {
             try {
-              SessionHandle.Lease acquiredLease = handle.acquire();
+              SessionHandle.Lease acquiredLease = handle.acquire(request());
               leasesAcquired.incrementAndGet();
               try (SessionHandle.Lease lease = acquiredLease) {
                 if (closed.get()) {
@@ -352,6 +353,11 @@ final class NativeSessionHandleConcurrentStressTest {
         io.justsearch.ort.testing.ModelDirTestResolver.discover(
             "models/onnx/gte-multilingual-base", null, "model.onnx");
     return gte.modelDir();
+  }
+
+  private static SessionAcquisitionRequest request() {
+    return SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(5));
   }
 
   private static String summarize(AtomicInteger... counters) {

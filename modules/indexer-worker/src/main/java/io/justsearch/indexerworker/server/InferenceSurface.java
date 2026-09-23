@@ -26,9 +26,9 @@ import java.util.Set;
  * {@code VariantSelection} resolved — matching today's {@code SessionPoliciesController} omit-on-
  * unresolved semantic.
  *
- * <p>{@link #handles()} collects every live {@link SessionHandle}; {@link #close()} iterates and
- * closes them (best-effort). Swallows per-handle close exceptions — shutdown must never abort
- * mid-iteration.
+ * <p>{@link #handles()} collects every live {@link SessionHandle}; {@link #close()} attempts to
+ * retire all of them before propagating an aggregate failure. Refused handles remain available
+ * for a later retry, and {@link #retirementStatus()} exposes their aggregate disposition.
  *
  * <p>Sparse-model selection (bge-m3 vs splade) means at most one of {@link #splade()} and
  * {@link #bgeM3()} is populated: BGE-M3 wins when {@code cfg.ai().sparseModel() == "bge-m3"} and
@@ -127,14 +127,57 @@ public record InferenceSurface(
     }
   }
 
-  @Override
-  public void close() {
-    for (SessionHandle h : handles) {
-      try {
-        h.close();
-      } catch (RuntimeException ignored) {
-        // shutdown must continue across per-handle failures
+  /**
+   * Returns the aggregate native-retirement disposition for all handles owned by this surface.
+   * Refusal takes precedence over work still retiring, followed by handles that remain active.
+   * A surface with no handles is already retired.
+   */
+  public SessionHandle.RetirementStatus retirementStatus() {
+    SessionHandle.RetirementStatus aggregate = SessionHandle.RetirementStatus.RETIRED;
+    for (SessionHandle handle : handles) {
+      SessionHandle.RetirementStatus status = handle.retirementStatus();
+      if (status == SessionHandle.RetirementStatus.REFUSED) {
+        return status;
+      }
+      if (status == SessionHandle.RetirementStatus.RETIRING) {
+        aggregate = status;
+      } else if (status == SessionHandle.RetirementStatus.ACTIVE
+          && aggregate == SessionHandle.RetirementStatus.RETIRED) {
+        aggregate = status;
       }
     }
+    return aggregate;
+  }
+
+  @Override
+  public void close() {
+    IllegalStateException aggregateFailure = null;
+    for (SessionHandle handle : handles) {
+      try {
+        handle.close();
+      } catch (RuntimeException failure) {
+        aggregateFailure = addFailure(aggregateFailure, failure);
+      }
+      SessionHandle.RetirementStatus status = handle.retirementStatus();
+      if (status != SessionHandle.RetirementStatus.RETIRED) {
+        aggregateFailure =
+            addFailure(
+                aggregateFailure,
+                new IllegalStateException("Native session handle has not retired: " + status));
+      }
+    }
+    if (aggregateFailure != null) {
+      throw aggregateFailure;
+    }
+  }
+
+  private static IllegalStateException addFailure(
+      IllegalStateException aggregateFailure, RuntimeException failure) {
+    IllegalStateException aggregate = aggregateFailure;
+    if (aggregate == null) {
+      aggregate = new IllegalStateException("Inference surface retirement was not quiescent");
+    }
+    aggregate.addSuppressed(failure);
+    return aggregate;
   }
 }

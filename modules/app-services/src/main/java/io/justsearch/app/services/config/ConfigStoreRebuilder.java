@@ -134,6 +134,9 @@ public final class ConfigStoreRebuilder {
     if (settings.configuredGpuLayers() != null) {
       builder.putSettings("justsearch.gpu.layers", String.valueOf(settings.getGpuLayers()));
     }
+    if (settings.configuredApiPort() != null) {
+      builder.putSettings("justsearch.api.port", String.valueOf(settings.configuredApiPort()));
+    }
     if (settings.getContextLength() > 0) {
       builder.putSettings("justsearch.context.size", String.valueOf(settings.getContextLength()));
     }

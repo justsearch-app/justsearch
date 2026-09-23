@@ -398,3 +398,87 @@ installed standard-model and hosted proof remain required; no completion is clai
 CI35678039813 finished with the same two failed audit classes, while other jobs passed;
 its log is tmp/2465-hosted-failed.txt. Resume at branch HEAD after the audit-correction
 handoff commit. See ../../handoff.md for exact continuation and authorization.
+
+### Successor verification and hosted ordering correction (2026-09-23)
+
+Runtime code at `22800c842` remained content-equivalent through documentation HEAD
+`2e7f1e1f6`. Local generation2466 ran the full `spotlessCheck pmdAll test
+-PincludeStress=true :modules:ui:installDist --continue --console=plain` command at that
+HEAD: native exit0,11559 cases,zero failures/errors,31 skips,1805 suites and34 test
+tasks (27 reused). `tmp/2466-candidate-corrected-integrated*` holds the complete log,
+copied XML/counts/skips, the actual HEAD inventory (no Java changes in that docs commit),
+and the five-file `22800c842` source inventory under the `-code` label. This closes the
+local audit-residue regression, but hosted CI35793788189 exposed a separate activation
+observation ordering race in `RuntimeActivationServiceTest` line226.
+
+The hosted job ran3043 app-services cases with one failure: terminal activation status
+became `failed` before its component observation became `UNAVAILABLE`. The owner now
+publishes the component observation before terminal status, including when publication
+throws; no test wait or audit exception was added. Focused2468 passes28 activation cases,
+Spotless and PMD. A latch-based regression in the corrected test blocks component
+publication and requires status to stay `running`; negative control2469 against the
+exact pre-fix production bytes fails `expected running, was failed`, then those bytes
+were restored to the correction. Logs, copied XML, counts and source inventory are
+retained under the respective `tmp/2468-*`/`tmp/2469-*` labels.
+
+Corrected generation2470 at commit `79c63e9b0` passes the same full command in9m17s:
+native exit0,11560 cases,zero failures/errors,31 skips,1805 suites,34 test tasks
+(28 reused). Complete log, XML, counts, skips and two-file source inventory are
+`tmp/2470-candidate-order-integrated*`. The commit was pushed to PR727; corrected
+hosted CI35796030905 is pending as this record is written. The previous hosted red
+run cannot close that proof.
+
+Installed run `191bb413-b3bd-4205-911c-a88efde74d4a` launched the fresh worktree
+distribution with retained data and `standard` profile: API59268, all four health
+components READY, runtime-client0.4.0 smoke passed (`tmp/2472-runtime-smoke.txt`).
+The jseval tier2 single real-model query (`tmp/2473-model-query/tier2-eval.json`)
+served `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, answered Captain Mortimer Flux exactly,
+and reported zero query or anchor errors. This is functional plumbing proof, not a
+quality benchmark. Official stop reported `portsClosed:true`; quick_health then
+reported ABSENT, no foreign runs and no inference orphan. The dev MCP preflight's
+old Worker-dist check fails because Lane F retired that distribution; the active
+dev-runner launched the fresh `ui` Engine distribution and reported buildArtifact
+FRESH at `79c63e9b0`. An initial owned start against a newly resolved deeper
+data path was stopped cleanly before the retained-data run.
+
+### Integrated, installed and hosted successor evidence (2026-09-23)
+
+The ordering correction's full local generation2475 at `358af2cb4` passed
+`spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist --continue
+--console=plain`: exit0,11561 cases,zero failures/errors,31 skips,1805 suites.
+`tmp/2475-candidate-publication-integrated*` retains the full log, XML, counts,
+skips and source inventory. Owned installed run `25140142-8163-48fd-90ea-f7096472668f`
+used that exact distribution with retained data and the `standard` Qwen9B model:
+all four health components were READY, runtime-client0.4.0 smoke passed
+(`tmp/2477-runtime-smoke.txt`), and a real-model jseval query answered Captain
+Mortimer Flux exactly with zero query/anchor errors
+(`tmp/2478-model-query/tier2-eval.json`). Official stop reported
+`portsClosed:true`; quick_health reported ABSENT with no foreign/orphan process.
+
+Hosted CI35797331099 at `358af2cb4` passed every lane except Windows-native:
+`WindowsParserContainmentTest`'s first cold child bootstrap took longer than its
+test-only PID deadline, while the retry passed. The assertion and response clocks
+were extended without weakening the containment condition; focused local2483
+passed. Commit `22b76b850` was pushed. CI35799156920 passed Windows-native,
+app-ui and system integration, but search-worker failed once in
+`IndexGenerationVduEligibilityTest`: a strict state reader contended on the old
+file and reopened during the writer's `state.json -> state.json.prev`, then
+temporary missing-path gap. The retry passed. `tmp/2479-hosted-windows-native-log.txt`
+and `tmp/2490-hosted-search-worker-log.txt` retain the exact hosted failures.
+
+The narrow `ContendedFileReads` correction retries `NoSuchFileException` only
+after it observed lock contention, within the existing bounded wait. An initially
+missing path still fails immediately. Focused local configuration and worker
+tests (2491/2492) and configuration Spotless/PMD (2499) pass. A Linux-only
+regression holds an exclusive lock, rotates the path, leaves the replacement
+gap open, and requires the reader to reopen the new named file. Commit
+`e3b7b6d3c` is pushed. Hosted CI35800678462 completed successfully at the
+exact commit: all 13 jobs passed, including search-worker, Windows-native,
+app-ui, system integration, and public claims. Downloaded search-worker XML
+`tmp/2506-hosted-search-worker-results` confirms all 12
+`IndexGenerationVduEligibilityTest` cases passed, including the formerly
+failing strict reopen case (zero failures/errors/skips); its configuration XML
+confirms all seven `ContendedFileReadsTest` cases passed, including the Linux
+replacement-gap regression (zero failures/errors/skips). The corrected
+candidate-context slice has integrated, installed standard-model and hosted
+proof. These results do not establish D1-4 composition or later stages.

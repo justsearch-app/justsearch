@@ -36,6 +36,14 @@ import org.junit.jupiter.api.io.TempDir;
 final class HeadlessAppShutdownWiringTest {
 
   @Test
+  void uncaughtFailureHardStopsAfterCrashReportingWithoutEnteringJvmShutdown(@TempDir Path tempDir) {
+    var selected = new AtomicInteger(-1);
+    HeadlessApp.fatalUncaughtHandler(tempDir, selected::set)
+        .uncaughtException(Thread.currentThread(), new IllegalStateException("fatal probe"));
+    assertEquals(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT, selected.get());
+  }
+
+  @Test
   void stalledStartupCannotHoldFatalCleanupIndefinitelyOrClaimQuiescence() {
     var stalled = new CompletableFuture<>();
     var instanceLock = mock(AppInstanceLock.class);
@@ -66,7 +74,7 @@ final class HeadlessAppShutdownWiringTest {
     steps.stream().filter(step -> "head-assembly".equals(step.name())).findFirst().orElseThrow()
         .action().run(Reason.QUIT);
     assertEquals("FAILED", indexStep.action().run(Reason.QUIT));
-    lockStep.action().run(Reason.QUIT);
+    assertThrows(IllegalStateException.class, () -> lockStep.action().run(Reason.QUIT));
     org.mockito.Mockito.verifyNoInteractions(instanceLock);
     assertThrows(IllegalStateException.class, () -> storeStep.action().run(Reason.QUIT));
     assertThrows(IllegalStateException.class, () -> resourceStep.action().run(Reason.QUIT));
@@ -81,6 +89,30 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(operations).close();
     order.verify(resources).close();
     order.verify(instanceLock).close();
+  }
+
+  @Test
+  void refusedLiveWorkDrainRetainsHeadStoreResourcesAndInstanceLock(@TempDir Path tempDir) throws Exception {
+    var admission = mock(EngineAdmissionService.class);
+    var attempts = mock(io.justsearch.app.api.operations.OperationAttemptRunner.class);
+    var head = mock(HeadAssembly.class);
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    when(admission.awaitDrained(java.time.Duration.ofSeconds(5))).thenReturn(false);
+    when(attempts.awaitDrained(java.time.Duration.ofSeconds(5))).thenReturn(false);
+    var sequence = new EngineShutdownSequence(tempDir,
+        HeadlessApp.orderedShutdownSteps(null, head, null, null, null, null, null,
+            instanceLock, mock(OperationLeaseService.class), admission, resources, () -> null,
+            operations, attempts), ignored -> {});
+
+    var result = sequence.run(Reason.QUIT);
+
+    assertFalse(result.clean());
+    assertTrue(result.errors().stream().anyMatch(error -> error.contains("live-work-drain")));
+    org.mockito.Mockito.verify(attempts).beginClosing();
+    org.mockito.Mockito.verifyNoInteractions(head, resources, instanceLock);
+    org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
   }
 
   @Test
@@ -179,6 +211,7 @@ final class HeadlessAppShutdownWiringTest {
             processResources,
             instanceLock);
     order.verify(manifest).markShutdownPending(Reason.RESTART.wire());
+    order.verify(admission).beginClosing();
     order.verify(leases).freezeAdmission(Reason.RESTART.wire());
     order.verify(admission).cancelInteractive(Reason.RESTART.wire());
     order.verify(watcher).close();
@@ -282,6 +315,7 @@ final class HeadlessAppShutdownWiringTest {
       sequence.run(reason);
 
       var order = inOrder(leases, admission, api, assembly);
+      order.verify(admission).beginClosing();
       order.verify(leases).freezeAdmission(reason.wire());
       order.verify(admission).cancelInteractive(reason.wire());
       order.verify(api).stop();

@@ -76,6 +76,7 @@ final class CoreOperationCatalogTest {
             "core.create-user-policy",
             "core.allowlist-add-digest",
             "core.reset-settings",
+            "core.reconfigure",
             "core.cancel-indexing-job",
             "core.retry-indexing-job",
             "core.resolve-path-hash",
@@ -405,6 +406,20 @@ final class CoreOperationCatalogTest {
     assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
     assertEquals(Set.of(ExecutorTag.UI), op.executors());
+  }
+
+  @Test
+  void reconfigureIsAUiOnlyNoConfirmReconfigureRecordWithWitnessEnvelope() {
+    Operation op = catalog.findById(CoreOperationCatalog.RECONFIGURE).orElseThrow();
+    assertEquals(RiskTier.MEDIUM, op.policy().risk());
+    assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
+    assertEquals(OperationKind.RECONFIGURE, op.policy().recordKind());
+    assertEquals(AuditPolicy.METADATA_ONLY, op.policy().audit());
+    assertEquals(Set.of(ExecutorTag.UI), op.executors());
+    assertTrue(op.intf().inputs().contains("\"settings\""));
+    assertTrue(op.intf().inputs().contains("\"witness\""));
+    assertTrue(op.intf().inputs().contains("\"operationKey\""));
+    assertTrue(op.intf().inputs().contains("\"modeIntent\""));
   }
 
   /**

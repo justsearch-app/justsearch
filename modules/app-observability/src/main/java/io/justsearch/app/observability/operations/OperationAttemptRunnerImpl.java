@@ -16,6 +16,7 @@ import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.core.context.EngineContext;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,10 +50,43 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   private final List<OperationRecord> interrupted;
   private final Map<Long, Control> active = new ConcurrentHashMap<>();
   private final CompletableFuture<PersistenceFailure> persistenceFailure = new CompletableFuture<>();
+  private final Object executionLock = new Object();
+  private boolean closing;
+  private int liveExecutions;
 
   @Override
   public CompletionStage<PersistenceFailure> persistenceFailure() {
     return persistenceFailure.minimalCompletionStage();
+  }
+
+  @Override
+  public void beginClosing() {
+    synchronized (executionLock) {
+      closing = true;
+      executionLock.notifyAll();
+    }
+  }
+
+  @Override
+  public boolean awaitDrained(Duration timeout) {
+    Objects.requireNonNull(timeout, "timeout");
+    long budget = timeout.toNanos();
+    if (budget < 0) throw new IllegalArgumentException("Drain timeout must be nonnegative");
+    long deadline = System.nanoTime() + budget;
+    synchronized (executionLock) {
+      if (!closing) throw new IllegalStateException("Drain requires process closing");
+      while (liveExecutions != 0) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) return false;
+        try {
+          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(executionLock, remaining);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return false;
+        }
+      }
+      return true;
+    }
   }
 
   /** Construct synchronously before the index fork; kind ownership is declared before the sweep. */
@@ -349,6 +383,30 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private Result execute(Control control, Function<OperationRecordHandle, OperationExecution> body, boolean resume) {
+    synchronized (executionLock) {
+      if (closing) throw new IllegalStateException("Operation execution refused during process shutdown");
+      liveExecutions++;
+    }
+    var methodExited = new AtomicBoolean();
+    var released = new AtomicBoolean();
+    Runnable release = () -> {
+      if (methodExited.get() && control.done.isDone() && released.compareAndSet(false, true)) {
+        synchronized (executionLock) {
+          liveExecutions--;
+          executionLock.notifyAll();
+        }
+      }
+    };
+    control.done.whenComplete((ignored, failure) -> release.run());
+    try {
+      return executeOwned(control, body, resume);
+    } finally {
+      methodExited.set(true);
+      release.run();
+    }
+  }
+
+  private Result executeOwned(Control control, Function<OperationRecordHandle, OperationExecution> body, boolean resume) {
     try {
       if (!(resume ? store.resume(control.id) : store.start(control.id))) {
         OperationRecord row = current(control);
@@ -468,16 +526,25 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   public OperationResult applySettings(OperationRecordHandle handle,
       SettingsWitness expected, io.justsearch.app.api.UiSettings candidate) {
     Objects.requireNonNull(expected, "expected settings witness");
-    return applySettingsOwned(handle, expected, candidate, false);
+    return applySettingsOwned(handle, expected, candidate, false, null);
+  }
+
+  @Override
+  public OperationResult applySettings(OperationRecordHandle handle,
+      SettingsWitness expected, io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    Objects.requireNonNull(expected, "expected settings witness");
+    return applySettingsOwned(handle, expected, candidate, false, Objects.requireNonNull(work, "work"));
   }
 
   @Override
   public OperationResult applySettingsReset(OperationRecordHandle handle) {
-    return applySettingsOwned(handle, null, null, true);
+    return applySettingsOwned(handle, null, null, true, null);
   }
 
   private OperationResult applySettingsOwned(OperationRecordHandle handle, SettingsWitness expected,
-      io.justsearch.app.api.UiSettings candidate, boolean reset) {
+      io.justsearch.app.api.UiSettings candidate, boolean reset,
+      io.justsearch.app.api.EngineWorkHandle work) {
     if (settingsOwner == null) throw new IllegalStateException("Settings owner is not composed");
     if (!(handle instanceof OperationAttemptRunnerImpl.Control control)
         || active.get(control.id) != control || control.bodyThread != Thread.currentThread()
@@ -494,6 +561,10 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (!control.settingsStarted.compareAndSet(false, true)) {
       throw new IllegalStateException("Settings commitment already attempted");
     }
+    io.justsearch.app.api.EngineWorkHandle.Registration cancellation = work == null ? null
+        : work.onCancel(ignored -> {
+          synchronized (control) { control.settingsCancellationRequested = true; }
+        });
     try {
       var reservation = Objects.requireNonNull(reset
           ? settingsOwner.reserveReset(row, store.acceptedPreparation(control.id).orElseThrow(
@@ -525,6 +596,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     } catch (Error fatal) {
       fatalSettings(control, fatal);
       throw fatal;
+    } finally {
+      if (cancellation != null) cancellation.close();
     }
   }
 
@@ -748,18 +821,36 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     private final AtomicBoolean settingsRestartRequested = new AtomicBoolean();
     private volatile Thread bodyThread;
     private volatile SettingsCommitOwner.Receipt settingsReceipt;
+    private SettingsCommitOwner.Receipt admittedSettingsReceipt;
+    private boolean settingsCancellationRequested;
     private volatile boolean settingsUncertain;
     private volatile RuntimeException settingsFailure;
     private long settingsExpected;
     // Kept separate from the handler-visible Control: casting its handle must not expose commit authority.
     private final SettingsCommitOwner.AttemptControl settingsControl = new SettingsCommitOwner.AttemptControl() {
-      @Override public void committed(SettingsCommitOwner.Receipt receipt) {
-        if (receipt == null || settingsReceipt != null || !key.equals(receipt.operationKey())
-            || receipt.acceptedRevision() != Math.addExact(settingsExpected, 1)) {
-          settingsUncertain = true;
-          throw new IllegalStateException("Settings owner supplied a contradictory receipt");
+      @Override public boolean admitCommit(SettingsCommitOwner.Receipt receipt) {
+        synchronized (Control.this) {
+          if (receipt == null || admittedSettingsReceipt != null || settingsReceipt != null
+              || !key.equals(receipt.operationKey())
+              || receipt.acceptedRevision() != Math.addExact(settingsExpected, 1)) {
+            settingsUncertain = true;
+            throw new IllegalStateException("Settings owner supplied a contradictory receipt");
+          }
+          if (settingsCancellationRequested) return false;
+          admittedSettingsReceipt = receipt;
+          return true;
         }
-        settingsReceipt = receipt;
+      }
+      @Override public void committed(SettingsCommitOwner.Receipt receipt) {
+        synchronized (Control.this) {
+          // Only the exact receipt admitted before replacement may cross the commit boundary.
+          // A cancellation after admission is advisory, but no owner can skip arbitration.
+          if (receipt == null || receipt != admittedSettingsReceipt || settingsReceipt != null) {
+            settingsUncertain = true;
+            throw new IllegalStateException("Settings owner committed without exact admission");
+          }
+          settingsReceipt = receipt;
+        }
       }
       @Override public void uncertain() { settingsUncertain = true; }
     };

@@ -24,6 +24,7 @@ import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.registry.executor.OperationExecutorImpl;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.settings.SettingsCommitCoordinator;
+import io.justsearch.app.services.settings.SettingsComponentComposer;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.resolved.ConfigStore;
 import java.nio.file.Files;
@@ -60,7 +61,8 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
     var owner = new SettingsCommitCoordinator(settings,
         new ConfigStore(ConfigStoreRebuilder.prepare(initial)),
         () -> { throw new AssertionError("Unexpected settings restart"); },
-        candidate -> OperationResult.success("Settings committed"));
+        candidate -> OperationResult.success("Settings committed"),
+        () -> false, inMemoryComponents());
     runner = new OperationAttemptRunnerImpl(operations, Clock.systemUTC(),
         Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE), owner);
     spec = new RuntimeSpecStore(settings, runner);
@@ -75,7 +77,8 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
     var owner = new SettingsCommitCoordinator(settings,
         java.util.Objects.requireNonNull(config, "config"),
         () -> { throw new AssertionError("Unexpected settings restart"); },
-        candidate -> OperationResult.success("Settings committed"));
+        candidate -> OperationResult.success("Settings committed"),
+        () -> false, inMemoryComponents());
     runner = new OperationAttemptRunnerImpl(operations, Clock.systemUTC(),
         Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE), owner);
     spec = new RuntimeSpecStore(settings, runner);
@@ -91,6 +94,25 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
 
   public RuntimeSpecStore spec() {
     return spec;
+  }
+
+  /**
+   * Runtime-intent tests do not compose real inference or registry owners.  They still opt into
+   * the coordinator's prepared-component protocol explicitly so a test fixture cannot become an
+   * accidental production fallback.
+   */
+  private static SettingsComponentComposer inMemoryComponents() {
+    return (candidate, desired, affected) -> new SettingsComponentComposer.Prepared() {
+      @Override public void validate() { }
+
+      @Override public void install() { }
+
+      @Override public void notifyObservers() { }
+
+      @Override public void retire() { }
+
+      @Override public void abort() { }
+    };
   }
 
   /** Real prepared dispatcher around one handler under test. */

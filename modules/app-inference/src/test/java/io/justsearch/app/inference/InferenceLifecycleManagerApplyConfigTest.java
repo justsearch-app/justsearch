@@ -115,7 +115,6 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       var prepared = manager.prepareResolvedConfig(b, resolvedB);
 
-      prepared.validateForCommit();
       assertSame(a, manager.currentConfig());
       assertEquals(4096, manager.configuredContextTokens(),
           "candidate B must not become the serving projection before outer commit");
@@ -125,12 +124,115 @@ final class InferenceLifecycleManagerApplyConfigTest {
       server.recovery.accept(() -> server.active.get() == incumbent);
       verify(server.mock(), never()).recoverActiveServer();
 
-      prepared.installAfterSettingsCommit();
+      prepared.withLifecycleLock(() -> {
+        prepared.validateForCommit();
+        prepared.installAfterSettingsCommit();
+      });
+      prepared.retireAfterSettingsCommit();
 
       assertSame(b, manager.currentConfig());
       assertEquals(8192, manager.configuredContextTokens());
       server.recovery.accept(() -> true);
       verify(server.mock(), times(1)).recoverActiveServer();
+    }
+  }
+
+  @Test
+  void coldEnablePublishesModeAtCommitBeforeRetirement() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      var prepared = manager.prepareResolvedConfig(b, resolvedB, true);
+
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      assertSame(a, manager.currentConfig());
+      assertSame(b, server.active.get().context().inference());
+      prepared.withLifecycleLock(prepared::installAfterSettingsCommit);
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertSame(b, manager.currentConfig());
+
+      prepared.retireAfterSettingsCommit();
+
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertSame(b, server.active.get().context().inference());
+      assertEquals(1, server.starts.size());
+    }
+  }
+
+  @Test
+  void disableRetainsIncumbentUntilCommitThenRetiresIt() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      var incumbent = server.active.get();
+
+      var prepared = manager.prepareResolvedConfig(b, resolvedB, false);
+
+      assertSame(incumbent, server.active.get());
+      assertSame(a, manager.currentConfig());
+      assertNull(prepared.declaredConfigHash());
+      prepared.withLifecycleLock(prepared::installAfterSettingsCommit);
+      assertSame(incumbent, server.active.get());
+      assertSame(b, manager.currentConfig());
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+
+      prepared.retireAfterSettingsCommit();
+
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      assertNull(server.active.get());
+      verify(server.mock(), times(1)).stopLlamaServer();
+    }
+  }
+
+  @Test
+  void lifecycleCallbackFencesRecoveryBeforePublicationLockAcquisition() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    var ownerLocked = new CountDownLatch(1);
+    var releaseOwner = new CountDownLatch(1);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      manager.switchToOnlineMode();
+      var prepared = manager.prepareResolvedConfig(b, resolvedB);
+      var guarded = tasks.submit(() -> prepared.withLifecycleLock(() -> {
+        ownerLocked.countDown();
+        try {
+          if (!releaseOwner.await(5, TimeUnit.SECONDS)) throw new AssertionError("release timeout");
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(interrupted);
+        }
+        prepared.installAfterSettingsCommit();
+      }));
+      assertTrue(ownerLocked.await(5, TimeUnit.SECONDS));
+      var recovery = tasks.submit(() -> server.recovery.accept(() -> true));
+      assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS));
+      releaseOwner.countDown();
+      guarded.get(5, TimeUnit.SECONDS);
+      recovery.get(5, TimeUnit.SECONDS);
+      verify(server.mock(), never()).recoverActiveServer();
+      prepared.retireAfterSettingsCommit();
+    } finally {
+      releaseOwner.countDown();
     }
   }
 

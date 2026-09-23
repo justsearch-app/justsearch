@@ -91,6 +91,8 @@ public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.app.services.bootstrap.CapabilityGraph capabilities;
   private io.justsearch.app.services.bootstrap.SubstrateGraph substrateGraph;
   private final InferenceLifecycleManager inferenceManager;
+  private final boolean inferenceLiteMode;
+  private final Path inferenceBaseDir;
   private final io.justsearch.core.component.ComponentHandle generativeComponent;
   private final AutoCloseable capabilityConditions;
   // Tempdoc 518 Wave A-E defect Fix-3 (ported from main commits 17545ad2a + 3a5355216) —
@@ -480,6 +482,10 @@ public final class HeadAssembly implements AutoCloseable {
     // §4 Phase 2 — CapabilityPhase first (F3 reorder); mode-change listener attached in
     // ServicePhase after the manager exists.
     boolean liteMode = EnvRegistry.LITE_MODE.getBoolean(false);
+    this.inferenceLiteMode = liteMode;
+    this.inferenceBaseDir =
+        io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
+            rc, io.justsearch.configuration.SystemAccess.sysProp("user.dir"));
     boolean inferenceConfigured =
         io.justsearch.app.services.bootstrap.phases.InferenceDecision.decideInferenceConfigured(rc, liteMode);
     // Tempdoc 541 §5.3 + fix-pass D.1 — CapabilityPhase uses the unified PhaseOutcome-aware
@@ -1093,6 +1099,8 @@ public final class HeadAssembly implements AutoCloseable {
     this.searchPort = searchPort;
     this.knowledgeClient = null;
     this.inferenceManager = null;
+    this.inferenceLiteMode = false;
+    this.inferenceBaseDir = Path.of(io.justsearch.configuration.SystemAccess.sysProp("user.dir"));
     this.gpuBroadcastListener = null;
     this.runtimeReconciler = null;
     this.offlineCoordinator = null;
@@ -1668,7 +1676,7 @@ public final class HeadAssembly implements AutoCloseable {
     }
   }
 
-  static io.justsearch.core.component.ComponentSpec generativeSpec() {
+  public static io.justsearch.core.component.ComponentSpec generativeSpec() {
     return new io.justsearch.core.component.ComponentSpec(
         "generative",
         false,
@@ -1858,6 +1866,19 @@ public final class HeadAssembly implements AutoCloseable {
   /** The same generative owner used by mode and activation producers. */
   public io.justsearch.core.component.ComponentHandle generativeComponent() {
     return generativeComponent;
+  }
+
+  /** Fixed settings owner for the Head-managed generative runtime. */
+  public io.justsearch.app.services.settings.FixedSettingsComponentComposer.Owner
+      generativeSettingsOwner() {
+    if (generativeComponent == null) {
+      throw new IllegalStateException("Generative component observation is unavailable");
+    }
+    return new GenerativeSettingsComponentOwner(
+        inferenceManager,
+        generativeComponent,
+        inferenceBaseDir,
+        inferenceLiteMode);
   }
 
   public io.justsearch.app.services.bootstrap.CapabilityGraph capabilities() {

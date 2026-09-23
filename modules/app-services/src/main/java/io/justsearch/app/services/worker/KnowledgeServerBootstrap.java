@@ -739,21 +739,23 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
 
 
-        // Release app lock last (after we have stopped all components that might touch the data dir).
-        if (appLock != null) {
+        // The in-process index still owns its data directory after a refused native or runtime
+        // close. Keep the exclusion lock and startup state so an ordered retry can finish it.
+        if (outcome == ShutdownOutcome.GRACEFUL && appLock != null) {
             try {
                 appLock.close();
+                appLock = null;
             } catch (Exception e) {
                 log.warn("Error releasing app lock", e);
+                outcome = ShutdownOutcome.FAILED;
             }
-            appLock = null;
         }
 
         try {
             // Suppressed between boot attempts AND across boot-recovery cycles (tempdoc 825): a retry
             // would immediately re-enter PENDING, and the OFFLINE flap in between is narration of a
             // state the Head was never actually in.
-            if (!narrationSuppressed()) {
+            if (outcome == ShutdownOutcome.GRACEFUL && !narrationSuppressed()) {
                 indexComponent.transition(
                     ComponentState.ABSENT,
                     LifecycleReasonCode.WORKER_SHUT_DOWN.code(),
@@ -762,7 +764,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         } finally {
             // Must clear even if a capability listener throws: a stranded started=true would make
             // the next start() throw "already started" and replace the real cause in the log.
-            started.set(false);
+            if (outcome == ShutdownOutcome.GRACEFUL) started.set(false);
             physicalHealthy = false;
             healthyInitializationComplete = false;
         }

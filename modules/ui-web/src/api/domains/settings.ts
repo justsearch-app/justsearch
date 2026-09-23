@@ -45,6 +45,10 @@ export interface AppSettings {
   ui?: UISettings | undefined;
   llm?: LLMSettings | undefined;
   indexPaths?: string[] | undefined;
+  /** Desired API listener policy: null/omitted follows resolver defaults, 0 is ephemeral. */
+  apiPort?: number | undefined;
+  /** A completed settings write requested a successor process for restart-required values. */
+  restartScheduled?: boolean | undefined;
   settingsMode?: 'read_write' | 'in_memory' | undefined;
   witness?: SettingsWitness;
 }

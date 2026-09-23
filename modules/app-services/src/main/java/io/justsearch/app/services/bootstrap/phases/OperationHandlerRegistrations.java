@@ -30,6 +30,7 @@ import io.justsearch.app.services.registry.operations.handlers.PingBackendHandle
 import io.justsearch.app.services.registry.operations.handlers.PreflightAiPackHandler;
 import io.justsearch.app.services.registry.operations.handlers.PreviewExcludesHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReconcileRootHandler;
+import io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReindexHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReloadInferenceHandler;
 import io.justsearch.app.services.registry.operations.handlers.RemoveWatchedRootHandler;
@@ -182,6 +183,8 @@ public final class OperationHandlerRegistrations {
         new AllowlistAddDigestHandler(policyServiceSupplier));
     handlers.register(
         CoreOperationCatalog.RESET_SETTINGS, new ResetSettingsHandler(settingsServiceSupplier));
+    handlers.register(
+        CoreOperationCatalog.RECONFIGURE, new ReconfigureHandler(settingsServiceSupplier));
     return workerService;
   }
 }

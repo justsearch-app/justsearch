@@ -78,6 +78,159 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void generationBoundChangeRefusesWithReindexPointerBeforeFileOrConfigPublication()
+      throws Exception {
+    Path settingsPath = temp.resolve("generation-bound-settings.json");
+    try (var operations = operations("generation-bound")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+      var config = new ConfigStore(initial);
+      var owner = coordinator(settings, config);
+      var runner = runner(operations, owner);
+      UiSettings candidate = new UiSettings();
+      candidate.setEmbedOnnxModelPath(temp.resolve("different-encoder.onnx").toString());
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertFalse(result.response().success());
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("GENERATION_BOUND_REQUIRES_REINDEX",
+          result.response().errorCode().orElseThrow());
+      assertEquals("core.bulk-reindex", result.response().errorDetails().get("operation"));
+      assertTrue(((List<?>) result.response().errorDetails().get("keys"))
+          .contains("justsearch.embed.onnx.model_path"));
+      assertFalse(Files.exists(settingsPath));
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertSame(initial, config.get());
+    }
+  }
+
+  @Test
+  void componentChangeRefusesBeforePublicationUntilItsRuntimeOwnerCanPrepare() throws Exception {
+    Path settingsPath = temp.resolve("component-settings.json");
+    try (var operations = operations("component")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+      var config = new ConfigStore(initial);
+      var owner = coordinator(settings, config);
+      var runner = runner(operations, owner);
+      UiSettings candidate = new UiSettings();
+      candidate.setContextLength(initial.ai().contextSize() + 1024);
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("COMPONENT_PREPARATION_REQUIRED", result.response().errorCode().orElseThrow());
+      assertFalse(Files.exists(settingsPath));
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertSame(initial, config.get());
+    }
+  }
+
+  @Test
+  void chatEnabledChangeCannotEscapeThroughPostcommitReconciler() throws Exception {
+    Path settingsPath = temp.resolve("chat-component-settings.json");
+    try (var operations = operations("chat-component")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+      var config = new ConfigStore(initial);
+      var runner = runner(operations, coordinator(settings, config));
+      UiSettings candidate = new UiSettings();
+      candidate.setChatEnabled(true);
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("COMPONENT_PREPARATION_REQUIRED", result.response().errorCode().orElseThrow());
+      assertFalse(Files.exists(settingsPath));
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertSame(initial, config.get());
+    }
+  }
+
+  @Test
+  void impossiblePostcommitInstallerFailureRetainsCommittedWitnessForOrderedRecovery()
+      throws Exception {
+    Path settingsPath = temp.resolve("committed-install-failure.json");
+    AtomicInteger restarts = new AtomicInteger();
+    try (var operations = operations("committed-install-failure")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      SettingsComponentComposer components = (candidate, desired, affected) ->
+          new SettingsComponentComposer.Prepared() {
+            @Override public void validate() {}
+            @Override public void install() { throw new IllegalStateException("broken prepared install"); }
+            @Override public void notifyObservers() {}
+            @Override public void retire() {}
+            @Override public void abort() {}
+          };
+      var owner = new SettingsCommitCoordinator(settings, config, restarts::incrementAndGet,
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(operations, owner);
+      UiSettings candidate = new UiSettings();
+      candidate.setChatEnabled(true);
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      assertThrows(IllegalStateException.class, () -> runner.start(attempt, handle ->
+          OperationExecution.finished(runner.applySettings(handle, currentWitness(settings), candidate))));
+
+      assertEquals(new SettingsWitness(1, attempt.accepted().key()), settings.inspect().witness());
+      assertEquals(OperationState.RUNNING,
+          operations.find(attempt.accepted().key()).orElseThrow().state());
+      assertEquals(1, restarts.get());
+    }
+  }
+
+  @Test
+  void restartRequiredPortCompletesBeforeSchedulingOneRequestedRestart() throws Exception {
+    Path settingsPath = temp.resolve("restart-port-settings.json");
+    AtomicInteger restarts = new AtomicInteger();
+    AtomicReference<String> committedKey = new AtomicReference<>();
+    try (var operations = operations("restart-port")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      int servingPort = config.get().ports().apiPort();
+      var servingPortResolution = config.get().resolution("justsearch.api.port");
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {
+        assertEquals(new SettingsWitness(1, committedKey.get()), settings.inspect().witness());
+        assertEquals(OperationState.COMPLETE,
+            operations.find(committedKey.get()).orElseThrow().state());
+        assertEquals(servingPort, config.get().ports().apiPort());
+        restarts.incrementAndGet();
+      }, candidate -> OperationResult.success("prepared"));
+      var runner = runner(operations, owner);
+      UiSettings candidate = new UiSettings();
+      candidate.setApiPort(0);
+      var request = request(OperationKind.RECONFIGURE);
+      var attempt = runner.accept(request);
+      committedKey.set(attempt.accepted().key());
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertTrue(result.response().success());
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(Boolean.TRUE, result.response().structuredData().get("restartScheduled"));
+      assertEquals(1, restarts.get());
+      assertEquals(Integer.valueOf(0), settings.inspect().settings().configuredApiPort());
+      assertEquals(servingPort, config.get().ports().apiPort());
+      assertEquals(servingPortResolution, config.get().resolution("justsearch.api.port"));
+      assertEquals(new SettingsWitness(1, attempt.accepted().key()), settings.inspect().witness());
+      var retry = runner.start(runner.accept(request), ignored -> {
+        throw new AssertionError("recorded reconfigure must not execute again");
+      });
+      assertEquals(OperationState.COMPLETE, retry.record().state());
+      assertEquals(1, restarts.get(), "a receipt lookup cannot schedule a second restart");
+    }
+  }
+
+  @Test
   void delayedRetryReturnsItsCommittedRevisionWithoutOverwritingLaterSettings() throws Exception {
     try (var operations = operations("delayed-retry")) {
       var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
@@ -650,6 +803,45 @@ final class SettingsCommitCoordinatorTest {
         () -> first.apply(reservation, candidate("light", List.of()), new RecordingControl()));
   }
 
+  @Test
+  void cancellationBeforeCommitAdmissionLeavesFileWitnessAndServingConfigUntouched() {
+    var path = temp.resolve("cancel-before-commit.json");
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, path);
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+    var serving = config.get();
+    var owner = coordinator(settings, config);
+    owner.inspectRecovery(List.of());
+    var reservation = owner.reserve(1, OperationKeys.generate(CLOCK), new SettingsWitness(0, null));
+    var control = new RecordingControl(false);
+
+    assertThrows(java.util.concurrent.CancellationException.class,
+        () -> owner.apply(reservation, candidate("dark", List.of()), control));
+
+    assertFalse(Files.exists(path));
+    assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    assertSame(serving, config.get());
+    assertNull(control.receipt);
+    owner.releaseAfterTerminal(1);
+  }
+
+  @Test
+  void processClosingRefusesBeforeReplacingSettings() {
+    var path = temp.resolve("closing-before-commit.json");
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, path);
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+    var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+        candidate -> OperationResult.success("prepared"), () -> true);
+    owner.inspectRecovery(List.of());
+    var reservation = owner.reserve(1, OperationKeys.generate(CLOCK), new SettingsWitness(0, null));
+
+    var refused = assertThrows(SettingsCommitOwner.Refused.class,
+        () -> owner.apply(reservation, candidate("dark", List.of()), new RecordingControl()));
+    assertEquals("ENGINE_CLOSING", refused.response().errorCode().orElseThrow());
+    assertFalse(Files.exists(path));
+    assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    owner.releaseAfterTerminal(1);
+  }
+
   private void bootDecision(String name, long expected, long observed, boolean exact,
       OperationState state, String failureReason) throws Exception {
     try (var operations = operations(name)) {
@@ -749,6 +941,13 @@ final class SettingsCommitCoordinatorTest {
   private static final class RecordingControl implements SettingsCommitOwner.AttemptControl {
     private SettingsCommitOwner.Receipt receipt;
 
+    private final boolean admit;
+
+    private RecordingControl() { this(true); }
+
+    private RecordingControl(boolean admit) { this.admit = admit; }
+
+    @Override public boolean admitCommit(SettingsCommitOwner.Receipt receipt) { return admit; }
     @Override public void committed(SettingsCommitOwner.Receipt receipt) { this.receipt = receipt; }
     @Override public void uncertain() {}
   }

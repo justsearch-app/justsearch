@@ -94,6 +94,18 @@ public record ResolvedConfig(
     return resolutions.get(key);
   }
 
+  /** Keep the currently bound API port in a serving snapshot until a successor boots. */
+  public ResolvedConfig retainingApiPortFrom(ResolvedConfig serving) {
+    Objects.requireNonNull(serving, "serving");
+    Map<String, ConfigResolution> traces = new LinkedHashMap<>(resolutions);
+    ConfigResolution prior = serving.resolution("justsearch.api.port");
+    if (prior == null) traces.remove("justsearch.api.port");
+    else traces.put("justsearch.api.port", prior);
+    return new ResolvedConfig(paths, new Ports(serving.ports().apiPort(), ports.serverPort()), ai,
+        agent, summary, search, telemetry, policy, ui, watcher, ocr, extraction, index, rag,
+        hybridSearch, worker, collections, workerIndexer, infraHealth, traces);
+  }
+
   /** Creates a new builder for constructing a {@link ResolvedConfig}. */
   public static ResolvedConfigBuilder builder() {
     return new ResolvedConfigBuilder();

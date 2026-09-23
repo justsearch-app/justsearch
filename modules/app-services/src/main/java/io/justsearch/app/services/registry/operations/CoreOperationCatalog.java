@@ -318,6 +318,13 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef(io.justsearch.app.services.settings.SettingsResetPreparation.OPERATION_ID);
 
   /**
+   * D1-4: the accepted settings transaction. The HTTP settings front supplies the complete
+   * {@code SettingsV2} witness and optional UI mode intent as one typed operation envelope;
+   * the operation runner owns acceptance and terminal persistence.
+   */
+  public static final OperationRef RECONFIGURE = new OperationRef("core.reconfigure");
+
+  /**
    * Slice 491 §9.D Phase E (C4 / E3) — agent navigation tool. Gives the agent loop a
    * structured tool-call form of navigation that complements the URL-emission path. The
    * handler dispatches a {@link io.justsearch.agent.api.registry.ShellAddress.Navigation}
@@ -363,6 +370,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
       createUserPolicy(),
       allowlistAddDigest(),
       resetSettings(),
+      reconfigure(),
       cancelIndexingJob(),
       retryIndexingJob(),
       resolvePathHash(),
@@ -1165,6 +1173,33 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI),
         // Slice 481 §7 step 2: factory-reset; admin-class destructive operation.
         Audience.OPERATOR);
+  }
+
+  private static final String RECONFIGURE_INPUT_SCHEMA =
+      "{\"type\":\"object\",\"additionalProperties\":false,"
+          + "\"required\":[\"settings\",\"modeIntent\"],\"properties\":{"
+          + "\"settings\":{\"type\":\"object\",\"required\":[\"witness\",\"operationKey\"]},"
+          + "\"modeIntent\":{\"type\":[\"string\",\"null\"]}}}";
+
+  private static Operation reconfigure() {
+    return new Operation(
+        RECONFIGURE,
+        Presentation.forId(RECONFIGURE),
+        Interface.of(RECONFIGURE_INPUT_SCHEMA, "{\"type\":\"object\"}"),
+        new OperationPolicy(
+            RiskTier.MEDIUM,
+            ConfirmStrategy.None.INSTANCE,
+            AuditPolicy.METADATA_ONLY,
+            RetryPolicy.noRetry(),
+            Set.of(),
+            false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.RECONFIGURE),
+        OperationAvailability.empty(),
+        OperationLineage.empty(),
+        Binding.of(RECONFIGURE),
+        Provenance.core("1.0"),
+        Set.of(ExecutorTag.UI),
+        Audience.USER);
   }
 
   // Tempdoc 560 WS4 (catalog collapse): the core.navigate-to-surface DEFINITION moved to

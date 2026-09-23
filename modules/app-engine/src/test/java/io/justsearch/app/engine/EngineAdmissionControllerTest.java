@@ -129,6 +129,33 @@ final class EngineAdmissionControllerTest {
   }
 
   @Test
+  void processClosingStaysClosedAfterUpgradeOwnerReleasesItsFreeze() {
+    var admission = new EngineAdmissionController(2, 2, 1);
+    var existing = admission.admit(context("a", EngineContext.Survival.INTERACTIVE), false);
+    var retained = existing.retain();
+    var upgrade = admission.freezeAdmission("upgrade");
+    admission.beginClosing();
+    assertFalse(admission.awaitDrained(java.time.Duration.ZERO),
+        "a durable body still holding its exact work reference is not quiescent");
+    admission.releaseAdmission(upgrade.preparationId());
+    assertTrue(admission.snapshot().admissionFrozen());
+    assertEquals("process-closing", admission.snapshot().preparationId());
+    assertEquals(EngineAdmissionException.Reason.FROZEN,
+        assertThrows(EngineAdmissionException.class,
+            () -> admission.admit(context("a", EngineContext.Survival.INTERACTIVE), true)).reason());
+    assertEquals(EngineAdmissionException.Reason.FROZEN,
+        assertThrows(EngineAdmissionException.class,
+            () -> admission.attach(existing.context())).reason());
+    assertThrows(OperationAdmissionClosedException.class,
+        () -> admission.register("mutation", OpCriticality.MUST_COMPLETE, 1, Map.of()));
+    existing.close();
+    assertEquals(1, admission.activeWorkCount());
+    retained.close();
+    assertEquals(0, admission.activeWorkCount());
+    assertTrue(admission.awaitDrained(java.time.Duration.ZERO));
+  }
+
+  @Test
   void equalAttributionHasIndependentCancellationAndDurableDetachment() {
     var admission = new EngineAdmissionController(3, 3, 1);
     try (var first = admission.admit(context("a", EngineContext.Survival.INTERACTIVE), false);

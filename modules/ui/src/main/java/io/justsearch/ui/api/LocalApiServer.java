@@ -168,9 +168,13 @@ public class LocalApiServer {
         b.telemetry instanceof io.justsearch.telemetry.LocalTelemetry lt0
             ? new HeadApiMetricCatalog(lt0.registry())
             : HeadApiMetricCatalog.noop();
+    var settingsOperations = b.HeadAssembly == null ? null : b.HeadAssembly.substrate().operations();
     this.settingsController = new SettingsController(b.settingsStore, b.indexBasePath, this.telemetry,
         b.settingsService != null ? b.settingsService
-            : b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null ? b.HeadAssembly.serviceOut().settings() : null);
+            : b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null ? b.HeadAssembly.serviceOut().settings() : null,
+        settingsOperations == null ? null : settingsOperations.executor(),
+        settingsOperations == null ? null : settingsOperations.operations().findByIdValue(
+            io.justsearch.app.services.registry.operations.CoreOperationCatalog.RECONFIGURE.value()).orElseThrow());
     // Tempdoc 560 §28: the plugin-trust allowlist is persisted as a sibling of settings.json so an
     // operator approval of a URL-loaded plugin survives restarts (otherwise it silently falls back
     // to UNTRUSTED). Mode follows settings (IN_MEMORY for prod/CI isolation; READ_WRITE for use).
@@ -1079,8 +1083,7 @@ public class LocalApiServer {
   private static Integer resolveConfiguredPort() {
     ConfigStore cs = ConfigStore.globalOrNull();
     if (cs == null) return null;
-    int port = cs.get().ports().apiPort();
-    return port > 0 ? port : null;
+    return cs.get().ports().apiPort();
   }
 
   /** Builder for {@link LocalApiServer}; a Knowledge Server requires an explicit search owner. */

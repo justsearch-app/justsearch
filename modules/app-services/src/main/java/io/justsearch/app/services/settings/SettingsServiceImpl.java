@@ -19,6 +19,7 @@ public final class SettingsServiceImpl implements SettingsService {
   private static final tools.jackson.databind.ObjectMapper JSON = tools.jackson.databind.json.JsonMapper.builder().build();
   private final UiSettingsStore store;
   private final OperationAttemptRunner attempts;
+  private final io.justsearch.app.api.EngineAdmissionService engineAdmission;
   private final Runnable chatEnabledChanged;
   // Replaces the controller's blocking whole-write monitor. Callbacks cannot wait on themselves.
   private final java.util.concurrent.atomic.AtomicBoolean publicWriteActive = new java.util.concurrent.atomic.AtomicBoolean();
@@ -30,13 +31,71 @@ public final class SettingsServiceImpl implements SettingsService {
       };
 
   public SettingsServiceImpl(UiSettingsStore store, OperationAttemptRunner attempts) {
-    this(store, attempts, () -> {});
+    this(store, attempts, () -> {}, null);
   }
 
   public SettingsServiceImpl(UiSettingsStore store, OperationAttemptRunner attempts, Runnable chatEnabledChanged) {
+    this(store, attempts, chatEnabledChanged, null);
+  }
+
+  public SettingsServiceImpl(UiSettingsStore store, OperationAttemptRunner attempts,
+      Runnable chatEnabledChanged, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     this.store = Objects.requireNonNull(store, "store");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.chatEnabledChanged = Objects.requireNonNull(chatEnabledChanged, "chatEnabledChanged");
+    this.engineAdmission = engineAdmission;
+  }
+
+  @Override
+  public OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
+      String modeIntentHeader, io.justsearch.core.context.EngineContext context,
+      OperationRecordHandle record) {
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(context, "context");
+    Objects.requireNonNull(record, "accepted record");
+    if (input.witness() == null || engineAdmission == null || context.workId().isEmpty()) {
+      throw new IllegalArgumentException("Accepted reconfigure requires a witness and exact admitted work");
+    }
+    var patch = SettingsPatch.normalize(input);
+    UiModeIntent modeIntent = modeIntentOf(modeIntentHeader, patch);
+    if (!publicWriteActive.compareAndSet(false, true)) {
+      throw refused("RECONFIGURE_IN_PROGRESS", "Another public settings mutation is active");
+    }
+    boolean changedChat = false;
+    OperationResult result;
+    try {
+      if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled");
+      UiSettingsStore.Snapshot snapshot;
+      try { snapshot = store.inspect(); }
+      catch (CorruptDurableStoreException | UnsupportedStoreVersionException | UncheckedIOException failure) {
+        throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings history cannot be verified");
+      }
+      Long latest = modeIntent == null ? null : latestUiModeIntentByClient.get(modeIntent.clientId());
+      boolean applyMode = modeIntent == null || latest == null || modeIntent.sequence() > latest;
+      var candidate = SettingsPatch.merge(snapshot.settings(), patch, applyMode);
+      String invalidPath = SettingsPatch.validateIndexPath(candidate.getIndexBasePath());
+      if (invalidPath != null) throw refused("INVALID_PATH", invalidPath);
+      try (var work = engineAdmission.attach(context)) {
+        result = attempts.applySettings(record, patch.witness(), candidate, work);
+      } catch (io.justsearch.app.api.EngineAdmissionException refusal) {
+        if (!engineAdmission.isClosing()) throw refusal;
+        throw refused("ENGINE_CLOSING", "Engine shutdown has closed settings admission");
+      }
+      if (result.success()) {
+        if (modeIntent != null && applyMode) latestUiModeIntentByClient.put(modeIntent.clientId(), modeIntent.sequence());
+        changedChat = !Objects.equals(snapshot.settings().getChatEnabled(), candidate.getChatEnabled());
+      }
+    } finally {
+      publicWriteActive.set(false);
+    }
+    if (changedChat) {
+      try { chatEnabledChanged.run(); }
+      catch (RuntimeException failure) {
+        org.slf4j.LoggerFactory.getLogger(SettingsServiceImpl.class)
+            .warn("Settings committed but chat reconciliation notification failed", failure);
+      }
+    }
+    return result;
   }
 
   @Override

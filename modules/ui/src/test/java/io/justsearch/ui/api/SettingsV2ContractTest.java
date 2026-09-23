@@ -93,6 +93,8 @@ final class SettingsV2ContractTest {
     assertTrue(tree.has("llm"), "fixture missing 'llm' key");
     assertTrue(tree.has("indexPaths"), "fixture missing 'indexPaths' key");
     assertTrue(tree.has("settingsMode"), "fixture missing 'settingsMode' key");
+    assertTrue(tree.has("apiPort"), "fixture missing 'apiPort' key");
+    assertTrue(tree.has("restartScheduled"), "fixture missing 'restartScheduled' key");
     assertTrue(tree.get("ui").has("vimMode"), "fixture missing 'ui.vimMode'");
   }
 }

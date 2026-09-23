@@ -22,6 +22,11 @@ public interface SettingsService {
       io.justsearch.app.api.settings.SettingsV2 input, String modeIntentHeader,
       io.justsearch.core.context.EngineContext context);
 
+  /** Execute a public patch inside the already accepted reconfigure row. */
+  OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
+      String modeIntentHeader, io.justsearch.core.context.EngineContext context,
+      OperationRecordHandle record);
+
   /** Freeze the readable witness or absent-history quarantine identity without an effect. */
   OperationPreparation prepareReset(String argumentsJson);
 

@@ -44,6 +44,20 @@ final class KnowledgeServerCloseCompletionTest {
   }
 
   @Test
+  void failedInitializerWithoutPublishedSurfaceCannotProveNativeQuiescence(@TempDir Path tempDir)
+      throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    server.deferredModelInit = CompletableFuture.failedFuture(new IllegalStateException("partial native init"));
+    try {
+      org.junit.jupiter.api.Assertions.assertEquals(io.justsearch.app.api.NativeQuiescence.UNQUIESCED,
+          server.nativeQuiescence());
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
   void failedQueueCloseRetainsServerAndIndexExclusionUntilRetry(@TempDir Path tempDir) throws Exception {
     var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
         WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
@@ -251,5 +265,48 @@ final class KnowledgeServerCloseCompletionTest {
     server.close();
 
     assertTrue(server.awaitClosed(0));
+  }
+
+  @Test
+  void refusedNativeRetirementRetainsServicesAndIndexLockUntilRetry(@TempDir Path tempDir)
+      throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var handle = org.mockito.Mockito.mock(io.justsearch.ort.SessionHandle.class);
+    var closeCalls = new java.util.concurrent.atomic.AtomicInteger();
+    var nativeStatus = new AtomicReference<>(
+        io.justsearch.ort.SessionHandle.RetirementStatus.ACTIVE);
+    org.mockito.Mockito.doAnswer(call -> {
+      nativeStatus.set(closeCalls.incrementAndGet() == 1
+          ? io.justsearch.ort.SessionHandle.RetirementStatus.REFUSED
+          : io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
+      return null;
+    }).when(handle).close();
+    org.mockito.Mockito.when(handle.retirementStatus()).thenAnswer(call -> nativeStatus.get());
+    server.inferenceSurface = new InferenceSurface(java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(),
+        new io.justsearch.ort.PolicySnapshot(io.justsearch.ort.RuntimePolicy.defaults(),
+            new java.util.TreeMap<>()), java.util.List.of(handle));
+    var services = org.mockito.Mockito.mock(WorkerAppServices.class);
+    server.appServices = services;
+    var rootLock = org.mockito.Mockito.mock(io.justsearch.indexerworker.util.IndexRootLock.class);
+    var lockField = KnowledgeServer.class.getDeclaredField("indexRootLock");
+    lockField.setAccessible(true);
+    lockField.set(server, rootLock);
+
+    org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close);
+    assertFalse(server.awaitClosed(0));
+    org.mockito.Mockito.verify(services, org.mockito.Mockito.never()).close();
+    org.mockito.Mockito.verify(rootLock, org.mockito.Mockito.never()).close();
+    org.junit.jupiter.api.Assertions.assertEquals(
+        io.justsearch.app.api.NativeQuiescence.UNQUIESCED, server.nativeQuiescence());
+
+    server.close();
+    assertTrue(server.awaitClosed(0));
+    org.mockito.Mockito.verify(handle, org.mockito.Mockito.times(2)).close();
+    org.mockito.Mockito.verify(rootLock).close();
+    org.junit.jupiter.api.Assertions.assertEquals(
+        io.justsearch.app.api.NativeQuiescence.QUIESCED, server.nativeQuiescence());
   }
 }

@@ -12,6 +12,7 @@ import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -301,7 +302,7 @@ class NativeSessionHandleTest {
       OrtSession cpu = mock(OrtSession.class);
       NativeSessionHandle manager = deferredCpuHandle();
       set(manager, "cpuSession", cpu);
-      SessionHandle.Lease held = manager.acquireCpu();
+      SessionHandle.Lease held = manager.acquireCpu(request());
       CountDownLatch closeFinished = new CountDownLatch(1);
       Thread closer = new Thread(() -> {
         manager.close();
@@ -312,7 +313,7 @@ class NativeSessionHandleTest {
 
       assertEquals(SessionHandle.RetirementStatus.RETIRING, manager.retirementStatus());
       verify(cpu, never()).close();
-      assertThrows(IllegalStateException.class, manager::acquireCpu);
+      assertThrows(SessionRetiredException.class, () -> manager.acquireCpu(request()));
       held.close();
 
       assertTrue(closeFinished.await(1, TimeUnit.SECONDS));
@@ -327,7 +328,7 @@ class NativeSessionHandleTest {
       OrtSession oldCpu = mock(OrtSession.class);
       NativeSessionHandle manager = deferredCpuHandle();
       set(manager, "cpuSession", oldCpu);
-      SessionHandle.Lease held = manager.acquireCpu();
+      SessionHandle.Lease held = manager.acquireCpu(request());
       manager.reportCpuSessionFailure(
           io.justsearch.ort.telemetry.CpuRecreateCause.BFC_ARENA_FAILURE);
 
@@ -336,7 +337,7 @@ class NativeSessionHandleTest {
       Thread recreator = new Thread(() -> {
         attempted.countDown();
         try {
-          manager.acquireCpu();
+          manager.acquireCpu(request());
         } catch (Throwable thrown) {
           outcome.set(thrown);
         }
@@ -350,8 +351,31 @@ class NativeSessionHandleTest {
       recreator.join(1_000);
       assertFalse(recreator.isAlive());
       verify(oldCpu).close();
-      assertInstanceOf(IllegalStateException.class, outcome.get());
+      assertInstanceOf(SessionTemporarilyUnavailableException.class, outcome.get());
       manager.close();
+    }
+
+    @Test
+    void cpuRecreationWaitHonorsAcquisitionDeadlineWithoutClosingHeldInstance() throws Exception {
+      OrtSession oldCpu = mock(OrtSession.class);
+      NativeSessionHandle manager = deferredCpuHandle();
+      set(manager, "cpuSession", oldCpu);
+      SessionHandle.Lease held = manager.acquireCpu(request());
+      manager.reportCpuSessionFailure(
+          io.justsearch.ort.telemetry.CpuRecreateCause.BFC_ARENA_FAILURE);
+
+      assertThrows(
+          SessionAcquireDeadlineExceededException.class,
+          () ->
+              manager.acquireCpu(
+                  SessionAcquisitionRequest.within(
+                      SessionAcquisitionRequest.Urgency.FOREGROUND,
+                      Duration.ofMillis(25))));
+      verify(oldCpu, never()).close();
+
+      held.close();
+      manager.close();
+      verify(oldCpu).close();
     }
 
     @Test
@@ -360,7 +384,7 @@ class NativeSessionHandleTest {
       doThrow(new OrtException("first close refused")).doNothing().when(cpu).close();
       NativeSessionHandle manager = deferredCpuHandle();
       set(manager, "cpuSession", cpu);
-      try (SessionHandle.Lease ignored = manager.acquireCpu()) {
+      try (SessionHandle.Lease ignored = manager.acquireCpu(request())) {
         // Register the injected native identity through the production acquisition seam.
       }
 
@@ -368,7 +392,7 @@ class NativeSessionHandleTest {
       verify(cpu).close();
       assertEquals(SessionHandle.RetirementStatus.REFUSED, manager.retirementStatus());
       assertSame(cpu, manager.peekCpuSession());
-      assertThrows(IllegalStateException.class, manager::acquireCpu);
+      assertThrows(SessionRetiredException.class, () -> manager.acquireCpu(request()));
 
       manager.close();
       verify(cpu, org.mockito.Mockito.times(2)).close();
@@ -398,6 +422,11 @@ class NativeSessionHandleTest {
         .runtime(DEFAULT_RUNTIME)
         .policy(cpuOnlyDeferred())
         .build();
+  }
+
+  private static SessionAcquisitionRequest request() {
+    return SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(2));
   }
 
   private static void set(NativeSessionHandle handle, String name, Object value) throws Exception {

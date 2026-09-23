@@ -300,7 +300,8 @@ public class InferenceLifecycleManager
   /** Crash-recovery callback installed on {@link LlamaServerOps}. Tempdoc 518 P1. */
   private void handleMaxCrashOffline(java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
-      if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
+      if (precommitComposition
+          || !stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
       tokenOps.clearCaches();
       InferenceFailure cleanupFailure = null;
       try {
@@ -317,7 +318,8 @@ public class InferenceLifecycleManager
   /** Serializes a captured physical server's recovery with apply, detach and close. */
   private void recoverManagedServer(java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
-      if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
+      if (precommitComposition
+          || !stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
       serverOps.recoverActiveServer();
     }
   }
@@ -326,7 +328,7 @@ public class InferenceLifecycleManager
   private void handleExternalFailureOffline(
       String reason, java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
-      if (!stillOwned.getAsBoolean()
+      if (precommitComposition || !stillOwned.getAsBoolean()
           || !serverOps.isUsingExternalRaw() || runner.currentMode() != Mode.ONLINE) {
         return;
       }
@@ -800,6 +802,8 @@ public class InferenceLifecycleManager
     private final ConfiguredInference candidateConfiguration;
     private final LlamaServerOps.StartResult candidate;
     private final Mode priorMode;
+    private final boolean enabled;
+    private TransitionRunner.PreparedPublication logicalPublication;
     private volatile State state = State.PREPARED;
 
     private PreparedConfigApply(
@@ -808,13 +812,15 @@ public class InferenceLifecycleManager
         LlamaServerOps.StartResult incumbent,
         ConfiguredInference candidateConfiguration,
         LlamaServerOps.StartResult candidate,
-        Mode priorMode) {
+        Mode priorMode,
+        boolean enabled) {
       this.owner = owner;
       this.incumbentConfiguration = incumbentConfiguration;
       this.incumbent = incumbent;
       this.candidateConfiguration = candidateConfiguration;
       this.candidate = candidate;
       this.priorMode = priorMode;
+      this.enabled = enabled;
     }
 
     /**
@@ -824,8 +830,29 @@ public class InferenceLifecycleManager
     public void validateForCommit() {
       if (state != State.PREPARED
           || owner.preparedConfigApply != this
-          || owner.serverOps.activeStartResult().orElse(null) != candidate) {
+          || owner.serverOps.activeStartResult().orElse(null)
+              != (enabled ? candidate : incumbent)) {
         throw new IllegalStateException("Prepared inference candidate is no longer current");
+      }
+      if (logicalPublication == null) {
+        throw new IllegalStateException("Prepared inference mode publication is not built");
+      }
+      logicalPublication.validate();
+    }
+
+    /**
+     * Runs the outer publication critical section while holding the manager lifecycle monitor.
+     * The caller must invoke this before it acquires the shared publication write lock; the
+     * callback then acquires that lock, validates all owners, commits and installs assignments.
+     */
+    public void withLifecycleLock(Runnable publication) {
+      Objects.requireNonNull(publication, "publication");
+      synchronized (owner.runner.lock()) {
+        if (logicalPublication == null) {
+          logicalPublication = owner.prepareLogicalPublication(enabled, priorMode);
+        }
+        validateForCommit();
+        publication.run();
       }
     }
 
@@ -836,9 +863,18 @@ public class InferenceLifecycleManager
      */
     public void installAfterSettingsCommit() {
       owner.configured = candidateConfiguration;
+      logicalPublication.install();
       state = State.INSTALLED;
-      owner.preparedConfigApply = null;
-      owner.precommitComposition = false;
+    }
+
+    /** Delivers the prebuilt mode notifications/history after publication locks are released. */
+    public void notifyAfterSettingsCommit() {
+      logicalPublication.notifyAfterInstall();
+    }
+
+    /** Finishes committed mode publication and old-resource retirement outside publication locks. */
+    public void retireAfterSettingsCommit() throws ModeTransitionException {
+      owner.retirePreparedConfig(this);
     }
 
     /** Stops the private candidate and restores the captured incumbent when commit is abandoned. */
@@ -846,9 +882,9 @@ public class InferenceLifecycleManager
       owner.abortPreparedConfig(this);
     }
 
-    /** Managed configuration witness established before this value was returned. */
+    /** Managed configuration witness established before return, or {@code null} for disable. */
     public String declaredConfigHash() {
-      return candidate.declaredConfigHash();
+      return candidate == null ? null : candidate.declaredConfigHash();
     }
   }
 
@@ -858,6 +894,16 @@ public class InferenceLifecycleManager
    */
   public PreparedConfigApply prepareResolvedConfig(
       InferenceConfig candidate, ResolvedConfig candidateResolved) throws ModeTransitionException {
+    return prepareResolvedConfig(candidate, candidateResolved, true);
+  }
+
+  /**
+   * Prepares the desired managed generative state. Enabled candidates are started and health
+   * checked privately; disabled candidates retain A until the outer commit and retire it after.
+   */
+  public PreparedConfigApply prepareResolvedConfig(
+      InferenceConfig candidate, ResolvedConfig candidateResolved, boolean enabled)
+      throws ModeTransitionException {
     Objects.requireNonNull(candidateResolved, "candidateResolved");
     if (candidate == null) {
       throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
@@ -873,6 +919,11 @@ public class InferenceLifecycleManager
             ModeTransitionException.Reason.ALREADY_TRANSITIONING,
             "Inference runtime is transitioning; try again shortly");
       }
+      if (enabled && runner.currentMode() == Mode.INDEXING) {
+        throw modeTransition(
+            ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+            "Managed inference cannot be enabled while indexing is active");
+      }
       if (serverOps.isExternalServerActive()) {
         throw modeTransition(
             ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT,
@@ -882,7 +933,18 @@ public class InferenceLifecycleManager
       var context = new LlamaServerConfigContext(candidate, candidateResolved);
       var request = new LlamaServerOps.StartRequest(
           context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
-      validatePrecommitCandidate(request);
+      if (enabled) {
+        validatePrecommitCandidate(request);
+      } else {
+        try {
+          candidate.validate();
+        } catch (Exception invalid) {
+          throw modeTransition(
+              ModeTransitionException.Reason.INVALID_CONFIG,
+              "Invalid inference configuration: " + safeMessage(invalid),
+              invalid);
+        }
+      }
 
       ConfiguredInference incumbentConfiguration = configured;
       Mode priorMode = runner.currentMode();
@@ -894,6 +956,21 @@ public class InferenceLifecycleManager
       }
 
       precommitComposition = true;
+      if (!enabled) {
+        ConfiguredInference candidateConfiguration = new ConfiguredInference(
+            candidate, candidateResolved,
+            LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+        PreparedConfigApply prepared = new PreparedConfigApply(
+            this,
+            incumbentConfiguration,
+            incumbent,
+            candidateConfiguration,
+            null,
+            priorMode,
+            false);
+        preparedConfigApply = prepared;
+        return prepared;
+      }
       try {
         tokenOps.clearCaches();
         serverOps.stopLlamaServer();
@@ -910,9 +987,17 @@ public class InferenceLifecycleManager
         serverOps.waitForServerHealth(started);
         verifyAppliedServer(request, started);
         ConfiguredInference candidateConfiguration = new ConfiguredInference(
-            candidate, candidateResolved, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+            candidate,
+            candidateResolved,
+            LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
         PreparedConfigApply prepared = new PreparedConfigApply(
-            this, incumbentConfiguration, incumbent, candidateConfiguration, started, priorMode);
+            this,
+            incumbentConfiguration,
+            incumbent,
+            candidateConfiguration,
+            started,
+            priorMode,
+            true);
         preparedConfigApply = prepared;
         return prepared;
       } catch (Exception candidateFailure) {
@@ -947,6 +1032,14 @@ public class InferenceLifecycleManager
           "Invalid inference configuration: " + safeMessage(invalid),
           invalid);
     }
+  }
+
+  private TransitionRunner.PreparedPublication prepareLogicalPublication(
+      boolean enabled, Mode priorMode) {
+    Mode target = enabled ? Mode.ONLINE : priorMode == Mode.ONLINE ? Mode.OFFLINE : priorMode;
+    InferenceRuntimeView next = runner.view().withPhase(target);
+    if (!enabled) next = next.withExternal(false);
+    return runner.preparePublication(target, next, TransitionReason.CONFIG_APPLY);
   }
 
   private ModeTransitionException rollbackPrecommitFailure(
@@ -996,6 +1089,12 @@ public class InferenceLifecycleManager
       if (preparedConfigApply != prepared) {
         throw new IllegalStateException("Prepared inference candidate is no longer current");
       }
+      if (!prepared.enabled) {
+        preparedConfigApply = null;
+        precommitComposition = false;
+        prepared.state = PreparedConfigApply.State.ABORTED;
+        return;
+      }
       var aborted = modeTransition(
           ModeTransitionException.Reason.INTERRUPTED, "Prepared inference candidate was aborted");
       ModeTransitionException rollback = rollbackPrecommitFailure(
@@ -1005,6 +1104,49 @@ public class InferenceLifecycleManager
           aborted);
       if (rollback != aborted) throw rollback;
       prepared.state = PreparedConfigApply.State.ABORTED;
+    }
+  }
+
+  private void retirePreparedConfig(PreparedConfigApply prepared) throws ModeTransitionException {
+    synchronized (runner.lock()) {
+      if (prepared.state != PreparedConfigApply.State.INSTALLED
+          || preparedConfigApply != prepared) {
+        throw new IllegalStateException("Prepared inference candidate is not installed");
+      }
+      try {
+        prepared.logicalPublication.notifyAfterInstall();
+        if (prepared.enabled
+            && serverOps.activeStartResult().orElse(null) != prepared.candidate) {
+          var lost = modeTransition(
+              ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+              "Committed inference candidate lost physical ownership before retirement");
+          runner.runForceOffline(
+              TransitionReason.CONFIG_APPLY,
+              new InferenceFailure.TransitionFailure(
+                  TransitionCode.CONFIG_APPLY_FAILED, lost.getMessage(), lost));
+          throw lost;
+        }
+        if (!prepared.enabled && prepared.priorMode == Mode.ONLINE) {
+          tokenOps.clearCaches();
+          try {
+            serverOps.stopLlamaServer();
+          } catch (RuntimeException retirementFailure) {
+            var failure = new InferenceFailure.TransitionFailure(
+                TransitionCode.CONFIG_APPLY_FAILED,
+                "Committed inference disable could not retire the incumbent: "
+                    + safeMessage(retirementFailure),
+                retirementFailure);
+            runner.recordFailureOutsideTransition(failure);
+            throw modeTransition(
+                ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+                failure.detail(),
+                retirementFailure);
+          }
+        }
+      } finally {
+        preparedConfigApply = null;
+        precommitComposition = false;
+      }
     }
   }
 

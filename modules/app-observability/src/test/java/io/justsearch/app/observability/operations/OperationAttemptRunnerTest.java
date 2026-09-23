@@ -16,12 +16,15 @@ import io.justsearch.core.context.EngineContext;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,6 +32,49 @@ import org.junit.jupiter.api.io.TempDir;
 final class OperationAttemptRunnerTest {
   private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-12T09:00:00Z"), ZoneOffset.UTC);
   @TempDir Path temp;
+
+  @Test
+  void closingWaitsForActualBodyExitAndAsyncReceipt() throws Exception {
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE));
+      var body = new Thread(() -> runner.start(attempt, ignored -> {
+        entered.countDown();
+        boolean released = false;
+        while (!released) {
+          try { released = release.await(5, TimeUnit.SECONDS); }
+          catch (InterruptedException cancelled) { /* Native-style work may ignore cancellation. */ }
+        }
+        return OperationExecution.finished(OperationResult.success("complete"));
+      }));
+      body.start();
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      runner.beginClosing();
+      body.interrupt();
+      assertFalse(runner.awaitDrained(Duration.ofMillis(20)));
+      release.countDown();
+      body.join(5_000);
+      assertFalse(body.isAlive());
+      assertTrue(runner.awaitDrained(Duration.ofSeconds(1)));
+    }
+  }
+
+  @Test
+  void closingRetainsStoreUntilAsyncEffectReceiptFinishes() throws Exception {
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var actual = new CompletableFuture<OperationResult>();
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.DURABLE));
+      runner.start(attempt, ignored -> new OperationExecution(OperationResult.success("started"), actual));
+      runner.beginClosing();
+      assertFalse(runner.awaitDrained(Duration.ofMillis(20)));
+      actual.complete(OperationResult.success("complete"));
+      assertTrue(runner.awaitDrained(Duration.ofSeconds(1)));
+      assertEquals(OperationState.COMPLETE, attempt.completion().toCompletableFuture().join().state());
+    }
+  }
 
   @Test
   void acceptancePrecedesBodyAndStartedResponseDoesNotCompleteAsyncWork() throws Exception {
@@ -66,7 +112,7 @@ final class OperationAttemptRunnerTest {
             try { result = method.invoke(store, args); }
             catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
             if (method.getName().equals(refusal ? "rejectBeforeStart" : "finish")) {
-              clock.setMillis(CLOCK.millis() + java.time.Duration.ofDays(31).toMillis());
+              clock.setMillis(CLOCK.millis() + Duration.ofDays(31).toMillis());
               store.pruneHistory();
             }
             return result;
@@ -294,7 +340,7 @@ final class OperationAttemptRunnerTest {
             if (prune && method.getName().equals("find") && result instanceof Optional<?> optional
                 && optional.orElse(null) instanceof io.justsearch.app.api.operations.OperationRecord row
                 && row.state().terminal()) {
-              clock.setMillis(CLOCK.millis() + java.time.Duration.ofDays(31).toMillis());
+              clock.setMillis(CLOCK.millis() + Duration.ofDays(31).toMillis());
               store.pruneHistory();
             }
             return result;

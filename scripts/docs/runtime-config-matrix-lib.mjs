@@ -232,6 +232,10 @@ export function buildMatrixModel(opts = {}) {
   const envRegistryPath = opts.envRegistryPath ?? path.join(configBase, "EnvRegistry.java");
   const configKeyPath = opts.configKeyPath ?? path.join(configBase, "ConfigKey.java");
   const builderPath = opts.builderPath ?? path.join(configBase, "resolved", "ResolvedConfigBuilder.java");
+  const uiSettingsContributorPath = opts.uiSettingsContributorPath ?? path.join(
+    repoRoot, "modules", "app-services", "src", "main", "java", "io", "justsearch",
+    "app", "services", "config", "ConfigStoreRebuilder.java",
+  );
   const configApplyPath = opts.configApplyPath ?? path.join(repoRoot, "governance", "config-apply.v1.json");
   // Classification/schema parity belongs to ConfigApplyRegisterTest; this is a count projection.
   const configApply = JSON.parse(fs.readFileSync(configApplyPath, "utf8"));
@@ -240,6 +244,10 @@ export function buildMatrixModel(opts = {}) {
   const configKeys = parseConfigKeys(configKeyPath);
   const yamlContrib = parseYamlContributions(builderPath);
   const yamlKeySet = new Set(yamlContrib.yamlKeys);
+  const hasTypedApiPort = fs.existsSync(uiSettingsContributorPath)
+    && /builder\.putSettings\("justsearch\.api\.port"/.test(
+      fs.readFileSync(uiSettingsContributorPath, "utf8"),
+    );
 
   const rows = [];
 
@@ -254,7 +262,9 @@ export function buildMatrixModel(opts = {}) {
       sysprop: entry.sysprop,
       envRegistryConstant: entry.constant,
       ownerModule: "modules/configuration (ResolvedConfigBuilder)",
-      precedenceNotes: hasYaml
+      precedenceNotes: entry.constant === "API_PORT" && hasTypedApiPort
+        ? "sysprop > env > settings.json > default; bound port is runtime evidence"
+        : hasYaml
         ? "YAML > sysprop > env > default"
         : "sysprop > env > default",
     });
@@ -290,6 +300,7 @@ export function buildMatrixModel(opts = {}) {
     envSyspropPairCount: envRegistry.entries.length,
     configKeyCount: configKeys.entries.length,
     applyScopeCount: configApply.entries.length,
+    hasTypedApiPort,
     rows,
   };
 }
@@ -337,7 +348,12 @@ export function renderMatrixMarkdown(model) {
     "- **`settings.json` (300)** — `ConfigStoreRebuilder.contributeUiSettings` forwards a handful" +
       " of `UiSettings` fields, including `justsearch.gpu.layers`, `justsearch.context.size`," +
       " `justsearch.server.exe`, `justsearch.ui.exclude_patterns`, `justsearch.index.base_path`" +
-      " and `justsearch.llm.model_path`.",
+      " and `justsearch.llm.model_path`." +
+      (model.hasTypedApiPort
+        ? " Its typed nullable `apiPort` contributes `justsearch.api.port` only when" +
+          " configured; `0` is an ephemeral listener policy, while the positive bound port" +
+          " remains runtime-manifest evidence."
+        : ""),
   );
   lines.push(
     "- **`auto_detected` (150, detail `hardware_probe`)** — the Head's startup probe contributes" +

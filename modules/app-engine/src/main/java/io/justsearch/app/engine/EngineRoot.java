@@ -58,23 +58,13 @@ public final class EngineRoot implements WorkerHost {
 
   /** Externally owned, shared by both halves; closed after the index half. */
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
-  private final DefaultEngineProcessResources processResources = new DefaultEngineProcessResources();
-  private final EngineResourcePolicy resources = processResources.policy();
-  private final EngineAdmissionController admission = processResources.admission();
-  private final io.justsearch.core.execution.EngineExecutorRegistry executors =
-      processResources.executors();
-  private final io.justsearch.core.component.EngineComponentRegistry components =
-      processResources.components();
-  private final io.justsearch.core.component.ComponentHandle indexComponent =
-      new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(components.register(
-      new io.justsearch.core.component.ComponentSpec("index", true, KnowledgeServer.componentDependencies(),
-          io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
-          java.time.Duration.ofSeconds(60), 2)));
-  private final io.justsearch.core.component.ComponentHandle encoderComponent = components.register(
-      new io.justsearch.core.component.ComponentSpec("encoders", false,
-          io.justsearch.indexerworker.server.InferenceCompositionRoot.componentDependencies(),
-          io.justsearch.core.component.ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY,
-          java.time.Duration.ofMinutes(2), 2));
+  private final DefaultEngineProcessResources processResources;
+  private final EngineResourcePolicy resources;
+  private final EngineAdmissionController admission;
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+  private final io.justsearch.core.component.EngineComponentRegistry components;
+  private final io.justsearch.core.component.ComponentHandle indexComponent;
+  private final io.justsearch.core.component.ComponentHandle encoderComponent;
 
   /** Process lifetime, deliberately independent of the restartable index-half close. */
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
@@ -200,9 +190,26 @@ public final class EngineRoot implements WorkerHost {
       IntConsumer terminalWriterFaultAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority,
       io.justsearch.configuration.resolved.ConfigStore configStore) {
+    return forProcess(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction,
+        childRegistry, requestedRestartAction, authority, configStore,
+        new DefaultEngineProcessResources(configStore.publicationLock()));
+  }
+
+  /** Uses the same already composed process resources as the settings owner. */
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize,
+      IntConsumer terminalWriterFaultAction, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.configuration.resolved.ConfigStore configStore,
+      DefaultEngineProcessResources processResources) {
     Objects.requireNonNull(configStore, "configStore");
+    Objects.requireNonNull(processResources, "processResources");
+    if (configStore.publicationLock() != processResources.publicationLock()) {
+      throw new IllegalArgumentException("ConfigStore and process resources must share publication lock");
+    }
     return new EngineRoot(operations, attempts, serverFactory(childRegistry, () -> configStore),
-        deadlineMs, batchSize, terminalWriterFaultAction, requestedRestartAction, authority);
+        deadlineMs, batchSize, terminalWriterFaultAction, requestedRestartAction, authority,
+        processResources);
   }
 
   private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize, IntConsumer exitAction) {
@@ -289,6 +296,31 @@ public final class EngineRoot implements WorkerHost {
       ServerFactory serverFactory, long deadlineMs, int batchSize,
       IntConsumer terminalWriterFaultAction, Runnable requestedRestartAction,
       io.justsearch.app.services.bootstrap.OperationAuthority authority) {
+    this(operations, attempts, serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
+        requestedRestartAction, authority, new DefaultEngineProcessResources());
+  }
+
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      ServerFactory serverFactory, long deadlineMs, int batchSize,
+      IntConsumer terminalWriterFaultAction, Runnable requestedRestartAction,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      DefaultEngineProcessResources processResources) {
+    this.processResources = Objects.requireNonNull(processResources, "processResources");
+    this.resources = processResources.policy();
+    this.admission = processResources.admission();
+    this.executors = processResources.executors();
+    this.components = processResources.components();
+    this.indexComponent = new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(
+        components.register(new io.justsearch.core.component.ComponentSpec("index", true,
+            KnowledgeServer.componentDependencies(),
+            io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
+            java.time.Duration.ofSeconds(60), 2)));
+    this.encoderComponent = components.register(new io.justsearch.core.component.ComponentSpec(
+        "encoders", false,
+        io.justsearch.indexerworker.server.InferenceCompositionRoot.componentDependencies(),
+        io.justsearch.core.component.ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY,
+        java.time.Duration.ofMinutes(2), 2));
     this.authority = Objects.requireNonNull(authority, "authority");
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
@@ -454,5 +486,21 @@ public final class EngineRoot implements WorkerHost {
         if (server == s) server = null;
       }
     }
+  }
+
+  /** Stop attachment producers before the process drains admitted work and closes Head. */
+  public void quiesceProducers() {
+    try {
+      recordedIngestion.stopProducers(deadlineMs);
+    } catch (IOException incomplete) {
+      throw new IllegalStateException("Recorded ingestion producer drain is incomplete", incomplete);
+    }
+  }
+
+  /** Physical native owner evidence for the process exit authority. */
+  public io.justsearch.app.api.NativeQuiescence nativeQuiescence() {
+    KnowledgeServer current = server;
+    return current == null ? io.justsearch.app.api.NativeQuiescence.QUIESCED
+        : current.nativeQuiescence();
   }
 }

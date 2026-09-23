@@ -3,6 +3,8 @@ package io.justsearch.ui.api;
 
 import io.javalin.http.Context;
 import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.UiSettings;
@@ -24,6 +26,8 @@ public class SettingsController {
   private final Path defaultIndexBasePath;
   private final Telemetry telemetry;
   private final SettingsService settingsService;
+  private final OperationDispatcher dispatcher;
+  private final Operation reconfigure;
 
   /** Read-only fallback; missing application composition never creates an unrecorded writer. */
   public SettingsController(UiSettingsStore store, Path defaultIndexBasePath, Telemetry telemetry) {
@@ -32,10 +36,19 @@ public class SettingsController {
 
   public SettingsController(UiSettingsStore store, Path defaultIndexBasePath,
       Telemetry telemetry, SettingsService settingsService) {
+    this(store, defaultIndexBasePath, telemetry, settingsService, null, null);
+  }
+
+  /** Production front uses the composed catalog and dispatcher for one accepted reconfigure row. */
+  public SettingsController(UiSettingsStore store, Path defaultIndexBasePath,
+      Telemetry telemetry, SettingsService settingsService, OperationDispatcher dispatcher,
+      Operation reconfigure) {
     this.settingsStore = store;
     this.defaultIndexBasePath = defaultIndexBasePath;
     this.telemetry = telemetry;
     this.settingsService = settingsService;
+    this.dispatcher = dispatcher;
+    this.reconfigure = dispatcher == null ? null : java.util.Objects.requireNonNull(reconfigure, "reconfigure");
   }
 
   /**
@@ -71,25 +84,51 @@ public class SettingsController {
       writeRefusal(ctx, OperationResult.failure("Invalid settings format", "INVALID_REQUEST", Map.of(), false));
       return;
     }
-    if (settingsService == null) {
+    if (dispatcher == null && settingsService == null) {
       writeRefusal(ctx, OperationResult.failure(
           "Settings commit owner is unavailable", "SETTINGS_RECOVERY_REQUIRED", Map.of(), false));
       return;
     }
     try {
-      var result = settingsService.applyPublic(incoming, ctx.header(UI_MODE_INTENT_HEADER), RequestEngineContext.get(ctx));
-      var data = new java.util.LinkedHashMap<String, Object>(result.response().structuredData());
-      data.put("operationKey", result.record().key());
-      data.put("operationRecordId", result.record().id());
-      data.put("state", result.record().state().name());
-      if (!result.response().success()) {
+      OperationResult response;
+      String state;
+      Long operationRecordId = null;
+      String operationKey = incoming.operationKey();
+      if (dispatcher != null) {
+        io.justsearch.app.api.operations.OperationKeys.timestampMillis(incoming.operationKey());
+        var args = new java.util.LinkedHashMap<String, Object>();
+        args.put("settings", incoming);
+        args.put("modeIntent", ctx.header(UI_MODE_INTENT_HEADER));
+        var context = RequestEngineContext.get(ctx);
+        var transport = io.justsearch.agent.api.registry.TransportTag.valueOf(context.transport());
+        var now = java.time.Instant.now();
+        var executor = io.justsearch.agent.api.registry.InvocationProvenance
+            .fromTransport(transport, java.util.Optional.empty(), now).executor();
+        var provenance = io.justsearch.app.services.intent.EngineProvenance.invocation(
+            context, executor, now, java.util.Optional.empty());
+        response = dispatcher.dispatch(reconfigure, MAPPER.writeValueAsString(args), provenance,
+            java.util.Optional.empty(), context, incoming.operationKey());
+        state = response.success() ? "COMPLETE" : "FAILED";
+      } else {
+        var result = settingsService.applyPublic(incoming, ctx.header(UI_MODE_INTENT_HEADER),
+            RequestEngineContext.get(ctx));
+        response = result.response();
+        state = result.record().state().name();
+        operationRecordId = result.record().id();
+        operationKey = result.record().key();
+      }
+      var data = new java.util.LinkedHashMap<String, Object>(response.structuredData());
+      if (operationKey != null) data.put("operationKey", operationKey);
+      if (operationRecordId != null) data.put("operationRecordId", operationRecordId);
+      data.put("state", state);
+      if (!response.success()) {
         data.remove("witness");
-        if (result.response().errorCode().filter("OPERATION_STORAGE_FAILED"::equals).isPresent()) data.remove("state");
-        writeRefusal(ctx, new OperationResult(false, result.response().message(), java.util.Optional.empty(), data,
-            result.response().errorCode(), Map.of(), result.response().retryable()));
+        if (response.errorCode().filter("OPERATION_STORAGE_FAILED"::equals).isPresent()) data.remove("state");
+        writeRefusal(ctx, new OperationResult(false, response.message(), java.util.Optional.empty(), data,
+            response.errorCode(), response.errorDetails(), response.retryable()));
         return;
       }
-      if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
+      if (!"COMPLETE".equals(state)) {
         data.remove("witness");
         data.remove("acceptedRevision");
         ctx.status(202).json(MAPPER.convertValue(data, SettingsV2.class));
@@ -116,18 +155,22 @@ public class SettingsController {
   private void writeRefusal(Context ctx, OperationResult refusal) {
     String code = refusal.errorCode().orElse("SETTINGS_RECOVERY_REQUIRED");
     int status = switch (code) {
-      case "INVALID_REQUEST", "INVALID_PATH", "OPERATION_KEY_INVALID" -> 400;
+      case "BAD_REQUEST", "INVALID_REQUEST", "INVALID_PATH", "OPERATION_KEY_INVALID" -> 400;
       case "SETTINGS_READ_ONLY", "VERSION_CONFLICT", "RECONFIGURE_IN_PROGRESS",
+          "GENERATION_BOUND_REQUIRES_REINDEX", "RESTART_SOURCE_DRIFT",
           "OPERATION_KEY_EXPIRED", "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> 409;
-      case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY" -> 503;
+      case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY", "ENGINE_CLOSING" -> 503;
+      case "COMPONENT_PREPARATION_REQUIRED" -> 503;
       default -> 500;
     };
     ApiErrorCode classification = switch (code) {
       case "SETTINGS_READ_ONLY" -> ApiErrorCode.SETTINGS_READ_ONLY;
       case "INVALID_PATH" -> ApiErrorCode.INVALID_PATH;
-      case "RECONFIGURE_IN_PROGRESS", "OPERATIONS_CAPACITY" -> ApiErrorCode.SERVICE_UNAVAILABLE;
+      case "RECONFIGURE_IN_PROGRESS", "OPERATIONS_CAPACITY", "ENGINE_CLOSING",
+          "COMPONENT_PREPARATION_REQUIRED" -> ApiErrorCode.SERVICE_UNAVAILABLE;
       case "SETTINGS_RECOVERY_REQUIRED" -> ApiErrorCode.INVALID_STATE;
-      case "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT", "OPERATION_KEY_EXPIRED",
+      case "BAD_REQUEST", "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT",
+          "GENERATION_BOUND_REQUIRES_REINDEX", "RESTART_SOURCE_DRIFT", "OPERATION_KEY_EXPIRED",
           "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> ApiErrorCode.INVALID_REQUEST;
       default -> ApiErrorCode.INTERNAL_ERROR;
     };
@@ -137,6 +180,14 @@ public class SettingsController {
     for (String field : java.util.List.of("operationKey", "operationRecordId", "state")) {
       Object value = refusal.structuredData().get(field);
       if (value != null) payload.put(field, value);
+    }
+    if ("GENERATION_BOUND_REQUIRES_REINDEX".equals(code)) {
+      payload.put("keys", refusal.errorDetails().get("keys"));
+      payload.put("operation", refusal.errorDetails().get("operation"));
+    } else if ("RESTART_SOURCE_DRIFT".equals(code)) {
+      payload.put("keys", refusal.errorDetails().get("keys"));
+    } else if ("COMPONENT_PREPARATION_REQUIRED".equals(code)) {
+      payload.put("components", refusal.errorDetails().get("components"));
     }
     ctx.status(status).json(payload);
   }

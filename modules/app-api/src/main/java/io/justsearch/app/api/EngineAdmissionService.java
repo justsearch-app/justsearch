@@ -11,6 +11,12 @@ public interface EngineAdmissionService {
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 
+  /** Permanently close new work admission for process shutdown. Existing retained work may finish. */
+  void beginClosing();
+
+  /** Whether the monotonic process-closing boundary has been crossed. */
+  boolean isClosing();
+
   void cancelInteractive(String reason);
 
   int retryAfterSeconds();
@@ -20,6 +26,9 @@ public interface EngineAdmissionService {
 
   /** All currently retained work, including internal producers and the inspecting request. */
   int activeWorkCount();
+
+  /** Waits for exact admitted-work references to leave after process closing begins. */
+  boolean awaitDrained(java.time.Duration timeout);
 
   record Limits(int perContextLimit, int aggregateLimit, int retryAfterSeconds) {}
 }

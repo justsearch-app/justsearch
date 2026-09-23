@@ -14,6 +14,7 @@ import ai.onnxruntime.OrtSession;
 import io.justsearch.ort.telemetry.OrtSessionTelemetryEvents;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
@@ -28,7 +29,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
   void interruptedWaiterExitsWithoutReleasingActiveGpuLease() throws Exception {
     OrtSession gpuSession = mock(OrtSession.class);
     NativeSessionHandle handle = gpuHandle(gpuSession);
-    SessionHandle.Lease active = handle.acquire();
+    SessionHandle.Lease active = handle.acquire(request());
     Thread waiter = null;
     try {
       Semaphore semaphore = semaphore(handle);
@@ -42,7 +43,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
               () -> {
                 entered.countDown();
                 try {
-                  handle.acquire();
+                  handle.acquire(request());
                   failure.set(new AssertionError("interrupted waiter acquired a GPU lease"));
                 } catch (Throwable thrown) {
                   failure.set(thrown);
@@ -65,12 +66,33 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
       active.close();
       active = null;
       assertEquals(1, semaphore.availablePermits(), "active lease still owns release");
-      try (SessionHandle.Lease next = handle.acquire()) {
+      try (SessionHandle.Lease next = handle.acquire(request())) {
         assertFalse(next.isCpu(), "the next caller can acquire GPU after the holder releases");
       }
     } finally {
       if (waiter != null) waiter.interrupt();
       if (active != null) active.close();
+      handle.close();
+    }
+  }
+
+  @Test
+  void gpuWaitHonorsDeadlineWithoutReleasingActiveLease() throws Exception {
+    OrtSession gpuSession = mock(OrtSession.class);
+    NativeSessionHandle handle = gpuHandle(gpuSession);
+    SessionHandle.Lease active = handle.acquire(request());
+    try {
+      assertThrows(
+          SessionAcquireDeadlineExceededException.class,
+          () ->
+              handle.acquire(
+                  SessionAcquisitionRequest.within(
+                      SessionAcquisitionRequest.Urgency.BACKGROUND,
+                      Duration.ofMillis(25))));
+      assertEquals(0, semaphore(handle).availablePermits());
+      verify(gpuSession, never()).close();
+    } finally {
+      active.close();
       handle.close();
     }
   }
@@ -89,7 +111,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
               () -> {
                 Thread.currentThread().interrupt();
                 try {
-                  handle.acquire();
+                  handle.acquire(request());
                   failure.set(new AssertionError("pre-interrupted caller acquired a GPU lease"));
                 } catch (Throwable thrown) {
                   failure.set(thrown);
@@ -129,7 +151,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
           new Thread(
               () -> {
                 try {
-                  handle.acquire();
+                  handle.acquire(request());
                   failure.set(new AssertionError("interrupted caller acquired a GPU lease"));
                 } catch (Throwable thrown) {
                   failure.set(thrown);
@@ -156,12 +178,12 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
       throws Exception {
     OrtSession gpuSession = mock(OrtSession.class);
     NativeSessionHandle handle = gpuHandle(gpuSession);
-    SessionHandle.Lease held = handle.acquire();
+    SessionHandle.Lease held = handle.acquire(request());
     AtomicReference<Throwable> waiterOutcome = new AtomicReference<>();
     CountDownLatch waiterFinished = new CountDownLatch(1);
     Thread waiter = new Thread(() -> {
       try {
-        handle.acquire();
+        handle.acquire(request());
         waiterOutcome.set(new AssertionError("queued waiter acquired after retirement"));
       } catch (Throwable thrown) {
         waiterOutcome.set(thrown);
@@ -183,14 +205,19 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
     held.close();
 
     assertTrue(waiterFinished.await(1, TimeUnit.SECONDS));
-    assertInstanceOf(IllegalStateException.class, waiterOutcome.get());
+    assertInstanceOf(SessionRetiredException.class, waiterOutcome.get());
     assertTrue(closeFinished.await(1, TimeUnit.SECONDS));
     verify(gpuSession).close();
-    assertThrows(IllegalStateException.class, handle::acquire);
+    assertThrows(SessionRetiredException.class, () -> handle.acquire(request()));
   }
 
   private static NativeSessionHandle gpuHandle(OrtSession gpuSession) throws Exception {
     return gpuHandle(gpuSession, OrtSessionTelemetryEvents.NOOP);
+  }
+
+  private static SessionAcquisitionRequest request() {
+    return SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(2));
   }
 
   private static NativeSessionHandle gpuHandle(

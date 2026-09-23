@@ -34,12 +34,13 @@ class SettingsV2ProjectionTest {
     settings.setLlmModelPath(" model.gguf ");
     settings.setLlamaLibPath(" native-dir ");
     settings.setIndexBasePath(" index-dir ");
+    settings.setApiPort(0);
 
     var expected = new SettingsV2(
         new UiSettingsV2("dark", true, "compact", true, "reveal", 420,
             true, "advanced", true, List.of("*.tmp"), true),
         new LlmSettingsV2(" server.exe ", 8192, 2048, 35, " model.gguf ", " native-dir "),
-        List.of("index-dir"), "read_write");
+        List.of("index-dir"), "read_write", null, null, null, 0);
     assertEquals(expected, SettingsV2Projection.toSettingsV2(settings, UiSettingsStore.PersistenceMode.READ_WRITE));
     assertEquals("in_memory",
         SettingsV2Projection.toSettingsV2(settings, UiSettingsStore.PersistenceMode.IN_MEMORY).settingsMode());
@@ -66,6 +67,27 @@ class SettingsV2ProjectionTest {
     assertNull(projected.llm().gpuLayers(), "a full-document round trip must not invent CPU intent");
     assertEquals(List.of(), projected.indexPaths());
     assertEquals("", settings.getIndexBasePath());
+  }
+
+  @Test
+  void patchPreservesOmissionAndCarriesExplicitEphemeralPort() {
+    var base = new UiSettings();
+    base.setApiPort(43123);
+
+    var omission = new SettingsV2(null, null, null, null, null, null, null, null);
+    SettingsPatch.merge(base, omission, true);
+    assertEquals(43123, base.configuredApiPort());
+
+    var explicitEphemeral = new SettingsV2(null, null, null, null, null, null, null, 0);
+    SettingsPatch.merge(base, explicitEphemeral, true);
+    assertEquals(0, base.configuredApiPort());
+    assertEquals(0, SettingsPatch.normalize(explicitEphemeral).apiPort());
+  }
+
+  @Test
+  void patchRejectsOutOfRangePortBeforeMutation() {
+    assertThrows(IllegalArgumentException.class,
+        () -> new SettingsV2(null, null, null, null, null, null, null, 65536));
   }
 
   @Test

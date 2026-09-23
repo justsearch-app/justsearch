@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.app.api.EngineAdmissionException;
+import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationState;
@@ -26,6 +28,28 @@ import tools.jackson.databind.node.ObjectNode;
 class SettingsPublicAdmissionTest {
   private static final JsonMapper JSON = JsonMapper.builder().build();
   @TempDir Path directory;
+
+  @Test
+  void closingBeforeAcceptedWorkAttachesKeepsTypedRefusal() {
+    var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        directory.resolve("closing-settings.json"));
+    OperationAttemptRunner attempts = mock(OperationAttemptRunner.class);
+    EngineAdmissionService admission = mock(EngineAdmissionService.class);
+    when(admission.attach(any())).thenThrow(new EngineAdmissionException(
+        EngineAdmissionException.Reason.FROZEN, 1));
+    when(admission.isClosing()).thenReturn(true);
+    var service = new SettingsServiceImpl(store, attempts, () -> {}, admission);
+    var context = TestEngineContexts.ui().withWorkId(java.util.UUID.randomUUID());
+    var input = patch(store.inspect().witness(), "{\"ui\":{\"theme\":\"dark\"}}");
+    var record = mock(io.justsearch.agent.api.registry.OperationRecordHandle.class);
+
+    var refusal = assertThrows(OperationPreparationRefused.class,
+        () -> service.applyAccepted(input, null, context, record));
+
+    assertEquals("ENGINE_CLOSING", refusal.refusal().errorCode().orElseThrow());
+    verifyNoInteractions(attempts);
+    assertEquals(new SettingsWitness(0, null), store.inspect().witness());
+  }
 
   @Test
   void committedResultGapRefusesFreshMutationButAllowsOriginalReplay() throws Exception {

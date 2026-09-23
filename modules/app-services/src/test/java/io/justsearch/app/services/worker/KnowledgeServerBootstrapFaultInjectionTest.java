@@ -40,6 +40,28 @@ final class KnowledgeServerBootstrapFaultInjectionTest {
     }
   }
 
+  @Test
+  void failedInProcessCloseRetainsAppLockUntilHostRetry(@TempDir Path dir) throws Exception {
+    WorkerHost host = mock(WorkerHost.class);
+    var lock = mock(io.justsearch.app.util.AppInstanceLock.class);
+    org.mockito.Mockito.doThrow(new IllegalStateException("native lease held"))
+        .doNothing().when(host).close();
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(config(dir, true), host)) {
+      var bootstrap = fixture.bootstrap();
+      var lockField = KnowledgeServerBootstrap.class.getDeclaredField("appLock");
+      lockField.setAccessible(true);
+      lockField.set(bootstrap, lock);
+
+      assertEquals(ShutdownOutcome.FAILED, bootstrap.closeForUpgrade());
+      verify(lock, never()).close();
+      org.junit.jupiter.api.Assertions.assertSame(lock, lockField.get(bootstrap));
+
+      assertEquals(ShutdownOutcome.GRACEFUL, bootstrap.closeForUpgrade());
+      verify(lock).close();
+      org.junit.jupiter.api.Assertions.assertNull(lockField.get(bootstrap));
+    }
+  }
+
   private static KnowledgeServerConfig config(Path dir, boolean production) {
     return new KnowledgeServerConfig(
         production, dir, dir, dir, 5000, 2000, 3, 2000, 1000, 300000, 100, 0, 3);

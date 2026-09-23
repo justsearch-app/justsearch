@@ -23,7 +23,7 @@ Use these meanings:
 
 | Persisted `UiSettings.apiPort` | Meaning |
 |---|---|
-| `null` / missing | no user-owned value; normal YAML/default, environment, and JVM-property resolution applies |
+| `null` / missing | no user-owned value; normal default, environment, and JVM-property resolution applies |
 | `0` | explicitly request an ephemeral listener on the next process incarnation |
 | `1..65535` | explicitly request that fixed listener port on the next process incarnation |
 
@@ -73,7 +73,8 @@ file may serialize it as null or an integer. Keep the envelope at schema 4.
 
 4. **Precedence.** Preserve the existing chain: JVM property/command-line
    `-Djustsearch.api.port` at 500, `JUSTSEARCH_API_PORT` at 400, persisted
-   settings at 300, YAML at 200, and programmatic default at 100
+   settings at 300, and programmatic default at 100. The current resolver has
+   no YAML contribution for this key
    ([ResolvedConfigBuilder.java:52-73](../../../../../modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java),
    [ResolvedConfigBuilder.java:202-210](../../../../../modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java)).
    Therefore a dev-runner `--api-port` remains an operator override: it is
@@ -105,7 +106,7 @@ file may serialize it as null or an integer. Keep the envelope at schema 4.
 6. **Diagnostics.** Replace
    `EffectiveConfigController.keyJustsearchApiPortConfigured`'s independent
    sysprop/env parse with the installed `ConfigStore` resolution; it currently
-   omits settings/YAML/default even though the controller already exposes the
+   omits settings/default even though the controller already exposes the
    full ordinal trace
    ([EffectiveConfigController.java:139-145](../../../../../modules/ui/src/main/java/io/justsearch/ui/api/EffectiveConfigController.java),
    [EffectiveConfigController.java:191-213](../../../../../modules/ui/src/main/java/io/justsearch/ui/api/EffectiveConfigController.java),

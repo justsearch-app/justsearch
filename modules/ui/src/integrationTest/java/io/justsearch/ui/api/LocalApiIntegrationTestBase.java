@@ -37,6 +37,7 @@ abstract class LocalApiIntegrationTestBase {
   protected LocalApiServer server;
   private final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
   private io.justsearch.app.observability.operations.SqliteOperationStore operations;
+  private io.justsearch.app.engine.DefaultEngineProcessResources settingsResources;
   protected HttpClient client;
   protected String baseUrl;
 
@@ -88,6 +89,18 @@ abstract class LocalApiIntegrationTestBase {
                   settingsStore.inspect().settings()));
     }
     var settingsConfig = config;
+    settingsResources = new io.justsearch.app.engine.DefaultEngineProcessResources(
+        settingsConfig.publicationLock());
+    var generativeObservation = settingsResources.components().register(
+        io.justsearch.app.services.HeadAssembly.generativeSpec());
+    var settingsComponents = new io.justsearch.app.services.settings.FixedSettingsComponentComposer(
+        settingsResources.components());
+    settingsComponents.register("generative",
+        new io.justsearch.app.services.GenerativeSettingsComponentOwner(
+            null, generativeObservation,
+            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
+                settingsConfig.get(), System.getProperty("user.dir")), false));
+    settingsComponents.seal();
     var settingsOwner =
         new io.justsearch.app.services.settings.SettingsCommitCoordinator(
             settingsStore,
@@ -106,7 +119,7 @@ abstract class LocalApiIntegrationTestBase {
                       "llm", projection.llm(),
                       "indexPaths", projection.indexPaths(),
                       "settingsMode", projection.settingsMode()));
-            });
+            }, settingsResources.admission()::isClosing, settingsComponents);
     var settingsAttempts =
         new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
             operations,
@@ -148,6 +161,14 @@ abstract class LocalApiIntegrationTestBase {
       } finally {
         operations = null;
       }
+    }
+
+    if (settingsResources != null) {
+      try { settingsResources.close(); }
+      catch (Exception failure) {
+        if (closeFailure == null) closeFailure = failure;
+        else closeFailure.addSuppressed(failure);
+      } finally { settingsResources = null; }
     }
 
     executors.close();

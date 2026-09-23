@@ -225,6 +225,16 @@ issued inference leases; a zero lease count while an owner is inside a native
 constructor is not confirmation. Use the handle owner's in-progress state.
 An unrelated telemetry error alone does not require hard termination. Test this
 selection in an isolated child process; never infer it from mocked exit callbacks.
+This guarantee applies when the Engine exit authority selects termination before
+JVM shutdown begins. JVM shutdown hooks start concurrently and have no ordering
+guarantee. An external SIGTERM/Ctrl+C, third-party System.exit, or last-thread
+termination can start ORT's hook before HeadlessApp's hook finishes native drain.
+The HeadlessApp hook may halt after detecting unquiesced work to shorten that
+window, but cannot prove race freedom or graceful close. Treat such termination
+as uncontrolled process death; its acceptance is durable recovery and eventual
+OS reclamation. Keep product-owned fatal exits on the controlled exit authority,
+or hard-stop immediately after crash reporting when ordered cleanup cannot safely
+run. Run boot contract validation before any native-capable asynchronous startup.
 OS reclamation at actual process death is not a successful graceful close.
 Resource close APIs remain retryable;
 the memoized process-exit sequence need not become a new resumable state machine.
@@ -245,6 +255,7 @@ In addition to the full D1-4 stage acceptance, prove:
 | Durable body ignores interruption | Store/executors/instance lock retained until actual exit or process death |
 | Apply requests recovery from its own thread | No self-join; ownership retained through queued recovery |
 | Head/process-resource close refuses but index closes | Finally path cannot close operation dependencies or release instance lock |
+| External JVM shutdown starts a competing hook during native drain | The competing hook may run before HeadlessApp can halt; report uncontrolled death and prove restart recovery, not native race freedom |
 
 Retire independent publication/back-reference rebuild paths, postcommit composing
 listeners, nested settings operations, scalar-only witness sketches and index-only

@@ -63,6 +63,9 @@ final class TransitionRunner {
       new AtomicReference<>(InferenceRuntimeView.initial());
   private final AtomicLong generationCounter = new AtomicLong(0L);
 
+  @GuardedBy("lock")
+  private boolean deferredNotificationActive;
+
   private final InferenceTelemetryEvents events;
 
   /** Tempdoc 518 Appendix F W4.1 — shared listener substrate. Wraps each typed
@@ -142,6 +145,104 @@ final class TransitionRunner {
   /** Current monotonic generation counter value. */
   long generation() {
     return generationCounter.get();
+  }
+
+  /**
+   * Prebuilt logical publication for a component transaction whose durable commit is owned
+   * outside this runner. Construction and validation happen under the lifecycle lock; install is
+   * assignment-only, while listener/history/telemetry work is deferred until after publication.
+   */
+  final class PreparedPublication {
+    private enum State {
+      PREPARED,
+      INSTALLED,
+      NOTIFIED
+    }
+
+    private final Mode from;
+    private final Mode target;
+    private final TransitionReason reason;
+    private final long expectedGeneration;
+    private final long installedGeneration;
+    private final long startedNanos;
+    private final InferenceRuntimeView installedView;
+    private volatile State state = State.PREPARED;
+
+    private PreparedPublication(
+        Mode from,
+        Mode target,
+        TransitionReason reason,
+        long expectedGeneration,
+        long installedGeneration,
+        long startedNanos,
+        InferenceRuntimeView installedView) {
+      this.from = from;
+      this.target = target;
+      this.reason = reason;
+      this.expectedGeneration = expectedGeneration;
+      this.installedGeneration = installedGeneration;
+      this.startedNanos = startedNanos;
+      this.installedView = installedView;
+    }
+
+    void validate() {
+      if (state != State.PREPARED
+          || modeState.current() != from
+          || generationCounter.get() != expectedGeneration) {
+        throw new IllegalStateException("Prepared inference mode publication is stale");
+      }
+    }
+
+    /** Caller has already validated under the lifecycle lock; assignments only from here. */
+    void install() {
+      modeState.installPrepared(target);
+      generationCounter.set(installedGeneration);
+      viewRef.set(installedView);
+      state = State.INSTALLED;
+    }
+
+    void notifyAfterInstall() {
+      synchronized (lock) {
+        if (state == State.NOTIFIED) return;
+        if (state != State.INSTALLED) {
+          throw new IllegalStateException("Prepared inference mode publication is not installed");
+        }
+        deferredNotificationActive = true;
+        try {
+          notifyListeners(from, Mode.TRANSITIONING, reason);
+          notifyListeners(Mode.TRANSITIONING, target, reason);
+          emitTransition(from, target, reason, startedNanos);
+        } finally {
+          deferredNotificationActive = false;
+          state = State.NOTIFIED;
+        }
+      }
+    }
+  }
+
+  /** Builds all identity and view objects needed by a later assignment-only install. */
+  PreparedPublication preparePublication(
+      Mode target, InferenceRuntimeView next, TransitionReason reason) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(next, "next");
+    Objects.requireNonNull(reason, "reason");
+    if (target == Mode.TRANSITIONING || modeState.current() == Mode.TRANSITIONING) {
+      throw new IllegalStateException("Prepared publication requires stable modes");
+    }
+    long expectedGeneration = generationCounter.get();
+    long installedGeneration = Math.addExact(expectedGeneration, 1L);
+    InferenceRuntimeView prepared =
+        (target == Mode.ONLINE || target == Mode.INDEXING) ? next.clearedFailure() : next;
+    prepared = prepared.withPhase(target)
+        .withIdentity(buildIdentity(installedGeneration, target, prepared));
+    return new PreparedPublication(
+        modeState.current(),
+        target,
+        reason,
+        expectedGeneration,
+        installedGeneration,
+        System.nanoTime(),
+        prepared);
   }
 
   /**
@@ -332,6 +433,9 @@ final class TransitionRunner {
     Objects.requireNonNull(reason, "reason");
     Objects.requireNonNull(body, "body");
     synchronized (lock) {
+      if (deferredNotificationActive) {
+        throw new IllegalStateException("Already transitioning");
+      }
       long startNanos = System.nanoTime();
       InferenceRuntimeView priorView = viewRef.get();
       Mode prev = modeState.beginTransition();

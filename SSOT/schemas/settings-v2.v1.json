@@ -2,6 +2,9 @@
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "type" : "object",
   "properties" : {
+    "apiPort" : {
+      "type" : [ "integer", "null" ]
+    },
     "indexPaths" : {
       "type" : [ "array", "null" ],
       "items" : {
@@ -33,6 +36,9 @@
     },
     "operationKey" : {
       "type" : [ "string", "null" ]
+    },
+    "restartScheduled" : {
+      "type" : [ "boolean", "null" ]
     },
     "settingsMode" : {
       "type" : [ "string", "null" ]

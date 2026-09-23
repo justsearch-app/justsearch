@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.NativeQuiescence;
 import io.justsearch.app.engine.EngineShutdownSequence.Step;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
 import java.nio.file.Files;
@@ -331,6 +332,93 @@ final class EngineShutdownSequenceTest {
     sequence.runAndExitFatal(Reason.RESTART);
 
     assertEquals(0, exitCode.get());
+  }
+
+  @Test
+  void unquiescedNativeOwnerSelectsHardStopAfterReceipt(@TempDir Path dataDir) throws Exception {
+    var normal = new AtomicInteger(-1);
+    var hard = new AtomicInteger(-1);
+    var sequence = new EngineShutdownSequence(dataDir,
+        List.of(new Step(EngineShutdownSequence.INDEX_HALF_STEP, ignored -> "FAILED")),
+        normal::set, hard::set, () -> NativeQuiescence.UNQUIESCED, ignored -> {});
+
+    sequence.runAndExitWithReceipt("native-preparation", "native-nonce");
+
+    assertEquals(-1, normal.get());
+    assertEquals(EngineExit.FATAL_OR_UNCAUGHT, hard.get());
+    assertEquals(NativeQuiescence.UNQUIESCED, sequence.resultIfRun().nativeQuiescence());
+    assertFalse(JSON.readTree(Files.readAllBytes(dataDir.resolve("upgrade")
+        .resolve(EngineShutdownSequence.RECEIPT_FILE))).get("clean").booleanValue());
+  }
+
+  @Test
+  void unrelatedStepFailureWithQuiescedNativeOwnerUsesNormalExit(@TempDir Path dataDir) {
+    var normal = new AtomicInteger(-1);
+    var hard = new AtomicInteger(-1);
+    var sequence = new EngineShutdownSequence(dataDir,
+        List.of(new Step("telemetry", ignored -> { throw new IllegalStateException("flush"); }),
+            new Step(EngineShutdownSequence.INDEX_HALF_STEP, ignored -> "GRACEFUL")),
+        normal::set, hard::set, () -> NativeQuiescence.QUIESCED, ignored -> {});
+
+    sequence.runAndExit(Reason.QUIT);
+
+    assertEquals(EngineExit.FATAL_OR_UNCAUGHT, normal.get());
+    assertEquals(-1, hard.get());
+    assertEquals(NativeQuiescence.QUIESCED, sequence.resultIfRun().nativeQuiescence());
+  }
+
+  @Test
+  void isolatedProcessRunsJvmHookOnlyForConfirmedNativeQuiescence(@TempDir Path dataDir)
+      throws Exception {
+    for (String mode : List.of("direct", "hook")) for (NativeQuiescence status : NativeQuiescence.values()) {
+      Path childDirectory = Files.createDirectory(dataDir.resolve(mode + "-" + status.name()));
+      String executable = System.getProperty("os.name").startsWith("Windows")
+          ? "java.exe" : "java";
+      Path javaExecutable = Path.of(System.getProperty("java.home"), "bin", executable);
+      // The Gradle test runtime classpath exceeds Windows CreateProcess's command-line limit.
+      Path argumentFile = childDirectory.resolve("classpath.args");
+      Files.writeString(argumentFile, "-cp\n\""
+          + System.getProperty("java.class.path").replace("\\", "\\\\")
+          + "\"\n");
+      Process child = new ProcessBuilder(javaExecutable.toString(), "@" + argumentFile,
+          EngineShutdownSequenceExitProbe.class.getName(),
+          childDirectory.toString(), status.name(), mode).redirectErrorStream(true).start();
+      try {
+        assertTrue(child.waitFor(15, java.util.concurrent.TimeUnit.SECONDS),
+            "Shutdown child did not exit: " + mode + " " + status);
+        String output = new String(child.getInputStream().readAllBytes(),
+            java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals(status == NativeQuiescence.QUIESCED ? EngineExit.OK
+            : EngineExit.FATAL_OR_UNCAUGHT, child.exitValue(), output);
+        assertEquals(status == NativeQuiescence.QUIESCED,
+            Files.exists(childDirectory.resolve("jvm-hook-ran")), output);
+      } finally {
+        if (child.isAlive()) child.destroyForcibly();
+      }
+    }
+  }
+
+  @Test
+  void externallyInitiatedShutdownCannotOrderAheadOfCompetingJvmHooks(@TempDir Path dataDir)
+      throws Exception {
+    String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
+    Path javaExecutable = Path.of(System.getProperty("java.home"), "bin", executable);
+    Path argumentFile = dataDir.resolve("classpath.args");
+    Files.writeString(argumentFile, "-cp\n\""
+        + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n");
+    Process child = new ProcessBuilder(javaExecutable.toString(), "@" + argumentFile,
+        EngineShutdownSequenceExitProbe.class.getName(), dataDir.toString(),
+        NativeQuiescence.UNQUIESCED.name(), "hook-race").redirectErrorStream(true).start();
+    try {
+      assertTrue(child.waitFor(15, java.util.concurrent.TimeUnit.SECONDS));
+      String output = new String(child.getInputStream().readAllBytes(),
+          java.nio.charset.StandardCharsets.UTF_8);
+      assertEquals(EngineExit.FATAL_OR_UNCAUGHT, child.exitValue(), output);
+      assertTrue(Files.exists(dataDir.resolve("competing-hook-ran")), output);
+      assertFalse(Files.exists(dataDir.resolve("jvm-hook-ran")), output);
+    } finally {
+      if (child.isAlive()) child.destroyForcibly();
+    }
   }
 
   @Test

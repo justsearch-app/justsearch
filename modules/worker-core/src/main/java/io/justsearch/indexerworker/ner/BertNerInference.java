@@ -6,6 +6,7 @@ import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.justsearch.ort.ModelManifest;
 import io.justsearch.ort.OrtCudaStatus;
@@ -204,7 +205,7 @@ public final class BertNerInference implements Closeable {
 
     long[] shape = {1, seqLen};
 
-    try (var lease = sessions.acquire()) {
+    try (var lease = sessions.acquire(LocalSessionAcquisition.foreground())) {
       try (OnnxTensor inputIdsTensor =
               OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(inputIds), shape);
           OnnxTensor attentionMaskTensor =
@@ -330,6 +331,8 @@ public final class BertNerInference implements Closeable {
       return List.of(infer(texts.get(0)));
     }
 
+    var acquisition = LocalSessionAcquisition.background();
+
     // Tokenize in memory-bounded groups (tempdoc 686/710 crash-fix port — see
     // TOKENIZE_GROUP_CHAR_BUDGET). Groups are processed in original order and written into the
     // same per-index arrays a single upfront scan would have produced, so grouping changes only
@@ -399,7 +402,7 @@ public final class BertNerInference implements Closeable {
 
       long[] shape = {batchSize, padLen};
 
-      try (var lease = sessions.acquire()) {
+      try (var lease = sessions.acquire(acquisition)) {
         try (OnnxTensor inputIdsTensor =
                 OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(flatIds), shape);
             OnnxTensor attentionMaskTensor =

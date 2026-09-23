@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,15 +24,45 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Test;
 
 final class DefaultEngineComponentRegistryTest {
+  @Test
+  void preparedBatchBuildsSnapshotBeforeCommitAndNotifiesOutsideSharedLock() {
+    var lock = new ReentrantReadWriteLock();
+    try (var registry = new DefaultEngineComponentRegistry(budget(), lock)) {
+      var handle = registry.register(spec("index", Set.of()));
+      var before = handle.snapshot();
+      var observed = new AtomicReference<EngineComponentSnapshot>();
+      try (var ignored = registry.subscribe(snapshot -> {
+        assertFalse(lock.isWriteLockedByCurrentThread());
+        observed.set(snapshot);
+      })) {
+        var desired = new EngineComponentSnapshot.Component(handle.spec(), ComponentState.READY,
+            null, Instant.now(), System.nanoTime(), "applied", "desired", null, 0, null);
+        var prepared = registry.prepareBatch(Map.of("index", desired));
+
+        assertEquals(before, handle.snapshot());
+        assertEquals(2L, prepared.snapshot().revision());
+        assertEquals(ComponentState.READY, prepared.snapshot().components().getFirst().state());
+
+        prepared.commit();
+
+        assertEquals(desired, handle.snapshot());
+        assertSame(prepared.snapshot(), observed.get());
+        assertThrows(IllegalStateException.class, prepared::commit);
+      }
+    }
+  }
+
   @Test
   void conditionalPublicationRejectsObsoleteObservationsButAcceptsMatchingNoOps() {
     try (var registry = new DefaultEngineComponentRegistry(budget())) {

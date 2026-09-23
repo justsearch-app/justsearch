@@ -66,6 +66,8 @@ public interface SettingsCommitOwner {
 
   /** Issued only by the runner to its fixed owner; never exposed to a handler. */
   interface AttemptControl {
+    /** Arbitrate precommit cancellation and validate the exact prepared receipt before replacement. */
+    boolean admitCommit(Receipt receipt);
     void committed(Receipt receipt);
     void uncertain();
   }

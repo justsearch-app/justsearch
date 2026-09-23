@@ -208,8 +208,21 @@ Settled empirical facts. Each was an open question that got answered.
   completion before releasing model fields; a timeout alone is not quiescence.
 - **Verification:** `KnowledgeServerCloseCompletionTest`,
   `HeadlessAppShutdownWiringTest`, `TerminalWriterFailureTest` and
-  `TerminalWriterSupervisedRecoveryE2ETest`. This narrow ordering repair does
-  not establish general NativeSessionHandle concurrency safety.
+  `TerminalWriterSupervisedRecoveryE2ETest`. Lane F now retains leases against
+  the exact CPU/GPU session instance, makes retirement monotonic and retryable,
+  and reports `ACTIVE`, `RETIRING`, `REFUSED` or `RETIRED` from the native owner.
+  `InferenceSurface` and `KnowledgeServer` propagate a refused retirement so
+  the index lock and dependent services remain owned. The ordered Engine exit
+  chooses a hard stop before JVM shutdown when native quiescence cannot be
+  proved. Isolated child JVM tests cover that controlled choice. An external
+  JVM shutdown starts hooks concurrently: a competing hook can run before
+  HeadlessApp's cleanup hook halts. That path is uncontrolled process death;
+  its proof is restart recovery and OS reclamation, not native race freedom.
+  The full `ort-common` suite including opt-in stress passed 176 cases at
+  `tmp/2515-d1-focused-integration.txt`; connected shutdown tests passed 53
+  cases at `tmp/2525-native-shutdown-connected.txt`. Installed real-model
+  held-call, full integration and hosted verification remain open for this
+  broader lifetime protocol.
 
 ### F-017: cancelled GPU waiters must leave admission without releasing active native work
 
@@ -624,9 +637,10 @@ Lane F design coordination (2026-09-23; **selected, not implemented/proven**):
 [native/generation lifetime](../design/lane-f-engine-jvm/evidence/D1/generation-native-cursor-design-2026-09-23.md)
 selects exact-instance CPU/GPU leases, serialized CPU replacement and retained
 generation capacity. [Publication/shutdown](../design/lane-f-engine-jvm/evidence/D1/publication-and-lifetime-design-2026-09-23.md)
-requires monotonic close admission and actual native quiescence before JVM exit;
-an unquiesced process uses controlled hard termination because of F-016's ORT
-shutdown hook. Embedded callers have no exit authority. Held native calls,
+requires monotonic close admission and actual native quiescence before controlled
+JVM exit; an unquiesced process uses controlled hard termination because of
+F-016's ORT shutdown hook. External JVM shutdown remains uncontrolled and
+requires durable recovery proof. Embedded callers have no exit authority. Held native calls,
 stress, isolated process termination and Windows deletion proof remain due in D1.
 
 Identified improvements not yet started. Lower priority than Open

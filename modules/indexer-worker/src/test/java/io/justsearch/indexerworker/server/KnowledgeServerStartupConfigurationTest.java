@@ -95,6 +95,14 @@ class KnowledgeServerStartupConfigurationTest {
     ConfigStore.setGlobal(new ConfigStore(captured));
 
     SessionHandle sessions = mock(SessionHandle.class);
+    var nativeRetired = new java.util.concurrent.atomic.AtomicBoolean();
+    doAnswer(invocation -> {
+      nativeRetired.set(true);
+      return null;
+    }).when(sessions).close();
+    when(sessions.retirementStatus()).thenAnswer(invocation ->
+        nativeRetired.get() ? SessionHandle.RetirementStatus.RETIRED
+            : SessionHandle.RetirementStatus.ACTIVE);
     HuggingFaceTokenizer tokenizer = mock(HuggingFaceTokenizer.class);
     var shape =
         new EmbeddingShape(

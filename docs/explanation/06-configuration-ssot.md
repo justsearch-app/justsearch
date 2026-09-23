@@ -74,7 +74,7 @@ Architectural tests in `ResolvedConfigBuilderTest` enforce uniqueness across ide
 
 ```java
 // Type-safe, centralized access
-int apiPort = EnvRegistry.API_PORT.getInt(33221);
+int apiPort = EnvRegistry.API_PORT.getInt(8080);
 int llamaPort = EnvRegistry.SERVER_PORT.getInt(8080);
 int ctx = EnvRegistry.CONTEXT_SIZE.getInt(4096);
 // v1 posture: CPU-first by default. GPU offload is opt-in via settings/env (gpuLayers > 0).
@@ -103,6 +103,14 @@ revision witnesses survive. Settings reset restores automatic selection. The v2 
 preserves null versus zero; null or omission in a partial update leaves the existing value.
 When GPU selection is known, rebuilding configuration recomputes the derived context window
 at ordinal150. Explicit settings and operator context overrides retain their precedence.
+
+The persisted settings object also owns the nullable desired API listener policy
+`UiSettings.apiPort`, projected as the top-level `SettingsV2.apiPort` field. A missing or
+null value contributes no settings candidate, so the resolver continues with its other
+sources. `0` explicitly requests an ephemeral listener for the next process incarnation;
+`1..65535` requests that fixed listener port. Values outside that range are rejected. In a
+partial `SettingsV2` update, a null or omitted `apiPort` member preserves the incumbent;
+the GET response uses null to show that no persisted API-port override is present.
 
 Preparation copies the mutable settings and serializes the candidate before touching the
 file. `replacePrepared` forces temporary bytes and requires atomic sibling replacement;
@@ -185,8 +193,8 @@ considered and the winner, which is what `/api/debug/effective-config` reports.
 ## Settings → Effective Runtime (AI)
 There are two layers that matter for “what the UI shows” vs “what is running”:
 
-1. **User settings** (`/api/settings/v2`): persisted UI preferences + AI knobs (e.g., model paths, `gpuLayers`, context window, `maxTokens`, `pauseIndexingDuringAi`).
-2. **Effective runtime config** (used by `InferenceLifecycleManager`): derived from `EnvRegistry` and system properties.
+1. **User settings** (`/api/settings/v2`): persisted UI preferences + AI knobs (e.g., model paths, `gpuLayers`, context window, `maxTokens`, `pauseIndexingDuringAi`, and the desired API port).
+2. **Effective runtime config** (used by `InferenceLifecycleManager`): derived from `EnvRegistry`, settings contributions, YAML and defaults, with operator system properties and environment variables retaining their higher ordinals.
 
 In the current app:
 * **The settings→system-property promotions are gone** (tempdoc 883 decision 4 and its §C.5c residue). They predated the ordinal chain and were a precedence lie: a GUI value written as a system property resolves at ordinal 500, so `/api/debug/effective-config` reported it as `jvm_arg` and then had to read a second `*.source=ui_settings` marker sysprop to un-tell that. Every settings-borne key now reaches the resolver exactly once, at ordinal 300, via `ConfigStoreRebuilder.contributeUiSettings` — including the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, whose `/api/debug/effective-config` rows are sourced from the resolver's own provenance and read no marker.
@@ -196,9 +204,10 @@ In the current app:
 * **`justsearch.llm.model_path.source` now has no writer at all.** The boot promotion went with 883 §C.5c and the installer/pack-import promotions with it, so a chat-model path reaches the resolver once, at ordinal 300. The constant survives only for tempdoc 842's unshipped profile-persistence writer; an absent marker correctly means "operator".
 * **`justsearch.context.size` no longer has a promotion or a `.source` marker.** The window is derived and contributed at ordinal 150 (`auto_detected` / `hardware_probe`); a user override rides `settings.json` at 300; an operator `-D` / env var still wins at 500 / 400 - by the chain, not by a sysprop write. See `05-ai-architecture.md`, section "The context window".
 * **`justsearch.gpu.layers`, `justsearch.server.exe` and `justsearch.ui.exclude_patterns` no longer have promotions or `.source` markers either** (883 decision 4 slice 2). All three ride `settings.json` at 300. Two consequences worth knowing: the VRAM-tier GPU auto-populate contributes `justsearch.gpu.layers=99` to the ordinal-150 probe map ONLY — mirroring it to a sysprop would put a derived number above the user's own setting — and `justsearch.ui.exclude_patterns` gained a `ResolvedConfig.Ui#excludePatterns` accessor, because it was contributed at 300 but never resolved, which is why its readers had to use the promoted sysprop.
+* **`justsearch.api.port` has a typed settings owner.** When `UiSettings.apiPort` is non-null, `ConfigStoreRebuilder.contributeUiSettings` contributes it at ordinal 300. The effective precedence is JVM property (500) > environment (400) > persisted settings (300) > YAML (200, where a YAML source is declared) > default (100). The persisted value is a desired policy: `0` requests an ephemeral bind and a positive value requests that fixed port. `/api/debug/effective-config` reports the desired value and its winning source; `process.apiPort` and the runtime manifest's `head.apiPort` report the positive port actually bound by the current process. The setting is classified as restart-required, so the current process's observed endpoint remains separate from the persisted policy.
 * **Profile activation:** the named model/projector pair, selected executable, context and GPU layers are submitted in one inference apply. Runtime profile switches do not mutate the bootstrap `justsearch.chat.profile` operator property or persist a resolved model path. The running profile remains available through the realized identity observation.
 * **Runtime propagation:** Public settings mutations enter `SettingsService` and the existing accepted settings owner, which replaces the witnessed file and publishes `ConfigStore`. The controller has no raw-save or configuration-rebuild path. Chat intent changes nudge reconciliation after committed completion. **Inference restart is required** for GPU layer changes to affect the running `llama-server` process.
-* **Attribution:** `/api/debug/effective-config` reports the resolver's ordinal chain. Installer paths resolve as settings at300; explicit operator properties remain at500. The external `llama.lib.path` loader property has no settings-copy marker.
+* **Attribution:** `/api/debug/effective-config` reports the resolver's ordinal chain. Installer paths resolve as settings at300; the typed API-port setting resolves at300 when present; explicit operator properties remain at500. The external `llama.lib.path` loader property has no settings-copy marker.
 * `InferenceConfig.fromEnvironment(...)` reads from `EnvRegistry` (`LLM_MODEL_PATH`, `GPU_LAYERS`, `CONTEXT_SIZE`, etc).
 * `InferenceLifecycleManager` also reads `llama-server`'s `GET /props` to show the **effective** `model_alias` and `n_ctx` when available (surface via `/api/inference/status`).
 * `POST /api/inference/reload` re-applies persisted settings to the inference runtime (`RESTART_IF_ONLINE`): it updates the stored `InferenceConfig` always, but restarts `llama-server` only when currently Online; if the runtime has adopted an external `llama-server` instance (no process handle), restart is rejected (use `POST /api/inference/detach` to switch to a managed server on a new port).

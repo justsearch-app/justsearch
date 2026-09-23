@@ -5,6 +5,7 @@ import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
@@ -300,7 +301,14 @@ public final class CrossEncoderReranker implements Closeable {
         }
 
         // Run inference (select GPU or CPU session based on availability and arbitration)
-        try (var lease = sessions.acquire()) {
+        // Bind native waiting to this rerank's existing request budget, with a finite ceiling
+        // even if a caller supplied an unusually large budget.
+        long acquisitionBudgetMs = Math.max(1L, Math.min(deadlineMs, 30_000L));
+        var acquisition = new SessionAcquisitionRequest(
+            SessionAcquisitionRequest.Urgency.FOREGROUND,
+            startNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(acquisitionBudgetMs),
+            () -> false);
+        try (var lease = sessions.acquire(acquisition)) {
           wasCpu = lease.isCpu();
           // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via
           // the recorder bound by the composition root (reranker/citation have no worker-core
