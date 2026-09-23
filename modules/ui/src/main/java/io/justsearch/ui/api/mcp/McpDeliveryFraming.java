@@ -2,7 +2,6 @@
 package io.justsearch.ui.api.mcp;
 
 import io.justsearch.app.api.knowledge.SearchTrace;
-import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -85,17 +84,6 @@ final class McpDeliveryFraming {
             false,
             ResolvedConfig.Search.DEFAULT_THIN_RESULT_FLOOR_BYTES,
             ResolvedConfig.Search.DEFAULT_WEAK_SCORE_FLOOR);
-  }
-
-  /**
-   * Resolves the framing flags from the global {@link ConfigStore} snapshot, mirroring {@code
-   * McpToolSurface#resolveDeliveryBudgetBytes}: falls back to {@link Settings#OFF} when the store is
-   * not yet initialized (test / early-boot paths), so an unconfigured process delivers exactly the
-   * pre-789 response.
-   */
-  static Settings resolveSettings() {
-    ConfigStore store = ConfigStore.globalOrNull();
-    return resolveSettings(store == null ? null : store.get());
   }
 
   /** Resolves framing from the same immutable config captured with the serving operation. */

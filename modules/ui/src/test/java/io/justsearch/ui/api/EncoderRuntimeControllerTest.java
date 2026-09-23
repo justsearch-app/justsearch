@@ -46,7 +46,7 @@ class EncoderRuntimeControllerTest {
     policies.put("configStatus", "worker-unreachable");
     policies.put("runtime", new LinkedHashMap<>());
     policies.put("models", new TreeMap<>());
-    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(policies);
+    stubSnapshot(client, policies, Map.of());
 
     EncoderRuntimeController controller = new EncoderRuntimeController(client);
     EncoderRuntimeResponse response = controller.buildResponse(TestRequestContexts.browser());
@@ -61,8 +61,7 @@ class EncoderRuntimeControllerTest {
     policies.put("configStatus", "ok");
     policies.put("runtime", new LinkedHashMap<>());
     policies.put("models", new TreeMap<>());
-    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(policies);
-    when(client.getEncoderOrtCudaViews(TestRequestContexts.browser())).thenReturn(Map.of());
+    stubSnapshot(client, policies, Map.of());
 
     EncoderRuntimeController controller = new EncoderRuntimeController(client);
     EncoderRuntimeResponse response = controller.buildResponse(TestRequestContexts.browser());
@@ -79,12 +78,11 @@ class EncoderRuntimeControllerTest {
     models.put("EMBEDDING", policyForGpu());
     models.put("CITATION", policyForCpu());
     policies.put("models", models);
-    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(policies);
 
     Map<EncoderRole, OrtCudaView> views = new EnumMap<>(EncoderRole.class);
     views.put(EncoderRole.EMBEDDING, gpuAvailable());
     views.put(EncoderRole.CITATION, OrtCudaView.notConfigured());
-    when(client.getEncoderOrtCudaViews(TestRequestContexts.browser())).thenReturn(views);
+    stubSnapshot(client, policies, views);
 
     EncoderRuntimeController controller = new EncoderRuntimeController(client);
     EncoderRuntimeResponse response = controller.buildResponse(TestRequestContexts.browser());
@@ -114,11 +112,10 @@ class EncoderRuntimeControllerTest {
     models.put("FUTURE_ROLE", policyForCpu());
     models.put("EMBEDDING", policyForGpu());
     policies.put("models", models);
-    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(policies);
 
     Map<EncoderRole, OrtCudaView> views = new EnumMap<>(EncoderRole.class);
     views.put(EncoderRole.EMBEDDING, gpuAvailable());
-    when(client.getEncoderOrtCudaViews(TestRequestContexts.browser())).thenReturn(views);
+    stubSnapshot(client, policies, views);
 
     EncoderRuntimeController controller = new EncoderRuntimeController(client);
     EncoderRuntimeResponse response = controller.buildResponse(TestRequestContexts.browser());
@@ -139,11 +136,10 @@ class EncoderRuntimeControllerTest {
     Map<String, Object> models = new TreeMap<>();
     models.put("EMBEDDING", policyForGpu());
     policies.put("models", models);
-    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(policies);
 
     Map<EncoderRole, OrtCudaView> views = new EnumMap<>(EncoderRole.class);
     views.put(EncoderRole.EMBEDDING, gpuAvailable());
-    when(client.getEncoderOrtCudaViews(TestRequestContexts.browser())).thenReturn(views);
+    stubSnapshot(client, policies, views);
 
     controller.setClient(client);
     assertEquals("ok", controller.buildResponse(TestRequestContexts.browser()).snapshotStatus());
@@ -159,6 +155,12 @@ class EncoderRuntimeControllerTest {
   }
 
   // ---------- helpers ----------
+
+  private static void stubSnapshot(KnowledgeClient client, Map<String, Object> policies,
+      Map<EncoderRole, OrtCudaView> views) {
+    when(client.getEncoderRuntimeSnapshot(TestRequestContexts.browser()))
+        .thenReturn(new KnowledgeClient.EncoderRuntimeSnapshot(policies, views));
+  }
 
   private static Map<String, Object> buildPoliciesEnvelope() {
     Map<String, Object> policies = new LinkedHashMap<>();

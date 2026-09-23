@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
-import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -353,7 +352,7 @@ final class McpEntityCarriageMetricTest {
             Map.of("query", "value associated with the designer"),
             FRAMING_OFF,
             -1L,
-            carriage, TestRequestContexts.mcp("s1"));
+            carriage, null);
     return McpToolSurface.renderSearchText(resp, content, false);
   }
 }

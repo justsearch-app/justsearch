@@ -974,7 +974,8 @@ public final class McpToolSurface {
           new KnowledgeSearchRequest(
               query, Math.min(limit, 50), mode, null, null, null, filters, null, facets,
               querySyntax, Boolean.TRUE, detail, null);
-      KnowledgeSearchResponse resp = adapter.search(req, engineContext);
+      try (KnowledgeHttpApiAdapter.SearchSession session = adapter.openSearch(req, engineContext)) {
+      KnowledgeSearchResponse resp = session.response();
 
       // Tempdoc 775 §E/§C: the delivery governor degrades the WHOLE assembled tool result (the
       // human-readable text block + the structuredContent channel + envelope) deterministically at
@@ -987,21 +988,26 @@ public final class McpToolSurface {
       // Tempdoc 735 W6: within a single render every response fact is computed ONCE by the
       // content-model builder and consumed by both renderers, so the two tiers cannot diverge.
       boolean includeDetail = Boolean.TRUE.equals(detail);
-      // Tempdoc 789 Phase 2: framing flags resolved once per call (OFF when the config store is not
-      // initialized). Resolved OUTSIDE the governor's view lambda so every degradation step renders
-      // under the same framing decision. The index doc count backing F3's coverage clause is read
-      // once, and only when F3 is enabled — an unconfigured or F3-off process makes no extra call.
-      McpDeliveryFraming.Settings framing = McpDeliveryFraming.resolveSettings();
-      long indexedDocs = framing.calibratedAbsenceEnabled() ? indexedDocCount(engineContext) : -1L;
+      // Framing, carriage, budget, and optional corpus count all come from the search's retained
+      // serving view. Governor rerenders therefore cannot combine A hits with B settings/status.
+      McpDeliveryFraming.Settings framing = McpDeliveryFraming.resolveSettings(session.config());
+      KnowledgeHttpApiAdapter.SearchSession.StatusFacts statusFacts = searchStatusFacts(session, engineContext);
+      long indexedDocs = framing.calibratedAbsenceEnabled()
+          ? (statusFacts == null ? -1L : statusFacts.docCount()) : -1L;
+      String searchEnrichmentHint = statusFacts != null
+          && (statusFacts.embeddingCoveragePercent() < 100
+              || statusFacts.spladeCoveragePercent() < 100)
+          ? SEARCH_ENRICHMENT_MESSAGE : null;
       // Tempdoc 771 item (b): carriage settings resolved once per call, outside the governor's view
       // lambda for the same reason the framing flags are — every degradation step renders under one
       // carriage decision, so the governor's re-renders cannot disagree about delivered content.
-      McpEntityCarriage.Settings carriage = McpEntityCarriage.resolveSettings();
+      McpEntityCarriage.Settings carriage = McpEntityCarriage.resolveSettings(session.config());
       McpDeliveryGovernor.ResultView view =
           (keep, includeProvenance) -> {
             KnowledgeSearchResponse sub =
                 keep >= resp.results().size() ? resp : truncateResults(resp, keep);
-            McpSearchResponseContent c = buildSearchContent(sub, args, framing, indexedDocs, carriage, engineContext);
+            McpSearchResponseContent c = buildSearchContent(
+                sub, args, framing, indexedDocs, carriage, searchEnrichmentHint);
             String t = renderSearchText(sub, c, concise);
             Map<String, Object> structured =
                 McpEvidenceProjection.searchEvidence(sub, c, includeProvenance);
@@ -1014,7 +1020,8 @@ public final class McpToolSurface {
                 false);
           };
       return McpDeliveryGovernor.govern(
-          resp.results().size(), includeDetail, resolveDeliveryBudgetBytes(), MAPPER, view);
+          resp.results().size(), includeDetail, resolveDeliveryBudgetBytes(session.config()), MAPPER, view);
+      }
     } catch (Exception e) {
       // The AGENT-facing message (below) keeps the query — the agent sent it. This SERVER log does
       // not: a rejected LUCENE-syntax search surfaces a Lucene ParseException whose message quotes
@@ -1051,17 +1058,14 @@ public final class McpToolSurface {
    * Tempdoc 775 §E: the delivery governor's serialized-JSON budget in bytes, read from the same
    * config machinery other search deliverables use ({@code search.mcp_delivery.budget_bytes},
    * default 45,000 — a margin under the lowest characterized 770 §E.3 truncation cliff at 46,617;
-   * {@code 0} disables the governor). Resolved from the global {@link
-   * io.justsearch.configuration.resolved.ConfigStore} snapshot, falling back to the default when the
-   * store is not yet initialized (test/early-boot paths) so the governor is always safe to call.
+   * {@code 0} disables the governor). A real search passes its captured configuration; an absent
+   * early-boot/test snapshot uses the fixed default.
    */
-  private static int resolveDeliveryBudgetBytes() {
-    io.justsearch.configuration.resolved.ConfigStore store =
-        io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-    if (store == null) {
-      return io.justsearch.configuration.resolved.ResolvedConfig.Search.DEFAULT_MCP_DELIVERY_BUDGET_BYTES;
-    }
-    return store.get().search().mcpDeliveryBudgetBytes();
+  private static int resolveDeliveryBudgetBytes(
+      io.justsearch.configuration.resolved.ResolvedConfig snapshot) {
+    return snapshot == null
+        ? io.justsearch.configuration.resolved.ResolvedConfig.Search.DEFAULT_MCP_DELIVERY_BUDGET_BYTES
+        : snapshot.search().mcpDeliveryBudgetBytes();
   }
 
   /**
@@ -1103,7 +1107,7 @@ public final class McpToolSurface {
       Map<String, Object> args,
       McpDeliveryFraming.Settings framing,
       long indexedDocs,
-      McpEntityCarriage.Settings carriage, EngineContext engineContext) {
+      McpEntityCarriage.Settings carriage, String searchEnrichmentHint) {
     // Tempdoc 789 Phase 2 (F1): the entity vocabulary comes from the facet snapshot this response
     // already carries — no new query path, no query-time NER (charter: prefer existing fields).
     // Empty (so F1 emits nothing) when the framing is off or the response carries no entity facets.
@@ -1194,9 +1198,8 @@ public final class McpToolSurface {
           "Searched the index in one call. For conceptual or cross-document questions,"
               + " justsearch_answer returns assembled cited passages directly.");
     }
-    String enrichmentHintText = enrichmentHint(SEARCH_ENRICHMENT_MESSAGE, engineContext);
-    if (enrichmentHintText != null) {
-      hints.add(enrichmentHintText);
+    if (searchEnrichmentHint != null) {
+      hints.add(searchEnrichmentHint);
     }
 
     // Tempdoc 789 Phase 2 (F2/F3): the two response-level framings. Both null when their flag is
@@ -1241,16 +1244,14 @@ public final class McpToolSurface {
    * the coverage clause rather than guess a number. Called at most once per search, and only when
    * the F3 framing is enabled.
    */
-  private long indexedDocCount(EngineContext engineContext) {
+  private KnowledgeHttpApiAdapter.SearchSession.StatusFacts searchStatusFacts(
+      KnowledgeHttpApiAdapter.SearchSession session,
+      EngineContext engineContext) {
     try {
-      KnowledgeSearchController ctrl = knowledgeLookup.get();
-      if (ctrl == null) {
-        return -1L;
-      }
-      return ctrl.getAdapter().status(engineContext).docCount();
+      return session.statusFacts(engineContext);
     } catch (Exception e) {
-      log.debug("MCP framing: index doc count unavailable", e);
-      return -1L;
+      log.debug("MCP search: retained status unavailable", e);
+      return null;
     }
   }
 

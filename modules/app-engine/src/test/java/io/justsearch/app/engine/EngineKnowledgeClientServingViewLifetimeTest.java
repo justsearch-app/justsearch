@@ -43,6 +43,43 @@ import org.junit.jupiter.api.Timeout;
 final class EngineKnowledgeClientServingViewLifetimeTest {
 
   @Test
+  void encoderRuntimeSnapshotKeepsPolicyAndProbeOnAThroughBPublication() throws Exception {
+    var policyEntered = new CountDownLatch(1);
+    var releasePolicy = new CountDownLatch(1);
+    var aIngest = mock(WorkerIngestService.class);
+    var bIngest = mock(WorkerIngestService.class);
+    doAnswer(ignored -> {
+      policyEntered.countDown();
+      await(releasePolicy);
+      return io.justsearch.ipc.SessionPoliciesResponse.newBuilder()
+          .setConfigStatus("generation-a").build();
+    }).when(aIngest).getSessionPolicies(any(), any());
+    when(aIngest.indexStatus(any(), any()))
+        .thenReturn(io.justsearch.ipc.StatusResponse.getDefaultInstance());
+    var aServices = services(null, aIngest);
+    var bServices = services(null, bIngest);
+    var aClosed = new AtomicInteger();
+    var selected = new AtomicReference<KnowledgeServer.ServingLease>(leaseFor(aServices, aClosed));
+
+    try (var registry = registry();
+        var client = client(registry, aServices, selected::get)) {
+      var result = CompletableFuture.supplyAsync(
+          () -> client.getEncoderRuntimeSnapshot(TestEngineContexts.FOREGROUND));
+      assertTrue(policyEntered.await(3, TimeUnit.SECONDS));
+      selected.set(leaseFor(bServices, new AtomicInteger()));
+      releasePolicy.countDown();
+
+      assertEquals("generation-a", result.get(5, TimeUnit.SECONDS).policies().get("configStatus"));
+      verify(aIngest).indexStatus(any(), any());
+      verify(bIngest, never()).getSessionPolicies(any(), any());
+      verify(bIngest, never()).indexStatus(any(), any());
+      assertTrue(aClosed.get() >= 3, "parent and both child reads release A");
+    } finally {
+      releasePolicy.countDown();
+    }
+  }
+
+  @Test
   void appliedGenerationCaptureCompletesOnIssuedAViewAfterBPublication() throws Exception {
     var aEntered = new CountDownLatch(1);
     var releaseA = new CountDownLatch(1);

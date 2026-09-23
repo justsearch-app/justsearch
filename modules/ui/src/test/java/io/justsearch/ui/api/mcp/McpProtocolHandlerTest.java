@@ -50,7 +50,7 @@ class McpProtocolHandlerTest {
         io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
         io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED)) {
       var adapter = mock(KnowledgeHttpApiAdapter.class);
-      when(adapter.search(any(), any(EngineContext.class))).thenThrow(
+      when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(
           new java.util.concurrent.CompletionException(
               new io.justsearch.core.execution.EngineExecutorRejectedException(reason, "test.search", 7)));
       var ctx = mock(Context.class);
@@ -539,7 +539,7 @@ class McpProtocolHandlerTest {
             1L, 1L, 5L, List.of(hit), null, null, null, null, null, null, null, trace, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     var surface =
@@ -651,7 +651,7 @@ class McpProtocolHandlerTest {
     // entry point — JSON arg parsing, schema validation, callSearch's Boolean unwrap, and the
     // projection call site — because every other detail=true test calls the projection directly.
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
+    McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
     McpProtocolHandler h = handlerOver(adapter);
 
     Map<String, Object> withDetail =
@@ -681,7 +681,7 @@ class McpProtocolHandlerTest {
     // — NOT silently coerced to false (which would be a costly silent trap: the agent asks for
     // provenance, gets none, and is told nothing).
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
+    McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
     McpProtocolHandler h = handlerOver(adapter);
 
     for (String badDetail : List.of("\"true\"", "1")) {
@@ -709,22 +709,22 @@ class McpProtocolHandlerTest {
     // so the restored SEARCH_DESC sentence is true only if the value actually reaches the
     // request — callSearch passed a hard-coded null before this fix.
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
+    McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
     McpProtocolHandler h = handlerOver(adapter);
 
     callTool(h, 34, "justsearch_search", "{\"query\":\"\\\"exact phrase\\\"\",\"query_syntax\":\"lucene\"}");
     ArgumentCaptor<KnowledgeSearchRequest> req =
         ArgumentCaptor.forClass(KnowledgeSearchRequest.class);
-    verify(adapter).search(req.capture(), any(EngineContext.class));
+    verify(adapter).openSearch(req.capture(), any(EngineContext.class));
     assertEquals("lucene", req.getValue().querySyntax(), "querySyntax must reach the request");
 
     // Omitted → null, so the engine applies its SIMPLE default.
     reset(adapter);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
+    McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
     callTool(h, 35, "justsearch_search", "{\"query\":\"plain\"}");
     ArgumentCaptor<KnowledgeSearchRequest> defaulted =
         ArgumentCaptor.forClass(KnowledgeSearchRequest.class);
-    verify(adapter).search(defaulted.capture(), any(EngineContext.class));
+    verify(adapter).openSearch(defaulted.capture(), any(EngineContext.class));
     assertNull(defaulted.getValue().querySyntax(), "omitted querySyntax leaves the engine default");
   }
 
@@ -733,7 +733,7 @@ class McpProtocolHandlerTest {
     // The schema declares an enum, so a value the engine would silently fold to SIMPLE is a clean
     // error instead — the exact failure mode (silently ignored querySyntax) this lane is fixing.
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
+    McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
     String raw =
         callTool(
             handlerOver(adapter), 36, "justsearch_search",
@@ -1190,7 +1190,7 @@ class McpProtocolHandlerTest {
         text.contains("validation could not run") && text.contains("not dispatched"),
         "must be the validator-unavailable error, not a downstream failure: " + text);
     assertTrue(text.contains("INTERNAL_ERROR"), "typed as a substrate error: " + text);
-    verify(adapter, never()).search(any(), any(EngineContext.class));
+    verify(adapter, never()).openSearch(any(), any(EngineContext.class));
     verifyNoInteractions(dispatcher);
   }
 

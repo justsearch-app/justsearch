@@ -581,6 +581,13 @@ final class KnowledgeSearchEngine {
 
 
   public KnowledgeSearchResponse search(KnowledgeSearchRequest req, EngineContext engineContext) {
+    try (var session = openSearch(req, engineContext)) {
+      return session.response();
+    }
+  }
+
+  KnowledgeHttpApiAdapter.SearchSession openSearch(
+      KnowledgeSearchRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
 
     // 250 Phase 5c: Root span for the entire search pipeline
@@ -591,19 +598,21 @@ final class KnowledgeSearchEngine {
                 "search.query_length",
                 (long) (req.query() == null ? 0 : req.query().length()))
             .startSpan();
-    Scope searchScope = searchSpan.makeCurrent();
-    try (SearchCapture captured = captureSearch()) {
-      KnowledgeSearchResponse resp = captured.lease().withClient(client ->
-          doSearch(req, searchSpan, engineContext, client, captured.config()));
+    SearchCapture captured = null;
+    try (Scope searchScope = searchSpan.makeCurrent()) { // NOPMD - scope used for auto-close
+      captured = captureSearch();
+      SearchCapture active = captured;
+      KnowledgeSearchResponse resp = active.lease().withClient(client ->
+          doSearch(req, searchSpan, engineContext, client, active.config()));
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
-      return resp;
-    } catch (Exception e) {
+      return new RetainedSearchSession(resp, captured);
+    } catch (RuntimeException | Error e) {
+      if (captured != null) captured.close();
       searchSpan.setStatus(StatusCode.ERROR, e.getMessage());
       searchSpan.recordException(e);
       throw e;
     } finally {
-      searchScope.close();
       searchSpan.end();
     }
   }
@@ -628,6 +637,33 @@ final class KnowledgeSearchEngine {
       io.justsearch.configuration.resolved.ResolvedConfig config,
       KnowledgeServerBootstrap.ClientLease lease) implements AutoCloseable {
     @Override public void close() { lease.close(); }
+  }
+
+  private static final class RetainedSearchSession implements KnowledgeHttpApiAdapter.SearchSession {
+    private final KnowledgeSearchResponse response;
+    private final SearchCapture captured;
+
+    private RetainedSearchSession(KnowledgeSearchResponse response, SearchCapture captured) {
+      this.response = response;
+      this.captured = captured;
+    }
+
+    @Override public KnowledgeSearchResponse response() { return response; }
+
+    @Override public io.justsearch.configuration.resolved.ResolvedConfig config() {
+      return captured.config();
+    }
+
+    @Override public StatusFacts statusFacts(EngineContext engineContext) {
+      return captured.lease().withClient(client -> {
+        var status = client.getStatus(engineContext);
+        return new StatusFacts(status.getCore().getDocCount(),
+            status.getEnrichment().getEmbedding().getCoveragePercent(),
+            status.getEnrichment().getSplade().getCoveragePercent());
+      });
+    }
+
+    @Override public void close() { captured.close(); }
   }
 
   private KnowledgeSearchResponse doSearch(

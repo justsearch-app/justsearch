@@ -45,6 +45,10 @@ final class EngineSupervisedRecoveryE2ETest {
           "the repository's process identity collector currently supports Windows only");
     }
     Path repo = repositoryRoot();
+    if (scenario.startsWith("installer-")) {
+      assumeTrue(hasRetainedInstallerModels(repo),
+          "installed standard-model activation requires retained model bytes; run on a model-equipped host");
+    }
     Path work =
         repo.resolve("tmp/lane-f-takeover/writer-junit-" + UUID.randomUUID()).normalize();
     Path outputFile = work.resolve("fixture-output.txt");
@@ -180,6 +184,18 @@ final class EngineSupervisedRecoveryE2ETest {
     }
     assertTrue(output.contains("PASS"), output);
     assertTrue(output.contains("\"portsClosed\":true"), output);
+  }
+
+  private static boolean hasRetainedInstallerModels(Path repo) {
+    for (Path ancestor = repo; ancestor != null; ancestor = ancestor.getParent()) {
+      Path models = ancestor.resolve("models");
+      if (Files.isRegularFile(models.resolve("onnx/gte-multilingual-base/model.onnx"))
+          && Files.isRegularFile(models.resolve("onnx/ner/model.onnx"))
+          && Files.isRegularFile(models.resolve("splade/naver-splade-v3/model.onnx"))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void stopOwnedRun(Path repo, Path work) throws Exception {

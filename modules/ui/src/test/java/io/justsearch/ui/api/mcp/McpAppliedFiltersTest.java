@@ -93,8 +93,8 @@ final class McpAppliedFiltersTest {
 
   private McpProtocolHandler handler(ArgumentCaptor<KnowledgeSearchRequest> captor) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(captor.capture(), any(EngineContext.class)))
-        .thenAnswer(inv -> respondingTo(inv.getArgument(0)));
+    when(adapter.openSearch(captor.capture(), any(EngineContext.class)))
+        .thenAnswer(inv -> McpSearchSessionFixture.of(adapter, respondingTo(inv.getArgument(0))));
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =

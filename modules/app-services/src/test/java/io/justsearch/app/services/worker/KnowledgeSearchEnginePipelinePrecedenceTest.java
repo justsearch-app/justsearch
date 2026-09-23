@@ -4,9 +4,12 @@ package io.justsearch.app.services.worker;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
 import io.justsearch.app.api.knowledge.PipelineConfig;
@@ -17,6 +20,7 @@ import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +38,38 @@ final class KnowledgeSearchEnginePipelinePrecedenceTest {
   @AfterEach
   void restoreConfiguration() {
     TestResolvedConfigHelper.restoreGlobal(previousConfig);
+  }
+
+  @Test
+  void retainedSearchSessionReadsStatusFromAAfterBIsSelected() {
+    KnowledgeClient a = mock(KnowledgeClient.class);
+    KnowledgeClient b = mock(KnowledgeClient.class);
+    var aLease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    var bLease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(aLease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0)).apply(a));
+    when(bLease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0)).apply(b));
+    when(a.search(any(SearchRequest.class), any())).thenReturn(SearchResponse.getDefaultInstance());
+    when(a.getStatus(any())).thenReturn(io.justsearch.ipc.StatusResponse.newBuilder()
+        .setCore(io.justsearch.ipc.CoreStatus.newBuilder().setDocCount(17)).build());
+    var selected = new AtomicReference<>(aLease);
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    when(bootstrap.publicationLock()).thenReturn(ConfigStore.global().publicationLock());
+    when(bootstrap.acquireClientLease()).thenAnswer(ignored -> selected.get());
+    KnowledgeSearchEngine engine = new KnowledgeSearchEngine(
+        bootstrap, mock(SearchPerSourceExecutor.class),
+        io.justsearch.app.api.OnlineAiService.unavailable(), null, ConfigStore.global());
+    var configA = ConfigStore.global().get();
+
+    try (var session = engine.openSearch(request("A", "text", null), TestEngineContexts.internal())) {
+      selected.set(bLease);
+      assertSame(configA, session.config());
+      assertEquals(17, session.indexedDocCount(TestEngineContexts.internal()));
+      verify(b, never()).getStatus(any());
+    }
+    verify(aLease).close();
+    verify(bLease, never()).close();
   }
 
   @Test

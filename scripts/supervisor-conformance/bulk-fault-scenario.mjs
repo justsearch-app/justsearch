@@ -6,12 +6,12 @@ import identity from '../dev/lib/process-identity.cjs';
 
 export const BULK_FAULT_CASES = Object.freeze({
   'bulk-partial-capture': Object.freeze({
-    phase: 'bulk-partial-capture', finalIncarnation: 4, faultIncarnation: 1,
-    requestedRestartIncarnations: Object.freeze([2, 3]), cutAttempts: 1, finalAttempts: 3,
+    phase: 'bulk-partial-capture', finalIncarnation: 3, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([2]), cutAttempts: 1, finalAttempts: 3,
   }),
   'bulk-state-before-binding': Object.freeze({
-    phase: 'bulk-before-building-checkpoint', finalIncarnation: 3, faultIncarnation: 1,
-    requestedRestartIncarnations: Object.freeze([2]), cutAttempts: 1, finalAttempts: 2,
+    phase: 'bulk-before-building-checkpoint', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
   }),
   'bulk-promotion-before-terminal': Object.freeze({
     phase: 'bulk-after-promotion', finalIncarnation: 3, faultIncarnation: 2,
@@ -167,6 +167,10 @@ export async function exerciseBulkFault(c) {
     requireThat(c.output().includes(`Engine incarnation ${incarnation} exited 4 (requested_restart`),
       `incarnation ${incarnation} did not record its own requested restart`);
   }
+  if (selected.requestedRestartIncarnations.length === 0) {
+    requireThat(!c.output().includes('exited 4 (requested_restart'),
+      'Flow A promotion unexpectedly requested a process restart');
+  }
 
   const final = await waitFor('bulk terminal success and exact queue acknowledgement', 90000, () => {
     const observed = snapshot({ operationPath, jobsPath, indexBase, operationKey });
@@ -214,6 +218,14 @@ export async function exerciseBulkFault(c) {
     before: { operation: stableOperation, queue: stableQueue },
     after: { operation: afterRetry.operation, queue: queueProjection(afterRetry) },
   })}`);
+
+  const servingAfterResult = readJson(path.join(runtime, 'supervisor.v1.json'));
+  requireThat(servingAfterResult?.state === 'running'
+    && servingAfterResult.incarnation === expectedIncarnation
+    && servingAfterResult.instanceId === recovered.supervisor.instanceId
+    && servingAfterResult.restartCount === 1
+    && !c.output().includes(`Engine incarnation ${expectedIncarnation} exited 4 (requested_restart`),
+  `Flow A promoted Green through the live process without a promotion restart: ${JSON.stringify(servingAfterResult)}`);
 
   console.log('BULK_FAULT_PASS', JSON.stringify({
     scenario, operationKey, phase: selected.phase,

@@ -67,6 +67,23 @@ public final class KnowledgeHttpApiAdapter {
     return searchEngine.search(req, engineContext);
   }
 
+  /** Retains the exact serving generation and settings through a caller's response rendering. */
+  public SearchSession openSearch(KnowledgeSearchRequest req, EngineContext engineContext) {
+    return searchEngine.openSearch(req, engineContext);
+  }
+
+  public interface SearchSession extends AutoCloseable {
+    record StatusFacts(long docCount, double embeddingCoveragePercent,
+                       double spladeCoveragePercent) {}
+    KnowledgeSearchResponse response();
+    io.justsearch.configuration.resolved.ResolvedConfig config();
+    StatusFacts statusFacts(EngineContext engineContext);
+    default long indexedDocCount(EngineContext engineContext) {
+      return statusFacts(engineContext).docCount();
+    }
+    @Override void close();
+  }
+
   public KnowledgeStatus status(EngineContext engineContext) {
     return searchEngine.status(engineContext);
   }

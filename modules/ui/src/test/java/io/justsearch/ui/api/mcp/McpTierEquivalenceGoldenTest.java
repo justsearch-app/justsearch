@@ -90,7 +90,7 @@ final class McpTierEquivalenceGoldenTest {
   private static Map<String, Object> invokeSearch(
       KnowledgeSearchResponse canned, Map<String, Object> args) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =

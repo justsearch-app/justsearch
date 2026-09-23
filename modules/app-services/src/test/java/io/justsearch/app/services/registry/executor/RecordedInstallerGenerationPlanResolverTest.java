@@ -36,7 +36,8 @@ final class RecordedInstallerGenerationPlanResolverTest {
   private static final Instant OCCURRED_AT = Instant.parse("2026-09-14T00:00:00Z");
   private static final Clock KEY_CLOCK = Clock.fixed(OCCURRED_AT, java.time.ZoneOffset.UTC);
   private static final String ARGUMENTS = "{\"source\":\"installer_model_activation\"}";
-  private static final String ROOT_PATH = "C:/private-installer-root";
+  private static final String ROOT_PATH = Path.of(
+      System.getProperty("java.io.tmpdir"), "private-installer-root").toAbsolutePath().toString();
   private static final String SETTINGS = "{\"models\":{}}";
   private static final String TARGET = "{\"dimension\":768}";
   private static final UUID NONCE = UUID.fromString("00000000-0000-4000-8000-000000000121");

@@ -670,6 +670,16 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     return new CallView(lease);
   }
 
+  @Override
+  public EncoderRuntimeSnapshot getEncoderRuntimeSnapshot(EngineContext engineContext) {
+    CallView view = captureCallView();
+    try {
+      return withTaskView(view, () -> super.getEncoderRuntimeSnapshot(engineContext));
+    } finally {
+      view.release();
+    }
+  }
+
   /** Coherent committed inputs for the composition root, with the normal call ownership/budget. */
   io.justsearch.app.api.operations.AppliedIndexGeneration captureAppliedGeneration(
       EngineContext engineContext) {

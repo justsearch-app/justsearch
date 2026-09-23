@@ -470,15 +470,9 @@ final class McpDeliveryFramingTest {
     }
 
     @Test
-    @DisplayName("an uninitialized config store resolves to OFF — nothing turns on by omission")
-    void uninitializedStoreResolvesOff() {
-      // Exercises the null-store branch production hits at early boot. The precondition is asserted
-      // explicitly so that if a future ui test installs a global store, this fails naming the
-      // changed precondition rather than silently testing a different branch.
-      assertNull(
-          io.justsearch.configuration.resolved.ConfigStore.globalOrNull(),
-          "precondition: no global ConfigStore is installed in the ui test JVM");
-      assertEquals(McpDeliveryFraming.Settings.OFF, McpDeliveryFraming.resolveSettings());
+    @DisplayName("an absent captured configuration resolves to OFF")
+    void absentCaptureResolvesOff() {
+      assertEquals(McpDeliveryFraming.Settings.OFF, McpDeliveryFraming.resolveSettings(null));
     }
 
     @Test

@@ -618,8 +618,8 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v19",
-      "currentVersion": 19,
+      "format": "SQLite WAL schema v20",
+      "currentVersion": 20,
       "readableLegacyVersions": [
         0,
         1,
@@ -639,7 +639,8 @@
         15,
         16,
         17,
-        18
+        18,
+        19
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "futureVersionRefusalTest": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
@@ -929,6 +930,7 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/pack/PackInstallOps.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/pack/PackStagingOps.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AcquisitionStage.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/PlacementStage.java",
         "modules/shell/src-tauri/src/lib.rs",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadExecutor.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadResume.java",

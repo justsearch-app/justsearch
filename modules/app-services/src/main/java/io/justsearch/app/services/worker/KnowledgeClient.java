@@ -1326,6 +1326,17 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return response;
     }
 
+    /** One logical diagnostic read of policy and observed accelerator state. */
+    public record EncoderRuntimeSnapshot(
+            Map<String, Object> policies,
+            Map<io.justsearch.ort.EncoderRole, io.justsearch.app.api.status.OrtCudaView> views) {}
+
+    /** Subclasses with a serving-view owner keep both reads on the same captured view. */
+    public EncoderRuntimeSnapshot getEncoderRuntimeSnapshot(EngineContext engineContext) {
+        return new EncoderRuntimeSnapshot(
+                getSessionPolicies(engineContext), getEncoderOrtCudaViews(engineContext));
+    }
+
     /**
      * Tempdoc 422: returns per-encoder {@link io.justsearch.app.api.status.OrtCudaView} typed
      * keyed by {@link io.justsearch.ort.EncoderRole}. Source of truth for the

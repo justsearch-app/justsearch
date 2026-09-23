@@ -223,7 +223,7 @@ final class McpTierEquivalenceTest {
             37L, 37L, 15L, hits, null, facets, Boolean.TRUE, null, null, null, null, null, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -293,7 +293,7 @@ final class McpTierEquivalenceTest {
             null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -380,7 +380,7 @@ final class McpTierEquivalenceTest {
     // Tempdoc 770 §F.5: the answer path fires NO second search — the facet sidecar (a full hybrid
     // search at limit 0, per call, for a 3-field block rendered into the undelivered text tier) is
     // gone, and with it the `facets` fact on both tiers.
-    verify(facetAdapter, never()).search(any(), any(EngineContext.class));
+    verify(facetAdapter, never()).openSearch(any(), any(EngineContext.class));
     assertFalse(text.contains("--- Top sources & entities ---"), text);
     assertFalse(structured.containsKey("facets"), structured.toString());
     // HINTS (flattened list carries the comparative hint at minimum)

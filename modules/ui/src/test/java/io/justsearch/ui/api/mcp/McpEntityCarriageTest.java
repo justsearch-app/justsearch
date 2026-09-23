@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
-import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -258,7 +257,7 @@ final class McpEntityCarriageTest {
           surface()
               .buildSearchContent(
                   resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L,
-                  CARRIAGE_ON, TestRequestContexts.mcp("s1"));
+                  CARRIAGE_ON, null);
       String concise = McpToolSurface.renderSearchText(resp, content, true);
       assertFalse(concise.contains("Preview:"), concise);
       assertTrue(concise.contains(BRIDGE), concise);
@@ -272,7 +271,7 @@ final class McpEntityCarriageTest {
           surface()
               .buildSearchContent(
                   resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L,
-                  CARRIAGE_ON, TestRequestContexts.mcp("s1"));
+                  CARRIAGE_ON, null);
       Map<String, Object> structured = McpEvidenceProjection.searchEvidence(resp, content, false);
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> results = (List<Map<String, Object>>) structured.get("results");
@@ -284,7 +283,7 @@ final class McpEntityCarriageTest {
           surface()
               .buildSearchContent(
                   resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L,
-                  CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
+                  CARRIAGE_OFF, null);
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> offResults =
           (List<Map<String, Object>>)
@@ -303,7 +302,7 @@ final class McpEntityCarriageTest {
       McpSearchResponseContent withoutCarriage =
           surface()
               .buildSearchContent(
-                  resp, Map.of("query", "power station upper wetlands"), f1, -1L, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
+                  resp, Map.of("query", "power station upper wetlands"), f1, -1L, CARRIAGE_OFF, null);
       assertNull(withoutCarriage.hits().get(0).continuation());
 
       // With carriage the same F1 setting now marks the bridge entity as a hop-2 candidate.
@@ -311,7 +310,7 @@ final class McpEntityCarriageTest {
           surface()
               .buildSearchContent(
                   resp, Map.of("query", "power station upper wetlands"), f1, -1L, CARRIAGE_ON,
-                  TestRequestContexts.mcp("s1"));
+                  null);
       assertNotNull(withCarriage.hits().get(0).continuation());
       assertTrue(withCarriage.hits().get(0).continuation().contains(BRIDGE));
     }
@@ -391,7 +390,7 @@ final class McpEntityCarriageTest {
     McpSearchResponseContent content =
         surface()
             .buildSearchContent(
-                resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L, carriage, TestRequestContexts.mcp("s1"));
+                resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L, carriage, null);
     return McpToolSurface.renderSearchText(resp, content, false);
   }
 

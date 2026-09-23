@@ -67,7 +67,8 @@ public final class EncoderRuntimeController {
       return new EncoderRuntimeResponse(Map.of(), "worker-unreachable");
     }
 
-    Map<String, Object> policies = current.getSessionPolicies(engineContext);
+    var snapshot = current.getEncoderRuntimeSnapshot(engineContext);
+    Map<String, Object> policies = snapshot.policies();
     Object configStatusNode = policies.get("configStatus");
     if ("worker-unreachable".equals(configStatusNode)) {
       return new EncoderRuntimeResponse(Map.of(), "worker-unreachable");
@@ -82,7 +83,7 @@ public final class EncoderRuntimeController {
     // /api/ai/runtime/status's observed-EP fields project the SAME derivation instead of
     // re-implementing it. This controller keeps only its own reachability reporting.
     Map<EncoderRole, EncoderRuntimeView> derived =
-        EncoderRuntimeExplainer.explainAll(policies, current.getEncoderOrtCudaViews(engineContext));
+        EncoderRuntimeExplainer.explainAll(policies, snapshot.views());
     Map<String, EncoderRuntimeView> encoders = new LinkedHashMap<>();
     for (Map.Entry<EncoderRole, EncoderRuntimeView> entry : derived.entrySet()) {
       encoders.put(entry.getKey().consumerName(), entry.getValue());

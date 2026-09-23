@@ -65,8 +65,8 @@ public final class WorkerEncoderRuntimeCache implements EncoderRuntimeCache {
           "encoder-runtime-cache", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
       KnowledgeClient client = clientSupplier == null ? null : clientSupplier.get();
       if (client == null) return Map.of(); // Worker not connected yet.
-      return EncoderRuntimeExplainer.explainAll(
-          client.getSessionPolicies(engineContext), client.getEncoderOrtCudaViews(engineContext));
+      var snapshot = client.getEncoderRuntimeSnapshot(engineContext);
+      return EncoderRuntimeExplainer.explainAll(snapshot.policies(), snapshot.views());
     };
   }
 

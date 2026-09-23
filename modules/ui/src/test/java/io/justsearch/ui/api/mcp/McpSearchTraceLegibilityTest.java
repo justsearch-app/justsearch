@@ -58,7 +58,7 @@ final class McpSearchTraceLegibilityTest {
   @SuppressWarnings("unchecked")
   private static Map<String, Object> invokeSearch(KnowledgeSearchResponse canned) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =

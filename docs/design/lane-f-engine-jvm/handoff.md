@@ -6,7 +6,68 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-23)
 
-### Active D1 checkpoint after `a3039517c` (20:45 Berlin)
+### Active D1 checkpoint after `756567096` (21:30 Berlin)
+
+Worktree `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` is on
+`codex/lane-f-pr1`; PR727 has pushed checkpoint `756567096`. The approved
+installer activation and Flow A implementation, six local installed
+standard-model pointer/settings crash cuts, full local Gradle/static/stress
+suite, and frontend checks are in that commit. Do not stage the untracked
+`modules/app-inference/logs/` directory. Checkpoint pushes remain authorized;
+merge still requires stage F acceptance.
+
+Hosted run `35904361821` completed at that SHA. Public claims found the
+jobs-db v20 recoverability catalog omission and an unclassified placement
+write; both are corrected locally and the recoverability test/gate passed.
+The app-ui shard found a Windows-only absolute-path fixture in
+`RecordedInstallerGenerationPlanResolverTest`; the portable-root correction
+passed its focused test. System integration ran for the full 35-minute job
+budget and was cancelled: its bulk partial-capture and pre-binding fixtures
+waited for obsolete promotion restarts while operation rows actually settled,
+and six installer cases lacked retained model bytes on the hosted runner.
+The bulk fixture now distinguishes a permitted Green-start restart from
+promotion, and asserts the serving incarnation is unchanged after terminal
+settlement, search, and replay. A private installed rerun passed partial
+capture at `tmp/2953-bulk-partial-live-no-promotion-restart.txt` and
+pre-binding at `tmp/2954-bulk-state-live-no-promotion-restart.txt`. Installer
+cases are explicitly skipped only on hosts
+without the three retained model assets; the six direct installed standard-model
+cuts above remain their proof. The next pushed checkpoint needs a coherent
+hosted system run that finishes.
+
+Uncommitted D1 request-capture changes retain MCP search's exact serving
+client/config through delivery and pair encoder runtime policies/probes on one
+lease. Focused search-session, MCP, and cutover tests passed at
+`tmp/2938-diagnostic-capture-focused.txt`, `tmp/2941-mcp-capture-tests.txt`,
+`tmp/2942-mcp-session-projection.txt`, and `tmp/2943-mcp-session-lease.txt`.
+The first full integrated rerun (`tmp/2945-lane-f-capture-integrated.txt`)
+completed with only PMD's scope annotation and two superseded global MCP
+settings readers red; these were corrected, with focused static tests green at
+`tmp/2949-static-corrections.txt`. The complete 358-task
+`spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist`
+sweep passed at `tmp/2955-lane-f-capture-integrated-green-candidate.txt`.
+Independent review then found MCP search's enrichment hint still reacquired
+live status during governor rendering. The pending correction reads one status
+fact snapshot through the retained search lease before rendering, so the count
+and hint both belong to A after B is selected. The MCP cutover and
+close-on-render-error tests, focused app-services/MCP suite
+(`tmp/2957-mcp-retained-status-focused.txt`), and dead-code architecture plus
+MCP suite (`tmp/2960-mcp-arch-recheck.txt`) pass. An intervening full suite
+(`tmp/2958-lane-f-capture-integrated-final.txt`) found only the now-removed
+test-only wrapper's dead-code violation. After removing it and formatting the
+tests, the exact-source 358-task rerun passed at
+`tmp/2963-lane-f-capture-integrated-green.txt`. Hosted proof is pending. The
+recoverability test/gate, script syntax, and diff check also pass.
+The current installed standard-model pointer-before-settings cut passed at
+`tmp/2956-installer-current-session-capture.txt`: the exact killed attempt
+recovered the same operation, settings witness and pointer B; both documents
+were returned in search and the private stack stopped cleanly. Hosted rerun
+is due after review and checkpoint push.
+Remaining D1 includes unrecorded live Flow A, held-query/A-B lifetime proof,
+fresh/no-READY activation, retained assets, cancellation/duplicate/conflict
+cases, and item-by-item D1-4 through D1-17 reconciliation. D2/E/F remain open.
+
+### Historical D1 checkpoint after `a3039517c` (20:45 Berlin)
 
 Worktree `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` remains on
 `codex/lane-f-pr1`. `a3039517c` is the current HEAD; the Flow A and installer

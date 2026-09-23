@@ -153,7 +153,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("search: generic failure states tool name, exception class/message, status pointer")
   void searchGenericFailureMessage() {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenThrow(new IllegalStateException("boom"));
+    when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(new IllegalStateException("boom"));
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -250,7 +250,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("search: typed failures retain the API policy in both serialized delivery tiers")
   void classifiedSearchFailure(Exception failure, ApiErrorCode expectedCode) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any(), any(EngineContext.class))).thenThrow(failure);
+    when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(failure);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface = new McpToolSurface(
