@@ -304,7 +304,7 @@ final class IndexReadinessPublicationTest {
     when(client.getWorkerOperationalView(any())).thenReturn(view(true));
     var server = mock(KnowledgeServerBootstrap.class);
     when(server.hasClient()).thenReturn(true);
-    when(server.client()).thenReturn(client);
+    BootstrapLeaseFixtures.bind(server, client);
     var handler = new StatusLifecycleHandler(
         mock(OnlineAiService.class), mock(io.justsearch.agent.api.AgentService.class), () -> null,
         server, null, indexBase, Instant.now(), () -> "OK", null, null, null,

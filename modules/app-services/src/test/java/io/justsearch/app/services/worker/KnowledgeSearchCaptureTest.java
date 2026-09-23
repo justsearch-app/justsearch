@@ -49,6 +49,9 @@ final class KnowledgeSearchCaptureTest {
     when(bootstrap.acquireClientLease()).thenReturn(lease);
     when(bootstrap.isReady()).thenReturn(true);
     when(lease.client()).thenReturn(client);
+    when(lease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(client));
 
     var facetEntered = new CountDownLatch(1);
     var releaseFacet = new CountDownLatch(1);

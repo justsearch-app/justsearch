@@ -44,6 +44,31 @@ import org.junit.jupiter.api.io.TempDir;
 @DisplayName("DevReloadManager — the on-disk reload trigger (item A18)")
 final class DevReloadManagerTriggerTest {
 
+  @Test
+  void failedReplacementStartupClosesCandidateBeforeRetry(@TempDir Path tempDir)
+      throws Exception {
+    var bus = busOver(Files.createDirectories(tempDir.resolve("runtime")));
+    var server = spy(serverWith(bus, tempDir.resolve("data")));
+    var old = mock(WorkerAppServices.class);
+    var failed = mock(DefaultWorkerAppServices.class);
+    var retry = mock(DefaultWorkerAppServices.class);
+    server.appServices = old;
+    doReturn(failed, retry).when(server).newAppServices();
+    doThrow(new IllegalStateException("producer refused"))
+        .when(failed).startIndexingLoop();
+    var manager = new DevReloadManager(server);
+
+    manager.performReload();
+    assertTrue(manager.isReloadRequested());
+    assertSame(old, server.appServices);
+    verify(failed).close();
+
+    manager.performReload();
+    assertFalse(manager.isReloadRequested());
+    assertSame(retry, server.appServices);
+    verify(retry).startIndexingLoop();
+  }
+
   /**
    * {@code WorkerBootFixture.workerConfig} reads {@code ConfigStore.global()}, which THROWS when
    * unset rather than defaulting. Whether some other test in this module happens to have set it

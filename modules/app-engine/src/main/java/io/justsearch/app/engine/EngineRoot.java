@@ -265,7 +265,7 @@ public final class EngineRoot implements WorkerHost {
           executorRegistry, workerConfig,
           new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
           childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
-          configStore::get);
+          configStore::get, configStore.publicationLock());
     };
   }
 
@@ -386,7 +386,8 @@ public final class EngineRoot implements WorkerHost {
     ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
     EngineKnowledgeClient built =
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
-            () -> requestRestart(started), admission, authority.roots());
+            () -> requestRestart(started), admission, authority.roots(),
+            started::captureServingView);
     this.client = built;
     try {
       recordedIngestion.bindProducer(built::enumerateRecordedRoot);
@@ -399,6 +400,25 @@ public final class EngineRoot implements WorkerHost {
     }
     log.info("Engine composed the index half in-process (no worker process, no channel)");
     return built;
+  }
+
+  @Override
+  public WorkerHost.ServingLease captureServingView() {
+    KnowledgeServer current = server;
+    if (current == null) throw new IllegalStateException("Index serving owner is unavailable");
+    var lease = current.captureServingView();
+    return new WorkerHost.ServingLease() {
+      @Override
+      public <T> T withClient(KnowledgeClient client,
+          java.util.function.Function<KnowledgeClient, T> action) {
+        if (!(client instanceof EngineKnowledgeClient engineClient)) {
+          throw new IllegalArgumentException("Serving view belongs to an Engine client");
+        }
+        return engineClient.withServingLease(lease, () -> action.apply(client));
+      }
+
+      @Override public void close() { lease.close(); }
+    };
   }
 
   private void requestRestart(KnowledgeServer source) {

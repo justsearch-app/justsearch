@@ -16,6 +16,7 @@ import io.justsearch.core.execution.EngineExecutorSpec.Kind;
 import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.server.WorkerAppServices;
+import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.ipc.SearchResponse;
 import java.time.Duration;
@@ -24,11 +25,71 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 @Timeout(10)
 final class EngineKnowledgeClientExecutorTest {
+
+  @Test
+  void deadlineRetainsExactServingViewUntilWorkerActuallyExits() throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var exited = new CountDownLatch(1);
+    var oldSearch = mock(WorkerSearchService.class);
+    when(oldSearch.search(any(), any())).thenAnswer(invocation -> {
+      entered.countDown();
+      boolean waiting = true;
+      while (waiting) {
+        try {
+          release.await();
+          waiting = false;
+        } catch (InterruptedException ignored) {
+          // Deadline releases the caller before an uninterruptible native body exits.
+        }
+      }
+      exited.countDown();
+      return SearchResponse.getDefaultInstance();
+    });
+    var oldServices = mock(WorkerAppServices.class);
+    when(oldServices.searchService()).thenReturn(oldSearch);
+    var oldLease = mock(KnowledgeServer.ServingLease.class);
+    when(oldLease.services()).thenReturn(oldServices);
+    var newSearch = mock(WorkerSearchService.class);
+    when(newSearch.search(any(), any())).thenReturn(SearchResponse.getDefaultInstance());
+    var newServices = mock(WorkerAppServices.class);
+    when(newServices.searchService()).thenReturn(newSearch);
+    var newLease = mock(KnowledgeServer.ServingLease.class);
+    when(newLease.services()).thenReturn(newServices);
+    var selected = new AtomicReference<>(oldLease);
+    var admission = new EngineAdmissionController(8, 8, 1);
+    try (var registry = registry(2, 2, 1, 4);
+        var client = new EngineKnowledgeClient(registry, () -> newServices,
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100,
+            IpcTelemetry.noop(), () -> {}, admission,
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(), selected::get)) {
+      var caller = new java.util.concurrent.FutureTask<>(
+          () -> client.search("old", 10, TestEngineContexts.FOREGROUND));
+      Thread.ofVirtual().start(caller);
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+      var timeout = assertThrows(java.util.concurrent.ExecutionException.class,
+          () -> caller.get(3, TimeUnit.SECONDS));
+      assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+          ((io.justsearch.app.api.knowledge.KnowledgeClientException) timeout.getCause()).status());
+      org.mockito.Mockito.verify(oldLease, org.mockito.Mockito.never()).close();
+      selected.set(newLease);
+      client.search("new", 10, TestEngineContexts.FOREGROUND);
+      org.mockito.Mockito.verify(newSearch).search(any(), any());
+      org.mockito.Mockito.verify(oldSearch).search(any(), any());
+      release.countDown();
+      assertTrue(exited.await(2, TimeUnit.SECONDS));
+      org.mockito.Mockito.verify(oldLease, org.mockito.Mockito.timeout(2_000)).close();
+      org.mockito.Mockito.verify(newLease).close();
+    } finally {
+      release.countDown();
+    }
+  }
 
   @Test
   void closeRetiresEveryLogicalOwnerSoClientCanRestartWithSameRegistry() {

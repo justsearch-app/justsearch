@@ -83,7 +83,7 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
       return;
     }
     try (var lease = server.captureClient()) {
-      Map<String, String> commitMetadata = lease.client().getCommitMetadata(engineContext);
+      Map<String, String> commitMetadata = lease.withClient(client -> client.getCommitMetadata(engineContext));
       ctx.json(commitMetadata);
     } catch (Exception e) {
       log.debug("Failed to fetch commit metadata: {}", e.getMessage());
@@ -114,7 +114,7 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
     KnowledgeServerBootstrap server = knowledgeServer;
     if (server != null && server.isReady()) {
       try (var lease = server.captureClient()) {
-        var snapshot = lease.client().getDebugWorkerState(engineContext);
+        var snapshot = lease.withClient(client -> client.getDebugWorkerState(engineContext));
         ObjectNode snapNode = (ObjectNode) mapper.valueToTree(snapshot);
         worker.setAll(snapNode);
         // Lane F stage A item A11 deleted the Worker process: the index half now runs inside this

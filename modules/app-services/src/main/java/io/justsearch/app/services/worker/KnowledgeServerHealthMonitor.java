@@ -717,7 +717,10 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     // Item A11: the channel reconnect that used to run here is gone. Hold the current in-process
     // client until this reconcile actually returns; recovery may be retiring it concurrently.
     try (lease) {
-      lease.client().reindexPersistedRoots(ENGINE_CONTEXT);
+      lease.withClient(client -> {
+        client.reindexPersistedRoots(ENGINE_CONTEXT);
+        return null;
+      });
     } catch (RuntimeException e) {
       log.warn("Post-resume watcher re-register + reconcile failed: {}", e.getMessage());
     }

@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -35,6 +36,40 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("KnowledgeServer.awaitClosed — close completion is observable")
 final class KnowledgeServerCloseCompletionTest {
+
+  @Test
+  void retiringViewRefusesNewCapturesAndWaitsForActualHolder(@TempDir Path tempDir)
+      throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var services = org.mockito.Mockito.mock(WorkerAppServices.class);
+    server.publishServingView(services);
+    var held = server.captureServingView();
+    try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      var retirement = executor.submit(() -> {
+        server.retireServingView();
+        return null;
+      });
+      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      boolean refused = false;
+      while (!refused && System.nanoTime() < deadline) {
+        try (var probe = server.captureServingView()) {
+          org.junit.jupiter.api.Assertions.assertSame(services, probe.services());
+          Thread.onSpinWait();
+        } catch (IllegalStateException expected) {
+          refused = true;
+        }
+      }
+      assertTrue(refused, "retirement must close capture admission");
+      assertTrue(!retirement.isDone(), "held physical view must delay retirement");
+      assertThrows(IllegalStateException.class, server::captureServingView);
+      held.close();
+      retirement.get(2, java.util.concurrent.TimeUnit.SECONDS);
+    } finally {
+      held.close();
+      server.close();
+    }
+  }
 
   @BeforeAll
   static void ensureGlobalConfig() {
@@ -73,7 +108,7 @@ final class KnowledgeServerCloseCompletionTest {
     org.mockito.Mockito.doThrow(failure).doNothing().when(queue).close();
     try {
       org.junit.jupiter.api.Assertions.assertSame(failure,
-          org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close));
+          assertThrows(java.io.IOException.class, server::close));
       assertFalse(server.awaitClosed(0));
       org.junit.jupiter.api.Assertions.assertSame(queue, queueField.get(server));
       org.junit.jupiter.api.Assertions.assertSame(rootLock, lockField.get(server));
@@ -99,7 +134,7 @@ final class KnowledgeServerCloseCompletionTest {
     org.mockito.Mockito.doThrow(failure).doNothing().when(rootLock).close();
     try {
       org.junit.jupiter.api.Assertions.assertSame(failure,
-          org.junit.jupiter.api.Assertions.assertThrows(java.io.UncheckedIOException.class, server::close));
+          assertThrows(java.io.UncheckedIOException.class, server::close));
       assertFalse(server.awaitClosed(0));
       org.junit.jupiter.api.Assertions.assertSame(rootLock, field.get(server));
     } finally {
@@ -133,9 +168,9 @@ final class KnowledgeServerCloseCompletionTest {
     var reconstruct = KnowledgeServer.class.getDeclaredMethod("reconstructAppServicesAfterDeferredUpgrade");
     reconstruct.setAccessible(true);
     try {
-      org.junit.jupiter.api.Assertions.assertThrows(java.lang.reflect.InvocationTargetException.class,
+      assertThrows(java.lang.reflect.InvocationTargetException.class,
           () -> reconstruct.invoke(server));
-      var failure = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close);
+      var failure = assertThrows(java.io.IOException.class, server::close);
       assertTrue(failure.getCause().getSuppressed().length > 0, "both failures must be retained");
       org.mockito.Mockito.verify(old, org.mockito.Mockito.times(2)).close();
       org.mockito.Mockito.verify(candidate, org.mockito.Mockito.times(2)).close();
@@ -167,7 +202,7 @@ final class KnowledgeServerCloseCompletionTest {
     var reconstruct = KnowledgeServer.class.getDeclaredMethod("reconstructAppServicesAfterDeferredUpgrade");
     reconstruct.setAccessible(true);
     try {
-      var failed = org.junit.jupiter.api.Assertions.assertThrows(java.lang.reflect.InvocationTargetException.class,
+      var failed = assertThrows(java.lang.reflect.InvocationTargetException.class,
           () -> reconstruct.invoke(server));
       assertTrue(failed.getCause() instanceof IllegalStateException);
       org.junit.jupiter.api.Assertions.assertSame(old, server.appServices());
@@ -192,7 +227,7 @@ final class KnowledgeServerCloseCompletionTest {
     server.appServices = services;
     org.mockito.Mockito.doThrow(new java.io.IOException("OCR child still alive"))
         .doNothing().when(services).close();
-    org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close);
+    assertThrows(java.io.IOException.class, server::close);
     assertFalse(server.awaitClosed(0));
     org.junit.jupiter.api.Assertions.assertSame(services, server.appServices());
     server.close();
@@ -295,7 +330,7 @@ final class KnowledgeServerCloseCompletionTest {
     lockField.setAccessible(true);
     lockField.set(server, rootLock);
 
-    org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close);
+    assertThrows(java.io.IOException.class, server::close);
     assertFalse(server.awaitClosed(0));
     org.mockito.Mockito.verify(services, org.mockito.Mockito.never()).close();
     org.mockito.Mockito.verify(rootLock, org.mockito.Mockito.never()).close();

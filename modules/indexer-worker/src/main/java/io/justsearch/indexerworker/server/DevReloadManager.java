@@ -65,49 +65,52 @@ final class DevReloadManager {
       // 2. Await deferred model init completion — get the ModelContext
       ModelContext modelCtx = awaitDeferredInit();
 
-      // 3. Close old application services (stops IndexingLoop, up to 5s join)
-      WorkerAppServices oldServices = server.appServices;
-      if (oldServices != null) {
-        log.info("Closing old application services...");
-        // The incumbent may already have stopped its watcher while its indexing owner drains.
-        // Retain this reload in the existing sentinel instead of requiring another compile.
-        closeRetryPending = true;
-        oldServices.close();
-        closeRetryPending = false;
+      // The initializer may itself upgrade the runtime. Do not hold runtimeSwapLock while
+      // awaiting it; acquire the same owner lock as admin reload and shutdown afterward.
+      try (var owner = server.beginDevReplacement()) {
+        owner.assertOwned();
+        boolean published = false;
+        try {
+          // The incumbent may have stopped its watcher while its indexing owner drains. Retain
+          // this request in the sentinel so a refused close retries without another compile.
+          WorkerAppServices oldServices = server.appServices;
+          if (oldServices != null) {
+            log.info("Closing old application services...");
+            closeRetryPending = true;
+            server.retireServingView();
+            oldServices.close();
+          }
+
+          // HotSwap has updated class bytecode. Retain B as an explicit pending owner from
+          // construction through model wiring and producer startup, including every failure cut.
+          server.closeFailedPendingAppServices();
+          WorkerAppServices newServices = server.newAppServices();
+          server.retainPendingAppServices(newServices);
+          rewireModels(newServices, modelCtx);
+          newServices.startIndexingLoop();
+          server.publishServingView(newServices);
+          server.releasePendingAppServices(newServices);
+          published = true;
+          closeRetryPending = false;
+          server.notifyRecordedServicesPublished();
+
+          // The stamp is diagnostic; failure after publication cannot roll back B.
+          updateBuildStampFromReloadFile();
+          long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
+          log.info("=== DEV HOT-RELOAD: complete ({}ms) ===", elapsedMs);
+
+        } catch (Exception e) {
+          if (!published) {
+            closeRetryPending = true;
+            try {
+              server.closeFailedPendingAppServices();
+            } catch (RuntimeException cleanup) {
+              if (cleanup != e) e.addSuppressed(cleanup);
+            }
+          }
+          throw e;
+        }
       }
-
-      // 4. Construct new services from the same InfraContext.
-      // Class bytecode was already updated by HotSwap (Phase 1). Reconstruction
-      // re-evaluates constructors, static initializers, and field defaults.
-      // 516 P3 FINAL CUT: use the KS helper that pre-wires migrationActiveSupplier +
-      // embeddingTelemetry at ctor time (replaces the old rewireEmbeddingTelemetry shim
-      // and the wireMigrationActiveSupplier post-ctor call).
-      WorkerAppServices newServices = server.newAppServices();
-
-      // 5. Re-wire models from ModelContext (typed, no scattered field reads)
-      rewireModels(newServices, modelCtx);
-
-      // 6-7. Publish the new services (volatile write — atomic for calls that arrive after it).
-      //
-      // Lane F stage A item A9: this used to be two steps. The gRPC registration held three
-      // `Delegating*Service` wrappers whose delegates had to be re-pointed, and only then was
-      // `appServices` updated. Those wrappers existed for nothing else, and they went with the
-      // server. The volatile write IS the swap now, because every caller reads the services per
-      // call through `KnowledgeServer.appServices()` rather than through a registered object —
-      // `EngineKnowledgeClient` holds a supplier for exactly this reason, so a reload it did not
-      // know about still reaches the new instance on the next call.
-      server.appServices = newServices;
-
-      // 8. Start new indexing loop
-      newServices.startIndexingLoop();
-      server.notifyRecordedServicesPublished();
-
-      // 9. 371: Update build stamp from reload-build-stamp.txt (written by MCP reload tool).
-      //    This prevents false-positive "stale JVM" warnings from jseval after a successful reload.
-      updateBuildStampFromReloadFile();
-
-      long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
-      log.info("=== DEV HOT-RELOAD: complete ({}ms) ===", elapsedMs);
 
     } catch (Exception e) {
       log.error("DEV HOT-RELOAD failed", e);

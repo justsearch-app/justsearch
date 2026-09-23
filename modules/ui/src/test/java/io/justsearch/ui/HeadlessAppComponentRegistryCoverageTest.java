@@ -156,7 +156,7 @@ final class HeadlessAppComponentRegistryCoverageTest {
           });
       var knowledgeServer = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
       var workerCapability = new RegistryBackedCapability(root.components(), "index", "worker");
-      org.mockito.Mockito.when(knowledgeServer.client()).thenReturn(client);
+      io.justsearch.ui.api.BootstrapLeaseFixtures.bind(knowledgeServer, client);
       org.mockito.Mockito.when(knowledgeServer.hasClient()).thenReturn(true);
       org.mockito.Mockito.when(knowledgeServer.workerCapability()).thenReturn(workerCapability);
       org.mockito.Mockito.when(knowledgeServer.gpuScheduling())

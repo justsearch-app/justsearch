@@ -443,6 +443,46 @@ XML at `tmp/2641-app-services-results`. Its only failure is the unchanged ONNX
 recorded-generation route. This is a WIP checkpoint, not D1-4 acceptance;
 the independent review's physical view and async lifetime blockers remain.
 
+The next uncommitted D1 correction captures a `KnowledgeServer.ServingView` in the
+Head client lease, pins each unary Engine task's exact `WorkerAppServices` through
+actual worker exit, and routes synchronous search plus short status/debug probes
+through `ClientLease.withClient`. A deadline regression passes at
+`tmp/2648-serving-deadline-test.txt`; an owner retirement pause test passes at
+`tmp/2650-serving-retirement-tests.txt`. Focused app-services tests pass at
+`tmp/2647-serving-view-focused-tests.txt`; the UI suite passes all 1,348 tests
+(one skip) at `tmp/2656-ui-lease-full.txt`. Dev reload now shares the runtime
+replacement lock and retains/cleans an unpublished candidate on startup failure;
+its cleanup/retry regression passes at `tmp/2659-dev-reload-cleanup-test.txt`.
+The physical view implementation remains WIP: independent review found that
+deferred model wiring mutates a published service, in-place replacement can leave
+all captures fenced while the component still advertises READY, streams and
+HeadAssembly cached clients bypass lifetime capture, and side-by-side A/B
+publication while A is held is not yet supported. No D1-4 or generation-lifetime
+acceptance is claimed. The existing `EncoderBindings`/`SearchOrchestrator` seam
+was identified for a single immutable model snapshot; text search currently
+waits on `modelReadyLatch`, so an EMPTY-model view needs a deliberate text-path
+cut rather than only wrapping current mutable fields.
+
+Hosted run 35821663891 for pushed checkpoint `15535fea8` passed build,
+platform-contracts, search-worker, Windows-native, jseval Python, license,
+secret scan and measured axe. Public claims failed `runtime-state/unregistered-
+referencer` for the new `GenerativeSettingsComponentOwner`; the consumer was
+registered locally and `node scripts/governance/run.mjs --gate runtime-state
+--mode gate` now passes. App-ui failed the unreferenced-method audit on two
+superseded overloads; they were retired locally and the focused ArchUnit plus
+behavior rerun passes at `tmp/2665-dead-overload-cleanup-rerun.txt`. The hosted
+integration job was still pending at the last check. These are local corrections
+only until a later pushed revision completes hosted checks. The installed
+standard-model proof remains at the prior `b9dd6ace4` checkpoint; no new stack
+was started for this WIP. The shared stack remains stopped.
+The first integrated `build -x test` exposed only PMD findings introduced in the
+new view/reload tests and one newly imported type (`tmp/2667-serving-wip-build.txt`).
+Their source-level corrections passed affected PMD at
+`tmp/2668-serving-pmd-corrections.txt`, and the full `build -x test` now passes at
+`tmp/2669-serving-wip-build-green.txt`. `spotlessCheck` passed at
+`tmp/2666-serving-wip-spotless.txt`. Neither build is a full test suite or D1
+acceptance proof.
+
 ## Evidence and owner map
 
 | Concern | Governing record |

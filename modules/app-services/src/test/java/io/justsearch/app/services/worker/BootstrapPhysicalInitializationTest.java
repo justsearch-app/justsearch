@@ -316,6 +316,16 @@ final class BootstrapPhysicalInitializationTest {
           5_000L, 2_000L, 3, 2_000L, 1_000L, 300_000L, 100, 0L, 0);
       var host = mock(WorkerHost.class);
       when(host.start(any(), any())).thenReturn(client);
+      when(host.captureServingView()).thenAnswer(ignored -> new WorkerHost.ServingLease() {
+        @Override
+        public <T> T withClient(KnowledgeClient client,
+            java.util.function.Function<KnowledgeClient, T> action) {
+          return action.apply(client);
+        }
+
+        @Override
+        public void close() {}
+      });
       when(client.isHealthy(any())).thenAnswer(invocation -> healthy.get());
       bootstrap =
           new KnowledgeServerBootstrap(

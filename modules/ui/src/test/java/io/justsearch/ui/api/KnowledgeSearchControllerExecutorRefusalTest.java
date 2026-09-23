@@ -40,6 +40,9 @@ class KnowledgeSearchControllerExecutorRefusalTest {
     var lease = mock(KnowledgeServerBootstrap.ClientLease.class);
     when(bootstrap.captureClient()).thenReturn(lease);
     when(lease.client()).thenReturn(client);
+    when(lease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(client));
     var controller = new KnowledgeSearchController(bootstrap, mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
     var ctx = mock(Context.class);
     when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());

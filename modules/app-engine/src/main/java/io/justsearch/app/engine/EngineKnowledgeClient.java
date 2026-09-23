@@ -36,6 +36,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.slf4j.Logger;
@@ -93,6 +94,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private final ExecutorService backgroundCallThreads;
   private final ExecutorService foregroundStreamThreads;
   private final ExecutorService backgroundStreamThreads;
+  private final java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
+      servingLeaseSupplier;
+  private final ThreadLocal<WorkerAppServices> taskServices = new ThreadLocal<>();
+  private final ThreadLocal<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
+      parentServingLease = new ThreadLocal<>();
 
   /**
    * @param services the composed index half, read per call and never cached: {@code KnowledgeServer}
@@ -140,11 +146,23 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       long deadlineMs, int batchSize, IpcTelemetry telemetry, Runnable requestedRestartAction,
       io.justsearch.app.api.EngineAdmissionService admission,
       io.justsearch.app.services.worker.WatchedRootsState roots) {
+    this(executors, services, foregroundLoad, deadlineMs, batchSize, telemetry,
+        requestedRestartAction, admission, roots, null);
+  }
+
+  EngineKnowledgeClient(EngineExecutorRegistry executors,
+      java.util.function.Supplier<WorkerAppServices> services, ForegroundLoadGate foregroundLoad,
+      long deadlineMs, int batchSize, IpcTelemetry telemetry, Runnable requestedRestartAction,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.app.services.worker.WatchedRootsState roots,
+      java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
+          servingLeaseSupplier) {
     super(executors, deadlineMs, batchSize, telemetry, roots);
     Objects.requireNonNull(executors, "executors");
     this.admission = Objects.requireNonNull(admission, "admission");
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.services = Objects.requireNonNull(services, "services");
+    this.servingLeaseSupplier = servingLeaseSupplier;
     this.foregroundLoad = Objects.requireNonNull(foregroundLoad, "foregroundLoad");
     ExecutorOwners owners;
     try {
@@ -448,13 +466,17 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private final Budget budget;
     private final io.justsearch.app.api.EngineWorkHandle work;
     private final Runnable body;
+    private final Runnable releaseServingView;
+    private final AtomicBoolean servingReleased = new AtomicBoolean();
     private ExecutorService queueOwner;
 
     private OwnedCallTask(
-        Budget budget, io.justsearch.app.api.EngineWorkHandle work, Runnable body) {
+        Budget budget, io.justsearch.app.api.EngineWorkHandle work, Runnable body,
+        Runnable releaseServingView) {
       this.budget = budget;
       this.work = work;
       this.body = body;
+      this.releaseServingView = releaseServingView;
     }
 
     synchronized void executeOn(ExecutorService executor) {
@@ -475,6 +497,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         throw new IllegalStateException(failure);
       } finally {
         state.set(FINISHED);
+        releaseServingView();
       }
     }
 
@@ -484,11 +507,16 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         if (queueOwner instanceof java.util.concurrent.ThreadPoolExecutor pool) {
           pool.remove(this);
         }
-        work.close();
+        try { work.close(); }
+        finally { releaseServingView(); }
       } finally {
         completion.cancel(false);
       }
       return true;
+    }
+
+    private void releaseServingView() {
+      if (servingReleased.compareAndSet(false, true)) releaseServingView.run();
     }
 
     @Override
@@ -544,7 +572,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   /** Resolve once per call; runtime replacement briefly publishes no composed services. */
   private <T> T requireService(Function<WorkerAppServices, T> selector) {
-    WorkerAppServices current = services.get();
+    WorkerAppServices current = currentServices();
     if (current == null) {
       throw translate(WorkerServiceException.unavailable("Index services are being replaced"));
     }
@@ -555,18 +583,48 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     return service;
   }
 
+  private WorkerAppServices currentServices() {
+    WorkerAppServices captured = taskServices.get();
+    return captured != null ? captured : services.get();
+  }
+
+  private record CallView(WorkerAppServices services, Runnable release) {}
+
+  <T> T withServingLease(io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease,
+      java.util.function.Supplier<T> action) {
+    var previous = parentServingLease.get();
+    parentServingLease.set(Objects.requireNonNull(lease, "lease"));
+    try {
+      return action.get();
+    } finally {
+      if (previous == null) parentServingLease.remove();
+      else parentServingLease.set(previous);
+    }
+  }
+
+  private CallView captureCallView() {
+    var parent = parentServingLease.get();
+    if (parent != null) {
+      var child = parent.fork();
+      return new CallView(child.services(), child::close);
+    }
+    if (servingLeaseSupplier == null) return new CallView(services.get(), () -> {});
+    var lease = servingLeaseSupplier.get();
+    return new CallView(lease.services(), lease::close);
+  }
+
   /** Coherent committed inputs for the composition root, with the normal call ownership/budget. */
   io.justsearch.app.api.operations.AppliedIndexGeneration captureAppliedGeneration(
       EngineContext engineContext) {
     return withBudget("captureAppliedGeneration", deadline(RpcDeadlineCategory.STANDARD),
         engineContext, budget -> {
-          WorkerAppServices owner = services.get();
+          WorkerAppServices owner = currentServices();
           WorkerIngestService ingest = owner == null ? null : owner.ingestService();
           if (ingest == null) {
             throw WorkerServiceException.unavailable("Applied generation services are unavailable");
           }
           var generation = ingest.captureAppliedGeneration(budget.context());
-          if (services.get() != owner) {
+          if (currentServices() != owner) {
             throw WorkerServiceException.aborted("Index runtime changed during applied generation capture");
           }
           return generation;
@@ -604,16 +662,26 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
       Function<Budget, T> body) {
     var work = admission.attach(engineContext);
+    CallView view;
+    try {
+      view = captureCallView();
+    } catch (RuntimeException | Error failure) {
+      work.close();
+      throw failure;
+    }
     var pending = new CompletableFuture<T>();
     Budget budget;
     try {
       budget = new Budget(budgetMs, work, pending::completeExceptionally);
     } catch (RuntimeException | Error failure) {
+      view.release().run();
       work.close();
       throw failure;
     }
     try {
       OwnedCallTask task = new OwnedCallTask(budget, work, () -> {
+        WorkerAppServices prior = taskServices.get();
+        taskServices.set(view.services());
         T result = null;
         Throwable failure = null;
         try {
@@ -632,6 +700,9 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           } catch (Throwable cleanupFailure) {
             if (failure == null) failure = cleanupFailure;
             else failure.addSuppressed(cleanupFailure);
+          } finally {
+            if (prior == null) taskServices.remove();
+            else taskServices.set(prior);
           }
         }
         if (budget.complete()) {
@@ -641,7 +712,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           log.error("Engine {} worker failed after caller completion", operation, failure);
         }
         if (failure instanceof Error error) throw error;
-      });
+      }, view.release());
       ExecutorService executor = callThreads(work.context());
       budget.submitted(task);
       task.executeOn(executor);
@@ -649,7 +720,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       OwnedCallTask task = budget.submission.get();
       if (task == null || !task.isCancelled()) {
         budget.close();
-        if (task == null) work.close();
+        if (task == null) {
+          try { work.close(); }
+          finally { view.release().run(); }
+        }
         else task.cancelBeforeStart();
         throw engineLimit();
       }
@@ -1109,7 +1183,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // and per directory, so a cancel lands within a file — well inside the 100-file progress tick
     // the item asks for.
     FlowCancelSignal cancel = new FlowCancelSignal();
-    var deadlineExpired = new java.util.concurrent.atomic.AtomicBoolean();
+    var deadlineExpired = new AtomicBoolean();
     try (flow) {
       flow.onClose(cancel::cancel);
       try (var _ = work.onCancel(reason -> cancel.cancel())) {

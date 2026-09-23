@@ -323,7 +323,7 @@ final class WorkerStatusSamplerTest {
         attached.getAsBoolean() ? null : "worker.starting",
         attached.getAsBoolean() ? "Worker serving" : "Worker starting");
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
-    when(ks.client()).thenReturn(client);
+    BootstrapLeaseFixtures.bind(ks, client);
     when(ks.hasClient()).thenAnswer(invocation -> attached.getAsBoolean());
 
     var graph = components.capabilities();

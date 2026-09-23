@@ -45,6 +45,9 @@ final class KnowledgeSearchEnginePipelinePrecedenceTest {
     when(bootstrap.publicationLock()).thenReturn(publicationLock);
     when(bootstrap.acquireClientLease()).thenReturn(lease);
     when(lease.client()).thenReturn(client);
+    when(lease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(client));
     List<SearchRequest> sent = new ArrayList<>();
     when(client.search(any(SearchRequest.class), any()))
         .thenAnswer(

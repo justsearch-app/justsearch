@@ -256,7 +256,7 @@ class FilterNormalizationServiceTest {
     }
 
     @Test
-    void disabledPublicNormalizeStaysDeterministicWhileGatedMethodReturnsNull() throws Exception {
+    void disabledPublicNormalizeStaysDeterministicWhileCapturedGateReturnsNull() throws Exception {
       AtomicInteger samples = new AtomicInteger();
       FilterNormalizationService disabled =
           new FilterNormalizationService(
@@ -270,15 +270,15 @@ class FilterNormalizationServiceTest {
           disabled.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT);
       var gated =
           disabled.normalizeIfAvailable(
-              filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT);
+              filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT, false);
 
       assertNotNull(deterministic);
       assertEquals(
           List.of("cbs sports"), deterministic.get().normalizedFilters().metaSource());
       assertNull(gated);
-      assertEquals(2, samples.get());
+      assertEquals(1, samples.get());
       assertNull(disabled.normalize(null, FACET_SNAPSHOT, TEST_CONTEXT).get());
-      assertEquals(2, samples.get(), "null filters must not sample the feature flag");
+      assertEquals(1, samples.get(), "null filters must not sample the feature flag");
       verify(aiService, never()).isAvailable();
       verify(aiService, never()).chatCompletion(any(), anyInt(), any(), any());
     }

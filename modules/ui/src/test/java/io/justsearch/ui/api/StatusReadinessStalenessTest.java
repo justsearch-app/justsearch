@@ -109,7 +109,7 @@ final class StatusReadinessStalenessTest {
     Instant headStart = Instant.now().minusSeconds(60);
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     when(ks.hasClient()).thenReturn(true);
-    when(ks.client()).thenThrow(new IllegalStateException("worker gone"));
+    when(ks.captureClient()).thenThrow(new IllegalStateException("worker gone"));
 
     StatusLifecycleHandler handler = newHandler(indexBase, headStart, true);
     handler.setKnowledgeServer(ks, null);
@@ -167,7 +167,7 @@ final class StatusReadinessStalenessTest {
     when(ks.hasClient()).thenReturn(true);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
-    when(ks.client()).thenReturn(client);
+    BootstrapLeaseFixtures.bind(ks, client);
 
     StatusLifecycleHandler handler = newReachableHandler(indexBase, headStart, ks);
 
@@ -178,7 +178,7 @@ final class StatusReadinessStalenessTest {
     // Contact is lost after that successful observation. Tempdoc 885 item 6: contact loss is
     // discovered by the internal sampler, not by a request — a request only reports what the last
     // sample found, so the sampler is what has to run here.
-    when(ks.client()).thenThrow(new IllegalStateException("worker gone"));
+    when(ks.captureClient()).thenThrow(new IllegalStateException("worker gone"));
     StatusResponse stale = handler.sampleAndBuildStatusSnapshot();
     long afterFailure = System.currentTimeMillis();
 
@@ -271,7 +271,7 @@ final class StatusReadinessStalenessTest {
     when(ks.hasClient()).thenReturn(true);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
-    when(ks.client()).thenReturn(client);
+    BootstrapLeaseFixtures.bind(ks, client);
     return newReachableHandler(indexBase, headStart, ks);
   }
 

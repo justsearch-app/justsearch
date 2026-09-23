@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 556 (F-C4.2): owns the Worker status projection ({@link #status(EngineContext)}) and the QU
- * facet-snapshot cache ({@link #refreshFacetSnapshotIfStale(EngineContext)}) extracted verbatim from {@code
+ * facet-snapshot cache ({@link #refreshFacetSnapshotIfStale(EngineContext, KnowledgeClient)}) extracted verbatim from {@code
  * KnowledgeHttpApiAdapter}/{@code KnowledgeSearchEngine}. These belong together because they share the
  * mutable cache state (avg-content-length for the cross-encoder doc-length gate, the facet snapshot +
  * meta_source vocabulary for query understanding) that the search path reads. {@code KnowledgeSearchEngine}
@@ -115,7 +115,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
 
     StatusResponse s;
     try (var lease = knowledgeServer.captureClient()) {
-      s = lease.client().getStatus(engineContext);
+      s = lease.withClient(client -> client.getStatus(engineContext));
     }
 
     // Include embedding compatibility status in extras
@@ -198,12 +198,6 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
    * background search with facets and updates the cached snapshot when the result arrives. The
    * snapshot is a text block listing top facet values per field.
    */
-  void refreshFacetSnapshotIfStale(EngineContext engineContext) {
-    try (var lease = knowledgeServer.captureClient()) {
-      refreshFacetSnapshotIfStale(engineContext, lease.client());
-    }
-  }
-
   /** Search operations pass their already captured client so refresh cannot rebind mid-request. */
   void refreshFacetSnapshotIfStale(EngineContext engineContext, KnowledgeClient client) {
     long now = System.currentTimeMillis();

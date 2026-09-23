@@ -23,6 +23,13 @@ import java.io.Closeable;
  */
 public interface WorkerHost extends Closeable {
 
+  /** Exact physical serving view retained by an operation after publication capture. */
+  interface ServingLease extends AutoCloseable {
+    <T> T withClient(KnowledgeClient client,
+        java.util.function.Function<KnowledgeClient, T> action);
+    @Override void close();
+  }
+
   /**
    * Starts the index half and returns the client for it.
    *
@@ -35,6 +42,9 @@ public interface WorkerHost extends Closeable {
    * @throws Exception if the index half could not be started
    */
   KnowledgeClient start(GpuSchedulingGauge gpuScheduling, IpcTelemetry telemetry) throws Exception;
+
+  /** Captures the current physical view while the caller holds the shared publication read lock. */
+  ServingLease captureServingView();
 
   /**
    * The OS process id that owns the index — this JVM's own pid for an in-process host.
@@ -75,6 +85,11 @@ public interface WorkerHost extends Closeable {
       @Override
       public long ownerPid() {
         return 0L;
+      }
+
+      @Override
+      public ServingLease captureServingView() {
+        throw new IllegalStateException("No index serving view is configured");
       }
 
       @Override

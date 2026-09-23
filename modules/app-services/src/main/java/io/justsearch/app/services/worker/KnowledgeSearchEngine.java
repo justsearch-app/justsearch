@@ -593,8 +593,8 @@ final class KnowledgeSearchEngine {
             .startSpan();
     Scope searchScope = searchSpan.makeCurrent();
     try (SearchCapture captured = captureSearch()) {
-      KnowledgeSearchResponse resp = doSearch(req, searchSpan, engineContext,
-          captured.client(), captured.config());
+      KnowledgeSearchResponse resp = captured.lease().withClient(client ->
+          doSearch(req, searchSpan, engineContext, client, captured.config()));
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
       return resp;
@@ -627,7 +627,6 @@ final class KnowledgeSearchEngine {
   private record SearchCapture(
       io.justsearch.configuration.resolved.ResolvedConfig config,
       KnowledgeServerBootstrap.ClientLease lease) implements AutoCloseable {
-    KnowledgeClient client() { return lease.client(); }
     @Override public void close() { lease.close(); }
   }
 

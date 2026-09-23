@@ -827,7 +827,7 @@ final class InferenceHandlers {
       return 0;
     }
     try (var lease = server.captureClient()) {
-      return lease.client().countPendingEmbeddings(engineContext);
+      return lease.withClient(client -> client.countPendingEmbeddings(engineContext));
     } catch (Exception e) {
       log.debug("Failed to count pending embeddings", e);
       return 0;
@@ -845,7 +845,7 @@ final class InferenceHandlers {
       return 0;
     }
     try (var lease = server.captureClient()) {
-      return lease.client().countPendingVdu(engineContext);
+      return lease.withClient(client -> client.countPendingVdu(engineContext));
     } catch (Exception e) {
       log.debug("Failed to count pending VDU", e);
       return 0;

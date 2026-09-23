@@ -53,7 +53,7 @@ final class WorkerStatusCacheContextTest {
       cache.setWorkerCapability(readyCapability.view());
       EngineContext caller = TestEngineContexts.ui();
 
-      cache.refreshFacetSnapshotIfStale(caller);
+      cache.refreshFacetSnapshotIfStale(caller, client);
 
       ArgumentCaptor<EngineContext> context = ArgumentCaptor.forClass(EngineContext.class);
       verify(client)
@@ -67,6 +67,9 @@ final class WorkerStatusCacheContextTest {
     KnowledgeServerBootstrap.ClientLease lease = mock(KnowledgeServerBootstrap.ClientLease.class);
     when(bootstrap.captureClient()).thenReturn(lease);
     when(lease.client()).thenReturn(client);
+    when(lease.withClient(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(client));
     return bootstrap;
   }
 

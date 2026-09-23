@@ -75,6 +75,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -135,6 +136,86 @@ public final class KnowledgeServer implements Closeable {
   private WorkerAppServices pendingAppServices;
   private final Object closeLock = new Object();
   private final ReentrantLock runtimeSwapLock = new ReentrantLock();
+
+  /** Serializes dev service replacement with admin runtime replacement and shutdown. */
+  final class DevReplacementLease implements AutoCloseable {
+    private boolean released;
+
+    void assertOwned() {
+      if (released || !runtimeSwapLock.isHeldByCurrentThread()) {
+        throw new IllegalStateException("Dev replacement owner lock is not held");
+      }
+    }
+
+    @Override public void close() {
+      if (released) return;
+      released = true;
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  DevReplacementLease beginDevReplacement() {
+    if (closeStarted) throw new IllegalStateException("Dev reload refused during server close");
+    runtimeSwapLock.lock();
+    if (closeStarted) {
+      runtimeSwapLock.unlock();
+      throw new IllegalStateException("Dev reload refused during server close");
+    }
+    return new DevReplacementLease();
+  }
+  private final ReentrantReadWriteLock publicationLock;
+  private final Object servingViewMonitor = new Object();
+  private ServingView servingView;
+
+  private static final class ServingView {
+    private final WorkerAppServices services;
+    private final LuceneRuntime searchRuntime;
+    private final LuceneRuntime ingestRuntime;
+    private final Path activeGenerationPath;
+    private int holders;
+    private boolean retiring;
+
+    private ServingView(WorkerAppServices services, LuceneRuntime searchRuntime,
+        LuceneRuntime ingestRuntime, Path activeGenerationPath) {
+      this.services = Objects.requireNonNull(services, "services");
+      this.searchRuntime = searchRuntime;
+      this.ingestRuntime = ingestRuntime;
+      this.activeGenerationPath = activeGenerationPath;
+    }
+  }
+
+  /** Retains the exact application services and runtimes selected at capture. */
+  public final class ServingLease implements AutoCloseable {
+    private final ServingView captured;
+    private final AtomicBoolean released = new AtomicBoolean();
+
+    private ServingLease(ServingView captured) { this.captured = captured; }
+
+    public WorkerAppServices services() { return captured.services; }
+
+    public LuceneRuntime searchRuntime() { return captured.searchRuntime; }
+
+    public LuceneRuntime ingestRuntime() { return captured.ingestRuntime; }
+
+    public Path activeGenerationPath() { return captured.activeGenerationPath; }
+
+    /** Child work may retain its already-issued view after ordinary acquisitions stop. */
+    public ServingLease fork() {
+      synchronized (servingViewMonitor) {
+        if (released.get()) throw new IllegalStateException("Serving lease already released");
+        captured.holders++;
+        return new ServingLease(captured);
+      }
+    }
+
+    @Override public void close() {
+      if (!released.compareAndSet(false, true)) return;
+      synchronized (servingViewMonitor) {
+        captured.holders--;
+        servingViewMonitor.notifyAll();
+      }
+    }
+  }
   private volatile boolean closeStarted;
   private volatile boolean migrationEnumeratorDone;
   private volatile Throwable migrationEnumeratorFailure;
@@ -396,6 +477,24 @@ public final class KnowledgeServer implements Closeable {
       io.justsearch.core.component.ComponentHandle encoderComponent,
       ResolvedConfig startupConfiguration,
       java.util.function.Supplier<ResolvedConfig> liveConfiguration) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, startupConfiguration, liveConfiguration,
+        new ReentrantReadWriteLock());
+  }
+
+  /** Process composition shares the exact configuration/component publication lock. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration,
+      ReentrantReadWriteLock publicationLock) {
+    this.publicationLock = Objects.requireNonNull(publicationLock, "publicationLock");
     this.startupConfiguration = startupConfiguration;
     this.liveConfiguration = liveConfiguration;
     this.indexComponent = indexComponent;
@@ -1154,6 +1253,8 @@ public final class KnowledgeServer implements Closeable {
         appServices.startIndexingLoop();
       }
 
+      publishServingView(appServices);
+
       notifyRecordedServicesPublished();
 
       // 7. Start sentinel thread for liveness monitoring
@@ -1494,7 +1595,7 @@ public final class KnowledgeServer implements Closeable {
       if (oldServices != null) oldServices.close();
       this.appServices = null; // The incumbent has actually closed; callers see unavailability.
       newServices.startIndexingLoop();
-      this.appServices = newServices;
+      publishServingView(newServices);
       pendingAppServices = null;
     } catch (Exception | Error failure) {
       try { closePendingAppServices(); }
@@ -1522,6 +1623,24 @@ public final class KnowledgeServer implements Closeable {
     } catch (IOException failure) {
       throw new IllegalStateException("Unpublished application services still own resources", failure);
     }
+  }
+
+  void retainPendingAppServices(WorkerAppServices candidate) {
+    if (pendingAppServices != null) {
+      throw new IllegalStateException("Prior pending application services still own resources");
+    }
+    pendingAppServices = Objects.requireNonNull(candidate, "candidate");
+  }
+
+  void releasePendingAppServices(WorkerAppServices published) {
+    if (pendingAppServices != published) {
+      throw new IllegalStateException("Published application services do not match pending owner");
+    }
+    pendingAppServices = null;
+  }
+
+  void closeFailedPendingAppServices() {
+    closePendingAppServices();
   }
 
   /**
@@ -1552,6 +1671,11 @@ public final class KnowledgeServer implements Closeable {
     final long elapsed;
     try {
       if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
+      try {
+        retireServingView();
+      } catch (IOException refusal) {
+        throw new IllegalStateException("Runtime reload retains active serving holders", refusal);
+      }
       long startNanos = System.nanoTime();
       LuceneRuntime old = this.ingestLifecycle;
       if (old instanceof RunningRuntime running) {
@@ -1594,6 +1718,7 @@ public final class KnowledgeServer implements Closeable {
       //   - search continues seamlessly via the upgraded runtime
       //   - write methods stop returning UNAVAILABLE; the indexing loop starts
       if (ingestLifecycle instanceof DeferredRuntime deferred) {
+        retireServingView();
         RunningRuntime upgraded = deferred.upgradeWriter();
         publishIngestLifecycle(upgraded);
         if (this.searchLifecycle == deferred) {
@@ -2501,6 +2626,70 @@ public final class KnowledgeServer implements Closeable {
     return appServices;
   }
 
+  /** Captures one published physical view under the process configuration publication guard. */
+  public ServingLease captureServingView() {
+    publicationLock.readLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        ServingView current = servingView;
+        if (closeStarted || current == null || current.retiring) {
+          throw new IllegalStateException("Index serving view is unavailable");
+        }
+        current.holders++;
+        return new ServingLease(current);
+      }
+    } finally {
+      publicationLock.readLock().unlock();
+    }
+  }
+
+  /** Installs a fully composed owner view; called only after fallible preparation succeeds. */
+  void publishServingView(WorkerAppServices preparedServices) {
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        if (servingView != null && (!servingView.retiring || servingView.holders != 0)) {
+          throw new IllegalStateException("Prior index serving view is still active");
+        }
+        appServices = Objects.requireNonNull(preparedServices, "preparedServices");
+        servingView = new ServingView(preparedServices, searchLifecycle, ingestLifecycle,
+            activeIndexPath);
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+  }
+
+  /** Stops new captures, then waits outside publication for actual users to leave. */
+  void retireServingView() throws IOException {
+    ServingView retiring;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        retiring = servingView;
+        if (retiring == null) return;
+        retiring.retiring = true;
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    synchronized (servingViewMonitor) {
+      while (retiring.holders != 0) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) {
+          throw new IOException("Index serving view still has active holders; owner retained");
+        }
+        try {
+          TimeUnit.NANOSECONDS.timedWait(servingViewMonitor, remaining);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted waiting for index serving holders", interrupted);
+        }
+      }
+    }
+  }
+
   /**
    * The process-scoped foreground-load gauge (tempdoc 885 item 3).
    *
@@ -2568,6 +2757,8 @@ public final class KnowledgeServer implements Closeable {
               log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
             }
           }
+
+          retireServingView();
 
           // Native retirement is a dependency of every later service and tokenizer close. A
           // timeout retains the exact sessions, their owners and the index root lock for retry.

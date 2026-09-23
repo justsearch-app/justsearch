@@ -90,7 +90,8 @@ public final class KnowledgeHttpApiAdapter {
 
   public List<String> suggest(String query, int limit, EngineContext engineContext) {
     try (var lease = knowledgeServer.captureClient()) {
-      return lease.client().suggest(query, limit, engineContext).getSuggestionsList();
+      return lease.withClient(client -> client.suggest(query, limit, engineContext)
+          .getSuggestionsList());
     }
   }
 
@@ -99,7 +100,8 @@ public final class KnowledgeHttpApiAdapter {
     ListFoldersResponse proto;
     try (var lease = knowledgeServer.captureClient()) {
       int maxFolders = req.maxFolders() == null ? 0 : req.maxFolders();
-      proto = lease.client().listFolders(req.parentPath(), maxFolders, engineContext);
+      proto = lease.withClient(client ->
+          client.listFolders(req.parentPath(), maxFolders, engineContext));
     }
 
     List<FolderBrowseResponse.Folder> folders = new ArrayList<>();
@@ -119,8 +121,8 @@ public final class KnowledgeHttpApiAdapter {
     ListFolderFilesResponse proto;
     try (var lease = knowledgeServer.captureClient()) {
       int limit = req.limit() == null ? 0 : req.limit();
-      proto = lease.client().listFolderFiles(
-          req.folderPath(), limit, req.projection(), engineContext);
+      proto = lease.withClient(client -> client.listFolderFiles(
+          req.folderPath(), limit, req.projection(), engineContext));
     }
 
     List<FolderFilesResponse.FileEntry> files = new ArrayList<>();

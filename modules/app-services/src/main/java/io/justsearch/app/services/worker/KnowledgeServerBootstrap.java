@@ -494,7 +494,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * Delegates to {@link io.justsearch.app.api.lifecycle.Capability#available()}.
      */
     public boolean isReady() {
-        return workerCapability.available();
+        if (!workerCapability.available()) return false;
+        try (ClientLease ignored = captureClient()) {
+            return true;
+        } catch (IllegalStateException unavailable) {
+            return false;
+        }
     }
 
     public Capability workerCapability() {
@@ -530,8 +535,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
             if (clientRetiring || !clientVerified || captured == null) {
                 throw new IllegalStateException("Knowledge Server client is unavailable");
             }
+            WorkerHost.ServingLease serving =
+                java.util.Objects.requireNonNull(workerHost.captureServingView(), "serving lease");
             clientHolders++;
-            return new ClientLease(captured);
+            return new ClientLease(captured, serving);
         }
     }
 
@@ -552,17 +559,31 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     public final class ClientLease implements AutoCloseable {
         private final KnowledgeClient captured;
+        private final WorkerHost.ServingLease serving;
         private final AtomicBoolean released = new AtomicBoolean();
 
-        private ClientLease(KnowledgeClient captured) { this.captured = captured; }
+        private ClientLease(KnowledgeClient captured, WorkerHost.ServingLease serving) {
+            this.captured = captured;
+            this.serving = serving;
+        }
 
         public KnowledgeClient client() { return captured; }
 
+        /** Runs a synchronous operation bound to this exact physical view. */
+        public <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
+            if (released.get()) throw new IllegalStateException("Client lease already released");
+            return serving.withClient(captured, action);
+        }
+
         @Override public void close() {
             if (!released.compareAndSet(false, true)) return;
-            synchronized (clientLeaseMonitor) {
-                clientHolders--;
-                clientLeaseMonitor.notifyAll();
+            try {
+                serving.close();
+            } finally {
+                synchronized (clientLeaseMonitor) {
+                    clientHolders--;
+                    clientLeaseMonitor.notifyAll();
+                }
             }
         }
     }

@@ -261,10 +261,10 @@ final class CoreApiAssembly {
               () -> {
                 if (b.knowledgeServer == null) return java.util.List.of();
                 try (var lease = b.knowledgeServer.captureClient()) {
-                  return lease.client().getWatchedRoots(
+                  return lease.withClient(client -> client.getWatchedRoots(
                       io.justsearch.app.services.intent.EngineProvenance.internal(
                           "index-drift-health-tap", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-                          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+                          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
                 }
               }));
       // Tempdoc 629 (FLOOR): wire the at-rest-protection condition tap + the shared disk-encryption

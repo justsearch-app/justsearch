@@ -194,6 +194,14 @@
       "note": "737 fix pack (fix 4): the /api/inference/mode REST authority — BrainRuntimeServiceImpl.switchInferenceMode became an intent write (online->chatEnabled=true, indexing->false) through the ONE runtime-intent authority instead of a raw onlineAi.switchTo*, removing the second dispatch authority that bypassed the reconciler (§12b). Consumes the authority; does not re-model it."
     },
     {
+      "id": "generative-settings-component-owner-consumer",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/GenerativeSettingsComponentOwner.java",
+      "guard": "test:GenerativeSettingsComponentOwnerTest",
+      "note": "Lane F D1 settings candidate owner reads RuntimeSpec.fromSettings to resolve desired chatEnabled before preparing the managed generative component. It consumes the existing desired-state projection and does not write or fork runtime state."
+    },
+    {
       "id": "mode-enum-legacy",
       "kind": "projection-pending",
       "lang": "java",

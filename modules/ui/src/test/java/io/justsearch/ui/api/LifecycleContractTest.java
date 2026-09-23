@@ -202,7 +202,7 @@ final class LifecycleContractTest {
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
-    when(mockKs.client()).thenReturn(mockClient);
+    BootstrapLeaseFixtures.bind(mockKs, mockClient);
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 2, 0, true, false));
 
@@ -256,7 +256,7 @@ final class LifecycleContractTest {
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
-    when(mockKs.client()).thenReturn(mockClient);
+    BootstrapLeaseFixtures.bind(mockKs, mockClient);
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, null));
 
@@ -301,7 +301,7 @@ final class LifecycleContractTest {
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
-    when(mockKs.client()).thenReturn(mockClient);
+    BootstrapLeaseFixtures.bind(mockKs, mockClient);
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
@@ -360,7 +360,7 @@ final class LifecycleContractTest {
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
-    when(mockKs.client()).thenReturn(mockClient);
+    BootstrapLeaseFixtures.bind(mockKs, mockClient);
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
@@ -413,7 +413,7 @@ final class LifecycleContractTest {
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
-    when(mockKs.client()).thenReturn(mockClient);
+    BootstrapLeaseFixtures.bind(mockKs, mockClient);
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
@@ -461,7 +461,7 @@ final class LifecycleContractTest {
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
-    when(mockKs.client()).thenReturn(mockClient);
+    BootstrapLeaseFixtures.bind(mockKs, mockClient);
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenThrow(new RuntimeException("Worker unreachable (test)"));
 
@@ -512,7 +512,7 @@ final class LifecycleContractTest {
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
-    when(mockKs.client()).thenReturn(mockClient);
+    BootstrapLeaseFixtures.bind(mockKs, mockClient);
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true, 8, 4, 2, "STALLED"));
 
