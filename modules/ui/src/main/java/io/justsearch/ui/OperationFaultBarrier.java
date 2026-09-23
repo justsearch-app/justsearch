@@ -47,6 +47,10 @@ final class OperationFaultBarrier {
         || key == null || kind == null || !Set.of("ingest", "settings-apply", "reconfigure", "reindex").contains(kind)) {
       throw new IllegalArgumentException("Invalid operation fault selection");
     }
+    boolean selfExit = "1".equals(env.apply("JUSTSEARCH_OPERATION_FAULT_SELF_EXIT"));
+    if (selfExit && !("installer-before-receipt".equals(phase) && "reindex".equals(kind))) {
+      throw new IllegalArgumentException("Self-exit is reserved for the installer before-receipt cut");
+    }
     OperationKeys.timestampMillis(key);
     OperationKind selectedKind = OperationKind.fromWire(kind);
     Path runtime = data.resolve("runtime");
@@ -65,6 +69,9 @@ final class OperationFaultBarrier {
         Path pending = runtime.resolve("operation-fault-reached.pending");
         Files.writeString(pending, json.writeValueAsString(marker));
         Files.move(pending, reached, StandardCopyOption.ATOMIC_MOVE);
+        // This cut races a legitimate concurrent terminal reconciliation. Halt this
+        // harness Engine at the marker so the disk snapshot precedes that writer.
+        if (selfExit) haltHarnessEngine();
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(180);
         while (!Files.exists(release)) {
           if (System.nanoTime() >= deadline) throw new IllegalStateException("Operation fault barrier was not released");
@@ -77,5 +84,12 @@ final class OperationFaultBarrier {
         throw new IllegalStateException("Operation fault barrier interrupted", interrupted);
       }
     };
+  }
+
+  // This harness-only cut needs abrupt death: ProcessHandle.destroyForcibly() on
+  // Windows took the Engine's requested-restart shutdown path in installed proof.
+  @SuppressWarnings("PMD.DoNotTerminateVM")
+  private static void haltHarnessEngine() {
+    Runtime.getRuntime().halt(1);
   }
 }

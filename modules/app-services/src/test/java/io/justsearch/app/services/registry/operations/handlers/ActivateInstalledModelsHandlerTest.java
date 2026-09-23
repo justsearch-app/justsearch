@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 final class ActivateInstalledModelsHandlerTest {
@@ -137,6 +138,47 @@ final class ActivateInstalledModelsHandlerTest {
     when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target(),
         new IndexTargetSnapshot(
             "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb", "a"));
+    ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
+    OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
+
+    OperationExecution result = handler.executePrepared(
+        approved, PROVENANCE, CONTEXT, mock(OperationRecordHandle.class));
+
+    assertEquals("ACTIVATION_PREVIEW_STALE", result.response().errorCode().orElseThrow());
+    verify(ingestion, org.mockito.Mockito.never()).execute(any(), any());
+  }
+
+  @Test
+  void changedWatchedScopeAfterApprovalRequiresFreshPreviewBeforeIngestion() {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
+    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target());
+    var roots = new AtomicReference<>(List.of(new RootBinding(
+        Path.of("activation-root").toAbsolutePath(), "documents")));
+    ActivateInstalledModelsHandler handler = new ActivateInstalledModelsHandler(
+        () -> install, ingestion, ignored -> roots.get(), () -> indexing, () -> List.of("*.tmp"));
+    OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
+    roots.set(List.of(new RootBinding(Path.of("different-root").toAbsolutePath(), "documents")));
+
+    OperationExecution result = handler.executePrepared(
+        approved, PROVENANCE, CONTEXT, mock(OperationRecordHandle.class));
+
+    assertEquals("ACTIVATION_PREVIEW_STALE", result.response().errorCode().orElseThrow());
+    verify(ingestion, org.mockito.Mockito.never()).execute(any(), any());
+  }
+
+  @Test
+  void changedServingSourceAfterApprovalRequiresFreshPreviewBeforeIngestion() {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn(
+        "serving-a", "serving-a", "serving-b", "serving-b");
+    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target());
     ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
     OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
 

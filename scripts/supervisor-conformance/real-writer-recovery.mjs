@@ -68,6 +68,7 @@ const env = {
 delete env.JUSTSEARCH_OPERATION_FAULT_KEY;
 delete env.JUSTSEARCH_OPERATION_FAULT_KIND;
 delete env.JUSTSEARCH_OPERATION_FAULT_POINT;
+delete env.JUSTSEARCH_OPERATION_FAULT_SELF_EXIT;
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
     || operationFault || lockScenario) {
@@ -107,6 +108,7 @@ if (installerFault) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = INSTALLER_FAULT_CASES[scenario].phase;
+  if (scenario === 'installer-before-receipt') env.JUSTSEARCH_OPERATION_FAULT_SELF_EXIT = '1';
   const roots = ['installer-root-a', 'installer-root-b'].map(name => ({ path: path.join(work, name) }));
   for (const root of roots) fs.mkdirSync(root.path, { recursive: true });
   fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({ schemaVersion: 1, roots }));

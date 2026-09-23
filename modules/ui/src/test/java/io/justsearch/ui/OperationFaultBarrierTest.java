@@ -108,6 +108,18 @@ final class OperationFaultBarrierTest {
   }
 
   @Test
+  void selfExitIsRestrictedToTheExactInstallerReceiptBoundary() {
+    var wrong = new HashMap<>(selection("installer-before-pointer", "reindex"));
+    wrong.put("JUSTSEARCH_OPERATION_FAULT_SELF_EXIT", "1");
+    assertThrows(IllegalArgumentException.class,
+        () -> OperationFaultBarrier.fromEnvironment(data, wrong::get));
+    wrong.put("JUSTSEARCH_OPERATION_FAULT_POINT", "installer-before-receipt");
+    wrong.put("JUSTSEARCH_OPERATION_FAULT_KIND", "ingest");
+    assertThrows(IllegalArgumentException.class,
+        () -> OperationFaultBarrier.fromEnvironment(data, wrong::get));
+  }
+
+  @Test
   void exactBoundaryPublishesEvidenceAndSuccessorDoesNotRetrigger() throws Exception {
     var hook = OperationFaultBarrier.fromEnvironment(data, selection()::get);
     var boundary = new OperationAttemptRunnerImpl.FaultBoundary("after-effect", OperationKind.INGEST,

@@ -123,9 +123,8 @@ export async function exerciseBulkFault(c) {
       && currentManifest.instanceId === supervisor.instanceId
       ? { supervisor, manifest: currentManifest } : null;
   });
-  const processRecord = captureEngineIdentity(faulted.supervisor, data, requireThat);
   const cooldown = await killOwnedEngineAndObserveCooldown({
-    record: processRecord, engine: faulted.supervisor, data, readJson, waitFor, requireThat,
+    engine: faulted.supervisor, data, readJson, waitFor, requireThat,
   });
   await dispatched.settled;
 
@@ -284,14 +283,19 @@ export async function exerciseInstallerActivationFault(c) {
     'caller-selected installer activation key must be unknown before dispatch');
 
   const beforeSettings = settingsWitnessOnDisk(data);
+  const initialAiManifest = await waitFor('initial installer AI phase published', 30000, () => {
+    const current = readJson(path.join(runtime, 'manifest.json'));
+    return current?.instanceId === first.instanceId && typeof current.ai?.phase === 'string'
+      ? current : null;
+  });
   requireThat(beforeSettings.witness.acceptedRevision === 0
     && beforeSettings.witness.lastCommittedOperationKey == null
     && !beforeSettings.settings?.embedOnnxModelPath
     && !beforeSettings.settings?.nerModelPath
     && !beforeSettings.settings?.spladeModelPath
-    && typeof manifest.ai?.phase === 'string' && manifest.ai.phase !== 'READY',
+    && initialAiManifest.ai.phase !== 'READY',
   `installer activation must start without a prior READY model or committed model settings: ${JSON.stringify({
-    witness: beforeSettings.witness, ai: manifest.ai,
+    witness: beforeSettings.witness, ai: initialAiManifest.ai,
   })}`);
   const headers = sessionHeaders(manifest);
   const input = { source: 'installer_model_activation' };
@@ -309,20 +313,47 @@ export async function exerciseInstallerActivationFault(c) {
     && Number.isSafeInteger(reached.operationRecordId) && reached.operationRecordId > 0,
   `installer activation hook reached the wrong boundary: ${JSON.stringify(reached)}`);
 
-  const faulted = await waitFor('admitted Engine that emitted the installer activation marker', 10000, () => {
-    const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
-    const currentManifest = readJson(path.join(runtime, 'manifest.json'));
-    return supervisor?.state === 'running' && supervisor.pid === reached.pid
-      && supervisor.runId === first.runId
-      && supervisor.incarnation === selected.faultIncarnation
-      && currentManifest?.pid === supervisor.pid
-      && currentManifest.instanceId === supervisor.instanceId
-      ? { supervisor, manifest: currentManifest } : null;
-  });
-  const processRecord = captureEngineIdentity(faulted.supervisor, data, requireThat);
-  const cooldown = await killOwnedEngineAndObserveCooldown({
-    record: processRecord, engine: faulted.supervisor, data, readJson, waitFor, requireThat,
-  });
+  // Before-receipt must crash with no terminal row. A same-key request here can
+  // legitimately reconcile the committed pointer and settle that row, erasing
+  // the intended fault cut. The other cuts exercise in-flight deduplication;
+  // the final same-key replay below covers this cut after recovery.
+  if (selected.phase !== 'installer-before-receipt') {
+    const duplicate = await post(apiPort, ACTIVATION_ROUTE,
+      { args: input, idempotencyKey: operationKey }, 10000);
+    const duplicateReceipt = requireOperationSuccess(duplicate,
+      'in-flight installer activation duplicate');
+    requireThat(duplicateReceipt.operationKey === operationKey
+      && duplicateReceipt.operationRecordId === reached.operationRecordId
+      && duplicateReceipt.body.structuredData.state === 'RUNNING'
+      && operationRows(operationPath, operationKey).length === 1,
+    `in-flight duplicate changed accepted activation identity: ${duplicate.text}`);
+  }
+
+  let faulted;
+  const cooldown = selected.phase === 'installer-before-receipt'
+    ? await waitFor('self-halted installer Engine and counted restart cooldown', 12000, () => {
+      const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+      return supervisor?.state === 'restarting' && supervisor.pid === reached.pid
+        && supervisor.runId === first.runId
+        && supervisor.incarnation === selected.faultIncarnation
+        && supervisor.restartCount === 1 && supervisor.lastExit?.counted === true
+        ? supervisor : null;
+    })
+    : await (async () => {
+      faulted = await waitFor('admitted Engine that emitted the installer activation marker', 10000, () => {
+        const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+        const currentManifest = readJson(path.join(runtime, 'manifest.json'));
+        return supervisor?.state === 'running' && supervisor.pid === reached.pid
+          && supervisor.runId === first.runId
+          && supervisor.incarnation === selected.faultIncarnation
+          && currentManifest?.pid === supervisor.pid
+          && currentManifest.instanceId === supervisor.instanceId
+          ? { supervisor, manifest: currentManifest } : null;
+      });
+      return killOwnedEngineAndObserveCooldown({
+        engine: faulted.supervisor, data, readJson, waitFor, requireThat,
+      });
+    })();
   await dispatched.settled;
 
   const cut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
@@ -402,7 +433,9 @@ export async function exerciseInstallerActivationFault(c) {
 
   console.log('INSTALLER_ACTIVATION_FAULT_PASS', JSON.stringify({
     scenario, operationKey, phase: selected.phase,
-    faulted: compactSupervisor(faulted.supervisor), cooldown: compactSupervisor(cooldown),
+    faulted: faulted ? compactSupervisor(faulted.supervisor)
+      : { pid: reached.pid, incarnation: selected.faultIncarnation },
+    cooldown: compactSupervisor(cooldown),
     recovered: compactSupervisor(recovered.supervisor), operation: {
       id: final.operation.id, operation_key: final.operation.operation_key,
       state: final.operation.state, phase: final.operation.phase,
@@ -864,22 +897,19 @@ function preparationPlan(payload) {
   return parseStoredJson(envelope.preparation?.replayPayloadJson, 'accepted bulk replay plan');
 }
 
-function captureEngineIdentity(engine, data, requireThat) {
+async function killOwnedEngineAndObserveCooldown({ engine, data, readJson, waitFor, requireThat }) {
+  const before = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
+  requireThat(before?.pid === engine.pid && before.instanceId === engine.instanceId
+    && before.runId === engine.runId && before.incarnation === engine.incarnation,
+  'only the captured admitted Engine may receive this bulk fault');
   const table = identity.readProcessTable();
   requireThat(table.ok, `Engine process identity must be readable: ${table.reason ?? 'unknown'}`);
   const original = table.table.find(row => Number(row.ProcessId) === engine.pid);
   requireThat(original?.CommandLine?.includes(data),
     'Engine process identity must name this fixture data directory');
-  return { pid: engine.pid, creationFileTimeUtc: original.CreationFileTimeUtc,
+  const record = { pid: engine.pid, creationFileTimeUtc: original.CreationFileTimeUtc,
     cmdlineFingerprint: original.CommandLine };
-}
-
-async function killOwnedEngineAndObserveCooldown({ record, engine, data, readJson, waitFor, requireThat }) {
-  const before = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
-  requireThat(before?.pid === engine.pid && before.instanceId === engine.instanceId
-    && before.runId === engine.runId && before.incarnation === engine.incarnation,
-  'only the captured admitted Engine may receive this bulk fault');
-  const verified = identity.verifyProcessIdentity({ record, table: identity.readProcessTable() });
+  const verified = identity.verifyProcessIdentity({ record, table });
   requireThat(identity.isVerifiedMatch(verified),
     `refusing unverified bulk fault: ${verified.reason}`);
 

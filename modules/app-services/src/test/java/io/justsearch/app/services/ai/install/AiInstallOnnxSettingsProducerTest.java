@@ -3,15 +3,20 @@ package io.justsearch.app.services.ai.install;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.BrainInstallService;
 import io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate;
 import io.justsearch.app.api.IndexingService;
@@ -49,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import io.justsearch.core.context.EngineContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -173,30 +179,7 @@ class AiInstallOnnxSettingsProducerTest {
     writeContract(root, embedding);
 
     AiInstallService helper = new AiInstallService(null, store, null, null, directory);
-    BrainInstallService install = new BrainInstallService() {
-      @Override
-      public Optional<InstalledGenerationCandidate> prepareInstalledGenerationCandidate() {
-        return helper.prepareInstalledGenerationCandidate(registry);
-      }
-
-      @Override
-      public io.justsearch.app.api.AiInstallService.Attempt startInstall(boolean acceptTerms)
-          throws Exception {
-        return helper.startInstall(acceptTerms);
-      }
-
-      @Override
-      public Map<String, Object> cancelInstall() {
-        helper.cancel();
-        return Map.of();
-      }
-
-      @Override
-      public io.justsearch.app.api.AiInstallService.Attempt repairInstall(boolean acceptTerms)
-          throws Exception {
-        return helper.repair(acceptTerms);
-      }
-    };
+    BrainInstallService install = brainInstall(helper, registry);
     IndexingService indexing = mock(IndexingService.class);
     RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
     EngineContext context = TestEngineContexts.internal();
@@ -225,9 +208,89 @@ class AiInstallOnnxSettingsProducerTest {
       assertEquals(2, plan.assets().size());
       assertEquals(1, plan.scope().roots().size());
       verifyNoInteractions(ingestion);
+
+      Files.writeString(root.resolve(embedding.targetDir()).resolve("model.onnx"),
+          "tampered-model", StandardCharsets.UTF_8);
+      var refused = handler.executePrepared(prepared, provenance, context,
+          mock(OperationRecordHandle.class));
+      assertEquals("ACTIVATION_CANDIDATE_UNAVAILABLE", refused.response().errorCode().orElseThrow(),
+          "a changed staged model must invalidate the accepted preview before ingestion");
+      assertEquals(new SettingsWitness(0L, null), store.inspect().witness());
+      verifyNoInteractions(ingestion);
     } finally {
       ConfigStore.restoreGlobal(current, previous);
     }
+  }
+
+  @Test
+  void cancellingAcquisitionDoesNotRevokeAnAcceptedActivation() throws Exception {
+    UiSettingsStore store = new UiSettingsStore(
+        UiSettingsStore.PersistenceMode.READ_WRITE, directory.resolve("settings.json"));
+    ModelPackage embedding = packageWith("embedding", "model.onnx", "tokenizer.json");
+    ModelRegistry registry = new ModelRegistry(2, "test", List.of(embedding));
+    Path root = directory.resolve("models");
+    stagePackage(root, embedding);
+    writeContract(root, embedding);
+    AiInstallService helper = new AiInstallService(null, store, null, null, directory);
+    BrainInstallService install = brainInstall(helper, registry);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    EngineContext context = TestEngineContexts.internal();
+    InvocationProvenance provenance = EngineProvenance.invocation(
+        context, ExecutorTag.UI, Instant.parse("2026-09-23T00:00:00Z"), Optional.empty());
+    when(indexing.captureServingGeneration(context)).thenReturn("serving-a");
+    when(indexing.captureCandidateIndexTarget(any(), any()))
+        .thenReturn(new IndexTargetSnapshot(sha("{}"), "{}"));
+    ActivateInstalledModelsHandler handler = new ActivateInstalledModelsHandler(
+        () -> install, ingestion,
+        ignored -> List.of(new RootBinding(directory.resolve("watched").toAbsolutePath(), "documents")),
+        () -> indexing, List::of);
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore current = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
+    ConfigStore.setGlobal(current);
+    try {
+      OperationPreparation accepted = handler.prepare(
+          "{\"source\":\"installer_model_activation\"}", provenance, context);
+      helper.cancel();
+      OperationRecordHandle row = mock(OperationRecordHandle.class);
+      OperationExecution expected = new OperationExecution(OperationResult.success("accepted"),
+          new CompletableFuture<OperationResult>());
+      when(ingestion.execute(row, context)).thenReturn(expected);
+
+      assertSame(expected, handler.executePrepared(accepted, provenance, context, row));
+      verify(ingestion).execute(row, context);
+      assertEquals(new SettingsWitness(0L, null), store.inspect().witness(),
+          "acquisition cancellation cannot commit model settings");
+    } finally {
+      ConfigStore.restoreGlobal(current, previous);
+    }
+  }
+
+  private static BrainInstallService brainInstall(AiInstallService helper, ModelRegistry registry) {
+    return new BrainInstallService() {
+      @Override
+      public Optional<InstalledGenerationCandidate> prepareInstalledGenerationCandidate() {
+        return helper.prepareInstalledGenerationCandidate(registry);
+      }
+
+      @Override
+      public io.justsearch.app.api.AiInstallService.Attempt startInstall(boolean acceptTerms)
+          throws Exception {
+        return helper.startInstall(acceptTerms);
+      }
+
+      @Override
+      public Map<String, Object> cancelInstall() {
+        helper.cancel();
+        return Map.of();
+      }
+
+      @Override
+      public io.justsearch.app.api.AiInstallService.Attempt repairInstall(boolean acceptTerms)
+          throws Exception {
+        return helper.repair(acceptTerms);
+      }
+    };
   }
 
   @Test

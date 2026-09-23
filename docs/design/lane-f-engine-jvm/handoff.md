@@ -6,7 +6,36 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-24)
 
-### Integrated live Blue retirement checkpoint after `449653f63bb3`
+### Installer activation acceptance slice after `07179edeafed` (uncommitted)
+
+The producer now has runnable regressions for tampered staged model bytes after
+preview, accepted activation after download cancellation, and frozen watched
+scope/source-generation drift. Focused app-services checks passed at
+`tmp/3008-installer-boundary-focused.txt` and
+`tmp/3009-installer-boundary-focused.txt`. The installed standard-model fixture
+proved an in-flight same-key call retains one accepted row at five fault cuts:
+pointer-before-settings at `tmp/3012-installer-inflight-duplicate-standard.txt`,
+and before-marker, before-arm, before-pointer, and settings-before-publication
+in their respective `tmp/3013-installer-*-standard.txt` runs. The before-receipt cut can be terminalized by legitimate
+concurrent reconciliation before an external Windows kill; the harness now
+self-halts only the exact selected Engine at that marker. A process-handle
+forced destroy proved insufficient on Windows: it took the requested-restart
+path at `tmp/3022-installer-before-receipt-self-destroy.txt`. The narrow
+harness-only hard halt and its focused UI/PMD/installDist check passed at
+`tmp/3023-receipt-hard-halt-focused.txt`; the 358-task integrated
+`spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist`
+gate passed at `tmp/3024-installer-acceptance-integrated.txt`. The final
+deterministic installed cut passed at `tmp/3025-installer-before-receipt-final.txt`: pointer/settings B,
+sealed queue receipt with no terminal operation result at crash, one counted
+Engine restart, same accepted preparation and row at COMPLETE, two Green search
+documents and same-key replay. Its private stack stopped with ports closed.
+The updated external-kill fixture passed pointer-before-settings at
+`tmp/3026-installer-external-cut-final.txt` with clean teardown.
+The six installed runs begin without a READY model and with no committed ONNX
+settings. Retained differing-model A/B assets remain D1-12 proof, not established
+by this fresh-install fixture. Hosted proof is due for this uncommitted slice.
+
+### Active checkpoint `07179edeafed` (2026-09-24)
 
 The installed recorded migration exposed two issued Blue serving-view holders
 after live Green publication: the indexing-jobs subscription and its delivery
@@ -22,8 +51,11 @@ clear and directory deletion while incarnation 2 remained running, and clean
 private-stack teardown. The native pointer-before-publication boot assertion
 and the fresh no-READY installer fixture are included. The coherent 358-task
 `spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist`
-sweep passed at `tmp/3007-stream-retirement-integrated.txt`. Push this
-checkpoint, then let hosted CI finish before another push.
+sweep passed at `tmp/3007-stream-retirement-integrated.txt`. Checkpoint
+`07179edeafed` is pushed to PR727; hosted CI run `35929769206` finished
+SUCCESS at that exact SHA, including system integration and Windows-native
+jobs. This closes the live Blue retirement defect and its installed proof;
+D1/D2/E/F acceptance remains open.
 
 ### Active checkpoint `449653f63bb3` (23:48 Berlin)
 
