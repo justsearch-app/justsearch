@@ -584,6 +584,8 @@ class HeadAssemblyTest {
       org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
       org.mockito.Mockito.when(ks.isReady()).thenReturn(health == io.justsearch.app.api.lifecycle.CapabilityHealth.READY);
       org.mockito.Mockito.when(ks.client()).thenReturn(client);
+      org.mockito.Mockito.when(ks.publicationLock())
+          .thenReturn(ConfigStore.global().publicationLock());
 
       // Must NOT throw the boot NPE, and the agent-tool handlers must register.
       var gpuGauge = new io.justsearch.core.scheduling.GpuSchedulingGauge();
@@ -656,6 +658,8 @@ class HeadAssemblyTest {
       org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
       org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
       org.mockito.Mockito.when(ks.client()).thenReturn(client);
+      org.mockito.Mockito.when(ks.publicationLock())
+          .thenReturn(ConfigStore.global().publicationLock());
 
       org.mockito.Mockito.when(ks.gpuScheduling())
           .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
@@ -862,6 +866,181 @@ class HeadAssemblyTest {
       // Post-merge, this is the entire contract â€” the 429 substrate dispatches via
       // defaultFacade.lateBindWorkerServices when ks != null, no reflective field probe.
       bootstrap.connectKnowledgeServer(null);
+    }
+  }
+
+  @Test
+  void servingCaptureWaitsForCompletePublicationAndRetainsExactClientLease() throws Exception {
+    try (HeadAssembly bootstrap =
+        new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+            new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(),
+            new ConfigManagerBootstrap(), null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
+            org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+      var ks = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      var client = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeClient.class);
+      var lease = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.ClientLease.class);
+      org.mockito.Mockito.when(ks.client()).thenReturn(client);
+      org.mockito.Mockito.when(ks.publicationLock())
+          .thenReturn(ConfigStore.global().publicationLock());
+      org.mockito.Mockito.when(ks.gpuScheduling())
+          .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
+      org.mockito.Mockito.when(ks.acquireClientLease()).thenAnswer(invocation -> {
+        assertTrue(
+            ConfigStore.global().publicationLock().getReadHoldCount() > 0,
+            "Head capture must acquire the physical client lease while holding publication read");
+        return lease;
+      });
+      org.mockito.Mockito.when(lease.client()).thenReturn(client);
+
+      var writerPaused = new java.util.concurrent.CountDownLatch(1);
+      var releaseWriter = new java.util.concurrent.CountDownLatch(1);
+      var firstStep = new java.util.concurrent.atomic.AtomicBoolean(true);
+      var writerFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+      Thread writer = Thread.startVirtualThread(() -> {
+        try {
+          bootstrap.connectKnowledgeServer(ks, () -> {
+            if (firstStep.compareAndSet(true, false)) {
+              writerPaused.countDown();
+              try {
+                if (!releaseWriter.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                  throw new IllegalStateException("timed out waiting to resume publication");
+                }
+              } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("publication interrupted", interrupted);
+              }
+            }
+          });
+        } catch (Throwable failure) {
+          writerFailure.set(failure);
+        }
+      });
+      assertTrue(writerPaused.await(5, java.util.concurrent.TimeUnit.SECONDS));
+
+      var captured = new java.util.concurrent.atomic.AtomicReference<HeadAssembly.ServingCapture>();
+      var captureFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+      var captureStarted = new java.util.concurrent.CountDownLatch(1);
+      var captureDone = new java.util.concurrent.CountDownLatch(1);
+      Thread reader = Thread.startVirtualThread(() -> {
+        try {
+          captureStarted.countDown();
+          captured.set(bootstrap.captureServingView());
+        } catch (Throwable failure) {
+          captureFailure.set(failure);
+        } finally {
+          captureDone.countDown();
+        }
+      });
+
+      assertTrue(captureStarted.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      assertFalse(
+          captureDone.await(200, java.util.concurrent.TimeUnit.MILLISECONDS),
+          "capture must remain behind the publication writer while only some fields are assigned");
+      releaseWriter.countDown();
+      writer.join(5_000);
+      reader.join(5_000);
+      assertFalse(writer.isAlive());
+      assertFalse(reader.isAlive());
+      assertNull(writerFailure.get());
+      assertNull(captureFailure.get());
+
+      HeadAssembly.ServingCapture view = captured.get();
+      assertNotNull(view);
+      assertSame(client, view.searchPort());
+      assertSame(client, view.knowledgeClient());
+      assertSame(ks, view.knowledgeServer());
+      assertSame(client, view.services().worker().indexing());
+      view.close();
+      org.mockito.Mockito.verify(lease).close();
+    }
+  }
+
+  @Test
+  void failedAgentToolRegistrationKeepsCommittedServingViewButDegradesConnect() throws Exception {
+    try (HeadAssembly bootstrap =
+        new HeadAssembly(mockOperationStore(),
+            org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+            new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(),
+            new ConfigManagerBootstrap(), null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
+            org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+      var ks = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      var client = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeClient.class);
+      var lease = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.ClientLease.class);
+      org.mockito.Mockito.when(ks.client()).thenReturn(client);
+      org.mockito.Mockito.when(ks.publicationLock())
+          .thenReturn(ConfigStore.global().publicationLock());
+      org.mockito.Mockito.when(ks.acquireClientLease()).thenReturn(lease);
+      org.mockito.Mockito.when(lease.client()).thenReturn(client);
+      org.mockito.Mockito.when(ks.gpuScheduling())
+          .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
+
+      // Exercise the actual post-publication failure branch while keeping the real graph.
+      try (var failedRegistration = org.mockito.Mockito.mockStatic(
+          io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.class,
+          invocation -> { throw new IllegalStateException("registration failed"); })) {
+        bootstrap.connectKnowledgeServer(ks);
+        assertFalse(failedRegistration.isClosed());
+      }
+      try (HeadAssembly.ServingCapture view = bootstrap.captureServingView()) {
+        assertSame(client, view.knowledgeClient());
+      }
+      var connect = bootstrap.rebuildHistory().snapshot().getLast();
+      assertEquals(io.justsearch.app.services.bootstrap.PhaseRecord.DEGRADED, connect.outcome());
+      assertEquals("agent_tools.registration_failed", connect.reasonCode());
+    }
+  }
+
+  @Test
+  void failedPublicationRestoresHeadReferencesBeforeRetry() throws Exception {
+    try (HeadAssembly bootstrap =
+        new HeadAssembly(mockOperationStore(),
+            org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+            new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(),
+            new ConfigManagerBootstrap(), null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
+            org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+      var ks = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      var client = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeClient.class);
+      var lease = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.ClientLease.class);
+      org.mockito.Mockito.when(ks.client()).thenReturn(client);
+      org.mockito.Mockito.when(ks.publicationLock())
+          .thenReturn(ConfigStore.global().publicationLock());
+      org.mockito.Mockito.when(ks.gpuScheduling())
+          .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
+      org.mockito.Mockito.when(ks.acquireClientLease()).thenReturn(lease);
+      org.mockito.Mockito.when(lease.client()).thenReturn(client);
+
+      assertThrows(IllegalStateException.class,
+          () -> bootstrap.connectKnowledgeServer(ks, () -> {
+            throw new IllegalStateException("publication interrupted");
+          }));
+      assertNull(bootstrap.currentKnowledgeServer());
+      assertThrows(IllegalStateException.class, bootstrap::captureServingView);
+
+      bootstrap.connectKnowledgeServer(ks);
+      try (HeadAssembly.ServingCapture view = bootstrap.captureServingView()) {
+        assertSame(client, view.knowledgeClient());
+      }
     }
   }
 

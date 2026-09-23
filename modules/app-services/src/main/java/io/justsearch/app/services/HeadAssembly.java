@@ -84,6 +84,7 @@ public final class HeadAssembly implements AutoCloseable {
   private volatile SearchPort searchPort;
   private volatile KnowledgeClient knowledgeClient;
   private volatile KnowledgeServerBootstrap knowledgeServerBootstrap;
+  private final java.util.concurrent.locks.ReentrantReadWriteLock publicationLock;
   // §31 Phase 3: LateBoundServices DELETED. The 7 controller-services are constructed by
   // ServicePhase and held via this.serviceOut. Diagnostic controller back-refs
   // (DebugStateProvider, StatusSnapshotProvider) flow through this.lateBindings.
@@ -435,6 +436,7 @@ public final class HeadAssembly implements AutoCloseable {
     Objects.requireNonNull(configManager, "configManager");
     ConfigSnapshot snapshot = configManager.currentSnapshot();
     ConfigStore configStore = ConfigStore.global();
+    this.publicationLock = configStore.publicationLock();
     ResolvedConfig rc = configStore.get();
     Path dataDir = rc.paths().dataDir() != null
         ? rc.paths().dataDir() : PlatformPaths.resolveDataDir();
@@ -1029,6 +1031,7 @@ public final class HeadAssembly implements AutoCloseable {
 
   /** F5 Phase 4: delegates to OrchestrationAssembly.build. */
   private io.justsearch.app.services.bootstrap.OrchestrationHandles buildOrchestrationHandles(
+      io.justsearch.app.api.ServiceGraph servingServices,
       AutoCloseable indexingJobsBridge, AutoCloseable agentToolHandlers) {
     return io.justsearch.app.services.bootstrap.phases.OrchestrationAssembly.build(
         this.gplAutoTrigger,
@@ -1040,8 +1043,8 @@ public final class HeadAssembly implements AutoCloseable {
         this.inferenceManager,
         this.gpuBroadcastListener,
         this.runtimeReconciler,
-        this.services == null ? null : this.services.worker().indexing(),
-        this.services == null ? null : this.services.worker().documents(),
+        servingServices == null ? null : servingServices.worker().indexing(),
+        servingServices == null ? null : servingServices.worker().documents(),
         this.substrateOut.resourceOut() == null ? null : this.substrateOut.resourceOut().diagnosticChannelAppenderInstaller(),
         this.substrateOut.indexingJobsBridgeRegistrySubscription(),
         this.agentSearchAdapter,
@@ -1078,6 +1081,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.recordedIngestion = io.justsearch.app.api.operations.RecordedIngestionService.unavailable();
+    this.publicationLock = ConfigStore.global().publicationLock();
     Objects.requireNonNull(searchPort, "searchPort");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
     try {
@@ -1482,23 +1486,142 @@ public final class HeadAssembly implements AutoCloseable {
     return knowledgeServerBootstrap;
   }
 
+  /**
+   * Captures the related Worker-backed Head references as one immutable serving view.
+   *
+   * <p>The shared publication read lock orders the reference capture with both settings
+   * publication and Worker replacement. The returned view retains the exact Knowledge Server
+   * client until it is closed; callers must therefore keep it for their whole operation and use
+   * try-with-resources.
+   *
+   * @throws IllegalStateException when no verified Worker client is available
+   */
+  public ServingCapture captureServingView() {
+    publicationLock.readLock().lock();
+    try {
+      KnowledgeServerBootstrap bootstrap = this.knowledgeServerBootstrap;
+      if (bootstrap == null) {
+        throw new IllegalStateException("Knowledge Server is not connected");
+      }
+      KnowledgeServerBootstrap.ClientLease lease = bootstrap.acquireClientLease();
+      try {
+        KnowledgeClient client = lease.client();
+        SearchPort capturedSearch = this.searchPort;
+        io.justsearch.app.api.ServiceGraph capturedServices = this.services;
+        if (client != this.knowledgeClient || client != capturedSearch || capturedServices == null) {
+          throw new IllegalStateException("Head serving references are not coherently published");
+        }
+        return new ServingCapture(
+            capturedSearch, client, bootstrap, capturedServices, lease);
+      } catch (RuntimeException | Error failure) {
+        lease.close();
+        throw failure;
+      }
+    } finally {
+      publicationLock.readLock().unlock();
+    }
+  }
+
+  /** Immutable Worker-backed Head view whose close releases the retained physical client. */
+  public static final class ServingCapture implements AutoCloseable {
+    private final SearchPort searchPort;
+    private final KnowledgeClient knowledgeClient;
+    private final KnowledgeServerBootstrap knowledgeServer;
+    private final io.justsearch.app.api.ServiceGraph services;
+    private final KnowledgeServerBootstrap.ClientLease clientLease;
+
+    private ServingCapture(
+        SearchPort searchPort,
+        KnowledgeClient knowledgeClient,
+        KnowledgeServerBootstrap knowledgeServer,
+        io.justsearch.app.api.ServiceGraph services,
+        KnowledgeServerBootstrap.ClientLease clientLease) {
+      this.searchPort = Objects.requireNonNull(searchPort, "searchPort");
+      this.knowledgeClient = Objects.requireNonNull(knowledgeClient, "knowledgeClient");
+      this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
+      this.services = Objects.requireNonNull(services, "services");
+      this.clientLease = Objects.requireNonNull(clientLease, "clientLease");
+    }
+
+    public SearchPort searchPort() { return searchPort; }
+
+    public KnowledgeClient knowledgeClient() { return knowledgeClient; }
+
+    public KnowledgeServerBootstrap knowledgeServer() { return knowledgeServer; }
+
+    public io.justsearch.app.api.ServiceGraph services() { return services; }
+
+    public <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
+      return clientLease.withClient(action);
+    }
+
+    @Override
+    public void close() { clientLease.close(); }
+  }
+
   /** Late-bind the Knowledge Server after async Worker startup; rebuilds the held graph. */
   public void connectKnowledgeServer(KnowledgeServerBootstrap ks) {
+    connectKnowledgeServer(ks, () -> {});
+  }
+
+  /** Package-private publication step hook permits deterministic lock-boundary regression tests. */
+  void connectKnowledgeServer(KnowledgeServerBootstrap ks, Runnable publicationStepHook) {
     if (ks == null) return;
+    Objects.requireNonNull(publicationStepHook, "publicationStepHook");
+    if (ks.publicationLock() != publicationLock) {
+      throw new IllegalArgumentException("Knowledge Server must share the process publication lock");
+    }
     // Fix-pass Tier 4 (C-revised): record the rebuild event into RebuildHistory. Captures
     // the connect window + outcome reasonCode so downstream consumers (FE panel, observability
     // exporters) can see post-boot substrate mutations that the sealed BootTrace can't.
     long t_rebuild_0 = System.currentTimeMillis();
     KnowledgeClient client = ks.client();
-    this.knowledgeClient = client;
-    this.knowledgeServerBootstrap = ks;
     io.justsearch.app.services.bootstrap.phases.InferenceWiring.refreshGpuStatus(
         this.inferenceManager, ks);
-    this.searchPort = client;
     IndexingService newIndexing = client;
     DocumentService newDocuments =
         io.justsearch.app.services.bootstrap.phases.BootstrapDocumentService.create(
-            foregroundDocuments, backgroundDocuments, () -> this.knowledgeClient, telemetry);
+            foregroundDocuments, backgroundDocuments, () -> client, telemetry);
+    AutoCloseable bridgeHandle =
+        this.substrateOut.indexingJobsBridge() == null ? null : (AutoCloseable) this.substrateOut.indexingJobsBridge()::stop;
+    io.justsearch.app.api.SearchService newSearch =
+        new io.justsearch.app.services.search.SearchServiceImpl(() -> client);
+    io.justsearch.app.api.ServiceGraph currentServices = this.services;
+    io.justsearch.app.api.ServiceGraph newServices =
+        assembleServiceGraph(
+            currentServices.core().agent(),
+            currentServices.inference().onlineAi(),
+            newSearch,
+            newIndexing,
+            newDocuments);
+    var newOrchestration =
+        buildOrchestrationHandles(newServices, bridgeHandle, null)
+            .withOperationsMaintenance(this.operationsMaintenanceTimer);
+    publicationLock.writeLock().lock();
+    KnowledgeClient oldClient = this.knowledgeClient;
+    KnowledgeServerBootstrap oldBootstrap = this.knowledgeServerBootstrap;
+    SearchPort oldSearch = this.searchPort;
+    io.justsearch.app.api.ServiceGraph oldServices = this.services;
+    var oldOrchestration = this.orchestration;
+    try {
+      this.knowledgeClient = client;
+      publicationStepHook.run();
+      this.knowledgeServerBootstrap = ks;
+      publicationStepHook.run();
+      this.searchPort = client;
+      publicationStepHook.run();
+      this.services = newServices;
+      this.orchestration = newOrchestration;
+    } catch (RuntimeException | Error failure) {
+      this.knowledgeClient = oldClient;
+      this.knowledgeServerBootstrap = oldBootstrap;
+      this.searchPort = oldSearch;
+      this.services = oldServices;
+      this.orchestration = oldOrchestration;
+      throw failure;
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
     if (this.substrateOut.indexingJobsBridge() != null) {
       try {
         this.substrateOut.indexingJobsBridge().start();
@@ -1506,24 +1629,17 @@ public final class HeadAssembly implements AutoCloseable {
         log.warn("RemoteIndexingJobsBridge.start failed at connectKnowledgeServer", e);
       }
     }
-    AutoCloseable bridgeHandle =
-        this.substrateOut.indexingJobsBridge() == null ? null : (AutoCloseable) this.substrateOut.indexingJobsBridge()::stop;
-    this.orchestration =
-        buildOrchestrationHandles(bridgeHandle, null)
-            .withOperationsMaintenance(this.operationsMaintenanceTimer);
-    io.justsearch.app.api.SearchService newSearch =
-        new io.justsearch.app.services.search.SearchServiceImpl(() -> this.searchPort);
-    this.services =
-        assembleServiceGraph(
-            this.services.core().agent(),
-            this.services.inference().onlineAi(),
-            newSearch,
-            newIndexing,
-            newDocuments);
     // Bind tools after the client and service graph exist. Readiness is sampled from that client,
     // so waiting for READY here would make composition depend on its own eventual result.
     // Request admission remains governed by the capability/condition gates.
-    if (client != null) this.agentToolsRegistration.get();
+    boolean agentToolsReady = false;
+    if (client != null) {
+      try {
+        agentToolsReady = Boolean.TRUE.equals(this.agentToolsRegistration.get());
+      } catch (RuntimeException e) {
+        log.error("Agent tool registration failed after Worker publication", e);
+      }
+    }
     log.info(
         "Knowledge Server late-bound into HeadAssembly (capability health: {})",
         this.capabilities.worker().health());
@@ -1533,7 +1649,8 @@ public final class HeadAssembly implements AutoCloseable {
     // Degraded outcome carrying the actual health name in the reason code.
     long t_rebuild_1 = System.currentTimeMillis();
     var workerHealth = this.capabilities.worker().health();
-    if (workerHealth == io.justsearch.app.api.lifecycle.CapabilityHealth.READY) {
+    if (workerHealth == io.justsearch.app.api.lifecycle.CapabilityHealth.READY
+        && agentToolsReady) {
       this.rebuildHistory.record(
           io.justsearch.app.services.bootstrap.PhaseRecord.ready(
               "worker-connect", t_rebuild_0, t_rebuild_1, null));
@@ -1543,7 +1660,9 @@ public final class HeadAssembly implements AutoCloseable {
               "worker-connect",
               t_rebuild_0,
               t_rebuild_1,
-              "worker.connected." + (workerHealth == null ? "null" : workerHealth.name().toLowerCase()),
+              client != null && !agentToolsReady
+                  ? "agent_tools.registration_failed"
+                  : "worker.connected." + (workerHealth == null ? "null" : workerHealth.name().toLowerCase()),
               null));
     }
   }
