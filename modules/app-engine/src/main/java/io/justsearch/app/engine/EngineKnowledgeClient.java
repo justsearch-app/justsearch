@@ -680,9 +680,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           if (ingest == null) {
             throw WorkerServiceException.unavailable("Applied generation services are unavailable");
           }
-          // withBudget retains the selected serving view until this body actually exits. A
-          // successor may publish meanwhile, but it cannot invalidate this issued A capture.
-          return ingest.captureAppliedGeneration(budget.context());
+          var generation = ingest.captureAppliedGeneration(budget.context());
+          // A real serving lease retains the selected view through actual task exit. Supplier-only
+          // fixture/compatibility calls have no such owner and must still reject a stale rebound.
+          if (taskServingView.get().lease == null && services.get() != owner) {
+            throw WorkerServiceException.aborted("Index runtime changed during applied generation capture");
+          }
+          return generation;
         });
   }
 

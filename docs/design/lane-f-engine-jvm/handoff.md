@@ -566,12 +566,14 @@ generation target rather than a relaxation of that refusal.
 
 The Engine applied-generation capture also had a stale supplier check after
 acquiring its exact A serving lease: publication of B caused an otherwise valid
-A capture to abort. The check was removed because the retained view owns the
-runtime through actual call exit. A held A/B regression passes with app-engine
-PMD and Spotless at `tmp/2709-applied-generation-held-view.txt`; restoring the
-old check made that exact test fail with ABORTED at
-`tmp/2710-applied-generation-negative.txt`, and the corrected source passed
-again at `tmp/2711-applied-generation-restored.txt`. This does not yet prove the
+A capture to abort. The check now applies only to supplier-only calls with no
+retained lease; those still refuse a stale rebound. A held A/B regression first
+passed at `tmp/2709-applied-generation-held-view.txt`; restoring the old
+unconditional check made that exact test fail with ABORTED at
+`tmp/2710-applied-generation-negative.txt`. The existing supplier-only
+A→B→A refusal test exposed an overbroad first correction, so the final
+lease-conditional version ran both test classes plus PMD and Spotless green at
+`tmp/2712-applied-generation-two-paths.txt`. This does not yet prove the
 complete Head config/component/graph paired-reader capture.
 
 The `e709bd33d` hosted run 35830605012 passed Public claims, search-worker,
