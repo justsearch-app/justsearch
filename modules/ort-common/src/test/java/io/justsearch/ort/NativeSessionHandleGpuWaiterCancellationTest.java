@@ -4,6 +4,7 @@ package io.justsearch.ort;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -150,6 +151,44 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
     }
   }
 
+  @Test
+  void heldGpuLeasePreventsExactSessionCloseAndQueuedWaiterIsRefusedAfterRetirement()
+      throws Exception {
+    OrtSession gpuSession = mock(OrtSession.class);
+    NativeSessionHandle handle = gpuHandle(gpuSession);
+    SessionHandle.Lease held = handle.acquire();
+    AtomicReference<Throwable> waiterOutcome = new AtomicReference<>();
+    CountDownLatch waiterFinished = new CountDownLatch(1);
+    Thread waiter = new Thread(() -> {
+      try {
+        handle.acquire();
+        waiterOutcome.set(new AssertionError("queued waiter acquired after retirement"));
+      } catch (Throwable thrown) {
+        waiterOutcome.set(thrown);
+      } finally {
+        waiterFinished.countDown();
+      }
+    }, "native-gpu-retiring-waiter-test");
+    waiter.start();
+    awaitQueued(semaphore(handle));
+    CountDownLatch closeFinished = new CountDownLatch(1);
+    Thread closer = new Thread(() -> {
+      handle.close();
+      closeFinished.countDown();
+    }, "native-gpu-retire-test");
+    closer.start();
+    awaitRetired(handle);
+
+    verify(gpuSession, never()).close();
+    held.close();
+
+    assertTrue(waiterFinished.await(1, TimeUnit.SECONDS));
+    assertInstanceOf(IllegalStateException.class, waiterOutcome.get());
+    assertTrue(closeFinished.await(1, TimeUnit.SECONDS));
+    verify(gpuSession).close();
+    assertThrows(IllegalStateException.class, handle::acquire);
+  }
+
   private static NativeSessionHandle gpuHandle(OrtSession gpuSession) throws Exception {
     return gpuHandle(gpuSession, OrtSessionTelemetryEvents.NOOP);
   }
@@ -195,5 +234,15 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
       Thread.sleep(1);
     }
     assertTrue(semaphore.getQueueLength() > 0, "waiter did not reach the semaphore queue");
+  }
+
+  private static void awaitRetired(NativeSessionHandle handle) throws Exception {
+    Field field = NativeSessionHandle.class.getDeclaredField("retired");
+    field.setAccessible(true);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+    while (!(boolean) field.get(handle) && System.nanoTime() < deadline) {
+      Thread.sleep(1);
+    }
+    assertTrue((boolean) field.get(handle), "handle did not enter monotonic retirement");
   }
 }

@@ -144,13 +144,29 @@ public interface SessionHandle extends AutoCloseable {
    */
   void setOrtRunRecorder(OrtRunRecorder recorder);
 
+  /** Typed disposition of this handle's monotonic native-session retirement. */
+  enum RetirementStatus {
+    ACTIVE,
+    RETIRING,
+    REFUSED,
+    RETIRED
+  }
+
+  /**
+   * Reports whether native retirement is active, still running, refused with resources retained,
+   * or complete. A {@link #close()} timeout or native close failure is {@link
+   * RetirementStatus#REFUSED}; callers may invoke {@code close()} again to retry.
+   */
+  RetirementStatus retirementStatus();
+
   /** Closes all sessions and releases resources. Idempotent. */
   @Override
   void close();
 
   /**
-   * A lease on an ORT session that releases the GPU serialisation semaphore (if held) on close.
-   * Use with try-with-resources.
+   * A lease on one exact ORT session instance. Closing it releases that instance's holder count
+   * and the GPU serialisation semaphore (if held). Release is idempotent; a lease never releases
+   * or authorizes closure of a replacement session. Use with try-with-resources.
    *
    * <p>The {@code release} runnable captures any internal cleanup logic (semaphore release,
    * state-re-check) from the underlying session manager.

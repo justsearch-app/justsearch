@@ -133,6 +133,8 @@ final class NativeSessionHandleConcurrentStressTest {
     AtomicInteger releaseGpuCalls = new AtomicInteger();
     AtomicInteger metadataReads = new AtomicInteger();
     AtomicInteger postCloseAcquires = new AtomicInteger();
+    AtomicInteger postRetirementLeasesIssued = new AtomicInteger();
+    AtomicInteger retirementRefusals = new AtomicInteger();
     List<Throwable> uncaught = new CopyOnWriteArrayList<>();
 
     int totalThreads =
@@ -143,20 +145,20 @@ final class NativeSessionHandleConcurrentStressTest {
     Thread.UncaughtExceptionHandler handler = (t, e) -> uncaught.add(e);
     int idx = 0;
 
-    // Acquire threads: tight lease loop. Post-close, handle.acquire() may throw or return a
-    // session that's about to be invalid — both are acceptable, but must never produce an NPE
-    // or a null session object. Count post-close acquires separately to confirm graceful
-    // degradation.
+    // Acquire threads: tight lease loop. Before retirement, a refusal is a defect. Once the
+    // typed retirement state leaves ACTIVE, acquisition must refuse; after close returns no lease
+    // may be issued at all.
     for (int i = 0; i < ACQUIRE_THREADS; i++) {
       threads[idx] = new Thread(() -> {
         try {
           startLatch.await();
           while (running.get()) {
             try {
-              try (SessionHandle.Lease lease = handle.acquire()) {
-                leasesAcquired.incrementAndGet();
+              SessionHandle.Lease acquiredLease = handle.acquire();
+              leasesAcquired.incrementAndGet();
+              try (SessionHandle.Lease lease = acquiredLease) {
                 if (closed.get()) {
-                  postCloseAcquires.incrementAndGet();
+                  postRetirementLeasesIssued.incrementAndGet();
                 }
                 if (lease.session() == null) {
                   throw new IllegalStateException("lease.session() is null on CPU path");
@@ -168,10 +170,11 @@ final class NativeSessionHandleConcurrentStressTest {
                 leasesClosed.incrementAndGet();
               }
             } catch (RuntimeException rex) {
-              // Post-close acquires may surface IllegalStateException (or similar) because the
-              // underlying session is closed. That's acceptable — count it, keep looping.
-              if (closed.get()) {
-                postCloseAcquires.incrementAndGet();
+              if (handle.retirementStatus() != SessionHandle.RetirementStatus.ACTIVE) {
+                retirementRefusals.incrementAndGet();
+                if (closed.get()) {
+                  postCloseAcquires.incrementAndGet();
+                }
               } else {
                 throw rex;
               }
@@ -305,11 +308,15 @@ final class NativeSessionHandleConcurrentStressTest {
     // asserted — the metadata-read thread was deleted with the SessionHandle.inputNames
     // interface method. Leaving the counter zero is expected.
     assertTrue(closed.get(), "close() thread did not run");
-    // Post-close acquires should have happened — the 5 s window between close and running=false
-    // is long enough for at least a few acquire iterations.
+    assertEquals(SessionHandle.RetirementStatus.RETIRED, handle.retirementStatus());
+    assertEquals(
+        0,
+        postRetirementLeasesIssued.get(),
+        "retirement is monotonic: no CPU or GPU lease may be issued after close returns");
+    // The window after close confirms callers actually exercised the refusal path.
     assertTrue(
-        postCloseAcquires.get() > 0,
-        "Post-close acquires did not run — window too narrow?");
+        retirementRefusals.get() > 0,
+        "Retirement refusal path did not run — window too narrow?");
 
     // close() is idempotent per the SessionHandle contract.
     handle.close();
