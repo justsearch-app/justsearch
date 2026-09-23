@@ -427,12 +427,14 @@ final class RecordedGenerationBootTest {
   void nativeCurrentDoesNotFenceNonPristineRecordedArchiveBeyondPrevious() throws Exception {
     Started started = startRecorded(temp.resolve("completed-archive"));
     var manager = new IndexGenerationManager(started.base());
-    manager.promoteBuildingGenerationToActive();
+    var recorded = manager.promoteBuildingGenerationToActive();
     // The manager does not parse Lucene contents; a completed generation owns content
     // beyond its two generation metadata files, even when the corpus was empty.
     Files.writeString(generation(started.base()).resolve("segments_1"), "retained completed commit");
+    manager.retirePreviousGeneration(recorded.active_generation(), recorded.previous_generation());
     manager.startMigration("later-native-one");
-    manager.promoteBuildingGenerationToActive();
+    var firstNative = manager.promoteBuildingGenerationToActive();
+    manager.retirePreviousGeneration(firstNative.active_generation(), firstNative.previous_generation());
     manager.startMigration("later-native-two");
     var current = manager.promoteBuildingGenerationToActive();
     assertFalse(started.targetGeneration().equals(current.active_generation()));
@@ -470,7 +472,8 @@ final class RecordedGenerationBootTest {
   void completedRecordedActiveCanParticipateInLaterNativeMigration() throws Exception {
     Started started = startRecorded(temp.resolve("recorded-blue-native-green"));
     var manager = new IndexGenerationManager(started.base());
-    manager.promoteBuildingGenerationToActive();
+    var recorded = manager.promoteBuildingGenerationToActive();
+    manager.retirePreviousGeneration(recorded.active_generation(), recorded.previous_generation());
     var nativeBuild = manager.startMigration("later-schema-upgrade");
     Snapshot before = snapshot(started.base());
     var boot = new IndexGenerationManager(started.base()).initializeForBoot(

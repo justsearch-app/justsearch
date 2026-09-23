@@ -68,10 +68,10 @@ class IndexGenerationManagerRestartTest {
     String green1 = first.building_generation();
     assertNotNull(green1, "first migration must create a building generation");
 
-    // Promote it so a second migration is allowed (migration_state returns to IDLE), then immediately
-    // (same wall-clock second, no sleep) start another. Pre-fix this threw "generation already exists";
-    // the uniqueness suffix must instead yield a distinct id.
-    mgr.promoteBuildingGenerationToActive();
+    // Retire Blue after promotion so its physical representation releases the second slot. Then
+    // immediately (same wall-clock second, no sleep) allocate another building generation.
+    var promoted = mgr.promoteBuildingGenerationToActive();
+    mgr.retirePreviousGeneration(green1, promoted.previous_generation());
     IndexGenerationManager.State second = mgr.startMigration("rebuild-2");
     String green2 = second.building_generation();
     assertNotNull(green2, "second same-second migration must create a building generation, not throw");

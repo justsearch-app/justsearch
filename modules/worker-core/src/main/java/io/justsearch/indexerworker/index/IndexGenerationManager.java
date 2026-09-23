@@ -392,6 +392,11 @@ public final class IndexGenerationManager {
     catch (IOException invalid) { return false; }
   }
 
+  /** Generation identity only; callers still verify its operation's terminal receipt. */
+  public static boolean isRecordedGenerationIdentity(String generation) {
+    return isRecordedIdentity(generation);
+  }
+
   private boolean hasPristineRecordedOrphan(State state) throws IOException {
     if (!Files.isDirectory(indicesDir)) return false;
     try (var entries = Files.list(indicesDir)) {
@@ -490,6 +495,11 @@ public final class IndexGenerationManager {
       }
 
       String active = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
+      // A discarded build has already been marked for deletion. Reclaim that exact owned
+      // representation before asking whether another Green can fit; a locked payload still
+      // occupies capacity and is refused by the check below.
+      pruneMarkedForDeletionBestEffort();
+      requireBuildCapacity(normalized, null, true);
       String genId = newUniqueGenerationId();
       Path genPath = resolveGenerationPath(genId);
       Files.createDirectories(genPath);
@@ -574,7 +584,7 @@ public final class IndexGenerationManager {
       if (phase != MigrationState.IDLE || building != null && !building.isBlank()) {
         throw new IOException("Recorded generation conflicts with the current migration state");
       }
-      requireRecordedBuildCapacity(current, target);
+      requireBuildCapacity(current, target, false);
       if (Files.exists(targetPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, true);
       } else {
@@ -1335,12 +1345,14 @@ public final class IndexGenerationManager {
     }
   }
 
-  private void requireRecordedBuildCapacity(State state, String acceptedTarget)
+  /** Count physical representations, including an abandoned but not yet deleted candidate. */
+  private void requireBuildCapacity(State state, String acceptedTarget, boolean allowActivePrevious)
       throws IOException {
     String active =
         requireSafeGenerationId(state.active_generation(), "state.json active_generation");
-    if (state.previous_generation() != null && !state.previous_generation().isBlank()) {
-      throw new IOException("Previous generation still occupies recorded build capacity");
+    if (state.previous_generation() != null && !state.previous_generation().isBlank()
+        && (!allowActivePrevious || !active.equals(state.previous_generation()))) {
+      throw new IOException("Previous generation still occupies build capacity");
     }
     if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
       return;
@@ -1351,9 +1363,14 @@ public final class IndexGenerationManager {
           continue;
         }
         String name = entry.getFileName().toString();
+        // Backup-first corruption recovery retains the damaged index as a diagnostic backup.
+        // It is not a serving/building generation and must not block rebuilding its replacement.
+        if (name.matches("g-.+\\.bak-[0-9]{8}-[0-9]{6}")) {
+          continue;
+        }
         if (!name.equals(active) && !name.equals(acceptedTarget)) {
           throw new IOException(
-              "A retained generation representation still occupies recorded build capacity");
+              "A retained generation representation still occupies build capacity");
         }
       }
     }

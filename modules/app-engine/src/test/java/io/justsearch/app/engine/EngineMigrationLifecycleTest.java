@@ -60,8 +60,7 @@ final class EngineMigrationLifecycleTest {
   }
 
   @Test
-  @DisplayName("a forced cutover swaps the active generation, remembers the previous one, and the"
-      + " document is still searchable afterwards")
+  @DisplayName("live cutover retains Blue for a held view, then retires it after release")
   void cutoverSwapsTheGenerationPointerAndPreservesSearch(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
     Path docsDir = dataDir.resolve("migration-docs");
@@ -89,18 +88,25 @@ final class EngineMigrationLifecycleTest {
     // Engine has no in-place reopen (see below).
     engine.restart();
 
-    assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");
+    Path bluePath = engine.indexBase().resolve("indices").resolve(activeBefore);
+    try (var heldBlue = engine.captureServingView()) {
+      assertEquals(bluePath, heldBlue.activeGenerationPath(), "the lease must hold the actual Blue view");
+      assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(),
+          "requestCutover must be accepted");
 
-    // The cutover monitor promotes the building generation and publishes its serving view.
-    assertTrue(
-        awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
-        "the cutover must promote the building generation; state.json still reads " + activeBefore);
+      assertTrue(awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
+          "the cutover must promote the building generation");
+      StatusResponse live = awaitMigrationState("IDLE", 60_000);
+      assertNotEquals(activeBefore, live.getMigration().getActiveGenerationId());
+      assertEquals(activeBefore, live.getMigration().getPreviousGenerationId(),
+          "the issued Blue view must keep its generation referenced");
+      assertTrue(Files.isDirectory(bluePath), "Blue's directory must survive its held view");
+      assertTrue(engine.awaitSearchable(marker, 60_000),
+          "the promoted generation must serve search without restarting the Engine");
+    }
 
-    StatusResponse live = awaitMigrationState("IDLE", 60_000);
-    assertNotEquals(activeBefore, live.getMigration().getActiveGenerationId());
-    assertTrue(
-        engine.awaitSearchable(marker, 60_000),
-        "the promoted generation must serve search without restarting the Engine");
+    assertTrue(awaitPreviousRetired(engine.indexBase(), activeBefore, 60_000),
+        "Blue must retire only after its last serving view exits");
 
     engine.restart();
 
@@ -113,10 +119,8 @@ final class EngineMigrationLifecycleTest {
         activeBefore,
         after.getMigration().getActiveGenerationId(),
         "the active generation must change after cutover");
-    assertEquals(
-        activeBefore,
-        after.getMigration().getPreviousGenerationId(),
-        "the old active generation must be remembered until its serving holders retire");
+    assertTrue(after.getMigration().getPreviousGenerationId().isBlank(),
+        "the retired predecessor must not consume generation capacity after restart");
 
     assertTrue(
         engine.awaitSearchable(marker, 120_000),
@@ -216,10 +220,8 @@ final class EngineMigrationLifecycleTest {
     assertEquals("IDLE", afterCutover.getMigration().getMigrationState(), "IDLE after cutover");
     String activeAfterCutover = afterCutover.getMigration().getActiveGenerationId();
     assertNotEquals(activeBefore, activeAfterCutover, "the active generation must have changed");
-    assertEquals(
-        activeBefore,
-        afterCutover.getMigration().getPreviousGenerationId(),
-        "previous must be the old active generation");
+    assertTrue(afterCutover.getMigration().getPreviousGenerationId().isBlank(),
+        "the unheld Blue generation should be retired before this explicit restart");
 
     assertFalse(engine.client().rollbackMigration(TestEngineContexts.FOREGROUND).accepted(),
         "a published generation cannot be rolled back by pointer-only control");
@@ -391,8 +393,7 @@ final class EngineMigrationLifecycleTest {
    * Polls {@code <indexBase>/state.json} until {@code active_generation} differs from
    * {@code before}. This file is the cutover's durable record — {@code IndexGenerationManager}
    * writes it at {@code basePath/state.json} (IndexGenerationManager.java:138) and the cutover
-   * monitor promotes into it just before it asks for a restart
-   * (KnowledgeServerMigrationOps.java:261-268).
+   * monitor promotes into it before publishing the new serving view.
    */
   private static boolean awaitActiveGenerationChanged(Path indexBase, String before, long timeoutMs)
       throws Exception {
@@ -411,6 +412,27 @@ final class EngineMigrationLifecycleTest {
         }
       }
       Thread.sleep(250);
+    }
+    return false;
+  }
+
+  private static boolean awaitPreviousRetired(Path indexBase, String previous, long timeoutMs)
+      throws Exception {
+    Path statePath = indexBase.resolve("state.json");
+    Path oldPath = indexBase.resolve("indices").resolve(previous);
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      if (Files.exists(statePath)) {
+        try {
+          JsonNode state = JSON.readTree(Files.readString(statePath, StandardCharsets.UTF_8));
+          if (state.path("previous_generation").asText().isBlank() && !Files.exists(oldPath)) {
+            return true;
+          }
+        } catch (RuntimeException midWrite) {
+          // Atomic state replacement may briefly make one observation unreadable.
+        }
+      }
+      Thread.sleep(100);
     }
     return false;
   }

@@ -136,6 +136,13 @@ or discard valid cursors solely to manufacture capacity. Normal cursor expiry
 and defined quota eviction eventually release holds. Surface retained reason and
 count in the existing component map.
 
+An abandoned candidate already marked for deletion still consumes its slot until
+the next allocation has actually removed it; a locked or ambiguous remnant
+refuses allocation. Existing backup-first corruption recovery keeps its damaged
+index under a `.bak-*` diagnostic name. That backup is outside the set of
+serving/building generations, so it does not prevent rebuilding from source;
+the backup still consumes disk space outside this generation permit.
+
 The two-encoder-set limit counts retained A as well as serving B. Count permits
 do not prove VRAM fit: retain D1-14's actual device-line/footprint decision and
 governed floor override. Boot composes the serving manifest's models, reports

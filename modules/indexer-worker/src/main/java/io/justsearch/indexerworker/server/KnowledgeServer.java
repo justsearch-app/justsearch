@@ -3150,9 +3150,9 @@ public final class KnowledgeServer implements Closeable {
     for (ServingView retired : snapshot) cleanRetiredServingView(retired);
   }
 
-  /** Reclaim a committed predecessor only after the runner settled and every old view closed. */
+  /** Reclaim a committed predecessor only after replay and every old view have settled. */
   private void retryCommittedGenerationRetirement() {
-    if (indexGenerationManager == null || recordedIngestionLifecycle == null || closeStarted) return;
+    if (indexGenerationManager == null || closeStarted) return;
     IndexGenerationManager.State state;
     try { state = indexGenerationManager.readStateBestEffort(); }
     catch (RuntimeException unavailable) {
@@ -3172,10 +3172,31 @@ public final class KnowledgeServer implements Closeable {
           || activeIndexPath == null || !active.equals(activeIndexPath.getFileName().toString())) return;
     }
     try {
-      if (!recordedIngestionLifecycle.committedBulkTerminal(active.substring(2))) return;
+      if (IndexGenerationManager.isRecordedGenerationIdentity(active)) {
+        if (recordedIngestionLifecycle == null
+            || !recordedIngestionLifecycle.committedBulkTerminal(active.substring(2))) return;
+      } else if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
+          || !nativePredecessorReplaySettled()) {
+        return;
+      }
       indexGenerationManager.retirePreviousGeneration(active, previous);
     } catch (IOException | RuntimeException unavailable) {
       log.warn("Committed generation predecessor {} still owns capacity", previous, unavailable);
+    }
+  }
+
+  /** Native boot can finish replay after a pointer-before-publication crash without a new journal. */
+  private boolean nativePredecessorReplaySettled() {
+    if (promotedReplaySettled) return true;
+    if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
+        || jobQueue == null || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue)) {
+      return false;
+    }
+    try {
+      var counts = jobQueue.jobStateCountsStrict();
+      return counts.pendingCount() == 0 && counts.processingCount() == 0;
+    } catch (RuntimeException unavailable) {
+      return false;
     }
   }
 

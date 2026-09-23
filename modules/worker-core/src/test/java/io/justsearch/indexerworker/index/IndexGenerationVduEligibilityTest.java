@@ -368,6 +368,9 @@ final class IndexGenerationVduEligibilityTest {
                   manager.startMigration("strict-read-race-" + i);
                   IndexGenerationManager.State promoted = manager.promoteBuildingGenerationToActive();
                   activeTarget.set(manager.resolveGenerationPathStrict(promoted.active_generation()));
+                  // Physical capacity remains occupied until the exact predecessor is deleted.
+                  manager.retirePreviousGeneration(promoted.active_generation(),
+                      promoted.previous_generation());
                 }
                 return null;
               });

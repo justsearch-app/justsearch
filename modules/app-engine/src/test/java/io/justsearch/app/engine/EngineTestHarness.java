@@ -6,7 +6,9 @@ import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
+import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.ipc.StatusResponse;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -116,6 +118,13 @@ final class EngineTestHarness implements AutoCloseable {
 
   KnowledgeClient client() {
     return client;
+  }
+
+  /** Hold the actual published Worker view across a cutover in lifetime tests. */
+  KnowledgeServer.ServingLease captureServingView() throws ReflectiveOperationException {
+    Field serverField = EngineRoot.class.getDeclaredField("server");
+    serverField.setAccessible(true);
+    return ((KnowledgeServer) serverField.get(root)).captureServingView();
   }
 
   Path dataDir() {
