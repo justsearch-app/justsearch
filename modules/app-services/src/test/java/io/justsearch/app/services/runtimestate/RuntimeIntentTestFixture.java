@@ -71,14 +71,21 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
   /** Composes the accepted writer around an already-seeded store and its live config. */
   public RuntimeIntentTestFixture(Path directory, UiSettingsStore settings, ConfigStore config)
       throws Exception {
+    this(directory, settings, config, inMemoryComponents());
+  }
+
+  /** Composes the accepted writer with an explicit component composer. */
+  public RuntimeIntentTestFixture(Path directory, UiSettingsStore settings, ConfigStore config,
+      SettingsComponentComposer components) throws Exception {
     Files.createDirectories(directory);
     this.settings = java.util.Objects.requireNonNull(settings, "settings");
+    java.util.Objects.requireNonNull(components, "components");
     operations = new SqliteOperationStore(directory.resolve("operations.db"));
     var owner = new SettingsCommitCoordinator(settings,
         java.util.Objects.requireNonNull(config, "config"),
         () -> { throw new AssertionError("Unexpected settings restart"); },
         candidate -> OperationResult.success("Settings committed"),
-        () -> false, inMemoryComponents());
+        () -> false, components);
     runner = new OperationAttemptRunnerImpl(operations, Clock.systemUTC(),
         Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE), owner);
     spec = new RuntimeSpecStore(settings, runner);
@@ -102,7 +109,7 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
    * accidental production fallback.
    */
   private static SettingsComponentComposer inMemoryComponents() {
-    return (candidate, desired, affected) -> new SettingsComponentComposer.Prepared() {
+    SettingsComponentComposer.Prepared prepared = new SettingsComponentComposer.Prepared() {
       @Override public void validate() { }
 
       @Override public void install() { }
@@ -112,6 +119,20 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
       @Override public void retire() { }
 
       @Override public void abort() { }
+    };
+    return new SettingsComponentComposer() {
+      @Override public Prepared prepare(UiSettings candidate,
+          io.justsearch.configuration.resolved.ResolvedConfig desired,
+          java.util.Map<String, Set<String>> affected) {
+        return prepared;
+      }
+
+      @Override public Prepared prepare(UiSettings candidate,
+          io.justsearch.configuration.resolved.ResolvedConfig desired,
+          java.util.Map<String, Set<String>> affected,
+          io.justsearch.app.api.settings.SettingsCandidateContext context) {
+        return prepared;
+      }
     };
   }
 

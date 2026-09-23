@@ -6,17 +6,20 @@ import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.services.bootstrap.phases.InferenceDecision;
 import io.justsearch.app.services.runtimestate.RuntimeSpec;
 import io.justsearch.app.services.settings.FixedSettingsComponentComposer;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedPathResolver;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -39,18 +42,56 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     this.liteMode = liteMode;
   }
 
+  /** Keep the API and text paths alive while the unresolved generative row remains fenced. */
+  public void markRecoveryUnavailable() {
+    if (manager != null) manager.fenceForSettingsRecovery();
+    observation.transition(ComponentState.UNAVAILABLE,
+        LifecycleReasonCode.SETTINGS_RECOVERY_REQUIRED.code(),
+        "committed generative settings recovery is unresolved");
+  }
+
   @Override
   public FixedSettingsComponentComposer.PreparedOwner prepare(UiSettings candidate,
       ResolvedConfig desired, Set<String> changedKeys) {
+    return prepare(candidate, desired, changedKeys, SettingsCandidateContext.NONE);
+  }
+
+  @Override
+  public FixedSettingsComponentComposer.PreparedOwner prepare(UiSettings candidate,
+      ResolvedConfig desired, Set<String> changedKeys, SettingsCandidateContext candidateContext) {
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(desired, "desired");
     Objects.requireNonNull(changedKeys, "changedKeys");
+    Objects.requireNonNull(candidateContext, "candidateContext");
 
     // Capture every candidate input before starting physical work. The nullable UI bit resolves
     // through the same RuntimeSpec projection used by the boot/runtime reconciler.
     boolean chatEnabled = RuntimeSpec.fromSettings(candidate).chatEnabled();
     boolean enabled = chatEnabled && InferenceDecision.decideInferenceConfigured(desired, liteMode);
+    if (candidateContext.hasChatProfile()) {
+      var modelSource = desired.resolution("justsearch.llm.model_path");
+      if (modelSource != null && modelSource.isResolved() && modelSource.sourceOrdinal() >= 400) {
+        throw refused(PREPARATION_REFUSED,
+            "Chat profile cannot override an operator-selected model path",
+            Map.of("source", modelSource.sourceName()), null);
+      }
+    }
     InferenceConfig inference = InferenceConfig.fromResolvedConfig(desired, baseDir);
+    if (candidateContext.hasChatProfile()) {
+      var profile = candidateContext.chatProfile();
+      Path resolvedBase = ResolvedPathResolver.resolveBaseDir(desired,
+          baseDir.toAbsolutePath().normalize().toString());
+      Path modelsDir = ResolvedPathResolver.resolveModelsDir(desired, resolvedBase);
+      Path model = modelsDir.resolve(profile.modelFile());
+      if (!Files.isRegularFile(model)) {
+        throw refused(PREPARATION_REFUSED, "Chat profile model is unavailable",
+            Map.of("profile", profile.id(), "model", model.toString()), null);
+      }
+      Path mmproj = modelsDir.resolve(profile.mmprojFile());
+      inference = new InferenceConfig(inference.serverExecutable(), model,
+          Files.isRegularFile(mmproj) ? mmproj : null, inference.serverPort(),
+          inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id());
+    }
     EngineComponentSnapshot.Component preparedObservation =
         preparedObservation(desired, inference, enabled);
 

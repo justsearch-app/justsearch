@@ -460,8 +460,12 @@ public class HeadlessApp {
     LocalApiServer constructedApi = null;
     try {
       // Register fixed physical owners before the API can admit a settings transaction.
-      settingsComponents.register("generative", bootstrap.generativeSettingsOwner());
+      var generativeSettingsOwner = bootstrap.generativeSettingsOwner();
+      settingsComponents.register("generative", generativeSettingsOwner);
       settingsComponents.seal();
+      if (!engineRoot.operationAttempts().reconcileSettingsAfterComposition()) {
+        generativeSettingsOwner.markRecoveryUnavailable();
+      }
       log.info("HeadAssembly started (degraded â€” Worker connecting in background).");
 
       var headInfra = bootstrap.headInfraRegistry();

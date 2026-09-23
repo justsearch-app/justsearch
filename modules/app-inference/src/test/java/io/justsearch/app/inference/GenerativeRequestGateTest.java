@@ -72,4 +72,14 @@ final class GenerativeRequestGateTest {
       issued.close();
     }
   }
+
+  @Test
+  void recoveryFenceRemainsClosedAfterAnExistingCandidateHoldCloses() throws Exception {
+    var gate = new GenerativeRequestGate();
+    var hold = gate.closeAndDrain(Duration.ofSeconds(1));
+    gate.fenceForRecovery();
+    hold.close();
+    assertThrows(IllegalStateException.class, gate::acquire);
+    assertThrows(IllegalStateException.class, gate::requireOpen);
+  }
 }

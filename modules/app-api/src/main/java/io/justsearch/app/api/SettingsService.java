@@ -17,6 +17,17 @@ public interface SettingsService {
       UiSettings candidate, io.justsearch.app.api.settings.SettingsWitness expected,
       io.justsearch.core.context.EngineContext context);
 
+  /** Carry an internal transient target through the same accepted settings attempt. */
+  default io.justsearch.app.api.operations.OperationAttemptRunner.Result applyInternal(
+      UiSettings candidate, io.justsearch.app.api.settings.SettingsWitness expected,
+      io.justsearch.core.context.EngineContext context,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    if (io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(candidateContext)) {
+      return applyInternal(candidate, expected, context);
+    }
+    throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
+  }
+
   /** Public partial mutation; the caller retains one witness and key for every retry. */
   io.justsearch.app.api.operations.OperationAttemptRunner.Result applyPublic(
       io.justsearch.app.api.settings.SettingsV2 input, String modeIntentHeader,

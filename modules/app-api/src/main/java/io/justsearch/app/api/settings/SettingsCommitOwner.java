@@ -13,7 +13,7 @@ import java.util.Objects;
 
 /** Fixed settings collaborator of the attempt runner; never a producer's terminal writer. */
 public interface SettingsCommitOwner {
-  enum RecoveryReason { UNREADABLE_WITNESS, CONTRADICTORY_WITNESS, MULTIPLE_ARMED_ROWS, PERSISTENCE_DISABLED }
+  enum RecoveryReason { UNREADABLE_WITNESS, CONTRADICTORY_WITNESS, INVALID_PREPARATION, COMPOSITION_FAILED, MULTIPLE_ARMED_ROWS, PERSISTENCE_DISABLED }
 
   /** Bounded Health projection of the first unresolved recovery; settings bytes stay in the store. */
   record RecoveryIssue(RecoveryReason reason, Long operationRecordId) {}
@@ -78,11 +78,22 @@ public interface SettingsCommitOwner {
   /** Decode the actual accepted fixed reset invocation before reserving its witnessed base. */
   Reservation reserveReset(OperationRecord row, OperationStore.Preparation accepted);
 
+  /** Compare transient physical intent with this row's accepted private preparation. */
+  void verifyCandidatePreparation(OperationRecord row,
+      Optional<OperationStore.Preparation> accepted, SettingsCandidateContext context);
+
   /** Build the fixed reset candidate only after reservation and durable SQL arming. */
   void applyReset(Reservation reservation, AttemptControl control);
 
   /** Prepare, replace and publish synchronously; arbitrary notifications run outside owner locks. */
   void apply(Reservation reservation, UiSettings candidate, AttemptControl control);
+
+  /** The runner's internal transient intent follows the same witness and commit control. */
+  void apply(Reservation reservation, UiSettings candidate, AttemptControl control,
+      SettingsCandidateContext candidateContext);
+
+  /** Finish a committed internal candidate after fixed owners are composed; false fences serving. */
+  boolean recoverCommittedComposition();
 
   /** Called after durable terminal persistence, before the runner publishes completion futures. */
   void releaseAfterTerminal(long id);

@@ -140,6 +140,15 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     }
   }
 
+  /** Called once by the composition root after fixed component owners are sealed, before API bind. */
+  @Override public boolean reconcileSettingsAfterComposition() {
+    if (settingsOwner == null) return true;
+    if (!settingsOwner.recoverCommittedComposition()) return false;
+    reconcileOwned(OperationKind.SETTINGS_APPLY, settingsOwner::reconcile);
+    reconcileOwned(OperationKind.RECONFIGURE, settingsOwner::reconcile);
+    return true;
+  }
+
   private SettingsCommitOwner.RecoveryInput settingsRecoveryInput(OperationRecord row, boolean soleArmed) {
     if (!soleArmed || row.expectedSettingsRevision() == null) {
       return new SettingsCommitOwner.RecoveryInput(row, Optional.empty());
@@ -526,7 +535,17 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   public OperationResult applySettings(OperationRecordHandle handle,
       SettingsWitness expected, io.justsearch.app.api.UiSettings candidate) {
     Objects.requireNonNull(expected, "expected settings witness");
-    return applySettingsOwned(handle, expected, candidate, false, null);
+    return applySettingsOwned(handle, expected, candidate, false, null,
+        io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
+  }
+
+  @Override
+  public OperationResult applySettings(OperationRecordHandle handle,
+      SettingsWitness expected, io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    Objects.requireNonNull(expected, "expected settings witness");
+    return applySettingsOwned(handle, expected, candidate, false, null,
+        Objects.requireNonNull(candidateContext, "candidateContext"));
   }
 
   @Override
@@ -534,17 +553,20 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       SettingsWitness expected, io.justsearch.app.api.UiSettings candidate,
       io.justsearch.app.api.EngineWorkHandle work) {
     Objects.requireNonNull(expected, "expected settings witness");
-    return applySettingsOwned(handle, expected, candidate, false, Objects.requireNonNull(work, "work"));
+    return applySettingsOwned(handle, expected, candidate, false, Objects.requireNonNull(work, "work"),
+        io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
   }
 
   @Override
   public OperationResult applySettingsReset(OperationRecordHandle handle) {
-    return applySettingsOwned(handle, null, null, true, null);
+    return applySettingsOwned(handle, null, null, true, null,
+        io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
   }
 
   private OperationResult applySettingsOwned(OperationRecordHandle handle, SettingsWitness expected,
       io.justsearch.app.api.UiSettings candidate, boolean reset,
-      io.justsearch.app.api.EngineWorkHandle work) {
+      io.justsearch.app.api.EngineWorkHandle work,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
     if (settingsOwner == null) throw new IllegalStateException("Settings owner is not composed");
     if (!(handle instanceof OperationAttemptRunnerImpl.Control control)
         || active.get(control.id) != control || control.bodyThread != Thread.currentThread()
@@ -566,6 +588,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
           synchronized (control) { control.settingsCancellationRequested = true; }
         });
     try {
+      if (!reset) settingsOwner.verifyCandidatePreparation(row,
+          store.acceptedPreparation(control.id), candidateContext);
       var reservation = Objects.requireNonNull(reset
           ? settingsOwner.reserveReset(row, store.acceptedPreparation(control.id).orElseThrow(
               () -> new IllegalArgumentException("Settings reset requires accepted preparation")))
@@ -580,7 +604,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
       }
       if (reset) settingsOwner.applyReset(reservation, control.settingsControl);
-      else settingsOwner.apply(reservation, candidate, control.settingsControl);
+      else settingsOwner.apply(reservation, candidate, control.settingsControl, candidateContext);
       if (control.settingsUncertain) throw new IllegalStateException("Settings commitment remains unresolved");
       if (control.settingsReceipt == null) {
         control.settingsUncertain = true;

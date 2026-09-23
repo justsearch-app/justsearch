@@ -53,12 +53,16 @@ public final class SettingsRecoveryNotice {
         String reason = switch (issue.reason()) {
           case UNREADABLE_WITNESS -> "SettingsWitnessUnreadable";
           case CONTRADICTORY_WITNESS -> "SettingsWitnessContradictory";
+          case INVALID_PREPARATION -> "SettingsPreparationInvalid";
+          case COMPOSITION_FAILED -> "SettingsCompositionFailed";
           case MULTIPLE_ARMED_ROWS -> "MultipleSettingsCommits";
           case PERSISTENCE_DISABLED -> "SettingsPersistenceDisabled";
         };
         String message = switch (issue.reason()) {
           case UNREADABLE_WITNESS -> "Settings history cannot be verified. Settings changes are paused until recovery completes.";
           case CONTRADICTORY_WITNESS -> "Saved settings disagree with an unfinished change. Settings changes are paused to preserve the available history.";
+          case INVALID_PREPARATION -> "An unfinished settings change has invalid accepted preparation. Settings changes are paused.";
+          case COMPOSITION_FAILED -> "An unfinished settings change could not restore its runtime component. Settings changes are paused.";
           case MULTIPLE_ARMED_ROWS -> "Several settings changes have unresolved outcomes. Settings changes are paused to preserve the available history.";
           case PERSISTENCE_DISABLED -> "An unfinished settings change needs writable storage for recovery. Settings changes are paused.";
         };

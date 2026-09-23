@@ -42,7 +42,8 @@ final class SettingsControllerSpecNudgeTest {
         io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(store.load()));
     var owner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(store, config,
         () -> { throw new AssertionError("Unexpected settings restart"); },
-        candidate -> io.justsearch.agent.api.registry.OperationResult.success("Settings committed"));
+        candidate -> io.justsearch.agent.api.registry.OperationResult.success("Settings committed"),
+        () -> false, inMemoryComponents());
     var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operations,
         java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
             io.justsearch.agent.api.registry.OperationKind.RECONFIGURE), owner);
@@ -77,6 +78,16 @@ final class SettingsControllerSpecNudgeTest {
     Context ctx = contextWithBody(body);
     when(ctx.header(SettingsController.UI_MODE_INTENT_HEADER)).thenReturn(intent);
     return ctx;
+  }
+
+  private static io.justsearch.app.services.settings.SettingsComponentComposer inMemoryComponents() {
+    return (candidate, desired, affected) -> new io.justsearch.app.services.settings.SettingsComponentComposer.Prepared() {
+      @Override public void validate() { }
+      @Override public void install() { }
+      @Override public void notifyObservers() { }
+      @Override public void retire() { }
+      @Override public void abort() { }
+    };
   }
 
   @Test

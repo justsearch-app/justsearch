@@ -83,7 +83,9 @@ final class HeadlessAppComponentRegistryCoverageTest {
       Telemetry telemetry = () -> {};
       var infraPhase = new HeadlessApp.InfraPhaseResult(configPhase, telemetry, null);
       manifest = new RuntimeManifestPublisher(dataDir);
-      root = new EngineRoot(operations, mock(OperationAttemptRunner.class), 30_000L, 100);
+      var attempts = mock(OperationAttemptRunner.class);
+      org.mockito.Mockito.when(attempts.reconcileSettingsAfterComposition()).thenReturn(true);
+      root = new EngineRoot(operations, attempts, 30_000L, 100);
 
       apiPhase =
           buildApi(
@@ -93,7 +95,9 @@ final class HeadlessAppComponentRegistryCoverageTest {
               io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
               new UpgradeShutdownBridge(),
               new LifecycleShutdownBridge(),
-              root);
+              root,
+              new io.justsearch.app.services.settings.FixedSettingsComponentComposer(
+                  root.components()));
 
       var components = root.components().snapshot().components();
       Set<String> registeredWithDependencies =
@@ -221,7 +225,8 @@ final class HeadlessAppComponentRegistryCoverageTest {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       UpgradeShutdownBridge upgradeShutdown,
       LifecycleShutdownBridge lifecycleShutdown,
-      EngineRoot root)
+      EngineRoot root,
+      io.justsearch.app.services.settings.FixedSettingsComponentComposer settingsComponents)
       throws Exception {
     Method method =
         HeadlessApp.class.getDeclaredMethod(
@@ -232,7 +237,8 @@ final class HeadlessAppComponentRegistryCoverageTest {
             io.justsearch.app.api.runtime.ManagedChildRegistry.class,
             UpgradeShutdownBridge.class,
             LifecycleShutdownBridge.class,
-            EngineRoot.class);
+            EngineRoot.class,
+            io.justsearch.app.services.settings.FixedSettingsComponentComposer.class);
     method.setAccessible(true);
     try {
       return (HeadlessApp.ApiPhaseResult)
@@ -244,7 +250,8 @@ final class HeadlessAppComponentRegistryCoverageTest {
               childRegistry,
               upgradeShutdown,
               lifecycleShutdown,
-              root);
+              root,
+              settingsComponents);
     } catch (InvocationTargetException failure) {
       if (failure.getCause() instanceof Exception cause) throw cause;
       if (failure.getCause() instanceof Error cause) throw cause;

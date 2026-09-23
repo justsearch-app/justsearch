@@ -12,6 +12,15 @@ public interface SettingsComponentComposer {
   Prepared prepare(UiSettings candidate, ResolvedConfig desired,
       Map<String, Set<String>> affected);
 
+  default Prepared prepare(UiSettings candidate, ResolvedConfig desired,
+      Map<String, Set<String>> affected,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    if (io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(candidateContext)) {
+      return prepare(candidate, desired, affected);
+    }
+    throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
+  }
+
   interface Prepared {
     /** Holds physical owner lifecycle locks before entering the publication write section. */
     default void withOwnerLocks(Runnable publication) {

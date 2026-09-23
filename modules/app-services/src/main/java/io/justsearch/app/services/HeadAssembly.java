@@ -1869,7 +1869,7 @@ public final class HeadAssembly implements AutoCloseable {
   }
 
   /** Fixed settings owner for the Head-managed generative runtime. */
-  public io.justsearch.app.services.settings.FixedSettingsComponentComposer.Owner
+  public GenerativeSettingsComponentOwner
       generativeSettingsOwner() {
     if (generativeComponent == null) {
       throw new IllegalStateException("Generative component observation is unavailable");

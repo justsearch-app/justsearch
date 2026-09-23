@@ -787,6 +787,19 @@ final class OperationSettingsRunnerTest {
     }
 
     @Override
+    public void apply(Reservation reservation, UiSettings candidate, AttemptControl control,
+        io.justsearch.app.api.settings.SettingsCandidateContext context) {
+      apply(reservation, candidate, control);
+    }
+
+    @Override
+    public void verifyCandidatePreparation(OperationRecord row,
+        Optional<io.justsearch.app.api.operations.OperationStore.Preparation> accepted,
+        io.justsearch.app.api.settings.SettingsCandidateContext context) {}
+
+    @Override public boolean recoverCommittedComposition() { return true; }
+
+    @Override
     public void releaseAfterTerminal(long id) {
       if (!keys.containsKey(id)) return;
       events.add("release");

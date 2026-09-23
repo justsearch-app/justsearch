@@ -13,11 +13,13 @@ import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -151,6 +153,87 @@ final class SettingsCommitCoordinatorTest {
       assertFalse(Files.exists(settingsPath));
       assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
       assertSame(initial, config.get());
+    }
+  }
+
+  @Test
+  void transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta() throws Exception {
+    try (var operations = operations("transient-profile")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          temp.resolve("transient-profile-settings.json"));
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      var seen = new AtomicReference<SettingsCandidateContext>();
+      var installed = new AtomicBoolean();
+      SettingsComponentComposer components = new SettingsComponentComposer() {
+        @Override public Prepared prepare(UiSettings candidate,
+            io.justsearch.configuration.resolved.ResolvedConfig desired,
+            Map<String, Set<String>> affected) {
+          throw new AssertionError("Profile context must not be dropped");
+        }
+
+        @Override public Prepared prepare(UiSettings candidate,
+            io.justsearch.configuration.resolved.ResolvedConfig desired,
+            Map<String, Set<String>> affected, SettingsCandidateContext context) {
+          assertEquals(Set.of("generative"), affected.keySet());
+          assertEquals(Set.of("chatProfile"), affected.get("generative"));
+          seen.set(context);
+          return new Prepared() {
+            @Override public void validate() {}
+            @Override public void install() { installed.set(true); }
+            @Override public void notifyObservers() {}
+            @Override public void retire() {}
+            @Override public void abort() {}
+          };
+        }
+      };
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(operations, owner);
+      var context = new SettingsCandidateContext(ChatModelProfile.COMPACT);
+      var candidateRequest = new OperationAttemptRunner.Request(OperationKeys.generate(CLOCK),
+          OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+              SettingsCandidatePreparation.OPERATION_REF, "{}", false), context(), null);
+      var prepared = runner.withPreparation(candidateRequest, scope ->
+          runner.savePreparation(scope.request(), new io.justsearch.app.api.operations.OperationStore.Preparation(
+              java.util.UUID.randomUUID(), SettingsCandidatePreparation.encode(context))).orElseThrow());
+      var attempt = runner.acceptPrepared(candidateRequest, prepared.nonce());
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), new UiSettings(), context)));
+
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(context, seen.get());
+      assertTrue(installed.get());
+      assertEquals(1, settings.inspect().witness().acceptedRevision());
+    }
+  }
+
+  @Test
+  void acceptedProfilePreparationCannotBeChangedByExecutingBody() throws Exception {
+    try (var operations = operations("profile-binding")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          temp.resolve("profile-binding.json"));
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      var owner = coordinator(settings, config);
+      var runner = runner(operations, owner);
+      var acceptedContext = new SettingsCandidateContext(ChatModelProfile.COMPACT);
+      var request = new OperationAttemptRunner.Request(OperationKeys.generate(CLOCK),
+          OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+              SettingsCandidatePreparation.OPERATION_REF, "{}", false), context(), null);
+      var preparation = runner.withPreparation(request, scope ->
+          runner.savePreparation(scope.request(), new io.justsearch.app.api.operations.OperationStore.Preparation(
+              java.util.UUID.randomUUID(), SettingsCandidatePreparation.encode(acceptedContext))).orElseThrow());
+      var accepted = runner.acceptPrepared(request, preparation.nonce());
+
+      assertThrows(IllegalArgumentException.class, () -> runner.start(accepted,
+          handle -> OperationExecution.finished(runner.applySettings(handle,
+              currentWitness(settings), new UiSettings(),
+              new SettingsCandidateContext(ChatModelProfile.STANDARD)))));
+
+      assertEquals(OperationState.FAILED, operations.find(accepted.accepted().key()).orElseThrow().state());
+      assertFalse(Files.exists(settings.settingsPath()));
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertNull(operations.find(accepted.accepted().key()).orElseThrow().expectedSettingsRevision());
     }
   }
 
@@ -728,6 +811,144 @@ final class SettingsCommitCoordinatorTest {
       new OperationAttemptRunnerImpl(reopened, CLOCK, SETTINGS_KINDS, owner);
       assertEquals(OperationState.COMPLETE, reopened.find(key).orElseThrow().state());
       assertEquals(0, restarts.get());
+    }
+  }
+
+  @Test
+  void committedTransientProfileWaitsForBootCompositionBeforeTerminalCompletion() throws Exception {
+    Path db = temp.resolve("profile-recovery.db");
+    Path file = temp.resolve("profile-recovery.json");
+    var context = new SettingsCandidateContext(ChatModelProfile.COMPACT);
+    String key;
+    try (var operations = new SqliteOperationStore(db)) {
+      var request = new OperationAttemptRunner.Request(OperationKeys.generate(CLOCK),
+          OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+              SettingsCandidatePreparation.OPERATION_REF, "{}", false), context(), null);
+      var preparation = new io.justsearch.app.api.operations.OperationStore.Preparation(
+          java.util.UUID.randomUUID(), SettingsCandidatePreparation.encode(context));
+      operations.savePreparation(request.key(), request.descriptor(), preparation);
+      var row = operations.acceptPrepared(request.key(), request.descriptor(), request.context(),
+          request.provenance(), preparation.nonce()).record();
+      key = row.key();
+      assertTrue(operations.start(row.id()));
+      assertTrue(operations.armSettingsRevision(row.id(), 0));
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      UiSettings candidate = new UiSettings();
+      candidate.setServerExecutablePath(temp.resolve("llama-server.exe").toString());
+      settings.replacePrepared(settings.prepare(candidate, new SettingsWitness(1, key)));
+      // Process termination here loses the in-memory prepared owner, after the durable move.
+    }
+
+    try (var reopened = new SqliteOperationStore(db)) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()));
+      var installed = new AtomicInteger();
+      SettingsComponentComposer components = new SettingsComponentComposer() {
+        @Override public Prepared prepare(UiSettings candidate,
+            io.justsearch.configuration.resolved.ResolvedConfig desired,
+            Map<String, Set<String>> affected) {
+          throw new AssertionError("Recovered transient context was dropped");
+        }
+
+        @Override public Prepared prepare(UiSettings candidate,
+            io.justsearch.configuration.resolved.ResolvedConfig desired,
+            Map<String, Set<String>> affected, SettingsCandidateContext recovered) {
+          assertEquals(context, recovered);
+          assertEquals(Set.of("chatProfile"), affected.get("generative"));
+          assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
+          return new Prepared() {
+            @Override public void validate() {}
+            @Override public void install() { installed.incrementAndGet(); }
+            @Override public void notifyObservers() {}
+            @Override public void retire() {}
+            @Override public void abort() {}
+          };
+        }
+      };
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(reopened, owner);
+      assertEquals(OperationState.RUNNING, reopened.find(key).orElseThrow().state());
+      assertEquals(0, installed.get());
+      assertTrue(runner.reconcileSettingsAfterComposition());
+      assertEquals(1, installed.get());
+      assertEquals(OperationState.COMPLETE, reopened.find(key).orElseThrow().state());
+      assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
+      assertEquals("", settings.load().getLlmModelPath());
+    }
+  }
+
+  @Test
+  void committedTransientProfileWithoutPreparationStaysRunningAndBlocksServing() throws Exception {
+    Path db = temp.resolve("profile-missing-preparation.db");
+    Path file = temp.resolve("profile-missing-preparation.json");
+    String key;
+    try (var operations = new SqliteOperationStore(db)) {
+      var descriptor = OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+          SettingsCandidatePreparation.OPERATION_REF, "{}", false);
+      var row = operations.accept(OperationKeys.generate(CLOCK), descriptor, context(), null).record();
+      key = row.key();
+      assertTrue(operations.start(row.id()));
+      assertTrue(operations.armSettingsRevision(row.id(), 0));
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      settings.replacePrepared(settings.prepare(new UiSettings(), new SettingsWitness(1, key)));
+    }
+    try (var reopened = new SqliteOperationStore(db)) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      var owner = coordinator(settings, new ConfigStore(ConfigStoreRebuilder.prepare(settings.load())));
+      var runner = runner(reopened, owner);
+      assertEquals(OperationState.RUNNING, reopened.find(key).orElseThrow().state());
+      assertEquals(SettingsCommitOwner.RecoveryReason.INVALID_PREPARATION,
+          owner.recoveryIssue().toCompletableFuture().join().reason());
+      assertFalse(runner.reconcileSettingsAfterComposition());
+      assertEquals(OperationState.RUNNING, reopened.find(key).orElseThrow().state());
+    }
+  }
+
+  @Test
+  void missingRecoveredProfileModelLeavesCommittedRowRunningWithoutBootRestart() throws Exception {
+    Path db = temp.resolve("profile-unavailable.db");
+    Path file = temp.resolve("profile-unavailable.json");
+    String key;
+    try (var operations = new SqliteOperationStore(db)) {
+      var context = new SettingsCandidateContext(ChatModelProfile.COMPACT);
+      var descriptor = OperationDescriptor.invocation(OperationKind.SETTINGS_APPLY,
+          SettingsCandidatePreparation.OPERATION_REF, "{}", false);
+      key = OperationKeys.generate(CLOCK);
+      var preparation = new io.justsearch.app.api.operations.OperationStore.Preparation(
+          java.util.UUID.randomUUID(), SettingsCandidatePreparation.encode(context));
+      operations.savePreparation(key, descriptor, preparation);
+      var row = operations.acceptPrepared(key, descriptor, context(), null, preparation.nonce()).record();
+      assertTrue(operations.start(row.id()));
+      assertTrue(operations.armSettingsRevision(row.id(), 0));
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      settings.replacePrepared(settings.prepare(new UiSettings(), new SettingsWitness(1, key)));
+    }
+    try (var reopened = new SqliteOperationStore(db)) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()));
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false,
+          new SettingsComponentComposer() {
+            @Override public Prepared prepare(UiSettings candidate,
+                io.justsearch.configuration.resolved.ResolvedConfig desired,
+                Map<String, Set<String>> affected) {
+              throw new AssertionError("Recovered candidate context was dropped");
+            }
+            @Override public Prepared prepare(UiSettings candidate,
+                io.justsearch.configuration.resolved.ResolvedConfig desired,
+                Map<String, Set<String>> affected, SettingsCandidateContext recovered) {
+              assertEquals(new SettingsCandidateContext(ChatModelProfile.COMPACT), recovered);
+              throw new IllegalStateException("profile model is missing");
+            }
+          });
+      var runner = runner(reopened, owner);
+      assertFalse(runner.reconcileSettingsAfterComposition());
+      assertEquals(OperationState.RUNNING, reopened.find(key).orElseThrow().state());
+      assertEquals(SettingsCommitOwner.RecoveryReason.COMPOSITION_FAILED,
+          owner.recoveryIssue().toCompletableFuture().join().reason());
+      assertFalse(runner.reconcileSettingsAfterComposition(), "unresolved boot recovery is not retried in place");
+      assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
     }
   }
 

@@ -5,7 +5,6 @@ import io.justsearch.app.api.AiInstallException;
 import io.justsearch.app.api.AiInstallStatus;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.InstallPlanPreview;
-import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.OpCriticality;
 import io.justsearch.app.api.OpLeaseOutcome;
@@ -1877,18 +1876,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     var snapshot = settingsStore.inspect();
     UiSettings s = snapshot.settings();
     s.setLlmModelPath(chatModelPath.toAbsolutePath().toString());
-    commitSettings(s, snapshot.witness(), "ai-install-chat-model");
-
-    OnlineAiService onlineAi = this.onlineAi;
-    if (onlineAi instanceof OnlineAiRuntimeControl control) {
-      ConfigStore store = ConfigStore.globalOrNull();
-      var effective = store == null ? null : store.get().ai();
-      control.applyRuntimeOverrides(
-          effective == null ? s.getLlmModelPath() : java.util.Objects.toString(effective.llmModelPath(), null),
-          effective == null ? s.getContextLength() : effective.contextSize(),
-          effective == null ? s.configuredGpuLayers() : Integer.valueOf(effective.gpuLayers()),
-          OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
-    }
+    Path effectiveModel = io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(s)
+        .ai().llmModelPath();
+    boolean refreshServingModel = effectiveModel != null
+        && effectiveModel.toAbsolutePath().normalize().equals(chatModelPath.toAbsolutePath().normalize());
+    commitSettings(s, snapshot.witness(), "ai-install-chat-model",
+        refreshServingModel
+            ? new io.justsearch.app.api.settings.SettingsCandidateContext(null, true)
+            : io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
     return true;
   }
 
@@ -1934,8 +1929,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   /**
    * Tempdoc 374 alpha.15 follow-up: write {@code justsearch.server.exe} pointing at
    * the cuda12 llama-server binary (now extracted by the cuda-runtime Install AI
-   * package) so the next {@link #applySettings} → {@code applyRuntimeOverrides}
-   * call routes chat through the cuda12 variant instead of the default CPU
+   * package) so the prepared generative settings owner routes chat through the cuda12 variant
+   * instead of the default CPU
    * binary.
    *
    * <p>Why this is needed: {@link io.justsearch.ui.HeadlessApp#maybeAutoSelectCuda12Variant}
@@ -1986,11 +1981,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   private void commitSettings(UiSettings candidate,
       io.justsearch.app.api.settings.SettingsWitness witness, String producer) {
+    commitSettings(candidate, witness, producer,
+        io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
+  }
+
+  private void commitSettings(UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsWitness witness, String producer,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
     if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
-    var result = settingsService.applyInternal(candidate, witness,
-        io.justsearch.app.services.intent.EngineProvenance.internal(producer,
-            io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-            io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+    var context = io.justsearch.app.services.intent.EngineProvenance.internal(producer,
+        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+    var result = io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(candidateContext)
+        ? settingsService.applyInternal(candidate, witness, context)
+        : settingsService.applyInternal(candidate, witness, context, candidateContext);
     if (!result.response().success()) throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
     if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
       throw new IllegalStateException("Settings commitment is unresolved");

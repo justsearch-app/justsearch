@@ -77,6 +77,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private boolean restartIssued;
   private Long recoveredId;
   private OperationAttemptRunner.Reconciliation recoveredDecision;
+  private io.justsearch.app.api.settings.SettingsCandidateContext recoveredContext;
 
   public SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
       Function<UiSettings, OperationResult> prepareResponse) {
@@ -201,16 +202,40 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   }
 
   @Override
+  public void verifyCandidatePreparation(OperationRecord row,
+      java.util.Optional<OperationStore.Preparation> accepted,
+      io.justsearch.app.api.settings.SettingsCandidateContext context) {
+    Objects.requireNonNull(context, "candidate context");
+    boolean preparedRow = SettingsCandidatePreparation.OPERATION_REF.equals(row.descriptor().operationRef());
+    if (preparedRow != !io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(context)) {
+      throw new IllegalArgumentException("Settings candidate intent does not match its accepted row");
+    }
+    if (preparedRow && !context.equals(SettingsCandidatePreparation.decode(row, accepted.orElseThrow()))) {
+      throw new IllegalArgumentException("Settings candidate preparation changed after acceptance");
+    }
+  }
+
+  @Override
   public void applyReset(Reservation reservation, AttemptControl control) {
-    applyOwned(reservation, null, control, true);
+    applyOwned(reservation, null, control, true,
+        io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
   }
 
   @Override
   public void apply(Reservation reservation, UiSettings candidate, AttemptControl control) {
-    applyOwned(reservation, candidate, control, false);
+    applyOwned(reservation, candidate, control, false,
+        io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
   }
 
-  private void applyOwned(Reservation reservation, UiSettings candidate, AttemptControl control, boolean reset) {
+  @Override
+  public void apply(Reservation reservation, UiSettings candidate, AttemptControl control,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    applyOwned(reservation, candidate, control, false,
+        Objects.requireNonNull(candidateContext, "candidateContext"));
+  }
+
+  private void applyOwned(Reservation reservation, UiSettings candidate, AttemptControl control,
+      boolean reset, io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
     Objects.requireNonNull(control, "control");
     ConfigChangedEvent[] event = new ConfigChangedEvent[1];
     SettingsComponentComposer.Prepared preparedComponents = null;
@@ -270,7 +295,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       ResolvedConfig servingResolved = changedKeys.restartRequired().contains("justsearch.api.port")
           ? resolved.retainingApiPortFrom(serving) : resolved;
-      if (!changedKeys.component().isEmpty() || chatComponentChanged) {
+      if (!changedKeys.component().isEmpty() || chatComponentChanged
+          || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
         var affected = new java.util.TreeMap<String, java.util.Set<String>>(changedKeys.component());
         if (chatComponentChanged) {
           affected.merge("generative", java.util.Set.of("ui.chatEnabled"), (left, right) -> {
@@ -279,8 +305,22 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
             return java.util.Set.copyOf(keys);
           });
         }
+        if (candidateContext.hasChatProfile()) {
+          affected.merge("generative", java.util.Set.of("chatProfile"), (left, right) -> {
+            var keys = new java.util.TreeSet<>(left);
+            keys.addAll(right);
+            return java.util.Set.copyOf(keys);
+          });
+        }
+        if (candidateContext.forceGenerativeRefresh()) {
+          affected.merge("generative", java.util.Set.of("modelRefresh"), (left, right) -> {
+            var keys = new java.util.TreeSet<>(left);
+            keys.addAll(right);
+            return java.util.Set.copyOf(keys);
+          });
+        }
         preparedComponents = Objects.requireNonNull(
-            components.prepare(prepared.settings(), resolved, Map.copyOf(affected)),
+            components.prepare(prepared.settings(), resolved, Map.copyOf(affected), candidateContext),
             "Prepared component transaction");
       }
       OperationResult preparedResponse = prepareResponse.apply(prepared.settings());
@@ -515,7 +555,19 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         return;
       }
       if (row.key().equals(witness.lastCommittedOperationKey()) && witness.acceptedRevision() == expected + 1) {
-        recoveredDecision = new OperationAttemptRunner.Reconciliation.Complete(new OperationReceipt("SUCCESS", null));
+        if (SettingsCandidatePreparation.OPERATION_REF.equals(row.descriptor().operationRef())) {
+          try {
+            recoveredContext = SettingsCandidatePreparation.decode(row,
+                armed.getFirst().preparation().orElseThrow());
+          } catch (RuntimeException unavailable) {
+            block(new RecoveryIssue(RecoveryReason.INVALID_PREPARATION, row.id()));
+            return;
+          }
+          // The file is B, but the transient physical target is still unproven. Keep RUNNING
+          // until the fixed owner has been composed and boot installs that exact target.
+        } else {
+          recoveredDecision = new OperationAttemptRunner.Reconciliation.Complete(new OperationReceipt("SUCCESS", null));
+        }
       } else if (witness.acceptedRevision() == expected
           && normalResetBaseMatches(armed.getFirst(), witness)) {
         recoveredDecision = precommitFailure();
@@ -525,7 +577,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       // Keep the bounded witness reserved until the runner persists the recovery result.
       fence = new SettingsCommitFence(row.id(), row.key(), witness);
-      if (recoveredDecision instanceof OperationAttemptRunner.Reconciliation.Complete) fence.phase = Phase.COMMITTED;
+      if (row.key().equals(witness.lastCommittedOperationKey())) fence.phase = Phase.COMMITTED;
     } finally {
       mutex.unlock();
       publishIssue();
@@ -540,6 +592,89 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (row.expectedSettingsRevision() == null) return precommitFailure();
       return Objects.equals(recoveredId, row.id()) ? recoveredDecision : new OperationAttemptRunner.Reconciliation.Wait();
     } finally { mutex.unlock(); }
+  }
+
+  @Override
+  public boolean recoverCommittedComposition() {
+    SettingsComponentComposer.Prepared prepared = null;
+    boolean installed = false;
+    mutex.lock();
+    try {
+      if (!inspected) throw new IllegalStateException("Settings recovery has not been inspected");
+      if (blocked && issue != null && issue.reason() == RecoveryReason.COMPOSITION_FAILED) return false;
+      if (recoveredContext == null) {
+        if (issue != null && issue.reason() == RecoveryReason.INVALID_PREPARATION) {
+          return false;
+        }
+        return true;
+      }
+      SettingsCommitFence active = fence;
+      if (active == null || active.phase != Phase.COMMITTED || !Objects.equals(recoveredId, active.id)) {
+        throw new IllegalStateException("Committed settings recovery fence is unavailable");
+      }
+      var snapshot = store.inspect();
+      // The recovery fence's prior field is the already committed file witness on boot.
+      if (!active.prior.equals(snapshot.witness())) {
+        block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, active.id));
+        throw new IllegalStateException("Committed settings witness changed during boot recovery");
+      }
+      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(snapshot.settings()), "Recovered config");
+      var affected = Map.<String, java.util.Set<String>>of("generative",
+          recoveredContext.hasChatProfile() ? java.util.Set.of("chatProfile") : java.util.Set.of("modelRefresh"));
+      prepared = Objects.requireNonNull(components.prepare(snapshot.settings(), desired, affected,
+          recoveredContext), "Recovered component transaction");
+      SettingsComponentComposer.Prepared chosen = prepared;
+      var publication = config.publicationLock();
+      chosen.withOwnerLocks(() -> {
+        publication.writeLock().lock();
+        try {
+          if (!active.prior.equals(store.inspect().witness())) {
+            throw new IllegalStateException("Committed settings witness changed during recovery publication");
+          }
+          chosen.validate();
+          chosen.install();
+        } finally { publication.writeLock().unlock(); }
+      });
+      installed = true;
+    } catch (RuntimeException failure) {
+      block(new RecoveryIssue(RecoveryReason.COMPOSITION_FAILED, recoveredId));
+      if (!installed && prepared != null) {
+        try { prepared.abort(); }
+        catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      }
+      LOG.error("Committed settings component recovery remains unresolved", failure);
+      return false;
+    } catch (Error fatal) {
+      block(new RecoveryIssue(RecoveryReason.COMPOSITION_FAILED, recoveredId));
+      if (!installed && prepared != null) {
+        try { prepared.abort(); }
+        catch (RuntimeException | Error cleanup) { fatal.addSuppressed(cleanup); }
+      }
+      throw fatal;
+    } finally {
+      mutex.unlock();
+      publishIssue();
+    }
+    // A completed install is externally visible. Arbitrary observation and retirement run
+    // outside the settings mutex and the shared publication writer.
+    try { prepared.notifyObservers(); }
+    catch (RuntimeException notificationFailure) {
+      LOG.warn("Recovered generative component notification failed", notificationFailure);
+    }
+    try { prepared.retire(); }
+    catch (RuntimeException retirementFailure) {
+      mutex.lock();
+      try { block(new RecoveryIssue(RecoveryReason.COMPOSITION_FAILED, recoveredId)); }
+      finally { mutex.unlock(); publishIssue(); }
+      LOG.error("Recovered settings component retirement remains unresolved", retirementFailure);
+      return false;
+    }
+    mutex.lock();
+    try {
+      recoveredDecision = new OperationAttemptRunner.Reconciliation.Complete(new OperationReceipt("SUCCESS", null));
+      recoveredContext = null;
+    } finally { mutex.unlock(); }
+    return true;
   }
 
   private static boolean normalResetBaseMatches(RecoveryInput input, SettingsWitness witness) {

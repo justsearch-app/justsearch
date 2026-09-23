@@ -277,7 +277,7 @@ Independent read-only review of `0b68b4e29` found four concrete D1 publication
 defects: generative requests could use B before commit; a dead prepared B could
 still validate READY; the reserved settings witness was not revalidated just
 before file replacement; and prepared READY→READY registry publication reset
-`stateSince`. The current dirty correction adds a generative admission/lease
+`stateSince`. Checkpoint `ea7f6e1c9` adds a generative admission/lease
 gate for chat, vision, stream and token endpoints, bounded drain before A stops,
 staging observation, candidate liveness/invalidation checks, final witness
 reinspection under publication write, and registry state-epoch normalization.
@@ -286,9 +286,13 @@ settings/registry checks at `tmp/2566-publication-review-focused.txt`, and the
 full compile/static/integration `build -x test` passed at
 `tmp/2571-d1-review-checkpoint-build.txt`. The earlier `tmp/2568` and `tmp/2570`
 build attempts exposed PMD findings corrected without suppressing the rules.
-These corrections are not yet a committed checkpoint or full D1 acceptance.
+The checkpoint was pushed to PR727. `tmp/2572-generative-full-unit.txt` passes
+the complete app-inference unit suite (367 tests). The complete app-services
+run at `tmp/2573-app-services-full-unit.txt` ran 3,070 tests with eight failures
+and three skips; its XML is retained under `tmp/2573-app-services-results`.
+It is not full D1 acceptance.
 
-The remaining app-services red classes in the 2558 suite are
+The remaining app-services red classes in the 2573 suite are
 `AiInstallOnnxSettingsProducerTest` and seven
 `RuntimeActivationServiceChatProfileTest` cases. Their install-time settings
 paths still expect generation-bound model paths to become serving config or
@@ -297,6 +301,54 @@ require those paths to join the prepared owner route; do not turn the tests gree
 by allowing a generation-bound reconfigure or restoring apply-then-compensate.
 The physical index/encoder owners, paired reader captures, installed held-call
 and hosted proof remain open. No stage acceptance is claimed.
+
+The current dirty activation slice threads a typed transient `ChatModelProfile`
+and forced same-path model refresh through the existing accepted settings row,
+runner, coordinator and fixed generative composer. `RuntimeActivationService`
+and Install AI's chat-model stage no longer perform a separate inference apply
+after settings commitment. The profile is not a stored model path or JVM
+property. Internal physical intent is now frozen in accepted private preparation;
+the runner checks the executing context against it before arming SQL. A committed
+profile/refresh row remains RUNNING after a crash until the sealed fixed owner
+reconstructs and installs the target before API bind. Missing preparation blocks
+serving. Focused regression `tmp/2593-candidate-binding-and-repair.txt` passes
+same-path repair, accepted-context binding and committed-profile boot recovery;
+the broad `tmp/2594-d1-integrated-tests.txt` is running. The earlier full
+`tmp/2584-activation-integrated-tests.txt` reported one intentional ONNX
+generation-bound gap plus stale app-launcher/UI test fixtures; their XML is
+retained at `tmp/2584-integrated-results` and fixtures have been recut.
+The next full run `tmp/2594-d1-integrated-tests.txt` had 3,078 app-services
+tests with two ONNX installer failures; the incomplete-attempt mock used the
+old three-argument seam and has been corrected in production routing. Its XML
+is retained at `tmp/2594-app-services-results`. All other executed modules
+passed. Independent review found that failed boot composition would cause a
+fatal restart loop, profile activation could override an operator model path,
+and Install AI refreshed an unrelated operator model. The current dirty source
+returns an unresolved boot verdict, fences generative admission and publishes
+UNAVAILABLE while API/text can start; it checks operator precedence before
+self-test and owner prepare; Install AI forces refresh only for the effective
+model. Focused proof is `tmp/2597-recovery-guard-focused.txt` and
+`tmp/2598-boot-degrade-focused.txt`; full compile/static/integration proof is
+`tmp/2599-recovery-guard-build.txt`. The full unit run
+`tmp/2600-d1-integrated-after-review.txt` finished in 9m25s with 11,648 cases,
+one failure, zero errors and 32 skips across 1,810 suites and 34 test tasks.
+Its sole failure is `AiInstallOnnxSettingsProducerTest.stageCommitsEligiblePathsTogetherWithoutPropertyPromotionAndPreservesEarlierStage`:
+the coordinator correctly refuses generation-bound ONNX paths until the recorded
+bulk owner can carry the staged target. All other executed tasks passed. XML and
+task counts are preserved under `tmp/2600-d1-integrated-after-review-xml` and
+`tmp/2600-d1-integrated-after-review-counts.json`; 19 test tasks were reused.
+The ONNX stage still requires the recorded generation owner route; no D1-4
+acceptance is claimed.
+
+Install AI's embedding, NER and SPLADE paths are generation-bound by the governed
+register. The remaining ONNX test failure is therefore an ownership gap, not a
+reason to permit ordinary reconfigure to bypass `core.bulk-reindex`. The chosen
+next connection is one explicit installer-owned recorded generation target that
+carries the staged candidate and full witness to the bulk owner; its Green
+composition and promotion must use D1-8/D1-12. The current bulk plan captures
+only live config, and the installer has no generation-owner port, so that path
+is not yet implemented or verified. It must preserve staged install merging,
+whole-stage conflict refusal, and no global property promotion.
 
 ## Evidence and owner map
 

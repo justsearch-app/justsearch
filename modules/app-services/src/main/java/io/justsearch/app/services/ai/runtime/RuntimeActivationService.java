@@ -11,7 +11,6 @@ import tools.jackson.databind.SerializationFeature;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.gpu.VramFlagsUtil;
-import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.OpCriticality;
 import io.justsearch.app.api.OpLeaseOutcome;
@@ -124,7 +123,6 @@ public final class RuntimeActivationService
   // Self-test VRAM delta threshold (best-effort; noisy environments should produce INCONCLUSIVE).
   private static final long MIN_VRAM_DELTA_BYTES = 64L * 1024 * 1024; // 64 MiB
 
-  private final OnlineAiService onlineAi;
   private final UiSettingsStore settingsStore;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; routes through
   // GpuCapabilitiesService (NVML-first) + VramRequirements helpers.
@@ -439,7 +437,7 @@ public final class RuntimeActivationService
       RuntimeReconciler runtimeReconciler,
       SettingsService settingsService) {
     Objects.requireNonNull(processExecutors, "processExecutors");
-    this.onlineAi = Objects.requireNonNull(onlineAi, "onlineAi");
+    Objects.requireNonNull(onlineAi, "onlineAi");
     this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
     this.gpuCapabilitiesService = gpuCapabilitiesService == null ? new GpuCapabilitiesService() : gpuCapabilitiesService;
     this.policyService = policyService; // may be null (best-effort)
@@ -792,8 +790,8 @@ public final class RuntimeActivationService
    *
    * @param variantId the GPU runtime variant to activate (unchanged semantics)
    * @param chatProfile optional {@code ChatModelProfile} id ({@code "standard"} | {@code
-   *     "compact"} | ...). A null/blank value means "do not touch the chat model" and the flow is
-   *     byte-for-byte the pre-842 one — every existing caller keeps its exact behavior.
+   *     "compact"} | ...). A null/blank value retains the settings-selected model path. Both
+   *     variants compose through the accepted settings owner before its file commitment.
    */
   public Attempt startActivate(String variantId, String chatProfile) {
     String v = variantId == null ? "" : variantId.trim();
@@ -924,6 +922,11 @@ public final class RuntimeActivationService
     // a system-owned, re-derivable copy of the standard model on every installed and dev data dir,
     // so consulting it here would make every profile switch silently inert (§2.3 precedence rule).
     ChatModelProfile profile = chatProfileRaw == null ? null : ChatModelProfile.resolve(chatProfileRaw);
+    if (profile != null && operatorOwnsChatModel()) {
+      fail("MODEL_OVERRIDE_LOCKED", "An operator-selected chat model path cannot be replaced by a profile.",
+          null, publication);
+      return;
+    }
     Path model;
     boolean modelPathFromContract = false;
     if (profile != null) {
@@ -1008,7 +1011,6 @@ public final class RuntimeActivationService
 
   private void applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
       ChatModelProfile profile, boolean activating, AttemptPublication publication) {
-    SettingsWitness committed = null;
     boolean procedureBegun = false;
     try {
       if (runtimeReconciler != null) {
@@ -1016,26 +1018,10 @@ public final class RuntimeActivationService
             activating ? "runtime-variant-activation" : "runtime-variant-deactivation");
         procedureBegun = true;
       }
-      committed = commitCandidate(next, base.witness(), "runtime-variant-apply");
+      SettingsWitness committed = commitCandidate(next, base.witness(),
+          "runtime-variant-apply", profile);
       publication.advancedTo(committed);
-      // The settings owner has already published the candidate ConfigStore. Inference does
-      // one transition; its lifecycle manager owns restoration of the previous runtime on failure.
-      if (profile != null) applyChatProfileOrThrow(profile, next);
-      else applyRuntimeOverridesBestEffort(next);
     } catch (Exception failure) {
-      if (committed != null) {
-        updateState("running", "rollback", "Runtime apply failed; restoring settings…", null);
-        try {
-          SettingsWitness restored =
-              commitCandidate(base.settings(), committed, "runtime-variant-compensation");
-          publication.advancedTo(restored);
-        } catch (Exception compensationFailure) {
-          failure.addSuppressed(compensationFailure);
-          fail("RUNTIME_ROLLBACK_FAILED", "Settings restoration refused after runtime error: "
-              + safeMsg(failure), failure, publication);
-          return;
-        }
-      }
       fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
           "Runtime apply failed: " + safeMsg(failure), failure, publication);
       return;
@@ -1047,11 +1033,13 @@ public final class RuntimeActivationService
         : "GPU runtime deactivated (CPU baseline).", null);
   }
 
-  private SettingsWitness commitCandidate(UiSettings candidate, SettingsWitness expected, String owner) {
+  private SettingsWitness commitCandidate(UiSettings candidate, SettingsWitness expected,
+      String owner, ChatModelProfile profile) {
     if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
     var result = settingsService.applyInternal(candidate, expected,
         EngineProvenance.internal(owner, EngineContext.Survival.INTERACTIVE,
-            EngineContext.Urgency.FOREGROUND));
+            EngineContext.Urgency.FOREGROUND),
+        new io.justsearch.app.api.settings.SettingsCandidateContext(profile));
     if (!result.response().success()) throw new SettingsCommitOwner.Refused(result.response());
     if (result.record().state() != OperationState.COMPLETE) {
       throw new IllegalStateException("Settings commitment is unresolved");
@@ -1065,6 +1053,12 @@ public final class RuntimeActivationService
     if (resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400) {
       throw new IllegalStateException("Server executable override is locked by operator config");
     }
+  }
+
+  private static boolean operatorOwnsChatModel() {
+    ConfigStore config = ConfigStore.globalOrNull();
+    var resolution = config == null ? null : config.get().resolution("justsearch.llm.model_path");
+    return resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400;
   }
 
   /**
@@ -1105,52 +1099,6 @@ public final class RuntimeActivationService
             ? " Run `node scripts/dev/fetch-compact-model.mjs` to download it."
             : " Run Install AI to download it.";
     return "Chat profile '" + profile.id() + "' model does not exist: " + resolved + "." + remedy;
-  }
-
-  /**
-   * Applies a profile as one atomic (model, mmproj, profile-id) unit.
-   *
-   * <p>Deliberately NOT {@link #applyRuntimeOverridesBestEffort}: that routes through the bare-path
-   * {@code applyRuntimeOverrides}, which clears the profile claim and nulls the projector — the
-   * exact defect (dev stacks running silently text-only) tempdoc 842 §2.3 exists to fix. A control
-   * surface that cannot apply pairs throws {@link UnsupportedOperationException} rather than
-   * half-applying, and that propagates into the rollback bracket.
-   */
-  private void applyChatProfileOrThrow(ChatModelProfile profile, UiSettings settings) {
-    OnlineAiService onlineAi = this.onlineAi;
-    if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
-      // Same graceful degradation as applyRuntimeOverridesBestEffort: no control surface means
-      // there is no engine to switch, and activation of the GPU variant still succeeded.
-      return;
-    }
-    try {
-      var config = ConfigStore.globalOrNull();
-      var effective = config == null ? null : config.get().ai();
-      control.applyChatProfileWithRuntime(profile, settings.getServerExecutablePath(),
-          effective == null ? settings.getContextLength() : effective.contextSize(),
-          effective == null ? settings.configuredGpuLayers() : effective.gpuLayers(),
-          OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to apply chat profile '" + profile.id() + "'", e);
-    }
-  }
-
-  private void applyRuntimeOverridesBestEffort(UiSettings settings) {
-    OnlineAiService onlineAi = this.onlineAi;
-    if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
-      return;
-    }
-    try {
-      var config = ConfigStore.globalOrNull();
-      var effective = config == null ? null : config.get().ai();
-      control.applyRuntimeOverrides(
-          settings == null ? null : settings.getLlmModelPath(),
-          effective == null ? settings.getContextLength() : effective.contextSize(),
-          effective == null ? settings.configuredGpuLayers() : effective.gpuLayers(),
-          OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to apply runtime overrides", e);
-    }
   }
 
   private SelfTestResult runSelfTest(Path exe, Path model, UiSettings settings) {

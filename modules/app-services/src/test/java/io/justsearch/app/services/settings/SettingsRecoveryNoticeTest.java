@@ -41,6 +41,8 @@ class SettingsRecoveryNoticeTest {
       String expectedReason = switch (reason) {
         case UNREADABLE_WITNESS -> "SettingsWitnessUnreadable";
         case CONTRADICTORY_WITNESS -> "SettingsWitnessContradictory";
+        case INVALID_PREPARATION -> "SettingsPreparationInvalid";
+        case COMPOSITION_FAILED -> "SettingsCompositionFailed";
         case MULTIPLE_ARMED_ROWS -> "MultipleSettingsCommits";
         case PERSISTENCE_DISABLED -> "SettingsPersistenceDisabled";
       };

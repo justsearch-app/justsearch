@@ -88,8 +88,9 @@ final class RegistryControllerTest {
     // Tempdoc 737 §12b: core.set-chat-enabled added (intent write superseding
     // switch-inference-mode); total 30.
     // Tempdoc 899 D5: core.copy-diagnostic-summary added; total 31.
-    // Tempdoc 931 §E item 10: core.settle-index added; total 32.
-    assertEquals(32, envelope.get("entries").size());
+    // Tempdoc 931 §E item 10: core.settle-index added; total 32. D1-4 adds
+    // core.reconfigure to the canonical core catalog, bringing this fixture to 33.
+    assertEquals(33, envelope.get("entries").size());
   }
 
   @Test

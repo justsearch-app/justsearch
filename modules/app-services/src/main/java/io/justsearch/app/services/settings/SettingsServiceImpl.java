@@ -6,6 +6,7 @@ import io.justsearch.agent.api.registry.OperationPreparationRefused;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.SettingsService;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
@@ -102,23 +103,60 @@ public final class SettingsServiceImpl implements SettingsService {
   public OperationAttemptRunner.Result applyInternal(io.justsearch.app.api.UiSettings candidate,
       io.justsearch.app.api.settings.SettingsWitness expected,
       io.justsearch.core.context.EngineContext context) {
+    return applyInternal(candidate, expected, context,
+        SettingsCandidateContext.NONE);
+  }
+
+  @Override
+  public OperationAttemptRunner.Result applyInternal(io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsWitness expected,
+      io.justsearch.core.context.EngineContext context,
+      SettingsCandidateContext candidateContext) {
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(expected, "expected");
     Objects.requireNonNull(context, "context");
+    Objects.requireNonNull(candidateContext, "candidateContext");
     if (!io.justsearch.agent.api.registry.TransportTag.SYSTEM_INTERNAL.name().equals(context.transport())) {
       throw new IllegalArgumentException("Internal settings producer requires system transport");
     }
     io.justsearch.app.services.intent.EngineProvenance.sourceTier(context);
     var frozen = JSON.readValue(JSON.writeValueAsString(candidate), io.justsearch.app.api.UiSettings.class);
+    var identity = new java.util.LinkedHashMap<String, Object>();
+    identity.put("settings", frozen);
+    identity.put("expected", expected);
+    if (candidateContext.hasChatProfile()) {
+      identity.put("chatProfile", candidateContext.chatProfile().id());
+    }
+    if (candidateContext.forceGenerativeRefresh()) identity.put("forceGenerativeRefresh", true);
     var descriptor = io.justsearch.app.api.operations.OperationDescriptor.invocation(
-        io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY, "settings.apply-internal",
-        JSON.writeValueAsString(Map.of("settings", frozen, "expected", expected)), false);
+        io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+        SettingsCandidateContext.NONE.equals(candidateContext)
+            ? "settings.apply-internal" : SettingsCandidatePreparation.OPERATION_REF,
+        JSON.writeValueAsString(identity), false);
     var request = new OperationAttemptRunner.Request(null, descriptor, context,
         io.justsearch.app.services.intent.EngineProvenance.invocation(context,
             io.justsearch.agent.api.registry.ExecutorTag.UI, java.time.Instant.now(), java.util.Optional.empty()));
-    var accepted = attempts.accept(request);
+    var accepted = SettingsCandidateContext.NONE.equals(candidateContext) ? attempts.accept(request)
+        : attempts.withPreparation(request, scope -> {
+          if (scope.existing().isPresent()) {
+            return (java.util.function.Supplier<OperationAttemptRunner.PreparedAttempt>)
+                () -> attempts.lookup(scope.request()).orElseThrow();
+          }
+          var pending = attempts.pendingPreparation(scope.request());
+          var saved = pending.isPresent() ? pending : attempts.savePreparation(scope.request(),
+              new io.justsearch.app.api.operations.OperationStore.Preparation(
+                  java.util.UUID.randomUUID(), SettingsCandidatePreparation.encode(candidateContext)));
+          if (saved.isEmpty()) {
+            return (java.util.function.Supplier<OperationAttemptRunner.PreparedAttempt>)
+                () -> attempts.lookup(scope.request()).orElseThrow();
+          }
+          return (java.util.function.Supplier<OperationAttemptRunner.PreparedAttempt>)
+              () -> attempts.acceptPrepared(scope.request(), saved.orElseThrow().nonce());
+        }).get();
     return attempts.start(accepted, record -> io.justsearch.agent.api.registry.OperationExecution.finished(
-        attempts.applySettings(record, expected, frozen)));
+        !SettingsCandidateContext.NONE.equals(candidateContext)
+            ? attempts.applySettings(record, expected, frozen, candidateContext)
+            : attempts.applySettings(record, expected, frozen)));
   }
 
   @Override

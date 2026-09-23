@@ -3,20 +3,17 @@ package io.justsearch.app.services.ai.install;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
-import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
+import io.justsearch.app.services.settings.SettingsComponentComposer;
 import io.justsearch.app.services.settings.SettingsServiceImpl;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.ModelPathSource;
@@ -36,11 +33,10 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -193,8 +189,8 @@ final class AiInstallServiceModelPathMarkerTest {
   }
 
   @Test
-  @DisplayName("the install commit publishes the operator target before one runtime apply")
-  void committedSettingsReachRuntimeAfterPublication() throws Exception {
+  @DisplayName("the install commit publishes the operator target without a second runtime apply")
+  void committedSettingsDoNotTriggerPostCommitRuntimeApply() throws Exception {
     clearProp(ModelPathSource.SOURCE_PROP_LLM_MODEL_PATH);
     clearProp("justsearch.models.dir");
     String operatorModel = tmp.resolve("operator-choice.gguf").toAbsolutePath().toString();
@@ -211,46 +207,82 @@ final class AiInstallServiceModelPathMarkerTest {
     settings.setContextLength(8192);
     settings.setGpuLayers(23);
     store.replacePrepared(store.prepare(settings, new SettingsWitness(0, null)));
-    OnlineAiService onlineAi =
-        mock(
-            OnlineAiService.class,
-            org.mockito.Mockito.withSettings().extraInterfaces(OnlineAiRuntimeControl.class));
-    OnlineAiRuntimeControl runtime = (OnlineAiRuntimeControl) onlineAi;
-    AtomicInteger applyCount = new AtomicInteger();
-    AtomicReference<String> appliedModel = new AtomicReference<>();
-    AtomicReference<Integer> appliedContext = new AtomicReference<>();
-    AtomicReference<Integer> appliedGpu = new AtomicReference<>();
-    AtomicReference<ResolvedConfig> observedConfig = new AtomicReference<>();
-    AtomicReference<SettingsWitness> observedWitness =
-        new AtomicReference<>();
+    OnlineAiService onlineAi = mock(OnlineAiService.class);
     AiInstallService svc = newService(store, onlineAi);
     var before = store.inspect().witness();
-    doAnswer(
-            invocation -> {
-              applyCount.incrementAndGet();
-              appliedModel.set(invocation.getArgument(0));
-              appliedContext.set(invocation.getArgument(1));
-              appliedGpu.set(invocation.getArgument(2));
-              observedConfig.set(configStore.get());
-              observedWitness.set(store.inspect().witness());
-              return null;
-            })
-        .when(runtime)
-        .applyRuntimeOverrides(
-            anyString(), any(), any(), eq(OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE));
 
     invokeApplySettings(svc, registryWithChatModel("model.gguf"), planFor(DownloadProfile.GPU_FULL));
 
-    assertEquals(1, applyCount.get(), "one settings commit requests exactly one runtime apply");
-    assertEquals(operatorModel, appliedModel.get(), "the operator model remains authoritative");
-    assertEquals(12288, appliedContext.get());
-    assertEquals(0, appliedGpu.get(), "an explicit operator zero selects CPU execution");
-    assertNotNull(observedConfig.get(), "runtime must observe a published config");
-    assertEquals(operatorModel, observedConfig.get().ai().llmModelPath().toString());
-    assertEquals(12288, observedConfig.get().ai().contextSize());
-    assertEquals(0, observedConfig.get().ai().gpuLayers());
-    assertNotNull(observedWitness.get(), "runtime apply must follow a durable settings commit");
-    assertEquals(before.acceptedRevision() + 1, observedWitness.get().acceptedRevision());
+    verifyNoInteractions(onlineAi);
+    assertEquals(operatorModel, configStore.get().ai().llmModelPath().toString());
+    assertEquals(12288, configStore.get().ai().contextSize());
+    assertEquals(0, configStore.get().ai().gpuLayers());
+    assertEquals(before.acceptedRevision() + 1, store.inspect().witness().acceptedRevision());
+  }
+
+  @Test
+  @DisplayName("same-path chat repair forces one prepared generative refresh")
+  void samePathChatRepairUsesPreparedRefreshWithoutSecondRuntimeApply() throws Exception {
+    clearProp(ModelPathSource.SOURCE_PROP_LLM_MODEL_PATH);
+    clearProp("justsearch.models.dir");
+
+    Path chatModel = tmp.resolve("models").resolve("chat").resolve("model.gguf");
+    Files.createDirectories(chatModel.getParent());
+    Files.writeString(chatModel, "repaired-gguf-bytes", StandardCharsets.UTF_8);
+    String installed = chatModel.toAbsolutePath().toString();
+
+    UiSettingsStore store = writableStore();
+    UiSettings initial = store.load();
+    initial.setLlmModelPath(installed);
+    store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
+
+    RecordingComponents components = new RecordingComponents();
+    OnlineAiService onlineAi = mock(OnlineAiService.class);
+    AiInstallService svc = newService(store, onlineAi, components);
+    var before = store.inspect().witness();
+
+    invokeApplySettings(svc, registryWithChatModel("model.gguf"), planFor(DownloadProfile.GPU_FULL));
+
+    assertEquals(installed, store.load().getLlmModelPath());
+    assertEquals(
+        before.acceptedRevision() + 1,
+        store.inspect().witness().acceptedRevision(),
+        "same-path repair still records exactly one accepted settings revision");
+    assertEquals(1, components.preparedContexts.size());
+    assertEquals(new SettingsCandidateContext(null, true), components.preparedContexts.getFirst());
+    assertEquals(
+        java.util.Set.of("modelRefresh"),
+        components.preparedAffected.getFirst().get("generative"),
+        "same-path repair must force the generative owner through the prepared refresh scope");
+    assertEquals(1, components.installCount);
+    verifyNoInteractions(onlineAi);
+  }
+
+  @Test
+  @DisplayName("repair of a settings model hidden by an operator choice leaves the operator runtime alone")
+  void hiddenChatRepairDoesNotRefreshOperatorModel() throws Exception {
+    clearProp(ModelPathSource.SOURCE_PROP_LLM_MODEL_PATH);
+    clearProp("justsearch.models.dir");
+    Path operator = tmp.resolve("operator-choice.gguf");
+    setProp(MODEL_PATH_PROP, operator.toString());
+    Path chatModel = tmp.resolve("models").resolve("chat").resolve("model.gguf");
+    Files.createDirectories(chatModel.getParent());
+    Files.writeString(chatModel, "repaired-default");
+    UiSettingsStore store = writableStore();
+    UiSettings initial = store.load();
+    initial.setLlmModelPath(chatModel.toAbsolutePath().toString());
+    store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
+    RecordingComponents components = new RecordingComponents();
+    OnlineAiService onlineAi = mock(OnlineAiService.class);
+    AiInstallService svc = newService(store, onlineAi, components);
+
+    invokeApplySettings(svc, registryWithChatModel("model.gguf"), planFor(DownloadProfile.GPU_FULL));
+
+    assertEquals(1L, store.inspect().witness().acceptedRevision());
+    assertEquals(operator.toString(), configStore.get().ai().llmModelPath().toString());
+    assertEquals(0, components.installCount);
+    assertEquals(List.of(), components.preparedContexts);
+    verifyNoInteractions(onlineAi);
   }
 
   // ---------------------------------------------------------------- fixtures
@@ -262,10 +294,18 @@ final class AiInstallServiceModelPathMarkerTest {
 
   private AiInstallService newService(UiSettingsStore store, OnlineAiService onlineAi)
       throws Exception {
+    return newService(store, onlineAi, null);
+  }
+
+  private AiInstallService newService(
+      UiSettingsStore store, OnlineAiService onlineAi, SettingsComponentComposer components)
+      throws Exception {
     previousConfigStore = ConfigStore.globalOrNull();
     configStore = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
     ConfigStore.setGlobal(configStore);
-    fixture = new RuntimeIntentTestFixture(tmp.resolve("intent"), store, configStore);
+    fixture = components == null
+        ? new RuntimeIntentTestFixture(tmp.resolve("intent"), store, configStore)
+        : new RuntimeIntentTestFixture(tmp.resolve("intent"), store, configStore, components);
     return new AiInstallService(
         onlineAi,
         store,
@@ -274,6 +314,40 @@ final class AiInstallServiceModelPathMarkerTest {
         tmp,
         null,
         new SettingsServiceImpl(store, fixture.runner()));
+  }
+
+  private static final class RecordingComponents implements SettingsComponentComposer {
+    final List<SettingsCandidateContext> preparedContexts = new ArrayList<>();
+    final List<Map<String, java.util.Set<String>>> preparedAffected = new ArrayList<>();
+    int installCount;
+
+    @Override
+    public Prepared prepare(
+        UiSettings candidate, ResolvedConfig desired, Map<String, java.util.Set<String>> affected) {
+      preparedAffected.add(Map.copyOf(affected));
+      return prepared(SettingsCandidateContext.NONE);
+    }
+
+    @Override
+    public Prepared prepare(
+        UiSettings candidate,
+        ResolvedConfig desired,
+        Map<String, java.util.Set<String>> affected,
+        SettingsCandidateContext context) {
+      preparedAffected.add(Map.copyOf(affected));
+      return prepared(context);
+    }
+
+    private Prepared prepared(SettingsCandidateContext context) {
+      preparedContexts.add(context);
+      return new Prepared() {
+        @Override public void validate() { }
+        @Override public void install() { installCount++; }
+        @Override public void notifyObservers() { }
+        @Override public void retire() { }
+        @Override public void abort() { }
+      };
+    }
   }
 
   private static void invokeApplySettings(

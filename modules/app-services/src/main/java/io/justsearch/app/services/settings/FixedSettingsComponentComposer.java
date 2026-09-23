@@ -21,6 +21,15 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
   private static final Logger LOG = LoggerFactory.getLogger(FixedSettingsComponentComposer.class);
   public interface Owner {
     PreparedOwner prepare(UiSettings candidate, ResolvedConfig desired, Set<String> changedKeys);
+
+    default PreparedOwner prepare(UiSettings candidate, ResolvedConfig desired,
+        Set<String> changedKeys,
+        io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+      if (io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(candidateContext)) {
+        return prepare(candidate, desired, changedKeys);
+      }
+      throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
+    }
   }
 
   public interface PreparedOwner extends SettingsComponentComposer.Prepared {
@@ -52,6 +61,15 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
   @Override
   public Prepared prepare(UiSettings candidate, ResolvedConfig desired,
       Map<String, Set<String>> affected) {
+    return prepare(candidate, desired, affected,
+        io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
+  }
+
+  @Override
+  public Prepared prepare(UiSettings candidate, ResolvedConfig desired,
+      Map<String, Set<String>> affected,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    Objects.requireNonNull(candidateContext, "candidateContext");
     Map<String, Owner> selected = new LinkedHashMap<>();
     synchronized (this) {
       if (!sealed) throw new IllegalStateException("Component owners are not sealed");
@@ -79,7 +97,9 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       Map<String, EngineComponentSnapshot.Component> observations = new LinkedHashMap<>();
       for (var entry : selected.entrySet()) {
         PreparedOwner owner = Objects.requireNonNull(
-            entry.getValue().prepare(candidate, desired, affected.get(entry.getKey())),
+            entry.getValue().prepare(candidate, desired, affected.get(entry.getKey()),
+                "generative".equals(entry.getKey()) ? candidateContext
+                    : io.justsearch.app.api.settings.SettingsCandidateContext.NONE),
             "Prepared owner: " + entry.getKey());
         prepared.add(owner);
         observations.put(entry.getKey(), Objects.requireNonNull(owner.observation(),

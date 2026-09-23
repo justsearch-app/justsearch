@@ -9,16 +9,19 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import io.justsearch.app.api.AiRuntimeActivationStatus;
 import io.justsearch.app.api.AiRuntimeStatusResponse;
-import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.inference.RealizedChatIdentity;
 import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.app.services.settings.SettingsComponentComposer;
 import io.justsearch.app.services.settings.SettingsServiceImpl;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.charset.StandardCharsets;
@@ -28,7 +31,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -123,7 +125,7 @@ final class RuntimeActivationServiceChatProfileTest {
   // ---------------------------------------------------------------- the apply seam
 
   @Test
-  @DisplayName("profile activation commits settings before one combined profile/runtime apply")
+  @DisplayName("profile activation passes a transient target and installs it after settings commit")
   void profileActivationAppliesCombinedTargetWithoutPersistingModelPath() throws Exception {
     setUpEnvironment();
     Path variantExe = createVariantExe("cuda12");
@@ -136,9 +138,8 @@ final class RuntimeActivationServiceChatProfileTest {
     s.setLlmModelPath(operatorModel.toAbsolutePath().toString());
     store.replacePrepared(store.prepare(s, new SettingsWitness(0, null)));
 
-    RecordingAiControl control = new RecordingAiControl();
-    control.observedStore = store;
-    RuntimeActivationService svc = newService(control, store);
+    RecordingComponents components = new RecordingComponents(store);
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components);
     List<Path> selfTested = new ArrayList<>();
     svc.setSelfTestOverrideForTest(
         (exe, model) -> {
@@ -154,27 +155,19 @@ final class RuntimeActivationServiceChatProfileTest {
         List.of(compact.toAbsolutePath()),
         selfTested,
         "the self-test must validate the model the engine is about to load, not the stored one");
+    assertEquals(List.of(ChatModelProfile.COMPACT), components.preparedProfiles);
+    assertEquals(List.of(ChatModelProfile.COMPACT), components.installedProfiles);
     assertEquals(
-        List.of(ChatModelProfile.COMPACT),
-        control.profilesApplied,
-        "a profile activation must keep the projector pair in the combined apply");
+        List.of(new SettingsCandidateContext(ChatModelProfile.COMPACT)),
+        components.preparedContexts);
     assertEquals(
-        List.of(OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS),
-        control.profilePolicies,
-        "same restart policy the pre-842 settings path used");
-    assertTrue(
-        control.barePathApplies.isEmpty(),
-        "the bare-path apply clears the profile claim and nulls the mmproj, so it must not be"
-            + " reached: "
-            + control.barePathApplies);
-    assertEquals(List.of(variantExe.toAbsolutePath().toString()), control.serverExecutables);
-    assertEquals(List.of(99), control.profileGpuLayers);
+        List.of(new SettingsCandidateContext(ChatModelProfile.COMPACT)),
+        components.installedContexts);
+    assertEquals(List.of(variantExe.toAbsolutePath().toString()), components.preparedExecutables);
+    assertEquals(List.of(99), components.preparedGpuLayers);
     assertEquals(
-        List.of(variantExe.toAbsolutePath()),
-        control.publishedServerExecutables,
-        "the settings owner must publish ConfigStore before inference observes the target");
-    assertEquals(List.of(99), control.publishedGpuLayers);
-    assertEquals(List.of(Boolean.TRUE), control.publishedChatEnabled);
+        List.of(Boolean.TRUE), components.chatEnabledAtInstall,
+        "the component target is installed only after the durable settings replacement");
     assertEquals(
         operatorModel.toAbsolutePath().toString(),
         store.load().getLlmModelPath(),
@@ -187,20 +180,48 @@ final class RuntimeActivationServiceChatProfileTest {
   }
 
   @Test
-  @DisplayName("runtime failure compensates settings without a second inference apply")
-  void applyFailureCompensatesSettingsOnce() throws Exception {
+  @DisplayName("explicit operator model path refuses profile before self-test or settings acceptance")
+  void operatorModelPathCannotBeReplacedByTransientProfile() throws Exception {
+    setUpEnvironment();
+    createVariantExe("cuda12");
+    createCompactModel();
+    Path operatorModel = tmp.resolve("operator-choice.gguf");
+    Files.writeString(operatorModel, "operator-model", StandardCharsets.UTF_8);
+    setProp("justsearch.llm.model_path", operatorModel.toString());
+    UiSettingsStore store = settingsStore();
+    var before = store.inspect().witness();
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store);
+    svc.setSelfTestOverrideForTest((exe, model) -> {
+      fail("profile self-test must not override an operator model path");
+      return null;
+    });
+
+    svc.startActivate("cuda12", "compact");
+    AiRuntimeActivationStatus status = awaitDone(svc);
+
+    assertEquals("failed", status.state);
+    assertEquals("MODEL_OVERRIDE_LOCKED", status.errorCode);
+    assertEquals(before, store.inspect().witness());
+    assertEquals(operatorModel.toString(), ConfigStore.global().get().ai().llmModelPath().toString());
+  }
+
+  @Test
+  @DisplayName("precommit component refusal leaves original settings and config")
+  void precommitComponentFailureLeavesOriginalSettingsAndConfig() throws Exception {
     setUpEnvironment();
     createVariantExe("cuda12");
     createCompactModel();
     assertNull(System.getProperty(CHAT_PROFILE_PROP), "precondition: no profile claim exists");
 
-    RecordingAiControl control = new RecordingAiControl();
-    control.failOnApplyProfile = true;
     UiSettingsStore store = settingsStore();
     UiSettings original = store.load();
     original.setContextLength(4096);
     store.replacePrepared(store.prepare(original, new SettingsWitness(0, null)));
-    RuntimeActivationService svc = newService(control, store);
+    var originalSettings = store.load();
+    RecordingComponents components = new RecordingComponents(store);
+    components.failValidation = true;
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components);
+    var originalConfig = ConfigStore.global().get().ai();
     svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
 
     svc.startActivate("cuda12", "compact");
@@ -209,36 +230,39 @@ final class RuntimeActivationServiceChatProfileTest {
     assertEquals("failed", st.state);
     assertEquals("RUNTIME_ACTIVATION_FAILED", st.errorCode, "message=" + st.message);
     UiSettings restored = store.load();
-    assertNull(restored.getChatEnabled());
-    assertEquals("", restored.getServerExecutablePath());
-    assertEquals(0, restored.getGpuLayers());
-    assertEquals(4096, restored.getContextLength());
-    assertEquals(1, control.profilesApplied.size(), "compensation must not apply inference again");
-    assertNull(ConfigStore.global().get().ai().serverExe());
-    assertEquals(0, ConfigStore.global().get().ai().gpuLayers());
-    assertEquals(4096, ConfigStore.global().get().ai().contextSize());
+    assertEquals(originalSettings.getChatEnabled(), restored.getChatEnabled());
+    assertEquals(originalSettings.getServerExecutablePath(), restored.getServerExecutablePath());
+    assertEquals(originalSettings.getGpuLayers(), restored.getGpuLayers());
+    assertEquals(originalSettings.getContextLength(), restored.getContextLength());
+    assertEquals(1, components.preparedProfiles.size());
+    assertEquals(1, components.abortedCount, "the refused candidate must be disposed");
+    assertEquals(0, components.installedProfiles.size(), "no component installs before commit");
+    assertEquals(originalConfig.serverExe(), ConfigStore.global().get().ai().serverExe());
+    assertEquals(originalConfig.gpuLayers(), ConfigStore.global().get().ai().gpuLayers());
+    assertEquals(originalConfig.contextSize(), ConfigStore.global().get().ai().contextSize());
     assertNull(
         System.getProperty(CHAT_PROFILE_PROP),
         "compensation must not invent a profile property");
   }
 
   @Test
-  @DisplayName("apply failure leaves a pre-existing operator chat-profile property unchanged")
-  void applyFailureLeavesPreviousChatProfilePropUnchanged() throws Exception {
+  @DisplayName("profile activation never promotes its transient target to a JVM property")
+  void profileActivationLeavesPreviousChatProfilePropUnchanged() throws Exception {
     setUpEnvironment();
     setProp(CHAT_PROFILE_PROP, "standard");
     createVariantExe("cuda12");
     createCompactModel();
 
-    RecordingAiControl control = new RecordingAiControl();
-    control.failOnApplyProfile = true;
-    RuntimeActivationService svc = newService(control);
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable());
     svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
 
     svc.startActivate("cuda12", "compact");
-    awaitDone(svc);
+    AiRuntimeActivationStatus st = awaitDone(svc);
 
+    assertEquals("completed", st.state, "message=" + st.message);
     assertEquals("standard", System.getProperty(CHAT_PROFILE_PROP));
+    assertNull(System.getProperty(SERVER_EXE_PROP));
+    assertNull(System.getProperty(SERVER_EXE_SOURCE_PROP));
   }
 
   @Test
@@ -248,8 +272,8 @@ final class RuntimeActivationServiceChatProfileTest {
     createVariantExe("cuda12");
     createCompactModel();
     UiSettingsStore store = settingsStore();
-    RecordingAiControl control = new RecordingAiControl();
-    RuntimeActivationService svc = newService(control, store);
+    RecordingComponents components = new RecordingComponents(store);
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components);
     svc.setSelfTestOverrideForTest(
         (exe, model) -> {
           commitCompetingSettings(store, 12288);
@@ -261,34 +285,40 @@ final class RuntimeActivationServiceChatProfileTest {
 
     assertEquals("failed", st.state);
     assertEquals("RUNTIME_ACTIVATION_FAILED", st.errorCode);
-    assertTrue(control.profilesApplied.isEmpty(), "stale candidate must fail before runtime apply");
-    assertTrue(control.barePathApplies.isEmpty());
+    assertTrue(components.preparedProfiles.isEmpty(), "stale candidate must fail before preparation");
+    assertTrue(components.installedProfiles.isEmpty());
     assertEquals(12288, store.load().getContextLength());
     assertEquals(12288, ConfigStore.global().get().ai().contextSize());
   }
 
   @Test
-  @DisplayName("stale compensation preserves settings accepted during a failing runtime apply")
-  void failingRuntimeInterveningWriteRefusesCompensation() throws Exception {
+  @DisplayName("a concurrent settings write remains authoritative while activation is preparing")
+  void concurrentSettingsWriteRemainsAuthoritativeDuringPreparation() throws Exception {
     setUpEnvironment();
     createVariantExe("cuda12");
     createCompactModel();
     UiSettingsStore store = settingsStore();
-    RecordingAiControl control = new RecordingAiControl();
-    control.duringProfileApply = () -> commitCompetingSettings(store, 24576);
-    control.failOnApplyProfile = true;
-    RuntimeActivationService svc = newService(control, store);
-    svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
+    RecordingComponents components = new RecordingComponents(store);
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components);
+
+    // The settings writer races the activation's witness after self-test but before its one
+    // settings attempt. The newer committed value must survive and the profile target must never
+    // reach preparation or installation.
+    svc.setSelfTestOverrideForTest(
+        (exe, model) -> {
+          commitCompetingSettings(store, 24576);
+          return passingSelfTest();
+        });
 
     svc.startActivate("cuda12", "compact");
     AiRuntimeActivationStatus st = awaitDone(svc);
 
     assertEquals("failed", st.state);
-    assertEquals("RUNTIME_ROLLBACK_FAILED", st.errorCode, "message=" + st.message);
+    assertEquals("RUNTIME_ACTIVATION_FAILED", st.errorCode, "message=" + st.message);
     assertEquals(24576, store.load().getContextLength(), "newer settings must survive");
-    assertTrue(Boolean.TRUE.equals(store.load().getChatEnabled()));
     assertEquals(24576, ConfigStore.global().get().ai().contextSize());
-    assertEquals(1, control.profilesApplied.size());
+    assertTrue(components.preparedProfiles.isEmpty());
+    assertTrue(components.installedProfiles.isEmpty());
   }
 
   @Test
@@ -303,19 +333,18 @@ final class RuntimeActivationServiceChatProfileTest {
     s.setLlmModelPath(chosen.toAbsolutePath().toString());
     store.replacePrepared(store.prepare(s, new SettingsWitness(0, null)));
 
-    RecordingAiControl control = new RecordingAiControl();
-    RuntimeActivationService svc = newService(control, store);
+    RecordingComponents components = new RecordingComponents(store);
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components);
     svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
 
     svc.startActivate("cuda12");
     AiRuntimeActivationStatus st = awaitDone(svc);
 
     assertEquals("completed", st.state, "message=" + st.message);
-    assertTrue(control.profilesApplied.isEmpty(), "no profile was requested, so none may be applied");
-    assertEquals(
-        List.of(chosen.toAbsolutePath().toString()),
-        control.barePathApplies,
-        "the settings path must still route through applyRuntimeOverrides exactly as before");
+    assertTrue(
+        components.preparedContexts.stream().noneMatch(SettingsCandidateContext::hasChatProfile),
+        "an activation without chatProfile must not carry a transient profile target");
+    assertTrue(components.installedContexts.stream().noneMatch(SettingsCandidateContext::hasChatProfile));
     assertNull(
         System.getProperty(CHAT_PROFILE_PROP),
         "an activation that names no profile must not invent a profile claim");
@@ -334,14 +363,14 @@ final class RuntimeActivationServiceChatProfileTest {
     var initial = store.load();
     initial.setContextLength(8192);
     store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
-    var control = new RecordingAiControl();
-    var svc = newService(control, store);
+    var components = new RecordingComponents(store);
+    var svc = newService(OnlineAiService.unavailable(), store, components);
     svc.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
     svc.startActivate("cuda12", "compact");
     assertEquals("completed", awaitDone(svc).state);
-    assertEquals(List.of(0), control.profileGpuLayers);
-    assertEquals(control.publishedGpuLayers, control.profileGpuLayers);
-    assertEquals(List.of(16384), control.profileContexts);
+    assertEquals(List.of(0), components.desiredGpuLayers);
+    assertEquals(List.of(16384), components.desiredContexts);
+    assertEquals(List.of(99), components.preparedGpuLayers);
     assertEquals(99, store.load().getGpuLayers(), "operator source overrides the stored preference");
   }
 
@@ -352,11 +381,11 @@ final class RuntimeActivationServiceChatProfileTest {
     Path baseline = tmp.resolve("native-bin/llama-server/llama-server.exe");
     Files.createDirectories(baseline.getParent());
     Files.writeString(baseline, "fixture");
-    var control = new RecordingAiControl();
-    var svc = newService(control);
+    var components = new RecordingComponents(settingsStore());
+    var svc = newService(OnlineAiService.unavailable(), components.store, components);
     svc.startDeactivate();
     assertEquals("completed", awaitDone(svc).state);
-    assertEquals(List.of(20), control.bareGpuLayers);
+    assertEquals(List.of(20), components.desiredGpuLayers);
     assertEquals(20, ConfigStore.global().get().ai().gpuLayers());
   }
 
@@ -458,8 +487,19 @@ final class RuntimeActivationServiceChatProfileTest {
   }
 
   private RuntimeActivationService newService(OnlineAiService onlineAi, UiSettingsStore store) throws Exception {
+    return newService(onlineAi, store, null);
+  }
+
+  private RuntimeActivationService newService(OnlineAiService onlineAi, UiSettingsStore store,
+      RecordingComponents requestedComponents) throws Exception {
+    // A running Engine starts from the fully resolved settings snapshot. The environment-only
+    // helper omits YAML composites such as search.facets.fields, making the first reconfigure
+    // look like an unrelated unknown-key change.
+    ConfigStore.setGlobal(new ConfigStore(ConfigStoreRebuilder.prepare(store.load())));
+    RecordingComponents components = requestedComponents == null
+        ? new RecordingComponents(store) : requestedComponents;
     var fixture = new io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture(
-        tmp.resolve("intent-" + intentFixtures.size()), store, ConfigStore.globalOrNull());
+        tmp.resolve("intent-" + intentFixtures.size()), store, ConfigStore.globalOrNull(), components);
     intentFixtures.add(fixture);
     var settingsService = new SettingsServiceImpl(store, fixture.runner());
     return new RuntimeActivationService(processExecutors, onlineAi, store, null, null,
@@ -511,80 +551,62 @@ final class RuntimeActivationServiceChatProfileTest {
     return svc.getActivationStatus();
   }
 
-  /**
-   * Records which apply path activation took. The distinction is the whole point of the slice:
-   * {@code applyChatProfileWithRuntime} carries (model, mmproj, profile-id) as one unit, while
-   * {@code applyRuntimeOverrides} takes a bare path and defensively nulls the projector.
-   */
-  private static final class RecordingAiControl implements OnlineAiService, OnlineAiRuntimeControl {
-    final List<ChatModelProfile> profilesApplied = new ArrayList<>();
-    final List<OnlineAiRuntimeControl.RestartPolicy> profilePolicies = new ArrayList<>();
-    final List<String> serverExecutables = new ArrayList<>();
-    final List<Integer> profileGpuLayers = new ArrayList<>();
-    final List<Integer> profileContexts = new ArrayList<>();
-    final List<Integer> bareGpuLayers = new ArrayList<>();
-    final List<Path> publishedServerExecutables = new ArrayList<>();
-    final List<Integer> publishedGpuLayers = new ArrayList<>();
-    final List<Boolean> publishedChatEnabled = new ArrayList<>();
-    final List<String> barePathApplies = new ArrayList<>();
-    UiSettingsStore observedStore;
-    Runnable duringProfileApply;
-    boolean failOnApplyProfile;
+  /** Records the candidate context and prepared/installed lifecycle without an inference service. */
+  private static final class RecordingComponents implements SettingsComponentComposer {
+    final UiSettingsStore store;
+    final List<SettingsCandidateContext> preparedContexts = new ArrayList<>();
+    final List<SettingsCandidateContext> installedContexts = new ArrayList<>();
+    final List<ChatModelProfile> preparedProfiles = new ArrayList<>();
+    final List<ChatModelProfile> installedProfiles = new ArrayList<>();
+    final List<String> preparedExecutables = new ArrayList<>();
+    final List<Integer> preparedGpuLayers = new ArrayList<>();
+    final List<Integer> desiredGpuLayers = new ArrayList<>();
+    final List<Integer> desiredContexts = new ArrayList<>();
+    final List<Boolean> chatEnabledAtInstall = new ArrayList<>();
+    boolean failValidation;
+    int abortedCount;
 
-    @Override
-    public void applyChatProfileWithRuntime(
-        ChatModelProfile profile,
-        String serverExecutable,
-        Integer contextLength,
-        Integer gpuLayers,
-        RestartPolicy restartPolicy) {
-      profilesApplied.add(profile);
-      profilePolicies.add(restartPolicy);
-      serverExecutables.add(serverExecutable);
-      profileGpuLayers.add(gpuLayers);
-      profileContexts.add(contextLength);
-      var published = ConfigStore.global().get().ai();
-      publishedServerExecutables.add(published.serverExe());
-      publishedGpuLayers.add(published.gpuLayers());
-      if (observedStore != null) {
-        publishedChatEnabled.add(observedStore.load().getChatEnabled());
-      }
-      if (duringProfileApply != null) duringProfileApply.run();
-      if (failOnApplyProfile) {
-        throw new IllegalStateException("simulated engine restart failure");
-      }
+    RecordingComponents(UiSettingsStore store) {
+      this.store = store;
     }
 
     @Override
-    public void applyRuntimeOverrides(
-        String llmModelPath, Integer contextLength, Integer gpuLayers, RestartPolicy restartPolicy) {
-      barePathApplies.add(llmModelPath);
-      bareGpuLayers.add(gpuLayers);
+    public Prepared prepare(UiSettings candidate, ResolvedConfig desired,
+        Map<String, java.util.Set<String>> affected) {
+      return prepare(candidate, desired, affected, SettingsCandidateContext.NONE);
     }
 
     @Override
-    public DetachExternalServerResult detachExternalServer() {
-      throw new UnsupportedOperationException("not used by this test");
-    }
+    public Prepared prepare(UiSettings candidate, ResolvedConfig desired,
+        Map<String, java.util.Set<String>> affected, SettingsCandidateContext context) {
+      preparedContexts.add(context);
+      if (context.hasChatProfile()) preparedProfiles.add(context.chatProfile());
+      preparedExecutables.add(candidate.getServerExecutablePath());
+      preparedGpuLayers.add(candidate.getGpuLayers());
+      desiredGpuLayers.add(desired.ai().gpuLayers());
+      desiredContexts.add(desired.ai().contextSize());
+      return new Prepared() {
+        @Override
+        public void validate() {
+          if (failValidation) throw new IllegalStateException("simulated precommit refusal");
+        }
 
-    @Override
-    public CompletableFuture<String> summarize(String content) {
-      throw new UnsupportedOperationException("not used by this test");
-    }
+        @Override
+        public void install() {
+          installedContexts.add(context);
+          if (context.hasChatProfile()) installedProfiles.add(context.chatProfile());
+          chatEnabledAtInstall.add(store.load().getChatEnabled());
+        }
 
-    @Override
-    public CompletableFuture<String> askQuestion(String question, String context) {
-      throw new UnsupportedOperationException("not used by this test");
-    }
+        @Override public void notifyObservers() {}
 
-    @Override
-    public boolean isAvailable() {
-      return true;
-    }
+        @Override public void retire() {}
 
-    @Override
-    public boolean isStartingUp() {
-      return false;
+        @Override
+        public void abort() {
+          abortedCount++;
+        }
+      };
     }
   }
 }

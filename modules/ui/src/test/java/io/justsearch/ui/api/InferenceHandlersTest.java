@@ -260,7 +260,9 @@ final class InferenceHandlersTest {
           settings,
           config,
           () -> { throw new AssertionError("Unexpected settings restart"); },
-          candidate -> io.justsearch.agent.api.registry.OperationResult.success("committed"));
+          candidate -> io.justsearch.agent.api.registry.OperationResult.success("committed"),
+          () -> false,
+          inMemoryComponents());
       var runner = new OperationAttemptRunnerImpl(
           operations,
           Clock.systemUTC(),
@@ -298,6 +300,16 @@ final class InferenceHandlersTest {
       assertEquals(LifecycleReasonCode.INFERENCE_STARTING.code(),
           handle.snapshot().reasonCode(), "old request failure is fenced by accepted settings ABA");
     }
+  }
+
+  private static io.justsearch.app.services.settings.SettingsComponentComposer inMemoryComponents() {
+    return (candidate, desired, affected) -> new io.justsearch.app.services.settings.SettingsComponentComposer.Prepared() {
+      @Override public void validate() { }
+      @Override public void install() { }
+      @Override public void notifyObservers() { }
+      @Override public void retire() { }
+      @Override public void abort() { }
+    };
   }
 
   @SuppressWarnings("unchecked")

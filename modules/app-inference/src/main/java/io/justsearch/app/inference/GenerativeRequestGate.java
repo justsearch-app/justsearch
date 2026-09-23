@@ -7,10 +7,18 @@ import java.util.concurrent.TimeUnit;
 /** Admits actual generative resource users and drains them before in-place replacement. */
 final class GenerativeRequestGate {
   private boolean reloading;
+  private boolean recoveryClosed;
   private int active;
 
   synchronized void requireOpen() {
-    if (reloading) throw new IllegalStateException("Generative component is reloading");
+    if (recoveryClosed || reloading) throw new IllegalStateException("Generative component is unavailable");
+  }
+
+  /** Boot recovery failure cannot reopen admission through a late candidate-hold close. */
+  synchronized void fenceForRecovery() {
+    recoveryClosed = true;
+    reloading = true;
+    notifyAll();
   }
 
   synchronized Lease acquire() {
@@ -66,7 +74,7 @@ final class GenerativeRequestGate {
       synchronized (GenerativeRequestGate.this) {
         if (released) return;
         released = true;
-        reloading = false;
+        if (!recoveryClosed) reloading = false;
         GenerativeRequestGate.this.notifyAll();
       }
     }

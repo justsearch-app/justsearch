@@ -74,7 +74,7 @@ final class LocalApiComponentRegistryTest {
               .findFirst().orElseThrow();
           String expected = AppliedConfigurationVersion.digest(
               Set.of(EnvRegistry.API_PORT.configKey()),
-              Collections.singletonMap(EnvRegistry.API_PORT.configKey(), null));
+              Collections.singletonMap(EnvRegistry.API_PORT.configKey(), 0));
           assertEquals(ComponentState.READY, api.state());
           assertEquals(expected, api.appliedVersion());
           assertEquals(expected, api.desiredVersion());

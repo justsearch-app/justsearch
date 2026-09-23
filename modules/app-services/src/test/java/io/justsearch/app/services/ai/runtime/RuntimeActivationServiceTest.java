@@ -880,7 +880,7 @@ class RuntimeActivationServiceTest {
   }
 
   @Test
-  void deactivationPersistsExplicitBaselineAndPublishesBeforeRuntimeApply() throws Exception {
+  void deactivationPersistsExplicitBaselineWithoutPostCommitRuntimeApply() throws Exception {
     setHome(tmp);
     clearProp("justsearch.server.exe");
     clearProp("justsearch.server.exe.source");
@@ -927,12 +927,13 @@ class RuntimeActivationServiceTest {
       assertEquals(0, persisted.getGpuLayers());
       assertEquals(io.justsearch.app.inference.ContextWindowPolicy.CPU_TOP_RUNG,
           ConfigStore.global().get().ai().contextSize());
-      assertEquals(List.of(persisted.getLlmModelPath()), control.modelPaths);
-      assertEquals(List.of(0), control.gpuLayers);
-      assertEquals(List.of(baseline.toAbsolutePath()), control.publishedServerExecutables);
-      assertEquals(List.of(0), control.publishedGpuLayers);
-      assertEquals(
-          List.of(baseline.toAbsolutePath().toString()), control.settingsServerExecutables);
+      assertTrue(control.modelPaths.isEmpty(), "physical work belongs inside prepared settings composition");
+      assertTrue(control.gpuLayers.isEmpty());
+      assertTrue(control.publishedServerExecutables.isEmpty());
+      assertTrue(control.publishedGpuLayers.isEmpty());
+      assertTrue(control.settingsServerExecutables.isEmpty());
+      assertEquals(baseline.toAbsolutePath(), ConfigStore.global().get().ai().serverExe());
+      assertEquals(0, ConfigStore.global().get().ai().gpuLayers());
       assertNull(System.getProperty("justsearch.server.exe"));
       assertNull(System.getProperty("justsearch.server.exe.source"));
     } finally {

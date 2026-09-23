@@ -93,6 +93,11 @@ public class InferenceLifecycleManager
   private final TransitionRunner runner;
   private final GenerativeRequestGate requestGate = new GenerativeRequestGate();
 
+  /** A committed settings target could not be reconstructed; no old model may serve as it. */
+  public void fenceForSettingsRecovery() {
+    requestGate.fenceForRecovery();
+  }
+
   /** One immutable configured snapshot; publication is serialized by the transition lock. */
   private volatile ConfiguredInference configured;
 

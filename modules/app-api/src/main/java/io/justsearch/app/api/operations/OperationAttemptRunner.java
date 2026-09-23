@@ -27,6 +27,9 @@ public interface OperationAttemptRunner {
   /** Permanently refuse new effect bodies for this process incarnation. */
   void beginClosing();
 
+  /** Boot-only fixed settings recovery after component owners exist and before request admission. */
+  boolean reconcileSettingsAfterComposition();
+
   /** Wait for executing bodies and their durable completion callbacks to leave the store. */
   boolean awaitDrained(Duration timeout);
 
@@ -142,6 +145,16 @@ public interface OperationAttemptRunner {
    */
   OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
       io.justsearch.app.api.UiSettings candidate);
+
+  /** Internal transient target belongs to this accepted attempt, not a second runtime effect. */
+  default OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
+      io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    if (io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(candidateContext)) {
+      return applySettings(handle, expected, candidate);
+    }
+    throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
+  }
 
   /** Bind cancellation of the exact admitted effect to precommit arbitration. */
   default OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
