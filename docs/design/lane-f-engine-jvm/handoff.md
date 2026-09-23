@@ -564,6 +564,24 @@ installed proof. The installer ONNX path still enters ordinary settings apply,
 which correctly refuses generation-bound model paths; it needs a recorded
 generation target rather than a relaxation of that refusal.
 
+The Engine applied-generation capture also had a stale supplier check after
+acquiring its exact A serving lease: publication of B caused an otherwise valid
+A capture to abort. The check was removed because the retained view owns the
+runtime through actual call exit. A held A/B regression passes with app-engine
+PMD and Spotless at `tmp/2709-applied-generation-held-view.txt`; restoring the
+old check made that exact test fail with ABORTED at
+`tmp/2710-applied-generation-negative.txt`, and the corrected source passed
+again at `tmp/2711-applied-generation-restored.txt`. This does not yet prove the
+complete Head config/component/graph paired-reader capture.
+
+The `e709bd33d` hosted run 35830605012 passed Public claims, search-worker,
+platform-contracts, build, jseval, secret scan and notices. App-ui failed only
+`AiInstallOnnxSettingsProducerTest.stageCommitsEligiblePathsTogetherWithoutPropertyPromotionAndPreservesEarlierStage`
+across its three retries: the intentional generation-bound refusal. Windows-native
+and system integration were then cancelled, so neither is hosted proof for this
+revision. The focused lifetime tests were committed and pushed as `9519b0b1e`;
+its own hosted run must still be checked.
+
 ## Evidence and owner map
 
 | Concern | Governing record |

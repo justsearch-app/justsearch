@@ -2,6 +2,7 @@
 package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -12,6 +13,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.app.api.operations.AppliedIndexGeneration;
+import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.WatchedRootsState;
@@ -28,6 +31,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,6 +41,44 @@ import org.junit.jupiter.api.Timeout;
 
 @Timeout(15)
 final class EngineKnowledgeClientServingViewLifetimeTest {
+
+  @Test
+  void appliedGenerationCaptureCompletesOnIssuedAViewAfterBPublication() throws Exception {
+    var aEntered = new CountDownLatch(1);
+    var releaseA = new CountDownLatch(1);
+    var aIngest = mock(WorkerIngestService.class);
+    var bIngest = mock(WorkerIngestService.class);
+    var generationA = new AppliedIndexGeneration("generation-a", mock(IndexTargetSnapshot.class));
+    doAnswer(ignored -> {
+      aEntered.countDown();
+      await(releaseA);
+      return generationA;
+    }).when(aIngest).captureAppliedGeneration(any());
+    var aServices = services(null, aIngest);
+    var bServices = services(null, bIngest);
+    var selectedServices = new AtomicReference<>(aServices);
+    var aClosed = new AtomicInteger();
+    var selectedLease = new AtomicReference<>(leaseFor(aServices, aClosed));
+
+    try (var registry = registry();
+        var client = new EngineKnowledgeClient(registry, selectedServices::get,
+            new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop(),
+            () -> {}, new EngineAdmissionController(16, 16, 1), WatchedRootsState.inMemory(),
+            selectedLease::get)) {
+      var result = CompletableFuture.supplyAsync(
+          () -> client.captureAppliedGeneration(TestEngineContexts.FOREGROUND));
+      assertTrue(aEntered.await(3, TimeUnit.SECONDS));
+      selectedServices.set(bServices);
+      selectedLease.set(leaseFor(bServices, new AtomicInteger()));
+      releaseA.countDown();
+
+      assertSame(generationA, result.get(5, TimeUnit.SECONDS));
+      verify(bIngest, never()).captureAppliedGeneration(any());
+      assertTrue(aClosed.get() > 0, "issued A capture must release its serving lease");
+    } finally {
+      releaseA.countDown();
+    }
+  }
 
   @Test
   void queuedRootWalksUseTheViewCapturedBeforeEachQueueEntry() throws Exception {

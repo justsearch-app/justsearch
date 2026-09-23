@@ -680,11 +680,9 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           if (ingest == null) {
             throw WorkerServiceException.unavailable("Applied generation services are unavailable");
           }
-          var generation = ingest.captureAppliedGeneration(budget.context());
-          if (services.get() != owner) {
-            throw WorkerServiceException.aborted("Index runtime changed during applied generation capture");
-          }
-          return generation;
+          // withBudget retains the selected serving view until this body actually exits. A
+          // successor may publish meanwhile, but it cannot invalidate this issued A capture.
+          return ingest.captureAppliedGeneration(budget.context());
         });
   }
 
