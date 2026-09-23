@@ -18,7 +18,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,6 +44,67 @@ final class RecordedGenerationBootTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @TempDir Path temp;
+
+  @Test
+  void recordedPromotionLeaseRetainsStateOwnerThroughStrictPointerReplacement() throws Exception {
+    Started started = startRecorded(temp.resolve("promotion-lease"));
+    var manager = new IndexGenerationManager(started.base());
+    try (var other = Executors.newSingleThreadExecutor()) {
+      var attempted = new CountDownLatch(1);
+      java.util.concurrent.Future<?> stateChange;
+      try (var promotion = manager.beginRecordedPromotion(
+          KEY, SOURCE, FINGERPRINT, started.sourceGeneration())) {
+        stateChange = other.submit(() -> {
+          attempted.countDown();
+          manager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+          return null;
+        });
+        assertTrue(attempted.await(2, TimeUnit.SECONDS));
+        assertTrue(awaitQueuedStateControl(),
+            "competing writer must actually reach the state guard before the hold assertion");
+        assertThrows(TimeoutException.class, () -> stateChange.get(100, TimeUnit.MILLISECONDS),
+            "another generation state writer must wait until publication releases this owner");
+        assertEquals(started.targetGeneration(), promotion.promote().active_generation());
+        assertTrue(awaitQueuedStateControl(),
+            "nested strict promotion must keep the competing writer queued");
+        assertThrows(TimeoutException.class, () -> stateChange.get(100, TimeUnit.MILLISECONDS),
+            "nested strict promotion must not release the outer state owner");
+        assertThrows(IllegalStateException.class, promotion::promote,
+            "one lease cannot replace the durable pointer twice");
+      }
+      stateChange.get(5, TimeUnit.SECONDS);
+    }
+  }
+
+  @Test
+  void recordedPromotionLeaseRefusesChangedAcceptedBindingWithoutPointerMutation() throws Exception {
+    Started started = startRecorded(temp.resolve("promotion-binding-refusal"));
+    var manager = new IndexGenerationManager(started.base());
+    Snapshot before = snapshot(started.base());
+    try (var promotion = manager.beginRecordedPromotion(
+        KEY, SOURCE, OTHER_FINGERPRINT, started.sourceGeneration())) {
+      assertThrows(IOException.class, promotion::promote);
+    }
+    assertUnchanged(started.base(), before);
+  }
+
+  @Test
+  void recordedPromotionLeaseRecognizesCommittedPointerAfterPostMoveIoFailure() throws Exception {
+    Started started = startRecorded(temp.resolve("promotion-post-move"));
+    var manager = new IndexGenerationManager(started.base(), state -> {
+      if (started.targetGeneration().equals(state.active_generation())
+          && state.building_generation() == null) {
+        throw new IOException("injected after durable pointer move");
+      }
+    });
+    try (var promotion = manager.beginRecordedPromotion(
+        KEY, SOURCE, FINGERPRINT, started.sourceGeneration())) {
+      assertEquals(started.targetGeneration(), promotion.promote().active_generation());
+    }
+    var boot = new IndexGenerationManager(started.base()).initializeForBoot(
+        recorded(started, true), FINGERPRINT);
+    assertEquals(IndexGenerationManager.BootDisposition.PROMOTED, boot.disposition());
+  }
 
   @ParameterizedTest
   @EnumSource(PointerDamage.class)
@@ -358,6 +422,15 @@ final class RecordedGenerationBootTest {
     assertEquals(started.targetGeneration(), boot.layout().activeGenerationId());
     assertEquals(nativeBuild.building_generation(), boot.layout().state().building_generation());
     assertUnchanged(started.base(), before);
+  }
+
+  private static boolean awaitQueuedStateControl() throws Exception {
+    var field = IndexGenerationManager.class.getDeclaredField("STATE_CONTROL");
+    field.setAccessible(true);
+    var lock = (java.util.concurrent.locks.ReentrantLock) field.get(null);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+    while (!lock.hasQueuedThreads() && System.nanoTime() < deadline) Thread.onSpinWait();
+    return lock.hasQueuedThreads();
   }
 
   private static Started startRecorded(Path base) throws Exception {

@@ -45,7 +45,23 @@ public final class IndexGenerationManager {
   private static final Logger log = LoggerFactory.getLogger(IndexGenerationManager.class);
   // Several manager instances share one Engine's generation pointers. Serialize control and
   // fallback repair without a persistent lock or an alias-sensitive/unbounded path registry.
-  private static final Object STATE_CONTROL = new Object();
+  private static final java.util.concurrent.locks.ReentrantLock STATE_CONTROL =
+      new java.util.concurrent.locks.ReentrantLock();
+
+  private static StateControlGuard stateControl() {
+    STATE_CONTROL.lock();
+    return new StateControlGuard();
+  }
+
+  private static final class StateControlGuard implements AutoCloseable {
+    private boolean released;
+
+    @Override public void close() {
+      if (released) return;
+      STATE_CONTROL.unlock();
+      released = true;
+    }
+  }
   private static final ObjectMapper RECORDED_JSON = JsonMapper.builder()
       .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
       .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -130,6 +146,12 @@ public final class IndexGenerationManager {
   private final Path statePath;
   private final Path stateTmpPath;
   private final Path statePrevPath;
+  private final StateMoveProbe stateMoveProbe;
+
+  @FunctionalInterface
+  interface StateMoveProbe {
+    void afterMove(State state) throws IOException;
+  }
 
   // Read-cache for readStateBestEffort(): avoids re-parsing state.json on every RPC when nothing has
   // changed. The cached State is published atomically through ONE volatile reference, so a reader on
@@ -171,7 +193,12 @@ public final class IndexGenerationManager {
   private record CachedState(State value, String contentHash) {}
 
   public IndexGenerationManager(Path indexBasePath) {
+    this(indexBasePath, ignored -> {});
+  }
+
+  IndexGenerationManager(Path indexBasePath, StateMoveProbe stateMoveProbe) {
     this.basePath = normalize(Objects.requireNonNull(indexBasePath, "indexBasePath"));
+    this.stateMoveProbe = Objects.requireNonNull(stateMoveProbe, "stateMoveProbe");
     if (this.basePath.getParent() == null) {
       throw new IllegalArgumentException(
           "indexBasePath must not be a filesystem root: " + this.basePath);
@@ -194,7 +221,7 @@ public final class IndexGenerationManager {
    * </ul>
    */
   public IndexLayout initializeOrLoad() throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       Files.createDirectories(basePath);
 
       State state = loadStateBestEffort();
@@ -242,7 +269,7 @@ public final class IndexGenerationManager {
    */
   public BootLayout initializeForBoot(BootOwnership ownership, String effectiveFingerprint) throws IOException {
     Objects.requireNonNull(ownership, "ownership");
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       if (ownership instanceof BootOwnership.Native) {
         State observed = null;
         try { observed = readRecordedState(); }
@@ -418,7 +445,7 @@ public final class IndexGenerationManager {
    * @return the updated normalized state (format_version=2)
    */
   public State startMigration(String source) throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       IndexLayout layout = initializeOrLoad();
       State current = layout.state();
       State normalized = normalizeAndUpgradeStateIfNeeded(current);
@@ -472,7 +499,7 @@ public final class IndexGenerationManager {
   /** Bind source comparison and generation creation under the same control lock. */
   public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint,
       String expectedSourceGeneration) throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       String target = recordedGenerationId(operationKey);
       if (source == null || source.isBlank() || source.length() > 256
           || source.chars().anyMatch(Character::isISOControl)
@@ -614,7 +641,7 @@ public final class IndexGenerationManager {
    *     generation to abandon
    */
   public State abandonBuildingGeneration(String reason) throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
         return null;
@@ -658,7 +685,7 @@ public final class IndexGenerationManager {
 
   /** Sets operator pause intent for migration orchestration (best-effort). */
   public State setMigrationPaused(boolean paused, String reason) throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
         // Ensure layout exists
@@ -704,7 +731,7 @@ public final class IndexGenerationManager {
    * Amendment B (Worker-side registration via Head SPI callback) should be implemented.
    */
   public void updateMigrationState(MigrationState state) throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       Objects.requireNonNull(state, "state");
       State current = readStateBestEffort();
       if (current == null) {
@@ -766,7 +793,7 @@ public final class IndexGenerationManager {
    * @return the 1-based attempt number for this key
    */
   public int recordAutoRebuildAttempt(String targetKey) throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
         initializeOrLoad();
@@ -819,10 +846,81 @@ public final class IndexGenerationManager {
     return key.equals(current.auto_rebuild_key()) ? current.auto_rebuild_count() : 0;
   }
 
+  /**
+   * Holds the durable generation state owner while a recorded activation acquires the process
+   * publication lock. The owner must acquire this after its runtime lock and release it after
+   * installing the prepared serving view. No unbound promotion is available through this lease.
+   */
+  public RecordedPromotion beginRecordedPromotion(String operationKey, String source,
+      String targetIndexFingerprint, String expectedSourceGeneration) {
+    Objects.requireNonNull(operationKey, "operationKey");
+    Objects.requireNonNull(source, "source");
+    Objects.requireNonNull(targetIndexFingerprint, "targetIndexFingerprint");
+    Objects.requireNonNull(expectedSourceGeneration, "expectedSourceGeneration");
+    return new RecordedPromotion(operationKey, source, targetIndexFingerprint,
+        expectedSourceGeneration, stateControl());
+  }
+
+  public final class RecordedPromotion implements AutoCloseable {
+    private final String operationKey;
+    private final String source;
+    private final String targetIndexFingerprint;
+    private final String expectedSourceGeneration;
+    private final StateControlGuard guard;
+    private final Thread owner = Thread.currentThread();
+    private boolean attempted;
+    private boolean closed;
+
+    private RecordedPromotion(String operationKey, String source, String targetIndexFingerprint,
+        String expectedSourceGeneration, StateControlGuard guard) {
+      this.operationKey = operationKey;
+      this.source = source;
+      this.targetIndexFingerprint = targetIndexFingerprint;
+      this.expectedSourceGeneration = expectedSourceGeneration;
+      this.guard = guard;
+    }
+
+    /** Revalidates the exact accepted binding and replaces the durable pointer at most once. */
+    public State promote() throws IOException {
+      requireOwner();
+      if (attempted) throw new IllegalStateException("Recorded promotion already attempted");
+      attempted = true;
+      try {
+        return promoteRecordedGenerationToActive(operationKey, source,
+            targetIndexFingerprint, expectedSourceGeneration);
+      } catch (IOException ambiguous) {
+        // A failed state.json move can be reported after the exact pointer is durable. Only the
+        // strict recorded boot witness may turn that ambiguous outcome into committed promotion.
+        try {
+          var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
+              expectedSourceGeneration, source, targetIndexFingerprint, true),
+              targetIndexFingerprint);
+          if (observed.disposition() == BootDisposition.PROMOTED) return observed.layout().state();
+        } catch (IOException unreadable) {
+          ambiguous.addSuppressed(unreadable);
+        }
+        throw ambiguous;
+      }
+    }
+
+    private void requireOwner() {
+      if (closed || owner != Thread.currentThread()) {
+        throw new IllegalStateException("Recorded promotion requires its owning live thread");
+      }
+    }
+
+    @Override public void close() {
+      if (closed) return;
+      requireOwner();
+      guard.close();
+      closed = true;
+    }
+  }
+
   /** Promote only the strict target/source binding validated by the recorded owner. */
   public State promoteRecordedGenerationToActive(String operationKey, String source,
       String targetIndexFingerprint, String expectedSourceGeneration) throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
           expectedSourceGeneration, source, targetIndexFingerprint, true), targetIndexFingerprint);
       if (observed.disposition() == BootDisposition.PROMOTED) return observed.layout().state();
@@ -842,7 +940,7 @@ public final class IndexGenerationManager {
    * @return the updated normalized state, or null if no state exists
    */
   public State promoteBuildingGenerationToActive() throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
         return null;
@@ -887,7 +985,7 @@ public final class IndexGenerationManager {
    * @return the updated normalized state, or null if no state exists
    */
   public State rollbackToPreviousGeneration() throws IOException {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
         return null;
@@ -1073,7 +1171,7 @@ public final class IndexGenerationManager {
    * never observes a torn version/state pair (tempdoc 589).
    */
   public State readStateBestEffort() {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       String stamp = contentStampBestEffort();
       CachedState cached = cache; // single volatile read — the whole entry is atomic
       // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
@@ -1341,6 +1439,7 @@ public final class IndexGenerationManager {
 
     // 4) Invalidate the read cache so the next readStateBestEffort() re-reads from disk.
     cache = null;
+    stateMoveProbe.afterMove(state);
   }
 
   private Path resolveGenerationPath(String genId) throws IOException {
@@ -1397,7 +1496,7 @@ public final class IndexGenerationManager {
    * a DELETEME marker). Not currently invoked by default; provided for future GC policies.
    */
   public void pruneMarkedForDeletionBestEffort() {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       if (!Files.isDirectory(indicesDir)) {
         return;
       }
@@ -1444,7 +1543,7 @@ public final class IndexGenerationManager {
    * <p>This method is intended to be called via an explicit operator control, not automatically.
    */
   public GcResult gcBestEffort(int keepLatest, boolean pruneMarkedOnly) {
-    synchronized (STATE_CONTROL) {
+    try (var ignored = stateControl()) {
       try {
         if (!Files.isDirectory(indicesDir)) {
           return new GcResult(0, 0);

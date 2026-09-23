@@ -575,6 +575,11 @@ A→B→A refusal test exposed an overbroad first correction, so the final
 lease-conditional version ran both test classes plus PMD and Spotless green at
 `tmp/2712-applied-generation-two-paths.txt`. This does not yet prove the
 complete Head config/component/graph paired-reader capture.
+The subsequent affected-module integrated run at `38cce11ae` passed adapter,
+worker-services, indexer-worker and app-engine tests with stress enabled, plus
+affected PMD and repository Spotless, in 9m25s at
+`tmp/2713-post-lifetime-affected-integrated.txt`. This run does not include the
+remaining app-services installer failure or installed model proof for this WIP.
 
 The `e709bd33d` hosted run 35830605012 passed Public claims, search-worker,
 platform-contracts, build, jseval, secret scan and notices. App-ui failed only
@@ -583,6 +588,24 @@ across its three retries: the intentional generation-bound refusal. Windows-nati
 and system integration were then cancelled, so neither is hosted proof for this
 revision. The focused lifetime tests were committed and pushed as `9519b0b1e`;
 its own hosted run must still be checked.
+
+The first Flow A owner seam is WIP: `IndexGenerationManager` now uses one
+reentrant process state guard in place of its 14 synchronized entries, and a
+strict, one-use `RecordedPromotion` lease can hold that guard across a future
+publication section. Focused recorded boot/lock-order tests, PMD and Spotless
+passed at `tmp/2714-recorded-promotion-owner.txt`; the full worker-core suite
+passed at `tmp/2715-worker-core-state-lock-suite.txt`. Independent review found
+that a post-move IOException needed an exact committed-pointer reread and the
+test needed to show a competitor stayed blocked after nested promotion. Both
+were added with a package-private post-move fault probe; focused tests/static
+passed at `tmp/2716-promotion-ambiguity.txt`. A second refute-first pass found
+the blocking test could pass on mere thread scheduling delay. It now observes
+the actual queued `STATE_CONTROL` waiter both before and after nested promotion;
+focused tests, PMD and Spotless pass at `tmp/2717-promotion-contention.txt`.
+This API is not yet connected to
+`KnowledgeServerMigrationOps` or `RecordedIngestionCoordinator`, and Flow A's
+mutation intake fence, prepared Green publication, no-restart cutover and
+installed evidence remain open. Do not claim D1-8 from this seam.
 
 ## Evidence and owner map
 
