@@ -548,6 +548,22 @@ generation-owned `EncoderSet`, live promotion/replay/gap protocol and model
 identity. D2/E/F remain open. Shared stack has stayed stopped; no new installed
 or hosted proof has been claimed for this WIP slice.
 
+The three named lifetime regressions are now implemented in the Worker tests.
+`KnowledgeServerStartupConfigurationTest` holds a real A search call at model
+readiness through B publication and checks both service instances bind the
+selected provider before release. `KnowledgeServerDeferredRetirementTest`
+injects an A close refusal, observes retained cleanup ownership and retry,
+and deterministically overlaps shutdown with an initializer waiting for
+`runtimeSwapLock`. The first focused run exposed a test-only Java checked
+exception and then thread-local Mockito static mocks on the wrong thread;
+both were corrected without weakening production checks. The final focused
+Worker tests, PMD and Spotless passed at `tmp/2708-lifetime-regressions.txt`
+(seven tests, 2026-09-23). A broader post-test integrated run and hosted run
+for this test revision remain due; these tests do not close D1-4 Head graph or
+installed proof. The installer ONNX path still enters ordinary settings apply,
+which correctly refuses generation-bound model paths; it needs a recorded
+generation target rather than a relaxation of that refusal.
+
 ## Evidence and owner map
 
 | Concern | Governing record |

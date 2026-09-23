@@ -19,11 +19,13 @@ import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.execution.TestEngineExecutors;
+import io.justsearch.ipc.SearchRequest;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.embed.EmbeddingService;
 import io.justsearch.indexerworker.embed.onnx.EmbeddingAssembly;
 import io.justsearch.indexerworker.embed.onnx.EmbeddingShape;
 import io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder;
+import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.ModelCapabilities;
 import io.justsearch.ort.ModelCapabilities.PoolingMode;
@@ -35,6 +37,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -314,6 +320,126 @@ class KnowledgeServerStartupConfigurationTest {
     }
   }
 
+  @Test
+  void deferredModelWiringBindsHeldARequestBeforeReadinessRelease() throws Exception {
+    var previous = ConfigStore.globalOrNull();
+    Path capturedModels = dir.resolve("model-ready-views-models");
+    Path capturedModel = createEmbeddingModel(capturedModels);
+    var captured = embeddingConfiguration("model-ready-views", capturedModels, 1536, 4096);
+    var seedConfiguration = configuration(
+        "model-ready-views", "splade", "2",
+        Map.of(EnvRegistry.EXTRACTION_SANDBOX_MODE.configKey(), "in_process"));
+    ConfigStore.setGlobal(new ConfigStore(captured));
+
+    // A second boot only takes the deferred-reader path after a persisted segment exists.
+    try (var seedExecutors = new TestEngineExecutors()) {
+      var seed = spy(new KnowledgeServer(seedExecutors, WorkerConfig.load(seedConfiguration), null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, null,
+          seedConfiguration));
+      doNothing().when(seed).startDeferredModelInitialization(any());
+      try {
+        seed.start();
+        ((LuceneRuntime) field(seed, "searchLifecycle")).commitOps().commitAndTrack();
+      } finally {
+        seed.close();
+      }
+    }
+
+    SessionHandle sessions = mock(SessionHandle.class);
+    var nativeRetired = new java.util.concurrent.atomic.AtomicBoolean();
+    doAnswer(invocation -> {
+      nativeRetired.set(true);
+      return null;
+    }).when(sessions).close();
+    when(sessions.retirementStatus()).thenAnswer(invocation ->
+        nativeRetired.get() ? SessionHandle.RetirementStatus.RETIRED
+            : SessionHandle.RetirementStatus.ACTIVE);
+    HuggingFaceTokenizer tokenizer = mock(HuggingFaceTokenizer.class);
+    var shape = new EmbeddingShape(
+        1536, false, OnnxEmbeddingEncoder.PoolingStrategy.MEAN_POOL, 4096, 768);
+    var capabilities = new ModelCapabilities(
+        PoolingMode.MEAN, 1536, 768, ModelPrecision.FP32, null, null, null,
+        Map.of(), List.of());
+    var assembly = new EmbeddingAssembly(sessions, shape, tokenizer, capabilities);
+    ComponentHandle encoderComponent = mock(ComponentHandle.class);
+    CountDownLatch compositionWired = new CountDownLatch(1);
+    CountDownLatch allowReadiness = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      compositionWired.countDown();
+      assertTrue(allowReadiness.await(30, TimeUnit.SECONDS),
+          "test must release model readiness after inspecting both views");
+      return null;
+    }).when(encoderComponent).setAppliedVersion(anyString());
+
+    try (var executors = new TestEngineExecutors();
+        var requestExecutor = Executors.newSingleThreadExecutor();
+        var initializerExecutor = Executors.newSingleThreadExecutor()) {
+      var server = spy(new KnowledgeServer(executors, WorkerConfig.load(captured), null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null,
+          encoderComponent, captured));
+      doNothing().when(server).startDeferredModelInitialization(any());
+      try {
+        server.start();
+        var modelReadyLatch = (CountDownLatch) field(server, "modelReadyLatch");
+        assertEquals(1, modelReadyLatch.getCount());
+        var a = server.captureServingView();
+        try {
+          var request = requestExecutor.submit(() -> a.services().searchService().search(
+              SearchRequest.newBuilder().setQuery("held while models load").build(),
+              CallContext.none()));
+          assertThrows(TimeoutException.class, () -> request.get(100, TimeUnit.MILLISECONDS),
+              "an A request must wait on the shared readiness gate before model init");
+
+          var initialization = initializerExecutor.submit(() -> {
+            // Mockito static mocks are scoped to the creating thread. Composition runs on this
+            // initializer thread, so its fake native assembly belongs here too.
+            try (var assemblerMock = mockStatic(OrtSessionAssembler.class);
+                var embeddingAssemblyMock = mockStatic(OnnxEmbeddingEncoder.class)) {
+              assemblerMock
+                  .when(() -> OrtSessionAssembler.buildManager(anyString(), any(), any(), any()))
+                  .thenReturn(sessions);
+              embeddingAssemblyMock
+                  .when(() -> OnnxEmbeddingEncoder.buildAssembly(
+                      same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false)))
+                  .thenReturn(assembly);
+              invokeDeferredModelInitialization(server);
+            }
+            return null;
+          });
+          assertTrue(compositionWired.await(30, TimeUnit.SECONDS),
+              "model composition must reach the publication pause");
+          assertEquals(1, modelReadyLatch.getCount(),
+              "readiness must remain closed while both views are inspected");
+          assertThrows(TimeoutException.class, () -> request.get(100, TimeUnit.MILLISECONDS),
+              "the already-issued A request must remain gated during B publication");
+
+          try (var b = server.captureServingView()) {
+            assertNotSame(a.services(), b.services(), "deferred publication must install B services");
+            var selectedProvider = field(server, "embeddingService");
+            assertNotNull(selectedProvider);
+            assertSame(selectedProvider, field(a.services().searchService(), "embeddingProvider"),
+                "A search service must receive the selected provider before readiness releases");
+            assertSame(selectedProvider, field(b.services().searchService(), "embeddingProvider"),
+                "B search service must receive the selected provider before readiness releases");
+            assertTrue(((EmbeddingService) selectedProvider).isAvailable());
+            assertEquals(capturedModel, ((EmbeddingService) selectedProvider).modelPath());
+          }
+
+          allowReadiness.countDown();
+          initialization.get(30, TimeUnit.SECONDS);
+          request.get(30, TimeUnit.SECONDS);
+        } finally {
+          allowReadiness.countDown();
+          a.close();
+        }
+      } finally {
+        server.close();
+      }
+    } finally {
+      TestResolvedConfigHelper.restoreGlobal(previous);
+    }
+  }
+
   private ResolvedConfig embeddingConfiguration(
       String name, Path modelsDir, int contextLength, int lateChunkingContextLength) {
     var values = new HashMap<String, String>();
@@ -353,9 +479,11 @@ class KnowledgeServerStartupConfigurationTest {
     method.invoke(server);
   }
 
-  private static Object field(KnowledgeServer server, String name) throws Exception {
-    var field = KnowledgeServer.class.getDeclaredField(name);
+  private static Object field(Object target, String name) throws Exception {
+    var field = target instanceof KnowledgeServer
+        ? KnowledgeServer.class.getDeclaredField(name)
+        : target.getClass().getDeclaredField(name);
     field.setAccessible(true);
-    return field.get(server);
+    return field.get(target);
   }
 }
