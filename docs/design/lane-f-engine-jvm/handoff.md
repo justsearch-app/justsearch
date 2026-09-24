@@ -6,7 +6,30 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-24)
 
-### Installer activation acceptance slice after `07179edeafed` (uncommitted)
+### Active checkpoint `d64339ef8` and D1-4 continuation
+
+Checkpoint `d64339ef8` is pushed to PR727. Its 358-task local integrated suite
+passed at `tmp/3024-installer-acceptance-integrated.txt`; all six installed
+standard-model installer activation crash cuts passed with a fresh no-READY
+start. The final before-receipt cut uses a narrowly scoped harness-only Engine
+hard halt and passed at `tmp/3025-installer-before-receipt-final.txt`; the
+updated external-kill pointer-before-settings cut passed at
+`tmp/3026-installer-external-cut-final.txt`. Hosted run
+[`35934855473`](https://github.com/justsearch-app/justsearch/actions/runs/35934855473)
+finished SUCCESS at the exact checkpoint, including system integration and
+Windows-native tests. This closes hosted proof for the six-cut installer slice;
+retained differing-model A/B assets remain open.
+
+The next local D1-4 tests in `SettingsCommitCoordinatorTest` exercise a real
+SQLite reconfigure row with two affected components. Refusal by the second
+aborts the first, closes its apply lease, fails the row with the component
+code, and preserves settings bytes, witness and ConfigStore A. An unrelated
+settings change completes without invoking the component composer. The two
+focused tests and Spotless passed at `tmp/3028-d1-component-boundary-focused.txt`.
+These tests do not close D1-4: the installed mid-compose crash, retirement of
+`core.reload-inference`, and the remaining D1/D2/E/F acceptance stay open.
+
+### Installer activation acceptance slice after `07179edeafed` (committed in `d64339ef8`)
 
 The producer now has runnable regressions for tampered staged model bytes after
 preview, accepted activation after download cancellation, and frozen watched
@@ -33,7 +56,8 @@ The updated external-kill fixture passed pointer-before-settings at
 `tmp/3026-installer-external-cut-final.txt` with clean teardown.
 The six installed runs begin without a READY model and with no committed ONNX
 settings. Retained differing-model A/B assets remain D1-12 proof, not established
-by this fresh-install fixture. Hosted proof is due for this uncommitted slice.
+by this fresh-install fixture. Hosted system integration passed at the exact
+checkpoint above.
 
 ### Active checkpoint `07179edeafed` (2026-09-24)
 

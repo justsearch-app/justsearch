@@ -342,6 +342,76 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void secondComponentRefusalAbortsFirstAndLeavesAcceptedSettingsAtA() throws Exception {
+    Path settingsPath = temp.resolve("two-component-settings.json");
+    try (var operations = operations("two-component")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      settings.replacePrepared(settings.prepareExact(new UiSettings(), new SettingsWitness(0, null)));
+      byte[] originalBytes = Files.readAllBytes(settingsPath);
+      var initial = ConfigStoreRebuilder.prepare(settings.load());
+      var config = new ConfigStore(initial);
+      var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+      var lease = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.ApplyLease.class);
+      org.mockito.Mockito.when(registry.tryApply()).thenReturn(
+          new io.justsearch.core.component.EngineComponentRegistry.ApplyAttempt.Acquired(lease));
+      var first = org.mockito.Mockito.mock(FixedSettingsComponentComposer.PreparedOwner.class);
+      org.mockito.Mockito.when(first.observation()).thenReturn(
+          org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentSnapshot.Component.class));
+      var components = new FixedSettingsComponentComposer(registry);
+      components.register("generative", (candidate, desired, keys) -> first);
+      components.register("index", (candidate, desired, keys) -> {
+        throw new SettingsCommitOwner.Refused(OperationResult.failure(
+            "Index candidate refused", "COMPONENT_PREPARATION_REQUIRED",
+            Map.of("component", "index"), false));
+      });
+      components.seal();
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(operations, owner);
+      UiSettings candidate = settings.load();
+      candidate.setContextLength(initial.ai().contextSize() + 1024);
+      candidate.setIndexBasePath(temp.resolve("different-index").toString());
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("COMPONENT_PREPARATION_REQUIRED", result.response().errorCode().orElseThrow());
+      assertEquals("index", result.response().errorDetails().get("component"));
+      org.mockito.Mockito.verify(first).abort();
+      org.mockito.Mockito.verify(lease).close();
+      assertArrayEquals(originalBytes, Files.readAllBytes(settingsPath));
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertSame(initial, config.get());
+    }
+  }
+
+  @Test
+  void unrelatedSettingsChangeDoesNotPrepareAnyComponent() throws Exception {
+    Path settingsPath = temp.resolve("unrelated-component-settings.json");
+    try (var operations = operations("unrelated-component")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      var components = org.mockito.Mockito.mock(SettingsComponentComposer.class);
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(operations, owner);
+      UiSettings candidate = settings.load();
+      candidate.setExcludePatterns(List.of("*.tmp"));
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(List.of("*.tmp"), settings.inspect().settings().getExcludePatterns());
+      assertEquals("[\"*.tmp\"]", config.get().ui().excludePatterns());
+      org.mockito.Mockito.verifyNoInteractions(components);
+    }
+  }
+
+  @Test
   void chatEnabledChangeCannotEscapeThroughPostcommitReconciler() throws Exception {
     Path settingsPath = temp.resolve("chat-component-settings.json");
     try (var operations = operations("chat-component")) {
