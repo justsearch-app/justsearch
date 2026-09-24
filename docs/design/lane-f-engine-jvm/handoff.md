@@ -60,6 +60,34 @@ query. The strengthened pass is `tmp/3148-model-live-ab-installed.txt`; owned
 ports closed. A and B used distinct private paths but the same standard-model
 SHA, so differing-model fingerprint isolation and held A lease retirement
 remain open acceptance.
+The exact `4a6dc7e47` installed distribution then passed a different-byte A/B
+activation at `tmp/3154-model-live-distinct-ab-installed.txt`: A's FP32 SHA
+remained searchable at the settled pre-pointer cut while B's FP16 SHA had two
+completed build units, then status converged to B's exact fingerprint and B
+answered a vector query; owned ports closed. A's query finished before
+promotion, so a held A lease spanning publication and retirement remains open.
+An adapters-lucene regression at the next local revision writes two open
+generations with different model SHA inputs, verifies each commit's own
+fingerprint, accepts own parity and rejects cross-parity. Focused test and
+static checks passed at `tmp/3149-two-runtime-model-identity-focused.txt`
+and `tmp/3150-two-runtime-model-identity-static.txt`. The installed different-byte
+probe above now complements that local commit/parity test.
+The exact CPU native stress at the `4a6dc7e47` production revision executed
+one unskipped test with zero failures under `-PincludeStress=true` at
+`tmp/3151-d1-13-exact-native-stress.txt`. D1-13 still needs a real installed
+lease crossing recompose/ordered shutdown; this
+stress result alone does not close native lifetime acceptance. A deterministic
+mocked GPU lease held across retirement now passes in the NativeSessionHandle suite
+at `tmp/3155-d1-13-gpu-held-lease-focused.txt`, with PMD and Spotless at
+`tmp/3156-d1-13-gpu-held-lease-static.txt`; installed native ownership is
+still open.
+A real standard-model CPU session is now held through ordered KnowledgeServer
+shutdown in an in-process test: its issued session remains usable, post-retire
+acquisition refuses, and close finishes after release. The focused class ran
+13 tests without skips/failures at
+`tmp/3162-d1-13-real-native-shutdown-final-focused.txt`; static checks passed
+at `tmp/3161-d1-13-real-native-shutdown-static.txt`. Held native recompose and
+installed GPU lifetime proof remain open.
 
 ### D1-4 accepted inference refresh slice and model-identity follow-up
 

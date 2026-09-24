@@ -450,7 +450,8 @@ export async function exerciseInstallerActivationFault(c) {
 
 /** Keep the installed A root intact while activating a second, separately owned model root. */
 export async function exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort,
-  operationKey, readJson, waitFor, request, post, requireThat, matchingHit }) {
+  operationKey, readJson, waitFor, request, post, requireThat, matchingHit,
+  distinctModelB = false }) {
   const runtime = path.join(data, 'runtime');
   const reachedFile = path.join(runtime, 'operation-fault-reached.json');
   const releaseFile = path.join(runtime, 'operation-fault-release');
@@ -465,7 +466,12 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   requireThat(operationRows(operationPath, operationKey).length === 0,
     'side-by-side activation key is already present');
   const bRoot = path.join(work, 'installer-models-b', operationKey);
-  for (const installed of Object.values(oldContract.models)) {
+  const candidateContract = structuredClone(oldContract);
+  const shippedRegistry = distinctModelB ? readJson(path.join(process.cwd(),
+    'modules', 'configuration', 'src', 'main', 'resources', 'ai', 'model-registry.v2.json'))
+    : null;
+  const retainedRoot = distinctModelB ? findRetainedModelsRoot() : null;
+  for (const [packageId, installed] of Object.entries(candidateContract.models)) {
     if (installed.skipped) continue;
     const source = path.join(oldContract.modelsDir, installed.targetDir);
     const target = path.join(bRoot, installed.targetDir);
@@ -473,9 +479,33 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       && path.resolve(target).startsWith(path.resolve(bRoot)),
     'installed model target escaped its owned root');
     linkRegularFiles(source, target);
+    if (distinctModelB) {
+      const pkg = shippedRegistry?.packages.find(item => item.id === packageId);
+      const variant = pkg?.variants.find(item => item.targetEP === 'CUDA');
+      requireThat(variant && retainedRoot,
+        `no retained CUDA variant for installed package ${packageId}`);
+      const alternate = path.join(retainedRoot, pkg.targetDir, variant.filename);
+      const selected = path.join(target, variant.filename);
+      fs.linkSync(alternate, selected);
+      requireThat(fs.statSync(selected).size === variant.sizeBytes
+        && sha256(fs.readFileSync(selected)) === variant.sha256.toLowerCase(),
+      `retained CUDA bytes differ from shipped registry for ${packageId}`);
+      installed.variantFilename = variant.filename;
+      installed.precision = variant.precision;
+      installed.targetEP = variant.targetEP;
+      installed.sha256 = variant.sha256;
+      installed.installedFiles = [variant.filename,
+        ...pkg.supportingFiles.filter(file => file.required !== false).map(file => file.filename)];
+    }
+  }
+  if (distinctModelB) {
+    candidateContract.downloadProfile = 'GPU_FULL';
+    candidateContract.hardwareProfile = {
+      gpuDetected: true, cudaFunctional: true, vramBytes: 12 * 1024 * 1024 * 1024,
+    };
   }
   fs.writeFileSync(path.join(data, 'install-contract.v2.json'), `${JSON.stringify({
-    ...oldContract, modelsDir: bRoot, installedAtEpochMs: Date.now(),
+    ...candidateContract, modelsDir: bRoot, installedAtEpochMs: Date.now(),
   }, null, 2)}\n`);
   const beforeSettings = settingsWitnessOnDisk(data);
   const input = { source: 'installer_model_activation' };
@@ -500,6 +530,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     const inFlight = operationRows(operationPath, operationKey)[0];
     requireThat(aState.active_generation === sourceGeneration
       && bManifest?.models?.embedding?.id?.startsWith(bRoot)
+      && (!distinctModelB || bManifest.models.embedding.sha256
+        !== sourceManifest.models.embedding.sha256)
       && inFlight?.phase === 'settled' && inFlight?.building_generation_id === bGeneration
       && inFlight.units_completed === 2 && inFlight.units_failed === 0
       && settingsWitnessOnDisk(data).witness.acceptedRevision
@@ -533,18 +565,30 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       && settings.witness.lastCommittedOperationKey === operationKey
       ? { row, active, settings } : null;
   });
-  const currentManifest = await waitFor('B runtime manifest after publication', 60000,
-    () => readJson(path.join(runtime, 'manifest.json'))?.head?.apiPort
-      ? readJson(path.join(runtime, 'manifest.json')) : null);
-  const bStatus = await waitFor('B status after publication', 60000, async () => {
+  const bFingerprint = readJson(path.join(indexBase, 'indices', `g-${operationKey}`,
+    '.justsearch-index-generation.json')).models.embedding.sha256;
+  let lastStatus = null;
+  const bStatus = await waitFor('B status after publication', 120000, async () => {
     try {
-      const result = await request(currentManifest.head.apiPort, '/api/status', {}, 15000);
-      return result.status === 200 ? result : null;
+      const live = readJson(path.join(runtime, 'manifest.json'));
+      if (!live?.head?.apiPort) return null;
+      const result = await request(live.head.apiPort, '/api/status', {}, 15000);
+      if (result.status !== 200) return null;
+      const status = JSON.parse(result.text);
+      lastStatus = {
+        active: status.worker?.migration?.activeGenerationId,
+        migration: status.worker?.migration?.migrationState,
+        encoder: status.components?.encoders?.state,
+        fingerprint: status.worker?.compatibility?.embeddingFingerprintCurrent,
+        compat: status.worker?.compatibility?.embeddingCompatState,
+      };
+      return lastStatus.active === `g-${operationKey}`
+        && lastStatus.encoder === 'READY'
+        && (!distinctModelB || lastStatus.fingerprint === bFingerprint)
+        ? { result, live } : null;
     } catch { return null; }
-  });
-  requireThat(JSON.parse(bStatus.text).components.encoders.state === 'READY',
-    `promoted B encoders were not READY: ${bStatus.text}`);
-  const bVector = await post(currentManifest.head.apiPort, '/api/knowledge/search',
+  }).catch(error => { throw new Error(`${error.message}; last B status=${JSON.stringify(lastStatus)}`); });
+  const bVector = await post(bStatus.live.head.apiPort, '/api/knowledge/search',
     { query: marker, limit: 10, mode: 'vector' }, 30000);
   requireThat(bVector.status === 200 && JSON.parse(bVector.text).results?.length > 0,
     `promoted B could not answer a real vector query: ${bVector.text}`);

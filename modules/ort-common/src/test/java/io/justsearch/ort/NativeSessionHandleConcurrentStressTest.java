@@ -35,8 +35,8 @@ import org.junit.jupiter.api.Timeout;
  *   <li><b>R4:</b> 1 metadata-read thread: {@code inputNames()} + {@code outputNames()} every
  *       200 ms — exercises concurrent metadata reads against CPU-session recreation
  *   <li><b>R4:</b> 1 delayed-close thread: fires {@code close()} after {@value #CLOSE_AT_MS} ms
- *       into the run; subsequent acquires must complete without crash (contract: post-close
- *       acquires may degrade gracefully but never leak a dangling lease or throw NPE)
+ *       into the run; subsequent acquires must refuse with the typed retirement exception,
+ *       without issuing a new lease or racing a closed native session
  * </ul>
  *
  * <p><b>Invariants exercised</b> (mapping to tempdoc 397 §13.1 Stage 4e.1 plan):

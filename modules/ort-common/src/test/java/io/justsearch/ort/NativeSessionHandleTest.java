@@ -324,6 +324,40 @@ class NativeSessionHandleTest {
     }
 
     @Test
+    void heldGpuLeasePreventsExactSessionCloseAndRetirementRefusesNewLeases() throws Exception {
+      OrtSession gpu = mock(OrtSession.class);
+      NativeSessionHandle manager = NativeSessionHandle.builder("gpu-retirement-test",
+              Path.of("nonexistent/model.onnx"))
+          .runtime(DEFAULT_RUNTIME)
+          .policy(gpuDeferred())
+          .shouldUseGpu(() -> true)
+          .build();
+      set(manager, "gpuSession", gpu);
+      set(manager, "gpuSessionAttempted", true);
+      set(manager, "gpuAvailable", true);
+      SessionHandle.Lease held = manager.acquire(request());
+      assertFalse(held.isCpu(), "the held lease must name the injected GPU instance");
+      CountDownLatch closeFinished = new CountDownLatch(1);
+      Thread closer = new Thread(() -> {
+        manager.close();
+        closeFinished.countDown();
+      }, "native-gpu-retire-test");
+      closer.start();
+      awaitRetired(manager);
+
+      assertEquals(SessionHandle.RetirementStatus.RETIRING, manager.retirementStatus());
+      verify(gpu, never()).close();
+      assertThrows(SessionRetiredException.class, () -> manager.acquire(request()));
+      held.close();
+
+      assertTrue(closeFinished.await(1, TimeUnit.SECONDS));
+      assertEquals(SessionHandle.RetirementStatus.RETIRED, manager.retirementStatus());
+      verify(gpu, timeout(1_000).times(1)).close();
+      held.close();
+      verify(gpu).close();
+    }
+
+    @Test
     void cpuRecreationWaitsForHeldOldInstanceBeforeClosingIt() throws Exception {
       OrtSession oldCpu = mock(OrtSession.class);
       NativeSessionHandle manager = deferredCpuHandle();

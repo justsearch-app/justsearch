@@ -2,14 +2,20 @@
 package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
+import io.justsearch.ort.SessionAcquisitionRequest;
+import io.justsearch.ort.SessionRetiredException;
 import java.nio.file.Path;
+import java.lang.reflect.Field;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +42,77 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("KnowledgeServer.awaitClosed — close completion is observable")
 final class KnowledgeServerCloseCompletionTest {
+
+  @Test
+  void orderedShutdownRetainsRealNativeSessionUntilIssuedLeaseExits(@TempDir Path tempDir)
+      throws Exception {
+    var discovery = io.justsearch.ort.testing.ModelDirTestResolver.discover(
+        "models/onnx/gte-multilingual-base", null, "model.onnx");
+    Assumptions.assumeTrue(discovery.modelDir() != null,
+        "standard embedding model is unavailable for native lifetime proof");
+    io.justsearch.ort.SessionHandle handle = io.justsearch.ort.testing.InferenceCompositionRootTestHelper
+        .cpuSessionFor("ordered-shutdown-held-native", discovery.modelDir());
+    var surface = new InferenceSurface(java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), org.mockito.Mockito.mock(io.justsearch.ort.PolicySnapshot.class),
+        java.util.List.of(handle));
+    var modelFingerprint = IndexFingerprint.ModelFingerprint.notConfigured();
+    var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
+        modelFingerprint, modelFingerprint, modelFingerprint, false, 768));
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    server.publishServingView(org.mockito.Mockito.mock(WorkerAppServices.class));
+    Field servingViewField = KnowledgeServer.class.getDeclaredField("servingView");
+    servingViewField.setAccessible(true);
+    Object view = servingViewField.get(server);
+    var attach = view.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+    attach.setAccessible(true);
+    attach.invoke(view, owner);
+    Field initialOwnerField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+    initialOwnerField.setAccessible(true);
+    initialOwnerField.set(server, owner);
+    var issuedView = server.captureServingView();
+    var nativeRequest = SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(2));
+    io.justsearch.ort.SessionHandle.Lease issuedNative = handle.acquireCpu(nativeRequest);
+    var closeFailure = new AtomicReference<Throwable>();
+    Thread closer = new Thread(() -> {
+      try { server.close(); }
+      catch (Throwable failure) { closeFailure.set(failure); }
+    }, "ordered-shutdown-held-native");
+    try {
+      closer.start();
+      long admissionDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      boolean admissionClosed = false;
+      while (!admissionClosed && System.nanoTime() < admissionDeadline) {
+        try (var ignored = server.captureServingView()) { Thread.onSpinWait(); }
+        catch (IllegalStateException expected) { admissionClosed = true; }
+      }
+      assertTrue(admissionClosed, "shutdown must stop new serving captures");
+      assertNotNull(issuedNative.session().getInputNames(),
+          "the issued native session must remain usable while its view is held");
+      issuedView.close();
+      long nativeDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      while (handle.retirementStatus() == io.justsearch.ort.SessionHandle.RetirementStatus.ACTIVE
+          && System.nanoTime() < nativeDeadline) Thread.onSpinWait();
+      org.junit.jupiter.api.Assertions.assertEquals(
+          io.justsearch.ort.SessionHandle.RetirementStatus.RETIRING, handle.retirementStatus());
+      assertNotNull(issuedNative.session().getInputNames(),
+          "native retirement must wait for the exact issued session");
+      assertThrows(SessionRetiredException.class, () -> handle.acquireCpu(nativeRequest));
+      issuedNative.close();
+      closer.join(2_000);
+      assertFalse(closer.isAlive());
+      org.junit.jupiter.api.Assertions.assertNull(closeFailure.get(), String.valueOf(closeFailure.get()));
+      org.junit.jupiter.api.Assertions.assertEquals(
+          io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED, handle.retirementStatus());
+    } finally {
+      issuedNative.close();
+      issuedView.close();
+      closer.join(2_000);
+      server.close();
+    }
+  }
 
   @Test
   void retiringViewRefusesNewCapturesAndWaitsForActualHolder(@TempDir Path tempDir)

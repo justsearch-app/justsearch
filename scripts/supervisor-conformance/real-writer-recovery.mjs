@@ -27,6 +27,7 @@ const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
 const modelLiveAB = scenario === 'model-live-a-b';
+const distinctModelB = modelLiveAB && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1';
 function readActiveGenerationManifest(base) {
   const active = JSON.parse(fs.readFileSync(path.join(base, 'state.json'), 'utf8'));
   return JSON.parse(fs.readFileSync(path.join(base, 'indices', active.active_generation,
@@ -153,6 +154,12 @@ if (modelLiveAB) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = 'installer-before-marker';
+  if (distinctModelB) {
+    env.JUSTSEARCH_GPU_ENABLED = 'true';
+    env.JUSTSEARCH_EMBED_GPU_ENABLED = 'true';
+    env.JUSTSEARCH_NER_GPU_ENABLED = 'true';
+    env.JUSTSEARCH_SPLADE_GPU_ENABLED = 'true';
+  }
 }
 const installerCandidate = installerFault
   ? writeRetainedInstallerCandidate({ data, requireThat }) : null;
@@ -355,7 +362,7 @@ try {
       scenario, operationKey, output: () => output });
   } else if (modelLiveAB) {
     await exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort, operationKey,
-      readJson, waitFor, request, post, requireThat, matchingHit });
+      readJson, waitFor, request, post, requireThat, matchingHit, distinctModelB });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {

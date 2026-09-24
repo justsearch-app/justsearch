@@ -1,14 +1,18 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator;
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.RequiredFieldsCommitMetadataValidator;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.runtime.CommitMetadataSource;
@@ -27,6 +31,53 @@ import org.apache.lucene.store.MMapDirectory;
 import org.junit.jupiter.api.Test;
 
 class CommitMetadataIntegrationTest extends LuceneExecutorTestBase {
+  @Test
+  void twoLiveGenerationsStampAndReopenAgainstTheirOwnModelIdentities() throws Exception {
+    Path parent = Files.createTempDirectory("lucene-two-model-identities");
+    Path blue = parent.resolve("blue");
+    Path green = parent.resolve("green");
+    ResolvedConfig config = ResolvedConfig.builder().build();
+    var noModel = IndexFingerprint.ModelFingerprint.notConfigured();
+    var blueSource = new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768,
+            IndexFingerprint.ModelFingerprint.present("a".repeat(64)), noModel, noModel));
+    var greenSource = new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768,
+            IndexFingerprint.ModelFingerprint.present("b".repeat(64)), noModel, noModel));
+    var validator = new JsonSchemaCommitMetadataValidator();
+    var blueRuntime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768),
+        blueSource, validator).atPath(blue).withExecutorRegistrations(testLuceneExecutors()).open();
+    var greenRuntime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768),
+        greenSource, validator).atPath(green).withExecutorRegistrations(testLuceneExecutors()).open();
+    try {
+      blueRuntime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, "blue", SchemaFields.DOC_UID, "blue#0")));
+      greenRuntime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, "green", SchemaFields.DOC_UID, "green#0")));
+      blueRuntime.commitOps().commitAndTrack();
+      greenRuntime.commitOps().commitAndTrack();
+    } finally {
+      greenRuntime.close();
+      blueRuntime.close();
+    }
+    String blueFingerprint = String.valueOf(blueSource.build().get(IndexFingerprint.COMMIT_META_KEY));
+    String greenFingerprint = String.valueOf(greenSource.build().get(IndexFingerprint.COMMIT_META_KEY));
+    assertNotEquals(blueFingerprint, greenFingerprint);
+    try (var blueDirectory = new MMapDirectory(blue);
+        var blueReader = DirectoryReader.open(blueDirectory);
+        var greenDirectory = new MMapDirectory(green);
+        var greenReader = DirectoryReader.open(greenDirectory)) {
+      assertEquals(blueFingerprint,
+          blueReader.getIndexCommit().getUserData().get(IndexFingerprint.COMMIT_META_KEY));
+      assertEquals(greenFingerprint,
+          greenReader.getIndexCommit().getUserData().get(IndexFingerprint.COMMIT_META_KEY));
+    }
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(blue, blueSource::build).isEmpty());
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(green, greenSource::build).isEmpty());
+    assertFalse(IndexMetadataParityGuard.inspectCommittedParity(blue, greenSource::build).isEmpty());
+    assertFalse(IndexMetadataParityGuard.inspectCommittedParity(green, blueSource::build).isEmpty());
+  }
+
   @Test
   void commitStampsUserData() throws Exception {
     Path dir = Files.createTempDirectory("lucene-commit-test");
