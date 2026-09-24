@@ -8,6 +8,7 @@ import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
 
 /** Indexer-local attachment for the Engine's recorded-ingestion owner. */
@@ -25,10 +26,13 @@ public interface RecordedIngestionLifecycle {
     return Optional.empty();
   }
 
-  record RecordedCandidate(ResolvedConfig configuration, IndexTargetSnapshot target) {
+  record RecordedCandidate(ResolvedConfig configuration, IndexTargetSnapshot target,
+      Map<String, IndexGenerationManager.ModelArtifact> models) {
     public RecordedCandidate {
       java.util.Objects.requireNonNull(configuration, "configuration");
       java.util.Objects.requireNonNull(target, "target");
+      models = Map.copyOf(java.util.Objects.requireNonNull(models, "models"));
+      if (models.isEmpty()) throw new IllegalArgumentException("Recorded candidate models are empty");
     }
   }
 

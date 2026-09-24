@@ -894,6 +894,13 @@ public final class KnowledgeServer implements Closeable {
       IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
       var boot = genManager.initializeForBoot(bootOwnership,
           candidate.map(value -> value.target().fingerprint()).orElseGet(this::expectedIndexFingerprintOrNull));
+      if (candidate.isPresent()
+          && (boot.disposition() == IndexGenerationManager.BootDisposition.BUILDING
+              || boot.disposition() == IndexGenerationManager.BootDisposition.PROMOTED)) {
+        var recorded = (IndexGenerationManager.BootOwnership.Recorded) bootOwnership;
+        genManager.bindRecordedModels(recorded.operationKey(), recorded.source(),
+            recorded.targetFingerprint(), candidate.orElseThrow().models());
+      }
       IndexGenerationManager.IndexLayout layout = boot.layout();
       this.generationBootOwnership = bootOwnership;
       this.generationBootDisposition = boot.disposition();

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -135,9 +136,30 @@ public final class IndexGenerationManager {
       String generation_id,
       String source,
       long created_at_ms,
-      String target_index_fingerprint) {
+      String target_index_fingerprint,
+      @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, ModelArtifact> models) {
+    public GenerationManifest {
+      models = models == null ? Map.of() : Map.copyOf(models);
+    }
+
     public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs) {
-      this(formatVersion, generationId, source, createdAtMs, null);
+      this(formatVersion, generationId, source, createdAtMs, null, Map.of());
+    }
+
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
+        String targetIndexFingerprint) {
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, Map.of());
+    }
+  }
+
+  /** Exact installed file selected for one encoder role in a generation. */
+  public record ModelArtifact(String id, String sha256) {
+    public ModelArtifact {
+      if (id == null || id.isBlank() || !Path.of(id).isAbsolute()
+          || !Path.of(id).normalize().toString().equals(id)
+          || sha256 == null || !sha256.matches("[0-9a-f]{64}")) {
+        throw new IllegalArgumentException("Invalid generation model artifact identity");
+      }
     }
   }
 
@@ -449,6 +471,11 @@ public final class IndexGenerationManager {
 
   /** Identity of the generation directory an already-open runtime actually uses. */
   public String generationIdForOpenedPath(Path openedPath) throws IOException {
+    return manifestForOwnedPath(openedPath).generation_id();
+  }
+
+  /** Exact model binding recorded with an owned generation. Empty means a legacy manifest. */
+  public GenerationManifest manifestForOwnedPath(Path openedPath) throws IOException {
     if (openedPath == null) throw new IOException("Opened generation path is unavailable");
     Path exact = normalize(openedPath);
     if (exact.getFileName() == null) throw new IOException("Opened generation path has no identity");
@@ -473,7 +500,7 @@ public final class IndexGenerationManager {
     if (manifest == null || !generationId.equals(manifest.generation_id())) {
       throw new IOException("Opened generation manifest names another directory");
     }
-    return generationId;
+    return manifest;
   }
 
   /**
@@ -649,6 +676,50 @@ public final class IndexGenerationManager {
 
   private static String recordedSentinel(String target, long created) {
     return "justsearch_generation_sentinel_v1\ngeneration_id=" + target + "\ncreated_at_ms=" + created + "\n";
+  }
+
+  /** Bind the accepted installer files to an existing recorded Green before any runtime opens. */
+  public GenerationManifest bindRecordedModels(String operationKey, String source,
+      String targetFingerprint, Map<String, ModelArtifact> models) throws IOException {
+    if (models == null || models.isEmpty() || models.size() > 128
+        || models.keySet().stream().anyMatch(role -> role == null
+            || !role.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}"))) {
+      throw new IOException("Recorded generation model binding is invalid");
+    }
+    Map<String, ModelArtifact> accepted = Map.copyOf(models);
+    try (var ignored = stateControl()) {
+      String target = recordedGenerationId(operationKey);
+      State state = readRecordedState();
+      boolean building = target.equals(state.building_generation());
+      boolean promoted = target.equals(state.active_generation())
+          && MigrationState.IDLE.name().equals(state.migration_state());
+      if (!building && !promoted) {
+        throw new IOException("Recorded generation is not the accepted building or active target");
+      }
+      Path targetPath = resolveGenerationPathReadOnly(target);
+      requireRecordedGeneration(targetPath, target, source, targetFingerprint, false);
+      Path manifestPath = targetPath.resolve(GENERATION_MANIFEST);
+      GenerationManifest manifest;
+      try {
+        manifest = RECORDED_JSON.readValue(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
+            GenerationManifest.class);
+      } catch (tools.jackson.core.JacksonException malformed) {
+        throw new IOException("Recorded generation manifest is invalid", malformed);
+      }
+      if (!manifest.models().isEmpty()) {
+        if (!accepted.equals(manifest.models())) {
+          throw new IOException("Recorded generation models differ from accepted preparation");
+        }
+        return manifest;
+      }
+      GenerationManifest bound = new GenerationManifest(manifest.format_version(),
+          manifest.generation_id(), manifest.source(), manifest.created_at_ms(),
+          manifest.target_index_fingerprint(), accepted);
+      io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(manifestPath,
+          RECORDED_JSON.writeValueAsBytes(bound));
+      return bound;
+    }
   }
 
   private static void requireRecordedGeneration(Path directory, String target, String source,

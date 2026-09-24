@@ -240,7 +240,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (!installer.target().equals(actual)) {
         throw new IOException("Recorded candidate target changed since acceptance");
       }
-      return Optional.of(new RecordedCandidate(configuration, actual));
+      Map<String, IndexGenerationManager.ModelArtifact> models = new HashMap<>();
+      for (var model : installer.models()) {
+        var artifact = new IndexGenerationManager.ModelArtifact(
+            model.path().toString(), model.sha256());
+        if (models.putIfAbsent(model.packageId(), artifact) != null) {
+          throw new IOException("Recorded candidate has duplicate model roles");
+        }
+      }
+      return Optional.of(new RecordedCandidate(configuration, actual, models));
     }
   }
 

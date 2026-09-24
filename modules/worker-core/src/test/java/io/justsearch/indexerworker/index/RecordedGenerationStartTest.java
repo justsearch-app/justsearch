@@ -16,6 +16,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -45,6 +46,32 @@ final class RecordedGenerationStartTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @TempDir Path temp;
+
+  @Test
+  void acceptedModelsBindOnceAndSurvivePointerPromotion() throws Exception {
+    Path base = temp.resolve("model-binding");
+    var manager = new IndexGenerationManager(base);
+    String source = manager.initializeOrLoad().state().active_generation();
+    manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, source);
+    String modelPath = temp.resolve("models/x/model.onnx").toAbsolutePath().normalize().toString();
+    Map<String, IndexGenerationManager.ModelArtifact> accepted = Map.of(
+        "embedding", new IndexGenerationManager.ModelArtifact(modelPath, "a".repeat(64)));
+
+    var bound = manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted);
+    assertEquals(accepted, bound.models());
+    assertEquals(accepted, manager.manifestForOwnedPath(generation(base, KEY)).models());
+    String manifest = Files.readString(generation(base, KEY).resolve(MANIFEST));
+    assertEquals(bound, manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted));
+    assertEquals(manifest, Files.readString(generation(base, KEY).resolve(MANIFEST)));
+    assertThrows(IOException.class, () -> manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT,
+        Map.of("embedding", new IndexGenerationManager.ModelArtifact(modelPath, "c".repeat(64)))));
+    assertEquals(manifest, Files.readString(generation(base, KEY).resolve(MANIFEST)));
+
+    manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, source);
+    var reopened = new IndexGenerationManager(base);
+    assertEquals(accepted, reopened.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted).models());
+    assertEquals(manifest, Files.readString(generation(base, KEY).resolve(MANIFEST)));
+  }
 
   @Test
   void createsExactTargetIsIdempotentAndSurvivesPromotionAndNewManager() throws Exception {

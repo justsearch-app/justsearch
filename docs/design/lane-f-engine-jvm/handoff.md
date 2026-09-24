@@ -114,17 +114,30 @@ PR727. Hosted run `35949287953` finished SUCCESS at that SHA, including
 system integration, Windows-native, public claims and all other jobs. It
 reached terminal system integration before the next checkpoint push.
 
-The next D1-12 implementation boundary is still open. `EncoderSet.ModelIdentity`
+The next D1-12 implementation boundary remains open. `EncoderSet.ModelIdentity`
 and `CandidateIndexTargetCapture` hold Green's captured hashes, and the accepted
-installer plan retains exact model paths and SHA-256 values. However
-`IndexGenerationManager.GenerationManifest` still has no `models` map, and boot
-initialization composes A from desired process configuration and global model
-fingerprint providers. A boot with manifest X and desired settings Y, plus the
-missing-X text-search fallback, therefore lack the specified implementation and
-proof. Continue from stage D1-12 and the accepted installer identity rather than
-claiming the fresh-install six-cut fixture proves retained differing-model A/B.
+installer plan retains exact model paths and SHA-256 values. Local work after
+`ebdb96abe` adds a manifest `models` map and binds those accepted installer
+paths and hashes to recorded Green before its runtime opens. The binding is
+idempotent, refuses a conflicting replay, and survives promotion in a focused
+Worker-core test (`tmp/3100-generation-model-binding-focused.txt`); affected
+compile, Spotless and PMD passed. The full 358-task integrated gate passed at
+`tmp/3101-generation-model-binding-integrated.txt`. The installed standard-model
+`installer-pointer-before-settings` cut passed at
+`tmp/3102-generation-binding-installed.txt`: the exact Green manifest retained
+the embedding, NER and SPLADE file paths and SHA-256 values through pointer
+commit, recovery and terminal success; settings witness and search converged,
+and the private stack stopped with ports closed. Official quick health afterward
+reported ABSENT, inference REFUSED and no foreign runs. This is the next
+checkpoint. Native generation creation and boot still compose A from desired
+process configuration and global model fingerprint providers. A boot with
+manifest X and desired settings Y still lacks the specified implementation and
+proof, as does the missing-X text-search fallback. Continue from stage D1-12
+and the accepted installer identity rather than claiming the fresh-install
+six-cut fixture proves
+retained differing-model A/B.
 
-### D1-10 opened-runtime status slice (uncommitted)
+### D1-10 opened-runtime status checkpoint `ebdb96abe`
 
 The production Worker status path now binds the search and ingest runtimes'
 opened directories and reports each generation from its validated manifest.
@@ -144,7 +157,10 @@ the status endpoint named the open Blue/Blue runtimes before rebuild and
 Green/Green after live promotion, alongside the existing search, queue,
 retirement and rollback checks. Its private stack stopped with ports closed;
 official quick health then reported ABSENT and inference REFUSED. Hosted proof
-for this slice remains required before closing D1-10.
+for this slice is now complete: checkpoint `ebdb96abe` is pushed to PR727 and
+hosted run `35951296305` finished SUCCESS, including system integration,
+Windows-native and Public claims, before another push. This status update
+follows the checkpoint and is not yet committed.
 
 ### Active checkpoint `d64339ef8` and D1-4 continuation
 
