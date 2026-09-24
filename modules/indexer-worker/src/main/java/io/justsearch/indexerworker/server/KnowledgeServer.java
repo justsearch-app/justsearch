@@ -3707,12 +3707,18 @@ public final class KnowledgeServer implements Closeable {
     }
     try {
       var state = indexGenerationManager.readStateBestEffort();
-      if (state == null || state.active_generation() == null
-          || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(
-              jobQueue, state.active_generation())) return false;
+      if (state == null || state.active_generation() == null) return false;
       var counts = jobQueue.jobStateCountsStrict();
-      return counts.pendingCount() == 0 && counts.processingCount() == 0;
-    } catch (RuntimeException unavailable) {
+      if (counts.pendingCount() != 0 || counts.processingCount() != 0) return false;
+      if (!(ingestLifecycle instanceof RunningRuntime active) || active != searchLifecycle
+          || activeIndexPath == null
+          || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
+              .equals(activeIndexPath)) return false;
+      boolean settled = KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
+          jobQueue, active, state.active_generation(), log);
+      if (settled) promotedReplaySettled = true;
+      return settled;
+    } catch (IOException | RuntimeException unavailable) {
       return false;
     }
   }
@@ -4338,24 +4344,59 @@ public final class KnowledgeServer implements Closeable {
         if (!("g-" + recorded.operationKey()).equals(state.building_generation())) return;
         recordedRefusalCleanupPending = true;
         try {
-          // Producer close joins the actual Green writer before its B model lease can leave.
-          producer.close();
-          if (recordedCandidateInPlace) {
-            recomposeSourceAfterCandidateRefusal(
-                new IOException("Recorded candidate refused before pointer"));
-          } else if (candidateModels != null) {
-            candidateModels.close();
-            candidateModels = null;
+          if (!(searchLifecycle instanceof RunningRuntime source)
+              || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
+                  .equals(activeIndexPath)) {
+            throw new IOException("Refused candidate has no exact writable source generation");
           }
-          if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
-          if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
-          indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
-          restart = true;
+          // Keep the scoped journal and Green alive until every accepted candidate mutation is
+          // certified on surviving A. The same producer fence excludes a later file admission.
+          try (var fence = producer.mutationAdmission().beginFinalFence(
+              producer.mutationOwnerToken(), 10_000)) {
+            if (fence == null || !producer.mutationAdmission().replayCertain()) {
+              throw new IOException("Refused candidate mutation admission is not settled");
+            }
+            var counts = jobQueue.jobStateCountsStrict();
+            if (counts.processingCount() != 0 || counts.pendingCount() != 0
+                || !producer.pauseProducerForCutover(10_000)) {
+              throw new IOException("Refused candidate writer has not settled");
+            }
+            try {
+              producer.commitActiveLexicalProjectionForCutover();
+              if (!KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+                  new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+                      jobQueue, source, signalBus, indexingPacing, indexBasePath, activeIndexPath,
+                      JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
+                      System.nanoTime() + TimeUnit.SECONDS.toNanos(10),
+                      state.building_generation()))) {
+                throw new IOException("Refused candidate still has unproved source mutations");
+              }
+              // Producer close joins the actual Green writer before its B model lease can leave.
+              producer.close();
+              if (recordedCandidateInPlace) {
+                recomposeSourceAfterCandidateRefusal(
+                    new IOException("Recorded candidate refused before pointer"));
+              } else if (candidateModels != null) {
+                candidateModels.close();
+                candidateModels = null;
+              }
+              if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
+              if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
+              indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
+              restart = true;
+            } finally {
+              if (!producer.producerClosed()) producer.resumeProducerAfterCutover();
+            }
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          log.warn("Refused candidate source reconciliation was interrupted; retaining Green",
+              interrupted);
         } catch (IOException | RuntimeException failure) {
           if (encoderComponent != null) encoderComponent.transition(
               io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
               "Refused candidate cleanup requires recovery: " + failure.getMessage());
-          log.error("Refused in-place candidate still owns its Green resources", failure);
+          log.error("Refused candidate still owns its Green resources", failure);
         }
       }
     } finally {

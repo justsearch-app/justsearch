@@ -121,6 +121,23 @@ final class AdmissionRevisionTest {
   }
 
   @Test
+  void administrativeDeleteRevokesAnAlreadyIssuedClaimBeforePublication() throws Exception {
+    Path db = temp.resolve("claimed-delete.db");
+    Path file = temp.resolve("claimed-delete.txt").toAbsolutePath();
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)),
+          null));
+      JobQueue.IndexJob claim = queue.pollPending(1).getFirst();
+      assertTrue(queue.ownsClaimForPublication(claim));
+
+      assertEquals(1, queue.deleteByExactPath(
+          io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file)));
+      assertFalse(queue.ownsClaimForPublication(claim));
+    }
+  }
+
+  @Test
   void pollRetryDeferAndGlobalRecoveryPreserveTheAdmissionRevision() throws Exception {
     Path db = temp.resolve("lifecycle.db");
     Path file = temp.resolve("lifecycle.txt");

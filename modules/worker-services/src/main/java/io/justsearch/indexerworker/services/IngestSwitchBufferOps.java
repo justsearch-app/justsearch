@@ -4,17 +4,12 @@ package io.justsearch.indexerworker.services;
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
 import io.justsearch.indexerworker.index.IndexGenerationManager;
-import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
-import io.justsearch.indexerworker.util.PathNormalizer;
-import io.justsearch.ipc.BatchResponse;
 import io.justsearch.ipc.DeleteByIdResponse;
 import io.justsearch.ipc.DeleteByPathResponse;
 import io.justsearch.ipc.PruneResponse;
 import io.justsearch.ipc.SyncDirectoryResponse;
-import java.nio.file.Path;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +26,6 @@ final class IngestSwitchBufferOps {
 
   // ==================== Switch-buffer operation constants ====================
 
-  static final String SWITCHBUF_OP_UPSERT = "UPSERT";
   static final String SWITCHBUF_OP_DELETE = "DELETE";
   static final String SWITCHBUF_OP_DELETE_PREFIX = "DELETE_PREFIX";
   static final String SWITCHBUF_OP_DELETE_COLLECTION = "DELETE_COLLECTION";
@@ -39,13 +33,10 @@ final class IngestSwitchBufferOps {
 
   private final JobQueue jobQueue;
   private final IndexGenerationManager indexGenerationManager;
-  private final OperationalMetrics metrics;
-
   IngestSwitchBufferOps(
-      JobQueue jobQueue, IndexGenerationManager indexGenerationManager, OperationalMetrics metrics) {
+      JobQueue jobQueue, IndexGenerationManager indexGenerationManager) {
     this.jobQueue = jobQueue;
     this.indexGenerationManager = indexGenerationManager;
-    this.metrics = metrics;
   }
 
   // ==================== SWITCHING state guard ====================
@@ -186,28 +177,6 @@ final class IngestSwitchBufferOps {
   }
 
   // ==================== Per-endpoint buffer methods ====================
-
-  BatchResponse bufferSubmitBatchDuringSwitching(
-      SwitchBufferCapableQueue sbq, List<Path> validPaths, int totalFiles, int rejected,
-      String collection, JobQueue.EnqueueProvenance provenance) {
-    int accepted = 0;
-    for (Path p : validPaths) {
-      String normalized = PathNormalizer.normalizeKey(p);
-      putSwitchBufferOrThrow(
-          sbq, switchBufferPathKey(normalized), SWITCHBUF_OP_UPSERT,
-          new io.justsearch.indexerworker.queue.SwitchBufferUpsert(normalized, collection, provenance)
-              .encode(), "submitBatch");
-      accepted++;
-    }
-    metrics.recordBatchSubmitted(accepted);
-    metrics.setQueueDepth(jobQueue.queueDepth());
-    log.info(
-        "Buffered {} of {} files for indexing (rejected {}) [SWITCHING]",
-        accepted,
-        totalFiles,
-        rejected);
-    return batchSuccessResponse(accepted);
-  }
 
   SyncDirectoryResponse bufferSyncDirectoryDuringSwitching(
       SwitchBufferCapableQueue sbq, String rootPath, boolean force,

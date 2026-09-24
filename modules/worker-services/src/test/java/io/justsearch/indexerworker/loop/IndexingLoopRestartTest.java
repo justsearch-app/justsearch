@@ -170,6 +170,7 @@ final class IndexingLoopRestartTest {
     AtomicBoolean claimIssued = new AtomicBoolean();
     when(queue.pollPending(anyInt())).thenAnswer(call ->
         claimIssued.compareAndSet(false, true) ? List.of(claim) : List.of());
+    when(queue.ownsClaimForPublication(claim)).thenReturn(true);
     doAnswer(call -> {
       writeEntered.countDown();
       awaitUninterruptibly(releaseWrite, ownerObservedInterrupt);

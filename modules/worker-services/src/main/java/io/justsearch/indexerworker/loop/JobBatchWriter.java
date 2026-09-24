@@ -23,6 +23,7 @@ import io.opentelemetry.api.trace.Tracer;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
+import java.util.concurrent.locks.Lock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +66,7 @@ public final class JobBatchWriter {
   // live resolved config on every write, so flipping it takes effect without a worker restart.
   private final BooleanSupplier chunkSpladeEnabledSupplier;
   private final Supplier<RunningRuntime> activeLexicalSource;
+  private final Lock fileMutationFence;
 
   public JobBatchWriter(
       IndexingCoordinator indexingCoordinator,
@@ -82,7 +84,8 @@ public final class JobBatchWriter {
       IndexingDocumentOps.StageRecorder stageRecorder,
       BooleanSupplier detailedTracingSupplier,
       BooleanSupplier chunkSpladeEnabledSupplier,
-      Supplier<RunningRuntime> activeLexicalSource) {
+      Supplier<RunningRuntime> activeLexicalSource,
+      Lock fileMutationFence) {
     this.indexingCoordinator = indexingCoordinator;
     this.documentFieldOps = documentFieldOps;
     this.signalBus = signalBus;
@@ -99,6 +102,7 @@ public final class JobBatchWriter {
     this.detailedTracingSupplier = detailedTracingSupplier;
     this.chunkSpladeEnabledSupplier = chunkSpladeEnabledSupplier;
     this.activeLexicalSource = activeLexicalSource;
+    this.fileMutationFence = fileMutationFence;
   }
 
   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
@@ -107,7 +111,17 @@ public final class JobBatchWriter {
     writeSpan.setAttribute("doc.path", ex.filePath().toString());
     String embeddingSource = precomputedEmbedding != null ? "batch" : "inline_or_pending";
     writeSpan.setAttribute("embedding.source", embeddingSource);
+    fileMutationFence.lock();
     try {
+      if (!jobQueue.ownsClaimForPublication(ex.claim())) {
+        journal.recordOutcomeSafely(ex.filePath(), "SUPERSEDED_BEFORE_WRITE",
+            () -> jobQueue.markClaimDone(ex.claim(),
+                journal.skipped(IngestionReasonCodes.DELETED_AFTER_SNAPSHOT),
+                LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
+                    contentExtractor.extractionPolicy(), ex.provenance())));
+        batchStats.recordSkipped();
+        return;
+      }
       if (staleResolver.tryHandleStale(
           ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write", ex.provenance(), ex.claim())) {
         batchStats.recordSkipped();
@@ -234,7 +248,8 @@ public final class JobBatchWriter {
         batchStats.recordFailed();
       }
     } finally {
-      writeSpan.end();
+      try { writeSpan.end(); }
+      finally { fileMutationFence.unlock(); }
     }
   }
 

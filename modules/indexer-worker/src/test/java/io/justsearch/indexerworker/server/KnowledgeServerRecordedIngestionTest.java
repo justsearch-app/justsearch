@@ -228,6 +228,70 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  @DisplayName("refused recorded candidate retains Green when accepted A projection is missing")
+  void refusalDoesNotAbandonUnprovedAcceptedMutation(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    var lifecycle = org.mockito.Mockito.mock(RecordedIngestionLifecycle.class);
+    var server = new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
+    String operation = "01994180-0000-7000-8000-000000000199";
+    String active = "g-source";
+    String building = "g-" + operation;
+    var manager = org.mockito.Mockito.mock(IndexGenerationManager.class);
+    org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
+        new IndexGenerationManager.State(1, active, building, null, "SWITCHING", false,
+            null, null, System.currentTimeMillis(), null, null, null));
+    org.mockito.Mockito.when(manager.resolveGenerationPathStrict(active))
+        .thenReturn(layout.activePath());
+    org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
+    var source = org.mockito.Mockito.mock(RunningRuntime.class);
+    var green = org.mockito.Mockito.mock(RunningRuntime.class);
+    org.mockito.Mockito.when(source.documentFieldOps()).thenReturn(
+        org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class));
+    var owner = new Object();
+    var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    org.mockito.Mockito.when(producer.mutationAdmission()).thenReturn(
+        new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
+    org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
+    org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+    var queue = org.mockito.Mockito.mock(
+        io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
+    var file = Files.writeString(tempDir.resolve("accepted.txt"), "accepted").toAbsolutePath();
+    var payload = new io.justsearch.indexerworker.queue.SwitchBufferUpsert(
+        file.toString(), null, null, "accepted-revision",
+        io.justsearch.indexerworker.loop.SourceContentHash.sha256(file)).encode();
+    org.mockito.Mockito.when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(
+        new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp(
+            building, "path:" + file, "UPSERT", payload, 1, "v1")));
+    org.mockito.Mockito.when(queue.jobStateCountsStrict()).thenReturn(
+        new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
+        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+        org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+    server.appServices = producer;
+    setField(server, "recordedRefusalCleanupPending", true);
+    setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
+        operation, active, "recorded-test", "a".repeat(64), true));
+    setField(server, "indexGenerationManager", manager);
+    setField(server, "activeIndexPath", layout.activePath());
+    setField(server, "searchLifecycle", source);
+    setField(server, "ingestLifecycle", green);
+    setField(server, "jobQueue", queue);
+
+    var reconcile = KnowledgeServer.class.getDeclaredMethod("reconcileRefusedRecordedCandidate");
+    reconcile.setAccessible(true);
+    reconcile.invoke(server);
+
+    org.mockito.Mockito.verify(manager, org.mockito.Mockito.never())
+        .abandonBuildingGeneration(org.mockito.ArgumentMatchers.anyString());
+    org.mockito.Mockito.verify(producer, org.mockito.Mockito.never()).close();
+    org.mockito.Mockito.verify(queue, org.mockito.Mockito.never())
+        .removeReplayedSwitchBufferOps(org.mockito.ArgumentMatchers.anyList());
+    org.mockito.Mockito.verify(producer).resumeProducerAfterCutover();
+  }
+
+  @Test
   @DisplayName("migration, deferred runtime, and rebuild brake all fence recorded serving")
   void migrationDeferredAndBrakeFenceRecordedServing(@TempDir Path tempDir) throws Exception {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);

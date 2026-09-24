@@ -233,7 +233,7 @@ public final class WorkerIngestService {
         // this constructor runs, so capturing the field here would capture the UNAVAILABLE sentinel.
         new ConfirmedDeletionMarker(() -> this.documentIdentityStore));
     this.switchBufferOps =
-        new IngestSwitchBufferOps(jobQueue, this.indexGenerationManager, metrics);
+        new IngestSwitchBufferOps(jobQueue, this.indexGenerationManager);
   }
 
   /** Bound once by the composing Worker owner before any request is published. */
@@ -251,19 +251,21 @@ public final class WorkerIngestService {
     }
   }
 
+  private <T> T withFileMutationFence(Supplier<T> mutation) {
+    return mutationAdmission == null || indexingLoop == null
+        ? mutation.get() : indexingLoop.withFileMutationFence(mutation);
+  }
+
+  private boolean hasDistinctWritableServingTarget() {
+    return searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active
+        && active != ingestLifecycle && active.isAcceptingWrites();
+  }
+
   /** Watcher events share RPC mutation admission and the existing durable switch buffer. */
   public void acceptWatcherUpsert(String collection, Path path) {
     try (var ignoredMutation = mutationLease()) {
-      if (switchBufferOps.isSwitching()) {
-        if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
-          switchBufferOps.bufferSubmitBatchDuringSwitching(sbq, List.of(path), 1, 0,
-              collection, CallContext.none().provenance());
-          return;
-        }
-        throw IngestSwitchBufferOps.switchingUnavailable();
-      }
       var entry = WorkerMethvinWatcher.entryForLiveEvent(path);
-      String candidateGeneration = switchBufferOps.migratingGeneration();
+      String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
       if (candidateGeneration != null) {
         if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
             || !sbq.enqueueAndBufferFileForGeneration(
@@ -280,20 +282,23 @@ public final class WorkerIngestService {
   public void acceptWatcherDelete(String normalizedPath, Runnable directEffect) {
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
-      if (switchBufferOps.isSwitching()) {
+      if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
           switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
           return;
         }
         throw IngestSwitchBufferOps.switchingUnavailable();
       }
-      journalAndProjectDeleteToServing(normalizedPath, CommitReason.WATCHER_DELETE);
-      directEffect.run();
+      withFileMutationFence(() -> {
+        journalAndProjectDeleteToServing(normalizedPath, CommitReason.WATCHER_DELETE);
+        directEffect.run();
+        return null;
+      });
     }
   }
 
   private void journalAndProjectDeleteToServing(String normalizedId, CommitReason reason) {
-    String candidateGeneration = switchBufferOps.migratingGeneration();
+    String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration == null) return;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
         || active == ingestLifecycle || !active.isAcceptingWrites()) {
@@ -306,7 +311,7 @@ public final class WorkerIngestService {
   }
 
   private void journalAndProjectPrefixDeleteToServing(String pathPrefix) {
-    String candidateGeneration = switchBufferOps.migratingGeneration();
+    String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration == null) return;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
         || active == ingestLifecycle || !active.isAcceptingWrites()) {
@@ -320,7 +325,7 @@ public final class WorkerIngestService {
   }
 
   private Integer journalAndProjectCollectionDeleteToServing(String collection) {
-    String candidateGeneration = switchBufferOps.migratingGeneration();
+    String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration == null) return null;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
         || active == ingestLifecycle || !active.isAcceptingWrites()) {
@@ -641,14 +646,10 @@ public final class WorkerIngestService {
         // Force bypasses unchanged extraction for selected files. It cannot attest to untouched
         // vectors: whole-index legacy recovery or generation migration owns compatibility.
 
-        // During cutover (SWITCHING), accept the request but buffer it durably instead of
-        // mutating the job queue/index directly. This avoids dropping updates while the Worker
-        // restarts.
-        if (switchBufferOps.isSwitching()) {
-          if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
-            return switchBufferOps.bufferSubmitBatchDuringSwitching(
-                sbq, validPaths, filePaths.size(), rejected, request.getTargetCollection(), ctx.provenance());
-          }
+        // The candidate queue remains the producer through SWITCHING until the final fence.
+        // Admit its job and exact source witness together; the loop projects A before ACK.
+        if (switchBufferOps.isSwitching()
+            && !(jobQueue instanceof SwitchBufferCapableQueue)) {
           throw IngestSwitchBufferOps.switchingUnavailable();
         }
 
@@ -660,7 +661,7 @@ public final class WorkerIngestService {
         // entry to unknown size (NULL) — it never rejects the enqueue.
         var entries = validPaths.stream()
             .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance())).toList();
-        String candidateGeneration = switchBufferOps.migratingGeneration();
+        String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
         int accepted = candidateGeneration == null
             ? jobQueue.enqueueEntries(entries, collection)
             : jobQueue instanceof SwitchBufferCapableQueue sbq
@@ -1029,27 +1030,21 @@ public final class WorkerIngestService {
     }
 
     try {
-      if (switchBufferOps.isSwitching()) {
+      if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
           return switchBufferOps.bufferDeleteByPathDuringSwitching(sbq, pathPrefix);
         }
         throw IngestSwitchBufferOps.switchingUnavailable();
       }
 
-      journalAndProjectPrefixDeleteToServing(pathPrefix);
-
-      // 1. Delete from Lucene FIRST (user-facing impact)
-      ingestLifecycle.indexingCoordinator().deleteByPathPrefix(pathPrefix);
-
-      // 2. Delete from job queue (count tracking)
-      int jobsDeleted = jobQueue.deleteByPathPrefix(pathPrefix);
-
-      // 3. Commit Lucene changes
-      ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
-
-      log.info("deleteByPath complete: {} jobs deleted for prefix: {}", jobsDeleted, pathPrefix);
-
-      return deleteByPathResponse(jobsDeleted, "");
+      return withFileMutationFence(() -> {
+        journalAndProjectPrefixDeleteToServing(pathPrefix);
+        ingestLifecycle.indexingCoordinator().deleteByPathPrefix(pathPrefix);
+        int jobsDeleted = jobQueue.deleteByPathPrefix(pathPrefix);
+        ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
+        log.info("deleteByPath complete: {} jobs deleted for prefix: {}", jobsDeleted, pathPrefix);
+        return deleteByPathResponse(jobsDeleted, "");
+      });
 
     } catch (WorkerServiceException e) {
       // Must precede the catch-all: the SWITCHING branch above throws UNAVAILABLE from inside
@@ -1092,18 +1087,19 @@ public final class WorkerIngestService {
       }
 
       try {
-        if (switchBufferOps.isSwitching()) {
+        if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
           // Fail closed rather than buffer: a collection-scoped bulk delete replayed against a
           // freshly-switched index could race the migration's own document set.
           throw IngestSwitchBufferOps.switchingUnavailable();
         }
 
-        Integer visibleDeleted = journalAndProjectCollectionDeleteToServing(collection);
-        int deleted = ingestLifecycle.indexingCoordinator().deleteByCollection(collection);
-        ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_COLLECTION);
-
-        log.info("deleteByCollection complete: {} documents deleted for {}", deleted, collection);
-        return deleteByCollectionResponse(visibleDeleted == null ? deleted : visibleDeleted, "");
+        return withFileMutationFence(() -> {
+          Integer visibleDeleted = journalAndProjectCollectionDeleteToServing(collection);
+          int deleted = ingestLifecycle.indexingCoordinator().deleteByCollection(collection);
+          ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_COLLECTION);
+          log.info("deleteByCollection complete: {} documents deleted for {}", deleted, collection);
+          return deleteByCollectionResponse(visibleDeleted == null ? deleted : visibleDeleted, "");
+        });
       } catch (WorkerServiceException e) {
         // Must precede the catch-all: this endpoint deliberately FAILS CLOSED during SWITCHING,
         // and the catch-all would turn that refusal into a deleted=-1 response, hiding the
@@ -1137,27 +1133,21 @@ public final class WorkerIngestService {
       // Normalize the path (lowercase on Windows)
       String normalizedId = normalizeDocIdForMutation(docId);
 
-      if (switchBufferOps.isSwitching()) {
+      if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
           return switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedId);
         }
         throw IngestSwitchBufferOps.switchingUnavailable();
       }
 
-      journalAndProjectDeleteToServing(normalizedId, CommitReason.GRPC_DELETE_BY_ID);
-
-      // 1. Delete from Lucene (exact match)
-      ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(normalizedId);
-
-      // 2. Delete from job queue (exact match)
-      jobQueue.deleteByExactPath(normalizedId);
-
-      // 3. Commit Lucene changes
-      ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_ID);
-
-      log.info("deleteById complete for doc_id: {}", normalizedId);
-
-      return deleteByIdResponse(true, "");
+      return withFileMutationFence(() -> {
+        journalAndProjectDeleteToServing(normalizedId, CommitReason.GRPC_DELETE_BY_ID);
+        ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(normalizedId);
+        jobQueue.deleteByExactPath(normalizedId);
+        ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_ID);
+        log.info("deleteById complete for doc_id: {}", normalizedId);
+        return deleteByIdResponse(true, "");
+      });
 
     } catch (WorkerServiceException e) {
       // Must precede the catch-all: the SWITCHING branch above throws UNAVAILABLE from inside
@@ -1183,7 +1173,11 @@ public final class WorkerIngestService {
 
     try {
       if (switchBufferOps.isSwitching()) {
-        // Keep the cutover fence: prune is a mutation, so durably buffer it during SWITCHING.
+        if (hasDistinctWritableServingTarget()) {
+          throw WorkerServiceException.unavailable(
+              "Prune requires candidate-scoped delete projection during migration; retry after activation");
+        }
+        // Legacy single-runtime switching retains its historical deferred contract.
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
           return switchBufferOps.bufferPruneMissingDuringSwitching(sbq, pathPrefix);
         }
@@ -1283,7 +1277,11 @@ public final class WorkerIngestService {
       }
 
       if (!finalCutoverReplay && switchBufferOps.isSwitching()) {
-        // During cutover, accept and durably buffer sync requests so OVERFLOW/burst events don't get lost.
+        if (hasDistinctWritableServingTarget()) {
+          throw WorkerServiceException.unavailable(
+              "Directory sync requires candidate-scoped reconciliation during migration; retry after activation");
+        }
+        // Legacy single-runtime switching retains its historical deferred contract.
         return switchBufferOps.bufferDuringSwitchingOrThrow(
             "syncDirectory",
             sbq ->

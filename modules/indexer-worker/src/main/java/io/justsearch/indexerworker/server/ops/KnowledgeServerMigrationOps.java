@@ -550,6 +550,12 @@ public final class KnowledgeServerMigrationOps {
     return drainSwitchBuffer(context, true, true).applied();
   }
 
+  /** A refused pre-pointer candidate must settle only its own obligations on surviving A. */
+  public static boolean drainRefusedCandidateOnSource(DrainSwitchBufferContext context) {
+    if (context.replayGeneration() == null || context.replayGeneration().isBlank()) return false;
+    return drainSwitchBuffer(context, true, true, false).applied();
+  }
+
   /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
   public record StrictReplay(List<SwitchBufferCapableQueue.SwitchBufferOp> versions) {
     public StrictReplay { versions = List.copyOf(versions); }
@@ -592,6 +598,37 @@ public final class KnowledgeServerMigrationOps {
     }
   }
 
+  /**
+   * A native pointer-before-publication cut can leave exact file witnesses after B is committed.
+   * Verify the already-completed queue row and B's indexed source identity before removing only
+   * those file rows. Other operation kinds still fence predecessor retirement for full replay.
+   */
+  public static boolean settleCommittedNativeFileWitnesses(
+      JobQueue queue, RunningRuntime active, String generation, Logger log) {
+    if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
+        || generation == null || generation.isBlank()) return false;
+    try {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
+          .stream().filter(op -> generation.equals(op.generation())).toList();
+      for (var op : selected) {
+        if (!"UPSERT".equals(op.op())) return false;
+        var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload());
+        if (upsert.sourceSha256() == null
+            || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
+                upsert.sourceSha256())
+            || !upsert.sourceSha256().equals(active.documentFieldOps()
+                .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) return false;
+      }
+      if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
+        return false;
+      }
+      return switchBufferEmptyStrict(queue, generation);
+    } catch (RuntimeException unavailable) {
+      log.warn("Committed native file witnesses remain unresolved", unavailable);
+      return false;
+    }
+  }
+
   /** No post-snapshot versions may remain while the final mutation admission fence is held. */
   public static boolean switchBufferEmptyStrict(JobQueue queue) {
     return switchBufferEmptyStrict(queue, null);
@@ -612,15 +649,22 @@ public final class KnowledgeServerMigrationOps {
 
   private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
       boolean exactRead, boolean removeAfterReplay) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, true);
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped) {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return new ReplayOutcome(false, List.of());
     }
     boolean allowVdu = context.vduReplayAllowed().getAsBoolean();
     List<SwitchBufferCapableQueue.SwitchBufferOp> allOps;
     try {
-      allOps = exactRead ? strictReplayOps(sbq, context.replayGeneration())
+      allOps = exactRead ? strictReplayOps(sbq, context.replayGeneration()).stream()
+              .filter(op -> includeUnscoped || context.replayGeneration().equals(op.generation()))
+              .toList()
           : sbq.listSwitchBufferOps().stream()
-              .filter(op -> op.generation() == null || op.generation().isEmpty()
+              .filter(op -> (includeUnscoped && (op.generation() == null || op.generation().isEmpty()))
                   || (context.replayGeneration() != null
                       && context.replayGeneration().equals(op.generation()))).toList();
     } catch (RuntimeException unreadable) {
@@ -651,7 +695,8 @@ public final class KnowledgeServerMigrationOps {
       // that a later DELETE_PREFIX removed.
       if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
         if (!enqueueBufferedUpserts(context, toEnqueue)
-            || (exactRead && !awaitQueuedUpserts(context))) {
+            || (exactRead && (!awaitQueuedUpserts(context)
+                || !verifyBufferedUpserts(context, toEnqueue)))) {
           context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
           return new ReplayOutcome(false, List.of());
         }
@@ -665,7 +710,12 @@ public final class KnowledgeServerMigrationOps {
         case "UPSERT" -> {
           if (!payload.isBlank()) {
             try {
-              toEnqueue.add(io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(payload));
+              var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(payload);
+              if (op.generation() != null && !op.generation().isEmpty()
+                  && upsert.sourceSha256() == null) {
+                throw new IllegalArgumentException("Scoped UPSERT has no exact source witness");
+              }
+              toEnqueue.add(upsert);
             } catch (Exception e) {
               allApplied = false;
               context
@@ -974,7 +1024,11 @@ public final class KnowledgeServerMigrationOps {
       }
     }
 
-    if (!toEnqueue.isEmpty()) allApplied &= enqueueBufferedUpserts(context, toEnqueue);
+    if (!toEnqueue.isEmpty()) {
+      allApplied &= enqueueBufferedUpserts(context, toEnqueue)
+          && (!exactRead || (awaitQueuedUpserts(context)
+              && verifyBufferedUpserts(context, toEnqueue)));
+    }
 
     if (mutatedLucene && context.ingestLifecycle() != null) {
       try {
@@ -1041,6 +1095,12 @@ public final class KnowledgeServerMigrationOps {
     int enqueued = 0;
     for (var upsert : upserts) {
       try {
+        if (upsert.sourceSha256() != null) {
+          // A scoped file admission already owns a durable queue row and an exact source
+          // witness. Re-enqueueing would mint a new revision and read later filesystem bytes.
+          // The caller waits for that row and verifies Green's indexed source witness.
+          continue;
+        }
         int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
         enqueued += accepted;
         if (accepted != 1) complete = false;
@@ -1051,6 +1111,31 @@ public final class KnowledgeServerMigrationOps {
     }
     context.log().info("Enqueued {} buffered UPSERT ops back into the job queue", enqueued);
     return complete;
+  }
+
+  private static boolean verifyBufferedUpserts(DrainSwitchBufferContext context,
+      List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> upserts) {
+    if (context.ingestLifecycle() == null
+        || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
+    for (var upsert : upserts) {
+      if (upsert.sourceSha256() == null) continue; // Historical unscoped cutover payload.
+      boolean settled;
+      String indexed;
+      try {
+        settled = queue.matchesAcceptedFileProjection(
+            upsert.path(), upsert.unitRevision(), upsert.sourceSha256());
+        indexed = context.ingestLifecycle().documentFieldOps()
+            .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256);
+      } catch (RuntimeException unavailable) {
+        context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
+        return false;
+      }
+      if (!settled || !upsert.sourceSha256().equals(indexed)) {
+        context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
+        return false;
+      }
+    }
+    return true;
   }
 
   private static boolean isVduBufferKind(String kind) {
@@ -1118,7 +1203,20 @@ public final class KnowledgeServerMigrationOps {
   private static int acceptMigrationBatch(EnqueueContext context, List<JobQueue.EnqueueEntry> batch)
       throws IOException {
     requireEnumerationRunning(context);
-    int accepted = context.jobQueue().enqueueEntries(batch);
+    IndexGenerationManager manager = context.indexGenerationManagerSupplier().get();
+    int accepted;
+    if (manager == null) {
+      // Lightweight enumeration callers without a generation owner retain the ordinary queue
+      // seam. A live migration always supplies its manager and must record the exact candidate.
+      accepted = context.jobQueue().enqueueEntries(batch);
+    } else {
+      IndexGenerationManager.State state = manager.readStateBestEffort();
+      if (state == null || state.building_generation() == null
+          || !(context.jobQueue() instanceof SwitchBufferCapableQueue scoped)) {
+        throw new IOException("Migration enumeration has no atomic candidate admission");
+      }
+      accepted = scoped.enqueueEnumeratedFilesForGeneration(state.building_generation(), batch);
+    }
     context.migrationEnumeratorFilesEnqueued().addAndGet(accepted);
     if (accepted != batch.size()) throw new IOException("Incomplete migration batch admission");
     batch.clear();

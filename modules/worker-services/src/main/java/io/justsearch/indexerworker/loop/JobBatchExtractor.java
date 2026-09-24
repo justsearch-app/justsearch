@@ -225,8 +225,9 @@ public final class JobBatchExtractor {
       }
       try {
         String normalizedPath = envelope.normalizedPath();
-        boolean forceReindex = claim.walkEpoch() != null
-            ? claim.recordedForce() : forcedPaths.remove(normalizedPath);
+        boolean forceReindex = claim.plannedSourceSha256() != null
+            || (claim.walkEpoch() != null
+                ? claim.recordedForce() : forcedPaths.remove(normalizedPath));
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
         if (!forceReindex && !indexEmptyForBatch) {
           if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs())) {
@@ -287,6 +288,15 @@ public final class JobBatchExtractor {
             collection,
             artifact,
             "during extraction",
+            FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, provenance, claim);
+        batchStats.recordSkipped();
+        return null;
+      }
+
+      if (claim.plannedSourceSha256() != null
+          && !claim.plannedSourceSha256().equals(sourceSha256)) {
+        staleResolver.handleKnownStale(
+            filePath, envelope, collection, artifact, "since admission",
             FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, provenance, claim);
         batchStats.recordSkipped();
         return null;

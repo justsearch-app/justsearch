@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.server.ops;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -14,19 +15,26 @@ import static org.mockito.Mockito.when;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
+import io.justsearch.indexerworker.loop.SourceContentHash;
+import io.justsearch.indexing.SchemaFields;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 final class SwitchBufferStrictReplayTest {
+  @TempDir Path tempDir;
   private final SwitchBufferCapableQueue queue = mock(SwitchBufferCapableQueue.class);
   private final RunningRuntime runtime = mock(RunningRuntime.class);
 
@@ -130,6 +138,188 @@ final class SwitchBufferStrictReplayTest {
     verify(indexing).deleteByIdAndChunks("green");
     verify(indexing, never()).deleteByIdAndChunks("other");
     verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+  }
+
+  @Test
+  void refusalReconcilesOnlyAcceptedCandidateRowsOnSurvivingSource() {
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:removed", "DELETE", "removed", 3, "v3");
+    var historical = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "path:historical", "DELETE", "historical", 4, "v4");
+    var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "other", "path:other", "DELETE", "other", 5, "v5");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, historical, foreign));
+    when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
+    var indexing = mock(IndexingCoordinator.class);
+    var commits = mock(CommitOps.class);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+    when(runtime.commitOps()).thenReturn(commits);
+
+    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+        scopedContext("green")));
+    var order = inOrder(indexing, commits, queue);
+    order.verify(indexing).deleteByIdAndChunks("removed");
+    order.verify(commits).commitAndTrack(org.mockito.ArgumentMatchers.any());
+    order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+    verify(indexing, never()).deleteByIdAndChunks("historical");
+    verify(indexing, never()).deleteByIdAndChunks("other");
+  }
+
+  @Test
+  void refusalRetainsCandidateWhenSourceProjectionIsMissing() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("candidate.txt"), "accepted").toAbsolutePath();
+    var payload = new SwitchBufferUpsert(file.toString(), null, null,
+        "accepted-revision", SourceContentHash.sha256(file)).encode();
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + file, "UPSERT", payload, 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected));
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
+        .thenReturn(true);
+    when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+
+    assertFalse(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+        scopedContext("green")));
+    verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
+  }
+
+  @Test
+  void committedNativePointerClearsOnlyVerifiedFileWitnesses() throws Exception {
+    String hash = "a".repeat(64);
+    String path = Files.writeString(tempDir.resolve("accepted-native.txt"), "accepted")
+        .toAbsolutePath().toString();
+    var upsert = new SwitchBufferUpsert(path, null, null, "issued-revision", hash);
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + path, "UPSERT", upsert.encode(), 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected), List.of());
+    when(queue.matchesAcceptedFileProjection(path, "issued-revision", hash))
+        .thenReturn(true);
+    var fields = mock(DocumentFieldOps.class);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(fields.getDocumentField(path, SchemaFields.SOURCE_SHA256))
+        .thenReturn(hash);
+    when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
+
+    assertTrue(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
+        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+    verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+  }
+
+  @Test
+  void committedNativePointerRetainsUnknownEffectForRecovery() {
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:deleted", "DELETE", "deleted", 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected));
+
+    assertFalse(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
+        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+    verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
+  }
+
+  @Test
+  void changedAcceptedSourceCannotReplayDifferentBytes() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("accepted.txt"), "accepted").toAbsolutePath();
+    String acceptedHash = SourceContentHash.sha256(file);
+    var payload = new SwitchBufferUpsert(file.toString(), null, null, "accepted-revision",
+        acceptedHash).encode();
+    var version = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + file, "UPSERT", payload, 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
+        .thenReturn(true);
+    var fields = mock(DocumentFieldOps.class);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    Files.writeString(file, "later unaccepted bytes");
+
+    assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
+    verify(fields).getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256);
+    verify(queue, never()).enqueueEntries(anyList(), isNull());
+    verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
+  }
+
+  @Test
+  void acceptedGreenProjectionSurvivesLaterUnacceptedFileEdit() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("already-projected.txt"), "accepted")
+        .toAbsolutePath();
+    String acceptedHash = SourceContentHash.sha256(file);
+    var payload = new SwitchBufferUpsert(file.toString(), null, null, "accepted-revision",
+        acceptedHash).encode();
+    var version = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + file, "UPSERT", payload, 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
+        .thenReturn(true);
+    when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
+    var fields = mock(DocumentFieldOps.class);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256))
+        .thenReturn(acceptedHash);
+    Files.writeString(file, "unaccepted later bytes");
+
+    assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
+    verify(queue, never()).enqueueEntries(anyList(), isNull());
+    verify(queue).removeReplayedSwitchBufferOps(List.of(version));
+  }
+
+  @Test
+  void missingAcceptedSourceCannotReplayAsSuccessfulStaleDelete() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("removed.txt"), "accepted").toAbsolutePath();
+    var payload = new SwitchBufferUpsert(file.toString(), null, null, "accepted-revision",
+        SourceContentHash.sha256(file)).encode();
+    var version = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + file, "UPSERT", payload, 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
+        .thenReturn(true);
+    var fields = mock(DocumentFieldOps.class);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    Files.delete(file);
+
+    assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
+    verify(fields).getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256);
+    verify(queue, never()).enqueueEntries(anyList(), isNull());
+    verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
+  }
+
+  @Test
+  void drainedQueueWithoutAcceptedGreenProjectionRefusesPromotion() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("unprojected.txt"), "accepted").toAbsolutePath();
+    var payload = new SwitchBufferUpsert(file.toString(), null, null, "accepted-revision",
+        SourceContentHash.sha256(file)).encode();
+    var version = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + file, "UPSERT", payload, 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
+    when(queue.enqueueEntries(anyList(), isNull())).thenReturn(1);
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
+        .thenReturn(true);
+    when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+
+    assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
+    verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
+  }
+
+  @Test
+  void matchingOldGreenDocumentCannotCertifyMissingAcceptedQueueRevision() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("revision.txt"), "same bytes")
+        .toAbsolutePath();
+    String hash = SourceContentHash.sha256(file);
+    var payload = new SwitchBufferUpsert(file.toString(), null, null, "new-revision",
+        hash).encode();
+    var version = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + file, "UPSERT", payload, 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    var fields = mock(DocumentFieldOps.class);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
+
+    assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
+    verify(queue).matchesAcceptedFileProjection(file.toString(), "new-revision", hash);
+    verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
   }
 
   @Test

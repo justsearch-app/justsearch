@@ -134,6 +134,26 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
           .map(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp::op)
           .collect(java.util.stream.Collectors.toSet()));
 
+      manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+      String switchingPath = PathNormalizer.normalizeKey(
+          tempDir.resolve("switching-removed.txt"));
+      IndexDocument switchingDocument = new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, switchingPath, SchemaFields.DOC_UID,
+          "00000000-0000-4000-8000-000000000083", SchemaFields.PATH, switchingPath,
+          SchemaFields.CONTENT, "switchingdeletebeforepromotion"));
+      runtime.indexingCoordinator().indexSingle(switchingDocument);
+      candidate.indexingCoordinator().indexSingle(switchingDocument);
+      runtime.commitOps().commitAndTrack();
+      candidate.commitOps().commitAndTrack();
+      assertTrue(service.deleteById(DeleteByIdRequest.newBuilder().setDocId(switchingPath).build(),
+          CallContext.none()).getSuccess());
+      runtime.commitOps().maybeRefreshBlocking();
+      candidate.commitOps().maybeRefreshBlocking();
+      assertNull(runtime.documentFieldOps().getDocumentField(switchingPath, SchemaFields.CONTENT));
+      assertNull(candidate.documentFieldOps().getDocumentField(switchingPath, SchemaFields.CONTENT));
+      assertEquals("DELETE", jobQueue.listSwitchBufferOpsStrictForGeneration(buildingId).stream()
+          .filter(op -> ("path:" + switchingPath).equals(op.key())).findFirst().orElseThrow().op());
+
       String refusedPath = PathNormalizer.normalizeKey(tempDir.resolve("refused-delete.txt"));
       IndexDocument refusedDocument = new IndexDocument(Map.of(
           SchemaFields.DOC_ID, refusedPath, SchemaFields.DOC_UID,

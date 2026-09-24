@@ -4,11 +4,13 @@ package io.justsearch.indexerworker.queue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.util.PathNormalizer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -87,6 +89,10 @@ final class SwitchBufferVersionTest {
       assertEquals(normalized, upsert.path());
       assertEquals("docs", upsert.collection());
       assertEquals(provenance, upsert.provenance());
+      assertEquals("a".repeat(64), upsert.sourceSha256());
+      var otherUpsert = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("other").getFirst().payload());
+      assertNotEquals(upsert.unitRevision(), otherUpsert.unitRevision());
 
       try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
           var statement = connection.prepareStatement(
@@ -103,6 +109,7 @@ final class SwitchBufferVersionTest {
           assertEquals("agent", row.getString("originator"));
           assertEquals("atomic-test", row.getString("transport"));
           assertTrue(row.getString("unit_revision").matches("[0-9a-f]{32}"));
+          assertEquals(row.getString("unit_revision"), otherUpsert.unitRevision());
           assertNull(row.getString("content_hash"));
         }
       }
@@ -110,9 +117,54 @@ final class SwitchBufferVersionTest {
   }
 
   @Test
+  void ordinaryAdmissionFreezesSourceHashAndRevisionBeforeLaterFileEdit() throws Exception {
+    Path db = tempDir.resolve("ordinary-source-witness.db");
+    Path file = Files.writeString(tempDir.resolve("ordinary.txt"), "first").toAbsolutePath();
+    String firstHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      assertTrue(queue.enqueueAndBufferFileForGeneration(
+          "green", JobQueue.EnqueueEntry.stat(file), "docs", null));
+      var upsert = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload());
+      assertEquals(firstHash, upsert.sourceSha256());
+      assertNotNull(upsert.unitRevision());
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), upsert.unitRevision(), firstHash));
+
+      Files.writeString(file, "second");
+      assertEquals(firstHash, SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload())
+          .sourceSha256());
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "SELECT unit_revision, planned_source_sha256 FROM jobs WHERE path = ?")) {
+        statement.setString(1, PathNormalizer.normalizeKey(file));
+        try (var row = statement.executeQuery()) {
+          assertTrue(row.next());
+          assertEquals(upsert.unitRevision(), row.getString("unit_revision"));
+          assertEquals(firstHash, row.getString("planned_source_sha256"));
+        }
+      }
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "UPDATE jobs SET state = 'DONE', content_hash = ? WHERE path = ?")) {
+        statement.setString(1, firstHash);
+        statement.setString(2, PathNormalizer.normalizeKey(file));
+        assertEquals(1, statement.executeUpdate());
+      }
+      assertTrue(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), upsert.unitRevision(), firstHash));
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), "older-revision", firstHash));
+    }
+  }
+
+  @Test
   void atomicFileAdmissionRollsBackJobWhenJournalWriteFails() throws Exception {
     Path db = tempDir.resolve("atomic-file-admission-rollback.db");
     Path file = tempDir.resolve("rollback.txt").toAbsolutePath();
+    Files.writeString(file, "rollback content");
     String normalized = PathNormalizer.normalizeKey(file);
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
@@ -138,6 +190,8 @@ final class SwitchBufferVersionTest {
     Path db = tempDir.resolve("atomic-file-batch-rollback.db");
     Path first = tempDir.resolve("first.txt").toAbsolutePath();
     Path second = tempDir.resolve("second.txt").toAbsolutePath();
+    Files.writeString(first, "first content");
+    Files.writeString(second, "second content");
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
       try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
@@ -182,6 +236,8 @@ final class SwitchBufferVersionTest {
       assertEquals(normalized, upsert.path());
       assertEquals("docs", upsert.collection());
       assertEquals(provenance, upsert.provenance());
+      assertEquals("c".repeat(64), upsert.sourceSha256());
+      assertNotNull(upsert.unitRevision());
       assertEquals(2, queue.recordedWalk(operationKey).orElseThrow().revision());
 
       try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());

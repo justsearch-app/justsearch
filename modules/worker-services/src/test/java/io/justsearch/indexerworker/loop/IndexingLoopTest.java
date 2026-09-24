@@ -41,6 +41,10 @@ import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -856,6 +860,90 @@ class IndexingLoopTest {
     }
 
     @Test
+    void changedClaimSourceCannotProduceAProjectionOfDifferentAcceptedBytes() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-planned-source", ".txt"), "first");
+      String acceptedHash = SourceContentHash.sha256(file);
+      Files.writeString(file, "second");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("second"));
+      var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
+          1L, false, acceptedHash);
+
+      assertNull(invokeExtractJob(loop, claim));
+      assertTrue(queue.deferred);
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+    }
+
+    @Test
+    void revokedClaimCannotPublishAfterAnAdministrativeDelete() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-revoked-claim", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      queue.claimRevoked = true;
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      verify(active, never()).indexingCoordinator();
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+      assertTrue(queue.done);
+    }
+
+    @Test
+    void directDeleteFenceWaitsForClaimedWriteThroughBothGenerations() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-held-claim", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      when(active.indexingCoordinator()).thenReturn(activeWrites);
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      loop.wireActiveLexicalSource(active);
+      CountDownLatch activeWriteEntered = new CountDownLatch(1);
+      CountDownLatch releaseActiveWrite = new CountDownLatch(1);
+      AtomicBoolean greenWritten = new AtomicBoolean();
+      doAnswer(invocation -> {
+        activeWriteEntered.countDown();
+        assertTrue(releaseActiveWrite.await(5, TimeUnit.SECONDS));
+        return null;
+      }).when(activeWrites).indexSingle(any());
+      doAnswer(invocation -> {
+        greenWritten.set(true);
+        return null;
+      }).when(queue.indexingCoordinator).indexSingle(any());
+      Object extracted = extractedJob(file, "body");
+      FutureTask<Void> write = new FutureTask<>(() -> {
+        invokeWriteExtractedJob(loop, extracted);
+        return null;
+      });
+      Thread writer = new Thread(write, "held-candidate-write-test");
+      writer.start();
+      assertTrue(activeWriteEntered.await(5, TimeUnit.SECONDS));
+      CountDownLatch deleteStarted = new CountDownLatch(1);
+      FutureTask<Boolean> delete = new FutureTask<>(() -> {
+        deleteStarted.countDown();
+        return loop.withFileMutationFence(greenWritten::get);
+      });
+      Thread deleter = new Thread(delete, "held-direct-delete-test");
+      deleter.start();
+      try {
+        assertTrue(deleteStarted.await(5, TimeUnit.SECONDS));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (deleter.getState() != Thread.State.WAITING && System.nanoTime() < deadline) {
+          Thread.sleep(5);
+        }
+        assertEquals(Thread.State.WAITING, deleter.getState(),
+            "delete must actually wait on the claimed writer's fence");
+        assertFalse(delete.isDone());
+      } finally {
+        releaseActiveWrite.countDown();
+      }
+      write.get(5, TimeUnit.SECONDS);
+      assertTrue(delete.get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
     void idleCommitKeepsGreenClaimPendingUntilActiveLexicalCommitSucceeds() throws Exception {
       Path file = Files.writeString(Files.createTempFile("js-active-idle", ".txt"), "body");
       RecordingQueue queue = new RecordingQueue();
@@ -1658,12 +1746,15 @@ class IndexingLoopTest {
     }
 
     private Object invokeExtractJob(IndexingLoop loop, Path file) throws Exception {
+      return invokeExtractJob(loop, new JobQueue.IndexJob(file, null));
+    }
+
+    private Object invokeExtractJob(IndexingLoop loop, JobQueue.IndexJob claim) throws Exception {
       // W5.2: extractJob moved to JobBatchExtractor. Call via the package-private accessor
       // + reflection on the now-private extractJob method on the extractor.
       Method method =
           JobBatchExtractor.class.getDeclaredMethod("extractJob", JobQueue.IndexJob.class);
       method.setAccessible(true);
-      var claim = new JobQueue.IndexJob(file, null);
       var extracted = method.invoke(loop.getExtractor(), claim);
       if (extracted instanceof ExtractedJob job) assertSame(claim, job.claim());
       return extracted;
@@ -1707,7 +1798,7 @@ class IndexingLoopTest {
     private void setRunning(IndexingLoop loop, boolean value) throws Exception {
       var field = IndexingLoop.class.getDeclaredField("running");
       field.setAccessible(true);
-      ((java.util.concurrent.atomic.AtomicBoolean) field.get(loop)).set(value);
+      ((AtomicBoolean) field.get(loop)).set(value);
     }
 
     private Object extractedJob(Path file, String content) throws Exception {
@@ -1824,8 +1915,7 @@ class IndexingLoopTest {
           new java.util.concurrent.atomic.AtomicInteger(0);
       java.util.concurrent.atomic.AtomicInteger polls =
           new java.util.concurrent.atomic.AtomicInteger(0);
-      java.util.concurrent.CountDownLatch batchBClaimed =
-          new java.util.concurrent.CountDownLatch(1);
+      CountDownLatch batchBClaimed = new CountDownLatch(1);
 
       JobQueue queue = mock(JobQueue.class);
       lenient()
@@ -1855,7 +1945,7 @@ class IndexingLoopTest {
       loop.start();
       try {
         assertTrue(
-            batchBClaimed.await(20, java.util.concurrent.TimeUnit.SECONDS),
+            batchBClaimed.await(20, TimeUnit.SECONDS),
             "the indexing loop must return from background enrichment and claim batch B."
                 + " Pre-fix the combined tight loop continued on `written > 0` — activity, not"
                 + " progress — so pollPending was never reached again (tempdoc 798). Observed"
@@ -2044,11 +2134,14 @@ class IndexingLoopTest {
     boolean done;
     boolean terminalFailed;
     boolean deferred;
+    boolean claimRevoked;
     boolean failOutcomeWrites;
     boolean failOutcomeWritesAsIllegalArgument;
     int transientOutcomeWriteFailures;
     int markDoneTransitionCalls;
     IndexingCoordinator indexingCoordinator;
+
+    @Override public boolean ownsClaimForPublication(IndexJob claim) { return !claimRevoked; }
 
     private void maybeFail(String op) {
       if (failOutcomeWritesAsIllegalArgument) {

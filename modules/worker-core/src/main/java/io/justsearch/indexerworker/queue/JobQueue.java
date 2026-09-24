@@ -204,8 +204,8 @@ public interface JobQueue extends Closeable {
   record IndexJob(Path path, String collection, EnqueueProvenance provenance,
       String scanId, String unitRevision, Long walkEpoch, boolean recordedForce, String plannedSourceSha256) {
     public IndexJob {
-      if (plannedSourceSha256 != null && (walkEpoch == null || !IngestionLedgerTransition.isSha256(plannedSourceSha256))) {
-        throw new IllegalArgumentException("Invalid captured source identity");
+      if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
+        throw new IllegalArgumentException("Invalid planned source identity");
       }
       if (recordedForce && walkEpoch == null) throw new IllegalArgumentException("Recorded force requires recorded membership");
     }
@@ -231,6 +231,12 @@ public interface JobQueue extends Closeable {
     public IndexJob(Path path, String collection) {
       this(path, collection, null);
     }
+  }
+
+  /** Verify an issued claim still owns its durable row immediately before index publication. */
+  default boolean ownsClaimForPublication(IndexJob claim) {
+    if (claim != null && claim.unitRevision() == null) return true; // Legacy fixture/queue path.
+    throw new UnsupportedOperationException("Exact claim publication ownership is unavailable");
   }
 
   /** One current recorded admission decision; force is a projection of the validated frozen plan. */

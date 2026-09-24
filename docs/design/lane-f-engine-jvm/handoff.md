@@ -84,15 +84,90 @@ paths now commit A before B; failure and ordering regressions, PMD and
 Spotless passed at `tmp/3325-idle-shutdown-projection-order-fixed.txt`.
 This later source edit has not had an integrated rerun.
 
-The same review found three further D1-9 acceptance blockers: scoped UPSERT
-payloads still store a path rather than the accepted document/revision/hash, so
-replay can read different source bytes; pre-pointer refusal can strand accepted
-SWITCHING rows scoped to abandoned Green; and a claimed writer can publish
-after an acknowledged direct delete because administrative queue deletion does
-not fence issued claims. These are source findings, not executed interleaving
-proof. Add controlled regressions and fix their owners before D1-9 acceptance
-or another hosted checkpoint. Keep the passing `tmp/3323` result explicitly
-bound to its pre-review working-tree snapshot.
+The review's source-witness and claim/delete findings now have focused fixes.
+Scoped file admissions carry the exact queue revision and source hash; strict
+replay verifies the settled row and indexed hash without rereading changed bytes.
+SWITCHING submissions and watcher upserts use atomic queue+journal admission.
+The writer holds a file-mutation fence through A/B publication and checks its
+issued claim before writing; direct deletes hold the same fence. Distinct-A
+SWITCHING deletes also project A immediately. The affected module suites passed
+at `tmp/3331` before the later queue-revision and delete-fence edits; focused
+proof for those later edits is `tmp/3332`, `tmp/3333`, `tmp/3337`, and `tmp/3338`.
+These edits remain uncommitted after local WIP checkpoint `1fa67ae92`; the
+current tree has no integrated or hosted proof.
+
+Recorded pre-pointer refusal now tries exact candidate-scoped replay on surviving
+writable A under the mutation fence, after Green settles and pauses. It retains
+Green when A projection cannot be proved, and removes exact journal versions
+only after source replay commits. Focused replay and owner regressions, PMD and
+Spotless passed at `tmp/3339` and `tmp/3340`. Ordinary failure/cancel transfer,
+no-file accepted mutations, gap acceptance and crash-cut proof remain open.
+Keep `tmp/3323` bound to its earlier working-tree snapshot. Let a coherent
+hosted checkpoint complete before another push.
+
+The first post-review full gate `tmp/3341-d1-source-refusal-integrated.txt`
+completed all 358 tasks but failed two modules. Its full Worker, Indexer and
+Engine XML was preserved under `tmp/3341-test-results/` before reruns. A Worker
+shutdown fixture's mocked queue did not grant the new exact-claim check; its
+writer never reached the controlled seam. The agent-context test still assumed
+SWITCHING was journal-only, though candidate admission now persists the queue
+row atomically. Both fixtures retain their ownership/provenance intent at the
+new boundary and pass with the real enumeration regression at `tmp/3342`.
+The longer real Engine VDU migration test exposed a production omission: native
+root enumeration replaced a scoped queue row with plain `enqueueEntries`,
+leaving an older source witness in the journal and blocking Green promotion.
+Native enumeration now uses atomic candidate admission; a changed-source
+regression and the real VDU migration pass at `tmp/3342` and `tmp/3343`.
+The current tree still needs a full integrated rerun and installed/hosted proof.
+
+The second full 358-task gate `tmp/3344-d1-source-refusal-integrated-rerun.txt`
+failed two real migration cases; the full Indexer and Engine XML is retained at
+`tmp/3344-test-results/`. Force-switching let the native enumerator scan after
+an accepted DELETE and overwrite that journal key with a baseline UPSERT,
+resurrecting the deleted file. Enumeration now distinguishes its own prior
+admissions from foreground mutations within the same SQLite transaction and
+counts superseded scan entries as covered. The atomic changed-file/delete
+precedence regression and the real Engine SWITCHING case passed at `tmp/3345`
+and `tmp/3346`. A manual native pointer-before-publication cut left a verified
+scoped file witness at boot, preventing old-generation retirement. Native boot
+now clears only exact file witnesses after checking the completed queue revision
+and committed Green source hash; other operation kinds remain fenced. The real
+document-identity boot cut and strict replay tests passed at `tmp/3348` (the
+first `tmp/3347` run only failed on a new test's invalid Windows fixture path).
+Another full integrated gate and installed/hosted proof remain required.
+
+The next 358-task gate `tmp/3349-d1-file-mutation-integrated.txt` reached
+400 Engine tests but failed the live VDU migration's replacement-search assertion;
+the isolated rerun `tmp/3352-vdu-live-rerun.txt` failed identically after Green
+promotion. Native enumeration had been taught to preserve every prior foreground
+UPSERT, including one whose accepted source hash differed from the rewritten
+file now being enumerated. A real SQLite regression for that changed-source cut
+failed at `tmp/3353-changed-foreground-red.txt`. The queue rule now preserves a
+foreground UPSERT only while its exact source hash still matches, and separately
+preserves accepted exact, prefix, and collection deletes. The prefix regression
+failed on the old rule at `tmp/3350-prefix-regression-red.txt`; prefix and
+collection coverage passed locally at `tmp/3351-bulk-enumeration-focused.txt`.
+An unprovable collection identity refuses candidate batch admission and retains
+the delete. The live VDU case passed at `tmp/3354`; its paired synthetic
+foreground fixture lacked the provenance that real RPC admission supplies, so
+that focused assertion failed. After specifying the actual producer provenance,
+the full enumeration suite passed at `tmp/3355`. Full integration and
+installed/hosted proof remain open.
+
+The next 358-task `tmp/3356-d1-file-mutation-integrated.txt` ran every test
+task without a reported failure, but PMD rejected one unused variable in the
+new prefix regression. Its Indexer and Engine XML is retained at
+`tmp/3356-test-results/`. Source review then confirmed that real foreground
+admission can also have null provenance: the source-hash comparison must cover
+that case, rather than treating null as an immutable foreground winner. The
+real-shaped SQLite test, Indexer PMD and live VDU case all pass at
+`tmp/3357-enumeration-null-provenance.txt`. A fresh full gate is still required.
+
+The final coherent `tmp/3358-d1-file-mutation-integrated.txt` gate passed all
+358 Gradle tasks in 9m18s: Spotless, PMD, stress-enabled tests and installed
+distribution. This proves local integration of the current file-mutation slice;
+installed A/B mutation probes, hosted completion and the remaining D1-9
+non-file/cancel/gap acceptance are still required.
 
 ## Prior checkpoints (2026-09-24)
 

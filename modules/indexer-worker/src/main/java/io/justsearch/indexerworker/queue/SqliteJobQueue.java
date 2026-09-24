@@ -179,8 +179,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String declaredCollection;
       String originator;
       String transport;
+      String revision;
+      String sourceHash;
       try (var query = connection.prepareStatement(
-          "SELECT collection, originator, transport, scan_id, walk_seen_epoch "
+          "SELECT collection, originator, transport, scan_id, walk_seen_epoch, "
+              + "unit_revision, planned_source_sha256 "
               + "FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (var row = query.executeQuery()) {
@@ -195,11 +198,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           if (row.wasNull() || memberEpoch != epoch) {
             throw new SQLException("Recorded admission has a different enumeration epoch: " + path);
           }
+          revision = row.getString("unit_revision");
+          sourceHash = row.getString("planned_source_sha256");
         }
+      }
+      if (revision == null || sourceHash == null) {
+        throw new SQLException("Recorded admission has no exact source witness: " + path);
       }
       JobQueue.EnqueueProvenance provenance = originator == null && transport == null
           ? null : new JobQueue.EnqueueProvenance(originator, transport);
-      String payload = new SwitchBufferUpsert(path, declaredCollection, provenance).encode();
+      String payload = new SwitchBufferUpsert(path, declaredCollection, provenance,
+          revision, sourceHash).encode();
       if (!switchBufferOps.putForGenerationInTransaction(
           connection, generation, "path:" + path, "UPSERT", payload)) {
         throw new SQLException("Generation-scoped recorded journal admission was refused");
@@ -918,7 +927,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.setString(10, normalizedPath);
         if (membership.epoch() == null) stmt.setNull(11, java.sql.Types.BIGINT);
         else stmt.setLong(11, membership.epoch());
-        stmt.setString(12, membership.plannedSourceSha256());
+        stmt.setString(12, membership.plannedSourceSha256() == null
+            ? entry.plannedSourceSha256() : membership.plannedSourceSha256());
         stmt.executeUpdate();
         if (membership.epoch() != null) {
           SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -947,6 +957,19 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public int enqueueAndBufferFilesForGeneration(
       String generation, List<JobQueue.EnqueueEntry> entries, String collection, String scanId) {
+    return enqueueCandidateFileBatch(generation, entries, collection, scanId, false);
+  }
+
+  @Override
+  public int enqueueEnumeratedFilesForGeneration(
+      String generation, List<JobQueue.EnqueueEntry> entries) {
+    return enqueueCandidateFileBatch(generation, entries, null, null, true);
+  }
+
+  private record CandidateFileBatch(int covered, int enqueued) {}
+
+  private int enqueueCandidateFileBatch(String generation, List<JobQueue.EnqueueEntry> entries,
+      String collection, String scanId, boolean enumeration) {
     if (generation == null || generation.isBlank() || entries == null || entries.isEmpty()
         || entries.stream().anyMatch(entry -> entry == null || entry.path() == null)) {
       return 0;
@@ -956,51 +979,168 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       return 0;
     }
 
+    List<JobQueue.EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
+    try {
+      for (JobQueue.EnqueueEntry entry : entries) {
+        String hash = entry.plannedSourceSha256() == null
+            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
+            : entry.plannedSourceSha256();
+        JobQueue.EnqueueProvenance provenance = enumeration
+            ? new JobQueue.EnqueueProvenance("system", "MIGRATION_ENUMERATOR")
+            : entry.provenance();
+        witnessedEntries.add(new JobQueue.EnqueueEntry(
+            entry.path(), entry.sizeBytes(), provenance, hash));
+      }
+    } catch (IOException | RuntimeException unreadable) {
+      log.warn("Refusing candidate file admission without exact source bytes", unreadable);
+      return 0;
+    }
+
     lockTimed();
     try {
       ensureOpen();
       String normalizedCollection = collection == null || collection.isBlank() ? null : collection;
       String normalizedScan = scanId == null || scanId.isBlank() ? null : scanId;
-      int committed = inTransaction(() -> {
+      CandidateFileBatch committed = inTransaction(() -> {
+        List<JobQueue.EnqueueEntry> admitted = witnessedEntries;
+        int superseded = 0;
+        if (enumeration) {
+          admitted = new ArrayList<>(witnessedEntries.size());
+          for (JobQueue.EnqueueEntry entry : witnessedEntries) {
+            if (enumerationSupersededByAcceptedMutation(
+                generation, normalizePath(entry.path()), entry.plannedSourceSha256())) {
+              superseded++;
+            } else {
+              admitted.add(entry);
+            }
+          }
+        }
         int accepted = enqueueEntriesInTransaction(
-            entries, normalizedCollection, normalizedScan, System.currentTimeMillis());
-        if (accepted != entries.size()) {
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis());
+        if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }
-        for (JobQueue.EnqueueEntry entry : entries) {
+        for (JobQueue.EnqueueEntry entry : admitted) {
           String normalizedPath = normalizePath(entry.path());
           String effectiveCollection;
           String originator;
           String transport;
+          String revision;
+          String sourceHash;
           try (PreparedStatement query = connection.prepareStatement(
-              "SELECT collection, originator, transport FROM jobs WHERE path = ?")) {
+              "SELECT collection, originator, transport, unit_revision, planned_source_sha256 "
+                  + "FROM jobs WHERE path = ?")) {
             query.setString(1, normalizedPath);
             try (ResultSet row = query.executeQuery()) {
               if (!row.next()) throw new SQLException("Atomic file batch lost an admitted row");
               effectiveCollection = row.getString("collection");
               originator = row.getString("originator");
               transport = row.getString("transport");
+              revision = row.getString("unit_revision");
+              sourceHash = row.getString("planned_source_sha256");
             }
+          }
+          if (revision == null || sourceHash == null) {
+            throw new SQLException("Atomic file batch lost its exact source witness");
           }
           JobQueue.EnqueueProvenance effectiveProvenance = originator == null && transport == null
               ? null : new JobQueue.EnqueueProvenance(originator, transport);
           String payload = new SwitchBufferUpsert(
-              normalizedPath, effectiveCollection, effectiveProvenance).encode();
+              normalizedPath, effectiveCollection, effectiveProvenance,
+              revision, sourceHash).encode();
           if (!switchBufferOps.putForGenerationInTransaction(
               connection, generation, "path:" + normalizedPath, "UPSERT", payload)) {
             throw new SQLException("Generation-scoped switch-buffer admission was refused");
           }
         }
-        return accepted;
+        return new CandidateFileBatch(accepted + superseded, accepted);
       });
-      meters.recordEnqueued(committed);
-      return committed;
+      meters.recordEnqueued(committed.enqueued());
+      return committed.covered();
     } catch (SQLException | RuntimeException failure) {
       recordDbError();
       log.error("Failed atomic file batch admission", failure);
       return 0;
     } finally {
       unlockAfterChanges();
+    }
+  }
+
+  /** The baseline walk cannot replace an accepted foreground mutation. */
+  private boolean enumerationSupersededByAcceptedMutation(
+      String generation, String path, String sourceSha256)
+      throws SQLException {
+    List<String> deletedCollections = new ArrayList<>();
+    String collection = null;
+    boolean collectionKnown = false;
+    try (PreparedStatement query = connection.prepareStatement(
+        "SELECT key, op, payload FROM switch_buffer WHERE generation = ? "
+            + "AND (key = ? OR op IN ('DELETE_PREFIX', 'DELETE_COLLECTION'))")) {
+      query.setString(1, generation);
+      query.setString(2, "path:" + path);
+      try (ResultSet row = query.executeQuery()) {
+        while (row.next()) {
+          String op = row.getString("op");
+          String payload = row.getString("payload");
+          if ("DELETE_PREFIX".equals(op) && path.startsWith(payload)) return true;
+          if ("DELETE_COLLECTION".equals(op)) {
+            deletedCollections.add(payload);
+          } else if (("path:" + path).equals(row.getString("key"))) {
+            if (!"UPSERT".equals(op)) return true;
+            var prior = SwitchBufferUpsert.decode(payload);
+            if ((prior.provenance() == null
+                || !"MIGRATION_ENUMERATOR".equals(prior.provenance().transport()))
+                && (prior.sourceSha256() == null
+                    || prior.sourceSha256().equals(sourceSha256))) return true;
+            collection = prior.collection();
+            collectionKnown = true;
+          }
+        }
+      }
+    }
+    if (deletedCollections.isEmpty()) return false;
+    if (!collectionKnown) {
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT collection FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (ResultSet row = query.executeQuery()) {
+          if (row.next()) {
+            collection = row.getString(1);
+            collectionKnown = true;
+          }
+        }
+      }
+    }
+    if (!collectionKnown) {
+      throw new SQLException("Cannot prove collection identity during candidate enumeration");
+    }
+    return deletedCollections.contains(collection);
+  }
+
+  @Override
+  public boolean matchesAcceptedFileProjection(
+      String path, String unitRevision, String sourceSha256) {
+    if (path == null || unitRevision == null || sourceSha256 == null) return false;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT state, unit_revision, planned_source_sha256, content_hash "
+              + "FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (ResultSet row = query.executeQuery()) {
+          return row.next() && STATE_DONE.equals(row.getString("state"))
+              && unitRevision.equals(row.getString("unit_revision"))
+              && sourceSha256.equals(row.getString("planned_source_sha256"))
+              && (row.getString("content_hash") == null
+                  || sourceSha256.equals(row.getString("content_hash")));
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Accepted file projection evidence is unreadable", unavailable);
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -1207,6 +1347,20 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private boolean isIssuedClaim(IndexJob claim) {
     return claim != null && activeClaims.get(normalizePath(claim.path())) == claim;
+  }
+
+  @Override
+  public boolean ownsClaimForPublication(IndexJob claim) {
+    lock.lock();
+    try {
+      ensureOpen();
+      return ownsClaim(claim);
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Claim publication ownership is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
   }
 
   private boolean ownsClaim(IndexJob claim) throws SQLException {

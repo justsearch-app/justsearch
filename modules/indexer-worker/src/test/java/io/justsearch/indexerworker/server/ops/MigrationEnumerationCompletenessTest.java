@@ -14,7 +14,10 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -157,6 +160,163 @@ final class MigrationEnumerationCompletenessTest {
     assertEquals(2, counters.filesEnqueued.get());
     assertEquals(1, counters.rootsDone.get());
     verify(queue).enqueueEntries(anyList());
+  }
+
+  @Test
+  void resumedEnumerationReplacesTheCandidateWitnessWithItsNewAcceptedBytes(
+      @TempDir Path directory) throws Exception {
+    Path file = Files.writeString(directory.resolve("source.txt"), "first");
+    var manager = mock(IndexGenerationManager.class);
+    when(manager.readStateBestEffort()).thenReturn(new IndexGenerationManager.State(
+        2, "g-active", "g-building", null, "MIGRATING", false, null, null,
+        System.currentTimeMillis(), null, null, null));
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"))) {
+      queue.open();
+      var counters = new Counters();
+      var context = new KnowledgeServerMigrationOps.EnqueueContext(
+          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      var first = queue.listSwitchBufferOpsStrict().getFirst();
+      var firstWitness = SwitchBufferUpsert.decode(first.payload());
+
+      Files.writeString(file, "replacement source");
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      var retained = queue.listSwitchBufferOpsStrict();
+      assertEquals(1, retained.size(), "the candidate owns only the latest path version");
+      var secondWitness = SwitchBufferUpsert.decode(retained.getFirst().payload());
+      assertEquals("g-building", retained.getFirst().generation());
+      assertTrue(!firstWitness.unitRevision().equals(secondWitness.unitRevision()));
+      assertEquals(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),
+          secondWitness.sourceSha256());
+      var claim = queue.pollPending(1).getFirst();
+      assertEquals(secondWitness.unitRevision(), claim.unitRevision());
+      assertEquals(secondWitness.sourceSha256(), claim.plannedSourceSha256());
+
+      String normalized = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
+      assertTrue(queue.putSwitchBufferForGeneration(
+          "g-building", "path:" + normalized, "DELETE", normalized));
+      queue.deleteByExactPath(normalized);
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context),
+          "a foreground delete supersedes the baseline enumeration for coverage");
+      assertEquals("DELETE", queue.listSwitchBufferOpsStrict().getFirst().op());
+      assertTrue(queue.pollPending(1).isEmpty(),
+          "the resumed baseline walk must not resurrect an accepted delete");
+    }
+  }
+
+  @Test
+  void resumedEnumerationCannotResurrectAcceptedPrefixDelete(@TempDir Path directory)
+      throws Exception {
+    Path root = Files.createDirectory(directory.resolve("watched"));
+    Files.writeString(root.resolve("source.txt"), "source");
+    var manager = mock(IndexGenerationManager.class);
+    when(manager.readStateBestEffort()).thenReturn(new IndexGenerationManager.State(
+        2, "g-active", "g-building", null, "MIGRATING", false, null, null,
+        System.currentTimeMillis(), null, null, null));
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"))) {
+      queue.open();
+      var counters = new Counters();
+      var context = new KnowledgeServerMigrationOps.EnqueueContext(
+          List.of(root), queue, () -> true, () -> manager, counters.filesSeen,
+          counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      String prefix = io.justsearch.indexerworker.util.PathNormalizer
+          .normalizePathPrefix(root.toString());
+      assertTrue(queue.putSwitchBufferForGeneration(
+          "g-building", "prefix:" + prefix, "DELETE_PREFIX", prefix));
+      assertEquals(1, queue.deleteByPathPrefix(prefix));
+
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      assertEquals("DELETE_PREFIX", queue.listSwitchBufferOpsStrict().getLast().op());
+      assertTrue(queue.pollPending(1).isEmpty(),
+          "the resumed baseline must not enqueue a file below the accepted prefix delete");
+    }
+  }
+
+  @Test
+  void resumedEnumerationCapturesSourceChangedAfterForegroundAdmission(@TempDir Path directory)
+      throws Exception {
+    Path file = Files.writeString(directory.resolve("source.txt"), "first");
+    var manager = mock(IndexGenerationManager.class);
+    when(manager.readStateBestEffort()).thenReturn(new IndexGenerationManager.State(
+        2, "g-active", "g-building", null, "MIGRATING", false, null, null,
+        System.currentTimeMillis(), null, null, null));
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"))) {
+      queue.open();
+      assertTrue(queue.enqueueAndBufferFileForGeneration("g-building",
+          new JobQueue.EnqueueEntry(file, 5), null, null));
+      var oldWitness = SwitchBufferUpsert.decode(queue.listSwitchBufferOpsStrict().getFirst().payload());
+      Files.writeString(file, "replacement");
+      var counters = new Counters();
+      var context = new KnowledgeServerMigrationOps.EnqueueContext(
+          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      var replacement = SwitchBufferUpsert.decode(queue.listSwitchBufferOpsStrict().getFirst().payload());
+      assertTrue(!oldWitness.sourceSha256().equals(replacement.sourceSha256()),
+          "the resumed scan must capture the newer source, not preserve the stale foreground bytes");
+      assertEquals(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),
+          replacement.sourceSha256());
+    }
+  }
+
+  @Test
+  void resumedEnumerationCannotResurrectAcceptedCollectionDelete(@TempDir Path directory)
+      throws Exception {
+    Path file = Files.writeString(directory.resolve("source.txt"), "source");
+    var manager = mock(IndexGenerationManager.class);
+    when(manager.readStateBestEffort()).thenReturn(new IndexGenerationManager.State(
+        2, "g-active", "g-building", null, "MIGRATING", false, null, null,
+        System.currentTimeMillis(), null, null, null));
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"))) {
+      queue.open();
+      assertEquals(1, queue.enqueueEntries(List.of(new JobQueue.EnqueueEntry(file, 6)), "books"));
+      var counters = new Counters();
+      var context = new KnowledgeServerMigrationOps.EnqueueContext(
+          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      assertTrue(queue.putSwitchBufferForGeneration(
+          "g-building", "collection:books", "DELETE_COLLECTION", "books"));
+      String normalized = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
+      assertEquals(1, queue.deleteByExactPath(normalized));
+
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      assertEquals(2, queue.listSwitchBufferOpsStrict().size());
+      assertTrue(queue.pollPending(1).isEmpty(),
+          "the resumed baseline must not recreate the deleted collection's file job");
+    }
+  }
+
+  @Test
+  void collectionDeleteWithoutSourceIdentityBlocksBaselineAdmission(@TempDir Path directory)
+      throws Exception {
+    Path file = Files.writeString(directory.resolve("source.txt"), "source");
+    var manager = mock(IndexGenerationManager.class);
+    when(manager.readStateBestEffort()).thenReturn(new IndexGenerationManager.State(
+        2, "g-active", "g-building", null, "MIGRATING", false, null, null,
+        System.currentTimeMillis(), null, null, null));
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"))) {
+      queue.open();
+      assertTrue(queue.putSwitchBufferForGeneration(
+          "g-building", "collection:books", "DELETE_COLLECTION", "books"));
+      var counters = new Counters();
+      var context = new KnowledgeServerMigrationOps.EnqueueContext(
+          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+
+      assertThrows(IOException.class, () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      assertEquals(1, queue.listSwitchBufferOpsStrict().size(),
+          "a refused baseline admission retains the accepted delete");
+      assertTrue(queue.pollPending(1).isEmpty());
+    }
   }
 
   @Test

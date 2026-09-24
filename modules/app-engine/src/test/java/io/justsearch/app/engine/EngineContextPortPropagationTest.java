@@ -265,17 +265,14 @@ final class EngineContextPortPropagationTest {
           new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop())) {
         client.submitBatch(List.of(document), caller);
         assertEquals(1, queue.switchBufferDepth());
-        assertEquals(0, queue.pollPending(1).size(), "SWITCHING must really buffer admission");
+        assertEquals(1, queue.jobStateCountsStrict().pendingCount(),
+            "SWITCHING must durably admit the candidate queue row with its journal witness");
       }
     }
     try (var queue = new io.justsearch.indexerworker.queue.SqliteJobQueue(database)) {
       queue.open();
-      io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
-          new io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.DrainSwitchBufferContext(
-              queue, null, null, null, index, index.resolve("indices/g-building"),
-              tools.jackson.databind.json.JsonMapper.builder().build(), () -> false, () -> false,
-              org.slf4j.LoggerFactory.getLogger(getClass()), Long.MAX_VALUE, "g-building"));
-      assertEquals(0, queue.switchBufferDepth());
+      assertEquals(1, queue.switchBufferDepth(),
+          "the candidate obligation survives restart until its projection is certified");
       var claimed = queue.pollPending(1).getFirst();
       queue.markDone(document, io.justsearch.indexerworker.ingest.IngestionOutcome.of(
           io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",

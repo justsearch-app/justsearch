@@ -80,6 +80,16 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         "Atomic generation-scoped batch admission is unavailable");
   }
 
+  /**
+   * Covers a native migration enumeration batch atomically. An earlier accepted foreground
+   * mutation for the same candidate path wins over this baseline scan; the covered count includes
+   * those superseded scan entries so enumeration completeness is still accountable.
+   */
+  default int enqueueEnumeratedFilesForGeneration(String generation, List<EnqueueEntry> entries) {
+    throw new UnsupportedOperationException(
+        "Atomic migration enumeration admission is unavailable");
+  }
+
   /** Atomic generation-scoped file admission without recorded scan membership. */
   default boolean enqueueAndBufferFileForGeneration(
       String generation, EnqueueEntry entry, String collection) {
@@ -92,6 +102,13 @@ public interface SwitchBufferCapableQueue extends JobQueue {
       List<EnqueueEntry> entries, String collection) {
     throw new UnsupportedOperationException(
         "Atomic generation-scoped recorded admission is unavailable");
+  }
+
+  /** Exact settled queue admission behind one versioned file projection obligation. */
+  default boolean matchesAcceptedFileProjection(
+      String path, String unitRevision, String sourceSha256) {
+    throw new UnsupportedOperationException(
+        "Exact accepted file projection evidence is unavailable");
   }
 
   /** Atomically buffers sync; maintenance preserves an earlier admission's attribution. */

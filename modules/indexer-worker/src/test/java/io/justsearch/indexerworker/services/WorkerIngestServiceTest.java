@@ -2,6 +2,7 @@ package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -139,6 +140,12 @@ final class WorkerIngestServiceTest {
     var scoped = ((SqliteJobQueue) jobQueue).listSwitchBufferOpsStrictForGeneration("g-green");
     assertEquals(1, scoped.size());
     assertEquals("UPSERT", scoped.getFirst().op());
+    var admitted = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(
+        scoped.getFirst().payload());
+    assertEquals(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),
+        admitted.sourceSha256());
+    assertNotNull(admitted.unitRevision());
+    assertEquals(1, jobQueue.queueDepth());
     assertTrue(((SqliteJobQueue) jobQueue).listSwitchBufferOpsStrictForGeneration("g-foreign")
         .isEmpty());
   }
