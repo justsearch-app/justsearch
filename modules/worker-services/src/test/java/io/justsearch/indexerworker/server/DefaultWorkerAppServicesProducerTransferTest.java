@@ -194,7 +194,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
   }
 
   @Test
-  void textOnlyCandidateBuildRemovesAQueriesWithoutChangingGreenProducer(@TempDir Path tempDir)
+  void textOnlyCandidateBuildKeepsIssuedAQueriesAndGreenProducerIndependent(@TempDir Path tempDir)
       throws Exception {
     try (Fixture fixture = new Fixture(tempDir)) {
       DefaultWorkerAppServices incumbent = fixture.newCandidateIncumbent();
@@ -211,16 +211,60 @@ final class DefaultWorkerAppServicesProducerTransferTest {
       Object statusOps = field(incumbent.ingestService(), "statusOps");
       assertNotNull(field(statusOps, "embedBackendSupplier"));
 
-      incumbent.enterTextOnlyCandidateBuild();
+      WorkerAppServices lexical = incumbent.prepareTextOnlyCandidateView(fixture.runtime);
 
-      assertFalse(queryEmbeddingProvider(incumbent).isAvailable());
-      assertEquals(EncoderBindings.Snapshot.empty(), queryBindings(incumbent).snapshot());
+      assertFalse(((EmbeddingProvider) field(lexical.searchService(), "embeddingProvider"))
+          .isAvailable());
+      assertNotSame(incumbent.healthService(), lexical.healthService());
+      assertSame(providerA, queryEmbeddingProvider(incumbent));
+      assertSame(spladeA, queryBindings(incumbent).spladeEncoder());
+      assertNotNull(field(statusOps, "embedBackendSupplier"));
+      incumbent.clearCandidateSourceStatusDiagnostics();
       assertNull(field(statusOps, "embedBackendSupplier"));
       assertNull(field(statusOps, "embedGpuLayersSupplier"));
       assertSame(providerB, producerEmbeddingProvider(incumbent));
       assertSame(spladeB, producerBindings(incumbent).spladeEncoder());
 
       incumbent.close();
+    }
+  }
+
+  @Test
+  void inPlaceSourceRetirementAndRecompositionKeepGreenProducerDetached(@TempDir Path tempDir)
+      throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = fixture.newCandidateIncumbent();
+      var aReleases = new AtomicInteger();
+      var bReleases = new AtomicInteger();
+      var providerA = mock(EmbeddingProvider.class, "provider-A");
+      var providerB = mock(EmbeddingProvider.class, "provider-B");
+      var spladeA = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class, "splade-A");
+      var spladeB = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class, "splade-B");
+      incumbent.replaceProducerModelLease(aReleases::incrementAndGet);
+      incumbent.wireEmbeddingProvider(providerA);
+      incumbent.wireSpladeEncoder(spladeA);
+      WorkerAppServices lexical = incumbent.prepareTextOnlyCandidateView(fixture.runtime);
+      assertSame(providerA, queryEmbeddingProvider(incumbent));
+      assertFalse(((EmbeddingProvider) field(lexical.searchService(), "embeddingProvider"))
+          .isAvailable());
+      incumbent.clearProducerModelLease();
+      assertEquals(1, aReleases.get());
+
+      incumbent.replaceProducerModelLease(bReleases::incrementAndGet);
+      incumbent.wireCandidateProducer(
+          providerB, new EncoderBindings.Snapshot(spladeB, null, null, null));
+      incumbent.restoreCandidateSourceQueryConfiguration();
+      incumbent.wireRestoredSourceEncoders(
+          new EncoderBindings.Snapshot(spladeA, null, null, null));
+      incumbent.wireEmbeddingProvider(providerA);
+
+      assertSame(providerA, queryEmbeddingProvider(incumbent));
+      assertSame(spladeA, queryBindings(incumbent).spladeEncoder());
+      assertSame(providerB, producerEmbeddingProvider(incumbent));
+      assertSame(spladeB, producerBindings(incumbent).spladeEncoder());
+      incumbent.close();
+      assertEquals(1, aReleases.get(), "A's retired lease is released exactly once");
+      assertEquals(1, bReleases.get(), "B's producer lease remains held until producer exit");
     }
   }
 

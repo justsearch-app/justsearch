@@ -148,6 +148,12 @@ public final class WorkerHealthService {
     return discoveredModels;
   }
 
+  /** Independent text-only status for a candidate build; the issued A service stays intact. */
+  public WorkerHealthService textOnlyView() {
+    return new WorkerHealthService(version, jobQueue, indexCountOps, null,
+        workerStateSupplier, discoveredModels);
+  }
+
   /** Parse a long env-var value, returning {@code defaultValue} on null/blank/parse failure. */
   private static long parseLongEnv(String name, long defaultValue) {
     String raw = System.getenv(name);

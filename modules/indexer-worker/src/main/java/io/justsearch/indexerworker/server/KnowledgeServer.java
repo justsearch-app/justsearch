@@ -181,6 +181,7 @@ public final class KnowledgeServer implements Closeable {
     private final List<Runnable> retirementListeners = new ArrayList<>();
     private boolean retiring;
     private boolean cleanupRunning;
+    private boolean abortRetirement;
     private Runnable retireCleanup;
 
     private ServingView(WorkerAppServices services, LuceneRuntime searchRuntime,
@@ -466,6 +467,11 @@ public final class KnowledgeServer implements Closeable {
       recordedCandidateFingerprint;
   private WorkerServiceConfiguration candidateServiceConfiguration;
   private volatile CandidateModels candidateModels;
+  private volatile boolean recordedCandidateInPlace;
+  private volatile boolean recordedRefusalCleanupPending;
+  private volatile WorkerAppServices inPlaceLexicalServices;
+  private volatile EncoderSet.ModelIdentity inPlaceSourceIdentity;
+  private volatile boolean inPlaceSourceHadModels;
   private volatile EmbeddingCompatibilityController candidateEmbeddingCompatController;
 
   /** B's native/model view, independent of the model wrappers serving A during its build. */
@@ -476,7 +482,30 @@ public final class KnowledgeServer implements Closeable {
       io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder spladeIdf,
       io.justsearch.reranker.CrossEncoderReranker reranker,
       io.justsearch.reranker.CitationScorer citation,
-      GpuDiagnosticSuppliers diagnostics) {}
+      GpuDiagnosticSuppliers diagnostics) {
+    void close() {
+      owner.close();
+      RuntimeException failure = null;
+      for (AutoCloseable wrapper : new AutoCloseable[] {embedding,
+          bindings.spladeEncoder(), bindings.bgeM3Encoder(), bindings.nerService(),
+          reranker, citation}) {
+        if (wrapper == null) continue;
+        try { wrapper.close(); }
+        catch (Exception cleanup) {
+          if (failure == null) failure = new IllegalStateException(
+              "Candidate model wrapper retirement failed", cleanup);
+          else failure.addSuppressed(cleanup);
+        }
+      }
+      if (failure != null) throw failure;
+    }
+  }
+
+  private static void closeWrapper(AutoCloseable wrapper) {
+    if (wrapper == null) return;
+    try { wrapper.close(); }
+    catch (Exception failure) { throw new IllegalStateException("Model wrapper retirement failed", failure); }
+  }
   private final java.util.function.Supplier<ResolvedConfig> liveConfiguration;
   private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
 
@@ -1510,6 +1539,10 @@ public final class KnowledgeServer implements Closeable {
       }
       retryRetiredServingViews();
       retryCommittedGenerationRetirement();
+      try { reconcileRefusedRecordedCandidate(); }
+      catch (RuntimeException failure) {
+        log.error("Refused candidate maintenance will retry", failure);
+      }
     }, REAP_INTERVAL_MS, REAP_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
 
@@ -1653,6 +1686,9 @@ public final class KnowledgeServer implements Closeable {
         incumbent.prepareServingSuccessor(fixedRuntimeContext(greenRuntime, buildingIndexPath));
     try {
       wireAppServicesPostConstruction(successor);
+      if (disambiguationService != null) {
+        successor.wireDisambiguationService(disambiguationService);
+      }
       if (recordedCandidate != null) {
         CandidateModels selected = Objects.requireNonNull(candidateModels,
             "Recorded Green candidate models are not READY");
@@ -2033,28 +2069,308 @@ public final class KnowledgeServer implements Closeable {
     var composition = memory.decision(footprint);
     if (encoderComponent != null) encoderComponent.setLastCompose(composition);
     if (composition.mode() == io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE) {
-      throw new IOException("Candidate encoder set requires in-place composition: "
-          + composition.reason() + ", free=" + composition.freeBytes()
-          + ", footprint=" + composition.footprintBytes());
+      beginInPlaceCandidateBuild();
     }
-    return composeSelectedModels(configuration, selection, inputs, dimension, hardware, contract, modelsDir,
+    var identity = new EncoderSet.ModelIdentity(inputs.embeddingModel(), inputs.spladeModel(),
+        inputs.nerModel(), "bge-m3".equalsIgnoreCase(configuration.ai().sparseModel()), dimension);
+    return composeSelectedModels(selection, identity, hardware, contract, modelsDir,
         encoderConfiguration);
   }
 
+  /** Publishes lexical A before retiring its exact native owner, then leaves Green's writer alive. */
+  private void beginInPlaceCandidateBuild() throws IOException {
+    ServingView nativeView;
+    DefaultWorkerAppServices producer;
+    EncoderSet incumbent;
+    runtimeSwapLock.lock();
+    try {
+      publicationLock.writeLock().lock();
+      try {
+        synchronized (servingViewMonitor) {
+          nativeView = servingView;
+          incumbent = initialEncoderSet;
+          if (closeStarted || recordedCandidateInPlace || incumbent == null
+              || nativeView == null || nativeView.retiring
+              || nativeView.encoderSet != incumbent
+              || !(nativeView.services instanceof DefaultWorkerAppServices current)
+              || current != appServices || ingestLifecycle == searchLifecycle) {
+            throw new IOException("In-place candidate lost its active A or Green producer");
+          }
+          producer = current;
+          inPlaceSourceIdentity = incumbent.modelIdentity();
+          var sourceObservation = incumbent.surfaceForOwner().componentObservation();
+          inPlaceSourceHadModels = sourceObservation.requestedRoles().stream()
+              .anyMatch(role -> !sourceObservation.missingRoles().contains(role));
+          // The old service remains immutable for its issued calls. New captures see a separate
+          // lexical search service over A while this producer continues writing Green.
+          WorkerAppServices lexicalServices = current.prepareTextOnlyCandidateView(
+              nativeView.searchRuntime);
+          ServingView lexicalView = new ServingView(lexicalServices, nativeView.searchRuntime,
+              nativeView.ingestRuntime, nativeView.activeGenerationPath);
+          nativeView.retiring = true;
+          nativeView.retireCleanup = nativeView::releaseEncoderSet;
+          retiredServingViews.add(nativeView);
+          servingView = lexicalView;
+          inPlaceLexicalServices = lexicalServices;
+          servingViewMonitor.notifyAll();
+          recordedCandidateInPlace = true;
+        }
+      } finally {
+        publicationLock.writeLock().unlock();
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    if (encoderComponent != null) encoderComponent.transition(
+        io.justsearch.core.component.ComponentState.RELOADING, null,
+        "A serves text while candidate native models compose in place");
+    notifyServingViewRetirement(nativeView);
+    try {
+      awaitRetiredNativeView(nativeView);
+    } catch (IOException refusal) {
+      restoreUnretiredNativeView(nativeView);
+      throw refusal;
+    }
+    producer.clearProducerModelLease();
+    producer.clearCandidateSourceStatusDiagnostics();
+    try {
+      incumbent.close();
+    } catch (RuntimeException refusal) {
+      if (encoderComponent != null) encoderComponent.transition(
+          io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
+          "A native retirement refused: " + refusal.getMessage());
+      throw new IOException("A native retirement refused; B composition is excluded", refusal);
+    }
+    initialEncoderSet = null;
+    closeWrapper(embeddingService);
+    closeWrapper(spladeEncoderInstance);
+    closeWrapper(bgeM3EncoderInstance);
+    closeWrapper(nerServiceInstance);
+    closeWrapper(searchRerankerInstance);
+    closeWrapper(citationScorerInstance);
+    inferenceSurface = null;
+    embeddingService = null;
+    nerServiceInstance = null;
+    spladeEncoderInstance = null;
+    spladeIdfQueryEncoder = null;
+    bgeM3EncoderInstance = null;
+    searchRerankerInstance = null;
+    citationScorerInstance = null;
+  }
+
+  /** A slow issued call never forces native retirement; restore the untouched A view. */
+  private void restoreUnretiredNativeView(ServingView nativeView) {
+    ServingView retiredLexical;
+    runtimeSwapLock.lock();
+    try {
+      publicationLock.writeLock().lock();
+      try {
+        synchronized (servingViewMonitor) {
+          if (!retiredServingViews.contains(nativeView) || nativeView.cleanupRunning
+              || servingView == null || servingView.services != inPlaceLexicalServices) return;
+          ServingView lexical = servingView;
+          retiredLexical = lexical;
+          lexical.retiring = true;
+          lexical.retireCleanup = () -> {};
+          retiredServingViews.add(lexical);
+          nativeView.retiring = false;
+          nativeView.retireCleanup = null;
+          nativeView.abortRetirement = false;
+          retiredServingViews.remove(nativeView);
+          servingView = nativeView;
+          recordedCandidateInPlace = false;
+          inPlaceLexicalServices = null;
+          servingViewMonitor.notifyAll();
+        }
+      } finally {
+        publicationLock.writeLock().unlock();
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    notifyServingViewRetirement(retiredLexical);
+    publishEncoderComposition();
+  }
+
+  /** A lexical successor remains capturable while older native calls finish. */
+  private void awaitRetiredNativeView(ServingView nativeView) throws IOException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (true) {
+      cleanRetiredServingView(nativeView);
+      synchronized (servingViewMonitor) {
+        if (!retiredServingViews.contains(nativeView)) return;
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) {
+          if (nativeView.cleanupRunning || nativeView.holders == 0) continue;
+          nativeView.abortRetirement = true;
+          throw new IOException("A native serving calls did not leave before candidate composition");
+        }
+        try {
+          TimeUnit.NANOSECONDS.timedWait(servingViewMonitor, remaining);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted waiting for A native serving calls", interrupted);
+        }
+      }
+    }
+  }
+
+  /** A committed pointer is never undone; this repairs only a refused precommit B build. */
+  private void recomposeSourceAfterCandidateRefusal(Exception candidateFailure) {
+    if (!recordedCandidateInPlace) return;
+    if (initialEncoderSet != null && !initialEncoderSet.isClosed()) {
+      recordFailedSourceRecompose(candidateFailure,
+          new IOException("A native retirement remains incomplete"));
+      return;
+    }
+    try {
+      if (!(appServices instanceof DefaultWorkerAppServices producer)) {
+        throw new IOException("A query and Green producer services are unavailable");
+      }
+      CandidateModels candidate = candidateModels;
+      if (candidate != null) {
+        if (!producer.producerClosed()) producer.clearProducerModelLease();
+        candidate.close();
+        candidateModels = null;
+      }
+      EncoderSet.ModelIdentity identity = Objects.requireNonNull(inPlaceSourceIdentity,
+          "Active generation model identity");
+      GenerationModelSelection selection = initialModelSelection;
+      if (!inPlaceSourceHadModels) {
+        publishEmptySource(producer);
+        if (encoderComponent != null) encoderComponent.transition(
+            io.justsearch.core.component.ComponentState.ABSENT, null,
+            "Candidate refused; active A remains text-only");
+        return;
+      }
+      ResolvedConfig configuration = Objects.requireNonNull(startupConfiguration,
+          "Active generation configuration");
+      Path aiHome = configuration.paths().dataDir();
+      InstallContract contract = aiHome == null ? null : InstallContractIO.read(aiHome);
+      Path modelsDir = resolveModelsDir(contract, aiHome, configuration);
+      HardwareProfile hardware = contract != null && contract.hardwareProfile() != null
+          ? contract.hardwareProfile() : configuration.ai().masterGpuEnabled()
+              ? HardwareProfile.gpuFull(0) : HardwareProfile.cpuOnly();
+      CandidateModels restored = composeSelectedModels(selection, identity, hardware, contract,
+          modelsDir, selection == null ? EncoderConfigurationProjection.from(configuration)
+              : EncoderConfigurationProjection.from(configuration, selection));
+      try {
+        publishRecomposedSource(producer, restored);
+      } catch (RuntimeException | Error wiringFailure) {
+        try { restored.close(); }
+        catch (RuntimeException | Error cleanup) { wiringFailure.addSuppressed(cleanup); }
+        throw wiringFailure;
+      }
+      publishEncoderComposition();
+      log.info("Recomposed active A after refused in-place candidate");
+    } catch (IOException | RuntimeException | Error restoreFailure) {
+      recordFailedSourceRecompose(candidateFailure, restoreFailure);
+    }
+  }
+
+  private void publishEmptySource(DefaultWorkerAppServices producer) {
+    ServingView retiredLexical;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        ServingView lexical = servingView;
+        if (closeStarted || lexical == null || lexical.services != inPlaceLexicalServices
+            || lexical.retiring) throw new IllegalStateException("Text-only A changed");
+        ServingView restored = new ServingView(producer, lexical.searchRuntime,
+            lexical.ingestRuntime, lexical.activeGenerationPath);
+        lexical.retiring = true;
+        retiredLexical = lexical;
+        lexical.retireCleanup = () -> {};
+        retiredServingViews.add(lexical);
+        servingView = restored;
+        inPlaceLexicalServices = null;
+        recordedCandidateInPlace = false;
+        servingViewMonitor.notifyAll();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    notifyServingViewRetirement(retiredLexical);
+  }
+
+  private void publishRecomposedSource(DefaultWorkerAppServices producer, CandidateModels restored) {
+    ServingView retiredLexical;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        ServingView lexical = servingView;
+        if (closeStarted || lexical == null || lexical.retiring
+            || lexical.services != inPlaceLexicalServices
+            || lexical.encoderSet != null) {
+          throw new IllegalStateException("Text-only A changed before recomposition");
+        }
+        var bindings = restored.bindings();
+        producer.restoreCandidateSourceQueryConfiguration();
+        producer.wireRestoredSourceEncoders(new EncoderBindings.Snapshot(
+            bindings.spladeEncoder(), bindings.bgeM3Encoder(), bindings.nerService(),
+            disambiguationService));
+        producer.wireEmbeddingProvider(restored.embedding());
+        producer.wireSpladeIdfQueryEncoder(restored.spladeIdf());
+        producer.wireSearchReranker(restored.reranker());
+        producer.wireCitationScorer(restored.citation());
+        producer.wireGpuDiagnostics(restored.diagnostics());
+        producer.wireStageEnabled(restored.embedding() != null,
+            bindings.spladeEncoder() != null, bindings.nerService() != null);
+        producer.wirePolicySnapshotSupplier(() -> inferenceSurface == null
+            ? null : inferenceSurface.policies());
+        ServingView restoredView = new ServingView(producer, lexical.searchRuntime,
+            lexical.ingestRuntime, lexical.activeGenerationPath);
+        restoredView.attachEncoderSet(restored.owner());
+        lexical.retiring = true;
+        retiredLexical = lexical;
+        lexical.retireCleanup = () -> {};
+        retiredServingViews.add(lexical);
+        servingView = restoredView;
+        inPlaceLexicalServices = null;
+        inferenceSurface = restored.owner().surfaceForOwner();
+        initialEncoderSet = restored.owner();
+        embeddingService = restored.embedding();
+        nerServiceInstance = bindings.nerService();
+        spladeEncoderInstance = bindings.spladeEncoder();
+        spladeIdfQueryEncoder = restored.spladeIdf();
+        bgeM3EncoderInstance = bindings.bgeM3Encoder();
+        searchRerankerInstance = restored.reranker();
+        citationScorerInstance = restored.citation();
+        recordedCandidateInPlace = false;
+        servingViewMonitor.notifyAll();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    notifyServingViewRetirement(retiredLexical);
+  }
+
+  private void recordFailedSourceRecompose(Exception candidateFailure, Throwable restoreFailure) {
+    candidateFailure.addSuppressed(restoreFailure);
+    if (encoderComponent != null) {
+      encoderComponent.transition(io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
+          "B refused: " + candidateFailure.getMessage() + "; A recompose refused: "
+              + restoreFailure.getMessage());
+      encoderComponent.recordRecoveryAttempt(restoreFailure.getMessage());
+    }
+    log.error("Active A could not be recomposed after candidate refusal", restoreFailure);
+  }
+
   /** Composes one exact generation-selected model set behind the device-line decision. */
-  private CandidateModels composeSelectedModels(ResolvedConfig configuration,
-      GenerationModelSelection selection,
-      SsotCommitMetadataSource.RuntimeFingerprintInputs inputs,
-      int dimension,
+  private CandidateModels composeSelectedModels(GenerationModelSelection selection,
+      EncoderSet.ModelIdentity identity,
       HardwareProfile hardware, InstallContract contract, Path modelsDir,
       EncoderConfigurationProjection encoderConfiguration) throws IOException {
     InferenceSurface surface = InferenceCompositionRoot.compose(encoderConfiguration, hardware,
         contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection);
-    var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
-        inputs.embeddingModel(), inputs.spladeModel(), inputs.nerModel(),
-        "bge-m3".equalsIgnoreCase(configuration.ai().sparseModel()), dimension));
+    var owner = new EncoderSet(surface, identity);
+    EmbeddingService embedding = null;
+    io.justsearch.indexerworker.ner.NerService ner = null;
+    io.justsearch.indexerworker.bgem3.BgeM3Encoder bge = null;
+    io.justsearch.indexerworker.splade.SpladeEncoder splade = null;
+    io.justsearch.reranker.CrossEncoderReranker reranker = null;
+    io.justsearch.reranker.CitationScorer citation = null;
     try {
-      EmbeddingService embedding = null;
       if (surface.embedding().isPresent()) {
         var assembly = surface.embedding().orElseThrow();
         var config = encoderConfiguration.embedding();
@@ -2064,21 +2380,19 @@ public final class KnowledgeServer implements Closeable {
             encoder, config.gpuEnabled() ? 1 : 0, config.contextLength());
         embedding = EmbeddingService.createWithBackend(backend, config, embeddingTelemetry,
             assembly.capabilities().documentPrefix(), assembly.capabilities().queryPrefix());
-        if (!embedding.isAvailable() || embedding.dimension() != dimension) {
+        if (!embedding.isAvailable() || embedding.dimension() != identity.vectorDimension()) {
           throw new IOException("Recorded candidate embedding does not match its index dimension");
         }
       }
-      io.justsearch.indexerworker.ner.NerService ner = surface.ner().isPresent()
+      ner = surface.ner().isPresent()
           ? new io.justsearch.indexerworker.ner.NerService(
               surface.ner().orElseThrow(), encoderConfiguration.ner()) : null;
-      io.justsearch.indexerworker.bgem3.BgeM3Encoder bge = null;
       if (surface.bgeM3().isPresent()) {
         var assembly = surface.bgeM3().orElseThrow();
         bge = new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
             assembly.sessions(), assembly.shape(), assembly.tokenizer(),
             encoderConfiguration.bgeM3());
       }
-      io.justsearch.indexerworker.splade.SpladeEncoder splade = null;
       io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder idf = null;
       if (surface.splade().isPresent()) {
         var assembly = surface.splade().orElseThrow();
@@ -2094,22 +2408,22 @@ public final class KnowledgeServer implements Closeable {
           }
         }
       }
-      if ((!"bge-m3".equalsIgnoreCase(configuration.ai().sparseModel())
-              && inputs.embeddingModel().state()
-                  == IndexFingerprint.ModelState.PRESENT && embedding == null)
-          || (inputs.spladeModel().state()
-              == IndexFingerprint.ModelState.PRESENT && splade == null)
-          || (inputs.nerModel().state()
-              == IndexFingerprint.ModelState.PRESENT && ner == null)
-          || ("bge-m3".equalsIgnoreCase(configuration.ai().sparseModel()) && bge == null)) {
+      if ((!identity.bgeM3Selected()
+              && identity.embeddingModel().state()
+                   == IndexFingerprint.ModelState.PRESENT && embedding == null)
+          || (identity.spladeModel().state()
+               == IndexFingerprint.ModelState.PRESENT && splade == null)
+          || (identity.nerModel().state()
+               == IndexFingerprint.ModelState.PRESENT && ner == null)
+          || (identity.bgeM3Selected() && bge == null)) {
         throw new IOException("Recorded candidate model could not become READY");
       }
-      io.justsearch.reranker.CrossEncoderReranker reranker = surface.reranker().isPresent()
+      reranker = surface.reranker().isPresent()
           ? new io.justsearch.reranker.CrossEncoderReranker(
               surface.reranker().orElseThrow().sessions(),
               surface.reranker().orElseThrow().shape(),
               surface.reranker().orElseThrow().tokenizer()) : null;
-      io.justsearch.reranker.CitationScorer citation = surface.citation().isPresent()
+      citation = surface.citation().isPresent()
           ? new io.justsearch.reranker.CitationScorer(
               surface.citation().orElseThrow().sessions(),
               surface.citation().orElseThrow().shape(),
@@ -2128,7 +2442,9 @@ public final class KnowledgeServer implements Closeable {
       owner.releaseModelReady();
       return new CandidateModels(owner, embedding, bindings, idf, reranker, citation, diagnostics);
     } catch (IOException | RuntimeException | Error failure) {
-      try { owner.close(); }
+      try { new CandidateModels(owner, embedding,
+          new EncoderBindings.Snapshot(splade, bge, ner, null), null,
+          reranker, citation, null).close(); }
       catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
       throw failure;
     }
@@ -2492,6 +2808,7 @@ public final class KnowledgeServer implements Closeable {
       modelReadyLatch.countDown();
       EncoderSet initial = initialEncoderSet;
       if (initial != null) initial.releaseModelReady();
+      for (ServingLease lease : modelWiringLeases) lease.close();
       if (recordedCandidate != null
           && generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING
           && !closeStarted) {
@@ -2516,11 +2833,12 @@ public final class KnowledgeServer implements Closeable {
           current.startIndexingLoop();
           log.info("Recorded Green candidate model set ready for indexing");
         } catch (Exception failure) {
+          recomposeSourceAfterCandidateRefusal(failure);
           migrationEnumeratorFailure = failure;
-          log.error("Recorded Green candidate models refused; A remains serving", failure);
+          log.error("Recorded Green candidate models refused; A state={}",
+              encoderComponent == null ? "unobserved" : encoderComponent.snapshot().state(), failure);
         }
       }
-      for (ServingLease lease : modelWiringLeases) lease.close();
     }
   }
 
@@ -3273,7 +3591,8 @@ public final class KnowledgeServer implements Closeable {
   private void cleanRetiredServingView(ServingView retired) {
     Runnable cleanup;
     synchronized (servingViewMonitor) {
-      if (retired.holders != 0 || retired.retireCleanup == null || retired.cleanupRunning) return;
+      if (retired.holders != 0 || retired.retireCleanup == null || retired.cleanupRunning
+          || retired.abortRetirement) return;
       retired.cleanupRunning = true;
       cleanup = retired.retireCleanup;
     }
@@ -3602,7 +3921,7 @@ public final class KnowledgeServer implements Closeable {
           CandidateModels selectedCandidate = candidateModels;
           if (selectedCandidate != null) {
             try {
-              selectedCandidate.owner().close();
+              selectedCandidate.close();
               candidateModels = null;
             } catch (RuntimeException refusal) {
               throw new IOException("Candidate native inference retirement incomplete; server retained for retry",
@@ -3686,6 +4005,15 @@ public final class KnowledgeServer implements Closeable {
             } catch (Exception e) {
               log.warn("Error closing search reranker", e);
             }
+          }
+
+          if (nerServiceInstance != null) {
+            try { nerServiceInstance.close(); }
+            catch (Exception e) { log.warn("Error closing NER service", e); }
+          }
+          if (citationScorerInstance != null) {
+            try { citationScorerInstance.close(); }
+            catch (Exception e) { log.warn("Error closing citation scorer", e); }
           }
 
           // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
@@ -3924,12 +4252,13 @@ public final class KnowledgeServer implements Closeable {
     }
     migrationCutoverThread =
         new Thread(
-            () ->
+            () -> {
+              try {
                 KnowledgeServerMigrationOps.runMigrationCutoverLoop(
                     new KnowledgeServerMigrationOps.CutoverContext(
                         indexGenerationManager,
                         jobQueue,
-                        () -> running,
+                        () -> running && !recordedCandidatePrecommitRefused(),
                         () -> migrationEnumeratorDone
                             && (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
                                 || recordedIngestionLifecycle.recordedCutoverReady(recorded.operationKey())),
@@ -3951,10 +4280,71 @@ public final class KnowledgeServer implements Closeable {
                          this::enterSwitchingWithMutationAdmission,
                          generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
                              ? () -> promoteServingSuccessor(recorded)
-                             : () -> promoteServingSuccessor(null))),
+                             : () -> promoteServingSuccessor(null)));
+              } finally {
+                try { reconcileRefusedRecordedCandidate(); }
+                catch (RuntimeException failure) {
+                  log.error("Refused candidate cutover cleanup will retry", failure);
+                }
+              }
+            },
             "migration-cutover");
     migrationCutoverThread.setDaemon(true);
     migrationCutoverThread.start();
+  }
+
+  private boolean recordedCandidatePrecommitRefused() {
+    return generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+        && recordedIngestionLifecycle.recordedPrecommitRefused(recorded.operationKey());
+  }
+
+  /** The application has durably refused B while A is still the pointer. Retire Green first. */
+  private void reconcileRefusedRecordedCandidate() {
+    if ((recordedCandidate == null && !recordedRefusalCleanupPending)
+        || !recordedCandidatePrecommitRefused() || closeStarted) return;
+    CompletableFuture<ModelContext> composition = deferredModelInit;
+    if (composition != null && !composition.isDone()) return;
+    boolean restart = false;
+    runtimeSwapLock.lock();
+    try {
+      if ((recordedCandidate == null && !recordedRefusalCleanupPending) || closeStarted
+          || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+          || !(appServices instanceof DefaultWorkerAppServices producer)) return;
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state == null || !recorded.sourceGeneration().equals(state.active_generation())) return;
+      if (state.building_generation() == null && recordedRefusalCleanupPending) {
+        restart = true;
+      } else {
+        if (!("g-" + recorded.operationKey()).equals(state.building_generation())) return;
+        recordedRefusalCleanupPending = true;
+        try {
+          // Producer close joins the actual Green writer before its B model lease can leave.
+          producer.close();
+          if (recordedCandidateInPlace) {
+            recomposeSourceAfterCandidateRefusal(
+                new IOException("Recorded candidate refused before pointer"));
+          } else if (candidateModels != null) {
+            candidateModels.close();
+            candidateModels = null;
+          }
+          if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
+          if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
+          indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
+          restart = true;
+        } catch (IOException | RuntimeException failure) {
+          if (encoderComponent != null) encoderComponent.transition(
+              io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
+              "Refused candidate cleanup requires recovery: " + failure.getMessage());
+          log.error("Refused in-place candidate still owns its Green resources", failure);
+        }
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    if (restart) {
+      migrationRestartAction.run();
+      recordedRefusalCleanupPending = false;
+    }
   }
 
   /** State transition and producer admission use one lock order: runtime, mutation, generation. */
@@ -4004,6 +4394,8 @@ public final class KnowledgeServer implements Closeable {
       }
       incumbent = current;
       successor = prepareServingSuccessor(green);
+      // A post-pointer failure must leave the transferred Green producer reachable by close().
+      retainPendingAppServices(successor);
       var switching = indexGenerationManager.readStateBestEffort();
       if (switching == null || !"SWITCHING".equals(switching.migration_state())) return null;
       String sourceGeneration = switching.active_generation();
@@ -4069,7 +4461,8 @@ public final class KnowledgeServer implements Closeable {
           RecordedIngestionLifecycle.CheckedPromotion publish = () -> {
             runtimeSwapLock.lock();
             try {
-              if (closeStarted || heldSource.services() != current
+          if (closeStarted || heldSource.services() !=
+                  (recordedCandidateInPlace ? inPlaceLexicalServices : current)
                   || heldSource.searchRuntime() != searchLifecycle
                   || heldSource.ingestRuntime() != green || appServices != current
                   || ingestLifecycle != green || buildingIndexPath == null
@@ -4101,7 +4494,8 @@ public final class KnowledgeServer implements Closeable {
                     ServingView old;
                     synchronized (servingViewMonitor) {
                       old = servingView;
-                      if (closeStarted || old == null || old.retiring || old.services != current
+                      if (closeStarted || old == null || old.retiring || old.services !=
+                              (recordedCandidateInPlace ? inPlaceLexicalServices : current)
                           || old.searchRuntime != searchLifecycle || old.ingestRuntime != green) {
                         throw new IOException("Serving source changed before pointer commitment");
                       }
@@ -4156,15 +4550,36 @@ public final class KnowledgeServer implements Closeable {
                       buildingIndexPath = null;
                       searchLifecycle = green;
                       generationBootDisposition = IndexGenerationManager.BootDisposition.PROMOTED;
+                      releasePendingAppServices(preparedServices);
                       appServices = preparedServices;
                       if (recordedCandidate != null) {
+                        CandidateModels promotedModels = Objects.requireNonNull(candidateModels,
+                            "Promoted candidate model bundle");
                         inferenceSurface = successorEncoder.surfaceForOwner();
+                        initialEncoderSet = promotedModels.owner();
+                        embeddingCompatController = candidateEmbeddingCompatController;
+                        candidateEmbeddingCompatController = null;
+                        embeddingService = promotedModels.embedding();
+                        nerServiceInstance = promotedModels.bindings().nerService();
+                        spladeEncoderInstance = promotedModels.bindings().spladeEncoder();
+                        spladeIdfQueryEncoder = promotedModels.spladeIdf();
+                        bgeM3EncoderInstance = promotedModels.bindings().bgeM3Encoder();
+                        searchRerankerInstance = promotedModels.reranker();
+                        citationScorerInstance = promotedModels.citation();
+                        startupConfiguration = recordedCandidate.configuration();
+                        initialModelSelection = GenerationModelSelection.accepted(
+                            recordedCandidate.models(), startupConfiguration.ai().sparseModel(),
+                            promotedModels.owner().modelIdentity().vectorDimension());
+                        candidateModels = null;
+                        recordedCandidateInPlace = false;
+                        inPlaceLexicalServices = null;
                       }
                       servingView = next;
                       servingViewMonitor.notifyAll();
                     }
                     committedProjection.set(projection);
                     published.set(true);
+                    if (recordedCandidate != null) publishEncoderComposition();
                     return promoted;
                   } finally {
                     publicationLock.writeLock().unlock();
@@ -4208,12 +4623,23 @@ public final class KnowledgeServer implements Closeable {
       }
       throw failure;
     } finally {
-      if (paused && incumbent != null && (!pointerUncertain.get() || published.get())) {
-        incumbent.resumeProducerAfterCutover();
+      try {
+        if (paused && incumbent != null && (!pointerUncertain.get() || published.get())) {
+          incumbent.resumeProducerAfterCutover();
+        }
+        if (!published.get() && !pointerUncertain.get() && successor != null) {
+          try {
+            successor.close();
+            if (pendingAppServices == successor) pendingAppServices = null;
+          } catch (IOException | RuntimeException cleanupFailure) {
+            log.error("Unpublished Green successor still owns resources", cleanupFailure);
+            requestRecovery = true;
+          }
+        }
+        if (!published.get() && preparedView.get() != null) preparedView.get().releaseEncoderSet();
+      } finally {
+        runtimeSwapLock.unlock();
       }
-      if (!published.get() && !pointerUncertain.get() && successor != null) successor.close();
-      if (!published.get() && preparedView.get() != null) preparedView.get().releaseEncoderSet();
-      runtimeSwapLock.unlock();
       if (published.get()) notifyServingViewRetirement(retiredForNotification.get());
       if (!published.get() && !pointerUncertain.get() && preparedProjection != null) {
         try { preparedProjection.abortBeforePointer(); }

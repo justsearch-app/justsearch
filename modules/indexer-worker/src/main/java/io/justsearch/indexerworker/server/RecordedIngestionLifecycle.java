@@ -39,6 +39,9 @@ public interface RecordedIngestionLifecycle {
   /** Bounded owner readiness before recorded cutover can advance phase or commit Green. */
   default boolean recordedCutoverReady(String operationKey) { return false; }
 
+  /** Durable owner decision that this recorded B can no longer commit its pointer. */
+  default boolean recordedPrecommitRefused(String operationKey) { return false; }
+
   /** Persist sealed operation evidence outside queue locking before recorded promotion. */
   default boolean beforeRecordedPromotion(String operationKey, JobQueue queue) {
     return false;

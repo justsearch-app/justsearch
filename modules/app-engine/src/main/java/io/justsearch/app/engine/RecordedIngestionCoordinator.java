@@ -1210,6 +1210,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     return bulk != null && bulkClaimAllowed(bulk);
   }
 
+  @Override public boolean recordedPrecommitRefused(String operationKey) {
+    return operations.find(operationKey).filter(RecordedIngestionCoordinator::isBulk)
+        .flatMap(row -> operations.bulkReindexProgress(row.id()))
+        .map(progress -> progress.refusalCode() != null).orElse(false);
+  }
+
   @Override public boolean beforeRecordedPromotion(String operationKey, JobQueue queue) {
     synchronized (lock) {
       Bulk bulk = bulks.get(operationKey);

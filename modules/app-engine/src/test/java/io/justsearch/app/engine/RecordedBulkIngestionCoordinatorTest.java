@@ -503,6 +503,8 @@ final class RecordedBulkIngestionCoordinatorTest {
       BulkReindexProgress refused = harness.progress();
       assertEquals(BulkReindexProgress.Phase.BUILDING, refused.phase());
       assertEquals("cancelled", refused.refusalCode());
+      assertTrue(harness.coordinator.recordedPrecommitRefused(harness.key),
+          "the durable refusal fences Worker restoration before terminal receipt");
       assertEquals(OperationState.RUNNING, harness.operations.find(harness.key).orElseThrow().state());
       JobQueue.WalkProgress open = harness.queue.recordedWalk(harness.key).orElseThrow();
       assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE, open.enumerationOutcome());
@@ -515,6 +517,7 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertEquals("cancelled", cancelled.receipt().code());
       assertEquals(attempts, cancelled.attempts(), "refusal reconciliation does not spend another attempt");
       assertEquals("cancelled", harness.progress().refusalCode());
+      assertTrue(harness.coordinator.recordedPrecommitRefused(harness.key));
       assertEquals(BulkReindexProgress.Phase.SETTLED, harness.progress().phase());
       assertEquals(1, harness.progress().settlement().gaps().size());
       assertEquals(1, harness.producerStarts.get(), "restored allowing policy cannot restart a refused walk");
@@ -690,6 +693,8 @@ final class RecordedBulkIngestionCoordinatorTest {
           "committed B waits for replay settlement despite a late cancellation");
       assertEquals(BulkReindexProgress.Phase.SETTLED, harness.progress().phase());
       assertNull(harness.progress().refusalCode());
+      assertFalse(harness.coordinator.recordedPrecommitRefused(harness.key),
+          "a committed pointer cannot be classified as precommit refusal");
       harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
       harness.coordinator.maintain();
       committed = harness.operations.find(harness.key).orElseThrow();

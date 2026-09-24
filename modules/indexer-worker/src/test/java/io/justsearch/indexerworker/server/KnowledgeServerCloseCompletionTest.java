@@ -149,6 +149,161 @@ final class KnowledgeServerCloseCompletionTest {
   }
 
   @Test
+  void inPlaceBuildKeepsLexicalCapturesOpenUntilIssuedNativeViewExits(@TempDir Path tempDir)
+      throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var aRuntime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+    var greenRuntime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+    var services = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    var lexicalServices = org.mockito.Mockito.mock(WorkerAppServices.class);
+    org.mockito.Mockito.when(services.prepareTextOnlyCandidateView(aRuntime))
+        .thenReturn(lexicalServices);
+    var absent = IndexFingerprint.ModelFingerprint.notConfigured();
+    var owner = new EncoderSet(new InferenceSurface(java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(),
+        org.mockito.Mockito.mock(io.justsearch.ort.PolicySnapshot.class), java.util.List.of(),
+        new InferenceSurface.ComponentObservation(java.util.Optional.of("configured A"),
+            java.util.Set.of(io.justsearch.ort.EncoderRole.EMBEDDING),
+            java.util.Set.of(io.justsearch.ort.EncoderRole.EMBEDDING))),
+        new EncoderSet.ModelIdentity(absent, absent, absent, false, 768));
+    Field searchField = KnowledgeServer.class.getDeclaredField("searchLifecycle");
+    Field ingestField = KnowledgeServer.class.getDeclaredField("ingestLifecycle");
+    Field initialField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+    searchField.setAccessible(true);
+    ingestField.setAccessible(true);
+    initialField.setAccessible(true);
+    searchField.set(server, aRuntime);
+    ingestField.set(server, greenRuntime);
+    server.publishServingView(services);
+    var servingField = KnowledgeServer.class.getDeclaredField("servingView");
+    servingField.setAccessible(true);
+    Object nativeView = servingField.get(server);
+    var attach = nativeView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+    attach.setAccessible(true);
+    attach.invoke(nativeView, owner);
+    initialField.set(server, owner);
+
+    var held = server.captureServingView();
+    try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      var build = executor.submit(() -> {
+        var begin = KnowledgeServer.class.getDeclaredMethod("beginInPlaceCandidateBuild");
+        begin.setAccessible(true);
+        begin.invoke(server);
+        return null;
+      });
+      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      boolean lexicalPublished = false;
+      while (!lexicalPublished && System.nanoTime() < deadline) {
+        try (var lexical = server.captureServingView()) {
+          lexicalPublished = lexical.encoderSet() == null;
+          assertTrue(lexical.searchRuntime() == aRuntime);
+        }
+      }
+      assertTrue(lexicalPublished, "new lexical calls must enter while old native work is held");
+      org.junit.jupiter.api.Assertions.assertSame(services, held.services(),
+          "issued A keeps its original service bindings");
+      assertFalse(owner.isClosed(), "the issued native A view retains its exact owner");
+      assertFalse(build.isDone(), "B cannot compose until the old native view exits");
+      try (var lexicalHeld = server.captureServingView()) {
+        var lexicalRetired = new AtomicReference<>(false);
+        lexicalHeld.onRetirement(() -> lexicalRetired.set(true));
+        held.close();
+        build.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(owner.isClosed());
+        org.mockito.Mockito.verify(services).prepareTextOnlyCandidateView(aRuntime);
+        org.mockito.Mockito.verify(services).clearProducerModelLease();
+        var refuse = KnowledgeServer.class.getDeclaredMethod(
+            "recomposeSourceAfterCandidateRefusal", Exception.class);
+        refuse.setAccessible(true);
+        refuse.invoke(server, new java.io.IOException("candidate refused"));
+        Field inPlace = KnowledgeServer.class.getDeclaredField("recordedCandidateInPlace");
+        inPlace.setAccessible(true);
+        assertFalse(inPlace.getBoolean(server),
+            "configured but unavailable A remains lexical after B refuses");
+        assertTrue(lexicalRetired.get(), "refusal must notify an issued lexical stream");
+      }
+    } finally {
+      held.close();
+      server.close();
+    }
+  }
+
+  @Test
+  void slowIssuedAQueryRestoresUntouchedNativeViewAfterDrainDeadline(@TempDir Path tempDir)
+      throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var aRuntime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+    var greenRuntime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+    var services = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    var lexical = org.mockito.Mockito.mock(WorkerAppServices.class);
+    org.mockito.Mockito.when(services.prepareTextOnlyCandidateView(aRuntime)).thenReturn(lexical);
+    var absent = IndexFingerprint.ModelFingerprint.notConfigured();
+    var owner = new EncoderSet(new InferenceSurface(java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(),
+        org.mockito.Mockito.mock(io.justsearch.ort.PolicySnapshot.class), java.util.List.of()),
+        new EncoderSet.ModelIdentity(absent, absent, absent, false, 768));
+    Field searchField = KnowledgeServer.class.getDeclaredField("searchLifecycle");
+    Field ingestField = KnowledgeServer.class.getDeclaredField("ingestLifecycle");
+    Field initialField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+    searchField.setAccessible(true);
+    ingestField.setAccessible(true);
+    initialField.setAccessible(true);
+    searchField.set(server, aRuntime);
+    ingestField.set(server, greenRuntime);
+    server.publishServingView(services);
+    var servingField = KnowledgeServer.class.getDeclaredField("servingView");
+    servingField.setAccessible(true);
+    Object nativeView = servingField.get(server);
+    var attach = nativeView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+    attach.setAccessible(true);
+    attach.invoke(nativeView, owner);
+    initialField.set(server, owner);
+
+    var held = server.captureServingView();
+    try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      var build = executor.submit(() -> {
+        var begin = KnowledgeServer.class.getDeclaredMethod("beginInPlaceCandidateBuild");
+        begin.setAccessible(true);
+        begin.invoke(server);
+        return null;
+      });
+      var lexicalRetired = new AtomicReference<>(false);
+      KnowledgeServer.ServingLease lexicalHeld = null;
+      long lexicalDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      while (lexicalHeld == null && System.nanoTime() < lexicalDeadline) {
+        var captured = server.captureServingView();
+        if (captured.encoderSet() == null) lexicalHeld = captured;
+        else captured.close();
+      }
+      assertTrue(lexicalHeld != null, "candidate must publish the lexical A view");
+      try {
+        lexicalHeld.onRetirement(() -> lexicalRetired.set(true));
+        assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> build.get(8, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(lexicalRetired.get(), "drain refusal must notify issued lexical streams");
+      } finally {
+        lexicalHeld.close();
+      }
+      try (var resumed = server.captureServingView()) {
+        org.junit.jupiter.api.Assertions.assertSame(services, resumed.services());
+        org.junit.jupiter.api.Assertions.assertSame(owner, resumed.encoderSet());
+      }
+      assertFalse(owner.isClosed());
+    } finally {
+      held.close();
+      server.close();
+    }
+  }
+
+  @Test
   void interruptedRetirementRestoresUndestroyedServingView(@TempDir Path tempDir)
       throws Exception {
     var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),

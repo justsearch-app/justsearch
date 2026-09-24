@@ -6,6 +6,40 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-24)
 
+The current unpushed D1-14 continuation corrected a refute-first lifecycle review of
+the first in-place implementation. A separate lexical A service now preserves the
+bindings of issued A calls while new captures answer text; a held-call test and a
+five-second drain-refusal test cover the distinction. The candidate bundle adopts
+its full wrappers on promotion or closes them after native retirement on refusal;
+promotion updates the serving owner, selected model identity, configuration and
+component state. A durable recorded refusal signal now starts pre-pointer
+cleanup: Worker joins Green's producer, releases B, recomposes A when in place,
+abandons the still-building generation and requests an ordered restart. The
+same cleanup covers a beside candidate. Focused coordinator, producer and
+held-view tests passed at `tmp/3238-refusal-focused.txt`; the drain deadline
+regression passed at `tmp/3236-inplace-drain-deadline.txt`. `tmp/3239` reached
+342 tasks but failed only test PMD after a new static import made ten older
+qualified assertions redundant; the correction passed `tmp/3242`. The full
+gate passed at `tmp/3243`, before the final lexical-health isolation edit;
+focused tests, PMD, Spotless and installed distribution then passed at
+`tmp/3245-lexical-status-dist.txt`. The first installed mixed chat/CUDA
+pointer-before-settings cut at `tmp/3246` reached the Engine crash but its
+observer hit a short SQLite writer lock. The observer now waits for that lock;
+the rerun passed at `tmp/3247-installed-mixed-inplace.txt`, with one COMPLETE
+row, matched pointer/settings witness, two search hits and closed private
+ports. No hosted proof applies to this unpushed revision yet. The accepted-write lexical A projection during
+Green build, every installed refusal cut, the simulated floor run and D1-14
+acceptance remain open.
+
+A second read-only lifecycle review found that an unpublished successor after
+pointer commitment was not retained for ordered shutdown, a configured but
+unavailable A was mistaken for a READY source, lexical view retirement did not
+notify streams, and B promotion omitted compatibility/disambiguation bindings.
+The corrections also close partially constructed candidate wrappers. Focused
+tests and static checks passed at `tmp/3250-lifecycle-final-focused.txt` after
+`tmp/3248` identified a PMD initializer issue. Full integrated and installed
+proof of this newest correction remains open.
+
 ### Current hosted and D1-14 boundary
 
 `ec1cd14b7` is pushed to PR727 with the distinct-model commit/parity
@@ -84,7 +118,8 @@ change, preserves operator precedence, and refuses changed bytes at preparation
 or replay. V2 no-chat rows replay; v2 rows with an unproven chat path refuse
 before pointer or fence recovery after pointer B. Producer, precedence,
 verifier and boot focused suites passed at `tmp/3188`, `tmp/3198`, `tmp/3191`
-and `tmp/3197`; installed activation remains owed. The drain regression now
+and `tmp/3197`; the installed mixed activation later passed at `tmp/3223`.
+The drain regression now
 measures the production writer's read hold inside its existing supplier seam
 and observes a queued drainer. Its focused test passed at `tmp/3199`; the
 paired acquire/release bypass negative control failed for missing writer
@@ -96,11 +131,24 @@ chat/CUDA installed fixture now stages registry-verified GGUF and companion
 assets and checks v3 identities. Its first run had CUDA disabled by the fixture;
 the corrected run reached the device-memory decision and refused before
 candidate composition because B needs about 14.2 GB while 11.4 GB is free.
-This is the current deliberate D1-14 `IN_PLACE` refusal. Mixed installed
-activation remains owed after the in-place path; preserve this negative evidence.
-Next finish D1-14 in-place ownership and mixed installed verification, then
-push a coherent checkpoint and wait for terminal hosted proof. PR727's last
-terminal hosted proof remains `35968550589` for `da60deb28`.
+This was the deliberate D1-14 checkpoint `IN_PLACE` refusal. The next local
+revision publishes text-only A, drains its held native view and exact set,
+then composes B. Installed mixed-chat pointer-before-settings recovery passed
+at `tmp/3223`: v3 selected chat identities, one COMPLETE row, B's pointer,
+accepted settings witness and two text hits; private ports closed. Focused
+producer and held-view regressions passed at `tmp/3224` and `tmp/3226`.
+Pre-pointer A recomposition is implemented locally; refusal, gap/cancel and
+accepted-write visibility proofs remain open. A full gate at `tmp/3227`
+found an Error Prone self-assignment in the fresh lexical-only branch; the
+one-line fix is local and the integrated rerun is owed.
+
+PR727 checkpoint `70c518144` has terminal hosted run `35982489785`:
+Windows-native, system integration and all other jobs passed except Public
+claims. That job found generated `status-response.ts` drift from the changed
+wire schema. Regeneration is local; the focused contract-projection gate and
+UI typecheck pass. No later push has replaced the terminal system-integration
+evidence. Next finish the in-place refusal/held-native proof and accepted-write
+routing, rerun the full local gate, then push a coherent correction checkpoint.
 
 ### Latest checkpoint and D1-12 installed boot evidence
 

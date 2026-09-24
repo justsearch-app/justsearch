@@ -130,6 +130,13 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       if (previous != null) previous.run();
     }
 
+    synchronized void clearModelLease() {
+      if (!owned || closed) throw new IllegalStateException("No live producer owns the model lease");
+      Runnable previous = modelLeaseRelease;
+      modelLeaseRelease = null;
+      if (previous != null) previous.run();
+    }
+
     synchronized void transferTo(SharedProducerOwnership successor) {
       if (!owned || closed || successor.closed || successor.owned
           || successor.modelLeaseRelease != null) {
@@ -707,6 +714,13 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     producerOwnership.replaceModelLease(release);
   }
 
+  /** The Green writer stays owned while A's native set is retired for an in-place build. */
+  public void clearProducerModelLease() {
+    producerOwnership.clearModelLease();
+  }
+
+  public boolean producerClosed() { return producerOwnership.closed(); }
+
   /** Physical producer identity shared by wrappers of this exact service view. */
   public Object mutationOwnerToken() { return mutationOwnerToken; }
 
@@ -870,26 +884,68 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   }
 
   /**
-   * Removes A's query-side native references after the serving owner has drained issued views.
-   * Green's detached producer registry is deliberately left to its own caller: it can continue
-   * lexical indexing with an empty candidate set while the replacement encoders are composed.
+   * A separate lexical query view over the same read runtime. Issued calls keep this service's
+   * original model bindings until their serving leases leave; Green keeps its writer owner.
    */
-  public void enterTextOnlyCandidateBuild() {
+  public WorkerAppServices prepareTextOnlyCandidateView(
+      io.justsearch.adapters.lucene.runtime.LuceneRuntime activeRuntime) {
     if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
       throw new IllegalStateException("No detached candidate producer is available");
     }
-    encoderBindings.publish(EncoderBindings.Snapshot.empty());
-    wireEmbeddingProvider(null);
-    wireSpladeIdfQueryEncoder(null);
-    wireSearchReranker(null);
-    wireCitationScorer(null);
-    searchService.setClusterSnapshotSupplier(null);
-    searchService.setChunkRerankerConfig(null);
-    searchService.setCitationScorerConfig(null);
+    var lexicalSearch = new WorkerSearchService(
+        java.util.Objects.requireNonNull(activeRuntime, "activeRuntime"));
+    lexicalSearch.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
+    return new TextOnlyCandidateView(this, lexicalSearch, healthService.textOnlyView());
+  }
+
+  private record TextOnlyCandidateView(DefaultWorkerAppServices incumbent,
+      WorkerSearchService lexicalSearch, WorkerHealthService lexicalHealth)
+      implements WorkerAppServices {
+    @Override public WorkerSearchService searchService() { return lexicalSearch; }
+    @Override public WorkerIngestService ingestService() { return incumbent.ingestService(); }
+    @Override public WorkerHealthService healthService() { return lexicalHealth; }
+    @Override public void startIndexingLoop() { incumbent.startIndexingLoop(); }
+    @Override public String indexingLoopState() { return incumbent.indexingLoopState(); }
+    @Override public boolean recordedWriterReady() { return incumbent.recordedWriterReady(); }
+    @Override public IndexingPacing indexingPacing() { return incumbent.indexingPacing(); }
+    @Override public void wireEmbeddingProvider(EmbeddingProvider provider) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireEmbeddingCompatController(EmbeddingCompatibilityController ecc) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireNerService(NerService ns) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireSpladeEncoder(SpladeEncoder enc) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireSpladeIdfQueryEncoder(SpladeIdfQueryEncoder enc) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireBgeM3Encoder(BgeM3Encoder enc) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireDisambiguationService(DisambiguationService ds) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireGpuDiagnostics(GpuDiagnosticSuppliers suppliers) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void wireSearchReranker(CrossEncoderReranker reranker) {
+      throw new IllegalStateException("A lexical view has no model wiring authority");
+    }
+    @Override public void onMainClaimedGpu() { lexicalSearch.onMainClaimedGpu(); }
+    @Override public void close() throws IOException { incumbent.close(); }
+  }
+
+  /** Old A calls have drained; status must not inspect soon-to-retire native wrappers. */
+  public void clearCandidateSourceStatusDiagnostics() {
+    if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
+      throw new IllegalStateException("No detached candidate producer is available");
+    }
+    healthService.setEmbeddingProvider(null);
     healthService.setBgeM3Encoder(null);
-    wireStageEnabled(false, false, false);
-    wirePolicySnapshotSupplier(null);
-    gpuDiagnostics = null;
     ingestService.setSpladeOrtCudaStatusSupplier(null);
     ingestService.setSpladeModelPathSupplier(null);
     ingestService.setEmbedOrtCudaStatusSupplier(null);
@@ -899,6 +955,27 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setNerOrtCudaStatusSupplier(null);
     ingestService.setCitationOrtCudaStatusSupplier(null);
     ingestService.setBgeM3OrtCudaStatusSupplier(null);
+  }
+
+  /** Restores A's non-native query configuration after its exact model set is recomposed. */
+  public void restoreCandidateSourceQueryConfiguration() {
+    if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
+      throw new IllegalStateException("No detached candidate producer is available");
+    }
+    searchService.setChunkRerankerConfig(chunkRerankerConfig);
+    searchService.setCitationScorerConfig(citationScorerConfig);
+  }
+
+  /** Publishes the recomposed A query set without touching Green's detached producer. */
+  public void wireRestoredSourceEncoders(EncoderBindings.Snapshot bindings) {
+    if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
+      throw new IllegalStateException("No detached candidate producer is available");
+    }
+    encoderBindings.publish(java.util.Objects.requireNonNull(bindings, "bindings"));
+    healthService.setBgeM3Encoder(bindings.bgeM3Encoder());
+    var disambiguation = bindings.disambiguationService();
+    searchService.setClusterSnapshotSupplier(
+        disambiguation == null ? null : disambiguation::snapshot);
   }
 
   /** Bind B's write-side compatibility proof without changing A's query admission. */

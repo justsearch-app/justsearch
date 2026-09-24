@@ -1135,6 +1135,8 @@ function operationRows(dbPath, operationKey) {
 function readRows(dbPath, sql, parameter) {
   const database = new DatabaseSync(dbPath, { readOnly: true });
   try {
+    // Recovery can hold the writer lock briefly while this observer polls.
+    database.exec('PRAGMA busy_timeout = 5000');
     const statement = database.prepare(sql);
     return parameter === undefined ? statement.all() : statement.all(parameter);
   } finally { database.close(); }

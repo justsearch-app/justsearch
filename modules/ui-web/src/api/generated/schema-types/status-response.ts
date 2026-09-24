@@ -224,7 +224,10 @@ export interface StatusResponse {
       deadlineMs?: number;
       desiredVersion?: string;
       evidence?: string;
+      footprintBytes?: number;
+      freeBytes?: number;
       mode?: "BESIDE" | "IN_PLACE";
+      reason?: string;
       reasonCode?: string;
       recoveryAttempts?: number;
       state?: ComponentState;
@@ -584,7 +587,10 @@ export const statusResponseSchema = z.strictObject({
       "deadlineMs": z.number().int().optional(),
       "desiredVersion": z.string().optional(),
       "evidence": z.string().optional(),
+      "footprintBytes": z.number().int().optional(),
+      "freeBytes": z.number().int().optional(),
       "mode": z.enum(["BESIDE", "IN_PLACE"]).optional(),
+      "reason": z.string().optional(),
       "reasonCode": z.string().optional(),
       "recoveryAttempts": z.number().int().optional(),
       "state": componentStateSchema.optional(),
