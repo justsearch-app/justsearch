@@ -29,6 +29,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-24: The owner re-cut §16/§17's acceptance ownership while preserving D1/D2 feature scope. Stage E pairs only seven rows against `main`; all other §16 conditions become one-sided D1/D2 feature acceptance. Floor-machine, other-OS, representative-change and collector bake-off work is conditional on the corresponding claim or a response-time failure. The owner sets soak duration. The old main-development re-cut trigger is retired; merge `main` at each checkpoint. [E runbook](stages/E.md), [D1 map](stages/D1.md#6-section-16-rows-d1-must-leave-exercisable), [D2 map](stages/D2.md#6-section-16-rows-d2-must-leave-exercisable).
+
 - 2026-09-23: D1 adopts a separate approved Install AI generation activation after download. The ordinary settings refusal remains; the accepted REINDEX candidate freezes settings, models and source identity, and a committed generation pointer requires settings roll-forward under the existing composite owner. This supersedes C2's direct ONNX path write for generation-bound candidates and changes the user-visible activation flow. [Owning generation protocol](evidence/D1/generation-native-cursor-design-2026-09-23.md#7-installer-produced-generation-candidate-2026-09-23-amendment); [C2 producer inventory](evidence/C2/C2-6-plan.md#2026-09-14-installer-model-and-pack-producer-cut).
 
 - 2026-09-23: [Remaining design resolution](evidence/design-resolution-2026-09-23.md) selects publication/lifetime, generation/native/cursor, production composition, fairness and durable-write protocols. Owning sections and D1/D2 checklists are amended; runtime code and acceptance evidence are unchanged.
@@ -2204,9 +2206,26 @@ API p95 for the agent loop, crash-to-recovered, installer size). Added: index-ti
 throughput and request-time single-call latency (one query NER, one embedding, one rerank of
 twenty); verification-profile boot time; reconfigure duration with the API up throughout.
 
-**Gate for the default flip: a joint envelope**, single versus split (the lane branch at
-stage E against `main` after PR 0, 17), paired runs on the same corpus and machine, bounds set
-by the owner before the run:
+**Acceptance allocation (owner decision, 2026-09-24).** The conditions in the
+table below all remain required. Stage E pairs only these seven groups against
+`main` on the same corpus and machine: semantic non-regression (quality and
+workflow fixture); foreground search and agent response times during bulk
+indexing; indexing progress; memory budget with an owner-duration no-crash soak;
+recovery process with no orphaned children; graceful and forced hang detection;
+and dead-Engine upgrade. Every other row is one-sided feature acceptance owned
+by its D1/D2 item, using existing installed and real-model evidence where it
+actually covers the condition and naming every gap. The [D1](stages/D1.md#6-section-16-rows-d1-must-leave-exercisable)
+and [D2](stages/D2.md#6-section-16-rows-d2-must-leave-exercisable) maps are the
+ownership index. The former all-row paired gate and E-owned feature rows are
+superseded by this allocation. Bounds for the seven paired groups are set before
+the run. Minimum-spec machine and other-OS recovery are run only if the
+corresponding claim is made; unrun shapes cannot be claimed. Representative
+changes are measured only if a lower-coordination-cost claim is made. G1 is
+the default collector; run a collector comparison only if a response-time row
+fails.
+
+**Gate for the default flip: a joint seven-group envelope**, single versus split
+(the lane branch at stage E against `main` after PR 0, 17):
 
 | metric | condition |
 |---|---|
@@ -2270,8 +2289,8 @@ not a merge; nothing in the programme rules says otherwise. The paired measureme
 branch against `main`; rollback is one revert; a failed gate leaves the code on a branch, which
 is cleaner than a dead flag on `main`. The one cost accepted and recorded: while the branch is
 open there is no hotfix path for split-mode code on `main`, which an alpha with a quiet `main`
-can afford. Drift is held by a weekly `git merge` from `main` (never a rebase of a pushed
-branch, `agent-lessons.md`).
+can afford. Drift is held by `git merge origin/main` at every checkpoint
+(never a rebase of a pushed branch, `agent-lessons.md`; owner decision 2026-09-24).
 
 ### 17.2 PR 0: launch flags on split
 
@@ -2330,8 +2349,18 @@ and what the checkpoint review must see.
 | **C2. Operations** | operations table in its own registered store, `operations.db` *(amended 2026-09-09: no existing store changes class or owner in lane F, because the installed updater refuses any identity change; the updater's successor rule and a release-descriptor baseline mode land with it)*; acceptance, effect, completion order stamped from the operations table's own autoincrement key *(amended 2026-09-09: no journal commit sequence number exists; `CommitOps.commit()` discards Lucene's and the journal is in-memory)*; client-supplied key, for which the inert `OperationInvocationRequest.idempotencyKey` wire field gets its first consumer, and outcome query answering the recorded outcome on a same-key retry, with `expired`, `history since` and the retention period, and `version conflict` on a reconfigure issued against a moved applied version, built on the global accepted-settings revision only *(amended 2026-09-09; the per-component versions are D1's)* (7.6, review seven); resume under the four conditions for ingestion and reindex bundles with the persisted content hash as the unit key; ingestion's per-file recovery re-based on it (7.5, 7.6) | a killed ingest resumes from its checkpoint; the outcome query answers all five states | the three-point forced-kill row and the resume-conditions row of 16 for a write |
 | **D1. Reconfigure, generations, readiness** | one Engine component registry in `core` that is both the recomposable registry and the readiness authority, with applied versions, `stateSince`, deadlines and recovery budgets *(amended 2026-09-10)*; the attempted record as the reconfigure row *(reversal 2026-09-10)*; beside-or-in-place, `generation-bound` and `restart required` in `governance/config-apply.v1.json` (7.4); `core.restart-worker` retired with its recovery arms moved to a per-component recover route *(amended 2026-09-10: `structuredData.port` has no consumer)* (6); the generation cutover at the scope 17.4 fixes, on top of `IndexGenerationManager` (a live re-point of the already-open building runtime in place of the post-cutover restart, the journal as the widened switch buffer keyed by generation, the failed-unit default flipped, 17.7), under the review-seven contract: the reindex as a converging operation with gaps distinct from processing history (7.5), lexical-only ingestion with deferred enrichment in the in-place mode and the response field that says so, encoder A recomposed on refusal or abandonment, and the applied config version computed from the active generation's metadata with boot composing encoders from the generation manifest's recorded models (7.4); encoder sets as generations with per-runtime model identity and per-handle native lease accounting *(amended 2026-09-10: Flow B, last batch, 17.8 re-cut to D1b if it overruns)*; the candidate footprint as the arena caps and free device memory through a `core` supplier bound in the root, plus a ceiling key for the floor *(amended 2026-09-10)* (7.4); readiness as projections of the registry with re-cut codes and `readinessNotice.ts`, the snapshot at schema 2 (17.7), start deadlines, local recovery generalized from the boot ladder, and bounded escalation with exit code 5 (7.6) | an encoder config change applies with the API up; a same-encoder migration activates live; requested restart serves restart-required settings and escalation only | the reconfigure, stuck-component and generation-transition rows of 16 |
 | **D2. Self-description and request-time paths** | component map endpoint and its coverage test, profiles (`full`, `bench`, `verification`), engine-as-library (10); session gate with aging under the `passed` rule and the one-producer test (4, review seven); index-and-return at the port with its durability test (the port's `submit` discards the sequence number today, so the durable variant is a new port method, not a flag); cursor generation token, reader pinning for a live cursor (Lucene's `SearcherLifetimeManager` is the obvious primitive) under the cursor and reader caps of the retained-state register, and `cursor expired` (4, 8); the ephemeral store axis for the `verification` profile completed (the Lucene side exists: `IndexSchema.ephemeral()` builds at an auto-temp path that `RuntimeSession` deletes on close; the four SQLite stores take a file path only *(corrected 2026-09-09: `EntityClusterStore` is the fourth)*, so they gain the temp-and-delete variant) | the verification profile boots in seconds; every 16 row is exercisable | the request-time-encoder and durability rows of 16 |
-| **E. Gate run** | signed dead-Engine upgrade and inherited-store recovery plus supported-OS whole-Engine recovery coverage (§16); no code beyond the fixes the run forces; collector and heap chosen, and the supervisor's hang poll interval and count set with them from the soak's worst safepoint pause (7.1); the owner's bounds and the three allowed-difference classes (17.7) instantiated from the PR 0 baseline before the run; paired against `main` after PR 0 on the same corpus and machine, plus a run at the supported floor | the measurement record exists | the 16 table row by row, including the registered dead-Engine installer/store-recovery exercise; §16 governs artifact availability and explicitly carried platform/installer gaps |
+| **E. Gate run** | seven paired branch-versus-current-main groups from §16, including signed dead-Engine upgrade and inherited-store recovery; G1 default, owner-duration no-crash soak, hang values set from the observed safepoint pause; minimum-spec, other-OS, representative-change and collector probes only when their claim or a response-time failure requires them | the seven-group measurement record exists, with D1/D2 one-sided feature proofs linked | all seven groups pass their clauses, or the signed-artifact gap follows §16's existing disposition; no other §16 row is moved into E |
 | **F. Prose sweep and report** | `CLAUDE.md` invariant 1, `AGENTS.md`, the subagent baseline brief, skills, postmortems, `19-module-architecture.md` rewritten on the rings, jseval and `scripts/agent-analytics` parsers, governance registers and contract-surface registrations, the docs listed in `verified-facts.md`; the report-back (19) | nothing on the branch names the Worker as a process | the 917 §8 residue grep returns only labelled hits; `docs-validate` and the regen set green |
+
+**2026-09-24 correction to the D1/D2/E checkpoint-proof cells:** The seven
+paired groups named in §16 are E's entire merge gate. Every other §16 row is
+one-sided feature acceptance at its D1/D2 owner, as mapped in those stage
+checklists; earlier wording that D1/D2 merely leave those rows exercisable or
+that E proves the whole table is superseded. E's floor run and supported-OS
+coverage are conditional on making those claims. The signed dead-Engine
+upgrade remains one of E's seven paired groups, with its artifact gap handled
+by §16's existing rule. G1 is used unless the response-time group fails; the
+soak duration is fixed by the owner before E runs.
 
 Then one final merge under delegated authority. Between checkpoints the branch may be red only in the way the
 "branch state after" column names; any other red is a defect of the stage.
@@ -2414,9 +2443,8 @@ picks it up:
   in its owning section with reasoning and alternatives, indexed by a dated one-line entry in
   section 0. Owner delegation (2026-09-07/08) includes decisions, continuation and merges; the
   root still owns independent review, the repository merge queue and post-merge verification.
-- **Drift.** `git merge origin/main` weekly and once more before stage E; never a rebase of the
-  pushed branch (`agent-lessons.md`). Main development resumed during the lane, so re-check
-  17.8 at each checkpoint. Integration of main `f938c4eb2` retained the one-Engine behavior and
+- **Drift.** `git merge origin/main` at every checkpoint; never rebase the
+  pushed branch (`agent-lessons.md`). Integration of main `f938c4eb2` retained the one-Engine behavior and
   imported accepted PR 0b; its 19 resolutions were independently reviewed. No stage reordering
   or new mechanism was needed. PRs 708/717 publication evidence remains separate from integration.
 - **Commits on the branch** are per checklist item so a review range is legible. ADR-0045
@@ -2426,7 +2454,7 @@ picks it up:
   dev-runner's supervisor and a campaign lease, the 17.7 values fixed before the first run. A
   failed row is answered by the section 16 decision rule; a fix re-runs the rows it can affect,
   and a fix to a shared mechanism (collector, executors, admission, the session gate) re-runs
-  the whole table.
+  the affected seven paired groups and their dependent one-sided feature proof.
 
 ### 17.7 Owner-set parameters
 
@@ -2439,7 +2467,7 @@ PR 0 baseline or the gate run confirms, not a design fact, and the "by" column s
 |---|---|---|---|
 | primary supported operating shape | 18, 3.1 | **one shape: a running desktop application that also serves agents.** Agent access is a mode of the running application, not a deployment; recovery during an agent loop is automatic and prompt-free, and an exhausted supervisor leaves a visible state, never a dialog. Unattended headless and trusted-network sharing stay unsupported behind their own ADRs; a Tauri-less Engine is a development shape | A (the supervision scope reads it) |
 | tolerated work loss per fault, in 16's units; what must stay usable through a fault and through ordinary maintenance; which interrupted work is unacceptable | 13, 18 | **set at what the mechanisms guarantee, no looser and no tighter**: at most the one agent turn in flight is interrupted; durable operations resume, never restart; only writes in flight at the crash need a query. Unacceptable: an accepted write lost silently, a half-applied configuration surviving a restart, a reindex starting over. Floor through a fault: API and text search within cooldown plus warm start. Floor through maintenance: text search always, semantic bounded by the row below (*moved from E, review seven*: tolerances constrain the investment; the numeric thresholds derived from them stay at E) | A |
-| semantic-availability bound during a generation transition on the floor machine (fraction and wall-clock) | 16 | **paired first, absolute second**: on the floor machine the in-place transition unloads encoder A, so the refused fraction approaches the whole build plus replay and wall-clock is the number that matters; the bound is "not longer than the split's semantic outage for the same reindex on the same machine" from the PR 0 baseline, plus an absolute ceiling the owner names once that baseline number exists | E, before the first run |
+| semantic-availability bound during a generation transition on the floor machine (fraction and wall-clock) | 16 | **2026-09-24:** D1 one-sided feature acceptance; run on a minimum-spec machine only when claiming that machine or its semantic-availability bound. Record duration/fraction and an absolute bound before the claim; the older E paired comparison is superseded | D1, before the claim |
 | operations-history retention, after which a key answers `expired` | 7.6 | **30 days, plus a row cap** so a scripted agent cannot grow the history without bound | C2 |
 | retained-state caps: cursors per context and aggregate, pinned readers, co-resident encoders | 8 | first cut by the implementer from the budget; **the webview is not privileged over agent contexts** (urgency lives on the work item, so identical per-context caps); overruled only if a gate row fails | C1; confirmed at E |
 | supervisor budget: max restarts, cooldown floor and ceiling, stability window, hang poll interval and count; exit-reason classes | 7.1 | **seeded from 627 (3 restarts; 300 s window), semantics re-cut** (7.1, *re-cut 2026-09-07, lock*): requested, transient and non-transient exit classes, with non-transient exhausting at once; cooldown floor is handle release and the ceiling a few seconds above it; the window runs from `ready`; hang interval and count set with the collector | B for the classes, cooldown and window; E for the hang parameters |
@@ -2447,28 +2475,25 @@ PR 0 baseline or the gate run confirms, not a design fact, and the "by" column s
 | who may accept gaps at generation activation | 7.4 | **a user through the webview, shown the gap list; agents report, never accept** | D1 |
 | admission defaults per context; aggregate caps per executor; retry-after | 8 | first cut by the implementer from the machine budget; identical per context (row above); confirmed by the owner | C1; confirmed at E |
 | memory budget lines (heap, Metaspace, direct, ORT arenas) | 8 | first cut at A; final by the gate run | A, E |
-| collector (G1 or ZGC) and heap | 8 | gate run | E |
+| collector (G1 or ZGC) and heap | 8 | **G1 default;** confirm heap against the memory budget. Compare collectors only if a paired response-time group fails (owner decision 2026-09-24) | E |
 | session-gate aging threshold and background batch size bound | 4 | first cut at D2; final by the gate run | D2, E |
 | group-commit coalescing deadline for `durable` index-and-return; cursor expiry | 4 | implementer | D2 |
 | checkpoint cadence | 7.5 | fixed: per unit, at most every 30 s | C2 |
-| gate bounds: p95 ceilings, admission rejection ceiling, indexing-progress fraction, warm-start budget, soak duration and workload, floor machine, corpus | 16 | **every bound derived from the PR 0 baseline with a declared margin.** Starting values: p95s at the split baseline plus ten percent (a noise margin, not a permitted regression: a consistent loss under it is still investigated under the section 2 rule before the flip); rejections zero with the agent idle and one percent under the scripted agent; indexing progress ninety percent of split; warm start at baseline index-ready plus five seconds; soak two hours of indexing, a scripted agent and a reconfigure every fifteen minutes; floor machine the lowest GPU class the lower-memory guidance names; corpus the jseval reference corpus | E, before the first run |
+| gate bounds: p95 ceilings, admission rejection ceiling, indexing-progress fraction, warm-start budget, soak duration and workload, floor machine, corpus | 16 | **2026-09-24:** bounds apply to the seven paired groups only. Derive relevant p95, rejection, indexing and recovery bounds from the split baseline with a declared margin. The owner sets the no-crash soak duration before its run. A minimum-spec machine is required only for a claim about that machine; record the actual corpus and hardware. Earlier fixed two-hour and mandatory floor wording is superseded | E, before the first run |
 | allowed-difference class per non-deterministic fixture field | 16 | **exactly three classes**: reason codes that did not exist in split, ordering of equal-score hits, generative text under a fixed seed; nothing else, and none added after a diff is seen | E, before the first run |
 | disclosure contract and exporter policy; non-goals amendment for idea 1 | 18, 11 | **two properties written apart** (retrieval and inference are local; disclosure happens at the handoff to a client as an authorisation decision, where "authorised" is a grant scoped to a folder or a session, not a client label); **OTLP export permitted in development, off in packaged builds unless a visible setting turns it on, egress class recorded either way**; the non-goals amendment waits for a write-back tool to be proposed | not gating: before the first write-back tool, and before stage F touches the README's neighbours |
 | failed-unit default at activation: `index.migration.cutover.max_failed_jobs` moves from -1 (unlimited, today) to 0, or the owner names another value | 7.4, 17.9 | **0**: today's value activates with documents missing and nobody told; with gaps reported and replay cheap, refusing is right and the row above is the escape hatch | D1 |
 | which readiness representation survives as the authority's name (`LifecycleSnapshotV1` or `ReadinessEnvelopeView`) and which becomes its projection | 7.6, 17.9 | **the envelope**, whose ten dimensions are already component-shaped; the lifecycle snapshot becomes its projection | D1 |
-| `UseCompactObjectHeaders` in the Engine's flag set (the Worker carries it today, the Head does not) | 8, 17.9 | gate run, with the collector | E |
+| `UseCompactObjectHeaders` in the Engine's flag set (the Worker carries it today, the Head does not) | 8, 17.9 | retain G1 defaults; probe this flag only if making its memory/latency benefit claim or a response-time group fails | E, conditional |
 | deterministic capture for the workflow fixture | 16, 0 | **decided 2026-09-07**: PR 0b lands the chunk-leg stable tie-break (unconditional), an exhaustive-kNN switch, a `sampling` request override with seed, candidate-budget pins and an applied-sampling echo; the gating reference is a same-build noise pair per side (section 0); CPU encoders measured too slow and stay an instrument | PR 0b; the baseline is retaken under it |
 
 ### 17.8 What would re-cut this sequencing
 
 The cut holds under stated conditions. If one fails, the cut is redone, not bent:
 
-- **Development resumes on `main` while the branch is open.** The coherence rule regains a
-  consumer. Either the resumed work waits, or the sequencing reverts to the incremental shape
-  from the next checkpoint, which reopens 15's flag decision. **Applied disposition, 2026-09-08:**
-  delegated review instead accepted checkpoint main integration after measuring the overlap and
-  independently reviewing the conflict resolutions (§17.6); stage order stays unchanged. Repeat
-  this assessment at each checkpoint rather than assuming that another overlap has the same cost.
+- **2026-09-24 owner disposition:** development on `main` no longer triggers a
+  sequencing re-cut. Merge `origin/main` at every checkpoint and review actual
+  conflicts; stage order and the locked decisions remain in force.
 - **A release must be cut mid-lane.** A fix to split code lands on `main` as its own PR and is
   merged into the branch; the "no hotfix path" cost in 17.1 is paid, not avoided.
 - **Stage A's checklist outgrows the 917 consumer audit.** Time-to-complete is an architecture

@@ -4,9 +4,106 @@ Start with the [continuation brief](continuation-brief.md): the next two batches
 owner boundaries, acceptance endpoints and execution protocol. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
+**Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
+D1-9 streaming correction and its proofs before further implementation. Stage
+E now pairs only seven groups against `main`: quality plus workflow fixture;
+search/agent response times under bulk indexing; indexing speed; memory and
+an owner-duration no-crash soak; crash recovery without orphaned children;
+graceful and forced hang; dead-Engine upgrade. Every other §16 condition is
+one-sided D1/D2 feature acceptance, with no waiver. Minimum-spec, other-OS,
+representative-change and collector comparisons are conditional on their
+claim or a response-time failure; use G1 by default. The old main-development
+re-cut trigger is retired; merge `origin/main` at each checkpoint. See
+[design §16](design.md#16-what-must-be-measured-and-the-gate-for-flipping-the-default),
+[E](stages/E.md), and the D1/D2 §6 maps.
+
 ## Latest checkpoint (2026-09-24)
 
-PR727 is at `daeb5704d`; hosted run `36003707287` completed SUCCESS across all
+PR727 is at `7c9f98e39`. The 358-task local integrated gate passed at
+`tmp/3358-d1-file-mutation-integrated.txt`. Its hosted run
+[`36039474659`](https://github.com/justsearch-app/justsearch/actions/runs/36039474659)
+finished: system integration, Windows native and every other job passed except
+Public claims. That job found `jobs.db` schema v21 in code but v20 in the
+recoverability register. The local register correction passes
+`check-store-recoverability.mjs` and its 77-assertion self-test; it is not yet
+pushed or hosted.
+
+The installed standard CPU seed passed at `tmp/3359` and `tmp/3361`. Its first
+watcher A/B run (`tmp/3360`) raced migration promotion; the next fixture paused
+MIGRATING before watcher changes. That run (`tmp/3362`) proved the watcher
+addition and deletion in serving A, then exposed a real failure in the
+recorded ingest child: `INGEST_ENUMERATION_FAILED` because streaming recorded
+members had no source hash for candidate-scoped journal admission. The source
+failure is in the private run's `operations.db` and Engine log. A focused
+regression failed at `tmp/3363`; the queue now hashes source bytes before its
+atomic recorded admission, and the regression, related recorded walk tests,
+PMD, Spotless and installed distribution pass at `tmp/3364` and `tmp/3365`.
+A fresh seed `tmp/3366` passed, but the next watcher attempt (`tmp/3367`)
+reached SWITCHING before the pause was acquired. A bounded diagnostic probe
+then acquired the pause at `tmp/3369` and confirmed the watcher deletion in A.
+The recorded ingest admitted a hash-witnessed scoped queue/journal pair but
+stayed PENDING: the queue's old claim guard denied any source hash on a
+streaming walk. Its focused regression failed at `tmp/3370`; the guard now
+validates that hash and retains the recorded owner decision. Focused queue and
+walk tests, PMD, Spotless and rebuilt distribution pass at `tmp/3371` and
+`tmp/3372`. A fresh installed combined run remains required. Do not count
+`tmp/3362` or `tmp/3369` as passing combined acceptance. D1-9's non-file,
+cancel, gap and crash-cut acceptance remains open.
+
+The refute-first review of that streaming correction found a further H1→H2
+failure: a changed source kept H1 in the recorded member and candidate UPSERT,
+so repeated claims could only defer. The current uncommitted correction uses
+one claim-owned SQLite transaction to record H1's stale result, replace the
+streaming member with a fresh revision/H2, replace the exact candidate UPSERT,
+and advance walk revision. Captured plans remain immutable. Focused queue and
+extractor tests, a post-ledger journal-failure rollback control, captured-plan
+control, PMD, Spotless and rebuilt distribution pass at `tmp/3378`; the prior
+focused passes are `tmp/3376` and `tmp/3377`. The installed A/B fixture now
+creates its migration load only after A serves a real vector result: `tmp/3375`
+timed out on that initial query because 1200 load files were created earlier.
+Fresh installed and integrated proof of this correction remains open.
+
+`tmp/3379` passed a fresh installed pointer/settings seed. The first A/B run
+`tmp/3380` held MIGRATING and admitted the watched addition with an exact
+candidate UPSERT, but timed out on A visibility: the file remained PENDING
+behind 995 of the fixture's 1200 build-load jobs. This is queue ordering under
+fixture load, not a demonstrated production refusal. The next fixture uses
+300 freshly added load files after A's vector check and a 240-second watcher
+visibility bound; another clean installed seed and A/B run are in progress.
+
+That `tmp/3381` seed passed. `tmp/3382` then proved the watched addition in
+A, its scoped UPSERT, watched deletion absent from A, and a recorded ingest
+accepted and text-searchable in A. Its held cut failed a fixture assertion:
+the physical free-device-memory decision selected `IN_PLACE`, but the fixture
+assumed `BESIDE` whenever its forced-floor flag was false. The status
+projection exposes the actual `encoders.mode`; the fixture now asserts that
+mode and applies the corresponding A vector/text expectation. B promotion and
+settlement remain to be rerun; `tmp/3382` is not full installed acceptance.
+
+The clean standard-model seed `tmp/3383` passed. The corrected A/B run
+`tmp/3384` passed end to end: A real vector before B, MIGRATING pause,
+watched addition's scoped UPSERT and A text visibility, watched deletion
+absent from A, recorded ingest accepted and text-searchable in A, a held
+IN_PLACE cut with 302 completed units and zero failures, then B pointer and
+settings revision 2 with a real B vector result. STOP 0 closed the owned run.
+This proves the combined installed file-mutation path on the local distribution;
+D1-9's non-file, gap, cancel and crash-cut acceptance remains open, as do the
+full integrated and hosted gates for this correction.
+
+The first complete 358-task gate `tmp/3385` failed six tests in three modules:
+five 30-second JUnit timeouts and one parser timeout under concurrent module
+load. Its original XML is retained in `tmp/3385-test-results/`. The same six
+subjects passed at `tmp/3386` with one Gradle worker and unchanged compiled
+source. A complete single-worker gate then passed at
+`tmp/3387-d1-streaming-integrated-serial.txt`: `spotlessCheck pmdAll test
+-PincludeStress=true :modules:ui:installDist --continue --max-workers=1`
+finished with 358 actionable tasks and exit 0. This is local integrated proof
+for the current uncommitted D1-9 correction. The concurrent-suite failure and
+its original XML remain recorded above. Hosted proof requires a pushed coherent
+checkpoint; D1-9's non-file, gap, cancel and pointer/settings crash-cut
+acceptance remains open.
+
+The earlier PR727 checkpoint `daeb5704d` had hosted run `36003707287` SUCCESS across all
 jobs, including Windows native and system integration. The 358-task local gate
 on its runtime checkpoint `4971fbb9f` passed at
 `tmp/3251-lifecycle-checkpoint-integrated.txt`. The standard installed CPU

@@ -482,6 +482,12 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
         ? response : null;
     } catch { return null; }
   });
+  // Add build load only after A has served a real vector result. These files hold
+  // MIGRATING long enough for the native watcher edges and explicit pause.
+  for (let i = 0; i < extraBuildFiles; i++) {
+    fs.writeFileSync(path.join(work, 'installer-root-a', `build-load-${i}.txt`),
+      `buildloadmarker${i} capybara\n`);
+  }
   const bRoot = path.join(work, 'installer-models-b', operationKey);
   const candidateContract = structuredClone(oldContract);
   const shippedRegistry = distinctModelB ? readJson(path.join(process.cwd(),
@@ -535,6 +541,38 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
     const acceptedMarker = 'lexicalbridgecobalt';
+    if (watcherDeleteDuringBuild) {
+      // The native watcher polls on its own cadence. Hold MIGRATING while it observes both
+      // filesystem edges; an unpaused candidate can enter SWITCHING between them.
+      let lastPauseObservation = 'candidate has not entered MIGRATING';
+      await waitFor('pause MIGRATING candidate for watcher mutations', 120000, async () => {
+        const state = readJson(path.join(indexBase, 'state.json'));
+        const live = readJson(path.join(runtime, 'manifest.json'));
+        if (state?.migration_state === 'SWITCHING') {
+          throw new Error(`candidate reached SWITCHING before watcher pause: ${lastPauseObservation}`);
+        }
+        lastPauseObservation = `state=${state?.migration_state} generation=${state?.building_generation}`
+          + ` livePort=${live?.head?.apiPort}`;
+        if (state?.migration_state !== 'MIGRATING'
+          || state.building_generation !== `g-${operationKey}`
+          || !live?.head?.apiPort) return null;
+        try {
+          const response = await request(live.head.apiPort, '/api/indexing/migration/pause', {
+            method: 'POST', headers: sessionHeaders(live),
+            body: JSON.stringify({ reason: 'installed watcher A/B verification' }),
+          }, 10000);
+          const paused = readJson(path.join(indexBase, 'state.json'));
+          lastPauseObservation = `http=${response.status} ${response.text}`
+            + ` paused=${paused?.migration_paused} state=${paused?.migration_state}`;
+          return response.status === 202 && paused?.migration_state === 'MIGRATING'
+            && paused.migration_paused === true ? paused : null;
+        } catch (error) {
+          lastPauseObservation = `request error=${error.message}`;
+          return null;
+        }
+      });
+      console.log('MODEL_LIVE_AB_PAUSED', lastPauseObservation);
+    }
     if (acceptedWriteDuringBuild) {
       await waitFor('MIGRATING B with a live A producer after restart', 120000, async () => {
         const state = readJson(path.join(indexBase, 'state.json'));
@@ -551,7 +589,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       });
       if (watcherDeleteDuringBuild) {
         fs.writeFileSync(removedFile, `${removedMarker} accepted by watcher during B\n`);
-        await waitFor('MIGRATING watcher addition visible in serving A', 90000, async () => {
+        await waitFor('MIGRATING watcher addition visible in serving A', 240000, async () => {
           const state = readJson(path.join(indexBase, 'state.json'));
           if (state?.migration_state !== 'MIGRATING') return null;
           try {
@@ -617,6 +655,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
         90000, async () => {
         const state = readJson(path.join(indexBase, 'state.json'));
         const acceptedRow = operationRows(operationPath, ingestKey)[0];
+        requireThat(!['FAILED', 'CANCELLED'].includes(acceptedRow?.state),
+          `recorded ingest did not complete: ${acceptedRow?.state} ${acceptedRow?.failure_reason}`);
         if (state?.active_generation !== sourceGeneration
           || !['MIGRATING', 'SWITCHING'].includes(state?.migration_state)
           || acceptedRow?.state !== 'COMPLETE'
@@ -634,6 +674,15 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
         buildingGeneration: `g-${operationKey}`, path: acceptedFile,
         aTextHits: JSON.parse(visibleInA.text).results?.length ?? 0,
       }));
+    }
+    if (watcherDeleteDuringBuild) {
+      const live = readJson(path.join(runtime, 'manifest.json'));
+      requireThat(live?.head?.apiPort, 'paused watcher fixture lost its live Head');
+      const resumed = await request(live.head.apiPort, '/api/indexing/migration/resume', {
+        method: 'POST', headers: sessionHeaders(live), body: '{}',
+      }, 10000);
+      requireThat(resumed.status === 202,
+        `watcher fixture could not resume candidate: ${resumed.status} ${resumed.text}`);
     }
     const reached = await waitFor('settled B before activation marker',
       acceptedWriteDuringBuild ? 300000 : 170000,
@@ -662,7 +711,14 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       { query: marker, limit: 10, mode: 'vector' }, 30000);
     const statusReply = await request(apiPort, '/api/status', {}, 15000);
     const status = statusReply.status === 200 ? JSON.parse(statusReply.text) : null;
-    const vectorOutcome = inPlaceModelB
+    const composeMode = status?.readiness?.engineComponents?.encoders?.mode;
+    requireThat(['IN_PLACE', 'BESIDE'].includes(composeMode)
+      && (!inPlaceModelB || composeMode === 'IN_PLACE'),
+    `candidate composition mode is unavailable or violated the forced floor: ${JSON.stringify({
+      composeMode, encoder: status?.readiness?.engineComponents?.encoders,
+    })}`);
+    const actualInPlace = composeMode === 'IN_PLACE';
+    const vectorOutcome = actualInPlace
       ? vectorSearch.status === 400
         && JSON.parse(vectorSearch.text).errorCode === 'INVALID_REQUEST'
         && vectorSearch.text.includes('NO_EMBEDDING_SERVICE')
@@ -671,15 +727,15 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
         && JSON.parse(vectorSearch.text).results?.length > 0;
     requireThat(textSearch.status === 200 && matchingHit(textSearch, file, marker)
       && vectorOutcome,
-    `serving A violated ${inPlaceModelB ? 'in-place' : 'beside'} mode while B was settled: ${JSON.stringify({
+    `serving A violated ${composeMode} mode while B was settled: ${JSON.stringify({
       text: textSearch.text, vector: vectorSearch.text, encoders: status?.components?.encoders,
     })}`);
     console.log('MODEL_LIVE_AB_CUT', JSON.stringify({ operationKey, sourceGeneration,
       buildingGeneration: bGeneration, aModel: sourceManifest.models.embedding,
       bModel: bManifest.models.embedding, unitsCompleted: inFlight.units_completed,
-      unitsFailed: inFlight.units_failed, mode: inPlaceModelB ? 'IN_PLACE' : 'BESIDE',
+      unitsFailed: inFlight.units_failed, mode: composeMode,
       encoderState: status?.components?.encoders?.state,
-      vectorHits: inPlaceModelB ? 0 : JSON.parse(vectorSearch.text).results.length }));
+      vectorHits: actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
   } finally {
     fs.writeFileSync(releaseFile, 'release');
   }

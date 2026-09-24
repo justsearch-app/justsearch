@@ -140,7 +140,9 @@ final class SqliteIngestionWalkOps {
     String declaredCollection = collection == null || collection.isBlank() ? null : collection;
     for (var entry : entries) {
       Objects.requireNonNull(entry, "entry");
-      if (progress.capturedPlan() != (entry.plannedSourceSha256() != null)) {
+      // A finite captured plan requires a hash. Streaming walks may also carry one when
+      // candidate replay must certify the exact bytes accepted with the queue member.
+      if (progress.capturedPlan() && entry.plannedSourceSha256() == null) {
         throw new IllegalArgumentException("Source identity must match the recorded walk mode");
       }
       String path = io.justsearch.indexerworker.util.PathNormalizer.normalizePath(

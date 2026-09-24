@@ -5,6 +5,20 @@ entry point; [handoff](handoff.md) owns current evidence and
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
+**Current owner re-cut (2026-09-24):** Finish D1-9 streaming correction and
+proofs first. D1/D2 scope remains intact. E's paired branch/main gate contains
+seven groups only: quality and workflow fixture, search/agent response time
+under bulk indexing, indexing speed, memory with an owner-duration no-crash
+soak, crash recovery with no orphans, graceful/forced hang, and dead-Engine
+upgrade. Every other design §16 row is one-sided D1/D2 feature acceptance;
+reuse installed and real-model proof only where it covers a clause and name
+the rest. Minimum-spec, other-OS, representative-change and collector
+comparisons are conditional; G1 is default unless a response-time group fails.
+Merge `origin/main` at every checkpoint. The main-development sequencing
+re-cut condition is retired. [Design](design.md#16-what-must-be-measured-and-the-gate-for-flipping-the-default),
+[E runbook](stages/E.md), [D1 map](stages/D1.md#6-section-16-rows-d1-must-leave-exercisable),
+[D2 map](stages/D2.md#6-section-16-rows-d2-must-leave-exercisable).
+
 ## Assignment and authorization
 
 Resume the existing Lane F migration autonomously through remaining D1/D2/E/F.

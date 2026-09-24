@@ -30,6 +30,8 @@ import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.io.IOException;
@@ -871,6 +873,23 @@ class IndexingLoopTest {
 
       assertNull(invokeExtractJob(loop, claim));
       assertTrue(queue.deferred);
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+    }
+
+    @Test
+    void changedStreamingCandidateSourceRoutesStableNewHashToAtomicQueueTransition() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-streaming-source", ".txt"), "first");
+      String acceptedHash = SourceContentHash.sha256(file);
+      Files.writeString(file, "second");
+      RecordingQueue queue = new RecordingQueue();
+      queue.acceptStreamingSupersession = true;
+      IndexingLoop loop = newLoop(queue, providerReturning("second"));
+      var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
+          1L, false, acceptedHash);
+
+      assertNull(invokeExtractJob(loop, claim));
+      assertEquals(SourceContentHash.sha256(file), queue.supersededSourceHash);
+      assertFalse(queue.deferred);
       verify(queue.indexingCoordinator, never()).indexSingle(any());
     }
 
@@ -2120,7 +2139,7 @@ class IndexingLoopTest {
     public void close() {}
   }
 
-  private static final class RecordingQueue implements JobQueue {
+  private static final class RecordingQueue implements SwitchBufferCapableQueue {
     IngestionOutcome lastOutcome;
     IngestionLedgerEntry lastEntry;
     IngestionLedgerTransition lastTransition;
@@ -2134,12 +2153,27 @@ class IndexingLoopTest {
     boolean done;
     boolean terminalFailed;
     boolean deferred;
+    boolean acceptStreamingSupersession;
+    String supersededSourceHash;
     boolean claimRevoked;
     boolean failOutcomeWrites;
     boolean failOutcomeWritesAsIllegalArgument;
     int transientOutcomeWriteFailures;
     int markDoneTransitionCalls;
     IndexingCoordinator indexingCoordinator;
+
+    @Override
+    public boolean supersedeStreamingRecordedSource(IndexJob claim, String observedSha256,
+        IngestionOutcome staleOutcome, IngestionLedgerEntry entry) {
+      supersededSourceHash = observedSha256;
+      return acceptStreamingSupersession;
+    }
+
+    @Override public boolean putSwitchBuffer(String key, String op, String payload) { return false; }
+    @Override public boolean putSyncRoot(String key, SwitchBufferSyncRoot payload) { return false; }
+    @Override public long switchBufferDepth() { return 0L; }
+    @Override public List<SwitchBufferOp> listSwitchBufferOps() { return List.of(); }
+    @Override public int removeReplayedSwitchBufferOps(List<SwitchBufferOp> replayed) { return 0; }
 
     @Override public boolean ownsClaimForPublication(IndexJob claim) { return !claimRevoked; }
 

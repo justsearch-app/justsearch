@@ -618,8 +618,8 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v20",
-      "currentVersion": 20,
+      "format": "SQLite WAL schema v21",
+      "currentVersion": 21,
       "readableLegacyVersions": [
         0,
         1,
@@ -640,7 +640,8 @@
         16,
         17,
         18,
-        19
+        19,
+        20
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "futureVersionRefusalTest": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",

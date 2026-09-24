@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.HashMap;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
@@ -158,11 +159,24 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (!hasSufficientDiskSpace()) {
       throw new IllegalStateException("Recorded queue admission is unavailable");
     }
+    List<EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
+    try {
+      for (EnqueueEntry entry : entries) {
+        String hash = entry.plannedSourceSha256() == null
+            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
+            : entry.plannedSourceSha256();
+        witnessedEntries.add(new EnqueueEntry(
+            entry.path(), entry.sizeBytes(), entry.provenance(), hash));
+      }
+    } catch (IOException | RuntimeException unreadable) {
+      throw new IllegalStateException(
+          "Recorded candidate admission requires exact source bytes", unreadable);
+    }
     return accessRecordedWalk(() -> {
       int accepted = SqliteIngestionWalkOps.enqueueRecorded(
-          connection, operationKey, epoch, entries, collection, System.currentTimeMillis());
+          connection, operationKey, epoch, witnessedEntries, collection, System.currentTimeMillis());
       if (accepted > 0) {
-        bufferRecordedFileAdmissionsInTransaction(generation, operationKey, epoch, entries);
+        bufferRecordedFileAdmissionsInTransaction(generation, operationKey, epoch, witnessedEntries);
       }
       return accepted;
     }, true);
@@ -1428,6 +1442,101 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         () -> recordSupersededOutcome(claim, outcome, entry, null));
   }
 
+  @Override
+  public boolean supersedeStreamingRecordedSource(IndexJob claim, String observedSha256,
+      IngestionOutcome staleOutcome, JobQueue.IngestionLedgerEntry entry) {
+    if (claim == null || claim.walkEpoch() == null || claim.plannedSourceSha256() == null
+        || !IngestionLedgerTransition.isSha256(observedSha256)
+        || claim.plannedSourceSha256().equals(observedSha256)) return false;
+    lock.lock();
+    try {
+      ensureOpen();
+      if (!ownsClaim(claim)) return false;
+      boolean replaced = inTransaction(() -> supersedeStreamingRecordedSourceInTransaction(
+          claim, observedSha256, staleOutcome, entry));
+      if (replaced) releaseClaim(claim);
+      return replaced;
+    } catch (SQLException failure) {
+      throw new OutcomeWriteException("Could not supersede recorded candidate source", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  private boolean supersedeStreamingRecordedSourceInTransaction(IndexJob claim,
+      String observedSha256, IngestionOutcome staleOutcome, JobQueue.IngestionLedgerEntry entry)
+      throws SQLException {
+    String path = normalizePath(claim.path());
+    var progress = SqliteIngestionWalkOps.find(connection, claim.scanId())
+        .orElseThrow(() -> new SQLException("Recorded source owner is unavailable"));
+    if (progress.capturedPlan() || progress.sealedAt() != null
+        || progress.enumerationEpoch() != claim.walkEpoch()
+        || progress.enumerationOutcome() == WalkEnumerationOutcome.FAILED
+        || progress.enumerationOutcome() == WalkEnumerationOutcome.CANCELLED) return false;
+    try (var query = connection.prepareStatement(
+        "SELECT state, scan_id, walk_seen_epoch, unit_revision, planned_source_sha256 "
+            + "FROM jobs WHERE path = ?")) {
+      query.setString(1, path);
+      try (var row = query.executeQuery()) {
+        if (!row.next() || !STATE_PROCESSING.equals(row.getString(1))
+            || !Objects.equals(claim.scanId(), row.getString(2))
+            || row.getLong(3) != claim.walkEpoch() || row.wasNull()
+            || !Objects.equals(claim.unitRevision(), row.getString(4))
+            || !Objects.equals(claim.plannedSourceSha256(), row.getString(5))) return false;
+      }
+    }
+    String generation = null;
+    try (var query = connection.prepareStatement(
+        "SELECT generation, op, payload FROM switch_buffer WHERE key = ? AND generation <> ''")) {
+      query.setString(1, "path:" + path);
+      try (var rows = query.executeQuery()) {
+        while (rows.next()) {
+          if (!"UPSERT".equals(rows.getString(2))) continue;
+          SwitchBufferUpsert upsert;
+          try {
+            upsert = SwitchBufferUpsert.decode(rows.getString(3));
+          } catch (RuntimeException malformed) {
+            throw new SQLException("Candidate source journal is unreadable", malformed);
+          }
+          if (path.equals(upsert.path()) && Objects.equals(claim.unitRevision(), upsert.unitRevision())
+              && claim.plannedSourceSha256().equals(upsert.sourceSha256())) {
+            if (generation != null) throw new SQLException("Candidate source journal has multiple owners");
+            generation = rows.getString(1);
+          }
+        }
+      }
+    }
+    if (generation == null) return false;
+    String nextRevision = UUID.randomUUID().toString().replace("-", "");
+    recordSupersededOutcome(claim, staleOutcome, entry, null);
+    try (var update = connection.prepareStatement(
+        "UPDATE jobs SET state = 'PENDING', attempts = 0, retry_after = NULL, "
+            + "first_failed_at = NULL, error_message = NULL, "
+            + "content_hash = NULL, last_updated = ?, unit_revision = ?, planned_source_sha256 = ?, "
+            + "last_outcome_class = NULL, last_reason_code = NULL, last_retry_policy = NULL, "
+            + "last_diagnostic_summary = NULL, last_outcome_at = NULL "
+            + "WHERE path = ? AND state = 'PROCESSING' AND scan_id = ? "
+            + "AND walk_seen_epoch = ? AND unit_revision = ? AND planned_source_sha256 = ?")) {
+      update.setLong(1, System.currentTimeMillis());
+      update.setString(2, nextRevision);
+      update.setString(3, observedSha256);
+      update.setString(4, path);
+      update.setString(5, claim.scanId());
+      update.setLong(6, claim.walkEpoch());
+      update.setString(7, claim.unitRevision());
+      update.setString(8, claim.plannedSourceSha256());
+      if (update.executeUpdate() != 1) throw new SQLException("Recorded source claim changed");
+    }
+    var payload = new SwitchBufferUpsert(path, claim.collection(), claim.provenance(),
+        nextRevision, observedSha256).encode();
+    if (!switchBufferOps.putForGenerationInTransaction(
+        connection, generation, "path:" + path, "UPSERT", payload)) {
+      throw new SQLException("Candidate source journal refused replacement");
+    }
+    SqliteIngestionWalkOps.noteMutation(connection, claim.scanId());
+    return true;
+  }
+
   private Void recordSupersededOutcome(IndexJob claim, IngestionOutcome outcome,
       JobQueue.IngestionLedgerEntry entry, SqliteIngestionWalkOps.Coverage coverage) throws SQLException {
     String path = normalizePath(claim.path());
@@ -2313,8 +2422,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded claim projection is unavailable"));
       if (progress.sealedAt() != null) return RecordedClaimDecision.DENY;
       if (progress.capturedPlan() && (progress.enumerationOutcome() != WalkEnumerationOutcome.COMPLETE
-          || !IngestionLedgerTransition.isSha256(plannedHash))) return RecordedClaimDecision.DENY;
-      if (!progress.capturedPlan() && plannedHash != null) return RecordedClaimDecision.DENY;
+          || plannedHash == null)) return RecordedClaimDecision.DENY;
+      // Streaming recorded members can carry a frozen source witness during a candidate build.
+      // Their claim remains subject to the recorded owner policy and exact hash validation.
+      if (plannedHash != null && !IngestionLedgerTransition.isSha256(plannedHash)) {
+        return RecordedClaimDecision.DENY;
+      }
       return Objects.requireNonNull(recordedClaimPolicy.apply(operationKey), "recorded claim decision");
     } catch (SQLException | RuntimeException unavailableAuthority) {
       log.warn("Recorded claim authority unavailable; keeping the unit fenced", unavailableAuthority);

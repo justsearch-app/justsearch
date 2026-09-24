@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import java.util.List;
 
 /**
@@ -102,6 +103,17 @@ public interface SwitchBufferCapableQueue extends JobQueue {
       List<EnqueueEntry> entries, String collection) {
     throw new UnsupportedOperationException(
         "Atomic generation-scoped recorded admission is unavailable");
+  }
+
+  /**
+   * Replaces an issued streaming recorded claim's stale source witness and candidate UPSERT in
+   * one transaction. Returns false when the claim is not an eligible candidate member. Storage
+   * failure throws so the caller cannot acknowledge a partial replacement.
+   */
+  default boolean supersedeStreamingRecordedSource(
+      IndexJob claim, String observedSha256, IngestionOutcome staleOutcome,
+      IngestionLedgerEntry entry) {
+    return false;
   }
 
   /** Exact settled queue admission behind one versioned file projection obligation. */

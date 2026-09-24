@@ -4,29 +4,41 @@ stage: E
 created: 2026-09-09
 base: be47faa40
 status: "runbook, written during stage C planning; instruments and values re-verified at stage start (17.6)"
-updated: 2026-09-09
+updated: 2026-09-24
 ---
 
 # Lane F stage E — gate run: runbook
 
-Stage E runs, it does not build (17.6). This document is the runbook: which values are
+Stage E runs, it does not build (17.6). **The 2026-09-24 owner re-cut below
+supersedes the older all-row run list and fixed-soak/floor/collector directions.**
+This document is the runbook: which values are
 instantiated before the first run, which instruments exist and which E must add, the procedure
-for every row of section 16, the bound on every run, and what the record under `evidence/E/`
+for the seven paired groups of section 16, the bound on every run, and what the record under `evidence/E/`
 must contain for stage F's report. Section numbers are `design.md`'s; `design.md` is cited by
 section, code and scripts by `file:line` at `be47faa40` (the instrument inventory was taken there
 on 2026-09-09 and is re-verified at stage start).
 
-Stage E in one line (17.3 row E): **no code beyond the fixes the run forces; collector and heap
-chosen, and the supervisor's hang poll interval and count set with them from the soak's worst
-safepoint pause; the owner's bounds and the three allowed-difference classes instantiated from
-the PR 0 baseline before the run; paired against `main` after PR 0 on the same corpus and
-machine, plus a run at the supported floor; the signed dead-Engine upgrade and inherited-store
-recovery exercise (section 0, 2026-09-08).**
+Stage E runs the seven paired groups in §3 against current `main`. G1 is the
+default; the owner sets E4's soak duration. D1/D2 own every other §16 row as
+one-sided feature acceptance. The signed dead-Engine upgrade and inherited-store
+recovery exercise remains E7, with §16's artifact disposition.
 
 ---
 
 ## 0. Decisions and corrections this runbook records
 
+- **E0.8 — Seven paired groups only (owner, 2026-09-24).** Pair branch against
+  current `main` for quality plus workflow fixture, foreground search and agent
+  response time during bulk indexing, indexing speed, memory budget with an
+  owner-duration no-crash soak, crash recovery with no orphaned children,
+  graceful and forced hang detection, and dead-Engine upgrade. Every other §16
+  row is one-sided feature acceptance mapped to D1/D2; no condition is waived.
+  Installed and real-model proof may be reused where its revision and assertions
+  cover the row. Minimum-spec machine, other-OS recovery and representative
+  changes run only for their corresponding claim. G1 is the default; a
+  collector comparison runs only if a response-time group fails. The owner sets
+  soak duration before its run. E0.1, E0.4, E0.5 and E0.6 below remain as
+  historical decisions only where they conflict with this correction.
 - **E0.1 — Run length is bounded to fifty-five minutes** *(owner constraint, 2026-09-07: no
   benchmark, eval, soak or capture over one hour)*. 17.7's locked soak ("two hours of indexing, a
   scripted agent and a reconfigure every fifteen minutes") is satisfied by **two fifty-five-minute
@@ -70,7 +82,8 @@ recovery exercise (section 0, 2026-09-08).**
 - **E0.7 — A failed row is answered by section 2's rule** (collector and heap, pacing, a missing
   executor or admission bound, an operation contract that lost its bound, only then a process
   boundary), a fix re-runs the rows it can affect, and a fix to a shared mechanism re-runs the
-  whole table (17.6). The default does not flip on a failed envelope (16).
+  affected paired groups and dependent D1/D2 feature proof (2026-09-24). The
+  default does not flip on a failed envelope (16).
 
 ### 0.1 Corrections found while running (appended per run)
 
@@ -92,16 +105,16 @@ is a new run, not an amendment.
 | indexing-progress fraction | ninety percent of split | split side's docs/s and chunks/s at E under the same foreground load; baseline sanity: primary indexing 127.4 docs/s, embedding complete at 209.7 s on scifact | `evidence/baseline/scifact/summary.json` `ingest.pipeline_summary` |
 | warm-start budget | baseline index-ready plus five seconds | 7.6 s (`worker_ready_ms=7631` on warm restart) plus 5 s = **12.6 s** from the first cooldown's end to `index` ready | `evidence/pr0/after/restart-startup.txt` |
 | crash-to-API-restored | first cooldown plus the warm-start budget | 1 s (`cooldownIncrementMs`) plus 12.6 s = **13.6 s** to `api`; `index` within the same budget | `supervision-contract.v1.json:164` |
-| soak | two hours (17.7) → two 55-minute runs plus one 10-minute run (E0.1 amendment) | indexing of the reference corpus, the scripted agent from `admission-loop.mjs` at a fixed rate, a reconfigure every fifteen minutes (three per 55-minute run), under the chosen collector | E0.1 |
-| floor machine | lowest GPU class the lower-memory guidance names | the class named in `docs/` lower-memory guidance at E's start; simulated by device-memory cap if no machine (E0.4) | E0.4 |
+| soak | owner sets duration before E4 (2026-09-24) | indexing, scripted agent and reconfigure workload; record continuous windows and total measured duration | E0.8 |
+| floor machine | conditional on a minimum-spec claim | record the actual machine if claimed; a device-memory cap proves a mode path but not minimum-spec performance | E0.8 |
 | corpus | the jseval reference corpus | `scifact` (5,183 documents, 300 queries) for the quality and indexing rows; the 91-document fixture corpus for the workflow fixture; the 100-document lock workload (B17) for the recovery rows | `evidence/baseline/README.md` |
-| semantic-availability bound | paired first, absolute second | the split's semantic outage for the same reindex on the same machine, measured at E; an absolute ceiling fixed by the orchestrator from the split reference before the candidate gate run, with its value and rationale recorded in `values.json`; both bounds are required | 17.7 |
-| retained-state and admission caps | first cut by the implementer, confirmed at E | the C1 values from `governance/retained-state.v1.json` and the admission config, confirmed or changed by the aggregate-bound and memory rows | C1 |
-| session-gate aging threshold and background batch bound | first cut at D2, final at E | the D2 values, confirmed or changed by the request-time-encoders row | D2 |
+| semantic-availability bound | D1 one-sided feature acceptance | D1 records refusal fraction, duration and bound for any floor-machine claim; not an E comparison | D1 |
+| retained-state and admission caps | first cut by the implementer | D2 one-sided aggregate-bound acceptance confirms these values; E4 observes memory | C1/D2 |
+| session-gate aging threshold and background batch bound | first cut at D2 | D2 one-sided request-time encoder acceptance confirms these values | D2 |
 | allowed-difference classes | exactly three | `new-reason-code`, `equal-score-order`, `generative-text` — already code constants (`workflow_fixture.py:224`); none added after a diff | PR 0b |
 | noise-pair gate | three captures per side, `maxNoisyFraction` 0.05, `scoreTieEpsilon` 0.001 | unchanged from PR 0b | `lane-f-workflow-fixture.v1.json` |
-| collector, heap, `UseCompactObjectHeaders` | gate run | chosen by §5's protocol, then written to both spawn sites and the exact-set pin before the gate rows run | §5 |
-| hang poll interval and count | set with the collector from the soak's worst safepoint pause | interval × count ≥ 3 × the worst `Total time for which application threads were stopped` seen across all three soak runs, with interval ≥ 10 s; written to `governance/supervision-contract.v1.json` `:170-171` (both supervisors read it; no code change) | §5 |
+| collector, heap, `UseCompactObjectHeaders` | G1 default | confirm heap in E4; compare collectors/headers only after E2 failure or a specific benefit claim | §5 |
+| hang poll interval and count | set from E4's observed safepoint pause | interval × count ≥ 3 × the worst observed pause, interval ≥ 10 s; write the register before E6 | §5 |
 
 ---
 
@@ -142,144 +155,68 @@ still green; `npm run lint:scripts` green.
 
 ---
 
-## 3. The runs, each bounded
+## 3. Seven paired run groups (owner re-cut 2026-09-24)
 
-Every run is one script invocation with its own wall-clock cap inside the script, its own output
-directory under `tmp/e/<run>/`, and a record under `evidence/E/<run>/` holding the summary, the
-analyzer output, `values.json`'s hash and the SHA-256 of every raw file left in `tmp/`. Raw logs
-stay in `tmp/` (stage B's rule); the record carries hashes. Runs are sequential; the dev stack is
-held under a declared lease of the run's length. Order:
+Each comparison uses the branch and current main on the same machine, corpus,
+workload and instrument. Record source revisions, build identity, machine facts,
+commands, raw results and both arms' values. Fix the owner's numeric bounds and
+the soak duration before the run. No single run exceeds the existing one-hour
+execution limit; split a longer owner-set soak into separately recorded windows
+without calling them continuous. Reuse a recorded split fixture only if its
+pinned surfaces still match main.
 
-| run | rows of 16 | procedure | bound |
-|---|---|---|---|
-| **R0 collector protocol** | (§5) | three probe runs per candidate pair | 3 × 15 min per pair, at most two pairs per day |
-| **R1 paired latency and memory** | search p95, memory (steady state), indexing progress | `head-flag-run.sh` on `main` then on the lane, same day, same heap and collector, the status sampler running; `analyze-head-run.cjs` on both; the paired comparison written by a new `compare-head-runs.cjs` (p95 ratio per mode, RSS per phase, docs/s) | 2 × 25 min |
-| **R2 fixture gate** | semantic non-regression, layer 2 | `fixture-pair.sh <side> compact 33221 3` on the lane (three cycles), `fixture-gate.sh evidence/baseline/fixture-pr0b/side-a <lane-side> report.json`; the split side recaptured only per E0.2 | one side per run, about 45 min |
-| **R3 quality baselines** | semantic non-regression, layer 1 | `python -m jseval run --dataset scifact --modes lexical,hybrid --pipeline --start-backend --clean --settle-index` on each tree; `jseval compare <main-run> <lane-run> --fail-on-regression`; `relevance-gate` against the stored baseline | 2 × 12 min |
-| **R4a, R4b, R4c soak** | memory (zero crashes, no heap growth), indexing progress under load, admission rejections, hang parameters' input | `soak-run.sh`: start with GC and safepoint logging, ingest the reference corpus, the scripted agent at a fixed rate, a reconfigure every fifteen minutes, stop at 40 min; the analyzer reports crashes (`supervisor.v1.json` `restartCount` must be 0), live-after-GC trend (slope over the run, must be ≤ 0 after warm-up), worst safepoint pause | 3 × 40 min, separate occasions |
-| **R5 recovery** | recovery process, recovery workflow, hang graceful, hang forced, resume conditions | `run.mjs --adapter dev-runner` and `--adapter tauri` under the E hang parameters; `:modules:system-tests:integrationTest` for B17's five and C2's six scenarios; the client re-entry runs (webview via ui-shot, MCPB bridge, CLI, the generic MCP harness) each scripted to: search, kill, wait for `restarting`→`running`, re-bootstrap, search again; work-loss units read from the operations table | about 40 min |
-| **R6 lifecycle rows** | reconfigure, stuck component, generation transition, semantic availability, combined low-memory reindex, combined delayed retry | D1's harness on the reference machine, then on the floor (E0.4) | 2 × 45 min |
-| **R7 request-time encoders and aggregate bound** | request-time encoders, aggregate bound, durability | `encoder-latency-probe.sh` idle then during bulk embedding; `admission-loop.mjs` both arms; D2's cursor and durability tests | 30 min |
-| **R8 dead-Engine upgrade** | dead-Engine upgrade | §7 | one sandbox round, about 40 min of operator time |
-| **R9 positive benefit** | positive benefit | §6 | three changes × two modes, each under one hour, on separate occasions |
+| run | paired section 16 group | procedure and required result |
+|---|---|---|
+| E1 | search quality and workflow fixture | Run jseval quality comparison and the pinned fixture on both arms. Require baseline gate and SearchTrace shape, deterministic evidence/citation/cancellation equality, and only the three predeclared difference classes. |
+| E2 | search and agent response times during bulk indexing | Run idle-agent and scripted-agent loads on both arms while bulk indexing. Compare admitted search/API p95; count reason-coded rejections under the owner ceiling, with timeout/5xx as failure. |
+| E3 | indexing speed | Measure chunks/s under the same foreground loads on both arms; require the owner-set fraction of split while queries continue. |
+| E4 | memory budget and no-crash soak | Sum Engine, llama-server and children commit charge against section 8 and split, report working set, measure live-after-GC trend and zero crashes across the owner-duration indexing/agent/reconfigure soak. |
+| E5 | crash recovery and children | Force an actual Engine death with a durable operation in flight. Compare crash-to-API restoration and checkpoint resume; require visible restarting, no orphaned child, correct adopt/stop behavior for each restart/quit/upgrade path. |
+| E6 | hang detection, graceful and forced | Exercise runnable-watcher/API-pool wedge and whole-JVM wedge on both arms under fixed hang settings; require request-channel and forced-kill recovery within the respective deadline plus budget. |
+| E7 | dead-Engine upgrade | Run the registered sandbox repair over an exhausted Engine on both applicable releases; reconcile children first, open every inherited store at the broken release schema and answer search. Apply section 16's existing signed-artifact disposition if unavailable. |
 
-A run whose script exceeds its cap exits with `TIMED_OUT` and is recorded as such; it is re-cut,
-not re-run longer. No run is backgrounded past the harness's sixty-minute task kill.
-
----
-
-## 4. Row-by-row procedure and pass criterion
-
-For each row of 16, in the table's order: the run, the exact observation, the pass criterion in
-the instantiated values, and what stays unmeasurable at E with the reason.
-
-1. **foreground search p95 and agent-loop API p95** — R1 and R4: p95 over admitted requests per
-   mode from `search-load-*.csv` and the admission loop's calls; pass if lane p95 ≤ split p95 ×
-   1.10 in every mode and the rejection count on the wire is 0 (idle) and ≤ 1 % (scripted agent),
-   every rejection carrying the admission reason code; a timeout or a 5xx is a failed row, not a
-   rejection.
-2. **indexing progress** — R1 and R4: chunks/s from the status series while the foreground load
-   runs; pass if lane ≥ 0.90 × split under the same load.
-3. **memory** — R1 (steady state) and R4a+R4b (soak): commit charge within the section 8 budget
-   document (C1-13, `evidence/C1/memory-budget.md`) through the run; machine-wide sum (Engine +
-   llama-server + children) ≤ split's sum for the same phase; live-after-GC slope ≤ 0 after the
-   first fifteen minutes; `restartCount` 0 across all three soak runs. Working set reported beside,
-   never as the metric.
-4. **recovery, process** — R5: the conformance cases for the three exit classes and the budget
-   under the E hang values; the installed writer scenario's crash-to-`api` and crash-to-`index`
-   from `supervisor.v1.json` timestamps and the readiness envelope, pass if ≤ 13.6 s each;
-   `restarting` observed in the file; the PROCESSING scenario proves resume-from-checkpoint (C2)
-   not restart; no orphan child in the process table after restart; a healthy llama-server
-   adopted (the `external-adoption` fault mode and B12's tests) on the crash and `restart` paths,
-   absent after `quit` and `upgrade`.
-5. **recovery, workflow** — R5: per-component time to `api`, `index`, `encoders`, `generative`
-   from D1's envelope after a forced kill; each of the four clients completes search → kill →
-   re-bootstrap → search without operator action, result stated per client; C2's six kill-point
-   scenarios (unknown / accepted / running-or-failed with the right unit count; same-key retry
-   moves nothing); work loss in user units (turns interrupted, operations resumed vs restarted,
-   writes needing a query) reported and compared with 17.7's tolerance (one turn, zero restarts,
-   only in-flight writes).
-6. **stuck component** — R6: D1's harness blocks the index open past its deadline, asserts
-   `failed` with reason, `api` alive, recovery by reconfigure when released, no supervisor
-   restart; then the unreleasable lock: local budget exhausted, one supervised restart counted,
-   `index` ready after; an optional component in the same state never escalates.
-7. **generation transition** — R6: D1's harness on the reference machine and the floor: edit,
-   removal and new document during the rebuild reflected at activation; one gap refuses and names
-   the document; H1→H2 replay reports `superseded` and does not block; a cursor opened before
-   activation pages to expiry or fails `cursor expired` (D2); on the floor the in-place path with
-   `reloading` semantic legs, text search answering, a write accepted in the window text-searchable
-   at once with `semantic at activation`, semantically searchable after; the refusal branch on the
-   floor recomposes encoder A within the reconfigure budget with the deferred writes backfilled.
-8. **semantic availability during maintenance** — R6 on the floor: the refused fraction and the
-   wall-clock window of a full transition; pass if ≤ the split's semantic outage for the same
-   reindex on the same machine (measured in R6's split arm), and ≤ the owner's absolute ceiling
-   once named.
-9. **combined: low-memory reindex, changing inputs, interruption** — R6 on the floor, in-place
-   mode: edits under captured units, forced kill after the `state.json` swap and before the
-   completion row → on restart B active, encoders match B, row `complete`, edited documents current;
-   the same with the kill before the swap → replay resumes from the journal with A active.
-10. **combined: delayed retry after a later change** — R6: A→B (response dropped), B→C, retry of
-    the first under its key answers `complete` with C applied and one apply of C in the component
-    map; the same under a new key refused `version conflict`; a completed write retried after its
-    document was removed answers `complete` and the document stays removed; an aged key answers
-    `expired`; after a restore from backup `history since` is the restore point.
-11. **aggregate bound** — R7: `admission-loop.mjs` both arms (N contexts at their limit above an
-    executor's cap → aggregate code, queue never above its bound; one context with the same total
-    load rejects the same number); D2's cursor eviction with `cursor expired` at the per-context
-    cap, pinned-reader count in the component map ≤ its cap, memory row holding.
-12. **durability** — R7: D2's consumer test (a `durable` index-and-return write searchable after an
-    immediate forced kill; an NRT write searchable before the next commit).
-13. **request-time encoders** — R7: one query NER, one embedding, one rerank of twenty, idle then
-    during bulk embedding (`encoder-latency-probe.sh`, with D2's two stage timings); pass if the
-    contended latency ≤ idle + the running batch + one aged batch (the batch times from the run's
-    encoder profiles, `debug_state_snapshot.worker.enrichment.encoderProfiles`), the phase stated;
-    under the scripted agent reported against admitted concurrency; the `passed`-rule unit tests
-    (D2) green in the same record.
-14. **semantic non-regression** — R2 and R3: `relevance-gate.json` `ok` and `jseval compare` with
-    no significant regression on nDCG@10 per mode and the same `SearchTrace` shape per query;
-    `fixture-gate.sh` PASS with 0 regressions, the counts reported beside the verdict.
-15. **resume conditions** — R5: C2's `OperationResumeE2ETest` and the four condition tests; the
-    lifetime condition as the D2 cursor test.
-16. **dead-Engine upgrade** — R8 (§7).
-17. **positive benefit** — R9 (§6) plus the deletion counts and the verification-profile boot
-    time (D2's test, seconds).
-18. **hang, graceful / hang, forced** — R5: the two conformance cases under the E hang values on
-    both adapters; recovery within request deadline plus the warm-start budget.
-19. **reconfigure** — R6: encoder config change with zero connection drops (the admission loop
-    running throughout counts drops), one applied version per component (D1's component map
-    sampled every second during the apply), an undeclared-dependency component unchanged; beside
-    mode with a rejected compose leaving the incumbent; in-place mode (forced by the cap) with
-    `reloading`, a rejected compose leaving `unavailable` then recomposing A, the double-failure
-    variant handing over to the stuck-component path; a native-crash compose recovered by the
-    supervisor booting from A with the attempted-version record naming B, llama-server adopted
-    only on matching identity.
-
-**Unmeasurable at E, named:** Linux whole-Engine recovery (no Linux machine in the run; recorded
-as the gap section 16 already names); the floor machine if simulated (E0.4); the Tauri AppHandle setup and events (source-reviewed,
-not executed, as B recorded).
+The minimum-spec-machine run, other-OS recovery and representative-change
+exercise occur only when making those claims. They are not extra paired gate
+groups. One-sided section 16 feature acceptance stays with the D1/D2 mapping tables.
 
 ---
 
-## 5. The collector protocol (R0)
+## 4. Row procedure and verdict
 
-Candidates: the current pair (`SerialGC`, `-Xmx2g`, `UseCompactObjectHeaders` on) and `G1`
-at the same heap; `ZGC` only if `G1`'s young-pause p95 exceeds the split's. For each candidate,
-`head-flag-run.sh` with `--collector` and the soak's first fifteen minutes (`soak-run.sh --minutes 15`),
-GC and safepoint logging on. Read from `analyze-head-run.cjs`: young-pause p50/p95/max, full
-GCs (must be zero), live-after-GC max vs committed, worst safepoint pause, RSS p95 in the
-ingest phase, search p95 in the `after-enrich` phase. Choose by: search p95 first (within the
-row's ceiling), then RSS, then pause max. `UseCompactObjectHeaders` is toggled on the chosen
-collector in one more probe pair and kept only if RSS improves with search p95 unchanged. The
-chosen flags are written to both spawn sites and `SHARED_FLAGS`/`PACKAGED_ONLY_FLAGS` in one
-commit before R1 (`fix(936): E — the chosen collector and heap`), with `node
-scripts/dev/test-dev-runner-head-java-opts.mjs` green. The hang parameters follow from R4's worst
-safepoint pause (§1) and are written to the register after R4b.
+For each of E1-E7, freeze the corpus, launch flags, workload and bound before
+either arm. Run the split arm on current main and the branch arm with the same
+instrument, or verify the workflow fixture's recorded split arm still matches
+its pins. Preserve raw evidence and a per-clause verdict; a group passes only
+when every clause in its section 16 row passes. Investigate a consistent loss
+even inside a noise margin. A shared-mechanism fix re-runs every affected paired
+group and its dependent one-sided D1/D2 feature proof.
+
+The remaining section 16 rows are not E rows. D1 owns recovery workflow component
+readiness, stuck component, generation transition, semantic availability,
+combined low-memory reindex, delayed retry, resume/reconfigure behavior and
+their installed real-model cuts. D2 owns aggregate admission/cursor bounds,
+durability, request-time encoders, client re-entry, verification boot and
+conditional positive-benefit evidence. Joint clauses name both owners in the
+D1/D2 maps. Record a passed result only for the revision, environment and
+assertions actually run; list unproved clauses in those stage records.
 
 ---
 
-## 6. The three representative changes (R9, positive benefit)
+## 5. Collector and hang values
 
-Named here, before the flip, so they cannot be chosen after the fact: **retrieval** — add one
+Use G1 and the current Engine heap for E1-E7. Confirm the heap against the
+memory row and measure GC/safepoint pauses during E4 to set the hang interval
+and miss count before E6. If E2's response-time group fails, run the bounded
+collector/heap probe with the same corpus and workload; choose the best pair
+within the response and memory bounds, pin it in both spawn sites, rerun the
+affected groups, and record the change. A G1-versus-ZGC bake-off and compact
+object header probe are otherwise conditional on a claimed benefit.
+
+---
+
+## 6. Representative changes (conditional positive-benefit claim)
+
+Run this exercise only if claiming lower coordination cost. Named here, before the flip, so they cannot be chosen after the fact: **retrieval** — add one
 field to the search hit (source tier) through the port and the HTTP shape; **orchestration** —
 give the agent loop one new tool that fetches a document slice; **lifecycle** — add one optional
 component (a no-op encoder) with readiness and a reconfigure hook. Each is implemented on both
@@ -293,7 +230,7 @@ separated as 16 requires: capability work is not counted as merge benefit.
 
 ---
 
-## 7. The dead-Engine upgrade round (R8)
+## 7. The dead-Engine upgrade round (E7)
 
 The registered procedure `upgrade-dead-engine-recovery` (`governance/sandbox-coverage.v1.json:65`)
 against the **final candidate**: a signed installer from `build-installer.yml` (dispatch-only;
@@ -313,55 +250,52 @@ hour of sandbox time.
 
 ---
 
-## 8. The record (`evidence/E/`)
+## 8. The record (evidence/E/)
 
-- `values.json` (§1) and its hash in every run record.
-- One directory per run (`r0/` … `r9/`) with: the command line, the tree and commit of each arm,
-  the machine facts (GPU, driver, JDK, OS build), the analyzer output, the verdict per row, and a
-  SHA-256 inventory of the raw files left under `tmp/e/`.
-- `table.md`: the 16 table row by row with pass / fail / unmeasurable, the number behind each,
-  and the run it came from; the collector and heap chosen with R0's numbers; the hang parameters
-  and the safepoint pause they derive from.
-- `decision.md`: for a failed row, the section 2 remedy applied and the re-run; for a passing
-  envelope, the bounded conclusion 16's last paragraph requires (machine, corpus, workload,
-  duration, failure scenarios covered).
+- values.json fixes the seven groups' bounds, corpus, G1/heap, soak duration
+  supplied by the owner and hang values before their runs.
+- One directory for each E1-E7 group holds commands, branch and main revisions,
+  machine facts, raw files or accessible retained-artifact links, analyzer
+  output, both arms' values and each clause's verdict.
+- table.md lists the seven paired groups with pass/fail/unmeasurable, source
+  run and reason. It links D1/D2's separate one-sided feature-acceptance table
+  without presenting those rows as E passes.
+- decision.md records remedies and reruns for failed groups, plus the bounded
+  conclusion: machine, corpus, workload, soak duration and fault scenarios.
+  Conditional floor/OS/representative/collector exercises are named when run,
+  and claims are bounded when they are not.
 
-Stage F's report reads only this directory and the stage records.
+Stage F reads this directory and the D1/D2 stage records.
 
 ---
 
-## 9. What may be red or unmeasurable after E, and nothing else
+## 9. Required verdict at E
 
-1. Linux whole-Engine recovery (named gap; no Linux machine).
-2. The floor machine, if simulated (E0.4), named as such.
-3. The signed dead-Engine round, if signing prevents the candidate (carried by F).
-4. The semantic-availability ceiling must be fixed before the candidate gate run and is not an allowed proof gap.
-
-Not allowed: any gate row failing without a section 2 remedy and re-run recorded in
-`decision.md`; a row marked passed on a subset of its clauses; a run over the bound.
+Every E1-E7 group must pass all applicable clauses, or have an explicit
+installer/signing disposition already allowed by design section 16. Linux or
+another OS and a minimum-spec machine are tested only if their coverage is
+claimed; an unrun shape is named as unclaimed, not marked passed. The one-sided
+D1/D2 rows must have completed feature acceptance or a named gap in their
+own stage records. An unmeasured owner-duration soak cannot pass E4.
 
 ---
 
 ## 10. Stop rule (17.8)
 
-If the envelope fails a row whose remedy is a process boundary (section 2's last resort), stop
-and re-read 2 and 14 before any code; record the row, the remedy tried and the number in
-`decision.md` and in design section 0. A failed row answered by a shared-mechanism fix re-runs
-the whole table (17.6), which means at least R1, R4a, R4b and R6 again: budget the re-run before
-the fix.
+A failed paired group receives the section 2 remedy and a rerun. A fix to a
+shared mechanism reruns every affected E group and dependent D1/D2 proof.
+A process-boundary remedy triggers the design re-read at sections 2 and 14
+before code changes. Record the failed number, cause and rerun in decision.md.
 
 ---
 
 ## 11. Open questions
 
-- **Q1 — the floor machine.** Whether a machine of the lower-memory guidance's GPU class is
-  available at E. If not, E0.4 applies and the report says so. (No decision needed now.)
-- **Q2 — the semantic-availability absolute ceiling.** The owner names it once R6's paired
-  number exists; until then the row reports the paired verdict only.
-  **2026-09-09 amendment:** the owner's delegated authority assigns this decision to the
-  orchestrator. Fix the absolute ceiling from the measured split reference before the candidate
-  gate run, record the value/rationale in values.json, and require both bounds. This supersedes
-  the historical owner-wait clause above without rewriting it.
+- **Owner-duration soak:** E4's duration must be supplied before the run. The
+  exact workload and windows are recorded in values.json.
+- **Conditional claims:** D1/D2 and F must state whether minimum-spec hardware,
+  other-OS recovery or lower coordination cost is claimed. Run the matching
+  conditional exercise only for a claim; otherwise bound the report explicitly.
 
 ---
 

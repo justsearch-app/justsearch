@@ -295,9 +295,8 @@ public final class JobBatchExtractor {
 
       if (claim.plannedSourceSha256() != null
           && !claim.plannedSourceSha256().equals(sourceSha256)) {
-        staleResolver.handleKnownStale(
-            filePath, envelope, collection, artifact, "since admission",
-            FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, provenance, claim);
+        staleResolver.handleChangedAcceptedSource(
+            filePath, envelope, collection, artifact, sourceSha256, provenance, claim);
         batchStats.recordSkipped();
         return null;
       }

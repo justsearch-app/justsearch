@@ -5,6 +5,7 @@ import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import java.nio.file.Path;
 import java.util.function.LongConsumer;
 
@@ -52,6 +53,8 @@ public final class StaleSnapshotResolver {
   }
 
   /**
+   * Resolves a fresh or stale file snapshot after extraction.
+   *
    * @return {@code true} when the file is stale and the appropriate action
    *     (mark-done for DELETED, defer for other change shapes) has been
    *     recorded; {@code false} when the file is fresh and the caller may
@@ -83,6 +86,25 @@ public final class StaleSnapshotResolver {
       throw new IllegalArgumentException("Known-stale validation must not be FRESH");
     }
     return handleStale(filePath, envelope, collection, artifact, timing, validation, provenance, claim);
+  }
+
+  /** A stable new hash may replace an obsolete streaming candidate witness atomically. */
+  boolean handleChangedAcceptedSource(
+      Path filePath, FileEnvelope envelope, String collection,
+      ValidatedExtractionArtifact artifact, String observedSha256,
+      JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
+    IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(
+        FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, "since admission");
+    var entry = LedgerEntryFactory.forEnvelope(
+        envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance);
+    journal.recordOutcomeSafely(filePath, "STALE_SOURCE_SUPERSEDE", () -> {
+      if (!(jobQueue instanceof SwitchBufferCapableQueue candidateQueue)
+          || !candidateQueue.supersedeStreamingRecordedSource(
+              claim, observedSha256, staleOutcome, entry)) {
+        jobQueue.deferClaim(claim, staleOutcome, entry);
+      }
+    });
+    return true;
   }
 
   private boolean handleStale(

@@ -10,6 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.util.PathNormalizer;
+import io.justsearch.indexerworker.ingest.IngestionOutcome;
+import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
+import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -251,6 +254,155 @@ final class SwitchBufferVersionTest {
         }
       }
     }
+  }
+
+  @Test
+  void streamingRecordedAdmissionFreezesSourceBeforePublishingScopedUpsert() throws Exception {
+    Path db = tempDir.resolve("streaming-recorded-admission.db");
+    Path file = Files.writeString(tempDir.resolve("streaming.txt"), "streaming source");
+    String sourceHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    String operationKey = "streaming-recorded";
+    try (var queue = new SqliteJobQueue(
+        db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginRecordedWalk(operationKey, "a".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", operationKey, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), "docs"));
+
+      var upsert = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload());
+      assertEquals(PathNormalizer.normalizeKey(file), upsert.path());
+      assertEquals(sourceHash, upsert.sourceSha256());
+      assertNotNull(upsert.unitRevision());
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "SELECT scan_id, walk_seen_epoch, unit_revision, planned_source_sha256 "
+                  + "FROM jobs WHERE path = ?")) {
+        statement.setString(1, PathNormalizer.normalizeKey(file));
+        try (var row = statement.executeQuery()) {
+          assertTrue(row.next());
+          assertEquals(operationKey, row.getString("scan_id"));
+          assertEquals(walk.enumerationEpoch(), row.getLong("walk_seen_epoch"));
+          assertEquals(upsert.unitRevision(), row.getString("unit_revision"));
+          assertEquals(sourceHash, row.getString("planned_source_sha256"));
+        }
+      }
+      queue.closeRecordedWalkEnumeration(
+          operationKey, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      assertEquals(operationKey, claim.scanId());
+      assertEquals(sourceHash, claim.plannedSourceSha256());
+    }
+  }
+
+  @Test
+  void streamingCandidateReplacesChangedSourceAndJournalBeforeNextClaim() throws Exception {
+    Path db = tempDir.resolve("streaming-source-replacement.db");
+    Path file = Files.writeString(tempDir.resolve("changing.txt"), "first");
+    String firstHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginRecordedWalk("stream-change", "a".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", "stream-change", walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), "docs"));
+      var first = queue.pollPending(1).getFirst();
+      assertEquals(firstHash, first.plannedSourceSha256());
+      Files.writeString(file, "second");
+      String secondHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+
+      assertTrue(queue.supersedeStreamingRecordedSource(first, secondHash, staleSource(), null));
+      var successor = queue.pollPending(1).getFirst();
+      assertNotEquals(first.unitRevision(), successor.unitRevision());
+      assertEquals(secondHash, successor.plannedSourceSha256());
+      assertFalse(queue.ownsClaimForPublication(first));
+      var upsert = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload());
+      assertEquals(successor.unitRevision(), upsert.unitRevision());
+      assertEquals(secondHash, upsert.sourceSha256());
+      assertEquals(3, queue.recordedWalk("stream-change").orElseThrow().revision());
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(
+          successor, null, secondHash)), IngestionOutcome.of(
+          IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE));
+      assertTrue(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), successor.unitRevision(), secondHash));
+    }
+  }
+
+  @Test
+  void streamingSourceReplacementRollsBackWhenCandidateJournalIsUnavailable() throws Exception {
+    Path db = tempDir.resolve("streaming-source-rollback.db");
+    Path file = Files.writeString(tempDir.resolve("rollback-source.txt"), "first");
+    try (var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginRecordedWalk("stream-rollback", "a".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", "stream-rollback", walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), null));
+      var first = queue.pollPending(1).getFirst();
+      Files.writeString(file, "second");
+      String secondHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.createStatement()) {
+        statement.execute("CREATE TRIGGER reject_streaming_replacement "
+            + "BEFORE INSERT ON switch_buffer BEGIN SELECT RAISE(ABORT, 'journal unavailable'); END");
+      }
+      assertThrows(RuntimeException.class,
+          () -> queue.supersedeStreamingRecordedSource(first, secondHash, staleSource(), null));
+      assertTrue(queue.ownsClaimForPublication(first));
+      assertEquals(2, queue.recordedWalk("stream-rollback").orElseThrow().revision());
+      var upsert = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload());
+      assertEquals(first.unitRevision(), upsert.unitRevision());
+      assertEquals(first.plannedSourceSha256(), upsert.sourceSha256());
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "SELECT state, unit_revision, planned_source_sha256 FROM jobs WHERE path = ?")) {
+        statement.setString(1, PathNormalizer.normalizeKey(file));
+        try (var row = statement.executeQuery()) {
+          assertTrue(row.next());
+          assertEquals("PROCESSING", row.getString(1));
+          assertEquals(first.unitRevision(), row.getString(2));
+          assertEquals(first.plannedSourceSha256(), row.getString(3));
+        }
+      }
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.createStatement();
+          var row = statement.executeQuery(
+              "SELECT COUNT(*) FROM ingestion_ledger WHERE operation_key = 'stream-rollback'")) {
+        assertTrue(row.next());
+        assertEquals(0, row.getLong(1));
+      }
+    }
+  }
+
+  @Test
+  void capturedCandidateKeepsItsImmutableSourceWitness() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("captured-immutable.txt"), "first");
+    try (var queue = new SqliteJobQueue(
+        tempDir.resolve("captured-immutable.db"),
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk("captured-immutable", "a".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", "captured-immutable", walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), null));
+      queue.closeRecordedWalkEnumeration(
+          "captured-immutable", walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      var before = queue.listSwitchBufferOpsStrictForGeneration("green").getFirst();
+      Files.writeString(file, "second");
+      String changedHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+      assertFalse(queue.supersedeStreamingRecordedSource(claim, changedHash, staleSource(), null));
+      assertTrue(queue.ownsClaimForPublication(claim));
+      assertEquals(before, queue.listSwitchBufferOpsStrictForGeneration("green").getFirst());
+    }
+  }
+
+  private static IngestionOutcome staleSource() {
+    return IngestionOutcome.of(IngestionOutcomeClass.STALE_SOURCE, "CONTENT_CHANGED",
+        IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT);
   }
 
   @Test
