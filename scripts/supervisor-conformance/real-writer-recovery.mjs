@@ -11,6 +11,7 @@ import { exerciseOperationFault } from './operation-fault-scenario.mjs';
 import {
   exerciseBulkFault, BULK_FAULT_CASES,
   exerciseInstallerActivationFault, INSTALLER_FAULT_CASES, writeRetainedInstallerCandidate,
+  exerciseLiveModelAB,
 } from './bulk-fault-scenario.mjs';
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 import { captureFromLive } from '../codegen/gen-api-client.mjs';
@@ -25,6 +26,7 @@ const operationFault = new Set(['ingest-before-accept', 'settings-before-accept'
 const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
+const modelLiveAB = scenario === 'model-live-a-b';
 function readActiveGenerationManifest(base) {
   const active = JSON.parse(fs.readFileSync(path.join(base, 'state.json'), 'utf8'));
   return JSON.parse(fs.readFileSync(path.join(base, 'indices', active.active_generation,
@@ -42,12 +44,19 @@ function findRetainedModelsRoot() {
     current = parent;
   }
 }
-const operationKey = operationFault || bulkFault || installerFault ? createOperationKey() : null;
+const operationKey = operationFault || bulkFault || installerFault || modelLiveAB
+  ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
   : path.join(repo, 'tmp', 'lane-f-takeover', `writer-live-${Date.now()}`);
 const state = path.join(work, 'state');
 const data = path.join(work, 'data');
+if (modelLiveAB) {
+  // This owned installed fixture previously exercised a different crash cut.
+  for (const marker of ['operation-fault-reached.json', 'operation-fault-release']) {
+    fs.rmSync(path.join(data, 'runtime', marker), { force: true });
+  }
+}
 const lockScenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO?.startsWith('lock-');
 const indexBase = path.join(lockScenario ? data : work, 'index');
 const aiEnabled = process.env.JUSTSEARCH_WRITER_RECOVERY_AI_ENABLED === '1';
@@ -139,6 +148,11 @@ if (installerFault) {
   delete env.JUSTSEARCH_NER_MODEL_PATH;
   delete env.JUSTSEARCH_SPLADE_MODEL_PATH;
   delete env.AI_OFFLINE;
+}
+if (modelLiveAB) {
+  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = 'installer-before-marker';
 }
 const installerCandidate = installerFault
   ? writeRetainedInstallerCandidate({ data, requireThat }) : null;
@@ -339,6 +353,9 @@ try {
       candidate: installerCandidate,
       readJson, waitFor, request, post, requireThat, requireOperationSuccess, matchingHit,
       scenario, operationKey, output: () => output });
+  } else if (modelLiveAB) {
+    await exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort, operationKey,
+      readJson, waitFor, request, post, requireThat, matchingHit });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {
@@ -380,6 +397,13 @@ try {
       requireThat(status.readiness.engineComponents.encoders.appliedVersion
         !== status.readiness.engineComponents.encoders.desiredVersion,
       'desired Y was not reported as pending');
+      const vector = await post(apiPort, '/api/knowledge/search',
+        { query: marker, limit: 10, mode: 'vector' }, 30000);
+      requireThat(vector.status === 200 && Array.isArray(JSON.parse(vector.text).results),
+        `serving X could not answer a real vector query while Y is desired: ${vector.text}`);
+      console.log('MODEL_BINDING_VECTOR_QUERY', JSON.stringify({
+        status: vector.status, results: JSON.parse(vector.text).results.length,
+      }));
     } else {
       requireThat(status.worker.compatibility.embeddingCompatState === 'UNAVAILABLE',
         'missing X did not make embedding compatibility unavailable');

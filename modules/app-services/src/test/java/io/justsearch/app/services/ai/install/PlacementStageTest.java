@@ -71,18 +71,16 @@ class PlacementStageTest {
 
   @Test
   void placeReplacesCorruptCandidateWithoutReplacingServingTarget() throws Exception {
-    Path downloaded = tempDir.resolve("downloaded-model.onnx");
-    Files.writeString(downloaded, "candidate", StandardCharsets.UTF_8);
-    String sha = DownloadExecutor.sha256(downloaded);
-    String targetPath = "onnx/embed/candidates/" + sha + "/model.onnx";
-    Path target = tempDir.resolve(targetPath);
+    Path target = tempDir.resolve(CANDIDATE_TARGET_PATH);
     Files.createDirectories(target.getParent());
     Files.writeString(target, "corrupt", StandardCharsets.UTF_8);
     Path partial = InstallPlanner.partialPathFor(target);
-    Files.copy(downloaded, partial);
+    Files.writeString(partial, "candidate", StandardCharsets.UTF_8);
 
+    String sha = DownloadExecutor.sha256(partial);
     String failure = new PlacementStage(tempDir).place(new InstallPlan.PlannedDownload(
-        "embedding", "https://example.invalid/model.onnx", targetPath, sha, 9, true));
+        "embedding", "https://example.invalid/model.onnx", CANDIDATE_TARGET_PATH,
+        sha, 9, true));
 
     assertNull(failure);
     assertEquals("candidate", Files.readString(target));
@@ -106,6 +104,23 @@ class PlacementStageTest {
     assertTrue(failure.contains("different bytes"));
     assertEquals("old-tokenizer", Files.readString(target));
     assertTrue(Files.exists(partial));
+  }
+
+  @Test
+  void placeRefusesDifferentSupportingOnnxEvenInCandidateDirectory() throws Exception {
+    Path target = tempDir.resolve(CANDIDATE_TARGET_PATH).getParent().resolve("auxiliary.onnx");
+    Files.createDirectories(target.getParent());
+    Files.writeString(target, "old-bytes", StandardCharsets.UTF_8);
+    Path partial = InstallPlanner.partialPathFor(target);
+    Files.writeString(partial, "new-bytes", StandardCharsets.UTF_8);
+    String relative = tempDir.relativize(target).toString().replace('\\', '/');
+
+    String failure = new PlacementStage(tempDir).place(new InstallPlan.PlannedDownload(
+        "embedding", "https://example.invalid/auxiliary.onnx", relative,
+        DownloadExecutor.sha256(partial), Files.size(partial), false));
+
+    assertTrue(failure.contains("different bytes"));
+    assertEquals("old-bytes", Files.readString(target));
   }
 
   private static InstallPlan.PlannedDownload download(String sha, long size) {

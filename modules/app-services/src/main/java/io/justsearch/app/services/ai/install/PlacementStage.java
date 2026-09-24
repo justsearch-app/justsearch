@@ -67,10 +67,10 @@ final class PlacementStage {
         try {
           DownloadExecutor.verify(targetFile, dl.sizeBytes(), dl.sha256());
         } catch (Exception mismatch) {
-          if (!isRepairableModelTarget(targetFile, dl.sha256())) {
+          if (!isRepairableModelTarget(targetFile, dl)) {
             return "Failed to finalize: refusing to replace existing target with different bytes";
           }
-          // A corrupt ONNX file can be repaired only under its own content-addressed directory.
+          // A corrupt selected ONNX file can be repaired in its candidate-owned directory.
           // Supporting files may belong to a serving generation even in that directory; changing
           // their bytes in place would change that generation's model context on its next boot.
           if (Files.isSymbolicLink(partialFile)) {
@@ -126,13 +126,13 @@ final class PlacementStage {
     }
   }
 
-  private boolean isRepairableModelTarget(Path target, String expectedSha256) {
+  private boolean isRepairableModelTarget(Path target, InstallPlan.PlannedDownload download) {
     return isCandidateOwnedTarget(target)
-        && target.getFileName().toString().endsWith(".onnx")
-        && target.getParent().getFileName().toString().equalsIgnoreCase(expectedSha256);
+        && download.isModelVariant()
+        && target.getFileName().toString().endsWith(".onnx");
   }
 
-  /** The planner's retained ONNX shape: models/.../candidates/<full SHA-256>/<file>. */
+  /** The planner's candidate shape: models/.../candidates/<package identity SHA-256>/<file>. */
   private boolean isCandidateOwnedTarget(Path target) {
     Path root = modelsDir.toAbsolutePath().normalize();
     Path normalized = target.toAbsolutePath().normalize();

@@ -33,15 +33,33 @@ lifetime, then D2/E/F remain open; merge is conditional on stage F acceptance.
 After the `ccbe9df4a` push, the retained-asset follow-up freezes
 supporting metadata files for retained selected models in the accepted plan
 and refuses replacement of differing supporting bytes in candidate directories.
-The exact hash-addressed ONNX repair remains allowed. Focused tests, PMD and
+Repair of the plan's selected ONNX variant remains allowed. Focused tests, PMD and
 Spotless passed at `tmp/3139-d1-12-retained-assets-final-focused.txt`; the
 358-task full gate passed at `tmp/3140-d1-12-retained-assets-integrated.txt`.
 Installed standard-model pointer-before-settings recovery passed at the exact
 follow-up source in `tmp/3141-d1-12-retained-assets-exact-installed.txt`,
 including exact settings witness, one terminal operation, two text hits and
-closed ports. Hosted run `35960460879` for `ccbe9df4a` completed SUCCESS,
-including system integration. The retained-asset follow-up still needs its own
-hosted proof after push.
+closed ports. Hosted run `35960460879` for `ccbe9df4a` and run `35962108023`
+for `60176ac6e` completed SUCCESS, including system integration.
+
+The next local correction after `60176ac6e` fixes the placement repair
+predicate: the candidate directory key is the whole package identity, so it
+cannot be compared with the selected ONNX SHA. `PlannedDownload.isModelVariant`
+is the existing exact producer fact; it permits only that ONNX variant's
+candidate-owned repair. A negative control refuses an auxiliary ONNX file
+marked as supporting. Focused placement, PMD and Spotless checks passed at
+`tmp/3142-placement-repair-correction-focused.txt`. Full integrated proof is
+`tmp/3143-placement-repair-correction-integrated.txt` (358 tasks passed);
+hosted proof awaits this correction's push. The installed X/Y boot also answered a
+real vector query through serving X (HTTP 200, two results) with Y still
+pending at `tmp/3144-model-x-y-vector-installed.txt`; owned ports closed.
+The installed live A/B probe held B at the settled pre-pointer marker: A
+answered text and vector searches, B had two completed build units and zero
+failures, and B then promoted with matching settings and a working vector
+query. The strengthened pass is `tmp/3148-model-live-ab-installed.txt`; owned
+ports closed. A and B used distinct private paths but the same standard-model
+SHA, so differing-model fingerprint isolation and held A lease retirement
+remain open acceptance.
 
 ### D1-4 accepted inference refresh slice and model-identity follow-up
 

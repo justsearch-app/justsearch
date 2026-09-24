@@ -448,21 +448,146 @@ export async function exerciseInstallerActivationFault(c) {
     settings: final.settings, search: searchEvidence };
 }
 
-async function prepareApprovedActivationDispatch({ apiPort, input, operationKey, post, requireThat }) {
-  const response = await post(apiPort, ACTIVATION_ROUTE,
+/** Keep the installed A root intact while activating a second, separately owned model root. */
+export async function exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort,
+  operationKey, readJson, waitFor, request, post, requireThat, matchingHit }) {
+  const runtime = path.join(data, 'runtime');
+  const reachedFile = path.join(runtime, 'operation-fault-reached.json');
+  const releaseFile = path.join(runtime, 'operation-fault-release');
+  const operationPath = path.join(data, 'operations.db');
+  const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
+  const sourceManifest = readJson(path.join(indexBase, 'indices', sourceGeneration,
+    '.justsearch-index-generation.json'));
+  const oldContract = readJson(path.join(data, 'install-contract.v2.json'));
+  requireThat(sourceManifest?.models?.embedding?.id && oldContract?.modelsDir
+    && sourceManifest.models.embedding.id.startsWith(path.resolve(work)),
+  'side-by-side model fixture requires a private installed serving A');
+  requireThat(operationRows(operationPath, operationKey).length === 0,
+    'side-by-side activation key is already present');
+  const bRoot = path.join(work, 'installer-models-b', operationKey);
+  for (const installed of Object.values(oldContract.models)) {
+    if (installed.skipped) continue;
+    const source = path.join(oldContract.modelsDir, installed.targetDir);
+    const target = path.join(bRoot, installed.targetDir);
+    requireThat(path.resolve(source).startsWith(path.resolve(oldContract.modelsDir))
+      && path.resolve(target).startsWith(path.resolve(bRoot)),
+    'installed model target escaped its owned root');
+    linkRegularFiles(source, target);
+  }
+  fs.writeFileSync(path.join(data, 'install-contract.v2.json'), `${JSON.stringify({
+    ...oldContract, modelsDir: bRoot, installedAtEpochMs: Date.now(),
+  }, null, 2)}\n`);
+  const beforeSettings = settingsWitnessOnDisk(data);
+  const input = { source: 'installer_model_activation' };
+  const prepared = await prepareApprovedActivationDispatch({ apiPort, input, operationKey,
+    post, requireThat, allowPreflightApproval: true });
+  const dispatched = startHeldPost(apiPort, ACTIVATION_ROUTE, {
+    args: input, idempotencyKey: operationKey,
+    confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
+  }, sessionHeaders(manifest));
+  const file = path.join(work, 'installer-root-a', 'installer-0.txt');
+  const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
+  try {
+    const reached = await waitFor('settled B before activation marker', 170000,
+      () => readJson(reachedFile));
+    requireThat(reached.phase === 'installer-before-marker'
+      && reached.operationKey === operationKey,
+    `side-by-side B stopped at the wrong marker: ${JSON.stringify(reached)}`);
+    const aState = readJson(path.join(indexBase, 'state.json'));
+    const bGeneration = `g-${operationKey}`;
+    const bManifest = readJson(path.join(indexBase, 'indices', bGeneration,
+      '.justsearch-index-generation.json'));
+    const inFlight = operationRows(operationPath, operationKey)[0];
+    requireThat(aState.active_generation === sourceGeneration
+      && bManifest?.models?.embedding?.id?.startsWith(bRoot)
+      && inFlight?.phase === 'settled' && inFlight?.building_generation_id === bGeneration
+      && inFlight.units_completed === 2 && inFlight.units_failed === 0
+      && settingsWitnessOnDisk(data).witness.acceptedRevision
+        === beforeSettings.witness.acceptedRevision,
+    `A/B cut lost serving A or settled B: ${JSON.stringify({ aState, bManifest,
+      phase: inFlight?.phase })}`);
+    const textSearch = await post(apiPort, '/api/knowledge/search',
+      { query: marker, limit: 10, mode: 'text' }, 30000);
+    const vectorSearch = await post(apiPort, '/api/knowledge/search',
+      { query: marker, limit: 10, mode: 'vector' }, 30000);
+    requireThat(textSearch.status === 200 && matchingHit(textSearch, file, marker)
+      && vectorSearch.status === 200
+      && JSON.parse(vectorSearch.text).results?.length > 0,
+    `serving A failed a query while B was settled: ${textSearch.text} ${vectorSearch.text}`);
+    console.log('MODEL_LIVE_AB_CUT', JSON.stringify({ operationKey, sourceGeneration,
+      buildingGeneration: bGeneration, aModel: sourceManifest.models.embedding,
+      bModel: bManifest.models.embedding, unitsCompleted: inFlight.units_completed,
+      unitsFailed: inFlight.units_failed, vectorHits: JSON.parse(vectorSearch.text).results.length }));
+  } finally {
+    fs.writeFileSync(releaseFile, 'release');
+  }
+  await dispatched.settled;
+  const completed = await waitFor('side-by-side activation terminal promotion', 180000, () => {
+    const row = operationRows(operationPath, operationKey)[0];
+    if (row?.state === 'FAILED' || row?.state === 'CANCELLED') {
+      throw new Error(`side-by-side activation terminal refusal: ${row.failure_reason}`);
+    }
+    const active = readJson(path.join(indexBase, 'state.json'));
+    const settings = settingsWitnessOnDisk(data);
+    return row?.state === 'COMPLETE' && active?.active_generation === `g-${operationKey}`
+      && settings.witness.lastCommittedOperationKey === operationKey
+      ? { row, active, settings } : null;
+  });
+  const currentManifest = await waitFor('B runtime manifest after publication', 60000,
+    () => readJson(path.join(runtime, 'manifest.json'))?.head?.apiPort
+      ? readJson(path.join(runtime, 'manifest.json')) : null);
+  const bStatus = await waitFor('B status after publication', 60000, async () => {
+    try {
+      const result = await request(currentManifest.head.apiPort, '/api/status', {}, 15000);
+      return result.status === 200 ? result : null;
+    } catch { return null; }
+  });
+  requireThat(JSON.parse(bStatus.text).components.encoders.state === 'READY',
+    `promoted B encoders were not READY: ${bStatus.text}`);
+  const bVector = await post(currentManifest.head.apiPort, '/api/knowledge/search',
+    { query: marker, limit: 10, mode: 'vector' }, 30000);
+  requireThat(bVector.status === 200 && JSON.parse(bVector.text).results?.length > 0,
+    `promoted B could not answer a real vector query: ${bVector.text}`);
+  console.log('MODEL_LIVE_AB_PASS', JSON.stringify({ operationKey,
+    sourceGeneration, activeGeneration: completed.active.active_generation,
+    settingsRevision: completed.settings.witness.acceptedRevision,
+    bVectorHits: JSON.parse(bVector.text).results.length }));
+}
+
+function linkRegularFiles(source, target) {
+  fs.mkdirSync(target, { recursive: true });
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name);
+    const to = path.join(target, entry.name);
+    if (entry.isDirectory()) linkRegularFiles(from, to);
+    else if (entry.isFile()) fs.linkSync(from, to);
+    else throw new Error(`side-by-side fixture refuses non-regular model asset: ${from}`);
+  }
+}
+
+async function prepareApprovedActivationDispatch({ apiPort, input, operationKey, post,
+  requireThat, allowPreflightApproval = false }) {
+  let response = await post(apiPort, ACTIVATION_ROUTE,
     { args: input, idempotencyKey: operationKey }, 90000);
   requireThat(response.status === 428,
     `installer activation must exercise prepared approval: HTTP ${response.status} ${response.text}`);
-  const pending = parseJson(response, 'installer activation preparation');
+  let pending = parseJson(response, 'installer activation preparation');
   if (pending.preparationNonce == null && typeof pending.pendingId === 'string') {
+    const preflightPendingId = pending.pendingId;
+    requireThat(allowPreflightApproval,
+      `fresh activation unexpectedly requested approval before preparation: ${response.text}`);
     const approval = await post(apiPort, '/api/authorizations/approve',
       { pendingId: pending.pendingId });
     const approved = parseJson(approval, 'unprepared installer approval diagnostic');
-    const refused = approval.status === 200 && typeof approved.capsule === 'string'
-      ? await post(apiPort, ACTIVATION_ROUTE, {
-        args: input, idempotencyKey: operationKey, confirmationToken: approved.capsule,
-      }, 90000) : approval;
-    throw new Error(`installer activation failed before prepared approval: ${refused.text}`);
+    requireThat(approval.status === 200 && typeof approved.capsule === 'string',
+      `initial activation approval failed: ${approval.text}`);
+    response = await post(apiPort, ACTIVATION_ROUTE, {
+      args: input, idempotencyKey: operationKey, confirmationToken: approved.capsule,
+    }, 90000);
+    pending = parseJson(response, 'prepared activation after initial approval');
+    requireThat(response.status === 428 && typeof pending.preparationNonce === 'string'
+      && pending.pendingId !== preflightPendingId,
+      `activation reused preflight authority instead of requiring prepared approval: ${response.text}`);
   }
   requireThat(typeof pending.pendingId === 'string' && typeof pending.preparationNonce === 'string'
     && pending.operationKey === operationKey,
