@@ -3,11 +3,13 @@ package io.justsearch.indexerworker.loop;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.extract.ContentExtractor;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
@@ -804,6 +806,116 @@ class IndexingLoopTest {
     }
 
     @Test
+    void greenClaimProjectsLexicalDocumentToActiveGenerationBeforeGreen() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-lexical", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      CommitOps activeCommits = mock(CommitOps.class);
+      when(active.indexingCoordinator()).thenReturn(activeWrites);
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      when(active.commitOps()).thenReturn(activeCommits);
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      var lexical = org.mockito.ArgumentCaptor.forClass(IndexDocument.class);
+      verify(activeWrites).indexSingle(lexical.capture());
+      var order = inOrder(activeWrites, queue.indexingCoordinator);
+      order.verify(activeWrites).indexSingle(any());
+      order.verify(queue.indexingCoordinator).indexSingle(any());
+      assertEquals("body", lexical.getValue().fields().get(SchemaFields.CONTENT));
+      assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
+          lexical.getValue().fields().get(SchemaFields.EMBEDDING_STATUS));
+      assertFalse(lexical.getValue().fields().containsKey(SchemaFields.VECTOR),
+          "B's embedding must never be written into A");
+      assertNull(queue.lastOutcome, "neither generation may acknowledge before commit");
+      loop.commitActiveLexicalSource(
+          CommitReason.MIGRATION_CUTOVER);
+      verify(activeCommits).commitAndTrack(
+          CommitReason.MIGRATION_CUTOVER);
+    }
+
+    @Test
+    void failedActiveLexicalWriteCannotAcknowledgeGreenClaim() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-fail", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      when(active.indexingCoordinator()).thenReturn(activeWrites);
+      doThrow(new RuntimeException("A write failed")).when(activeWrites).indexSingle(any());
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+      assertEquals(IngestionOutcomeClass.WRITE_FAILED, queue.lastOutcome.outcomeClass());
+      assertFalse(queue.done);
+    }
+
+    @Test
+    void idleCommitKeepsGreenClaimPendingUntilActiveLexicalCommitSucceeds() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-idle", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      CommitOps activeCommits = mock(CommitOps.class);
+      CommitOps greenCommits = mock(CommitOps.class);
+      when(active.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      when(active.commitOps()).thenReturn(activeCommits);
+      loop.wireActiveLexicalSource(active);
+      replaceCommitOps(loop, greenCommits);
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      doThrow(new RuntimeException("A idle commit failed")).doNothing()
+          .when(activeCommits).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      invokeFinishIdleCommit(loop);
+      verify(greenCommits, never()).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      assertFalse(queue.done);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      invokeFinishIdleCommit(loop);
+      var commits = inOrder(activeCommits, greenCommits);
+      commits.verify(activeCommits, times(2)).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      commits.verify(greenCommits).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      assertTrue(queue.done);
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+    }
+
+    @Test
+    void shutdownCommitKeepsGreenClaimPendingUntilActiveLexicalCommitSucceeds() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-shutdown", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      CommitOps activeCommits = mock(CommitOps.class);
+      CommitOps greenCommits = mock(CommitOps.class);
+      when(active.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      when(active.commitOps()).thenReturn(activeCommits);
+      loop.wireActiveLexicalSource(active);
+      replaceCommitOps(loop, greenCommits);
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      doThrow(new RuntimeException("A shutdown commit failed")).doNothing()
+          .when(activeCommits).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      invokeFinalizeShutdownCommit(loop);
+      verify(greenCommits, never()).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      assertFalse(queue.done);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      invokeFinalizeShutdownCommit(loop);
+      var commits = inOrder(activeCommits, greenCommits);
+      commits.verify(activeCommits, times(2)).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      commits.verify(greenCommits).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      assertTrue(queue.done);
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+    }
+
+    @Test
     void writeFeedsSuccessEvidenceToTheEccOnlyForCompletedEmbeddings() throws Exception {
       // #470 D1: the attestation's success evidence flows through JobBatchWriter.write() -> the
       // ECC seam on EmbeddingProviderLifecycle. This test exercises the PRODUCTION wiring (real
@@ -883,7 +995,7 @@ class IndexingLoopTest {
       doThrow(new RuntimeException("first idle commit failure"))
           .doNothing()
           .when(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_IDLE);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
       invokeFinishIdleCommit(loop);
       assertEquals(0, queue.markDoneTransitionCalls, "a failed index commit must skip outcome drain");
       assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
@@ -901,7 +1013,7 @@ class IndexingLoopTest {
       assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
       assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
       verify(commitOps, times(2))
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_IDLE);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
     }
 
     @Test
@@ -925,9 +1037,9 @@ class IndexingLoopTest {
       assertEquals(3, queue.markDoneTransitionCalls);
       assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
       verify(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_IDLE);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
       verify(commitOps, never())
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
     }
 
     @Test
@@ -941,7 +1053,7 @@ class IndexingLoopTest {
       invokeWriteExtractedJob(loop, extractedJob(file, "body"));
       doThrow(new RuntimeException("shutdown commit failure"))
           .when(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
 
       invokeFinalizeShutdownCommit(loop);
 
@@ -952,7 +1064,7 @@ class IndexingLoopTest {
           SourceContentHash.sha256(file),
           loop.getJournal().pendingTransitionsForTest().getFirst().committedContentHash());
       verify(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
     }
 
     @Test
@@ -1315,7 +1427,7 @@ class IndexingLoopTest {
       finalize.invoke(loop); // second consecutive read — certifies
 
       verify(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_REBUILD_STAMP);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_REBUILD_STAMP);
       verify(ecc).onFingerprintStamped();
       assertEquals(
           0L,
@@ -1386,12 +1498,12 @@ class IndexingLoopTest {
       finalizeShutdown.invoke(loop);
 
       verify(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_REBUILD_STAMP);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_REBUILD_STAMP);
       verify(ecc).onFingerprintStamped();
       // The indexedSinceCommit == 0 branch of the shutdown block must NOT also fire a redundant
       // INDEXING_LOOP_SHUTDOWN commit.
       verify(commitOps, never())
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
     }
 
     @Test

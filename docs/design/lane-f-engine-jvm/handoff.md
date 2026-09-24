@@ -4,7 +4,97 @@ Start with the [continuation brief](continuation-brief.md): the next two batches
 owner boundaries, acceptance endpoints and execution protocol. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-24)
+## Latest checkpoint (2026-09-24)
+
+PR727 is at `daeb5704d`; hosted run `36003707287` completed SUCCESS across all
+jobs, including Windows native and system integration. The 358-task local gate
+on its runtime checkpoint `4971fbb9f` passed at
+`tmp/3251-lifecycle-checkpoint-integrated.txt`. The standard installed CPU
+activation and forced in-place distinct-model A/B checks passed at `tmp/3253`
+and `tmp/3256` respectively. This establishes the D1-14 candidate lifetime
+checkpoint, while D1-9 accepted-write visibility and refusal/cancel coverage
+remain open.
+
+Local uncommitted D1-9 work opens recorded A as a distinct writable runtime,
+projects accepted Green file batches lexically into A, and commits A before
+Green acknowledges a batch or the final cutover. Focused tests and static
+checks passed at `tmp/3259-lexical-projection-focused.txt`. The first installed
+write probe (`tmp/3262`) reproduced the old prepared-ingest refusal during a
+recorded build. The serving-generation capture and recorded owner check now
+admit a writable A with Green as producer; focused checks passed at `tmp/3264`.
+The next probe (`tmp/3266`) held the already-settled activation marker, where
+the producer is paused for cutover, so its A-text timeout is not evidence about
+the MIGRATING write path. Its abort exposed an invalid bulk refusal code;
+the code and a durable-progress regression passed at `tmp/3267`. The revised
+private installed probe passed at `tmp/3273-lexical-build-ab.txt`: the
+MIGRATING-accepted file became text-searchable in serving A before pointer
+promotion, remained searchable in B afterward, and the distinct FP16 B model
+answered a real vector query. The first two attempts at `tmp/3269` and
+`tmp/3271` corrected fixture timing and retry of `UPGRADE_PREPARING`; neither
+was counted as passing proof. Direct deletes, watcher deletes, non-file projections, durable
+journal replay, beside semantic indexing, and refusal backfill still need D1-9
+implementation and proof. The private fixtures close their owned ports.
+
+The next local D1-9 slice widens the existing SQLite `switch_buffer` to carry
+candidate generation with exact `(generation, key, revision)` removal. Ordinary
+file batches and finite recorded-walk members now admit their jobs and scoped
+UPSERT obligations in one `jobs.db` transaction; the Worker routes watcher,
+batch and scan producers through that seam during migration. Direct watcher,
+ID, prefix and collection deletes journal first, then commit their lexical A
+effect before the B effect. Promotion replay selects the building generation
+plus historical unscoped cutover entries, leaving a foreign candidate untouched.
+Focused queue, service, replay and real-Lucene deletion tests passed at
+`tmp/3292-scoped-journal-replay-focused.txt` and
+`tmp/3294-file-journal-producer-regressions.txt`; `:modules:ui:installDist`
+passed at `tmp/3295-d1-file-projection-installDist.txt` before the final scan
+phase guard edit. Later focused UI and Worker tests plus installed distribution
+passed at `tmp/3306-switch-scoped-watcher-dist.txt`. These are uncommitted
+proofs, not hosted acceptance. The first watcher-deletion probes exposed a
+fixture issue: the fault harness suppressed automatic root producers. A
+narrowly enabled probe registered both roots, and `tmp/3308-watcher-delete-ab.txt`
+proved the deletion absent from serving A during MIGRATING with a
+candidate-scoped DELETE row. That run could not promote: it deleted a file in
+the recorded captured plan, leaving one legitimate missing-projection gap.
+The second probe (`tmp/3310-watcher-delete-ab.txt`) added a file outside the
+captured plan: it acquired a candidate-scoped UPSERT and its queue job completed,
+but only after the migration entered SWITCHING. The probe's MIGRATING-only A
+visibility check timed out; it is not a passing A/B deletion check. A second
+candidate request now refuses under the generation manager's state lock while
+preserving the retained candidate; focused proof is `tmp/3311`. Maintenance
+sync, prune and profiling reset now refuse during MIGRATING until
+their accepted projections can be represented; focused refusal proof is
+`tmp/3316`. Rename retains its existing paused-migration identity contract;
+its A/B replay remains open. The scoped SWITCHING batch and sync tests pass
+at `tmp/3312`.
+Exact accepted projection
+payloads, stale-source and non-file mutations, refusal/cancel reconciliation,
+and all D1/D2/E/F integrated acceptance remain open.
+
+The 358-task integrated gate `tmp/3317-d1-scoped-integrated.txt` reached all
+selected tasks but failed three test modules. The context replay test used the
+legacy unscoped drain context, the serving-view lifetime test observed its
+close count before lease cleanup, and one 60-second Lucene RMW test timed out
+under full-suite load. The RMW test passed alone at `tmp/3320`; the two test
+corrections and restored paused-migration rename behavior passed focused
+checks at `tmp/3321`. The corrected full gate passed all 358 tasks at
+`tmp/3323-d1-scoped-integrated-rerun.txt` in 11m32s, before the next source
+edit. A refute-first review then found that idle and shutdown batches committed
+only B before queue ACK, while the time/buffer path committed A first. Both
+paths now commit A before B; failure and ordering regressions, PMD and
+Spotless passed at `tmp/3325-idle-shutdown-projection-order-fixed.txt`.
+This later source edit has not had an integrated rerun.
+
+The same review found three further D1-9 acceptance blockers: scoped UPSERT
+payloads still store a path rather than the accepted document/revision/hash, so
+replay can read different source bytes; pre-pointer refusal can strand accepted
+SWITCHING rows scoped to abandoned Green; and a claimed writer can publish
+after an acknowledged direct delete because administrative queue deletion does
+not fence issued claims. These are source findings, not executed interleaving
+proof. Add controlled regressions and fix their owners before D1-9 acceptance
+or another hosted checkpoint. Keep the passing `tmp/3323` result explicitly
+bound to its pre-review working-tree snapshot.
+
+## Prior checkpoints (2026-09-24)
 
 The current unpushed D1-14 continuation corrected a refute-first lifecycle review of
 the first in-place implementation. A separate lexical A service now preserves the

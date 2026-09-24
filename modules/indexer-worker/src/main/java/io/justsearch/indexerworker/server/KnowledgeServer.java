@@ -1036,13 +1036,17 @@ public final class KnowledgeServer implements Closeable {
               .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
           this.searchLifecycle = this.ingestLifecycle;
         } else {
-          this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery().openReadOnly();
           if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+            // A remains the lexical serving generation while Green owns the queue producer.
+            // The directories are distinct; the producer projects accepted text to A.
+            this.searchLifecycle = buildIndexRuntime(activeIndexPath, fpSupplier)
+                .withoutRecovery().withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open();
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
             publishIngestLifecycle(buildIndexRuntime(buildingIndexPath, fpSupplier).withoutRecovery()
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open());
             this.migrationEnumeratorDone = true;
           } else {
+            this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery().openReadOnly();
             publishIngestLifecycle(this.searchLifecycle);
           }
         }
@@ -1291,7 +1295,8 @@ public final class KnowledgeServer implements Closeable {
       // there is no writer to drain into.
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
         if (!(ingestLifecycle instanceof RunningRuntime)
-            || !KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(jobQueue)) {
+            || !KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(
+                jobQueue, layout.activeGenerationId())) {
           throw new IOException("Promoted generation switch replay remains unresolved");
         }
         promotedReplaySettled = true;
@@ -1477,13 +1482,24 @@ public final class KnowledgeServer implements Closeable {
     LuceneRuntime search = searchLifecycle;
     java.util.Optional<String> generation;
     try {
-      generation = indexGenerationManager.idleActiveGeneration(activeIndexPath);
+      boolean projectedRecordedBuild = generationBootOwnership
+              instanceof IndexGenerationManager.BootOwnership.Recorded
+          && ingestLifecycle != searchLifecycle
+          && searchLifecycle instanceof RunningRuntime activeWriter
+          && activeWriter.isAcceptingWrites();
+      generation = projectedRecordedBuild
+          ? indexGenerationManager.activeGeneration(activeIndexPath)
+          : indexGenerationManager.idleActiveGeneration(activeIndexPath);
     } catch (tools.jackson.core.JacksonException malformed) {
       throw new IOException("Malformed authoritative index state", malformed);
     }
     if (runtimeSwapLock.isLocked() || initializedServices == null
         || !initializedServices.recordedWriterReady() || !(ingest instanceof RunningRuntime running)
-        || !running.isAcceptingWrites() || ingest != search
+        || !running.isAcceptingWrites()
+        || (ingest != search && !(generationBootOwnership
+            instanceof IndexGenerationManager.BootOwnership.Recorded
+            && search instanceof RunningRuntime activeWriter
+            && activeWriter.isAcceptingWrites()))
         || rebuildBrakeExhausted) {
       return java.util.Optional.empty();
     }
@@ -3686,10 +3702,14 @@ public final class KnowledgeServer implements Closeable {
   private boolean nativePredecessorReplaySettled() {
     if (promotedReplaySettled) return true;
     if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
-        || jobQueue == null || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue)) {
+        || jobQueue == null || indexGenerationManager == null) {
       return false;
     }
     try {
+      var state = indexGenerationManager.readStateBestEffort();
+      if (state == null || state.active_generation() == null
+          || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(
+              jobQueue, state.active_generation())) return false;
       var counts = jobQueue.jobStateCountsStrict();
       return counts.pendingCount() == 0 && counts.processingCount() == 0;
     } catch (RuntimeException unavailable) {
@@ -4419,7 +4439,8 @@ public final class KnowledgeServer implements Closeable {
         var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
             new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 jobQueue, green, signalBus, indexingPacing, indexBasePath, buildingIndexPath,
-                JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline));
+                JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
+                buildingGeneration));
         if (replay.isEmpty()) return null;
 
         // Replay can enqueue file work. The already-running Green writer drains it while new
@@ -4439,6 +4460,7 @@ public final class KnowledgeServer implements Closeable {
             || (migrationCutoverMaxFailedJobs >= 0
                 && settled.failedCount() > migrationCutoverMaxFailedJobs)
             || !finalizeEmbeddingRebuildBeforeCutover()) return null;
+        current.commitActiveLexicalProjectionForCutover();
         green.commitOps().commitWithBuildState(
             LuceneRuntimeTypes.BuildState.COMPLETE,
             io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
@@ -4541,6 +4563,7 @@ public final class KnowledgeServer implements Closeable {
                     }
                     fence.install(preparedServices.mutationOwnerToken());
                     transfer.install();
+                    current.clearActiveLexicalProjectionAfterCutover();
                     synchronized (servingViewMonitor) {
                       old.retiring = true;
                       old.retireCleanup = cleanup;
@@ -4600,7 +4623,8 @@ public final class KnowledgeServer implements Closeable {
         }
         if (result == null) return null;
           if (!KnowledgeServerMigrationOps.finishPromotedSwitchReplay(jobQueue, replay.orElseThrow())
-              || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue)) {
+              || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue,
+                  buildingGeneration)) {
             log.warn("Promoted Green retains switch-buffer versions; ordered recovery will retry exact replay");
             requestRecovery = true;
           } else {

@@ -97,6 +97,42 @@ final class SwitchBufferStrictReplayTest {
   }
 
   @Test
+  void collectionDeleteReplaysAndCommitsBeforeItsJournalVersionIsRemoved() {
+    var version = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "collection:notes", "DELETE_COLLECTION", "notes", 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
+    when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
+    var indexing = mock(IndexingCoordinator.class);
+    var commits = mock(CommitOps.class);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+    when(runtime.commitOps()).thenReturn(commits);
+
+    assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
+    var order = inOrder(indexing, commits, queue);
+    order.verify(indexing).deleteByCollection("notes");
+    order.verify(commits).commitAndTrack(org.mockito.ArgumentMatchers.any());
+    order.verify(queue).removeReplayedSwitchBufferOps(List.of(version));
+  }
+
+  @Test
+  void candidateReplayLeavesAnotherGenerationUntouched() {
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:green", "DELETE", "green", 1, "v1");
+    var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "abandoned", "path:other", "DELETE", "other", 2, "v2");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, foreign));
+    when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
+    var indexing = mock(IndexingCoordinator.class);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+    when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
+
+    assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
+    verify(indexing).deleteByIdAndChunks("green");
+    verify(indexing, never()).deleteByIdAndChunks("other");
+    verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+  }
+
+  @Test
   void claimedUpsertMustFinishBeforeLaterPrefixDelete() throws Exception {
     String root = Path.of(System.getProperty("java.io.tmpdir"), "ordered-replay-root")
         .toAbsolutePath().toString();
@@ -169,9 +205,32 @@ final class SwitchBufferStrictReplayTest {
     verify(queue).removeReplayedSwitchBufferOps(versions);
   }
 
+  @Test
+  void promotedBootCleansOnlyCommittedGenerationAndHistoricalCutoverEntries() {
+    var legacy = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "path:legacy", "DELETE", "legacy", 1, "v1");
+    var promoted = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:green", "DELETE", "green", 2, "v2");
+    var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "foreign", "path:foreign", "DELETE", "foreign", 3, "v3");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(
+        List.of(legacy, promoted, foreign), List.of(foreign));
+    when(queue.removeReplayedSwitchBufferOps(List.of(legacy, promoted))).thenReturn(2);
+
+    assertTrue(KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(queue, "green"));
+    verify(queue).removeReplayedSwitchBufferOps(List.of(legacy, promoted));
+  }
+
   private KnowledgeServerMigrationOps.DrainSwitchBufferContext context() {
     return new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, runtime, null,
         IndexingPacing.unthrottled(), Path.of("."), Path.of("."), new ObjectMapper(),
         () -> false, () -> true, LoggerFactory.getLogger(getClass()));
+  }
+
+  private KnowledgeServerMigrationOps.DrainSwitchBufferContext scopedContext(String generation) {
+    return new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, runtime, null,
+        IndexingPacing.unthrottled(), Path.of("."), Path.of("."), new ObjectMapper(),
+        () -> false, () -> true, LoggerFactory.getLogger(getClass()), Long.MAX_VALUE,
+        generation);
   }
 }

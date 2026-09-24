@@ -14,7 +14,8 @@ public record BulkReindexProgress(String generationId, IndexTargetSnapshot targe
   public static final int MAX_PROCESSING_HISTORY = 200;
   private static final Set<String> REFUSALS = Set.of("cancelled", "RECOVERY_AUTHORIZATION_REFUSED",
       "RECOVERY_SCOPE_REFUSED", "RECOVERY_BINDING_INVALID", "BULK_GENERATION_REFUSED",
-      "BULK_CAPTURE_FAILED", "INGEST_RECOVERY_ATTEMPTS_EXHAUSTED");
+      "BULK_CAPTURE_FAILED", "INGEST_RECOVERY_ATTEMPTS_EXHAUSTED",
+      "ACTIVATION_PRECOMMIT_REFUSED");
 
   public BulkReindexProgress(String generationId, IndexTargetSnapshot target, Phase phase,
       Capture capture, Settlement settlement) {

@@ -92,6 +92,29 @@ final class MigrationRestartRequiredTest {
   }
 
   @Test
+  void secondCandidateIsRefusedWithoutChangingTheRetainedGeneration(@TempDir Path tempDir)
+      throws Exception {
+    Path indexBase = tempDir.resolve("index");
+    IndexGenerationManager manager = new IndexGenerationManager(indexBase);
+    manager.initializeOrLoad();
+    MigrationControlOps ops = opsOver(indexBase);
+    MigrationStartRequest request = MigrationStartRequest.newBuilder().setReason("manual").build();
+    MigrationStartResponse first = ops.startMigration(request);
+    assertTrue(first.getAccepted());
+
+    MigrationStartResponse second = ops.startMigration(request);
+    assertFalse(second.getAccepted());
+    assertTrue(second.getError().contains("retained"));
+    assertEquals(first.getBuildingGenerationId(), manager.readStateBestEffort().building_generation());
+
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+    MigrationStartResponse failedCandidate = ops.startMigration(request);
+    assertFalse(failedCandidate.getAccepted());
+    assertTrue(failedCandidate.getError().contains("retained"));
+    assertEquals(first.getBuildingGenerationId(), manager.readStateBestEffort().building_generation());
+  }
+
+  @Test
   @DisplayName("cutover reports the reopen requirement only when there is a generation to promote")
   void cutoverRequirementComesFromTheGenerationState(@TempDir Path tempDir) throws Exception {
     Path indexBase = tempDir.resolve("index");

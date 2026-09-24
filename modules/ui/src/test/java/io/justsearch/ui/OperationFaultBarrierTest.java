@@ -40,6 +40,11 @@ final class OperationFaultBarrierTest {
     assertTrue(OperationFaultBarrier.automaticRootProducersEnabled(Map.<String, String>of()::get, noop));
     assertFalse(OperationFaultBarrier.automaticRootProducersEnabled(selection()::get,
         OperationFaultBarrier.fromEnvironment(data, selection()::get)));
+    var watcherProbe = new HashMap<>(selection());
+    watcherProbe.put("JUSTSEARCH_REAL_RECOVERY_SCENARIO", "model-live-a-b");
+    watcherProbe.put("JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE", "1");
+    assertTrue(OperationFaultBarrier.automaticRootProducersEnabled(watcherProbe::get,
+        OperationFaultBarrier.fromEnvironment(data, selection()::get)));
   }
 
   @Test

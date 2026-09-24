@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
@@ -63,6 +64,7 @@ public final class JobBatchWriter {
   // Tempdoc 931 §E item 8 — a SUPPLIER, not a snapshot: rag.chunk_splade.enabled is read from the
   // live resolved config on every write, so flipping it takes effect without a worker restart.
   private final BooleanSupplier chunkSpladeEnabledSupplier;
+  private final Supplier<RunningRuntime> activeLexicalSource;
 
   public JobBatchWriter(
       IndexingCoordinator indexingCoordinator,
@@ -79,7 +81,8 @@ public final class JobBatchWriter {
       LongConsumer indexedDelta,
       IndexingDocumentOps.StageRecorder stageRecorder,
       BooleanSupplier detailedTracingSupplier,
-      BooleanSupplier chunkSpladeEnabledSupplier) {
+      BooleanSupplier chunkSpladeEnabledSupplier,
+      Supplier<RunningRuntime> activeLexicalSource) {
     this.indexingCoordinator = indexingCoordinator;
     this.documentFieldOps = documentFieldOps;
     this.signalBus = signalBus;
@@ -95,6 +98,7 @@ public final class JobBatchWriter {
     this.stageRecorder = stageRecorder;
     this.detailedTracingSupplier = detailedTracingSupplier;
     this.chunkSpladeEnabledSupplier = chunkSpladeEnabledSupplier;
+    this.activeLexicalSource = activeLexicalSource;
   }
 
   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
@@ -130,6 +134,23 @@ public final class JobBatchWriter {
               ex.docUid());
 
       long writeStart = System.currentTimeMillis();
+      RunningRuntime lexicalSource = activeLexicalSource.get();
+      if (lexicalSource != null) {
+        // A is a separate generation. The accepted B claim also projects text to the
+        // still-serving A, without placing B's vector or sparse model output in A.
+        var lexicalMetadata = IndexingDocumentOps.deriveParentMetadata(
+            ex.filePath(), ex.artifact().result(), null, log);
+        var lexicalDocument = IndexingDocumentOps.buildDocument(
+            ex.filePath(), ex.artifact(), ex.collection(), signalBus, null, false, null,
+            lexicalMetadata, stageRecorder, log, null,
+            new IndexingDocumentOps.SourceFileMetadata(
+                ex.envelope().sizeBytes(), ex.envelope().modifiedAtMs(), ex.sourceSha256()),
+            ex.docUid());
+        lexicalSource.indexingCoordinator().indexSingle(lexicalDocument);
+        IndexingDocumentOps.indexChunks(ex.filePath(), ex.artifact().result(),
+            lexicalSource.documentFieldOps(), lexicalSource.indexingCoordinator(),
+            lexicalMetadata, ex.collection(), ex.docUid(), false);
+      }
       indexingCoordinator.indexSingle(doc);
       // Tempdoc 819 / 821 §O.1 (+ #470 D2): when the document carries a completed embedding (the
       // migration/blue-green inline-embed path), that IS the success evidence the attestation must

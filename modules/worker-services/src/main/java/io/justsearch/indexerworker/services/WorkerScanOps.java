@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.services;
 
 import io.justsearch.indexerworker.ingest.IngestionSkipPolicy;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ipc.ScanRootProgress;
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +72,7 @@ final class WorkerScanOps {
   private final BackpressureWaiter backpressureWaiter;
   private final ForcedPathSink forcedPathSink;
   private final Runnable beforeRecordedAdmission;
+  private final Supplier<String> migratingGeneration;
 
   private static void denyUnguardedRecordedAdmission() {
     throw WorkerServiceException.unavailable("RECORDED_GENERATION_GUARD_REQUIRED");
@@ -103,6 +106,13 @@ final class WorkerScanOps {
 
   WorkerScanOps(JobQueue jobQueue, LongSupplier queueDepthSupplier,
       BooleanSupplier isCancelled, ForcedPathSink forcedPathSink, Runnable beforeRecordedAdmission) {
+    this(jobQueue, queueDepthSupplier, isCancelled, forcedPathSink,
+        beforeRecordedAdmission, () -> null);
+  }
+
+  WorkerScanOps(JobQueue jobQueue, LongSupplier queueDepthSupplier,
+      BooleanSupplier isCancelled, ForcedPathSink forcedPathSink, Runnable beforeRecordedAdmission,
+      Supplier<String> migratingGeneration) {
     this(
         jobQueue,
         new CloudPlaceholderRecorder(jobQueue),
@@ -110,7 +120,7 @@ final class WorkerScanOps {
         queueDepthSupplier,
         isCancelled,
         WorkerScanOps::sleepForBackpressure,
-        forcedPathSink, beforeRecordedAdmission);
+        forcedPathSink, beforeRecordedAdmission, migratingGeneration);
   }
 
   /**
@@ -135,6 +145,15 @@ final class WorkerScanOps {
       Predicate<Path> isCloudPlaceholder, LongSupplier queueDepthSupplier,
       BooleanSupplier isCancelled, BackpressureWaiter backpressureWaiter,
       ForcedPathSink forcedPathSink, Runnable beforeRecordedAdmission) {
+    this(jobQueue, cloudPlaceholderRecorder, isCloudPlaceholder, queueDepthSupplier,
+        isCancelled, backpressureWaiter, forcedPathSink, beforeRecordedAdmission, () -> null);
+  }
+
+  WorkerScanOps(JobQueue jobQueue, CloudPlaceholderRecorder cloudPlaceholderRecorder,
+      Predicate<Path> isCloudPlaceholder, LongSupplier queueDepthSupplier,
+      BooleanSupplier isCancelled, BackpressureWaiter backpressureWaiter,
+      ForcedPathSink forcedPathSink, Runnable beforeRecordedAdmission,
+      Supplier<String> migratingGeneration) {
     this.jobQueue = Objects.requireNonNull(jobQueue, "jobQueue");
     this.cloudPlaceholderRecorder =
         Objects.requireNonNull(cloudPlaceholderRecorder, "cloudPlaceholderRecorder");
@@ -144,6 +163,7 @@ final class WorkerScanOps {
     this.backpressureWaiter = Objects.requireNonNull(backpressureWaiter, "backpressureWaiter");
     this.forcedPathSink = Objects.requireNonNull(forcedPathSink, "forcedPathSink");
     this.beforeRecordedAdmission = Objects.requireNonNull(beforeRecordedAdmission, "beforeRecordedAdmission");
+    this.migratingGeneration = Objects.requireNonNull(migratingGeneration, "migratingGeneration");
   }
 
   /** Test-only convenience for the prior 3-arg constructor. */
@@ -251,7 +271,7 @@ final class WorkerScanOps {
             }
             counters[0]++; // walked
             if (excludedByOwnership(request, file)
-                || request.recordedEpoch() != null && matchesAny(excludes, root, file)) {
+                || (request.recordedEpoch() != null && matchesAny(excludes, root, file))) {
               counters[2]++;
               return FileVisitResult.CONTINUE;
             }
@@ -335,9 +355,22 @@ final class WorkerScanOps {
       long[] counters, long[] bytes) {
     String coll = collection == null || collection.isBlank() ? null : collection;
     if (recordedEpoch != null) beforeRecordedAdmission.run();
-    int accepted = recordedEpoch == null
-        ? jobQueue.enqueueEntries(List.copyOf(batch), coll, scanId == null || scanId.isBlank() ? null : scanId)
-        : jobQueue.enqueueRecordedEntries(scanId, recordedEpoch, List.copyOf(batch), coll);
+    String candidateGeneration = migratingGeneration.get();
+    int accepted;
+    if (candidateGeneration == null) {
+      accepted = recordedEpoch == null
+          ? jobQueue.enqueueEntries(List.copyOf(batch), coll,
+              scanId == null || scanId.isBlank() ? null : scanId)
+          : jobQueue.enqueueRecordedEntries(scanId, recordedEpoch, List.copyOf(batch), coll);
+    } else if (jobQueue instanceof SwitchBufferCapableQueue scoped) {
+      accepted = recordedEpoch == null
+          ? scoped.enqueueAndBufferFilesForGeneration(candidateGeneration, List.copyOf(batch), coll,
+              scanId == null || scanId.isBlank() ? null : scanId)
+          : scoped.enqueueRecordedEntriesAndBufferForGeneration(candidateGeneration,
+              scanId, recordedEpoch, List.copyOf(batch), coll);
+    } else {
+      throw WorkerServiceException.unavailable("CANDIDATE_JOURNAL_UNAVAILABLE");
+    }
     if (accepted != batch.size()) {
       throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
@@ -506,8 +539,8 @@ final class WorkerScanOps {
       mode = mode == null ? ScanMode.INITIAL : mode;
       scanId = scanId == null ? "" : scanId;
       excludedSubtrees = List.copyOf(excludedSubtrees);
-      if (recordedEpoch != null && (recordedEpoch < 1 || scanId.isBlank())
-          || recordedEpoch == null && (!excludedSubtrees.isEmpty() || singleFile)) {
+      if ((recordedEpoch != null && (recordedEpoch < 1 || scanId.isBlank()))
+          || (recordedEpoch == null && (!excludedSubtrees.isEmpty() || singleFile))) {
         throw new IllegalArgumentException("Invalid recorded scan membership");
       }
       for (Path subtree : excludedSubtrees) {

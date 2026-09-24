@@ -29,6 +29,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V18: Added finite-walk receipts and ledger terminal coverage (lane F C2)</li>
  *   <li>V19: Added captured source plans and immutable sealed member selection (lane F C2)</li>
  *   <li>V20: Added explicit switch-buffer admission order for exact replay (lane F D1)</li>
+ *   <li>V21: Scoped switch-buffer rows to a candidate generation (lane F D1-9)</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -41,7 +42,7 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 20;
+  public static final int TARGET_VERSION = 21;
 
   public static final String MIGRATE_V19_TO_V20_SWITCH_ORDER =
       "ALTER TABLE switch_buffer ADD COLUMN accepted_order INTEGER NOT NULL DEFAULT 0 "
@@ -49,6 +50,10 @@ public final class SqliteSchema {
   public static final String CREATE_SWITCH_BUFFER_ORDER_INDEX =
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_switch_buffer_order "
           + "ON switch_buffer(accepted_order)";
+
+  public static final String CREATE_SWITCH_BUFFER_GENERATION_ORDER_INDEX =
+      "CREATE INDEX IF NOT EXISTS idx_switch_buffer_generation_order "
+          + "ON switch_buffer(generation, accepted_order)";
 
   public static final String MIGRATE_V18_TO_V19_JOB_PLAN =
       "ALTER TABLE jobs ADD COLUMN planned_source_sha256 TEXT";
@@ -194,7 +199,8 @@ public final class SqliteSchema {
    *
    * <p>Columns:
    * <ul>
-   *   <li>key - Primary key for deduplication (e.g., "path:/normalized/path")</li>
+   *   <li>generation - Candidate generation scope; empty is the legacy unscoped buffer</li>
+   *   <li>key - Primary key within a generation (e.g., "path:/normalized/path")</li>
    *   <li>op - Operation type (UPSERT, DELETE, SYNC_ROOT, etc.)</li>
    *   <li>payload - JSON payload with operation details</li>
    *   <li>last_updated - Observation timestamp, not replay order</li>
@@ -203,14 +209,19 @@ public final class SqliteSchema {
    */
   public static final String CREATE_SWITCH_BUFFER_TABLE = """
       CREATE TABLE IF NOT EXISTS switch_buffer (
-        key TEXT PRIMARY KEY,
+        generation TEXT NOT NULL DEFAULT '',
+        key TEXT NOT NULL,
         op TEXT NOT NULL,
         payload TEXT NOT NULL,
         last_updated INTEGER NOT NULL,
         revision TEXT NOT NULL DEFAULT '',
-        accepted_order INTEGER NOT NULL DEFAULT 0 CHECK(accepted_order >= 0)
+        accepted_order INTEGER NOT NULL DEFAULT 0 CHECK(accepted_order >= 0),
+        PRIMARY KEY(generation, key)
       )
       """;
+
+  /** V20→V21 copies legacy rows into a generation-scoped switch buffer. */
+  public static final String SWITCH_BUFFER_LEGACY_TABLE = "switch_buffer_v20";
 
   /** Index on switch_buffer.last_updated for ordered replay. */
   public static final String CREATE_SWITCH_BUFFER_INDEX = """

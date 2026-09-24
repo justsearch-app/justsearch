@@ -928,9 +928,9 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(20, rs.getInt(1));
+        assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(20, SqliteSchema.TARGET_VERSION);
+      assertEquals(21, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -1047,7 +1047,7 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(20, rs.getInt(1));
+        assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity)")) {
@@ -1126,7 +1126,7 @@ final class JobQueueMigrationTest {
         Statement statement = db.createStatement()) {
       try (ResultSet version = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(version.next());
-        assertEquals(20, version.getInt(1));
+        assertEquals(SqliteSchema.TARGET_VERSION, version.getInt(1));
       }
       assertTrue(hasColumn(statement, "content_hash"));
       try (ResultSet row = statement.executeQuery(
@@ -1299,6 +1299,7 @@ final class JobQueueMigrationTest {
     try (var db = DriverManager.getConnection("jdbc:sqlite:" + path);
         var query = db.createStatement()) {
       query.execute("DROP INDEX IF EXISTS idx_switch_buffer_order");
+      query.execute("DROP INDEX IF EXISTS idx_switch_buffer_generation_order");
       query.execute("ALTER TABLE switch_buffer DROP COLUMN accepted_order");
       query.execute(SqliteSchema.CREATE_SWITCH_BUFFER_INDEX);
       query.execute("INSERT INTO switch_buffer(key, op, payload, last_updated, revision) "
@@ -1349,6 +1350,7 @@ final class JobQueueMigrationTest {
     }
     try (var db = DriverManager.getConnection("jdbc:sqlite:" + path); var query = db.createStatement()) {
       query.execute("DROP INDEX IF EXISTS idx_switch_buffer_order");
+      query.execute("DROP INDEX IF EXISTS idx_switch_buffer_generation_order");
       query.execute("ALTER TABLE switch_buffer DROP COLUMN accepted_order");
       query.execute(SqliteSchema.CREATE_SWITCH_BUFFER_INDEX);
       query.execute("DROP TABLE ingestion_walk_sealed_units");

@@ -262,7 +262,17 @@ public final class WorkerIngestService {
         }
         throw IngestSwitchBufferOps.switchingUnavailable();
       }
-      jobQueue.enqueueEntries(List.of(WorkerMethvinWatcher.entryForLiveEvent(path)), collection);
+      var entry = WorkerMethvinWatcher.entryForLiveEvent(path);
+      String candidateGeneration = switchBufferOps.migratingGeneration();
+      if (candidateGeneration != null) {
+        if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
+            || !sbq.enqueueAndBufferFileForGeneration(
+                candidateGeneration, entry, collection)) {
+          throw IngestSwitchBufferOps.switchBufferUnavailable();
+        }
+      } else if (jobQueue.enqueueEntries(List.of(entry), collection) != 1) {
+        throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
+      }
     }
   }
 
@@ -277,8 +287,50 @@ public final class WorkerIngestService {
         }
         throw IngestSwitchBufferOps.switchingUnavailable();
       }
+      journalAndProjectDeleteToServing(normalizedPath, CommitReason.WATCHER_DELETE);
       directEffect.run();
     }
+  }
+
+  private void journalAndProjectDeleteToServing(String normalizedId, CommitReason reason) {
+    String candidateGeneration = switchBufferOps.migratingGeneration();
+    if (candidateGeneration == null) return;
+    if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
+        || active == ingestLifecycle || !active.isAcceptingWrites()) {
+      throw WorkerServiceException.unavailable(
+          "Serving projection is unavailable during migration; retry shortly");
+    }
+    switchBufferOps.journalDeleteForGeneration(candidateGeneration, normalizedId);
+    active.indexingCoordinator().deleteByIdAndChunks(normalizedId);
+    active.commitOps().commitAndTrack(reason);
+  }
+
+  private void journalAndProjectPrefixDeleteToServing(String pathPrefix) {
+    String candidateGeneration = switchBufferOps.migratingGeneration();
+    if (candidateGeneration == null) return;
+    if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
+        || active == ingestLifecycle || !active.isAcceptingWrites()) {
+      throw WorkerServiceException.unavailable(
+          "Serving projection is unavailable during migration; retry shortly");
+    }
+    String normalizedPrefix = resolveNormalizedPathPrefix(pathPrefix);
+    switchBufferOps.journalDeletePrefixForGeneration(candidateGeneration, normalizedPrefix);
+    active.indexingCoordinator().deleteByPathPrefix(normalizedPrefix);
+    active.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
+  }
+
+  private Integer journalAndProjectCollectionDeleteToServing(String collection) {
+    String candidateGeneration = switchBufferOps.migratingGeneration();
+    if (candidateGeneration == null) return null;
+    if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
+        || active == ingestLifecycle || !active.isAcceptingWrites()) {
+      throw WorkerServiceException.unavailable(
+          "Serving projection is unavailable during migration; retry shortly");
+    }
+    switchBufferOps.journalDeleteCollectionForGeneration(candidateGeneration, collection);
+    int visibleDeleted = active.indexingCoordinator().deleteByCollection(collection);
+    active.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_COLLECTION);
+    return visibleDeleted;
   }
 
   public UpgradeQuiescenceResponse prepareUpgrade(
@@ -606,9 +658,17 @@ public final class WorkerIngestService {
         }
         // 813 Slice B: stat each admitted path for its byte size. A stat failure degrades that
         // entry to unknown size (NULL) — it never rejects the enqueue.
-        int accepted =
-            jobQueue.enqueueEntries(
-                validPaths.stream().map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance())).toList(), collection);
+        var entries = validPaths.stream()
+            .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance())).toList();
+        String candidateGeneration = switchBufferOps.migratingGeneration();
+        int accepted = candidateGeneration == null
+            ? jobQueue.enqueueEntries(entries, collection)
+            : jobQueue instanceof SwitchBufferCapableQueue sbq
+                ? sbq.enqueueAndBufferFilesForGeneration(
+                    candidateGeneration, entries, collection, null) : 0;
+        if (candidateGeneration != null && accepted != entries.size()) {
+          throw IngestSwitchBufferOps.switchBufferUnavailable();
+        }
 
         // Mark paths for force reindex if requested (bypasses "unchanged" check).
         // The key must be the one JobBatchExtractor looks the forced set up by — the envelope's —
@@ -843,13 +903,22 @@ public final class WorkerIngestService {
       if (ctx.cancelled()) {
         throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
       }
-      if ((requireWriter ? !ingestIsServing || ingestLifecycle == null : !hasServingRuntime)
+      boolean projectedServingWriter = searchLifecycle instanceof
+          io.justsearch.adapters.lucene.runtime.RunningRuntime active
+          && active.isAcceptingWrites() && ingestLifecycle != null;
+      if ((requireWriter ? ((!ingestIsServing && !projectedServingWriter)
+              || ingestLifecycle == null) : !hasServingRuntime)
           || indexGenerationManager == null || capturedServingPath == null) {
         throw WorkerServiceException.unavailable("Serving generation authority is unavailable");
       }
       java.util.Optional<String> generation;
       try {
-        generation = indexGenerationManager.idleActiveGeneration(capturedServingPath);
+        // During a recorded build, the source remains the active A generation and has
+        // its own lexical writer. The admitted Green producer projects accepted writes
+        // into A; requiring IDLE here would reject every such prepared ingest.
+        generation = requireWriter && !ingestIsServing
+            ? indexGenerationManager.activeGeneration(capturedServingPath)
+            : indexGenerationManager.idleActiveGeneration(capturedServingPath);
       } catch (java.io.IOException | RuntimeException failure) {
         throw new WorkerServiceException(WorkerServiceException.Status.UNAVAILABLE,
             "Serving generation state could not be established", failure);
@@ -967,6 +1036,8 @@ public final class WorkerIngestService {
         throw IngestSwitchBufferOps.switchingUnavailable();
       }
 
+      journalAndProjectPrefixDeleteToServing(pathPrefix);
+
       // 1. Delete from Lucene FIRST (user-facing impact)
       ingestLifecycle.indexingCoordinator().deleteByPathPrefix(pathPrefix);
 
@@ -1027,11 +1098,12 @@ public final class WorkerIngestService {
           throw IngestSwitchBufferOps.switchingUnavailable();
         }
 
+        Integer visibleDeleted = journalAndProjectCollectionDeleteToServing(collection);
         int deleted = ingestLifecycle.indexingCoordinator().deleteByCollection(collection);
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_COLLECTION);
 
         log.info("deleteByCollection complete: {} documents deleted for {}", deleted, collection);
-        return deleteByCollectionResponse(deleted, "");
+        return deleteByCollectionResponse(visibleDeleted == null ? deleted : visibleDeleted, "");
       } catch (WorkerServiceException e) {
         // Must precede the catch-all: this endpoint deliberately FAILS CLOSED during SWITCHING,
         // and the catch-all would turn that refusal into a deleted=-1 response, hiding the
@@ -1072,6 +1144,8 @@ public final class WorkerIngestService {
         throw IngestSwitchBufferOps.switchingUnavailable();
       }
 
+      journalAndProjectDeleteToServing(normalizedId, CommitReason.GRPC_DELETE_BY_ID);
+
       // 1. Delete from Lucene (exact match)
       ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(normalizedId);
 
@@ -1107,13 +1181,6 @@ public final class WorkerIngestService {
       return blank;
     }
 
-    PruneResponse unavailable =
-        indexRuntimeUnavailableReply(
-            "pruneMissing", pruneErrorResponse("Index runtime not available"));
-    if (unavailable != null) {
-      return unavailable;
-    }
-
     try {
       if (switchBufferOps.isSwitching()) {
         // Keep the cutover fence: prune is a mutation, so durably buffer it during SWITCHING.
@@ -1121,6 +1188,17 @@ public final class WorkerIngestService {
           return switchBufferOps.bufferPruneMissingDuringSwitching(sbq, pathPrefix);
         }
         throw IngestSwitchBufferOps.switchingUnavailable();
+      }
+      if (switchBufferOps.migratingGeneration() != null) {
+        throw WorkerServiceException.unavailable(
+            "Prune requires candidate-scoped delete projection during migration; retry after activation");
+      }
+
+      PruneResponse unavailable =
+          indexRuntimeUnavailableReply(
+              "pruneMissing", pruneErrorResponse("Index runtime not available"));
+      if (unavailable != null) {
+        return unavailable;
       }
 
       // Prune orphan documents - abort if user becomes active
@@ -1211,6 +1289,10 @@ public final class WorkerIngestService {
             sbq ->
                 switchBufferOps.bufferSyncDirectoryDuringSwitching(
                     sbq, rootPath, force, provenance));
+      }
+      if (!finalCutoverReplay && switchBufferOps.migratingGeneration() != null) {
+        throw WorkerServiceException.unavailable(
+            "Directory sync requires candidate-scoped reconciliation during migration; retry after activation");
       }
 
       SyncDirectoryResponse unavailable =
@@ -1496,18 +1578,18 @@ public final class WorkerIngestService {
       return UpdatePathsResponse.newBuilder().setUpdatedCount(0).build();
     }
 
-    UpdatePathsResponse unavailable =
-        indexRuntimeUnavailableReply(
-            "updateDocumentPaths", UpdatePathsResponse.newBuilder().setUpdatedCount(0).build());
-    if (unavailable != null) {
-      return unavailable;
-    }
-
     // Rename is a two-authority mutation (identity store plus Lucene). Unlike simple path
     // upserts/deletes, the existing switch buffer cannot replay both halves atomically. Refuse
     // during the narrow cutover fence before touching either authority and let the caller retry.
     if (switchBufferOps.isSwitching()) {
       throw IngestSwitchBufferOps.switchingUnavailable();
+    }
+
+    UpdatePathsResponse unavailable =
+        indexRuntimeUnavailableReply(
+            "updateDocumentPaths", UpdatePathsResponse.newBuilder().setUpdatedCount(0).build());
+    if (unavailable != null) {
+      return unavailable;
     }
 
     try {
@@ -1990,7 +2072,8 @@ public final class WorkerIngestService {
         // when the sink is CREATED, which would make every ordinary scan depend on a field only
         // the forced branch actually uses.
         new WorkerScanOps(jobQueue, queueDepth, isCancelled, paths -> indexingLoop.markForced(paths),
-            () -> validateRecordedGeneration(java.util.Objects.requireNonNull(recorded), ctx))
+            () -> validateRecordedGeneration(java.util.Objects.requireNonNull(recorded), ctx),
+            switchBufferOps::buildingGenerationForFileAdmission)
             .scan(scanRequest, sink);
       } catch (java.io.IOException e) {
         log.warn("ScanRoot walk failed for {}: {}", rootPath, e.getMessage());
@@ -2031,6 +2114,9 @@ public final class WorkerIngestService {
   public ResetIndexResponse resetIndex(ResetIndexRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       log.info("resetIndex: starting profiling reset");
+      if (switchBufferOps.isSwitching() || switchBufferOps.migratingGeneration() != null) {
+        return ResetIndexResponse.newBuilder().setSuccess(false).build();
+      }
 
       indexingLoop.resetForProfiling(
           () -> {

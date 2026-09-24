@@ -198,6 +198,36 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  @DisplayName("recorded Green build admits writes through a separate writable A projection")
+  void recordedBuildRetainsServingWriteAuthority(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    KnowledgeServer server = helperServer(layout);
+    RunningRuntime source = org.mockito.Mockito.mock(RunningRuntime.class);
+    RunningRuntime green = org.mockito.Mockito.mock(RunningRuntime.class);
+    org.mockito.Mockito.when(source.isAcceptingWrites()).thenReturn(true);
+    org.mockito.Mockito.when(green.isAcceptingWrites()).thenReturn(true);
+    server.appServices = org.mockito.Mockito.mock(WorkerAppServices.class);
+    org.mockito.Mockito.when(server.appServices.recordedWriterReady()).thenReturn(true);
+    setField(server, "searchLifecycle", source);
+    setField(server, "ingestLifecycle", green);
+    setField(server, "indexGenerationManager", layout.genManager());
+    setField(server, "activeIndexPath", layout.activePath());
+    String active = layout.genManager().initializeOrLoad().activeGenerationId();
+    setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
+        "01994180-0000-7000-8000-000000000199", active, "recorded-test", "a".repeat(64), true));
+    try {
+      layout.genManager().startMigration("recorded-test");
+      assertEquals(Optional.of(active), server.currentRecordedServingGeneration(),
+          "accepted ingestion binds to A while its lexical writer and Green producer coexist");
+      layout.genManager().promoteBuildingGenerationToActive();
+      assertEquals(Optional.empty(), server.currentRecordedServingGeneration(),
+          "the old source cannot authorize ingestion after pointer movement");
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
   @DisplayName("migration, deferred runtime, and rebuild brake all fence recorded serving")
   void migrationDeferredAndBrakeFenceRecordedServing(@TempDir Path tempDir) throws Exception {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);

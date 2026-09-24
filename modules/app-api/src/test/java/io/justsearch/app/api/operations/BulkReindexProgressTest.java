@@ -59,6 +59,20 @@ final class BulkReindexProgressTest {
   }
 
   @Test
+  void installerPrecommitRefusalRemainsAValidDurableBulkCheckpoint() {
+    var settled = new BulkReindexProgress(generationId(), target(),
+        BulkReindexProgress.Phase.SETTLED, new BulkReindexProgress.Capture(HASH_A, 1),
+        settlement(1, HASH_B, List.of(), List.of()));
+    var refused = settled.withRefusal("ACTIVATION_PRECOMMIT_REFUSED");
+
+    assertEquals("ACTIVATION_PRECOMMIT_REFUSED", refused.refusalCode());
+    assertEquals("ACTIVATION_PRECOMMIT_REFUSED",
+        refused.withRefusal("ACTIVATION_PRECOMMIT_REFUSED").refusalCode());
+    assertThrows(IllegalArgumentException.class,
+        () -> settled.withRefusal("UNVALIDATED_SETTINGS_DETAIL"));
+  }
+
+  @Test
   void rejectsInvalidGenerationAndPhaseEvidenceCombinations() {
     String generation = generationId();
     var capture = new BulkReindexProgress.Capture(HASH_A, 1);

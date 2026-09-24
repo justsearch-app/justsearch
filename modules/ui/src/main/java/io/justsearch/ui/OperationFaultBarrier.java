@@ -20,6 +20,9 @@ final class OperationFaultBarrier {
 
   static boolean automaticRootProducersEnabled(Function<String, String> env,
       Consumer<OperationAttemptRunnerImpl.FaultBoundary> hook) {
+    if ("1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))
+        && "model-live-a-b".equals(env.apply("JUSTSEARCH_REAL_RECOVERY_SCENARIO"))
+        && "1".equals(env.apply("JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE"))) return true;
     if (hook != OperationAttemptRunnerImpl.NO_FAULT_HOOK) return false;
     // These installed proofs must claim the explicitly accepted recorded revision, rather than
     // a watcher revision that is legitimately superseded by the later recorded admission.

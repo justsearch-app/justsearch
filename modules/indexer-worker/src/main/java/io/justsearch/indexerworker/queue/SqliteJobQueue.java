@@ -141,6 +141,72 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         connection, operationKey, epoch, entries, collection, System.currentTimeMillis()), true);
   }
 
+  /**
+   * Accepts a finite recorded walk member set and its candidate replay obligations atomically.
+   *
+   * <p>The recorded admission helper remains the authority for membership, source hashes and walk
+   * revision. The UPSERT rows are written with the same connection before the surrounding queue
+   * transaction commits, so a journal failure rolls back both the jobs rows and walk projection.
+   */
+  @Override
+  public int enqueueRecordedEntriesAndBufferForGeneration(
+      String generation, String operationKey, long epoch,
+      List<EnqueueEntry> entries, String collection) {
+    if (generation == null || generation.isBlank()) {
+      throw new IllegalArgumentException("Generation must be non-blank");
+    }
+    if (!hasSufficientDiskSpace()) {
+      throw new IllegalStateException("Recorded queue admission is unavailable");
+    }
+    return accessRecordedWalk(() -> {
+      int accepted = SqliteIngestionWalkOps.enqueueRecorded(
+          connection, operationKey, epoch, entries, collection, System.currentTimeMillis());
+      if (accepted > 0) {
+        bufferRecordedFileAdmissionsInTransaction(generation, operationKey, epoch, entries);
+      }
+      return accepted;
+    }, true);
+  }
+
+  private void bufferRecordedFileAdmissionsInTransaction(
+      String generation, String operationKey, long epoch, List<EnqueueEntry> entries)
+      throws SQLException {
+    var paths = new java.util.LinkedHashSet<String>();
+    for (EnqueueEntry entry : entries) {
+      paths.add(normalizePath(Objects.requireNonNull(entry, "entry").path()));
+    }
+    for (String path : paths) {
+      String declaredCollection;
+      String originator;
+      String transport;
+      try (var query = connection.prepareStatement(
+          "SELECT collection, originator, transport, scan_id, walk_seen_epoch "
+              + "FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (var row = query.executeQuery()) {
+          if (!row.next()) throw new SQLException("Recorded admission disappeared: " + path);
+          declaredCollection = row.getString("collection");
+          originator = row.getString("originator");
+          transport = row.getString("transport");
+          if (!Objects.equals(operationKey, row.getString("scan_id"))) {
+            throw new SQLException("Recorded admission has a different operation key: " + path);
+          }
+          long memberEpoch = row.getLong("walk_seen_epoch");
+          if (row.wasNull() || memberEpoch != epoch) {
+            throw new SQLException("Recorded admission has a different enumeration epoch: " + path);
+          }
+        }
+      }
+      JobQueue.EnqueueProvenance provenance = originator == null && transport == null
+          ? null : new JobQueue.EnqueueProvenance(originator, transport);
+      String payload = new SwitchBufferUpsert(path, declaredCollection, provenance).encode();
+      if (!switchBufferOps.putForGenerationInTransaction(
+          connection, generation, "path:" + path, "UPSERT", payload)) {
+        throw new SQLException("Generation-scoped recorded journal admission was refused");
+      }
+    }
+  }
+
   @Override
   public boolean hasIssuedRecordedClaims(String operationKey) {
     lock.lock();
@@ -652,8 +718,20 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public boolean putSwitchBufferForGeneration(
+      String generation, String key, String op, String payload) {
+    return switchBufferOps.putForGeneration(generation, key, op, payload);
+  }
+
+  @Override
   public boolean putSyncRoot(String key, SwitchBufferSyncRoot payload) {
     return switchBufferOps.putSyncRoot(key, payload);
+  }
+
+  @Override
+  public boolean putSyncRootForGeneration(
+      String generation, String key, SwitchBufferSyncRoot payload) {
+    return switchBufferOps.putSyncRootForGeneration(generation, key, payload);
   }
 
   /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
@@ -668,9 +746,42 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public List<SwitchBufferCapableQueue.SwitchBufferOp> listSwitchBufferOpsStrictForGeneration(
+      String generation) {
+    return switchBufferOps.listAllStrictForGeneration(generation);
+  }
+
+  @Override
   public int removeReplayedSwitchBufferOps(List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) {
     var snapshot = List.copyOf(replayed);
     for (var entry : snapshot) {
+      if (entry.revision() == null || entry.revision().isBlank()) {
+        throw new IllegalArgumentException("Replayed buffer entry has no replacement identity");
+      }
+    }
+    lock.lock();
+    try {
+      ensureOpen();
+      return inTransaction(() -> switchBufferOps.removeReplayedLocked(snapshot));
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException("Failed to remove replayed switch-buffer versions", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  @Override
+  public int removeReplayedSwitchBufferOpsForGeneration(
+      String generation, List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) {
+    if (generation == null || generation.isBlank()) {
+      throw new IllegalArgumentException("Generation must be non-blank");
+    }
+    var snapshot = List.copyOf(replayed);
+    for (var entry : snapshot) {
+      if (!generation.equals(entry.generation())) {
+        throw new IllegalArgumentException("Replay entry belongs to a different generation");
+      }
       if (entry.revision() == null || entry.revision().isBlank()) {
         throw new IllegalArgumentException("Replayed buffer entry has no replacement identity");
       }
@@ -746,66 +857,147 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // column", not "clear it"; a caller that HAS something to say (a real scan) still
       // overwrites. size_bytes deliberately keeps the restate-or-lose-it rule from 813 Slice B:
       // there, the re-enqueue re-stats the file, so its silence really does mean unknown.
-      String sql = """
-          INSERT OR REPLACE INTO jobs
-            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256)
-          VALUES (
-            ?, 'PENDING', 0, ?,
-            COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
-            ?,
-            ?,
-            COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
-            COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-            lower(hex(randomblob(16))), ?, ?)
-          """;
-
       long now = System.currentTimeMillis();
       String col = (collection != null && !collection.isBlank()) ? collection : null;
       // Tempdoc 812 D2: the enqueueing scan's identity rides the row so the Head can group the
       // per-document terminal outcomes into one durable scan-completion audit record.
       String scan = (scanId != null && !scanId.isBlank()) ? scanId : null;
 
-      int count = inTransaction(() -> {
-        int accepted = 0;
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-          for (JobQueue.EnqueueEntry entry : entries) {
-            if (entry == null || entry.path() == null) {
-              continue;
-            }
-            String normalizedPath =
-                PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
-            sealBeforeMaintenance(normalizedPath);
-            var membership = SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scan);
-            stmt.setString(1, normalizedPath);
-            stmt.setLong(2, now);
-            stmt.setString(3, col);
-            stmt.setString(4, normalizedPath); // carry-forward lookup for collection
-            if (entry.sizeBytes() >= 0) {
-              stmt.setLong(5, entry.sizeBytes());
-            } else {
-              stmt.setNull(5, java.sql.Types.INTEGER);
-            }
-            stmt.setString(6, membership.key());
-            stmt.setString(7, entry.provenance() == null ? null : entry.provenance().originator());
-            stmt.setString(8, normalizedPath);
-            stmt.setString(9, entry.provenance() == null ? null : entry.provenance().transport());
-            stmt.setString(10, normalizedPath);
-            if (membership.epoch() == null) stmt.setNull(11, java.sql.Types.BIGINT);
-            else stmt.setLong(11, membership.epoch());
-            stmt.setString(12, membership.plannedSourceSha256());
-            stmt.executeUpdate();
-            if (membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
-            accepted++;
-          }
-        }
-        return accepted;
-      });
+      int count = inTransaction(() -> enqueueEntriesInTransaction(entries, col, scan, now));
 
       meters.recordEnqueued(count);
       log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
       return count;
     } catch (SQLException e) {
       log.error("Failed to enqueue jobs", e);
+      return 0;
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  private int enqueueEntriesInTransaction(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now)
+      throws SQLException {
+    String sql = """
+        INSERT OR REPLACE INTO jobs
+          (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256)
+        VALUES (
+          ?, 'PENDING', 0, ?,
+          COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
+          ?,
+          ?,
+          COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
+          COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
+          lower(hex(randomblob(16))), ?, ?)
+        """;
+    int accepted = 0;
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      for (JobQueue.EnqueueEntry entry : entries) {
+        if (entry == null || entry.path() == null) {
+          continue;
+        }
+        String normalizedPath =
+            PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
+        sealBeforeMaintenance(normalizedPath);
+        var membership =
+            SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
+        stmt.setString(1, normalizedPath);
+        stmt.setLong(2, now);
+        stmt.setString(3, collection);
+        stmt.setString(4, normalizedPath); // carry-forward lookup for collection
+        if (entry.sizeBytes() >= 0) {
+          stmt.setLong(5, entry.sizeBytes());
+        } else {
+          stmt.setNull(5, java.sql.Types.INTEGER);
+        }
+        stmt.setString(6, membership.key());
+        stmt.setString(7, entry.provenance() == null ? null : entry.provenance().originator());
+        stmt.setString(8, normalizedPath);
+        stmt.setString(9, entry.provenance() == null ? null : entry.provenance().transport());
+        stmt.setString(10, normalizedPath);
+        if (membership.epoch() == null) stmt.setNull(11, java.sql.Types.BIGINT);
+        else stmt.setLong(11, membership.epoch());
+        stmt.setString(12, membership.plannedSourceSha256());
+        stmt.executeUpdate();
+        if (membership.epoch() != null) {
+          SqliteIngestionWalkOps.noteMutation(connection, membership.key());
+        }
+        accepted++;
+      }
+    }
+    return accepted;
+  }
+
+  /**
+   * Accepts one file and its candidate replay obligation in one jobs.db transaction.
+   *
+   * <p>The normal jobs admission SQL remains the source of truth for unit revisions, source-plan
+   * hashes and attribution. The switch-buffer insert uses the same connection and transaction, so
+   * a failed journal write rolls back the accepted job instead of returning a half-admitted file.
+   */
+  @Override
+  public boolean enqueueAndBufferFileForGeneration(
+      String generation, JobQueue.EnqueueEntry entry, String collection, String scanId) {
+    return entry != null && entry.path() != null
+        && enqueueAndBufferFilesForGeneration(
+            generation, List.of(entry), collection, scanId) == 1;
+  }
+
+  @Override
+  public int enqueueAndBufferFilesForGeneration(
+      String generation, List<JobQueue.EnqueueEntry> entries, String collection, String scanId) {
+    if (generation == null || generation.isBlank() || entries == null || entries.isEmpty()
+        || entries.stream().anyMatch(entry -> entry == null || entry.path() == null)) {
+      return 0;
+    }
+    if (!hasSufficientDiskSpace()) {
+      log.warn("Refusing atomic file batch: insufficient free disk space");
+      return 0;
+    }
+
+    lockTimed();
+    try {
+      ensureOpen();
+      String normalizedCollection = collection == null || collection.isBlank() ? null : collection;
+      String normalizedScan = scanId == null || scanId.isBlank() ? null : scanId;
+      int committed = inTransaction(() -> {
+        int accepted = enqueueEntriesInTransaction(
+            entries, normalizedCollection, normalizedScan, System.currentTimeMillis());
+        if (accepted != entries.size()) {
+          throw new SQLException("Atomic file batch did not accept every entry");
+        }
+        for (JobQueue.EnqueueEntry entry : entries) {
+          String normalizedPath = normalizePath(entry.path());
+          String effectiveCollection;
+          String originator;
+          String transport;
+          try (PreparedStatement query = connection.prepareStatement(
+              "SELECT collection, originator, transport FROM jobs WHERE path = ?")) {
+            query.setString(1, normalizedPath);
+            try (ResultSet row = query.executeQuery()) {
+              if (!row.next()) throw new SQLException("Atomic file batch lost an admitted row");
+              effectiveCollection = row.getString("collection");
+              originator = row.getString("originator");
+              transport = row.getString("transport");
+            }
+          }
+          JobQueue.EnqueueProvenance effectiveProvenance = originator == null && transport == null
+              ? null : new JobQueue.EnqueueProvenance(originator, transport);
+          String payload = new SwitchBufferUpsert(
+              normalizedPath, effectiveCollection, effectiveProvenance).encode();
+          if (!switchBufferOps.putForGenerationInTransaction(
+              connection, generation, "path:" + normalizedPath, "UPSERT", payload)) {
+            throw new SQLException("Generation-scoped switch-buffer admission was refused");
+          }
+        }
+        return accepted;
+      });
+      meters.recordEnqueued(committed);
+      return committed;
+    } catch (SQLException | RuntimeException failure) {
+      recordDbError();
+      log.error("Failed atomic file batch admission", failure);
       return 0;
     } finally {
       unlockAfterChanges();

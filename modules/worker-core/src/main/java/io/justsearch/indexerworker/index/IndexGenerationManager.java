@@ -556,11 +556,24 @@ public final class IndexGenerationManager {
    * @return the updated normalized state (format_version=2)
    */
   public State startMigration(String source) throws IOException {
+    return startMigration(source, false);
+  }
+
+  /** Start a distinct caller-requested candidate; never report a retained one as newly accepted. */
+  public State startFreshMigration(String source) throws IOException {
+    return startMigration(source, true);
+  }
+
+  private State startMigration(String source, boolean requireFreshCandidate) throws IOException {
     try (var ignored = stateControl()) {
       IndexLayout layout = initializeOrLoad();
       State current = layout.state();
       State normalized = normalizeAndUpgradeStateIfNeeded(current);
       MigrationState ms = parseMigrationStateOrDefault(normalized.migration_state(), MigrationState.IDLE);
+      if (requireFreshCandidate && (ms != MigrationState.IDLE
+          || (normalized.building_generation() != null && !normalized.building_generation().isBlank()))) {
+        throw new IOException("A migration candidate is already active or retained; resolve it before starting another");
+      }
       if (ms == MigrationState.MIGRATING || ms == MigrationState.SWITCHING) {
         return normalized;
       }

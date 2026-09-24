@@ -23,6 +23,7 @@ public enum CommitReason {
   GRPC_DELETE_BY_PATH("grpc/deleteByPath"),
   GRPC_DELETE_BY_ID("grpc/deleteById"),
   GRPC_DELETE_BY_COLLECTION("grpc/deleteByCollection"),
+  WATCHER_DELETE("watcher/delete"),
   GRPC_UPDATE_PATHS("grpc/updatePaths"),
   VDU_UPDATE("vdu/update"),
   VDU_MARK_PROCESSING("vdu/mark-processing"),

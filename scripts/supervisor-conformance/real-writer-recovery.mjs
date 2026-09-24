@@ -27,6 +27,11 @@ const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
 const modelLiveAB = scenario === 'model-live-a-b';
+const acceptedWriteDuringBuild = modelLiveAB
+  && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1';
+const watcherDeleteDuringBuild = acceptedWriteDuringBuild
+  && process.env.JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE === '1';
+const extraBuildFiles = watcherDeleteDuringBuild ? 300 : acceptedWriteDuringBuild ? 80 : 0;
 const distinctModelB = modelLiveAB && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1';
 const inPlaceModelB = distinctModelB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE === '1';
@@ -60,6 +65,10 @@ if (modelLiveAB) {
   // This owned installed fixture previously exercised a different crash cut.
   for (const marker of ['operation-fault-reached.json', 'operation-fault-release']) {
     fs.rmSync(path.join(data, 'runtime', marker), { force: true });
+  }
+  for (let i = 0; i < extraBuildFiles; i++) {
+    fs.writeFileSync(path.join(work, 'installer-root-a', `build-load-${i}.txt`),
+      `buildloadmarker${i} capybara\n`);
   }
 }
 const lockScenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO?.startsWith('lock-');
@@ -370,8 +379,8 @@ try {
       scenario, operationKey, output: () => output });
   } else if (modelLiveAB) {
     await exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort, operationKey,
-      readJson, waitFor, request, post, requireThat, matchingHit, distinctModelB,
-      inPlaceModelB });
+      readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit, distinctModelB,
+      inPlaceModelB, acceptedWriteDuringBuild, watcherDeleteDuringBuild, extraBuildFiles });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {

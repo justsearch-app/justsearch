@@ -12,6 +12,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
@@ -20,6 +21,8 @@ import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.DeleteByIdRequest;
 import io.justsearch.ipc.DeleteByIdResponse;
+import io.justsearch.ipc.DeleteByCollectionRequest;
+import io.justsearch.ipc.DeleteByPathRequest;
 import io.justsearch.ipc.PathMapping;
 import io.justsearch.ipc.UpdatePathsRequest;
 import io.justsearch.ipc.UpdatePathsResponse;
@@ -42,6 +45,118 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
   private SqliteJobQueue jobQueue;
   private SqliteDocumentIdentityStore identityStore;
   private RunningRuntime runtime;
+
+  @Test
+  @DisplayName("watched and direct deletions during a build remove serving documents")
+  void deletionsDuringMigrationRemoveServingDocuments() throws Exception {
+    Path base = tempDir.resolve("generation-base");
+    var manager = new IndexGenerationManager(base);
+    String activeId = manager.initializeOrLoad().activeGenerationId();
+    String buildingId = manager.startMigration("watcher-delete-regression").building_generation();
+    jobQueue = new SqliteJobQueue(tempDir.resolve("jobs.db"));
+    jobQueue.open();
+    var schema = io.justsearch.adapters.lucene.runtime.IndexSchema
+        .fromCatalog(FieldCatalogDef.forChunkTesting(0));
+    runtime = schema.atPath(manager.resolveGenerationPathStrict(activeId))
+        .withExecutorRegistrations(testLuceneExecutors()).open();
+    try (RunningRuntime candidate = schema.atPath(manager.resolveGenerationPathStrict(buildingId))
+        .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      String path = PathNormalizer.normalizeKey(tempDir.resolve("removed.txt"));
+      String directPath = PathNormalizer.normalizeKey(tempDir.resolve("directly-removed.txt"));
+      String prefix = PathNormalizer.normalizeKey(tempDir.resolve("prefix-delete"));
+      String prefixedPath = PathNormalizer.normalizeKey(
+          tempDir.resolve("prefix-delete").resolve("removed.txt"));
+      String collectionPath = PathNormalizer.normalizeKey(tempDir.resolve("collection-removed.txt"));
+      IndexDocument document = new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, path, SchemaFields.DOC_UID,
+          "00000000-0000-4000-8000-000000000078", SchemaFields.PATH, path,
+          SchemaFields.CONTENT, "watcherdeletebeforepromotion"));
+      IndexDocument directDocument = new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, directPath, SchemaFields.DOC_UID,
+          "00000000-0000-4000-8000-000000000079", SchemaFields.PATH, directPath,
+          SchemaFields.CONTENT, "directdeletebeforepromotion"));
+      IndexDocument prefixedDocument = new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, prefixedPath, SchemaFields.DOC_UID,
+          "00000000-0000-4000-8000-000000000080", SchemaFields.PATH, prefixedPath,
+          SchemaFields.CONTENT, "prefixdeletebeforepromotion"));
+      IndexDocument collectionDocument = new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, collectionPath, SchemaFields.DOC_UID,
+          "00000000-0000-4000-8000-000000000082", SchemaFields.PATH, collectionPath,
+          SchemaFields.CONTENT, "collectiondeletebeforepromotion",
+          SchemaFields.COLLECTION, "migration-collection"));
+      runtime.indexingCoordinator().indexSingle(document);
+      runtime.indexingCoordinator().indexSingle(directDocument);
+      runtime.indexingCoordinator().indexSingle(prefixedDocument);
+      runtime.indexingCoordinator().indexSingle(collectionDocument);
+      candidate.indexingCoordinator().indexSingle(document);
+      candidate.indexingCoordinator().indexSingle(directDocument);
+      candidate.indexingCoordinator().indexSingle(prefixedDocument);
+      candidate.indexingCoordinator().indexSingle(collectionDocument);
+      runtime.commitOps().commitAndTrack();
+      candidate.commitOps().commitAndTrack();
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals("watcherdeletebeforepromotion",
+          runtime.documentFieldOps().getDocumentField(path, SchemaFields.CONTENT));
+
+      var service = new WorkerIngestService(
+          jobQueue, null, null, IndexingPacing.unthrottled(), base,
+          manager.resolveGenerationPathStrict(buildingId), candidate, runtime, null, 0L);
+      service.acceptWatcherDelete(path,
+          () -> candidate.indexingCoordinator().deleteByIdAndChunks(path));
+      DeleteByIdResponse directResult = service.deleteById(
+          DeleteByIdRequest.newBuilder().setDocId(directPath).build(), CallContext.none());
+      assertTrue(directResult.getSuccess(), directResult.getError());
+      var prefixResult = service.deleteByPath(
+          DeleteByPathRequest.newBuilder().setPath(prefix).build(), CallContext.none());
+      assertTrue(prefixResult.getError().isEmpty(), prefixResult.getError());
+      var collectionResult = service.deleteByCollection(
+          DeleteByCollectionRequest.newBuilder().setCollection("migration-collection").build(),
+          CallContext.none());
+      assertTrue(collectionResult.getError().isEmpty(), collectionResult.getError());
+
+      runtime.commitOps().maybeRefreshBlocking();
+      assertNull(runtime.documentFieldOps().getDocumentField(path, SchemaFields.CONTENT),
+          "the accepted watcher deletion must remove serving A before B is promoted");
+      assertNull(runtime.documentFieldOps().getDocumentField(directPath, SchemaFields.CONTENT),
+          "the accepted direct deletion must remove serving A before B is promoted");
+      assertNull(runtime.documentFieldOps().getDocumentField(prefixedPath, SchemaFields.CONTENT),
+          "the accepted prefix deletion must remove serving A before B is promoted");
+      assertNull(runtime.documentFieldOps().getDocumentField(collectionPath, SchemaFields.CONTENT),
+          "the accepted collection deletion must remove serving A before B is promoted");
+      var journal = jobQueue.listSwitchBufferOpsStrictForGeneration(buildingId);
+      assertEquals(4, journal.size(), "all candidate replay records must remain durable");
+      assertEquals(Set.of(path, directPath, IngestResponses.resolveNormalizedPathPrefix(prefix),
+          "migration-collection"),
+          journal.stream()
+          .map(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp::payload)
+          .collect(java.util.stream.Collectors.toSet()));
+      assertEquals(Set.of("DELETE", "DELETE_PREFIX", "DELETE_COLLECTION"), journal.stream()
+          .map(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp::op)
+          .collect(java.util.stream.Collectors.toSet()));
+
+      String refusedPath = PathNormalizer.normalizeKey(tempDir.resolve("refused-delete.txt"));
+      IndexDocument refusedDocument = new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, refusedPath, SchemaFields.DOC_UID,
+          "00000000-0000-4000-8000-000000000081", SchemaFields.PATH, refusedPath,
+          SchemaFields.CONTENT, "retainedafterjournalfailure"));
+      runtime.indexingCoordinator().indexSingle(refusedDocument);
+      candidate.indexingCoordinator().indexSingle(refusedDocument);
+      runtime.commitOps().commitAndTrack();
+      candidate.commitOps().commitAndTrack();
+      try (var db = java.sql.DriverManager.getConnection(
+          "jdbc:sqlite:" + tempDir.resolve("jobs.db")); var statement = db.createStatement()) {
+        statement.execute("DROP TABLE switch_buffer");
+      }
+      assertThrows(WorkerServiceException.class, () -> service.deleteById(
+          DeleteByIdRequest.newBuilder().setDocId(refusedPath).build(), CallContext.none()));
+      runtime.commitOps().maybeRefreshBlocking();
+      candidate.commitOps().maybeRefreshBlocking();
+      assertEquals("retainedafterjournalfailure",
+          runtime.documentFieldOps().getDocumentField(refusedPath, SchemaFields.CONTENT));
+      assertEquals("retainedafterjournalfailure",
+          candidate.documentFieldOps().getDocumentField(refusedPath, SchemaFields.CONTENT));
+    }
+  }
 
   @AfterEach
   void tearDown() throws Exception {

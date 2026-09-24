@@ -157,6 +157,8 @@ final class EngineKnowledgeClientServingViewLifetimeTest {
       assertTrue(complete.await(5, TimeUnit.SECONDS));
       verify(aSearch).search(any(), any());
       verify(bSearch).search(any(), any());
+      awaitClosed(aClosed, 2);
+      awaitClosed(bClosed, 2);
       assertTrue(aClosed.get() >= 2, "root and nested unary tasks must release view A");
       assertTrue(bClosed.get() >= 2, "root and nested unary tasks must release view B");
     } finally {

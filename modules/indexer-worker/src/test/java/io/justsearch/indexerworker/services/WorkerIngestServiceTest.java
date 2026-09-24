@@ -90,6 +90,89 @@ final class WorkerIngestServiceTest {
     assertTrue(response.getErrorMessage().isEmpty());
   }
 
+  @Test
+  void submitBatchDuringMigrationAdmitsJobsWithScopedReplayObligations() throws Exception {
+    Path base = tempDir.resolve("candidate-index");
+    Path building = base.resolve("indices").resolve("g-green");
+    Files.createDirectories(building);
+    Files.writeString(base.resolve("state.json"), """
+        {"format_version":2,"active_generation":"g-blue",
+         "building_generation":"g-green","previous_generation":"g-blue",
+         "migration_state":"MIGRATING","migration_paused":false,
+         "updated_at_ms":%d}
+        """.formatted(System.currentTimeMillis()));
+    WorkerIngestService candidate = new WorkerIngestService(jobQueue,
+        stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+        base, building, null, null, null, 0L);
+    Path first = Files.writeString(tempDir.resolve("candidate-first.txt"), "first");
+    Path second = Files.writeString(tempDir.resolve("candidate-second.txt"), "second");
+    BatchRequest request = BatchRequest.newBuilder()
+        .addFilePaths(first.toAbsolutePath().toString())
+        .addFilePaths(second.toAbsolutePath().toString()).build();
+
+    assertEquals(2, candidate.submitBatch(request, CallContext.none()).getAcceptedCount());
+    var scoped = ((SqliteJobQueue) jobQueue).listSwitchBufferOpsStrictForGeneration("g-green");
+    assertEquals(2, scoped.size());
+    assertEquals(List.of("UPSERT", "UPSERT"), scoped.stream()
+        .map(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp::op)
+        .toList());
+  }
+
+  @Test
+  void submitBatchDuringSwitchingRetainsTheCandidateScope() throws Exception {
+    Path base = tempDir.resolve("switching-candidate-index");
+    Path building = base.resolve("indices").resolve("g-green");
+    Files.createDirectories(building);
+    Files.writeString(base.resolve("state.json"), """
+        {"format_version":2,"active_generation":"g-blue",
+         "building_generation":"g-green","previous_generation":"g-blue",
+         "migration_state":"SWITCHING","migration_paused":false,
+         "updated_at_ms":%d}
+        """.formatted(System.currentTimeMillis()));
+    WorkerIngestService candidate = new WorkerIngestService(jobQueue,
+        stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+        base, building, null, null, null, 0L);
+    Path file = Files.writeString(tempDir.resolve("switching-candidate.txt"), "accepted");
+
+    assertEquals(1, candidate.submitBatch(BatchRequest.newBuilder()
+        .addFilePaths(file.toString()).build(), CallContext.none()).getAcceptedCount());
+    var scoped = ((SqliteJobQueue) jobQueue).listSwitchBufferOpsStrictForGeneration("g-green");
+    assertEquals(1, scoped.size());
+    assertEquals("UPSERT", scoped.getFirst().op());
+    assertTrue(((SqliteJobQueue) jobQueue).listSwitchBufferOpsStrictForGeneration("g-foreign")
+        .isEmpty());
+  }
+
+  @Test
+  void unsupportedMaintenanceMutationsRefuseBeforeChangingTheCandidate() throws Exception {
+    Path base = tempDir.resolve("maintenance-candidate-index");
+    Path building = base.resolve("indices").resolve("g-green");
+    Files.createDirectories(building);
+    Files.writeString(base.resolve("state.json"), """
+        {"format_version":2,"active_generation":"g-blue",
+         "building_generation":"g-green","previous_generation":"g-blue",
+         "migration_state":"MIGRATING","migration_paused":false,
+         "updated_at_ms":%d}
+        """.formatted(System.currentTimeMillis()));
+    WorkerIngestService candidate = new WorkerIngestService(jobQueue,
+        stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+        base, building, null, null, null, 0L);
+    String root = tempDir.toAbsolutePath().toString();
+
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE,
+        assertThrows(WorkerServiceException.class, () -> candidate.syncDirectory(
+            SyncDirectoryRequest.newBuilder().setRootPath(root).build(), CallContext.none()))
+            .status());
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE,
+        assertThrows(WorkerServiceException.class, () -> candidate.pruneMissing(
+            io.justsearch.ipc.PruneRequest.newBuilder().setPathPrefix(root).build(),
+            CallContext.none())).status());
+    assertFalse(candidate.resetIndex(io.justsearch.ipc.ResetIndexRequest.getDefaultInstance(),
+        CallContext.none()).getSuccess());
+    assertEquals(0, jobQueue.queueDepth());
+    assertEquals(0, ((SqliteJobQueue) jobQueue).switchBufferDepth());
+  }
+
   /**
    * Tempdoc 813 Slice B call-site pin. {@code SubmitBatch} is one of the four producers of queue
    * rows; the remaining-work byte weight is only as good as what each producer records, and a
@@ -529,6 +612,7 @@ final class WorkerIngestServiceTest {
             .orElseThrow(() -> new AssertionError("Missing switch_buffer op for sync root"));
 
     assertEquals("SYNC_ROOT", op.op());
+    assertEquals("g-test", op.generation());
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = JSON.readValue(op.payload(), Map.class);
     assertEquals(expectedRoot, payload.get("root_path"));

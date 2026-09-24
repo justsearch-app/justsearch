@@ -34,6 +34,7 @@ final class IngestSwitchBufferOps {
   static final String SWITCHBUF_OP_UPSERT = "UPSERT";
   static final String SWITCHBUF_OP_DELETE = "DELETE";
   static final String SWITCHBUF_OP_DELETE_PREFIX = "DELETE_PREFIX";
+  static final String SWITCHBUF_OP_DELETE_COLLECTION = "DELETE_COLLECTION";
   static final String SWITCHBUF_OP_PRUNE_PREFIX = "PRUNE_PREFIX";
 
   private final JobQueue jobQueue;
@@ -62,6 +63,71 @@ final class IngestSwitchBufferOps {
     } catch (Exception unavailable) {
       log.warn("Cannot establish migration state for a mutation", unavailable);
       throw switchingUnavailable();
+    }
+  }
+
+  /** The candidate that must retain accepted mutations while A still serves. */
+  String migratingGeneration() {
+    if (indexGenerationManager == null) return null;
+    try {
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state == null || !"MIGRATING".equalsIgnoreCase(state.migration_state())) return null;
+      if (state.building_generation() == null || state.building_generation().isBlank()) {
+        throw switchingUnavailable();
+      }
+      return state.building_generation();
+    } catch (WorkerServiceException unavailable) {
+      throw unavailable;
+    } catch (Exception unavailable) {
+      log.warn("Cannot establish candidate generation for a mutation", unavailable);
+      throw switchingUnavailable();
+    }
+  }
+
+  /** File scans may keep admitting before the final fence throughout candidate cutover. */
+  String buildingGenerationForFileAdmission() {
+    if (indexGenerationManager == null) return null;
+    try {
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state == null) return null;
+      String phase = state.migration_state();
+      if (!"MIGRATING".equalsIgnoreCase(phase)
+          && !"SWITCHING".equalsIgnoreCase(phase)) return null;
+      if (state.building_generation() == null || state.building_generation().isBlank()) {
+        throw switchingUnavailable();
+      }
+      return state.building_generation();
+    } catch (WorkerServiceException unavailable) {
+      throw unavailable;
+    } catch (Exception unavailable) {
+      log.warn("Cannot establish candidate generation for file admission", unavailable);
+      throw switchingUnavailable();
+    }
+  }
+
+  /** Durable admission precedes any A or B Lucene effect. */
+  void journalDeleteForGeneration(String generation, String normalizedId) {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
+        || !sbq.putSwitchBufferForGeneration(generation, switchBufferPathKey(normalizedId),
+            SWITCHBUF_OP_DELETE, normalizedId)) {
+      throw switchBufferUnavailable();
+    }
+  }
+
+  /** A path-prefix deletion uses the same ordered candidate journal as exact deletes. */
+  void journalDeletePrefixForGeneration(String generation, String normalizedPrefix) {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
+        || !sbq.putSwitchBufferForGeneration(generation,
+            switchBufferPrefixKey(normalizedPrefix), SWITCHBUF_OP_DELETE_PREFIX, normalizedPrefix)) {
+      throw switchBufferUnavailable();
+    }
+  }
+
+  void journalDeleteCollectionForGeneration(String generation, String collection) {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
+        || !sbq.putSwitchBufferForGeneration(generation,
+            "collection:" + collection, SWITCHBUF_OP_DELETE_COLLECTION, collection)) {
+      throw switchBufferUnavailable();
     }
   }
 
@@ -102,7 +168,8 @@ final class IngestSwitchBufferOps {
       String operation,
       String payload,
       String context) {
-    if (sbq.putSwitchBuffer(key, operation, payload)) {
+    if (sbq.putSwitchBufferForGeneration(
+        buildingGenerationForFileAdmission(), key, operation, payload)) {
       return;
     }
     log.error("Switch buffer write failed for {} during SWITCHING", context);
@@ -146,7 +213,8 @@ final class IngestSwitchBufferOps {
       SwitchBufferCapableQueue sbq, String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance) throws Exception {
     String resolvedRoot = resolveNormalizedPathPrefix(rootPath);
-    if (!sbq.putSyncRoot(switchBufferSyncRootKey(resolvedRoot),
+    if (!sbq.putSyncRootForGeneration(buildingGenerationForFileAdmission(),
+        switchBufferSyncRootKey(resolvedRoot),
         new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(resolvedRoot, force, provenance))) {
       throw switchBufferUnavailable();
     }

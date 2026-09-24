@@ -1310,10 +1310,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (physical == null || physical.queue != queue || bulk.physical != physical) {
         throw new IllegalStateException("Installer activation precommit owner detached", cause);
       }
+      // The bulk progress record has a closed refusal vocabulary. A settings owner
+      // detail is diagnostic, not a new bulk-state code.
       String reason = cause instanceof CancellationException ? "cancelled"
-          : cause instanceof io.justsearch.app.api.settings.SettingsCommitOwner.Refused refused
-              ? refused.response().errorCode().orElse("ACTIVATION_PRECOMMIT_REFUSED")
-              : "ACTIVATION_PRECOMMIT_REFUSED";
+          : "ACTIVATION_PRECOMMIT_REFUSED";
       refuseBulk(bulk, physical, reason);
     }
   }

@@ -54,7 +54,7 @@ final class MigrationControlOps {
       IndexGenerationManager.State next = recorded
           ? indexGenerationManager.startRecordedMigration(request.getRecordedOperationKey(), reason,
               request.getTargetIndexFingerprint(), request.getExpectedSourceGeneration())
-          : indexGenerationManager.startMigration(reason.isBlank() ? "manual" : reason.trim());
+          : indexGenerationManager.startFreshMigration(reason.isBlank() ? "manual" : reason.trim());
       String active =
           next == null || next.active_generation() == null ? "" : next.active_generation();
       String building =

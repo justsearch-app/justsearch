@@ -331,6 +331,35 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V19 to V20: Persisted exact switch-buffer admission order");
       }
+      case 21 -> {
+        // V20 used key as the sole primary key. Rebuild the table so a candidate generation can
+        // retain a key independently of another candidate (or the legacy unscoped buffer).
+        // Preserve the durable accepted_order and revision identities while assigning old rows to
+        // the empty legacy generation. The table rebuild is transactional with user_version.
+        try (Statement stmt = conn.createStatement()) {
+          stmt.execute("DROP INDEX IF EXISTS idx_switch_buffer_order");
+          stmt.execute("DROP INDEX IF EXISTS idx_switch_buffer_generation_order");
+          stmt.execute("DROP INDEX IF EXISTS idx_switch_buffer_updated");
+          stmt.execute(
+              "ALTER TABLE switch_buffer RENAME TO " + SqliteSchema.SWITCH_BUFFER_LEGACY_TABLE);
+          stmt.execute(SqliteSchema.CREATE_SWITCH_BUFFER_TABLE);
+          String generationExpression =
+              columnExists(conn, SqliteSchema.SWITCH_BUFFER_LEGACY_TABLE, "generation")
+                  ? "generation"
+                  : "''";
+          stmt.execute(
+              "INSERT INTO switch_buffer "
+                  + "(generation, key, op, payload, last_updated, revision, accepted_order) "
+                  + "SELECT "
+                  + generationExpression
+                  + ", key, op, payload, last_updated, revision, accepted_order FROM "
+                  + SqliteSchema.SWITCH_BUFFER_LEGACY_TABLE);
+          stmt.execute("DROP TABLE " + SqliteSchema.SWITCH_BUFFER_LEGACY_TABLE);
+          stmt.execute(SqliteSchema.CREATE_SWITCH_BUFFER_ORDER_INDEX);
+          stmt.execute(SqliteSchema.CREATE_SWITCH_BUFFER_GENERATION_ORDER_INDEX);
+        }
+        log.info("V20 to V21: Scoped switch-buffer rows to candidate generations");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

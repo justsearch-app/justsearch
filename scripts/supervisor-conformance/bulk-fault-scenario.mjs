@@ -450,12 +450,15 @@ export async function exerciseInstallerActivationFault(c) {
 
 /** Keep the installed A root intact while activating a second, separately owned model root. */
 export async function exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort,
-  operationKey, readJson, waitFor, request, post, requireThat, matchingHit,
-  distinctModelB = false, inPlaceModelB = false }) {
+  operationKey, readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
+  distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
+  watcherDeleteDuringBuild = false,
+  extraBuildFiles = 0 }) {
   const runtime = path.join(data, 'runtime');
   const reachedFile = path.join(runtime, 'operation-fault-reached.json');
   const releaseFile = path.join(runtime, 'operation-fault-release');
   const operationPath = path.join(data, 'operations.db');
+  const jobsPath = path.join(data, 'jobs.db');
   const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
   const sourceManifest = readJson(path.join(indexBase, 'indices', sourceGeneration,
     '.justsearch-index-generation.json'));
@@ -467,6 +470,10 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     'side-by-side activation key is already present');
   const file = path.join(work, 'installer-root-a', 'installer-0.txt');
   const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
+  const removedFile = watcherDeleteDuringBuild
+    ? path.join(work, 'installer-root-b', `watcher-delete-during-b-${operationKey}.txt`) : null;
+  const removedMarker = removedFile
+    ? 'watcherremovalcoral' : null;
   await waitFor('installed A serves a real vector query before B', 120000, async () => {
     try {
       const response = await post(apiPort, '/api/knowledge/search',
@@ -526,7 +533,110 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
   }, sessionHeaders(manifest));
   try {
-    const reached = await waitFor('settled B before activation marker', 170000,
+    const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
+    const acceptedMarker = 'lexicalbridgecobalt';
+    if (acceptedWriteDuringBuild) {
+      await waitFor('MIGRATING B with a live A producer after restart', 120000, async () => {
+        const state = readJson(path.join(indexBase, 'state.json'));
+        const row = operationRows(operationPath, operationKey)[0];
+        const successor = readJson(path.join(runtime, 'manifest.json'));
+        if (state?.migration_state !== 'MIGRATING'
+          || state?.building_generation !== `g-${operationKey}`
+          || row?.phase === 'settled'
+          || !successor?.instanceId || successor.instanceId === manifest.instanceId) return null;
+        try {
+          const health = await request(apiPort, '/api/health', {}, 10000);
+          return health.status === 200 ? state : null;
+        } catch { return null; }
+      });
+      if (watcherDeleteDuringBuild) {
+        fs.writeFileSync(removedFile, `${removedMarker} accepted by watcher during B\n`);
+        await waitFor('MIGRATING watcher addition visible in serving A', 90000, async () => {
+          const state = readJson(path.join(indexBase, 'state.json'));
+          if (state?.migration_state !== 'MIGRATING') return null;
+          try {
+            const search = await post(apiPort, '/api/knowledge/search',
+              { query: removedMarker, limit: 10, mode: 'text' }, 30000);
+            return search.status === 200 && matchingHit(search, removedFile, removedMarker)
+              ? search : null;
+          } catch { return null; }
+        });
+        const journalKey = `path:${removedFile.toLowerCase()}`;
+        const journalSql = `SELECT generation, op FROM switch_buffer
+          WHERE generation = 'g-${operationKey}' AND key = ?`;
+        requireThat(readRows(jobsPath, journalSql, journalKey).some(row => row.op === 'UPSERT'),
+          'watcher addition reached A without a candidate-scoped replay obligation');
+        const atDelete = readJson(path.join(indexBase, 'state.json'));
+        requireThat(atDelete?.migration_state === 'MIGRATING'
+          && atDelete.building_generation === `g-${operationKey}`,
+        `watcher deletion missed MIGRATING admission: ${JSON.stringify(atDelete)}`);
+        fs.unlinkSync(removedFile);
+        console.log('MODEL_LIVE_AB_WATCHER_DELETE_SUBMITTED', JSON.stringify({
+          sourceGeneration, buildingGeneration: `g-${operationKey}`,
+          submittedAt: Date.now(), stateUpdatedAt: atDelete.updated_at_ms, path: removedFile,
+        }));
+        await waitFor('MIGRATING watcher deletion absent from serving A', 90000, async () => {
+          const state = readJson(path.join(indexBase, 'state.json'));
+          if (state?.active_generation !== sourceGeneration
+            || !['MIGRATING', 'SWITCHING'].includes(state?.migration_state)) return null;
+          try {
+            const search = await post(apiPort, '/api/knowledge/search',
+              { query: removedMarker, limit: 10, mode: 'text' }, 30000);
+            return search.status === 200 && !matchingHit(search, removedFile, removedMarker)
+              ? search : null;
+          } catch { return null; }
+        });
+        console.log('MODEL_LIVE_AB_WATCHER_DELETE_A', JSON.stringify({
+          sourceGeneration, buildingGeneration: `g-${operationKey}`, path: removedFile,
+        }));
+        requireThat(readRows(jobsPath, journalSql, journalKey).some(row => row.op === 'DELETE'),
+          'watcher deletion reached A without a candidate-scoped delete obligation');
+      }
+      fs.writeFileSync(acceptedFile, `${acceptedMarker} capybara\n`);
+      const ingestKey = createOperationKey();
+      await waitFor('recorded ingest accepted while B builds', 90000, async () => {
+        const state = readJson(path.join(indexBase, 'state.json'));
+        if (state?.migration_state !== 'MIGRATING') return null;
+        try {
+          const reply = await post(apiPort, '/api/knowledge/ingest', {
+            paths: [acceptedFile], idempotencyKey: ingestKey,
+          }, 30000);
+          const body = JSON.parse(reply.text);
+          if (reply.status === 200 && body.success === true) return reply;
+          if (reply.status === 200 && body.message?.includes('Serving generation authority is unavailable')) {
+            return null;
+          }
+          if (body.retrySafe === true && body.errorCode === 'UPGRADE_PREPARING') return null;
+          throw new Error(`write during B build was not accepted: ${reply.text}`);
+        } catch (error) {
+          if (error.message?.startsWith('write during B build was not accepted:')) throw error;
+          return null;
+        }
+      });
+      const visibleInA = await waitFor('MIGRATING-accepted write text-visible in A before B publication',
+        90000, async () => {
+        const state = readJson(path.join(indexBase, 'state.json'));
+        const acceptedRow = operationRows(operationPath, ingestKey)[0];
+        if (state?.active_generation !== sourceGeneration
+          || !['MIGRATING', 'SWITCHING'].includes(state?.migration_state)
+          || acceptedRow?.state !== 'COMPLETE'
+          || (state.migration_state === 'SWITCHING'
+            && acceptedRow.accepted_at >= state.updated_at_ms)) return null;
+        const search = await post(apiPort, '/api/knowledge/search',
+          { query: acceptedMarker, limit: 10, mode: 'text' }, 30000);
+        return search.status === 200 && matchingHit(search, acceptedFile, acceptedMarker)
+          ? search : null;
+      });
+      const acceptedRow = operationRows(operationPath, ingestKey)[0];
+      console.log('MODEL_LIVE_AB_ACCEPTED_WRITE', JSON.stringify({
+        operationKey: ingestKey, acceptedAt: acceptedRow.accepted_at,
+        completedAt: acceptedRow.completed_at, sourceGeneration,
+        buildingGeneration: `g-${operationKey}`, path: acceptedFile,
+        aTextHits: JSON.parse(visibleInA.text).results?.length ?? 0,
+      }));
+    }
+    const reached = await waitFor('settled B before activation marker',
+      acceptedWriteDuringBuild ? 300000 : 170000,
       () => readJson(reachedFile));
     requireThat(reached.phase === 'installer-before-marker'
       && reached.operationKey === operationKey,
@@ -541,7 +651,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       && (!distinctModelB || bManifest.models.embedding.sha256
         !== sourceManifest.models.embedding.sha256)
       && inFlight?.phase === 'settled' && inFlight?.building_generation_id === bGeneration
-      && inFlight.units_completed === 2 && inFlight.units_failed === 0
+      && inFlight.units_completed >= 2 + extraBuildFiles && inFlight.units_failed === 0
       && settingsWitnessOnDisk(data).witness.acceptedRevision
         === beforeSettings.witness.acceptedRevision,
     `A/B cut lost serving A or settled B: ${JSON.stringify({ aState, bManifest,
@@ -612,6 +722,21 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     { query: marker, limit: 10, mode: 'vector' }, 30000);
   requireThat(bVector.status === 200 && JSON.parse(bVector.text).results?.length > 0,
     `promoted B could not answer a real vector query: ${bVector.text}`);
+  if (acceptedWriteDuringBuild) {
+    const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
+    const acceptedText = await post(bStatus.live.head.apiPort, '/api/knowledge/search',
+      { query: 'lexicalbridgecobalt', limit: 10, mode: 'text' }, 30000);
+    requireThat(acceptedText.status === 200
+      && matchingHit(acceptedText, acceptedFile, 'lexicalbridgecobalt'),
+    `promoted B lost the accepted write: ${acceptedText.text}`);
+  }
+  if (watcherDeleteDuringBuild) {
+    const removedText = await post(bStatus.live.head.apiPort, '/api/knowledge/search',
+      { query: removedMarker, limit: 10, mode: 'text' }, 30000);
+    requireThat(removedText.status === 200
+      && !matchingHit(removedText, removedFile, removedMarker),
+    `promoted B resurrected a watcher deletion: ${removedText.text}`);
+  }
   console.log('MODEL_LIVE_AB_PASS', JSON.stringify({ operationKey,
     sourceGeneration, activeGeneration: completed.active.active_generation,
     settingsRevision: completed.settings.witness.acceptedRevision,

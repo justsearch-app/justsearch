@@ -15,8 +15,26 @@ import java.util.List;
  */
 public interface SwitchBufferCapableQueue extends JobQueue {
 
-  /** A buffered operation stored during cutover (SWITCHING). */
-  record SwitchBufferOp(String key, String op, String payload, long lastUpdatedMs, String revision) {}
+  /**
+   * A buffered operation stored during migration or cutover.
+   *
+   * <p>{@code generation} is empty for the historical, unscoped switch buffer. New migration
+   * journal admissions must carry the building generation so that two candidates can retain the
+   * same logical key without replacing one another.
+   */
+  record SwitchBufferOp(
+      String generation,
+      String key,
+      String op,
+      String payload,
+      long lastUpdatedMs,
+      String revision) {
+
+    /** Compatibility constructor for the pre-generation switch buffer API. */
+    public SwitchBufferOp(String key, String op, String payload, long lastUpdatedMs, String revision) {
+      this("", key, op, payload, lastUpdatedMs, revision);
+    }
+  }
 
   /**
    * Inserts or replaces an operation in the durable switch buffer.
@@ -31,8 +49,60 @@ public interface SwitchBufferCapableQueue extends JobQueue {
    */
   boolean putSwitchBuffer(String key, String op, String payload);
 
+  /**
+   * Inserts or replaces an operation scoped to one candidate generation.
+   *
+   * <p>Implementations that do not support generation-scoped journalling fail closed rather than
+   * silently falling back to the legacy unscoped key space.
+   */
+  default boolean putSwitchBufferForGeneration(
+      String generation, String key, String op, String payload) {
+    throw new UnsupportedOperationException("Generation-scoped switch-buffer writes are unavailable");
+  }
+
+  /**
+   * Atomically accepts one file job and its generation-scoped UPSERT journal row.
+   *
+   * <p>The queue owns both writes so a caller never acknowledges a file whose replay obligation
+   * was not committed with the job admission. Implementations without this transaction refuse
+   * rather than falling back to two independent writes.
+   */
+  default boolean enqueueAndBufferFileForGeneration(
+      String generation, EnqueueEntry entry, String collection, String scanId) {
+    throw new UnsupportedOperationException(
+        "Atomic generation-scoped file admission is unavailable");
+  }
+
+  /** All-or-nothing ordinary batch admission and candidate replay obligation. */
+  default int enqueueAndBufferFilesForGeneration(
+      String generation, List<EnqueueEntry> entries, String collection, String scanId) {
+    throw new UnsupportedOperationException(
+        "Atomic generation-scoped batch admission is unavailable");
+  }
+
+  /** Atomic generation-scoped file admission without recorded scan membership. */
+  default boolean enqueueAndBufferFileForGeneration(
+      String generation, EnqueueEntry entry, String collection) {
+    return enqueueAndBufferFileForGeneration(generation, entry, collection, null);
+  }
+
+  /** Atomically admits a finite recorded walk and its candidate-scoped file UPSERTs. */
+  default int enqueueRecordedEntriesAndBufferForGeneration(
+      String generation, String operationKey, long epoch,
+      List<EnqueueEntry> entries, String collection) {
+    throw new UnsupportedOperationException(
+        "Atomic generation-scoped recorded admission is unavailable");
+  }
+
   /** Atomically buffers sync; maintenance preserves an earlier admission's attribution. */
   boolean putSyncRoot(String key, SwitchBufferSyncRoot payload);
+
+  /** Generation-scoped form of {@link #putSyncRoot(String, SwitchBufferSyncRoot)}. */
+  default boolean putSyncRootForGeneration(
+      String generation, String key, SwitchBufferSyncRoot payload) {
+    throw new UnsupportedOperationException(
+        "Generation-scoped sync-root buffering is unavailable");
+  }
 
   /** Returns the number of buffered ops currently in the durable switch buffer. */
   long switchBufferDepth();
@@ -45,10 +115,34 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     throw new UnsupportedOperationException("Strict switch-buffer listing is unavailable");
   }
 
+  /** Exact listing for one candidate generation; unreadable storage must fail closed. */
+  default List<SwitchBufferOp> listSwitchBufferOpsStrictForGeneration(String generation) {
+    throw new UnsupportedOperationException(
+        "Generation-scoped strict switch-buffer listing is unavailable");
+  }
+
   /**
    * Removes only unchanged versions from a successfully committed replay snapshot.
    * Concurrent insertions/replacements survive, including identical payloads/timestamps.
    * Storage failure throws; no caller may substitute an unconditional table clear.
    */
   int removeReplayedSwitchBufferOps(List<SwitchBufferOp> replayed);
+
+  /**
+   * Removes only unchanged versions from one generation's replay snapshot.
+   *
+   * <p>The implementation must include generation, key and revision in each conditional delete.
+   */
+  default int removeReplayedSwitchBufferOpsForGeneration(
+      String generation, List<SwitchBufferOp> replayed) {
+    if (generation == null || generation.isBlank()) {
+      throw new IllegalArgumentException("Generation must be non-blank");
+    }
+    for (SwitchBufferOp entry : replayed) {
+      if (!generation.equals(entry.generation())) {
+        throw new IllegalArgumentException("Replay entry belongs to a different generation");
+      }
+    }
+    return removeReplayedSwitchBufferOps(replayed);
+  }
 }

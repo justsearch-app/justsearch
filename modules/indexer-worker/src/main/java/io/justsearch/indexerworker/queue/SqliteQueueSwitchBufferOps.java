@@ -161,29 +161,43 @@ final class SqliteQueueSwitchBufferOps {
    * and the caller MUST NOT acknowledge the operation as successful.
    */
   boolean put(String key, String op, String payload) {
-    if (key == null || key.isBlank() || op == null || op.isBlank() || payload == null) {
-      log.warn("putSwitchBuffer called with invalid arguments: key={}, op={}", key, op);
+    return putWithGeneration("", key, op, payload);
+  }
+
+  /** Inserts or replaces an operation in one candidate generation's journal. */
+  boolean putForGeneration(String generation, String key, String op, String payload) {
+    if (generation == null || generation.isBlank()) {
+      log.warn("putSwitchBufferForGeneration called with invalid generation={}", generation);
+      return false;
+    }
+    return putWithGeneration(generation, key, op, payload);
+  }
+
+  /** Writes into a caller-owned SQLite transaction; the caller owns rollback and commit. */
+  boolean putForGenerationInTransaction(
+      Connection conn, String generation, String key, String op, String payload) throws SQLException {
+    if (generation == null || generation.isBlank()
+        || key == null || key.isBlank() || op == null || op.isBlank() || payload == null) {
+      return false;
+    }
+    try {
+      return writeForGeneration(conn, generation, key, op, payload);
+    } catch (SQLException failure) {
+      if (onWriteFailure != null) onWriteFailure.run();
+      throw failure;
+    }
+  }
+
+  private boolean putWithGeneration(String generation, String key, String op, String payload) {
+    if (generation == null || (!generation.isEmpty() && generation.isBlank())
+        || key == null || key.isBlank() || op == null || op.isBlank() || payload == null) {
+      log.warn("putSwitchBufferForGeneration called with invalid arguments: generation={}, key={}, op={}",
+          generation, key, op);
       return false;
     }
     lock.lock();
     try {
-      Connection conn = connSupplier.get();
-      String sql =
-          """
-          INSERT OR REPLACE INTO switch_buffer
-            (key, op, payload, last_updated, revision, accepted_order)
-          VALUES (?, ?, ?, ?, ?,
-            (SELECT COALESCE(MAX(accepted_order), 0) + 1 FROM switch_buffer))
-          """;
-      try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-        stmt.setString(1, key);
-        stmt.setString(2, op);
-        stmt.setString(3, payload);
-        stmt.setLong(4, System.currentTimeMillis());
-        stmt.setString(5, java.util.UUID.randomUUID().toString());
-        stmt.executeUpdate();
-        return true;
-      }
+      return writeForGeneration(connSupplier.get(), generation, key, op, payload);
     } catch (SQLException e) {
       if (onWriteFailure != null) {
         onWriteFailure.run();
@@ -199,11 +213,56 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
+  private boolean writeForGeneration(
+      Connection conn, String generation, String key, String op, String payload) throws SQLException {
+    String sql =
+        """
+        INSERT OR REPLACE INTO switch_buffer
+          (generation, key, op, payload, last_updated, revision, accepted_order)
+        VALUES (?, ?, ?, ?, ?, ?,
+          (SELECT COALESCE(MAX(accepted_order), 0) + 1 FROM switch_buffer))
+        """;
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, generation);
+      stmt.setString(2, key);
+      stmt.setString(3, op);
+      stmt.setString(4, payload);
+      stmt.setLong(5, System.currentTimeMillis());
+      stmt.setString(6, java.util.UUID.randomUUID().toString());
+      stmt.executeUpdate();
+      return true;
+    }
+  }
+
   /** The existing queue lock serializes coalescing with every other buffered admission. */
   boolean putSyncRoot(String key, SwitchBufferSyncRoot incoming) {
+    return putSyncRootWithGeneration("", key, incoming);
+  }
+
+  /** Generation-scoped sync buffering preserves attribution inside that generation only. */
+  boolean putSyncRootForGeneration(String generation, String key, SwitchBufferSyncRoot incoming) {
+    if (generation == null || generation.isBlank()) {
+      log.warn("putSyncRootForGeneration called with invalid generation={}", generation);
+      return false;
+    }
+    return putSyncRootWithGeneration(generation, key, incoming);
+  }
+
+  private boolean putSyncRootWithGeneration(
+      String generation, String key, SwitchBufferSyncRoot incoming) {
+    if (generation == null || (!generation.isEmpty() && generation.isBlank())
+        || key == null || key.isBlank() || incoming == null) {
+      log.warn("putSyncRootForGeneration called with invalid arguments: generation={}, key={}",
+          generation, key);
+      return false;
+    }
     lock.lock();
     try {
-      return put(key, "SYNC_ROOT", preserveSyncAdmission(connSupplier.get(), key, incoming));
+      return putWithGeneration(
+          generation,
+          key,
+          "SYNC_ROOT",
+          preserveSyncAdmission(connSupplier.get(), generation, key, incoming));
     } catch (SQLException e) {
       if (onWriteFailure != null) onWriteFailure.run();
       log.error("Cannot preserve buffered sync attribution; caller must NOT ACK key={}", key, e);
@@ -213,12 +272,14 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
-  private String preserveSyncAdmission(Connection conn, String key, SwitchBufferSyncRoot incoming)
+  private String preserveSyncAdmission(
+      Connection conn, String generation, String key, SwitchBufferSyncRoot incoming)
       throws SQLException {
     if (incoming.provenance() != null) return incoming.encode();
     try (PreparedStatement prior = conn.prepareStatement(
-        "SELECT op, payload FROM switch_buffer WHERE key = ?")) {
-      prior.setString(1, key);
+        "SELECT op, payload FROM switch_buffer WHERE generation = ? AND key = ?")) {
+      prior.setString(1, generation);
+      prior.setString(2, key);
       try (ResultSet rows = prior.executeQuery()) {
         if (!rows.next()) return incoming.encode();
         if (!"SYNC_ROOT".equals(rows.getString(1))) {
@@ -250,28 +311,40 @@ final class SqliteQueueSwitchBufferOps {
    * timestamps and VACUUM INTO backup/restore cannot reorder retained admissions.
    */
   List<SwitchBufferCapableQueue.SwitchBufferOp> listAllStrict() {
+    return listAllStrictForGeneration(null);
+  }
+
+  /** Exact final-cutover read for one candidate generation. */
+  List<SwitchBufferCapableQueue.SwitchBufferOp> listAllStrictForGeneration(String generation) {
+    if (generation != null && generation.isBlank()) {
+      throw new IllegalArgumentException("Generation must be non-blank when scoped");
+    }
     lock.lock();
     try {
       Connection conn = connSupplier.get();
       String sql =
-          """
-          SELECT key, op, payload, last_updated, revision, accepted_order
-          FROM switch_buffer
-          ORDER BY accepted_order ASC
-          """;
+          generation == null
+              ? "SELECT generation, key, op, payload, last_updated, revision, accepted_order "
+                  + "FROM switch_buffer ORDER BY accepted_order ASC"
+              : "SELECT generation, key, op, payload, last_updated, revision, accepted_order "
+                  + "FROM switch_buffer WHERE generation = ? ORDER BY accepted_order ASC";
       List<SwitchBufferCapableQueue.SwitchBufferOp> out = new ArrayList<>();
-      try (Statement stmt = conn.createStatement();
-          ResultSet rs = stmt.executeQuery(sql)) {
-        long previousOrder = 0;
-        while (rs.next()) {
-          long order = rs.getLong(6);
-          if (order <= previousOrder) {
-            throw new IllegalStateException("Switch buffer admission order is not strictly increasing");
+      try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        if (generation != null) stmt.setString(1, generation);
+        try (ResultSet rs = stmt.executeQuery()) {
+          long previousOrder = 0;
+          while (rs.next()) {
+            long order = rs.getLong(7);
+            if (order <= previousOrder) {
+              throw new IllegalStateException(
+                  "Switch buffer admission order is not strictly increasing");
+            }
+            previousOrder = order;
+            out.add(
+                new SwitchBufferCapableQueue.SwitchBufferOp(
+                    rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
+                    rs.getLong(5), rs.getString(6)));
           }
-          previousOrder = order;
-          out.add(
-              new SwitchBufferCapableQueue.SwitchBufferOp(
-                  rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5)));
         }
       }
       return out;
@@ -286,11 +359,12 @@ final class SqliteQueueSwitchBufferOps {
   /** Caller holds the queue lock and its existing transaction through commit. */
   int removeReplayedLocked(List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) throws SQLException {
     try (PreparedStatement stmt = connSupplier.get().prepareStatement(
-        "DELETE FROM switch_buffer WHERE key = ? AND revision = ?")) {
+        "DELETE FROM switch_buffer WHERE generation = ? AND key = ? AND revision = ?")) {
       int removed = 0;
       for (var entry : replayed) {
-        stmt.setString(1, entry.key());
-        stmt.setString(2, entry.revision());
+        stmt.setString(1, entry.generation() == null ? "" : entry.generation());
+        stmt.setString(2, entry.key());
+        stmt.setString(3, entry.revision());
         removed += stmt.executeUpdate();
       }
       return removed;

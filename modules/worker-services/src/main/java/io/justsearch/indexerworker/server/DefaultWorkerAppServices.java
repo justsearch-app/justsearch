@@ -433,6 +433,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     var servingRuntime = ctx.searchLifecycleSupplier().get();
     this.searchService =
         new WorkerSearchService(servingRuntime, null, encoderBindings);
+    if (indexingLoop != null && servingRuntime instanceof RunningRuntime activeSource
+        && activeSource != ingestRunning) {
+      indexingLoop.wireActiveLexicalSource(activeSource);
+    }
 
     // 3. Ingest service. WorkerIngestService is null-tolerant for
     // ingestLifecycle/indexingLoop — write methods report UNAVAILABLE when
@@ -734,6 +738,19 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   public void resumeProducerAfterCutover() {
     if (indexingLoop != null) indexingLoop.resumeAfterCutover();
+  }
+
+  /** The final fence makes the active A projection durable before B can publish. */
+  public void commitActiveLexicalProjectionForCutover() {
+    if (indexingLoop != null) {
+      indexingLoop.commitActiveLexicalSource(
+          io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
+    }
+  }
+
+  /** The producer is paused; future batches belong only to promoted B. */
+  public void clearActiveLexicalProjectionAfterCutover() {
+    if (indexingLoop != null) indexingLoop.clearActiveLexicalSourceAfterCutover();
   }
 
   /** Exact prepared producer transfer; install is assignment-only after pointer commitment. */

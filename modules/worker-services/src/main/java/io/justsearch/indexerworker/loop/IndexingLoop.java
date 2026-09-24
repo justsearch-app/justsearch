@@ -7,6 +7,7 @@ import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingConfig;
@@ -57,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -103,6 +105,8 @@ public class IndexingLoop implements Closeable {
 
   private final JobQueue jobQueue;
   private final CommitOps commitOps;
+  /** The active generation's lexical projection; Green remains the only queue producer. */
+  private final AtomicReference<RunningRuntime> activeLexicalSource = new AtomicReference<>();
   // Tempdoc 516 Slice 4d (W6): indexingCoordinator / documentFieldOps / indexCountOps are
   // consumed only by the extracted collaborators (writer, extractor, backfillScheduler,
   // embeddingLifecycle). Local ctor params pass them through directly — no IndexingLoop field
@@ -416,7 +420,8 @@ public class IndexingLoop implements Closeable {
             (long delta) -> indexedSinceCommit += delta,
             this::recordStageMs,
             () -> detailedTracing,
-            this::chunkSpladeEnabled);
+            this::chunkSpladeEnabled,
+            activeLexicalSource::get);
     // Tempdoc 516 Slice 4a.3 (W5.2): construct the extractor. Holds its own per-batch
     // indexEmptyForBatch cache, the forcedPaths set (shared with the markForced public API),
     // and the running/signalBus pair so it can self-decide when to stop the per-job loop.
@@ -734,6 +739,7 @@ public class IndexingLoop implements Closeable {
             long commitStart = System.currentTimeMillis();
             CommitReason reason =
                 bufferTriggered ? CommitReason.INDEXING_LOOP_BUFFER : CommitReason.INDEXING_LOOP_TIME;
+            commitActiveLexicalSource(reason);
             commitOps.commitAndTrack(reason);
             metrics.recordCommit();
             log.debug(
@@ -808,6 +814,7 @@ public class IndexingLoop implements Closeable {
   private void finishIdleCommit() {
     try {
       if (indexedSinceCommit > 0) {
+        commitActiveLexicalSource(CommitReason.INDEXING_LOOP_IDLE);
         commitOps.commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
         metrics.recordCommit();
         log.debug("Committed index: {} docs, reason=batch idle", indexedSinceCommit);
@@ -851,6 +858,7 @@ public class IndexingLoop implements Closeable {
     try {
       if (indexedSinceCommit > 0) {
         long commitStart = System.currentTimeMillis();
+        commitActiveLexicalSource(CommitReason.INDEXING_LOOP_SHUTDOWN);
         commitOps.commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
         metrics.recordCommit();
         log.info("Final commit: {} documents", indexedSinceCommit);
@@ -1026,6 +1034,30 @@ public class IndexingLoop implements Closeable {
    */
   public EmbeddingProviderLifecycle getEmbeddingLifecycle() {
     return embeddingLifecycle;
+  }
+
+  /** Bind A before the Green producer starts; A and B have distinct generation directories. */
+  public void wireActiveLexicalSource(RunningRuntime source) {
+    if (running.get() || !activeLexicalSource.compareAndSet(null,
+        java.util.Objects.requireNonNull(source, "active lexical source"))) {
+      throw new IllegalStateException("Active lexical projection cannot change during a batch");
+    }
+  }
+
+  /** A must commit before Green's queue transition can be acknowledged. */
+  public void commitActiveLexicalSource(CommitReason reason) {
+    RunningRuntime source = activeLexicalSource.get();
+    if (source != null) source.commitOps().commitAndTrack(reason);
+  }
+
+  /** Called only after the final fence has paused the Green producer. */
+  public void clearActiveLexicalSourceAfterCutover() {
+    synchronized (cutoverPauseMonitor) {
+      if (running.get() && !cutoverPaused) {
+        throw new IllegalStateException("Green producer is not paused for source retirement");
+      }
+      activeLexicalSource.set(null);
+    }
   }
 
   /** Test-only accessor for the writer extracted in W5.1. */

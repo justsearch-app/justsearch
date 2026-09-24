@@ -16,6 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.ipc.ScanRootProgress;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,6 +65,45 @@ final class WorkerScanOpsRecordedTest {
     assertEquals(PROVENANCE, admitted.get(0).provenance());
     verify(queue).enqueueRecordedEntries(eq(KEY), eq(EPOCH), anyList(), eq(COLLECTION));
     verify(queue, never()).enqueueEntries(anyList(), eq(COLLECTION));
+  }
+
+  @Test
+  void migrationRecordedAdmissionUsesAtomicCandidateJournal() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("candidate-recorded"));
+    Files.writeString(root.resolve("entry.txt"), "recorded");
+    SwitchBufferCapableQueue queue = org.mockito.Mockito.mock(SwitchBufferCapableQueue.class);
+    when(queue.enqueueRecordedEntriesAndBufferForGeneration(
+        eq("green"), eq(KEY), eq(EPOCH), anyList(), eq(COLLECTION)))
+        .thenAnswer(call -> ((List<?>) call.getArgument(3)).size());
+    WorkerScanOps scan = new WorkerScanOps(queue, new CloudPlaceholderRecorder(queue),
+        path -> false, () -> 0L, () -> false, millis -> true, paths -> {},
+        () -> {}, () -> "green");
+
+    assertEquals(1, scan.scan(recordedRequest(root, List.of()), ignored -> {}).getFilesAdmitted());
+    verify(queue).enqueueRecordedEntriesAndBufferForGeneration(
+        eq("green"), eq(KEY), eq(EPOCH), anyList(), eq(COLLECTION));
+    verify(queue, never()).enqueueRecordedEntries(anyString(), anyLong(), anyList(), any());
+  }
+
+  @Test
+  void migrationOrdinaryScanRefusesWhenAtomicCandidateJournalFails() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("candidate-ordinary"));
+    Files.writeString(root.resolve("entry.txt"), "ordinary");
+    SwitchBufferCapableQueue queue = org.mockito.Mockito.mock(SwitchBufferCapableQueue.class);
+    WorkerScanOps scan = new WorkerScanOps(queue, new CloudPlaceholderRecorder(queue),
+        path -> false, () -> 0L, () -> false, millis -> true, paths -> {},
+        () -> {}, () -> "green");
+    var request = new WorkerScanOps.ScanRequest(root, COLLECTION,
+        WorkerScanOps.ScanMode.INITIAL, List.of(), "ordinary-scan", PROVENANCE);
+    List<ScanRootProgress> frames = new ArrayList<>();
+
+    WorkerServiceException failure = assertThrows(WorkerServiceException.class,
+        () -> scan.scan(request, frames::add));
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
+    assertFalse(frames.stream().anyMatch(ScanRootProgress::getComplete));
+    verify(queue).enqueueAndBufferFilesForGeneration(
+        eq("green"), anyList(), eq(COLLECTION), eq("ordinary-scan"));
+    verify(queue, never()).enqueueEntries(anyList(), any(), any());
   }
 
   @Test

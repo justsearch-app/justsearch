@@ -154,7 +154,16 @@ public final class KnowledgeServerMigrationOps {
       BooleanSupplier chunkSpladeEnabledSupplier,
       BooleanSupplier vduReplayAllowed,
       Logger log,
-      long deadlineNanos) {
+      long deadlineNanos,
+      String replayGeneration) {
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, null);
+    }
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
         Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
@@ -569,10 +578,15 @@ public final class KnowledgeServerMigrationOps {
    * deletion; re-enqueueing them would create new, untracked work after the recorded settlement.
    */
   public static boolean finishCommittedBootSwitchReplay(JobQueue queue) {
+    return finishCommittedBootSwitchReplay(queue, null);
+  }
+
+  public static boolean finishCommittedBootSwitchReplay(JobQueue queue, String generation) {
     if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
     try {
-      return finishPromotedSwitchReplay(queue, new StrictReplay(sbq.listSwitchBufferOpsStrict()))
-          && switchBufferEmptyStrict(queue);
+      return finishPromotedSwitchReplay(queue,
+          new StrictReplay(strictReplayOps(sbq, generation)))
+          && switchBufferEmptyStrict(queue, generation);
     } catch (RuntimeException unreadable) {
       return false;
     }
@@ -580,9 +594,20 @@ public final class KnowledgeServerMigrationOps {
 
   /** No post-snapshot versions may remain while the final mutation admission fence is held. */
   public static boolean switchBufferEmptyStrict(JobQueue queue) {
+    return switchBufferEmptyStrict(queue, null);
+  }
+
+  public static boolean switchBufferEmptyStrict(JobQueue queue, String generation) {
     if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
-    try { return sbq.listSwitchBufferOpsStrict().isEmpty(); }
+    try { return strictReplayOps(sbq, generation).isEmpty(); }
     catch (RuntimeException unreadable) { return false; }
+  }
+
+  private static List<SwitchBufferCapableQueue.SwitchBufferOp> strictReplayOps(
+      SwitchBufferCapableQueue queue, String generation) {
+    return queue.listSwitchBufferOpsStrict().stream()
+        .filter(op -> op.generation() == null || op.generation().isEmpty()
+            || (generation != null && generation.equals(op.generation()))).toList();
   }
 
   private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
@@ -593,7 +618,11 @@ public final class KnowledgeServerMigrationOps {
     boolean allowVdu = context.vduReplayAllowed().getAsBoolean();
     List<SwitchBufferCapableQueue.SwitchBufferOp> allOps;
     try {
-      allOps = exactRead ? sbq.listSwitchBufferOpsStrict() : sbq.listSwitchBufferOps();
+      allOps = exactRead ? strictReplayOps(sbq, context.replayGeneration())
+          : sbq.listSwitchBufferOps().stream()
+              .filter(op -> op.generation() == null || op.generation().isEmpty()
+                  || (context.replayGeneration() != null
+                      && context.replayGeneration().equals(op.generation()))).toList();
     } catch (RuntimeException unreadable) {
       context.log().warn("Switch buffer cannot certify final replay", unreadable);
       return new ReplayOutcome(false, List.of());
@@ -680,6 +709,16 @@ public final class KnowledgeServerMigrationOps {
                       op.key(),
                       e.getMessage());
             }
+          }
+        }
+        case "DELETE_COLLECTION" -> {
+          try {
+            context.ingestLifecycle().indexingCoordinator().deleteByCollection(payload);
+            mutatedLucene = true;
+          } catch (Exception e) {
+            allApplied = false;
+            context.log().warn("Failed to replay buffered DELETE_COLLECTION: key={} err={}",
+                op.key(), e.getMessage());
           }
         }
         case "VDU_MARK_PROCESSING" -> {
