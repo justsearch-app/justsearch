@@ -21,6 +21,14 @@ public interface SettingsComponentComposer {
     throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
   }
 
+  /** Optional installed-test observation after each owner has prepared, before file commit. */
+  default Prepared prepare(UiSettings candidate, ResolvedConfig desired,
+      Map<String, Set<String>> affected,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      java.util.function.Consumer<String> afterOwnerPrepared) {
+    return prepare(candidate, desired, affected, candidateContext);
+  }
+
   interface Prepared {
     /** Holds physical owner lifecycle locks before entering the publication write section. */
     default void withOwnerLocks(Runnable publication) {

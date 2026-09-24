@@ -12,6 +12,7 @@ import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.registry.executor.RecordedInstallerGenerationPlanResolver;
 import io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler;
@@ -115,6 +116,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private final Replacement replacement;
   private final BooleanSupplier processClosing;
   private final SettingsComponentComposer components;
+  private final java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook;
   private final ReentrantLock mutex = new ReentrantLock();
   private final CompletableFuture<RecoveryIssue> recoveryIssue = new CompletableFuture<>();
   private volatile SettingsCommitFence fence;
@@ -139,8 +141,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   public SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
       Function<UiSettings, OperationResult> prepareResponse, BooleanSupplier processClosing,
       SettingsComponentComposer components) {
+    this(store, config, restart, prepareResponse, processClosing, components,
+        OperationAttemptRunnerImpl.NO_FAULT_HOOK);
+  }
+
+  public SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      Function<UiSettings, OperationResult> prepareResponse, BooleanSupplier processClosing,
+      SettingsComponentComposer components,
+      java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
     this(store, config, restart, ConfigStoreRebuilder::prepare, prepareResponse,
-        store::replacePrepared, processClosing, components);
+        store::replacePrepared, processClosing, components, faultHook);
   }
 
   /** Fault seams stay package-private; production always uses the strict store replacement. */
@@ -162,6 +172,15 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       Function<UiSettings, ResolvedConfig> prepareConfig,
       Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
       BooleanSupplier processClosing, SettingsComponentComposer components) {
+    this(store, config, restart, prepareConfig, prepareResponse, replacement, processClosing,
+        components, OperationAttemptRunnerImpl.NO_FAULT_HOOK);
+  }
+
+  SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      Function<UiSettings, ResolvedConfig> prepareConfig,
+      Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
+      BooleanSupplier processClosing, SettingsComponentComposer components,
+      java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
     this.store = Objects.requireNonNull(store, "store");
     this.config = Objects.requireNonNull(config, "config");
     this.restart = Objects.requireNonNull(restart, "restart");
@@ -170,6 +189,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     this.replacement = Objects.requireNonNull(replacement, "replacement");
     this.processClosing = Objects.requireNonNull(processClosing, "processClosing");
     this.components = Objects.requireNonNull(components, "components");
+    this.faultHook = Objects.requireNonNull(faultHook, "faultHook");
   }
 
   private static SettingsComponentComposer unavailableComponents() {
@@ -604,7 +624,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           });
         }
         preparedComponents = Objects.requireNonNull(
-            components.prepare(prepared.settings(), resolved, Map.copyOf(affected), candidateContext),
+            components.prepare(prepared.settings(), resolved, Map.copyOf(affected), candidateContext,
+                component -> faultHook.accept(new OperationAttemptRunnerImpl.FaultBoundary(
+                    "settings-mid-compose", OperationKind.RECONFIGURE, active.key, active.key,
+                    active.id, component, 0, 0))),
             "Prepared component transaction");
       }
       OperationResult preparedResponse = prepareResponse.apply(prepared.settings());

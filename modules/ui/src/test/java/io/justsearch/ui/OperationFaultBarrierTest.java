@@ -103,6 +103,14 @@ final class OperationFaultBarrierTest {
       assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(
           data.resolve(phase + "-reindex"), selection(phase, "reindex")::get));
     }
+    assertNotSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK,
+        OperationFaultBarrier.fromEnvironment(data.resolve("compose"),
+            selection("settings-mid-compose", "reconfigure")::get));
+    for (String wrongKind : java.util.List.of("ingest", "settings-apply", "reindex")) {
+      assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(
+          data.resolve("compose-" + wrongKind),
+          selection("settings-mid-compose", wrongKind)::get));
+    }
     assertThrows(IllegalArgumentException.class, () -> OperationFaultBarrier.fromEnvironment(
         data.resolve("unknown-kind"), selection("bulk-partial-capture", "reindexing")::get));
   }

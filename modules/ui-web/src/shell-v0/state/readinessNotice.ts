@@ -48,7 +48,7 @@ export const OPEN_HEALTH: NoticeRemedy = {
 };
 
 /** The Brain surface offers the witnessed reconfigure refresh action. */
-export const OPEN_BRAIN: NoticeRemedy = {
+const OPEN_BRAIN: NoticeRemedy = {
   kind: 'navigate',
   target: 'core.brain-surface',
   label: 'Open Brain',

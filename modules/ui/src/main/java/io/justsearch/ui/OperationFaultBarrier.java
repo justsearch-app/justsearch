@@ -42,7 +42,9 @@ final class OperationFaultBarrier {
             "installer-before-marker", "installer-before-arm", "installer-before-pointer",
             "installer-pointer-before-settings", "installer-settings-before-publication",
             "installer-before-receipt")
-        : Set.of("before-accept", "after-accept", "after-effect");
+        : "reconfigure".equals(kind)
+            ? Set.of("before-accept", "after-accept", "after-effect", "settings-mid-compose")
+            : Set.of("before-accept", "after-accept", "after-effect");
     if (phase == null || !phases.contains(phase)
         || key == null || kind == null || !Set.of("ingest", "settings-apply", "reconfigure", "reindex").contains(kind)) {
       throw new IllegalArgumentException("Invalid operation fault selection");

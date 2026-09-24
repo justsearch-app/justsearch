@@ -49,9 +49,32 @@ The first rerun at `tmp/3064` exposed a fixture race: the Head proxy answered a
 query before logical Online publication; waiting for the Online generation
 resolved it at `tmp/3065` and remained green after the lock fix.
 
-The local slice is ready for one hosted checkpoint. D1-4's
-installed mid-compose crash cut, browser-driven Brain Reload proof, retained
-differing-model assets and the remaining D1/D2/E/F acceptance stay open. The
+Checkpoint `821d196b4` is pushed to PR727. Hosted CI run `35943801825` passed
+Windows-native, platform, app-ui, search-worker, jseval, build and system
+integration jobs. Public claims failed the dead-code
+gate because `OPEN_BRAIN` was newly exported but used only inside
+`readinessNotice.ts`. Its export was removed locally; the real Knip report and
+`--gate dead-code` now pass without a baseline change. The system integration
+job reached terminal success before the next push.
+
+The following local D1-4 slice adds a harness-only `settings-mid-compose`
+boundary after the generative owner prepares and before the settings file
+commit. The owner-order regression and affected PMD/Spotless/installDist passed
+at `tmp/3070-mid-compose-focused.txt`; the full 358-task integrated gate passed
+at `tmp/3073-mid-compose-integrated.txt`. The installed standard-model cut at
+`tmp/3078-mid-compose-physical-standard.txt` proves the candidate's server
+became healthy and reported the Qwen 9B model before the marker, then an
+identity-verified kill left the accepted row RUNNING and the settings witness
+at A. The successor failed the same row with
+`ENGINE_RESTARTED_DURING_APPLY`, served settings A in Offline mode, and
+same-key replay preserved the failure. Its private stack stopped with ports
+closed. Earlier `tmp/3071`–`3072` exercised only nonstarting Offline refresh;
+`tmp/3076`–`3077` exposed a fixture log-path timing error; none is claimed as
+the physical mid-compose proof. Frontend typecheck, 45 focused readiness tests
+and the local dead-code gate pass after the export correction.
+
+Browser-driven Brain Reload proof, retained differing-model assets and the
+remaining D1/D2/E/F acceptance stay open. The
 shared dev MCP preflight still expects the retired Worker distribution; the
 installed proof used the existing private supervisor harness with
 identity-checked teardown.

@@ -10,6 +10,9 @@ const CASES = Object.freeze({
   'settings-after-accept-before-effect': {
     parentKind: 'reconfigure', phase: 'after-accept', recovery: 'fail-before-commit',
   },
+  'settings-mid-compose': {
+    parentKind: 'reconfigure', phase: 'settings-mid-compose', recovery: 'fail-before-commit',
+  },
   'ingest-after-effect-before-checkpoint': {
     parentKind: 'ingest', phase: 'after-effect', recovery: 'resume',
   },
@@ -78,7 +81,8 @@ export async function exerciseOperationFault(c) {
       `settings API and persisted witness differ before fault: api=${JSON.stringify(originalWitness)} `
         + `file=${JSON.stringify(persisted.witness)}`);
     settingsInput = {
-      ui: { highContrast: !Boolean(current.ui?.highContrast) },
+      ui: selected.phase === 'settings-mid-compose'
+        ? { chatEnabled: true } : { highContrast: !Boolean(current.ui?.highContrast) },
       witness: originalWitness,
       operationKey,
     };
@@ -230,6 +234,12 @@ export async function exerciseOperationFault(c) {
   }
   const afterDeath = await killOwnedEngineAndObserveCooldown({ record: originalIdentity, first, data, readJson,
     waitFor, requireThat });
+  if (selected.phase === 'settings-mid-compose') {
+    const engineLog = fs.readFileSync(path.join(work, 'state', 'runs', first.runId,
+      'logs', 'engine.log'), 'utf8');
+    requireThat(engineLog.includes('Server healthy') && engineLog.includes('llama-server model:'),
+      'mid-compose marker must follow managed standard-model health and identity verification');
+  }
   const effectKey = selected.phase === 'after-effect' && selected.parentKind === 'ingest'
     ? reached.operationKey : operationKey;
   const duringCooldown = snapshot(data, operationKey, effectKey, file);
@@ -287,6 +297,17 @@ export async function exerciseOperationFault(c) {
     requireThat(sameJson(afterReplay, failed)
       && sameJson(settingsWitnessOnDisk(data).witness, originalWitness),
     'failed settings replay must not rewrite its row or commit the patch');
+    if (selected.phase === 'settings-mid-compose') {
+      const restoredSettings = await request(successor.manifest.head.apiPort, SETTINGS_ROUTE);
+      const restored = parseJson(restoredSettings, 'recovered settings A');
+      requireThat(restoredSettings.status === 200
+        && sameJson(restored.witness, originalWitness) && restored.ui?.chatEnabled !== true,
+      `successor must expose settings A after mid-compose death: ${restoredSettings.text}`);
+      const inference = await request(successor.manifest.head.apiPort, '/api/inference/status');
+      const mode = parseJson(inference, 'recovered inference A');
+      requireThat(inference.status === 200 && mode.mode === 'offline' && mode.generation === 0,
+      `successor must leave uncommitted candidate offline: ${inference.text}`);
+    }
     console.log('OPERATION_FAULT_SETTINGS_PRE_EFFECT_PASS', JSON.stringify({ scenario,
       reached, duringCooldown, failed, failedReplay: failureBody, settings: settingsWitnessOnDisk(data) }));
     return { reached, duringCooldown, successor, operation: failed };
@@ -518,6 +539,16 @@ function assertCooldownState({ selected, operationKey, reached, duringCooldown, 
       requireThat(sameJson(settings.witness, originalWitness),
         'after-accept/before-effect settings must not arm or commit a revision');
     }
+    return;
+  }
+
+  if (selected.phase === 'settings-mid-compose') {
+    requireThat(operation.state === 'RUNNING' && operation.started_at !== null
+      && operation.accepted_settings_revision === originalWitness.acceptedRevision,
+    `mid-compose cut must retain the armed running row: ${JSON.stringify(operation)}`);
+    requireThat(reached.cursor === 'generative' && sameJson(settings.witness, originalWitness)
+      && jobs.length === 0 && ledger.length === 0 && walk === null,
+    `mid-compose cut must leave settings A and unrelated effects intact: ${JSON.stringify(duringCooldown)}`);
     return;
   }
 

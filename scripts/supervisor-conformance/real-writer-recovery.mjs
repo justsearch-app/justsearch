@@ -21,7 +21,7 @@ const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
 const operationFault = new Set(['ingest-before-accept', 'settings-before-accept',
   'ingest-after-accept-before-effect', 'settings-after-accept-before-effect',
   'ingest-after-effect-before-checkpoint', 'settings-after-effect-before-checkpoint',
-  'ingest-client-disconnect']).has(scenario);
+  'ingest-client-disconnect', 'settings-mid-compose']).has(scenario);
 const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const operationKey = operationFault || bulkFault || installerFault ? createOperationKey() : null;
@@ -91,7 +91,8 @@ if (operationFault) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = scenario.startsWith('settings-') ? 'reconfigure' : 'ingest';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = scenario.endsWith('before-accept') ? 'before-accept'
-    : scenario.endsWith('before-checkpoint') ? 'after-effect' : 'after-accept';
+    : scenario.endsWith('before-checkpoint') ? 'after-effect'
+      : scenario === 'settings-mid-compose' ? 'settings-mid-compose' : 'after-accept';
 }
 if (bulkFault) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;

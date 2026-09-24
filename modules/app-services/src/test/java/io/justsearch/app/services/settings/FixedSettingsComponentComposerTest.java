@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComponentSpec;
@@ -72,6 +73,29 @@ final class FixedSettingsComponentComposerTest {
     assertEquals(0, second.preparedCount);
     verify(registry, never()).prepareBatch(anyMap());
     verify(lease, times(1)).close();
+  }
+
+  @Test
+  void installedFaultObservationFallsBetweenFirstAndSecondOwnerPreparation() {
+    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
+    when(registry.tryApply()).thenReturn(new Acquired(lease));
+    RecordingOwner first = new RecordingOwner("first");
+    RecordingOwner second = new RecordingOwner("second");
+    FixedSettingsComponentComposer composer = composer(registry, first, second);
+    var marker = new IllegalStateException("fault marker");
+
+    assertEquals(marker, assertThrows(IllegalStateException.class,
+        () -> composer.prepare(CANDIDATE, DESIRED, affected("first", "second"),
+            SettingsCandidateContext.NONE, component -> {
+              assertEquals("first", component);
+              assertEquals(1, first.preparedCount);
+              assertEquals(0, second.preparedCount);
+              throw marker;
+            })));
+    assertEquals(1, first.prepared.abortCount);
+    verify(registry, never()).prepareBatch(anyMap());
+    verify(lease).close();
   }
 
   @Test

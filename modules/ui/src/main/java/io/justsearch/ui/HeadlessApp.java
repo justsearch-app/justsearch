@@ -1098,6 +1098,7 @@ public class HeadlessApp {
       processResources = runtimeResources;
       var settingsComponents = new io.justsearch.app.services.settings.FixedSettingsComponentComposer(
           runtimeResources.components());
+      var operationFaultHook = OperationFaultBarrier.fromEnvironment(configPhase.dataDir(), SystemAccess::rawEnvVar);
       final var resetSettingsStore = settingsStore;
       var settingsOwner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(
           resetSettingsStore, configStore, requestedRestartAction, candidate -> {
@@ -1108,8 +1109,7 @@ public class HeadlessApp {
                 "settingsMode", response.settingsMode()));
             if (response.apiPort() != null) data.put("apiPort", response.apiPort());
             return io.justsearch.agent.api.registry.OperationResult.success("Settings committed", data);
-          }, runtimeResources.admission()::isClosing, settingsComponents);
-      var operationFaultHook = OperationFaultBarrier.fromEnvironment(configPhase.dataDir(), SystemAccess::rawEnvVar);
+          }, runtimeResources.admission()::isClosing, settingsComponents, operationFaultHook);
       var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
           operations, java.time.Clock.systemUTC(), java.util.Set.of(
               io.justsearch.agent.api.registry.OperationKind.INGEST,

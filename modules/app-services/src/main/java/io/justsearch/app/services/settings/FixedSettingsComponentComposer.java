@@ -69,7 +69,16 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
   public Prepared prepare(UiSettings candidate, ResolvedConfig desired,
       Map<String, Set<String>> affected,
       io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    return prepare(candidate, desired, affected, candidateContext, ignored -> {});
+  }
+
+  @Override
+  public Prepared prepare(UiSettings candidate, ResolvedConfig desired,
+      Map<String, Set<String>> affected,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      java.util.function.Consumer<String> afterOwnerPrepared) {
     Objects.requireNonNull(candidateContext, "candidateContext");
+    Objects.requireNonNull(afterOwnerPrepared, "afterOwnerPrepared");
     Map<String, Owner> selected = new LinkedHashMap<>();
     synchronized (this) {
       if (!sealed) throw new IllegalStateException("Component owners are not sealed");
@@ -105,6 +114,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
         prepared.add(owner);
         observations.put(entry.getKey(), Objects.requireNonNull(owner.observation(),
             "Prepared observation: " + entry.getKey()));
+        afterOwnerPrepared.accept(entry.getKey());
       }
       return new Composite(List.copyOf(prepared),
           java.util.Collections.unmodifiableMap(new LinkedHashMap<>(observations)), registry, lease);
