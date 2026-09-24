@@ -19,7 +19,7 @@ export const BULK_FAULT_CASES = Object.freeze({
   }),
 });
 
-// The activation operation has its own durable operation identity and plan assertions below. The
+// The activation operation has its own durable operation identity and plan assertions below.
 // The marker cut plus the five installed coordinator callbacks cover the composite crash sequence;
 // the legacy bulk migration cases remain unchanged above.
 export const INSTALLER_FAULT_CASES = Object.freeze({
@@ -254,7 +254,10 @@ export async function exerciseInstallerActivationFault(c) {
   requireThat(first.incarnation === 1,
     `installer activation fixture must begin at incarnation 1: ${JSON.stringify(first)}`);
 
-  const deadline = Date.now() + 300000;
+  // Cold CPU model composition reached this exact hook at 180s on the installed
+  // standard profile. Leave time for the subsequent restart and reconciliation;
+  // Stage E owns the separate runtime latency threshold.
+  const deadline = Date.now() + 480000;
   const waitFor = (label, budget, probe) =>
     c.waitFor(label, Math.max(1, Math.min(budget, deadline - Date.now())), probe);
   const runtime = path.join(data, 'runtime');
@@ -306,7 +309,7 @@ export async function exerciseInstallerActivationFault(c) {
     confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
   }, headers);
 
-  const reached = await waitFor(`installer activation fault marker ${scenario}`, 170000,
+  const reached = await waitFor(`installer activation fault marker ${scenario}`, 240000,
     () => readJson(reachedFile) ?? null);
   requireThat(reached.phase === selected.phase && reached.parentKind === 'reindex'
     && reached.parentKey === operationKey && reached.operationKey === operationKey

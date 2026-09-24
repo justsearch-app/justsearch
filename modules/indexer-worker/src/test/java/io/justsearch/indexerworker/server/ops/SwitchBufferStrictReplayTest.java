@@ -166,6 +166,32 @@ final class SwitchBufferStrictReplayTest {
   }
 
   @Test
+  void refusalTransfersScopedPrefixAndCollectionDeletesBeforeRetiringThem() {
+    var prefix = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "prefix:root", "DELETE_PREFIX", "root", 1, "v1");
+    var collection = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "collection:notes", "DELETE_COLLECTION", "notes", 2, "v2");
+    var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "other", "prefix:foreign", "DELETE_PREFIX", "foreign", 3, "v3");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(prefix, collection, foreign));
+    when(queue.removeReplayedSwitchBufferOps(List.of(prefix, collection))).thenReturn(2);
+    var indexing = mock(IndexingCoordinator.class);
+    var commits = mock(CommitOps.class);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+    when(runtime.commitOps()).thenReturn(commits);
+
+    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+        scopedContext("green")));
+    var order = inOrder(indexing, commits, queue);
+    order.verify(indexing).deleteByPathPrefix("root");
+    order.verify(queue).deleteByPathPrefix("root");
+    order.verify(indexing).deleteByCollection("notes");
+    order.verify(commits).commitAndTrack(org.mockito.ArgumentMatchers.any());
+    order.verify(queue).removeReplayedSwitchBufferOps(List.of(prefix, collection));
+    verify(indexing, never()).deleteByPathPrefix("foreign");
+  }
+
+  @Test
   void refusalRetainsCandidateWhenSourceProjectionIsMissing() throws Exception {
     Path file = Files.writeString(tempDir.resolve("candidate.txt"), "accepted").toAbsolutePath();
     var payload = new SwitchBufferUpsert(file.toString(), null, null,
@@ -181,6 +207,34 @@ final class SwitchBufferStrictReplayTest {
     assertFalse(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
         scopedContext("green")));
     verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
+  }
+
+  @Test
+  void refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("accepted-on-a.txt"), "accepted").toAbsolutePath();
+    String hash = SourceContentHash.sha256(file);
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + file, "UPSERT",
+        new SwitchBufferUpsert(file.toString(), null, null, "accepted-revision", hash).encode(),
+        1, "v1");
+    var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "other", "path:foreign", "DELETE", "foreign", 2, "v2");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, foreign));
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    when(queue.matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash))
+        .thenReturn(true);
+    var fields = mock(DocumentFieldOps.class);
+    when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
+
+    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+        scopedContext("green")));
+    verify(queue, never()).enqueueEntries(anyList(), isNull());
+    var order = inOrder(queue);
+    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash);
+    order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+    verify(queue, never()).removeReplayedSwitchBufferOps(List.of(foreign));
   }
 
   @Test

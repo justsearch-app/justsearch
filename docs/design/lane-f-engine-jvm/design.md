@@ -2218,8 +2218,10 @@ actually covers the condition and naming every gap. The [D1](stages/D1.md#6-sect
 and [D2](stages/D2.md#6-section-16-rows-d2-must-leave-exercisable) maps are the
 ownership index. The former all-row paired gate and E-owned feature rows are
 superseded by this allocation. Bounds for the seven paired groups are set before
-the run. Minimum-spec machine and other-OS recovery are run only if the
-corresponding claim is made; unrun shapes cannot be claimed. Representative
+the run. The D1 low-memory and in-place behavior is still proved on an
+instrumented reference machine; a physical minimum-spec machine and other-OS
+recovery are run only if the corresponding claim is made, and unrun shapes
+cannot be claimed. Representative
 changes are measured only if a lower-coordination-cost claim is made. G1 is
 the default collector; run a collector comparison only if a response-time row
 fails.
@@ -2467,7 +2469,7 @@ PR 0 baseline or the gate run confirms, not a design fact, and the "by" column s
 |---|---|---|---|
 | primary supported operating shape | 18, 3.1 | **one shape: a running desktop application that also serves agents.** Agent access is a mode of the running application, not a deployment; recovery during an agent loop is automatic and prompt-free, and an exhausted supervisor leaves a visible state, never a dialog. Unattended headless and trusted-network sharing stay unsupported behind their own ADRs; a Tauri-less Engine is a development shape | A (the supervision scope reads it) |
 | tolerated work loss per fault, in 16's units; what must stay usable through a fault and through ordinary maintenance; which interrupted work is unacceptable | 13, 18 | **set at what the mechanisms guarantee, no looser and no tighter**: at most the one agent turn in flight is interrupted; durable operations resume, never restart; only writes in flight at the crash need a query. Unacceptable: an accepted write lost silently, a half-applied configuration surviving a restart, a reindex starting over. Floor through a fault: API and text search within cooldown plus warm start. Floor through maintenance: text search always, semantic bounded by the row below (*moved from E, review seven*: tolerances constrain the investment; the numeric thresholds derived from them stay at E) | A |
-| semantic-availability bound during a generation transition on the floor machine (fraction and wall-clock) | 16 | **2026-09-24:** D1 one-sided feature acceptance; run on a minimum-spec machine only when claiming that machine or its semantic-availability bound. Record duration/fraction and an absolute bound before the claim; the older E paired comparison is superseded | D1, before the claim |
+| semantic-availability bound during a generation transition on the floor machine (fraction and wall-clock) | 16 | **2026-09-24:** D1 one-sided feature acceptance; prove in-place mode under a device cap and record refusal duration/fraction and an absolute bound. Run on a physical minimum-spec machine only when claiming performance on that machine; the older E paired comparison is superseded | D1, before the claim |
 | operations-history retention, after which a key answers `expired` | 7.6 | **30 days, plus a row cap** so a scripted agent cannot grow the history without bound | C2 |
 | retained-state caps: cursors per context and aggregate, pinned readers, co-resident encoders | 8 | first cut by the implementer from the budget; **the webview is not privileged over agent contexts** (urgency lives on the work item, so identical per-context caps); overruled only if a gate row fails | C1; confirmed at E |
 | supervisor budget: max restarts, cooldown floor and ceiling, stability window, hang poll interval and count; exit-reason classes | 7.1 | **seeded from 627 (3 restarts; 300 s window), semantics re-cut** (7.1, *re-cut 2026-09-07, lock*): requested, transient and non-transient exit classes, with non-transient exhausting at once; cooldown floor is handle release and the ceiling a few seconds above it; the window runs from `ready`; hang interval and count set with the collector | B for the classes, cooldown and window; E for the hang parameters |

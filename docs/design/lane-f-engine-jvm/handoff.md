@@ -19,7 +19,8 @@ re-cut trigger is retired; merge `origin/main` at each checkpoint. See
 
 ## Latest checkpoint (2026-09-24)
 
-PR727 is at `7c9f98e39`. The 358-task local integrated gate passed at
+PR727's last fully hosted runtime checkpoint is `fc5b444d6`; the following
+chronology retains earlier failures and corrections. The 358-task local integrated gate passed at
 `tmp/3358-d1-file-mutation-integrated.txt`. Its hosted run
 [`36039474659`](https://github.com/justsearch-app/justsearch/actions/runs/36039474659)
 finished: system integration, Windows native and every other job passed except
@@ -98,10 +99,61 @@ source. A complete single-worker gate then passed at
 `tmp/3387-d1-streaming-integrated-serial.txt`: `spotlessCheck pmdAll test
 -PincludeStress=true :modules:ui:installDist --continue --max-workers=1`
 finished with 358 actionable tasks and exit 0. This is local integrated proof
-for the current uncommitted D1-9 correction. The concurrent-suite failure and
-its original XML remain recorded above. Hosted proof requires a pushed coherent
+for the D1-9 correction committed as `fc5b444d6`. The concurrent-suite failure and
+its original XML remain recorded above. Hosted proof requires a coherent
 checkpoint; D1-9's non-file, gap, cancel and pointer/settings crash-cut
 acceptance remains open.
+
+After checkpoint `fc5b444d6` was pushed, hosted run
+[`36055201547`](https://github.com/justsearch-app/justsearch/actions/runs/36055201547)
+passed every job, including system integration, Windows native, Public claims,
+build and module tests. `origin/main` was already an ancestor at this checkpoint.
+The next local D1-9 regression, in `SwitchBufferStrictReplayTest`, proves
+that refused-candidate cleanup removes a scoped UPSERT only after its exact
+accepted source projection is present on A, while retaining a foreign candidate.
+The focused class passed locally. A second local regression checks scoped
+prefix and collection deletes transfer to A and commit before their exact
+journal versions retire. These tests and the owner-recut wording correction were
+not part of that hosted run. Gap acceptance,
+positive installed cancel/abandon, no-file projection and D1-9 crash-cut proof
+remain open.
+
+The current-revision installed `installer-before-marker` crash cut at `tmp/3388`
+timed out waiting for its marker at 170 seconds. The correct marker appeared at
+20:44:00 UTC, concurrent with timeout, after cold standard CPU model composition;
+the fixture stopped its owned run with ports closed. This is a fixture observation
+timeout, not passing recovery proof. The fixture now allows 240 seconds to find
+the marker and 480 seconds for the whole fault/recovery path; Stage E retains its
+separate response-time requirements. The fresh installed rerun passed at
+`tmp/3389-installer-before-marker-current.txt` on the unchanged installed runtime
+`fc5b444d6`: the marker bound to the accepted operation, an identity-checked
+Engine kill consumed one counted restart, the successor completed the same row
+with matching pointer and settings witness, both watched files were searchable,
+same-key replay remained idempotent, and STOP 0 closed the owned ports. The
+remaining five composite crash cuts are still required.
+The next `installer-before-arm` cut also passed at
+`tmp/3392-installer-before-arm-current.txt`: the exact accepted row completed
+after one counted restart, matching pointer/settings and two searchable files;
+STOP 0 closed the owned ports. `installer-before-pointer` also passed at
+`tmp/3393-installer-before-pointer-current.txt` with the same exact recovery
+checks. The critical pointer-B/settings-A cut passed at
+`tmp/3394-installer-pointer-before-settings-current.txt`: the successor rolled
+settings forward to the exact operation key, completed the same row, served both
+files and closed owned ports. The pointer/settings-before-runtime-publication
+cut also passed at `tmp/3395-installer-settings-before-publication-current.txt`:
+the successor served B, completed the same row and closed owned ports. The
+before-receipt cut passed at `tmp/3396-installer-before-receipt-current.txt`.
+All six current-revision installed cuts now pass. An independent read of each
+`installer-cut.json` and `installer-final.json` confirmed the intended cut
+pointer/settings combination, the same final operation key and generation,
+`COMPLETE` row and acknowledged walk revision. Every run had one counted restart,
+two searchable files, same-key idempotence and STOP 0; quick_health afterward
+reported ABSENT with no foreign run or inference orphan. This is proof of the
+installer composite cut series, not of D1-9's missing no-file, gap or cancellation
+feature acceptance. The refusal transfer
+test class passed at `tmp/3390-switch-refusal-transfer-focused.txt`, with
+Spotless and PMD at `tmp/3391-switch-refusal-transfer-static.txt`; these are
+local-only WIP proof.
 
 The earlier PR727 checkpoint `daeb5704d` had hosted run `36003707287` SUCCESS across all
 jobs, including Windows native and system integration. The 358-task local gate

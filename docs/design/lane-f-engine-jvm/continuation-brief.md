@@ -19,6 +19,16 @@ re-cut condition is retired. [Design](design.md#16-what-must-be-measured-and-the
 [E runbook](stages/E.md), [D1 map](stages/D1.md#6-section-16-rows-d1-must-leave-exercisable),
 [D2 map](stages/D2.md#6-section-16-rows-d2-must-leave-exercisable).
 
+**Current D1-9 boundary:** `fc5b444d6` passed the serial 358-task local gate,
+hosted run 36055201547 (including system integration) and the standard-model
+installed A/B file-mutation path. Six current-revision installed installer
+pointer/settings crash cuts passed at `tmp/3389` and `tmp/3392`–`tmp/3396`;
+the [handoff](handoff.md) names each artifact. The next D1-9 work is no-file
+projection admission/replay, nonterminal gap acceptance and positive
+cancel/abandon transfer. Two refused-candidate transfer regressions passed
+focused checks locally; they were not in hosted run 36055201547. This paragraph is status,
+not a release of any later D1/D2/E/F acceptance.
+
 ## Assignment and authorization
 
 Resume the existing Lane F migration autonomously through remaining D1/D2/E/F.
