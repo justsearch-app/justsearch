@@ -1015,7 +1015,10 @@ public final class ResolvedConfigBuilder {
         resolveLlmSlots(),
         resolveLlmKvType(),
         resolveMasterGpuEnabled(),
-        resolvePolicyGpuAllowed());
+        resolvePolicyGpuAllowed(),
+        // D1-14: absent leaves the GPU capability line unchanged; zero is an explicit floor
+        // forcing cap, so preserve it rather than treating it as missing.
+        resolveNonNegativeNullableLong("justsearch.gpu.device_memory_ceiling_mb"));
   }
 
   /**
@@ -1735,6 +1738,21 @@ public final class ResolvedConfigBuilder {
       return Integer.parseInt(v.trim());
     } catch (NumberFormatException e) {
       LOG.debug("Invalid integer for '{}': '{}'", key, v);
+      return null;
+    }
+  }
+
+  /** Resolves an optional long that may not be negative; invalid values are treated as absent. */
+  private Long resolveNonNegativeNullableLong(String key) {
+    String v = resolveString(key, null);
+    if (v == null) return null;
+    try {
+      long value = Long.parseLong(v.trim());
+      if (value >= 0) return value;
+      LOG.debug("Negative value for '{}': '{}'; treating it as absent", key, value);
+      return null;
+    } catch (NumberFormatException e) {
+      LOG.debug("Invalid long for '{}': '{}'; treating it as absent", key, v);
       return null;
     }
   }

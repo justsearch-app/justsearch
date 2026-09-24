@@ -194,6 +194,37 @@ final class DefaultWorkerAppServicesProducerTransferTest {
   }
 
   @Test
+  void textOnlyCandidateBuildRemovesAQueriesWithoutChangingGreenProducer(@TempDir Path tempDir)
+      throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = fixture.newCandidateIncumbent();
+      EmbeddingProvider providerA = mock(EmbeddingProvider.class, "provider-A");
+      EmbeddingProvider providerB = mock(EmbeddingProvider.class, "provider-B");
+      var spladeA = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class, "splade-A");
+      var spladeB = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class, "splade-B");
+      incumbent.wireEmbeddingProvider(providerA);
+      incumbent.wireSpladeEncoder(spladeA);
+      incumbent.wireCandidateProducer(
+          providerB, new EncoderBindings.Snapshot(spladeB, null, null, null));
+      incumbent.wireGpuDiagnostics(new GpuDiagnosticSuppliers(
+          null, null, null, () -> "A-backend", () -> 1, null, null, null, null));
+      Object statusOps = field(incumbent.ingestService(), "statusOps");
+      assertNotNull(field(statusOps, "embedBackendSupplier"));
+
+      incumbent.enterTextOnlyCandidateBuild();
+
+      assertFalse(queryEmbeddingProvider(incumbent).isAvailable());
+      assertEquals(EncoderBindings.Snapshot.empty(), queryBindings(incumbent).snapshot());
+      assertNull(field(statusOps, "embedBackendSupplier"));
+      assertNull(field(statusOps, "embedGpuLayersSupplier"));
+      assertSame(providerB, producerEmbeddingProvider(incumbent));
+      assertSame(spladeB, producerBindings(incumbent).spladeEncoder());
+
+      incumbent.close();
+    }
+  }
+
+  @Test
   void transferredModelLeaseOutlivesBlockedProducerClose() throws Exception {
     var source = new DefaultWorkerAppServices.SharedProducerOwnership(true);
     var successor = new DefaultWorkerAppServices.SharedProducerOwnership(false);

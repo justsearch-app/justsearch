@@ -4,6 +4,7 @@ package io.justsearch.app.services.ai.install;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -32,6 +33,7 @@ import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.registry.operations.handlers.ActivateInstalledModelsHandler;
+import io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifier;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.configuration.model.DownloadProfile;
@@ -63,6 +65,114 @@ import org.junit.jupiter.api.io.TempDir;
 /** Read-only installer candidate coverage at the activation boundary. */
 class AiInstallOnnxSettingsProducerTest {
   @TempDir Path directory;
+
+  @Test
+  void mixedActivationBindsSelectedChatAndRefusesSameSizeDriftBeforeIngestion()
+      throws Exception {
+    UiSettingsStore store = new UiSettingsStore(
+        UiSettingsStore.PersistenceMode.READ_WRITE, directory.resolve("settings.json"));
+    ModelPackage embedding = packageWith("embedding", "model.onnx", "tokenizer.json");
+    ModelPackage chat = chatPackage();
+    ModelRegistry registry = new ModelRegistry(2, "test", List.of(embedding, chat));
+    Path root = directory.resolve("models");
+    stagePackage(root, embedding);
+    stagePackage(root, chat);
+    writeContract(root, DownloadProfile.GPU_FULL, embedding, chat);
+
+    AiInstallService helper = new AiInstallService(null, store, null, null, directory);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    EngineContext context = TestEngineContexts.internal();
+    InvocationProvenance provenance = EngineProvenance.invocation(
+        context, ExecutorTag.UI, Instant.parse("2026-09-23T00:00:00Z"), Optional.empty());
+    when(indexing.captureServingGeneration(context)).thenReturn("serving-a");
+    when(indexing.captureCandidateIndexSelection(any(), any()))
+        .thenReturn(new CandidateIndexSelection(new IndexTargetSnapshot(sha("{}"), "{}"), Map.of()));
+    ActivateInstalledModelsHandler handler = new ActivateInstalledModelsHandler(
+        () -> brainInstall(helper, registry), ingestion,
+        ignored -> List.of(new RootBinding(directory.resolve("watched").toAbsolutePath(), "documents")),
+        () -> indexing, List::of);
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore current = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
+    ConfigStore.setGlobal(current);
+    try {
+      OperationPreparation prepared = handler.prepare(
+          "{\"source\":\"installer_model_activation\"}", provenance, context);
+      RecordedInstallerGenerationPlan plan = RecordedInstallerGenerationPlan.fromReplayPayload(
+          prepared.replayPayloadJson());
+      assertTrue(plan.chatSelection().selected());
+      assertEquals("chat/chat.gguf", plan.chatSelection().modelAssetId());
+      assertEquals(List.of("chat/mmproj.gguf"), plan.chatSelection().companionAssetIds());
+      assertEquals(4, plan.assets().size());
+      RecordedInstallerAssetVerifier.verify(plan);
+
+      Path chatFile = root.resolve("chat.gguf");
+      Files.writeString(chatFile, "CHAT-model", StandardCharsets.UTF_8);
+      assertThrows(IllegalArgumentException.class,
+          () -> RecordedInstallerAssetVerifier.verify(plan),
+          "accepted chat bytes must be checked again before promotion");
+      var refused = handler.executePrepared(prepared, provenance, context,
+          mock(OperationRecordHandle.class));
+      assertEquals("ACTIVATION_CHAT_ASSET_INVALID", refused.response().errorCode().orElseThrow());
+      assertEquals(new SettingsWitness(0L, null), store.inspect().witness());
+      verifyNoInteractions(ingestion);
+    } finally {
+      ConfigStore.restoreGlobal(current, previous);
+    }
+  }
+
+  @Test
+  void explicitChatSelectionBindsSameStoredPathWithoutAnnexingOperatorOverrides()
+      throws Exception {
+    UiSettingsStore store = new UiSettingsStore(
+        UiSettingsStore.PersistenceMode.READ_WRITE, directory.resolve("settings.json"));
+    ModelPackage embedding = packageWith("embedding", "model.onnx", "tokenizer.json");
+    ModelPackage chat = chatPackage();
+    Path root = directory.resolve("models");
+    stagePackage(root, embedding);
+    stagePackage(root, chat);
+    writeContract(root, DownloadProfile.GPU_FULL, embedding, chat);
+    Path installedChat = root.resolve("chat.gguf").toAbsolutePath().normalize();
+    UiSettings earlier = store.inspect().settings();
+    earlier.setLlmModelPath(installedChat.toString());
+    store.replacePrepared(store.prepareExact(earlier, store.inspect().witness()));
+
+    Path operatorChat = directory.resolve("operator.gguf").toAbsolutePath().normalize();
+    Path operatorProjector = directory.resolve("operator-mmproj.gguf").toAbsolutePath().normalize();
+    String[] keys = {"justsearch.llm.model_path", "justsearch.chat.profile",
+        "justsearch.mmproj.model"};
+    String[] priorProperties = java.util.Arrays.stream(keys).map(System::getProperty)
+        .toArray(String[]::new);
+    System.setProperty(keys[0], operatorChat.toString());
+    System.setProperty(keys[1], "compact");
+    System.setProperty(keys[2], operatorProjector.toString());
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore current = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
+    ConfigStore.setGlobal(current);
+    try {
+      ModelRegistry registry = new ModelRegistry(2, "test", List.of(embedding, chat));
+      InstalledGenerationCandidate candidate = new AiInstallService(null, store, null, null,
+          directory).prepareInstalledGenerationCandidate(registry).orElseThrow();
+      assertEquals(installedChat.toString(), candidate.candidateSettings().getLlmModelPath());
+      assertTrue(candidate.chatSelection().selected(),
+          "explicit installer selection binds bytes even when its stored path is unchanged");
+      assertTrue(candidate.assets().stream().anyMatch(asset -> asset.path().equals(installedChat)));
+      assertFalse(candidate.assets().stream().anyMatch(asset ->
+          asset.path().equals(operatorChat) || asset.path().equals(operatorProjector)));
+      var effective = ConfigStoreRebuilder.prepare(candidate.candidateSettings()).ai();
+      assertEquals(operatorChat, effective.llmModelPath());
+      assertEquals("compact", effective.chatProfile());
+      assertEquals(operatorProjector.toString(), effective.mmprojModel());
+      assertEquals(installedChat.toString(), store.load().getLlmModelPath(),
+          "preparation cannot publish or replace the stored path");
+    } finally {
+      ConfigStore.restoreGlobal(current, previous);
+      for (int i = 0; i < keys.length; i++) {
+        if (priorProperties[i] == null) System.clearProperty(keys[i]);
+        else System.setProperty(keys[i], priorProperties[i]);
+      }
+    }
+  }
 
   @Test
   void candidateFreezesEligibleFilesWithoutWritingSettings() throws Exception {
@@ -417,6 +527,11 @@ class AiInstallOnnxSettingsProducerTest {
   }
 
   private void writeContract(Path root, ModelPackage... packages) throws Exception {
+    writeContract(root, DownloadProfile.CPU, packages);
+  }
+
+  private void writeContract(Path root, DownloadProfile profile, ModelPackage... packages)
+      throws Exception {
     Map<String, InstallContract.InstalledModel> entries = new java.util.LinkedHashMap<>();
     for (ModelPackage pkg : packages) {
       ModelVariant variant = pkg.variants().get(0);
@@ -427,8 +542,21 @@ class AiInstallOnnxSettingsProducerTest {
           variant.precision(), variant.targetEP(), pkg.targetDir(), variant.sha256(), files, false,
           null));
     }
-    InstallContractIO.write(new InstallContract(2, 1L, HardwareProfile.cpuOnly(),
-        DownloadProfile.CPU, entries, root, null), directory);
+    InstallContractIO.write(new InstallContract(2, 1L,
+        profile.usesCuda() ? HardwareProfile.gpuFull(16_000_000_000L)
+            : HardwareProfile.cpuOnly(),
+        profile, entries, root, null), directory);
+  }
+
+  private static ModelPackage chatPackage() throws Exception {
+    String model = "chat-model";
+    String companion = "chat-asset";
+    return new ModelPackage("chat", "chat", "chat", "",
+        List.of(new ModelVariant("chat.gguf", ModelPrecision.GGUF,
+            ExecutionProvider.LLAMA_SERVER, sha(model), model.length(),
+            "https://example.invalid/chat.gguf")),
+        List.of(new SupportingFile("mmproj.gguf", sha(companion), companion.length(),
+            "https://example.invalid/mmproj.gguf")), 0L, null);
   }
 
   private static void stagePackage(Path root, ModelPackage pkg) throws Exception {

@@ -96,7 +96,9 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
           CompletableFuture<SearchResponse> future = group.submit(
               () -> client.search(perSourceReq, work.context()));
           futures.add(future);
-          cancellationRegistrations.add(work.onCancel(reason -> future.cancel(true)));
+          // The child may be releasing a Lucene searcher. Cancellation ends the caller's
+          // wait immediately, while its retained work owner closes only after actual exit.
+          cancellationRegistrations.add(work.onCancel(reason -> future.cancel(false)));
         }
 
         for (CompletableFuture<SearchResponse> future : futures) {

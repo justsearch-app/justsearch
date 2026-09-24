@@ -12,6 +12,7 @@ import io.justsearch.core.execution.EngineFutures;
 import io.justsearch.core.execution.EngineTaskGroup;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
+import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.indexerworker.server.WorkerAppServices;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.WorkerSearchService;
@@ -38,7 +39,7 @@ final class EngineFanoutOwnershipTest {
     var admission = new EngineAdmissionController(1, 1, 1);
     var load = new ForegroundLoad();
     var entered = new CountDownLatch(1);
-    var interrupted = new CountDownLatch(1);
+    var childInterrupted = new AtomicBoolean();
     var release = new CountDownLatch(1);
     var parentCleanupEntered = new CountDownLatch(1);
     var releaseParentCleanup = new CountDownLatch(1);
@@ -47,6 +48,11 @@ final class EngineFanoutOwnershipTest {
     var refusal = new EngineExecutorRejectedException(
         EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "fanout-test", 3);
     var services = mock(WorkerAppServices.class);
+    var servingLease = mock(KnowledgeServer.ServingLease.class);
+    var childServingLease = mock(KnowledgeServer.ServingLease.class);
+    when(servingLease.services()).thenReturn(services);
+    when(servingLease.fork()).thenReturn(childServingLease);
+    when(childServingLease.services()).thenReturn(services);
     var search = mock(WorkerSearchService.class);
     when(services.searchService()).thenReturn(search);
     var outcome = new CompletableFuture<Throwable>();
@@ -55,7 +61,8 @@ final class EngineFanoutOwnershipTest {
             new SynchronousQueue<>(), (task, executor) -> { throw refusal; });
         var registry = new TestEngineExecutors();
         var client = new EngineKnowledgeClient(registry, () -> services,
-            new ForegroundLoadGate(load), 30_000, 100, IpcTelemetry.noop(), () -> {}, admission)) {
+            new ForegroundLoadGate(load), 30_000, 100, IpcTelemetry.noop(), () -> {}, admission,
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(), () -> servingLease)) {
       when(search.search(any(), any())).thenAnswer(invocation -> {
         CallContext context = invocation.getArgument(1);
         try (var group = EngineTaskGroup.open(() -> childExecutor, context.childLifetime())) {
@@ -64,7 +71,7 @@ final class EngineFanoutOwnershipTest {
             entered.countDown();
             while (release.getCount() != 0) {
               try { release.await(); }
-              catch (InterruptedException expected) { interrupted.countDown(); }
+              catch (InterruptedException unexpected) { childInterrupted.set(true); }
             }
             return 1;
           });
@@ -110,7 +117,9 @@ final class EngineFanoutOwnershipTest {
         } else {
           assertSame(refusal, failure, "preserve the exact refusal without replay");
         }
-        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
+        assertFalse(childInterrupted.get(),
+            "group cancellation must not interrupt a child doing native index I/O");
+        verify(childServingLease, never()).close();
         assertEquals(interruptCaller ? 1 : 2, submissions.get());
         assertEquals(0, laterBodies.get());
         assertThrows(EngineAdmissionException.class, () -> admission.attach(TestEngineContexts.BACKGROUND));
@@ -118,6 +127,8 @@ final class EngineFanoutOwnershipTest {
         assertEquals(1, load.startedTotal(), "a fanout does not wrap the work twice");
         release.countDown();
         assertTrue(childExecutor.awaitTermination(3, TimeUnit.SECONDS));
+        verify(childServingLease, timeout(2_000)).close();
+        assertFalse(childInterrupted.get());
         if (interruptCaller) {
           assertTrue(parentCleanupEntered.await(3, TimeUnit.SECONDS));
           assertEquals(1, admission.activeWorkCount(), "the parent call still owns admission after child exit");

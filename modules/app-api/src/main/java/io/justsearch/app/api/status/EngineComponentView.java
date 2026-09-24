@@ -16,6 +16,9 @@ public record EngineComponentView(
     String appliedVersion,
     String desiredVersion,
     ComposeEvidence.Mode mode,
+    String reason,
+    Long freeBytes,
+    Long footprintBytes,
     long deadlineMs,
     int recoveryAttempts,
     String evidence) {
@@ -28,9 +31,13 @@ public record EngineComponentView(
   }
 
   public static EngineComponentView from(EngineComponentSnapshot.Component component) {
+    var compose = component.lastCompose();
     return new EngineComponentView(component.state(), component.reasonCode(),
         component.stateSince().toString(), component.appliedVersion(), component.desiredVersion(),
-        component.lastCompose() == null ? null : component.lastCompose().mode(),
+        compose == null ? null : compose.mode(),
+        compose == null ? null : compose.reason(),
+        compose == null ? null : compose.freeBytes(),
+        compose == null ? null : compose.footprintBytes(),
         component.spec().startDeadline().toMillis(), component.recoveryAttempts(), component.evidence());
   }
 }

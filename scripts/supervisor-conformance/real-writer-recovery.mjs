@@ -28,6 +28,8 @@ const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
 const modelLiveAB = scenario === 'model-live-a-b';
 const distinctModelB = modelLiveAB && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1';
+const mixedChatInstaller = installerFault
+  && process.env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT === '1';
 function readActiveGenerationManifest(base) {
   const active = JSON.parse(fs.readFileSync(path.join(base, 'state.json'), 'utf8'));
   return JSON.parse(fs.readFileSync(path.join(base, 'indices', active.active_generation,
@@ -133,9 +135,10 @@ if (bulkFault) {
   delete env.AI_OFFLINE;
 }
 if (installerFault) {
-  env.JUSTSEARCH_EMBED_GPU_ENABLED = 'false';
-  env.JUSTSEARCH_NER_GPU_ENABLED = 'false';
-  env.JUSTSEARCH_SPLADE_GPU_ENABLED = 'false';
+  if (mixedChatInstaller) env.JUSTSEARCH_GPU_ENABLED = 'true';
+  env.JUSTSEARCH_EMBED_GPU_ENABLED = mixedChatInstaller ? 'true' : 'false';
+  env.JUSTSEARCH_NER_GPU_ENABLED = mixedChatInstaller ? 'true' : 'false';
+  env.JUSTSEARCH_SPLADE_GPU_ENABLED = mixedChatInstaller ? 'true' : 'false';
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = INSTALLER_FAULT_CASES[scenario].phase;
@@ -149,6 +152,8 @@ if (installerFault) {
   delete env.JUSTSEARCH_NER_MODEL_PATH;
   delete env.JUSTSEARCH_SPLADE_MODEL_PATH;
   delete env.AI_OFFLINE;
+  if (mixedChatInstaller) env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT = '1';
+  else delete env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT;
 }
 if (modelLiveAB) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
@@ -162,7 +167,7 @@ if (modelLiveAB) {
   }
 }
 const installerCandidate = installerFault
-  ? writeRetainedInstallerCandidate({ data, requireThat }) : null;
+  ? writeRetainedInstallerCandidate({ data, requireThat, mixedChat: mixedChatInstaller }) : null;
 delete env.JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND;
 if (aiEnabled) {
   delete env.JUSTSEARCH_AI_EMBED_ENABLED;

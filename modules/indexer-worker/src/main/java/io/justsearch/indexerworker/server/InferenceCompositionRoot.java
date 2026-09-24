@@ -67,6 +67,193 @@ public final class InferenceCompositionRoot {
     return EncoderConfigurationProjection.dependencies();
   }
 
+  /**
+   * Estimates the device-memory footprint needed to compose a candidate encoder set.
+   *
+   * <p>This is the pre-composition half of D1-14's beside-or-in-place decision. It deliberately
+   * uses this composition root's variant resolution and {@link ModelSessionPolicyResolver}, then
+   * sums only policies whose selected variant is CUDA-shaped. It does not build an ORT session,
+   * allocate a native handle, or publish any serving state. The returned value includes D1-14's
+   * ten-percent headroom, rounded up to the next byte.
+   *
+   * <p>When BGE-M3 is selected, composition can use either BGE-M3 or its SPLADE fallback, never
+   * both at once. The estimate therefore reserves the larger of the two alternative arena caps.
+   * This remains conservative when BGE-M3 resolves successfully and still covers the fallback
+   * when BGE-M3 is absent or rejects during composition without double-counting mutually
+   * exclusive sparse encoders.
+   */
+  public static long estimateCandidateFootprintBytes(
+      ResolvedConfig cfg,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir) {
+    return estimateCandidateFootprintBytes(
+        EncoderConfigurationProjection.from(cfg), hardware, contract, modelsDir, null);
+  }
+
+  /** Owner path for a candidate whose exact generation files have already been selected. */
+  static long estimateCandidateFootprintBytes(
+      EncoderConfigurationProjection projection,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GenerationModelSelection selection) {
+    ResolvedConfig cfg = projection.config();
+    long arenaCapBytes = 0L;
+    boolean bgeM3Selected = "bge-m3".equalsIgnoreCase(projection.sparseModel());
+
+    if (bgeM3Selected) {
+      long bgeM3Bytes =
+          candidateArenaCapBytes(
+              projection.bgeM3().isReady(),
+              "embedding",
+              EncoderRole.BGE_M3,
+              projection.bgeM3().modelPath(),
+              projection.bgeM3().gpuEnabled(),
+              cfg,
+              hardware,
+              contract,
+              modelsDir,
+              selection);
+      long spladeFallbackBytes =
+          candidateArenaCapBytes(
+              projection.splade().isReady(),
+              "splade",
+              EncoderRole.SPLADE,
+              projection.splade().modelPath(),
+              projection.splade().gpuEnabled(),
+              cfg,
+              hardware,
+              contract,
+              modelsDir,
+              selection);
+      arenaCapBytes = Math.max(bgeM3Bytes, spladeFallbackBytes);
+    } else {
+      arenaCapBytes =
+          Math.addExact(
+              arenaCapBytes,
+              candidateArenaCapBytes(
+                  projection.embedding().isReady(),
+                  "embedding",
+                  EncoderRole.EMBEDDING,
+                  projection.embedding().modelPath(),
+                  projection.embedding().gpuEnabled(),
+                  cfg,
+                  hardware,
+                  contract,
+                  modelsDir,
+                  selection));
+      arenaCapBytes =
+          Math.addExact(
+              arenaCapBytes,
+              candidateArenaCapBytes(
+                  projection.splade().isReady(),
+                  "splade",
+                  EncoderRole.SPLADE,
+                  projection.splade().modelPath(),
+                  projection.splade().gpuEnabled(),
+                  cfg,
+                  hardware,
+                  contract,
+                  modelsDir,
+                  selection));
+    }
+
+    arenaCapBytes =
+        Math.addExact(
+            arenaCapBytes,
+            candidateArenaCapBytes(
+                projection.ner().isReady(),
+                "ner",
+                EncoderRole.NER,
+                projection.ner().modelPath(),
+                projection.ner().gpuEnabled(),
+                cfg,
+                hardware,
+                contract,
+                modelsDir,
+                selection));
+    arenaCapBytes =
+        Math.addExact(
+            arenaCapBytes,
+            candidateArenaCapBytes(
+                projection.reranker().isReady(),
+                "reranker",
+                EncoderRole.RERANKER,
+                projection.reranker().modelPath(),
+                projection.reranker().gpuEnabled(),
+                cfg,
+                hardware,
+                contract,
+                modelsDir,
+                selection));
+    // Citation is deliberately resolved through the same policy owner. Its CPU-only policy has a
+    // zero arena cap today, which keeps this estimator correct if its readiness changes.
+    arenaCapBytes =
+        Math.addExact(
+            arenaCapBytes,
+            candidateArenaCapBytes(
+                projection.citation() != null && projection.citation().isReady(),
+                "citation-scorer",
+                EncoderRole.CITATION,
+                projection.citation() != null ? projection.citation().modelPath() : null,
+                false,
+                cfg,
+                hardware,
+                contract,
+                modelsDir,
+                selection));
+
+    long headroomBytes = arenaCapBytes / 10L + (arenaCapBytes % 10L == 0L ? 0L : 1L);
+    return Math.addExact(arenaCapBytes, headroomBytes);
+  }
+
+  private static long candidateArenaCapBytes(
+      boolean ready,
+      String packageId,
+      EncoderRole role,
+      Path configModelPath,
+      boolean gpuEnabled,
+      ResolvedConfig cfg,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GenerationModelSelection selection) {
+    if (!ready) {
+      return 0L;
+    }
+    VariantSelection variant =
+        resolveVariantForEstimate(
+            packageId,
+            contract,
+            hardware,
+            modelsDir,
+            configModelPath,
+            gpuEnabled,
+            selection);
+    return variant == null
+        ? 0L
+        : ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant).gpu().arenaCapBytes();
+  }
+
+  /** Exact-generation resolution without {@link GenerationModelSelection}'s missing-role mark. */
+  private static VariantSelection resolveVariantForEstimate(
+      String packageId,
+      InstallContract contract,
+      HardwareProfile hardware,
+      Path modelsDir,
+      Path configModelPath,
+      boolean gpuEnabled,
+      GenerationModelSelection selection) {
+    if (selection == null) {
+      return resolveVariant(packageId, contract, hardware, modelsDir, configModelPath, gpuEnabled);
+    }
+    return selection
+        .verify(packageId)
+        .map(model -> DevModeVariantProbe.probeExact(model.file(), gpuEnabled))
+        .orElse(null);
+  }
+
   // =========================================================================
   // §7.6 single-entry composition — tempdoc 397 §14.26 T2-C1.
   // =========================================================================

@@ -201,7 +201,8 @@ class PreparedOperationDispatchTest {
           List.of(new RecordedInstallerGenerationPlan.ModelIdentity("embedding", "fp32",
               root.resolve("embedding.onnx"), "a".repeat(64), 1, acquisition)),
           List.of(new RecordedInstallerGenerationPlan.AssetIdentity("embedding",
-              root.resolve("embedding.bin"), "a".repeat(64), 1, acquisition)), acquisition);
+              root.resolve("embedding.bin"), "a".repeat(64), 1, acquisition)),
+          RecordedInstallerGenerationPlan.ChatSelection.none(), acquisition);
       return new OperationPreparation(args, RecordedInstallerGenerationPlan.SCHEMA,
           plan.toReplayPayload(), OperationPreparation.Content.METADATA);
     }

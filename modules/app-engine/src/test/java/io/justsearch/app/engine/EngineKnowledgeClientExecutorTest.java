@@ -2,6 +2,7 @@
 package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +38,7 @@ final class EngineKnowledgeClientExecutorTest {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var exited = new CountDownLatch(1);
+    var workerInterrupted = new java.util.concurrent.atomic.AtomicBoolean();
     var oldSearch = mock(WorkerSearchService.class);
     when(oldSearch.search(any(), any())).thenAnswer(invocation -> {
       entered.countDown();
@@ -46,7 +48,7 @@ final class EngineKnowledgeClientExecutorTest {
           release.await();
           waiting = false;
         } catch (InterruptedException ignored) {
-          // Deadline releases the caller before an uninterruptible native body exits.
+          workerInterrupted.set(true);
         }
       }
       exited.countDown();
@@ -84,8 +86,61 @@ final class EngineKnowledgeClientExecutorTest {
       org.mockito.Mockito.verify(oldSearch).search(any(), any());
       release.countDown();
       assertTrue(exited.await(2, TimeUnit.SECONDS));
+      assertFalse(workerInterrupted.get(),
+          "deadline cancellation must not interrupt a worker that may hold Lucene's writer lock");
       org.mockito.Mockito.verify(oldLease, org.mockito.Mockito.timeout(2_000)).close();
       org.mockito.Mockito.verify(newLease).close();
+    } finally {
+      release.countDown();
+    }
+  }
+
+  @Test
+  void cancelledBudgetPreservesAnIndependentWorkerInterruptUntilViewRelease() throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var worker = new AtomicReference<Thread>();
+    var independentInterrupt = new java.util.concurrent.atomic.AtomicBoolean();
+    var interruptAtViewRelease = new java.util.concurrent.atomic.AtomicBoolean();
+    var search = mock(WorkerSearchService.class);
+    when(search.search(any(), any())).thenAnswer(invocation -> {
+      worker.set(Thread.currentThread());
+      entered.countDown();
+      while (release.getCount() != 0) {
+        try { release.await(); }
+        catch (InterruptedException expected) { independentInterrupt.set(true); }
+      }
+      if (independentInterrupt.get()) Thread.currentThread().interrupt();
+      return SearchResponse.getDefaultInstance();
+    });
+    var services = mock(WorkerAppServices.class);
+    when(services.searchService()).thenReturn(search);
+    var lease = mock(KnowledgeServer.ServingLease.class);
+    when(lease.services()).thenReturn(services);
+    org.mockito.Mockito.doAnswer(invocation -> {
+      interruptAtViewRelease.set(Thread.currentThread().isInterrupted());
+      return null;
+    }).when(lease).close();
+    var admission = new EngineAdmissionController(8, 8, 1);
+    try (var registry = registry(1, 1, 1, 4);
+        var client = new EngineKnowledgeClient(registry, () -> services,
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100,
+            IpcTelemetry.noop(), () -> {}, admission,
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(), () -> lease)) {
+      var caller = new java.util.concurrent.FutureTask<>(
+          () -> client.search("interrupt-preservation", 10, TestEngineContexts.FOREGROUND));
+      Thread.ofVirtual().start(caller);
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+      var timeout = assertThrows(java.util.concurrent.ExecutionException.class,
+          () -> caller.get(3, TimeUnit.SECONDS));
+      assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+          ((io.justsearch.app.api.knowledge.KnowledgeClientException) timeout.getCause()).status());
+      worker.get().interrupt();
+      release.countDown();
+      org.mockito.Mockito.verify(lease, org.mockito.Mockito.timeout(2_000)).close();
+      assertTrue(independentInterrupt.get(), "the worker must receive the independent interrupt");
+      assertTrue(interruptAtViewRelease.get(),
+          "budget cleanup must not clear an interrupt it did not issue");
     } finally {
       release.countDown();
     }

@@ -6,6 +6,102 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-24)
 
+### Current hosted and D1-14 boundary
+
+`ec1cd14b7` is pushed to PR727 with the distinct-model commit/parity
+regression, real standard CPU lease through ordered shutdown, mocked held GPU
+lease, and installed different-byte A/B activation evidence. Its hosted run
+`35966546167` passed system integration and all jobs except Windows-native:
+the first attempt of `DrainAndCloseTest.drainAndCloseWaitsForInFlightWriter`
+timed out after its fixed sleep failed to establish a held writer; automatic
+retry passed. `da60deb28` replaced that timing assumption with an explicit
+write-barrier lease and latches. Its focused test, PMD and Spotless passed at
+`tmp/3167-drain-native-deterministic-focused.txt`. Hosted run `35968550589`
+completed SUCCESS, including Windows-native and system integration. This is
+terminal hosted proof for `da60deb28`; later D1-14 edits are local WIP.
+
+D1-14 is locally in progress after `da60deb28`. The `core` device-memory line,
+restart-required ceiling key, resolved CUDA arena footprint with ten-percent
+headroom, `EngineRoot` GPU supplier binding, and component/wire projection of
+mode, reason, free bytes and footprint are implemented. Focused configuration,
+footprint, projection, PMD/Spotless, module-dependency, config-surface and
+canonical-doc checks pass at `tmp/3170`, `tmp/3173`–`tmp/3176` and the current
+worktree. The present `KnowledgeServer` candidate path records the decision
+but **refuses IN_PLACE** before native composition. This is a fail-closed
+implementation checkpoint, not D1-14 acceptance; it must not be pushed as a
+finished device-line flow. Required work is a text-only A serving interval,
+lexical Green ingestion with semantic deferral, bounded A-set retirement,
+B composition/promotion, immediate A recompose on pre-pointer refusal or
+abandonment, and the held-native and floor installed proofs. Preserve A's
+issued view leases and its query-side binding coherence while implementing it.
+The first worker-service seam removes A's query native references while leaving
+Green's detached producer set intact; its producer-transfer regression, PMD and
+Spotless passed at `tmp/3177-d1-14-text-only-service-focused.txt`; a refute-first
+review found an incomplete restoration helper, which was removed. The seam now
+also clears A's status-side GPU suppliers; its focused regression and static
+checks passed at `tmp/3183-d1-14-text-only-review-repair.txt`. The server does
+not yet invoke this seam.
+
+A second D1-14/Flow B acceptance gap is source-confirmed: an ordinary accepted
+ingest during Green build currently waits for Worker authority, so it is not
+immediately text-searchable in active A, contrary to design §7.4:1481–1495.
+The active runtime opens read-only and Green owns the sole writer. The selected
+minimal path is to open A writable from migration boot (two runtime sessions,
+not a same-directory upgrade), project each accepted mutation lexically to A,
+and retain its durable Green replay through the existing mutation admission and
+switch journal. This requires D1/D2 ownership and installed ordering proof;
+the current text-only service seam alone does not provide it.
+
+The first full D1-14 pre-in-place gate at `tmp/3181-d1-14-pre-in-place-integrated.txt`
+failed one app-engine foreground-pacing test during teardown. Its preserved XML
+at `tmp/3181-EngineForegroundPacingTest.xml` proves cancellation interrupted a
+Lucene searcher release, invalidated the Windows writer lock, then refused
+ordered close. `EngineKnowledgeClient` now signals cancellation without
+interrupting the Worker; the caller still receives a terminal outcome and its
+issued view remains held until actual exit. Executor/deadline and foreground
+pacing focused tests plus PMD/Spotless pass at
+`tmp/3182-cancel-lucene-lock-focused.txt`. The second full WIP gate
+`tmp/3184-d1-14-pre-in-place-integrated-repair.txt` found two remaining
+ownership assertions. Serving-view release now precedes terminal completion,
+and cancellation closes fanout cooperatively without interrupting Lucene or
+releasing child ownership early. The user approved changing the stale
+interruption test contract on 2026-09-24. Focused proof passed at `tmp/3193`
+and `tmp/3195`; the cancellation-signal test and static checks passed in the
+current focused run. Full gates `tmp/3202`, `tmp/3203` and `tmp/3207` exposed
+test PMD and stale interrupt expectations, plus a remaining production
+`cancel(true)` in per-source search fanout. That callback now cancels
+cooperatively, and the affected focused model, fanout and per-source tests
+passed at `tmp/3205` and `tmp/3208` with PMD/Spotless. An independent review
+found that child fanout work also needed its own serving-view lease; that
+ownership and an independent worker-interrupt regression passed focused tests
+at `tmp/3210` and `tmp/3211`. The full 358-task Java gate passed at `tmp/3212`
+on those corrections. Frontend typecheck and all 6,600 unit tests passed.
+
+The two bounded audit corrections are local WIP. Mixed installer activation
+records explicit selected chat GGUF and companion identities in a v3 accepted
+plan, validates durable contract/registry/bytes before candidate settings
+change, preserves operator precedence, and refuses changed bytes at preparation
+or replay. V2 no-chat rows replay; v2 rows with an unproven chat path refuse
+before pointer or fence recovery after pointer B. Producer, precedence,
+verifier and boot focused suites passed at `tmp/3188`, `tmp/3198`, `tmp/3191`
+and `tmp/3197`; installed activation remains owed. The drain regression now
+measures the production writer's read hold inside its existing supplier seam
+and observes a queued drainer. Its focused test passed at `tmp/3199`; the
+paired acquire/release bypass negative control failed for missing writer
+ownership at `tmp/3206`, after the final cleanup edit, with source restored.
+The installed standard CPU pointer-before-settings activation passed at
+`tmp/3214`: one terminal row, B's pointer, the exact settings witness and two
+text hits; the private stack stopped with ports closed. An opt-in mixed
+chat/CUDA installed fixture now stages registry-verified GGUF and companion
+assets and checks v3 identities. Its first run had CUDA disabled by the fixture;
+the corrected run reached the device-memory decision and refused before
+candidate composition because B needs about 14.2 GB while 11.4 GB is free.
+This is the current deliberate D1-14 `IN_PLACE` refusal. Mixed installed
+activation remains owed after the in-place path; preserve this negative evidence.
+Next finish D1-14 in-place ownership and mixed installed verification, then
+push a coherent checkpoint and wait for terminal hosted proof. PR727's last
+terminal hosted proof remains `35968550589` for `da60deb28`.
+
 ### Latest checkpoint and D1-12 installed boot evidence
 
 Pushed PR727 checkpoint `61958becc` passed terminal hosted run `35954572417`,

@@ -26,7 +26,7 @@ public final class RecordedInstallerGenerationPlanResolver {
       .build();
 
   /**
-   * Resolves the immutable v2 candidate only when the accepted row and its stored preparation
+   * Resolves the immutable installer candidate only when the accepted row and its stored preparation
    * describe the same durable activation. Current authority, target readiness and asset identity
    * are checked by the execution owner after this binding step.
    */
@@ -44,7 +44,7 @@ public final class RecordedInstallerGenerationPlanResolver {
 
     OperationPreparation preparation = PreparedInvocationCodec.decodeAcceptedMetadata(row, stored);
     if (preparation.content() != OperationPreparation.Content.METADATA
-        || !RecordedInstallerGenerationPlan.SCHEMA.equals(preparation.replaySchema())
+        || !RecordedInstallerGenerationPlan.isSupportedSchema(preparation.replaySchema())
         || !descriptor.hasSameIdentity(OperationDescriptor.invocation(
             OperationKind.REINDEX, RecordedInstallerGenerationPlan.OPERATION_ID,
             preparation.argumentsJson(), false))) {

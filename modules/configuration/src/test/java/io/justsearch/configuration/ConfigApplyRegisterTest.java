@@ -80,6 +80,9 @@ final class ConfigApplyRegisterTest {
 
     assertEquals("hot", rows.get(EnvRegistry.QU_ENABLED.configKey()));
     assertEquals("hot", rows.get(EnvRegistry.FILTER_NORM_ENABLED.configKey()));
+    assertEquals(
+        "restart-required",
+        rows.get(EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.configKey()));
   }
 
   @Test

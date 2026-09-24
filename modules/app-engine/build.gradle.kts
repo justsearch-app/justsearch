@@ -36,6 +36,7 @@ dependencies {
   implementation(project(":modules:indexer-worker"))
   implementation(project(":modules:worker-core"))
   implementation(project(":modules:configuration"))
+  implementation(project(":modules:gpu-bridge"))
   implementation(project(":modules:telemetry"))
   // Item B2: ShutdownRequest parses the supervisor request file. Declared explicitly rather than
   // leaned on transitively — the composed halves are `implementation`, so their Jackson edge is

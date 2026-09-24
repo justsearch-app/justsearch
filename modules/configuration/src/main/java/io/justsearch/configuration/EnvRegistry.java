@@ -322,6 +322,12 @@ public enum EnvRegistry {
     /** Master GPU switch for ONNX models (auto-set when CUDA detected). Per-model overrides win. */
     GPU_ENABLED("justsearch.gpu.enabled", "JUSTSEARCH_GPU_ENABLED", LifecycleStage.PERMANENT),
 
+    /** Optional startup cap for reported GPU device memory, in MB; absent means no cap. */
+    GPU_DEVICE_MEMORY_CEILING_MB(
+        "justsearch.gpu.device_memory_ceiling_mb",
+        "JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB",
+        LifecycleStage.PERMANENT),
+
     /** GPU acceleration policy gate (true = allow GPU, false = CPU-only). */
     POLICY_GPU_ACCELERATION_ENABLED(
         "policy.gpu_acceleration_enabled",

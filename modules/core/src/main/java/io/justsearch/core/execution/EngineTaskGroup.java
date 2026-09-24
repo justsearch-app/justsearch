@@ -14,7 +14,7 @@ import java.util.function.Supplier;
  *
  * <p>The group keeps its initial lease until it is closed and retains one child lease for every
  * accepted task. A child lease is released by {@link EngineFutures} only after the task has
- * actually exited, including a task that ignored an interruption requested by close.
+ * actually exited, including a running task that continues after cooperative cancellation.
  */
 public final class EngineTaskGroup implements AutoCloseable {
   private final ExecutorService executor;
@@ -38,9 +38,9 @@ public final class EngineTaskGroup implements AutoCloseable {
     Objects.requireNonNull(executorSupplier, "executorSupplier");
     Objects.requireNonNull(lifetime, "lifetime");
     Runnable releaseGroup = Objects.requireNonNull(lifetime.retain(), "lifetime.retain()");
+    ExecutorService executor;
     try {
-      ExecutorService executor = Objects.requireNonNull(executorSupplier.get(), "executor");
-      return new EngineTaskGroup(executor, releaseGroup);
+      executor = Objects.requireNonNull(executorSupplier.get(), "executor");
     } catch (RuntimeException | Error failure) {
       try {
         releaseGroup.run();
@@ -49,6 +49,14 @@ public final class EngineTaskGroup implements AutoCloseable {
       }
       throw failure;
     }
+    EngineTaskGroup group = new EngineTaskGroup(executor, releaseGroup);
+    try { lifetime.onCancel(group::close); }
+    catch (RuntimeException | Error failure) {
+      try { group.close(); }
+      catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      throw failure;
+    }
+    return group;
   }
 
   /**
@@ -58,7 +66,7 @@ public final class EngineTaskGroup implements AutoCloseable {
    * synchronous; {@link EngineFutures} releases the child lease when the refused task is
    * physically cancelled.
    */
-  public <T> CompletableFuture<T> submit(Supplier<T> supplier) {
+  public synchronized <T> CompletableFuture<T> submit(Supplier<T> supplier) {
     Objects.requireNonNull(supplier, "supplier");
     if (sealed) throw new IllegalStateException("Task group is closed");
 
@@ -69,24 +77,25 @@ public final class EngineTaskGroup implements AutoCloseable {
   }
 
   /**
-   * Cancels all accepted tasks, interrupts the executor, and seals the group without waiting.
+   * Cancels accepted results and seals the group without interrupting native index I/O.
+   * Running suppliers keep their lifetime leases until they actually exit.
    * Cleanup failures are aggregated and reported after every cleanup step has been attempted.
    */
   @Override
-  public void close() {
+  public synchronized void close() {
     if (sealed) return;
     sealed = true;
     Throwable cleanupFailure = null;
 
     for (CompletableFuture<?> future : accepted) {
       try {
-        future.cancel(true);
+        future.cancel(false);
       } catch (RuntimeException | Error failure) {
         cleanupFailure = aggregate(cleanupFailure, failure);
       }
     }
     try {
-      executor.shutdownNow();
+      executor.shutdown();
     } catch (RuntimeException | Error failure) {
       cleanupFailure = aggregate(cleanupFailure, failure);
     }

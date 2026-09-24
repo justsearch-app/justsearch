@@ -57,6 +57,9 @@ final class EngineLifecycleProjectionTest {
               assertEquals(component.appliedVersion(), view.appliedVersion());
               assertEquals(component.desiredVersion(), view.desiredVersion());
               assertEquals(component.lastCompose().mode(), view.mode());
+              assertEquals(component.lastCompose().reason(), view.reason());
+              assertEquals(component.lastCompose().freeBytes(), view.freeBytes());
+              assertEquals(component.lastCompose().footprintBytes(), view.footprintBytes());
               assertEquals(component.spec().startDeadline().toMillis(), view.deadlineMs());
               assertEquals(component.recoveryAttempts(), view.recoveryAttempts());
               assertEquals(component.evidence(), view.evidence());
@@ -88,6 +91,9 @@ final class EngineLifecycleProjectionTest {
     assertEquals("applied-index", view.appliedVersion());
     assertEquals("desired-index", view.desiredVersion());
     assertEquals(ComposeEvidence.Mode.BESIDE, view.mode());
+    assertEquals("capacity available", view.reason());
+    assertEquals(100L, view.freeBytes());
+    assertEquals(20L, view.footprintBytes());
     assertEquals(12_000, view.deadlineMs());
     assertEquals(1, view.recoveryAttempts());
     assertEquals("index evidence", view.evidence());

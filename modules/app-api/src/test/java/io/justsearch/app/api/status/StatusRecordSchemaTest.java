@@ -201,6 +201,35 @@ final class StatusRecordSchemaTest {
     }
 
     @Test
+    @DisplayName("engine component compose evidence projects values and omits absent evidence")
+    void engineComponentComposeEvidenceProjectionPreservesNullOmission() {
+      var populated = new EngineComponentView(
+          ComponentState.READY,
+          "encoders.ready",
+          "2025-01-01T00:00:00Z",
+          "applied-v1",
+          "desired-v1",
+          io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE,
+          "device memory floor",
+          100L,
+          20L,
+          30_000,
+          0,
+          "encoders ready");
+      JsonNode populatedJson = MAPPER.valueToTree(populated);
+      assertEquals("IN_PLACE", populatedJson.get("mode").asText());
+      assertEquals("device memory floor", populatedJson.get("reason").asText());
+      assertEquals(100L, populatedJson.get("freeBytes").asLong());
+      assertEquals(20L, populatedJson.get("footprintBytes").asLong());
+
+      JsonNode absentJson = MAPPER.valueToTree(readyEngineComponentView());
+      assertFalse(absentJson.has("mode"));
+      assertFalse(absentJson.has("reason"));
+      assertFalse(absentJson.has("freeBytes"));
+      assertFalse(absentJson.has("footprintBytes"));
+    }
+
+    @Test
     @DisplayName("StatusResponse serializes with expected top-level fields")
     void statusResponseSerializesExpectedFields() throws Exception {
       StatusResponse sample = sampleStatusResponse();
@@ -249,6 +278,11 @@ final class StatusRecordSchemaTest {
               .get("index")
               .get("state")
               .asText());
+      var indexView = serialized.get("readiness").get("engineComponents").get("index");
+      assertFalse(indexView.has("mode"));
+      assertFalse(indexView.has("reason"));
+      assertFalse(indexView.has("freeBytes"));
+      assertFalse(indexView.has("footprintBytes"));
 
       // 330 §4: Grouped sub-objects
       assertNotNull(serialized.get("embedding"), "grouped embedding sub-object missing");
@@ -783,6 +817,9 @@ final class StatusRecordSchemaTest {
         "2025-01-01T00:00:00Z",
         "applied-v1",
         "desired-v1",
+        null,
+        null,
+        null,
         null,
         0,
         0,

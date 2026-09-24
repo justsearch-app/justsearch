@@ -599,6 +599,10 @@
       "applyScope": "restart-required"
     },
     {
+      "key": "justsearch.gpu.device_memory_ceiling_mb",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.gpu.enabled",
       "applyScope": "component:encoders"
     },

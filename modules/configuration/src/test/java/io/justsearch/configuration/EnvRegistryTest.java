@@ -108,6 +108,19 @@ class EnvRegistryTest {
     }
 
     @Test
+    void gpuDeviceMemoryCeiling_hasMappingsAndNoDefault() {
+        assertEquals(
+            "justsearch.gpu.device_memory_ceiling_mb",
+            EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.sysProp());
+        assertEquals(
+            "JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB",
+            EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.envVar());
+        assertNull(
+            EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.defaultValue(),
+            "the device-memory ceiling is optional and must not impose a machine-independent default");
+    }
+
+    @Test
     void agentContextCompressionFlags_haveMappingsAndDefaults() {
         assertEquals(
             "justsearch.agent.context_compression.enabled",

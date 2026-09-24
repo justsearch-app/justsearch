@@ -833,6 +833,8 @@ function assertInstallerCut({ cut, reached, prepared, operationKey, selected, so
     && Array.isArray(plan.assets) && plan.assets.length > 0
     && plan.models.some(model => samePath(model.path, candidate.modelPath)),
   `accepted activation preparation did not retain the staged model identity: ${JSON.stringify(plan)}`);
+  assertInstallerChatSelection({ plan, preparationPayload: row.preparation_payload,
+    cut, candidate, requireThat, label: 'cut' });
   const target = `g-${operationKey}`;
   const pointerPublished = selected.phase === 'installer-pointer-before-settings'
     || selected.phase === 'installer-settings-before-publication'
@@ -911,7 +913,9 @@ function assertInstallerFinal({ final, cut, prepared, files, hashes, operationKe
   `installer activation did not serve the exact target: ${JSON.stringify(final.state)}`);
   requireThat(final.settings.witness.acceptedRevision === beforeSettings.witness.acceptedRevision + 1
     && final.settings.witness.lastCommittedOperationKey === operationKey
-    && final.settings.settings?.embedOnnxModelPath === candidate.modelDir,
+    && final.settings.settings?.embedOnnxModelPath === candidate.modelDir
+    && (!candidate.mixedChat
+      || samePath(final.settings.settings?.llmModelPath, candidate.chatModelPath)),
   `installer activation did not commit the exact settings witness: ${JSON.stringify(final.settings)}`);
   requireThat(final.walk.acknowledged_revision === final.walk.revision
     && final.walk.sealed_at != null && final.walk.receipt_json,
@@ -921,12 +925,44 @@ function assertInstallerFinal({ final, cut, prepared, files, hashes, operationKe
     && plan.sourceGeneration === sourceGeneration
     && plan.models.some(model => samePath(model.path, candidate.modelPath)),
   `installer activation final plan lost the retained candidate: ${JSON.stringify(plan)}`);
+  assertInstallerChatSelection({ plan, preparationPayload: row.preparation_payload,
+    final, candidate, requireThat, label: 'final' });
   requireExactMembers(final.jobs, files, hashes, true, requireThat);
   requireThat(final.recordedGenerations.length === 1 && final.recordedGenerations[0] === target,
     `installer activation created more than its one operation-derived target: ${JSON.stringify(final.recordedGenerations)}`);
 }
 
-export function writeRetainedInstallerCandidate({ data, requireThat }) {
+function assertInstallerChatSelection({ plan, preparationPayload, cut, final, candidate,
+  requireThat, label }) {
+  if (!candidate.mixedChat) return;
+  const envelope = parseStoredJson(preparationPayload, `${label} installer preparation envelope`);
+  requireThat(envelope.preparation?.replaySchema === 'recorded-installer-generation-v3',
+    `${label} installer activation did not retain the v3 generation plan: ${JSON.stringify(envelope)}`);
+  const selection = plan.chatSelection;
+  requireThat(selection?.modelAssetId === candidate.chatModelAssetId
+      && Array.isArray(selection.companionAssetIds)
+      && JSON.stringify(selection.companionAssetIds) === JSON.stringify(candidate.chatCompanionAssetIds),
+  `${label} installer activation lost the explicit chat asset selection: ${JSON.stringify(selection)}`);
+  const selectedAssets = [candidate.chatModelIdentity, ...candidate.chatCompanionIdentities];
+  requireThat(selectedAssets.every(expected => plan.assets.some(asset => asset.assetId === expected.assetId
+      && samePath(asset.path, expected.path)
+      && asset.sha256 === expected.sha256
+      && asset.sizeBytes === expected.sizeBytes)),
+  `${label} installer activation did not retain the registry verified chat identities: ${JSON.stringify({
+    selection, assets: plan.assets, expected: selectedAssets,
+  })}`);
+  const settings = (final ?? cut)?.settings?.settings;
+  if (final != null) {
+    requireThat(samePath(settings?.llmModelPath, candidate.chatModelPath),
+      `${label} installer activation omitted the private selected chat model path: ${JSON.stringify(settings)}`);
+  } else if (settings?.llmModelPath != null) {
+    requireThat(samePath(settings.llmModelPath, candidate.chatModelPath),
+      `${label} installer activation published the wrong chat model path: ${settings.llmModelPath}`);
+  }
+}
+
+export function writeRetainedInstallerCandidate({ data, requireThat,
+  mixedChat = process.env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT === '1' }) {
   const modelsRoot = findRetainedModelsRoot();
   requireThat(modelsRoot, 'installer activation requires retained real model bytes under a models/ root');
   // Stage one coherent standard-model candidate. The local embedding manifest is generated for
@@ -948,10 +984,12 @@ export function writeRetainedInstallerCandidate({ data, requireThat }) {
     === '9df8c6ed2d15a686eeb15e080971670919966de2812daf440b4469576b33157d',
   'embedded installer fixture manifest differs from the shipped registry');
   const installedModels = {};
+  const targetEP = mixedChat ? 'CUDA' : 'CPU';
+  const downloadProfile = mixedChat ? 'GPU_FULL' : 'CPU';
   for (const packageId of ['embedding', 'ner', 'splade']) {
     const pkg = registry.packages.find(entry => entry.id === packageId);
-    const variant = pkg?.variants.find(entry => entry.targetEP === 'CPU');
-    requireThat(pkg && variant, `installer fixture lacks CPU registry variant for ${packageId}`);
+    const variant = pkg?.variants.find(entry => entry.targetEP === targetEP);
+    requireThat(pkg && variant, `installer fixture lacks ${targetEP} registry variant for ${packageId}`);
     const sourceDir = path.join(modelsRoot, pkg.targetDir);
     const stagedDir = path.join(candidateRoot, pkg.targetDir);
     fs.mkdirSync(stagedDir, { recursive: true });
@@ -965,7 +1003,7 @@ export function writeRetainedInstallerCandidate({ data, requireThat }) {
         fs.linkSync(path.join(sourceDir, file.filename), staged);
       }
       requireThat(fs.statSync(staged).size === file.sizeBytes
-        && sha256(fs.readFileSync(staged)) === file.sha256.toLowerCase(),
+        && sha256File(staged) === file.sha256.toLowerCase(),
       `retained installer ${packageId}/${file.filename} differs from the shipped registry`);
     }
     // Runtime manifest selection is separate from the install contract's required assets.
@@ -980,21 +1018,62 @@ export function writeRetainedInstallerCandidate({ data, requireThat }) {
       skipped: false, skipReason: null, skipCause: null,
     };
   }
+  const chatIdentity = mixedChat ? (() => {
+    const pkg = registry.packages.find(entry => entry.id === 'chat');
+    const variant = pkg?.variants.find(entry => entry.targetEP === 'LLAMA_SERVER');
+    requireThat(pkg && variant, 'installer fixture lacks the registry chat variant');
+    const sourceDir = path.join(modelsRoot, pkg.targetDir ?? '');
+    const stagedDir = path.join(candidateRoot, pkg.targetDir ?? '');
+    fs.mkdirSync(stagedDir, { recursive: true });
+    const required = pkg.supportingFiles.filter(file => file.required !== false);
+    const identities = [];
+    for (const file of [{ filename: variant.filename, sha256: variant.sha256,
+      sizeBytes: variant.sizeBytes }, ...required]) {
+      const staged = path.join(stagedDir, file.filename);
+      fs.linkSync(path.join(sourceDir, file.filename), staged);
+      requireThat(fs.statSync(staged).size === file.sizeBytes
+        && sha256File(staged) === file.sha256.toLowerCase(),
+      `retained installer chat/${file.filename} differs from the shipped registry`);
+      identities.push({ assetId: `chat/${file.filename}`, path: path.resolve(staged),
+        sha256: file.sha256.toLowerCase(), sizeBytes: file.sizeBytes });
+    }
+    return { pkg, variant, identities };
+  })() : null;
   const modelDir = path.join(candidateRoot, 'onnx', 'gte-multilingual-base');
-  const modelPath = path.join(modelDir, 'model.onnx');
+  const modelPath = path.join(modelDir, mixedChat ? 'model_fp16.onnx' : 'model.onnx');
   const installedFiles = installedModels.embedding.installedFiles;
+  if (chatIdentity) {
+    const [model, ...companions] = chatIdentity.identities;
+    installedModels.chat = {
+      packageId: 'chat', variantFilename: chatIdentity.variant.filename,
+      precision: chatIdentity.variant.precision, targetEP: chatIdentity.variant.targetEP,
+      targetDir: chatIdentity.pkg.targetDir ?? '', sha256: chatIdentity.variant.sha256,
+      installedFiles: chatIdentity.identities.map(identity => path.basename(identity.path)),
+      skipped: false, skipReason: null, skipCause: null,
+    };
+    chatIdentity.model = model;
+    chatIdentity.companions = companions;
+  }
   const contract = {
     schemaVersion: 2,
     installedAtEpochMs: Date.now(),
-    hardwareProfile: { gpuDetected: false, cudaFunctional: false, vramBytes: -1 },
-    downloadProfile: 'CPU',
+    hardwareProfile: mixedChat
+      ? { gpuDetected: true, cudaFunctional: true, vramBytes: 12 * 1024 * 1024 * 1024 }
+      : { gpuDetected: false, cudaFunctional: false, vramBytes: -1 },
+    downloadProfile,
     modelsDir: path.resolve(candidateRoot),
     models: installedModels,
   };
   const contractPath = path.join(data, 'install-contract.v2.json');
   fs.writeFileSync(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+  const chatModelIdentity = chatIdentity?.model ?? null;
+  const chatCompanionIdentities = chatIdentity?.companions ?? [];
   return { contractPath, modelsRoot: path.resolve(candidateRoot), modelPath,
-    modelDir: path.resolve(modelDir), installedFiles };
+    modelDir: path.resolve(modelDir), installedFiles, mixedChat,
+    chatModelPath: chatModelIdentity?.path ?? null,
+    chatModelAssetId: chatModelIdentity?.assetId ?? null,
+    chatCompanionAssetIds: chatCompanionIdentities.map(identity => identity.assetId),
+    chatModelIdentity, chatCompanionIdentities };
 }
 
 function findRetainedModelsRoot() {
@@ -1163,6 +1242,21 @@ function sameJson(left, right) {
 
 function sha256(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
+function sha256File(file) {
+  const digest = crypto.createHash('sha256');
+  const handle = fs.openSync(file, 'r');
+  const chunk = Buffer.allocUnsafe(8 * 1024 * 1024);
+  try {
+    for (;;) {
+      const read = fs.readSync(handle, chunk, 0, chunk.length, null);
+      if (read === 0) return digest.digest('hex');
+      digest.update(chunk.subarray(0, read));
+    }
+  } finally {
+    fs.closeSync(handle);
+  }
 }
 
 function compactSupervisor(value) {

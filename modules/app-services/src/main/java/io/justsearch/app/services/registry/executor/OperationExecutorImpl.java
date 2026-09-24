@@ -469,7 +469,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     var execution = new OperationAttemptRunner.Request(request.key(), request.descriptor(), origin, envelope.provenance(), request.historyMode());
     var handler = resolveHandler(op);
     OperationPreparation preparation = envelope.preparation();
-    if (io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.SCHEMA.equals(
+    if (io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.isSupportedSchema(
         preparation.replaySchema())
         && !io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.continuationPreparation(
             op, preparation, request.key())) {

@@ -15,11 +15,22 @@ public interface EngineTaskLifetime {
   /** Acquires one child lease and returns its single-use release callback. */
   Runnable retain();
 
+  /** Register cooperative cancellation of child groups; ordinary lifetimes have no signal. */
+  default void onCancel(Runnable handler) {
+    java.util.Objects.requireNonNull(handler, "handler");
+  }
+
   /** Retains both owners, rolls back a failed second retain, and releases in reverse order. */
   default EngineTaskLifetime and(EngineTaskLifetime other) {
     java.util.Objects.requireNonNull(other, "other");
-    return () -> {
-      Runnable first = java.util.Objects.requireNonNull(retain(), "first retain");
+    return new EngineTaskLifetime() {
+      @Override public void onCancel(Runnable handler) {
+        EngineTaskLifetime.this.onCancel(handler);
+        other.onCancel(handler);
+      }
+
+      @Override public Runnable retain() {
+      Runnable first = java.util.Objects.requireNonNull(EngineTaskLifetime.this.retain(), "first retain");
       Runnable second;
       try {
         second = java.util.Objects.requireNonNull(other.retain(), "second retain");
@@ -42,6 +53,7 @@ public interface EngineTaskLifetime {
         if (failure instanceof RuntimeException runtime) throw runtime;
         if (failure instanceof Error error) throw error;
       };
+      }
     };
   }
 }

@@ -48,6 +48,8 @@ final class RecordedInstallerGenerationPlanTest {
     assertEquals(plan.planHash(), restored.planHash());
     assertEquals("core.activate-installed-models", restored.operationId());
     assertEquals("installer_model_activation", restored.source());
+    assertEquals(RecordedInstallerGenerationPlan.SCHEMA, restored.replaySchema());
+    assertEquals(RecordedInstallerGenerationPlan.ChatSelection.none(), restored.chatSelection());
     assertThrows(UnsupportedOperationException.class, () -> restored.models().clear());
   }
 
@@ -56,10 +58,12 @@ final class RecordedInstallerGenerationPlanTest {
     assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
         "core.bulk-reindex", RecordedInstallerGenerationPlan.Profile.INSTALLER_GENERATION,
         "installer_model_activation", key(), "g1", scope(), target(), witness(), candidate(),
-        List.of(model("embedding")), List.of(asset("embedding")), provenance()));
+        List.of(model("embedding")), List.of(asset("embedding")),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance()));
     assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
         key(), "other-generation", scope(), target(), witness(), candidate(),
-        List.of(model("embedding")), List.of(asset("embedding")), provenance()));
+        List.of(model("embedding")), List.of(asset("embedding")),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance()));
   }
 
   @Test
@@ -72,7 +76,88 @@ final class RecordedInstallerGenerationPlanTest {
     assertThrows(IllegalArgumentException.class, () -> RecordedInstallerGenerationPlan.fromReplayPayload(
         valid.replace("\"source\":\"installer_model_activation\",", "")));
     assertThrows(IllegalArgumentException.class, () -> RecordedInstallerGenerationPlan.fromReplayPayload(
+        valid.replace("\"chatSelection\":{\"companionAssetIds\":[],\"modelAssetId\":null},", "")));
+    assertThrows(IllegalArgumentException.class, () -> RecordedInstallerGenerationPlan.fromReplayPayload(
+        valid.replace("\"companionAssetIds\":[]", "\"companionAssetIds\":[],\"unexpected\":true")));
+    assertThrows(IllegalArgumentException.class, () ->
+        RecordedInstallerGenerationPlan.fromReplayPayload(
+            RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2, valid));
+    assertThrows(IllegalArgumentException.class, () -> RecordedInstallerGenerationPlan.fromReplayPayload(
         "recorded-installer-generation-v1", valid));
+  }
+
+  @Test
+  void v3DistinguishesExplicitNoneFromSelectedChatAssets() {
+    Path chatPath = ROOT.resolve("chat/model.gguf");
+    var selected = new RecordedInstallerGenerationPlan(key(), "g1", scope(), target(), witness(),
+        candidateWithChat(chatPath), List.of(model("embedding")),
+        List.of(asset("embedding"), assetAt("chat/model", chatPath),
+            asset("chat/tokenizer")),
+        RecordedInstallerGenerationPlan.ChatSelection.selected(
+            "chat/model", List.of("chat/tokenizer")), provenance());
+
+    var restored = RecordedInstallerGenerationPlan.fromReplayPayload(selected.toReplayPayload());
+
+    assertTrue(restored.chatSelection().selected());
+    assertEquals("chat/model", restored.chatSelection().modelAssetId());
+    assertEquals(List.of("chat/tokenizer"), restored.chatSelection().companionAssetIds());
+    assertEquals(RecordedInstallerGenerationPlan.SCHEMA, restored.replaySchema());
+
+    var none = new RecordedInstallerGenerationPlan(key(), "g1", scope(), target(), witness(),
+        candidateWithChat(chatPath), List.of(model("embedding")), List.of(asset("embedding")),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance());
+    assertFalse(none.chatSelection().selected());
+    assertEquals(RecordedInstallerGenerationPlan.ChatSelection.none(),
+        RecordedInstallerGenerationPlan.fromReplayPayload(none.toReplayPayload()).chatSelection());
+  }
+
+  @Test
+  void v3RequiresSelectedAssetIdsAndExactCandidateChatPath() {
+    Path chatPath = ROOT.resolve("chat/model.gguf");
+    List<RecordedInstallerGenerationPlan.AssetIdentity> assets =
+        List.of(asset("embedding"), assetAt("chat/model", chatPath));
+    assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
+        key(), "g1", scope(), target(), witness(), candidateWithChat(chatPath),
+        List.of(model("embedding")), assets,
+        RecordedInstallerGenerationPlan.ChatSelection.selected("chat/missing", List.of()),
+        provenance()));
+    assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
+        key(), "g1", scope(), target(), witness(),
+        candidateWithChat(ROOT.resolve("chat/other.gguf")), List.of(model("embedding")), assets,
+        RecordedInstallerGenerationPlan.ChatSelection.selected("chat/model", List.of()),
+        provenance()));
+    assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
+        key(), "g1", scope(), target(), witness(), candidateWithChat(chatPath),
+        List.of(model("embedding")), assets,
+        RecordedInstallerGenerationPlan.ChatSelection.selected(
+            "chat/model", List.of("chat/missing-companion")), provenance()));
+  }
+
+  @Test
+  void legacyV2ChatPathRemainsUnknownAndBindingPreservesV2Envelope() {
+    var current = new RecordedInstallerGenerationPlan("g1", scope(), target(), witness(),
+        candidateWithChat(ROOT.resolve("chat/model.gguf")), List.of(model("embedding")),
+        List.of(asset("embedding")), RecordedInstallerGenerationPlan.ChatSelection.none(),
+        provenance());
+    String legacyPayload = withoutChatSelection(current.toReplayPayload());
+    var legacy = RecordedInstallerGenerationPlan.fromReplayPayload(
+        RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2, legacyPayload);
+    assertNull(legacy.chatSelection());
+    assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2, legacy.replaySchema());
+
+    var preparation = new OperationPreparation("{}",
+        RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2, legacyPayload,
+        OperationPreparation.Content.METADATA);
+    String operationKey = key();
+    var bound = RecordedInstallerGenerationPlan.bindOperationKey(
+        operation(), preparation, operationKey);
+    assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2, bound.replaySchema());
+    var boundPlan = RecordedInstallerGenerationPlan.fromReplayPayload(
+        bound.replaySchema(), bound.replayPayloadJson());
+    assertEquals(operationKey, boundPlan.operationKey());
+    assertNull(boundPlan.chatSelection());
+    assertTrue(RecordedInstallerGenerationPlan.continuationPreparation(
+        operation(), bound, operationKey));
   }
 
   @Test
@@ -107,7 +192,8 @@ final class RecordedInstallerGenerationPlanTest {
   void executorBindingTurnsOnlyTheExactUnboundV2CandidateIntoAContinuation() {
     String key = key();
     var unbound = new RecordedInstallerGenerationPlan("g1", scope(), target(), witness(), candidate(),
-        List.of(model("embedding")), List.of(asset("embedding")), provenance());
+        List.of(model("embedding")), List.of(asset("embedding")),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance());
     assertNull(unbound.operationKey());
     var preparation = new OperationPreparation("{}", RecordedInstallerGenerationPlan.SCHEMA,
         unbound.toReplayPayload(), OperationPreparation.Content.METADATA);
@@ -137,7 +223,8 @@ final class RecordedInstallerGenerationPlanTest {
 
   private static RecordedInstallerGenerationPlan plan() {
     return new RecordedInstallerGenerationPlan(key(), "g1", scope(), target(), witness(), candidate(),
-        List.of(model("embedding")), List.of(asset("embedding")), provenance());
+        List.of(model("embedding")), List.of(asset("embedding")),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance());
   }
 
   private static RecordedRootPlan scope() {
@@ -156,6 +243,12 @@ final class RecordedInstallerGenerationPlanTest {
     return RecordedInstallerGenerationPlan.CandidateSettings.fromJson("{\"indexPaths\":[],\"models\":{}}");
   }
 
+  private static RecordedInstallerGenerationPlan.CandidateSettings candidateWithChat(Path path) {
+    String escaped = path.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+    return RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+        "{\"indexPaths\":[],\"llmModelPath\":\"" + escaped + "\",\"models\":{}}");
+  }
+
   private static RecordedInstallerGenerationPlan.ModelIdentity model(String id) {
     return new RecordedInstallerGenerationPlan.ModelIdentity(id, "fp32", ROOT.resolve(id + ".onnx"), HASH,
         1, provenance());
@@ -167,6 +260,17 @@ final class RecordedInstallerGenerationPlanTest {
 
   private static RecordedInstallerGenerationPlan.AssetIdentity asset(String id) {
     return new RecordedInstallerGenerationPlan.AssetIdentity(id, ROOT.resolve(id + ".bin"), HASH, 1, provenance());
+  }
+
+  private static RecordedInstallerGenerationPlan.AssetIdentity assetAt(String id, Path path) {
+    return new RecordedInstallerGenerationPlan.AssetIdentity(id, path, HASH, 1, provenance());
+  }
+
+  private static String withoutChatSelection(String payload) {
+    String selection = "\"chatSelection\":{\"companionAssetIds\":[],\"modelAssetId\":null},";
+    String legacy = payload.replace(selection, "");
+    assertFalse(legacy.equals(payload), "test fixture must remove the v3 chat selection");
+    return legacy;
   }
 
   private static RecordedInstallerGenerationPlan.AcquisitionProvenance provenance() {

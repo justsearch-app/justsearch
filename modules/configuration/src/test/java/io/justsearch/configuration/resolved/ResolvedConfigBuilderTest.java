@@ -721,6 +721,46 @@ final class ResolvedConfigBuilderTest {
     }
   }
 
+  @Test
+  @DisplayName("device memory ceiling is optional, honors precedence, and preserves explicit zero")
+  void deviceMemoryCeilingIsOptionalAndUsesExistingPrecedence() {
+    String key = EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.configKey();
+
+    ResolvedConfig absent = new ResolvedConfigBuilder().build();
+    assertNull(absent.ai().deviceMemoryCeilingMb());
+
+    ResolvedConfig resolved =
+        new ResolvedConfigBuilder()
+            .put(key, ResolvedConfigBuilder.ORDINAL_YAML, "yaml", "application.yaml", "2048")
+            .put(
+                key,
+                ResolvedConfigBuilder.ORDINAL_ENV_VAR,
+                "env_var",
+                EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.envVar(),
+                "4096")
+            .put(key, ResolvedConfigBuilder.ORDINAL_JVM_ARG, "jvm_arg", key, "0")
+            .build();
+    assertEquals(0L, resolved.ai().deviceMemoryCeilingMb());
+    assertEquals("jvm_arg", resolved.resolution(key).sourceName());
+  }
+
+  @Test
+  @DisplayName("negative device memory ceiling is treated as absent")
+  void negativeDeviceMemoryCeilingIsAbsent() {
+    String key = EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.configKey();
+    ResolvedConfig config =
+        new ResolvedConfigBuilder()
+            .put(
+                key,
+                ResolvedConfigBuilder.ORDINAL_ENV_VAR,
+                "env_var",
+                EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.envVar(),
+                "-1")
+            .build();
+
+    assertNull(config.ai().deviceMemoryCeilingMb());
+  }
+
   // ==================== EnvRegistry Integration ====================
 
   @Nested

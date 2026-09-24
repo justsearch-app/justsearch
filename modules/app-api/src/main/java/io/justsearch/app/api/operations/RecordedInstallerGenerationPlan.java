@@ -29,7 +29,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Frozen installer-produced generation activation candidate.
  *
- * <p>This is deliberately a new v2 preparation type. {@link RecordedBulkPlan} remains the v1
+ * <p>This is deliberately a versioned preparation type. {@link RecordedBulkPlan} remains the v1
  * contract for ordinary bulk and recovery rebuilds. The candidate contains metadata only: settings
  * are detached JSON and model/asset entries contain identities, never live runtime objects,
  * credentials, or executable configuration.
@@ -46,24 +46,31 @@ public record RecordedInstallerGenerationPlan(
     CandidateSettings candidateSettings,
     List<ModelIdentity> models,
     List<AssetIdentity> assets,
+    ChatSelection chatSelection,
     AcquisitionProvenance acquisition) implements RecordedGenerationPlan {
 
-  public static final String SCHEMA = "recorded-installer-generation-v2";
+  public static final String SCHEMA = "recorded-installer-generation-v3";
+  public static final String LEGACY_SCHEMA_V2 = "recorded-installer-generation-v2";
   public static final String OPERATION_ID = "core.activate-installed-models";
   public static final String SOURCE = "installer_model_activation";
   public static final int MAX_CANDIDATE_SETTINGS_BYTES = 131_072;
   public static final int MAX_MODELS = 128;
   public static final int MAX_ASSETS = 1024;
 
-  private static final Set<String> FIELDS = Set.of(
+  private static final Set<String> V2_FIELDS = Set.of(
       "operationId", "profile", "source", "operationKey", "sourceGeneration", "scope", "target",
       "settingsWitness", "candidateSettings", "models", "assets", "acquisition");
+  private static final Set<String> V3_FIELDS = Set.of(
+      "operationId", "profile", "source", "operationKey", "sourceGeneration", "scope", "target",
+      "settingsWitness", "candidateSettings", "models", "assets", "chatSelection", "acquisition");
   private static final Set<String> CANDIDATE_FIELDS = Set.of("sha256", "canonicalJson");
   private static final Set<String> WITNESS_FIELDS = Set.of("acceptedRevision", "lastCommittedOperationKey");
   private static final Set<String> MODEL_FIELDS = Set.of(
       "packageId", "variantId", "path", "sha256", "sizeBytes", "provenance");
   private static final Set<String> ASSET_FIELDS = Set.of(
       "assetId", "path", "sha256", "sizeBytes", "provenance");
+  private static final Set<String> CHAT_SELECTION_FIELDS = Set.of(
+      "modelAssetId", "companionAssetIds");
   private static final Set<String> PROVENANCE_FIELDS = Set.of("kind", "sourceId", "manifestSha256");
   private static final Pattern IDENTITY = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}");
   private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
@@ -103,10 +110,13 @@ public record RecordedInstallerGenerationPlan(
     if (assets.isEmpty()) {
       throw new IllegalArgumentException("Installer activation requires an asset identity");
     }
+    if (chatSelection != null) {
+      validateChatSelection(chatSelection, candidateSettings, assets);
+    }
     Objects.requireNonNull(acquisition, "acquisition");
   }
 
-  /** Convenience constructor for the only supported installer activation operation. */
+  /** Convenience constructor with an explicit installer chat selection. */
   public RecordedInstallerGenerationPlan(
       String operationKey,
       String sourceGeneration,
@@ -116,15 +126,14 @@ public record RecordedInstallerGenerationPlan(
       CandidateSettings candidateSettings,
       List<ModelIdentity> models,
       List<AssetIdentity> assets,
+      ChatSelection chatSelection,
       AcquisitionProvenance acquisition) {
     this(OPERATION_ID, Profile.INSTALLER_GENERATION, SOURCE, operationKey, sourceGeneration, scope,
-        target, settingsWitness, candidateSettings, models, assets, acquisition);
+        target, settingsWitness, candidateSettings, models, assets,
+        Objects.requireNonNull(chatSelection, "chatSelection"), acquisition);
   }
 
-  /**
-   * Creates the transient handler preparation before the attempt runner assigns its stable key.
-   * The executor must bind the key before freezing or displaying this preparation.
-   */
+  /** Creates a transient preparation with an explicit installer chat selection. */
   public RecordedInstallerGenerationPlan(
       String sourceGeneration,
       RecordedRootPlan scope,
@@ -133,9 +142,11 @@ public record RecordedInstallerGenerationPlan(
       CandidateSettings candidateSettings,
       List<ModelIdentity> models,
       List<AssetIdentity> assets,
+      ChatSelection chatSelection,
       AcquisitionProvenance acquisition) {
     this(OPERATION_ID, Profile.INSTALLER_GENERATION, SOURCE, null, sourceGeneration, scope,
-        target, settingsWitness, candidateSettings, models, assets, acquisition);
+        target, settingsWitness, candidateSettings, models, assets,
+        Objects.requireNonNull(chatSelection, "chatSelection"), acquisition);
   }
 
   public enum Profile {
@@ -214,6 +225,45 @@ public record RecordedInstallerGenerationPlan(
     }
   }
 
+  /** Explicit installer intent for chat assets; null on the plan is reserved for legacy v2. */
+  public record ChatSelection(String modelAssetId, List<String> companionAssetIds) {
+    public ChatSelection {
+      Objects.requireNonNull(companionAssetIds, "companionAssetIds");
+      List<String> companions = new ArrayList<>(companionAssetIds.size());
+      for (String companionAssetId : companionAssetIds) {
+        companions.add(identity(companionAssetId, "chat companion assetId"));
+      }
+      companions.sort(String::compareTo);
+      if (Set.copyOf(companions).size() != companions.size()) {
+        throw new IllegalArgumentException("Duplicate chat companion asset identity");
+      }
+      companionAssetIds = List.copyOf(companions);
+      if (modelAssetId == null) {
+        if (!companionAssetIds.isEmpty()) {
+          throw new IllegalArgumentException("Chat selection NONE cannot name companion assets");
+        }
+      } else {
+        modelAssetId = identity(modelAssetId, "chat model assetId");
+        if (companionAssetIds.contains(modelAssetId)) {
+          throw new IllegalArgumentException("Chat model asset cannot also be a companion asset");
+        }
+      }
+    }
+
+    public static ChatSelection none() {
+      return new ChatSelection(null, List.of());
+    }
+
+    public static ChatSelection selected(String modelAssetId, List<String> companionAssetIds) {
+      return new ChatSelection(Objects.requireNonNull(modelAssetId, "modelAssetId"),
+          companionAssetIds);
+    }
+
+    public boolean selected() {
+      return modelAssetId != null;
+    }
+  }
+
   /** Typed source and manifest provenance supplied by the acquisition front. */
   public record AcquisitionProvenance(Kind kind, String sourceId, String manifestSha256) {
     public AcquisitionProvenance {
@@ -250,9 +300,10 @@ public record RecordedInstallerGenerationPlan(
       OperationPreparation preparation) {
     if (!continuationPolicy(operation) || preparation == null
         || preparation.content() != OperationPreparation.Content.METADATA
-        || !SCHEMA.equals(preparation.replaySchema())) return false;
+        || !isSupportedSchema(preparation.replaySchema())) return false;
     try {
-      RecordedInstallerGenerationPlan plan = fromReplayPayload(preparation.replayPayloadJson());
+      RecordedInstallerGenerationPlan plan = fromReplayPayload(
+          preparation.replaySchema(), preparation.replayPayloadJson());
       return plan.operationId().equals(operation.id().value())
           && plan.profile() == Profile.INSTALLER_GENERATION
           && SOURCE.equals(plan.source())
@@ -268,40 +319,52 @@ public record RecordedInstallerGenerationPlan(
     if (!continuationPreparation(operation, preparation)) return false;
     try {
       OperationKeys.timestampMillis(operationKey);
-      return operationKey.equals(fromReplayPayload(preparation.replayPayloadJson()).operationKey());
+      return operationKey.equals(fromReplayPayload(
+          preparation.replaySchema(), preparation.replayPayloadJson()).operationKey());
     } catch (IllegalArgumentException malformed) {
       return false;
     }
   }
 
   /**
-   * Binds a transient v2 handler preparation to the attempt runner's stable key. Preparations for
-   * every other schema pass through unchanged. A pre-bound v2 preparation is accepted only when it
-   * already names the same key, so a handler cannot substitute its own durable identity.
+   * Binds a transient installer preparation to the attempt runner's stable key. Preparations for
+   * every other schema pass through unchanged. A pre-bound preparation is accepted only when it
+   * already names the same key, so a handler cannot substitute its own durable identity. Legacy v2
+   * preparations remain v2 after binding.
    */
   public static OperationPreparation bindOperationKey(Operation operation,
       OperationPreparation preparation, String operationKey) {
     Objects.requireNonNull(preparation, "preparation");
-    if (!SCHEMA.equals(preparation.replaySchema())) return preparation;
+    if (!isSupportedSchema(preparation.replaySchema())) return preparation;
     if (!continuationPolicy(operation)
         || preparation.content() != OperationPreparation.Content.METADATA) {
       throw new IllegalArgumentException("Installer generation preparation is not authorized");
     }
-    RecordedInstallerGenerationPlan plan = fromReplayPayload(preparation.replayPayloadJson());
+    RecordedInstallerGenerationPlan plan = fromReplayPayload(
+        preparation.replaySchema(), preparation.replayPayloadJson());
     OperationKeys.timestampMillis(operationKey);
     if (plan.operationKey() != null && !plan.operationKey().equals(operationKey)) {
       throw new IllegalArgumentException("Installer generation preparation key mismatch");
     }
     RecordedInstallerGenerationPlan bound = plan.operationKey() == null
         ? plan.withOperationKey(operationKey) : plan;
-    return new OperationPreparation(preparation.argumentsJson(), SCHEMA, bound.toReplayPayload(),
-        OperationPreparation.Content.METADATA);
+    return new OperationPreparation(preparation.argumentsJson(), bound.replaySchema(),
+        bound.toReplayPayload(), OperationPreparation.Content.METADATA);
   }
 
   private RecordedInstallerGenerationPlan withOperationKey(String operationKey) {
     return new RecordedInstallerGenerationPlan(operationId, profile, source, operationKey,
         sourceGeneration, scope, target, settingsWitness, candidateSettings, models, assets,
-        acquisition);
+        chatSelection, acquisition);
+  }
+
+  /** Stored envelope schema for this plan; null chat intent is reserved for decoded legacy v2. */
+  public String replaySchema() {
+    return chatSelection == null ? LEGACY_SCHEMA_V2 : SCHEMA;
+  }
+
+  public static boolean isSupportedSchema(String replaySchema) {
+    return SCHEMA.equals(replaySchema) || LEGACY_SCHEMA_V2.equals(replaySchema);
   }
 
   public String toReplayPayload() {
@@ -320,9 +383,12 @@ public record RecordedInstallerGenerationPlan(
     encoded.put("candidateSettings", candidateSettings);
     encoded.put("models", models.stream().map(RecordedInstallerGenerationPlan::modelMap).toList());
     encoded.put("assets", assets.stream().map(RecordedInstallerGenerationPlan::assetMap).toList());
+    if (chatSelection != null) {
+      encoded.put("chatSelection", chatSelectionMap(chatSelection));
+    }
     encoded.put("acquisition", provenanceMap(acquisition));
     String payload = JSON.writeValueAsString(encoded);
-    new OperationPreparation("{}", SCHEMA, payload);
+    new OperationPreparation("{}", replaySchema(), payload);
     return payload;
   }
 
@@ -336,21 +402,22 @@ public record RecordedInstallerGenerationPlan(
 
   /** Strict decoder for a prepared envelope, including its externally stored schema tag. */
   public static RecordedInstallerGenerationPlan fromReplayPayload(String replaySchema, String payload) {
-    if (!SCHEMA.equals(replaySchema)) {
+    if (!isSupportedSchema(replaySchema)) {
       throw new IllegalArgumentException("Installer generation schema mismatch");
     }
     if (payload == null || payload.isBlank()) {
       throw new IllegalArgumentException("Installer generation payload is required");
     }
-    new OperationPreparation("{}", SCHEMA, payload);
+    new OperationPreparation("{}", replaySchema, payload);
     final Object decoded;
     try {
       decoded = JSON.readValue(payload, Object.class);
     } catch (RuntimeException malformed) {
       throw new IllegalArgumentException("Invalid installer generation plan JSON", malformed);
     }
-    if (!(decoded instanceof Map<?, ?> fields) || !fields.keySet().equals(FIELDS)) {
-      throw new IllegalArgumentException("Installer generation plan fields do not match v2 schema");
+    Set<String> expectedFields = SCHEMA.equals(replaySchema) ? V3_FIELDS : V2_FIELDS;
+    if (!(decoded instanceof Map<?, ?> fields) || !fields.keySet().equals(expectedFields)) {
+      throw new IllegalArgumentException("Installer generation plan fields do not match schema");
     }
     try {
       return new RecordedInstallerGenerationPlan(
@@ -365,6 +432,7 @@ public record RecordedInstallerGenerationPlan(
           candidate(fields.get("candidateSettings")),
           models(fields.get("models")),
           assets(fields.get("assets")),
+          SCHEMA.equals(replaySchema) ? chatSelection(fields.get("chatSelection")) : null,
           provenance(fields.get("acquisition")));
     } catch (RuntimeException malformed) {
       throw new IllegalArgumentException("Invalid installer generation plan binding", malformed);
@@ -377,6 +445,27 @@ public record RecordedInstallerGenerationPlan(
 
   private static List<AssetIdentity> assets(Object value) {
     return list(value, ASSET_FIELDS, "assets", RecordedInstallerGenerationPlan::asset);
+  }
+
+  private static ChatSelection chatSelection(Object value) {
+    if (!(value instanceof Map<?, ?> fields) || !fields.keySet().equals(CHAT_SELECTION_FIELDS)) {
+      throw new IllegalArgumentException("Invalid chat selection fields");
+    }
+    Object companionsValue = fields.get("companionAssetIds");
+    if (!(companionsValue instanceof List<?> values)) {
+      throw new IllegalArgumentException("Chat companion asset IDs must be an array");
+    }
+    List<String> companions = new ArrayList<>(values.size());
+    for (Object item : values) {
+      if (!(item instanceof String companion)) {
+        throw new IllegalArgumentException("Chat companion asset ID must be a string");
+      }
+      companions.add(companion);
+    }
+    String modelAssetId = nullableString(fields, "modelAssetId");
+    return modelAssetId == null
+        ? new ChatSelection(null, companions)
+        : ChatSelection.selected(modelAssetId, companions);
   }
 
   private interface Decoder<T> { T decode(Map<?, ?> fields); }
@@ -443,6 +532,13 @@ public record RecordedInstallerGenerationPlan(
         "provenance", provenanceMap(value.provenance()));
   }
 
+  private static Map<String, Object> chatSelectionMap(ChatSelection value) {
+    Map<String, Object> encoded = new LinkedHashMap<>();
+    encoded.put("modelAssetId", value.modelAssetId());
+    encoded.put("companionAssetIds", value.companionAssetIds());
+    return encoded;
+  }
+
   private static Map<String, Object> provenanceMap(AcquisitionProvenance value) {
     return Map.of("kind", value.kind().name(), "sourceId", value.sourceId(),
         "manifestSha256", value.manifestSha256());
@@ -488,6 +584,40 @@ public record RecordedInstallerGenerationPlan(
       throw new IllegalArgumentException("Invalid " + label);
     }
     return value;
+  }
+
+  private static void validateChatSelection(ChatSelection selection,
+      CandidateSettings candidateSettings, List<AssetIdentity> assets) {
+    if (!selection.selected()) return;
+    Map<String, AssetIdentity> assetsById = new LinkedHashMap<>();
+    for (AssetIdentity asset : assets) {
+      assetsById.put(asset.assetId(), asset);
+    }
+    AssetIdentity model = assetsById.get(selection.modelAssetId());
+    if (model == null) {
+      throw new IllegalArgumentException("Selected chat model asset identity is missing");
+    }
+    for (String companionAssetId : selection.companionAssetIds()) {
+      if (!assetsById.containsKey(companionAssetId)) {
+        throw new IllegalArgumentException("Selected chat companion asset identity is missing");
+      }
+    }
+    Object decoded = readObject(candidateSettings.canonicalJson());
+    if (!(decoded instanceof Map<?, ?> fields)
+        || !(fields.get("llmModelPath") instanceof String chatPath)
+        || chatPath.isBlank()) {
+      throw new IllegalArgumentException("Selected chat model requires a candidate chat path");
+    }
+    Path candidatePath;
+    try {
+      candidatePath = normalizedAbsolutePath(Path.of(chatPath), "candidate chat path");
+    } catch (RuntimeException malformed) {
+      throw new IllegalArgumentException("Invalid candidate chat path", malformed);
+    }
+    if (!model.path().equals(candidatePath)) {
+      throw new IllegalArgumentException(
+          "Selected chat model asset must match the candidate chat path");
+    }
   }
 
   private static Path normalizedAbsolutePath(Path value, String label) {

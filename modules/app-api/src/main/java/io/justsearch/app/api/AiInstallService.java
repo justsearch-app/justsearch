@@ -47,6 +47,7 @@ public interface AiInstallService {
       Set<String> restartRequiredKeys,
       List<RecordedInstallerGenerationPlan.ModelIdentity> models,
       List<RecordedInstallerGenerationPlan.AssetIdentity> assets,
+      RecordedInstallerGenerationPlan.ChatSelection chatSelection,
       RecordedInstallerGenerationPlan.AcquisitionProvenance provenance) {
     static final JsonMapper JSON = JsonMapper.builder()
         .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
@@ -63,6 +64,7 @@ public interface AiInstallService {
       restartRequiredKeys = Set.copyOf(restartRequiredKeys == null ? Set.of() : restartRequiredKeys);
       models = List.copyOf(models == null ? List.of() : models);
       assets = List.copyOf(assets == null ? List.of() : assets);
+      if (chatSelection == null) throw new NullPointerException("chatSelection");
       if (provenance == null) throw new NullPointerException("provenance");
       try {
         RecordedInstallerGenerationPlan.CandidateSettings encoded =

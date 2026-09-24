@@ -239,6 +239,22 @@ candidate; duplicate calls observe one row and changed assets, witness, roots or
 target require a refreshed preview. Only installer-owned path fields may be
 changed. Prepare the resolved config in memory; do not serialize credentials or
 capture the currently serving target through ordinary `BulkReindexHandler`.
+For a mixed ONNX/chat acquisition, installer chat selection is explicit in the
+accepted v3 plan, including when the desired chat path already equals the
+selected installed path. The selected GGUF and required or actually selected
+serving companions are validated against registry variant, download profile,
+durable contract, allowed install location, digest and size, then recorded as
+asset identities before changing candidate settings. A conflicting active or
+failed acquisition state refuses; absent transient status after restart is
+normal when durable contract, registry and bytes agree. Operator model,
+profile and projector overrides keep their precedence and are never annexed as
+installer assets. Invalid selected chat is an explicit activation refusal.
+An explicit NONE selection may carry inherited chat settings without claiming
+their bytes. Legacy v2 plans have unknown chat intent. Rows with no chat path
+remain replayable; a v2 chat path has no selection proof and refuses before
+pointer commitment or fences committed-B recovery without rollback or a false
+terminal receipt.
+Current bytes cannot be hashed into approval during recovery.
 Assets serving A stay at their original bytes while B builds; replacement bytes
 have candidate-owned placement and remain retained through accepted recovery and
 issued/retired views. Fresh installation may use the actual bootstrap/recorded

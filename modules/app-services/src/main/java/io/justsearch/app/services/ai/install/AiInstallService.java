@@ -830,10 +830,17 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         : ConfigStore.globalOrNull().get();
     ResolvedConfig prepared = ConfigStoreRebuilder.prepare(candidate);
     ConfigApplyScopes.ChangedKeys changed = ConfigApplyScopes.classify(serving, prepared);
+    RecordedInstallerGenerationPlan.ChatSelection chatSelection =
+        RecordedInstallerGenerationPlan.ChatSelection.none();
     // A mixed install must freeze the chat path in the same full settings candidate. A query-only
     // ONNX candidate deliberately leaves chat to the ordinary settings owner.
     if (!changed.generationBound().isEmpty()) {
-      setChatCandidatePath(candidate, contract, root);
+      SelectedChat selectedChat = selectInstalledChat(registry, contract, root, provenance);
+      if (selectedChat != null) {
+        candidate.setLlmModelPath(selectedChat.modelPath().toString());
+        assets.addAll(selectedChat.assets());
+        chatSelection = selectedChat.selection();
+      }
       prepared = ConfigStoreRebuilder.prepare(candidate);
       changed = ConfigApplyScopes.classify(serving, prepared);
     }
@@ -847,7 +854,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           candidate, snapshot.witness(),
           RecordedInstallerGenerationPlan.CandidateSettings.fromJson(json),
           changed.hot(), changed.component(), changed.generationBound(), changed.restartRequired(),
-          models, assets, provenance));
+          models, assets, chatSelection, provenance));
     } catch (RuntimeException failure) {
       throw new IllegalStateException("Failed to encode installer activation candidate", failure);
     }
@@ -864,15 +871,71 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
   }
 
-  private static void setChatCandidatePath(
-      UiSettings settings, InstallContract contract, Path root) {
+  private SelectedChat selectInstalledChat(ModelRegistry registry, InstallContract contract,
+      Path root, RecordedInstallerGenerationPlan.AcquisitionProvenance provenance) {
     InstallContract.InstalledModel chat = contract.getModel("chat");
-    if (chat == null || chat.skipped() || chat.variantFilename() == null) return;
-    Path model = contract.resolveModelPath("chat", root);
-    if (model != null && Files.isRegularFile(model, LinkOption.NOFOLLOW_LINKS)) {
-      settings.setLlmModelPath(model.toAbsolutePath().normalize().toString());
+    if (chat == null || chat.skipped()) return null;
+    ModelPackage pkg = registry.findPackage("chat");
+    ModelVariant selected = pkg == null ? null : pkg.selectVariant(contract.downloadProfile());
+    if (!contract.downloadProfile().includesGguf() || selected == null
+        || chat.variantFilename() == null || chat.targetDir() == null
+        || !selected.filename().equals(chat.variantFilename())
+        || !selected.sha256().equalsIgnoreCase(chat.sha256())
+        || !chat.targetDir().equals(InstallPlanner.effectiveTargetDir(pkg, selected))) {
+      throw invalidInstalledChat("registry variant or durable contract differs from the selected profile");
     }
+    AiInstallStatus.PackageStatus status = findPackageStatus("chat");
+    if (status != null && !"installed".equals(status.state)) {
+      throw invalidInstalledChat("acquisition state is " + status.state);
+    }
+    Path model = contract.resolveModelPath("chat", root);
+    Path expected = root.resolve(chat.targetDir()).resolve(selected.filename()).toAbsolutePath().normalize();
+    if (model == null || !expected.startsWith(root)
+        || !expected.equals(model.toAbsolutePath().normalize())
+        || !chat.installedFiles().contains(selected.filename())) {
+      throw invalidInstalledChat("model location is outside the approved install contract");
+    }
+    FileIdentity identity = readFileIdentity(expected, selected.sha256());
+    if (identity == null || identity.size() != selected.sizeBytes()) {
+      throw invalidInstalledChat("model bytes differ from the registry and contract");
+    }
+    List<RecordedInstallerGenerationPlan.AssetIdentity> assets = new ArrayList<>();
+    String modelAssetId = "chat/" + selected.filename();
+    assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(modelAssetId,
+        identity.path(), identity.sha256(), identity.size(), provenance));
+    List<String> companionIds = new ArrayList<>();
+    for (var companion : pkg.supportingFiles()) {
+      boolean installed = chat.installedFiles().contains(companion.filename());
+      if (!installed && !companion.required()) continue;
+      if (!installed || companion.filename() == null
+          || companion.filename().contains("/") || companion.filename().contains("\\")) {
+        throw invalidInstalledChat("required companion is absent or has an invalid location");
+      }
+      Path companionPath = identity.path().getParent().resolve(companion.filename()).normalize();
+      if (!companionPath.startsWith(root)) {
+        throw invalidInstalledChat("companion location is outside the approved install contract");
+      }
+      FileIdentity companionIdentity = readFileIdentity(companionPath, companion.sha256());
+      if (companionIdentity == null || companionIdentity.size() != companion.sizeBytes()) {
+        throw invalidInstalledChat("companion bytes differ from the registry and contract");
+      }
+      String assetId = "chat/" + companion.filename();
+      assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(assetId,
+          companionIdentity.path(), companionIdentity.sha256(), companionIdentity.size(),
+          provenance));
+      companionIds.add(assetId);
+    }
+    return new SelectedChat(identity.path(), assets,
+        RecordedInstallerGenerationPlan.ChatSelection.selected(modelAssetId, companionIds));
   }
+
+  private static IllegalArgumentException invalidInstalledChat(String reason) {
+    return new IllegalArgumentException("Installed chat selection is invalid: " + reason);
+  }
+
+  private record SelectedChat(Path modelPath,
+      List<RecordedInstallerGenerationPlan.AssetIdentity> assets,
+      RecordedInstallerGenerationPlan.ChatSelection selection) {}
 
   private static RecordedInstallerGenerationPlan.AcquisitionProvenance registryProvenance() {
     try (InputStream input = ModelRegistryLoader.class.getClassLoader()

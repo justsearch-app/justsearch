@@ -56,7 +56,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:app-api` -> `:modules:api-contract-projection-java`, `:modules:app-agent-api`, `:modules:configuration`, `:modules:core`
 - `:modules:app-api-tck` -> `:modules:ai-backend`
 - `:modules:app-config` -> `:modules:configuration`
-- `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
+- `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:gpu-bridge`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
 - `:modules:app-inference` -> `:modules:app-api`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:telemetry`
 - `:modules:app-launcher` -> `:modules:app-agent`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:indexer-worker`, `:modules:telemetry`, `:modules:ui`
 - `:modules:app-observability` -> `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-util`, `:modules:configuration`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:prompt-support`
@@ -114,6 +114,7 @@ graph TD
   app-engine --> app-services
   app-engine --> configuration
   app-engine --> core
+  app-engine --> gpu-bridge
   app-engine --> indexer-worker
   app-engine --> indexing
   app-engine --> telemetry
@@ -243,6 +244,6 @@ graph TD
 | `app-services` | 18 | Orchestration + glue across large portions of the stack |
 | `indexer-worker` | 12 | Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene |
 | `worker-services` | 12 |  |
+| `app-engine` | 10 |  |
 | `app-launcher` | 10 | CLI/distribution wiring; pulls in most runtime modules |
-| `app-engine` | 9 |  |
 <!-- GENERATED:MODULE_DEPS:END -->

@@ -366,7 +366,7 @@ class OwnedStreamCancellationTest {
   void interruptedModelWaitRetainsWorkUntilTheOperationActuallyExits() throws Exception {
     var work = new WorkProbe();
     var entered = new CountDownLatch(1);
-    var interrupted = new CountDownLatch(1);
+    var workerInterrupted = new java.util.concurrent.atomic.AtomicBoolean();
     var release = new CountDownLatch(1);
     var observed = new CompletableFuture<Throwable>();
     var flag = new java.util.concurrent.atomic.AtomicBoolean();
@@ -381,7 +381,7 @@ class OwnedStreamCancellationTest {
             entered.countDown();
             while (release.getCount() != 0) {
               try { release.await(); }
-              catch (InterruptedException expected) { interrupted.countDown(); }
+              catch (InterruptedException expected) { workerInterrupted.set(true); }
             }
             return "finished";
           });
@@ -400,11 +400,12 @@ class OwnedStreamCancellationTest {
         assertInstanceOf(InterruptedException.class,
             assertInstanceOf(java.util.concurrent.CompletionException.class, failure).getCause());
         assertTrue(flag.get());
-        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
+        assertFalse(workerInterrupted.get(), "caller cancellation must not interrupt owned model work");
         assertEquals(1, work.references.get(), "the still-running model operation owns admission");
         assertFalse(work.finished.isDone());
         release.countDown();
         work.finished.get(3, TimeUnit.SECONDS);
+        assertFalse(workerInterrupted.get());
         assertEquals(0, work.references.get());
       } finally {
         release.countDown();

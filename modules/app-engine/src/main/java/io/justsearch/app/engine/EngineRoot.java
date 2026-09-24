@@ -266,6 +266,7 @@ public final class EngineRoot implements WorkerHost {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       java.util.function.Supplier<io.justsearch.configuration.resolved.ConfigStore> authority) {
     // Process boot supplies its explicit owner; embedded compatibility constructors resolve at start.
+    var gpuCapabilities = new io.justsearch.gpu.GpuCapabilitiesService();
     return (gauge, executorRegistry, ingestion, indexComponent, encoderComponent) -> {
       var configStore = authority.get();
       var startupConfiguration = configStore.get();
@@ -275,7 +276,11 @@ public final class EngineRoot implements WorkerHost {
           executorRegistry, workerConfig,
           new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
           childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
-          configStore::get, configStore.publicationLock());
+          configStore::get, configStore.publicationLock(), () -> {
+            var device = gpuCapabilities.snapshot().effective();
+            return new io.justsearch.core.component.DeviceMemoryLine(
+                device.totalVramBytes(), device.freeVramBytes());
+          });
     };
   }
 

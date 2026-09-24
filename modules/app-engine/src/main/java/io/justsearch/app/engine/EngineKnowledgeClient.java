@@ -349,12 +349,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private final FlowCancelSignal signal = new FlowCancelSignal();
     private final String traceId = currentTraceId();
     private final String requestId = currentRequestId();
-    private final Object workerLock = new Object();
     private final io.justsearch.app.api.EngineWorkHandle work;
     private final Consumer<Throwable> fail;
     private final io.justsearch.app.api.EngineWorkHandle.Registration cancellation;
     private final AtomicReference<OwnedCallTask> submission = new AtomicReference<>();
-    private Thread worker;
     private final ScheduledFuture<?> alarm;
 
     Budget(long budgetMs, io.justsearch.app.api.EngineWorkHandle work, Consumer<Throwable> fail) {
@@ -374,7 +372,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       if (outcome.compareAndSet(Outcome.RUNNING, Outcome.EXPIRED)) {
         fail.accept(new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED,
             "Engine call exceeded its deadline"));
-        signalAndInterrupt();
+        signalCancellation();
         cancelQueuedSubmission();
       }
     }
@@ -382,36 +380,22 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     boolean cancel(String reason) {
       if (outcome.compareAndSet(Outcome.RUNNING, Outcome.CANCELLED)) {
         fail.accept(new io.justsearch.app.api.EngineWorkCancelledException(reason));
-        signalAndInterrupt();
+        signalCancellation();
         cancelQueuedSubmission();
         return true;
       }
       return false;
     }
 
-    private void signalAndInterrupt() {
-      try {
-        signal.cancel();
-      } finally {
-        synchronized (workerLock) {
-          if (worker != null) worker.interrupt();
-        }
-      }
+    private void signalCancellation() {
+      // Lucene may validate its native file lock while a cancelled call releases a searcher.
+      // Interrupting that worker can invalidate the process writer lock on Windows. The caller
+      // receives its terminal result immediately; the issued work retains its view until exit.
+      signal.cancel();
     }
 
     boolean startWork() {
-      synchronized (workerLock) {
-        if (outcome.get() != Outcome.RUNNING) return false;
-        worker = Thread.currentThread();
-        return true;
-      }
-    }
-
-    void workerFinished() {
-      synchronized (workerLock) {
-        worker = null;
-        if (signal.isCancelled()) Thread.interrupted();
-      }
+      return outcome.get() == Outcome.RUNNING;
     }
 
     void submitted(OwnedCallTask task) {
@@ -743,6 +727,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       throw failure;
     }
     var pending = new CompletableFuture<T>();
+    var viewReleased = new AtomicBoolean();
+    Runnable releaseView = () -> {
+      if (viewReleased.compareAndSet(false, true)) view.release();
+    };
     Budget budget;
     try {
       budget = new Budget(budgetMs, work, pending::completeExceptionally);
@@ -762,7 +750,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         try {
           if (budget.startWork()) {
             result = foregroundLoad.callOwned(work, lifetime -> {
-              budget.childLifetime = lifetime;
+              var childOwnership = lifetime.and(() -> view.fork()::release);
+              budget.childLifetime = new io.justsearch.core.execution.EngineTaskLifetime() {
+                @Override public Runnable retain() { return childOwnership.retain(); }
+                @Override public void onCancel(Runnable handler) {
+                  budget.signal.onCancel(handler);
+                }
+              };
               return body.apply(budget);
             });
           }
@@ -770,7 +764,6 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           failure = cause;
         } finally {
           try {
-            budget.workerFinished();
             work.close();
           } catch (Throwable cleanupFailure) {
             if (failure == null) failure = cleanupFailure;
@@ -782,6 +775,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
             else taskServingView.set(priorView);
           }
         }
+        try {
+          // A successful result must not become visible before its serving-view owner releases A.
+          // A cancelled caller was already completed by Budget and still keeps this view until
+          // the issued worker and its children have actually exited.
+          releaseView.run();
+        } catch (Throwable cleanupFailure) {
+          if (failure == null) failure = cleanupFailure;
+          else failure.addSuppressed(cleanupFailure);
+        }
         if (budget.complete()) {
           if (failure == null) pending.complete(result);
           else pending.completeExceptionally(failure);
@@ -789,7 +791,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           log.error("Engine {} worker failed after caller completion", operation, failure);
         }
         if (failure instanceof Error error) throw error;
-      }, view::release);
+      }, releaseView);
       ExecutorService executor = callThreads(work.context());
       budget.submitted(task);
       task.executeOn(executor);

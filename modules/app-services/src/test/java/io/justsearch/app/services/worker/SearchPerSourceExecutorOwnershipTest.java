@@ -2,6 +2,7 @@
 package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -135,27 +136,39 @@ class SearchPerSourceExecutorOwnershipTest {
     EngineExecutorRejectedException refusal = new EngineExecutorRejectedException(
         EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "fanout-test", 1);
     CountDownLatch entered = new CountDownLatch(1);
-    CountDownLatch interrupted = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicBoolean childInterrupted = new AtomicBoolean();
     ExecutorService physical = new RefusingExecutor(entered, refusal);
     when(foreground.openVirtual()).thenReturn(physical);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.search(any(SearchRequest.class), any(EngineContext.class))).thenAnswer(invocation -> {
       entered.countDown();
-      try {
-        new CountDownLatch(1).await();
-      } catch (InterruptedException expected) {
-        interrupted.countDown();
+      while (release.getCount() != 0) {
+        try { release.await(); }
+        catch (InterruptedException expected) { childInterrupted.set(true); }
       }
       return response("accepted");
     });
     FakeAdmission admission = new FakeAdmission();
 
-    try (SearchPerSourceExecutor executor = new SearchPerSourceExecutor(registry, admission)) {
-      Throwable failure = assertThrows(EngineExecutorRejectedException.class,
-          () -> executor.execute(client, REQUEST, List.of("one", "two"), 4, admission.context()));
-      assertSame(refusal, failure);
-      assertTrue(entered.await(1, TimeUnit.SECONDS));
-      assertTrue(interrupted.await(1, TimeUnit.SECONDS));
+    try {
+      try (SearchPerSourceExecutor executor = new SearchPerSourceExecutor(registry, admission)) {
+        Throwable failure = assertThrows(EngineExecutorRejectedException.class,
+            () -> executor.execute(client, REQUEST, List.of("one", "two"), 4, admission.context()));
+        assertSame(refusal, failure);
+        assertTrue(entered.await(1, TimeUnit.SECONDS));
+        assertFalse(childInterrupted.get(), "refusal must not interrupt an accepted child");
+        assertTrue(admission.references() > 0, "accepted child retains its admission owner");
+        release.countDown();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (admission.references() != 0 && System.nanoTime() < deadline) Thread.sleep(5);
+        assertEquals(0, admission.references());
+        assertFalse(childInterrupted.get());
+      }
+    } finally {
+      release.countDown();
+      physical.shutdown();
+      if (!physical.awaitTermination(2, TimeUnit.SECONDS)) physical.shutdownNow();
     }
     ArgumentCaptor<SearchRequest> requests = ArgumentCaptor.forClass(SearchRequest.class);
     verify(client, atLeastOnce()).search(requests.capture(), any(EngineContext.class));
@@ -164,11 +177,11 @@ class SearchPerSourceExecutorOwnershipTest {
   }
 
   @Test
-  void cancellationInterruptsChildrenButAdmissionLivesUntilActualExit() throws Exception {
+  void cancellationRetainsChildrenAndAdmissionUntilActualExit() throws Exception {
     FakeAdmission admission = new FakeAdmission();
     KnowledgeClient client = mock(KnowledgeClient.class);
     CountDownLatch entered = new CountDownLatch(1);
-    CountDownLatch interrupted = new CountDownLatch(1);
+    AtomicBoolean childInterrupted = new AtomicBoolean();
     CountDownLatch release = new CountDownLatch(1);
     when(client.search(any(SearchRequest.class), any(EngineContext.class))).thenAnswer(invocation -> {
       entered.countDown();
@@ -176,7 +189,7 @@ class SearchPerSourceExecutorOwnershipTest {
         try {
           release.await();
         } catch (InterruptedException expected) {
-          interrupted.countDown();
+          childInterrupted.set(true);
         }
       }
       return response("late");
@@ -190,14 +203,14 @@ class SearchPerSourceExecutorOwnershipTest {
             executor.execute(client, REQUEST, List.of("one"), 4, admission.context()));
         assertTrue(entered.await(2, TimeUnit.SECONDS));
         admission.cancel("shutdown");
-        assertTrue(interrupted.await(2, TimeUnit.SECONDS));
+        assertFalse(childInterrupted.get(), "cancellation must not interrupt owned search work");
         long completionDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         while (!call.isDone() && System.nanoTime() < completionDeadline) {
           Thread.sleep(5);
         }
-        assertTrue(call.isDone(), "caller returns while interrupted child is still draining");
+        assertTrue(call.isDone(), "caller returns while the child is still draining");
         assertTrue(admission.references() > 0,
-            "accepted child retains admission while it ignores interrupt");
+            "accepted child retains admission until actual exit");
         assertThrows(java.util.concurrent.CompletionException.class, call::join);
         release.countDown();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
@@ -205,10 +218,11 @@ class SearchPerSourceExecutorOwnershipTest {
           Thread.sleep(5);
         }
         assertEquals(0, admission.references());
+        assertFalse(childInterrupted.get());
       }
     } finally {
       release.countDown();
-      if (call != null) call.cancel(true);
+      if (call != null) call.cancel(false);
     }
   }
 

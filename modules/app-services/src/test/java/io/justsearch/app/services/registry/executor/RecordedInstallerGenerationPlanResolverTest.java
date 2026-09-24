@@ -2,6 +2,7 @@
 package io.justsearch.app.services.registry.executor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.agent.api.encryption.StoreCipher;
@@ -48,6 +49,22 @@ final class RecordedInstallerGenerationPlanResolverTest {
 
     assertEquals(fixture.plan(), new RecordedInstallerGenerationPlanResolver()
         .resolve(fixture.row(), fixture.preparation()));
+  }
+
+  @Test
+  void resolvesLegacyV2CandidateWithoutInventingChatSelection() {
+    Fixture fixture = fixture();
+    String selection = "\"chatSelection\":{\"companionAssetIds\":[],\"modelAssetId\":null},";
+    String legacyPayload = fixture.plan().toReplayPayload().replace(selection, "");
+    OperationPreparation legacy = new OperationPreparation(
+        ARGUMENTS, RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2, legacyPayload,
+        OperationPreparation.Content.METADATA);
+
+    var resolved = new RecordedInstallerGenerationPlanResolver()
+        .resolve(fixture.row(), reencode(fixture, legacy));
+
+    assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2, resolved.replaySchema());
+    assertNull(resolved.chatSelection());
   }
 
   @Test
@@ -109,7 +126,8 @@ final class RecordedInstallerGenerationPlanResolverTest {
     RecordedInstallerGenerationPlan unbound = new RecordedInstallerGenerationPlan(
         fixture.plan().sourceGeneration(), fixture.plan().scope(), fixture.plan().target(),
         fixture.plan().settingsWitness(), fixture.plan().candidateSettings(),
-        fixture.plan().models(), fixture.plan().assets(), fixture.plan().acquisition());
+        fixture.plan().models(), fixture.plan().assets(),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), fixture.plan().acquisition());
     OperationStore.Preparation unboundPreparation = reencode(fixture, new OperationPreparation(
         ARGUMENTS, RecordedInstallerGenerationPlan.SCHEMA, unbound.toReplayPayload(),
         OperationPreparation.Content.METADATA));
@@ -169,7 +187,8 @@ final class RecordedInstallerGenerationPlanResolverTest {
         key, "serving-generation", scope,
         new IndexTargetSnapshot(sha256(TARGET), TARGET), new SettingsWitness(3, key),
         RecordedInstallerGenerationPlan.CandidateSettings.fromJson(SETTINGS),
-        List.of(model), List.of(asset), acquisition);
+        List.of(model), List.of(asset), RecordedInstallerGenerationPlan.ChatSelection.none(),
+        acquisition);
     OperationPreparation preparation = new OperationPreparation(
         ARGUMENTS, RecordedInstallerGenerationPlan.SCHEMA, plan.toReplayPayload(),
         OperationPreparation.Content.METADATA);

@@ -30,7 +30,7 @@ class EnginePerSourceOwnershipTest {
   private static void exercise(boolean interruptCaller) throws Exception {
     var admission = new EngineAdmissionController(1, 1, 1);
     var entered = new CountDownLatch(1);
-    var interrupted = new CountDownLatch(1);
+    var childInterrupted = new AtomicBoolean();
     var release = new CountDownLatch(1);
     var result = new CompletableFuture<Throwable>();
     var restored = new AtomicBoolean();
@@ -41,7 +41,7 @@ class EnginePerSourceOwnershipTest {
       entered.countDown();
       while (release.getCount() != 0) {
         try { release.await(); }
-        catch (InterruptedException expected) { interrupted.countDown(); }
+        catch (InterruptedException expected) { childInterrupted.set(true); }
       }
       return SearchResponse.getDefaultInstance();
     });
@@ -68,7 +68,7 @@ class EnginePerSourceOwnershipTest {
           assertInstanceOf(InterruptedException.class, failure.getCause());
           assertTrue(restored.get());
         } else assertInstanceOf(java.util.concurrent.CancellationException.class, failure);
-        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
+        assertFalse(childInterrupted.get(), "caller cancellation must not interrupt owned child work");
         assertEquals(1, admission.activeWorkCount());
         assertThrows(EngineAdmissionException.class,
             () -> admission.attach(TestEngineContexts.BACKGROUND));
@@ -77,6 +77,7 @@ class EnginePerSourceOwnershipTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (admission.activeWorkCount() != 0 && System.nanoTime() < deadline) Thread.sleep(5);
         assertEquals(0, admission.activeWorkCount());
+        assertFalse(childInterrupted.get());
         try (var next = admission.attach(TestEngineContexts.BACKGROUND)) {
           assertTrue(next.context().workId().isPresent());
         }

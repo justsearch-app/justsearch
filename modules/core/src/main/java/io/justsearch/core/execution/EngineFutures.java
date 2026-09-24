@@ -69,15 +69,15 @@ public final class EngineFutures {
   }
 
   /**
-   * Waits interruptibly and cancels the accepted task when its waiter leaves. Cancellation requests
-   * task interruption; the supplyAsync actual-exit callback still owns lifetime release.
+   * Waits interruptibly and cancels the accepted result when its waiter leaves. A running task
+   * is not interrupted during native index I/O; actual exit still owns lifetime release.
    */
   public static <T> T await(CompletableFuture<T> future) {
     Objects.requireNonNull(future, "future");
     try {
       return future.get();
     } catch (InterruptedException interrupted) {
-      try { future.cancel(true); }
+      try { future.cancel(false); }
       catch (RuntimeException | Error cleanupFailure) { interrupted.addSuppressed(cleanupFailure); }
       Thread.currentThread().interrupt();
       throw new java.util.concurrent.CompletionException(interrupted);
@@ -148,7 +148,7 @@ public final class EngineFutures {
     public boolean completeExceptionally(Throwable failure) {
       if (failure instanceof java.util.concurrent.TimeoutException && !isDone()) {
         timeoutCompleting = true;
-        try { task.cancel(true); }
+        try { task.cancel(false); }
         catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
       }
       return super.completeExceptionally(failure);

@@ -296,7 +296,8 @@ final class SettingsCommitCoordinatorTest {
         List.of(new RecordedInstallerGenerationPlan.ModelIdentity("embedding", "model.onnx",
             asset, assetHash, 1, provenance)),
         List.of(new RecordedInstallerGenerationPlan.AssetIdentity("embedding/model.onnx",
-            asset, assetHash, 1, provenance)), provenance);
+            asset, assetHash, 1, provenance)),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance);
 
     assertFalse(owner.installerGenerationProjected(plan));
     settings.replacePrepared(settings.prepareExact(candidate, new SettingsWitness(1, key)));

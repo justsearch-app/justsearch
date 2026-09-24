@@ -439,6 +439,9 @@ message EngineComponentView {
   int64 deadline_ms = 7 [json_name = "deadlineMs"];
   int32 recovery_attempts = 8 [json_name = "recoveryAttempts"];
   string evidence = 9;
+  string reason = 10;
+  int64 free_bytes = 11 [json_name = "freeBytes"];
+  int64 footprint_bytes = 12 [json_name = "footprintBytes"];
 }
 
 message ReadinessComponentView {

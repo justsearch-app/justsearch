@@ -762,7 +762,7 @@ public final class SqliteOperationStore implements OperationStore {
             AND preparation_payload IS NOT NULL
             AND json_valid(preparation_payload)
             AND json_extract(preparation_payload, '$.preparation.replaySchema')
-                = 'recorded-installer-generation-v2'
+                IN ('recorded-installer-generation-v2', 'recorded-installer-generation-v3')
             AND (accepted_settings_revision IS NULL OR accepted_settings_revision = ?)
           """)) {
         update.setLong(1, expectedRevision); update.setLong(2, clock.millis()); update.setLong(3, id);

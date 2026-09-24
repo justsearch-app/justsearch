@@ -68,9 +68,14 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
       String argumentsJson, InvocationProvenance provenance, EngineContext context) {
     requireSourceArguments(argumentsJson);
     BrainInstallService service = service();
-    var candidate = service.prepareInstalledGenerationCandidate().orElseThrow(
-        () -> refused("No retained installed generation candidate is available",
-            "ACTIVATION_CANDIDATE_UNAVAILABLE"));
+    final io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate candidate;
+    try {
+      candidate = service.prepareInstalledGenerationCandidate().orElseThrow(
+          () -> refused("No retained installed generation candidate is available",
+              "ACTIVATION_CANDIDATE_UNAVAILABLE"));
+    } catch (IllegalArgumentException invalid) {
+      throw refused(invalid.getMessage(), "ACTIVATION_CHAT_ASSET_INVALID");
+    }
     if (candidate.generationBoundKeys().isEmpty()) {
       // Query-only and effective-no-op installs remain ordinary settings changes. Refusing here
       // prevents the durable REINDEX operation from becoming a false generation build.
@@ -136,6 +141,7 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
         candidate.encodedSettings(),
         models,
         assets,
+        candidate.chatSelection(),
         candidate.provenance());
     return new OperationPreparation(argumentsJson, RecordedInstallerGenerationPlan.SCHEMA,
         plan.toReplayPayload());
@@ -179,11 +185,17 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
     }
     // The approval names one frozen candidate. A new download, settings revision, roots or
     // Worker target requires a new preview before this accepted attempt may start effects.
+    if (plan.chatSelection() == null && current.chatSelection().selected()) {
+      return OperationExecution.finished(OperationResult.failure(
+          "Legacy activation cannot acquire a new chat selection", "ACTIVATION_PREVIEW_STALE",
+          Map.of(), false));
+    }
     if (!plan.equals(new RecordedInstallerGenerationPlan(
         current.operationId(), current.profile(), current.source(), plan.operationKey(),
         current.sourceGeneration(), current.scope(), current.target(),
         current.settingsWitness(), current.candidateSettings(), current.models(),
-        current.assets(), current.acquisition()))) {
+        current.assets(), plan.chatSelection() == null ? null : current.chatSelection(),
+        current.acquisition()))) {
       return OperationExecution.finished(OperationResult.failure(
           "Installed activation candidate changed; request a fresh preview",
           "ACTIVATION_PREVIEW_STALE", Map.of(), false));
@@ -202,7 +214,7 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
   private static RecordedInstallerGenerationPlan frozenPlan(OperationPreparation prepared) {
     Objects.requireNonNull(prepared, "prepared");
     if (prepared.content() != OperationPreparation.Content.METADATA
-        || !RecordedInstallerGenerationPlan.SCHEMA.equals(prepared.replaySchema())) {
+        || !RecordedInstallerGenerationPlan.isSupportedSchema(prepared.replaySchema())) {
       throw new IllegalArgumentException("Installed activation requires a metadata generation plan");
     }
     requireSourceArguments(prepared.argumentsJson());

@@ -86,6 +86,65 @@ final class RecordedInstallerGenerationBootProjectionTest {
   }
 
   @Test
+  void committedBWithChangedSelectedChatBytesStaysFencedWithoutRollback() throws Exception {
+    try (Fixture fixture = new Fixture(temp.resolve("chat-drift-after-pointer"), true)) {
+      new IndexGenerationManager(fixture.indexBase).promoteBuildingGenerationToActive();
+      Files.writeString(fixture.chatPath, "CHAT-model", StandardCharsets.UTF_8);
+
+      IOException failure = assertThrows(IOException.class, fixture::reconcile);
+      assertTrue(failure.getMessage().contains("assets changed"));
+      assertEquals("g-" + fixture.operationKey,
+          new IndexGenerationManager(fixture.indexBase).inspectCurrentLayoutForBoot()
+              .orElseThrow().activeGenerationId(), "committed B must not roll back");
+      assertEquals(new SettingsWitness(0, null), fixture.settings.inspect().witness());
+      assertSameSettings(fixture.priorSettings, fixture.settings.inspect().settings());
+      assertEquals(OperationState.RUNNING,
+          fixture.operations.find(fixture.operationKey).orElseThrow().state(),
+          "fenced recovery must not mark the committed operation complete or failed");
+    }
+  }
+
+  @Test
+  void legacyV2WithoutChatKeepsAThenRollsForwardCommittedB() throws Exception {
+    try (Fixture fixture = new Fixture(temp.resolve("legacy-v2-no-chat"), false, true)) {
+      assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2,
+          fixture.plan.replaySchema());
+      assertSameSettings(fixture.priorSettings, fixture.reconcile());
+      assertEquals(fixture.sourceGeneration,
+          new IndexGenerationManager(fixture.indexBase).inspectCurrentLayoutForBoot()
+              .orElseThrow().activeGenerationId());
+      new IndexGenerationManager(fixture.indexBase).promoteBuildingGenerationToActive();
+      assertSameSettings(fixture.candidateSettings, fixture.reconcile());
+      assertEquals(new SettingsWitness(1, fixture.operationKey), fixture.settings.inspect().witness());
+    }
+  }
+
+  @Test
+  void legacyV2UnprovenChatAfterPointerStaysFencedWithoutFalseTerminal() throws Exception {
+    try (Fixture fixture = new Fixture(temp.resolve("legacy-v2-chat"), true, true)) {
+      assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V2,
+          fixture.plan.replaySchema());
+      assertThrows(IllegalArgumentException.class,
+          () -> io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifier
+              .verify(fixture.plan));
+      assertEquals(fixture.sourceGeneration,
+          new IndexGenerationManager(fixture.indexBase).inspectCurrentLayoutForBoot()
+              .orElseThrow().activeGenerationId());
+      assertEquals(new SettingsWitness(0, null), fixture.settings.inspect().witness());
+
+      new IndexGenerationManager(fixture.indexBase).promoteBuildingGenerationToActive();
+      IOException failure = assertThrows(IOException.class, fixture::reconcile);
+      assertTrue(failure.getMessage().contains("assets changed"));
+      assertEquals("g-" + fixture.operationKey,
+          new IndexGenerationManager(fixture.indexBase).inspectCurrentLayoutForBoot()
+              .orElseThrow().activeGenerationId());
+      assertEquals(new SettingsWitness(0, null), fixture.settings.inspect().witness());
+      assertEquals(OperationState.RUNNING,
+          fixture.operations.find(fixture.operationKey).orElseThrow().state());
+    }
+  }
+
+  @Test
   void unrelatedPointerSourceFailsClosedWithoutChangingSettings() throws Exception {
     try (Fixture fixture = new Fixture(temp.resolve("unrelated-pointer"))) {
       var manager = new IndexGenerationManager(fixture.indexBase);
@@ -157,8 +216,18 @@ final class RecordedInstallerGenerationBootProjectionTest {
     private final String sourceGeneration;
     private final String operationKey;
     private final String otherKey;
+    private final Path chatPath;
+    private final RecordedInstallerGenerationPlan plan;
 
     Fixture(Path root) throws Exception {
+      this(root, false, false);
+    }
+
+    Fixture(Path root, boolean selectChat) throws Exception {
+      this(root, selectChat, false);
+    }
+
+    Fixture(Path root, boolean selectChat, boolean legacy) throws Exception {
       indexBase = root.resolve("index").toAbsolutePath().normalize();
       settingsPath = root.resolve("ui-settings.json").toAbsolutePath().normalize();
       Files.createDirectories(root);
@@ -166,6 +235,8 @@ final class RecordedInstallerGenerationBootProjectionTest {
       otherKey = OperationKeys.generate(Clock.fixed(Instant.now().plusSeconds(1), ZoneOffset.UTC));
       priorSettings = settings("light", indexBase);
       candidateSettings = settings("dark", indexBase);
+      chatPath = root.resolve("chat.gguf").toAbsolutePath().normalize();
+      if (selectChat) candidateSettings.setLlmModelPath(chatPath.toString());
       preliminaryConfig = ConfigStoreRebuilder.prepare(priorSettings);
       ResolvedConfig candidateConfig = ConfigStoreRebuilder.prepare(candidateSettings);
       target = CandidateIndexTargetCapture.capture(candidateConfig);
@@ -185,14 +256,32 @@ final class RecordedInstallerGenerationBootProjectionTest {
           modelPath, sha256(modelPath), Files.size(modelPath), provenance);
       var asset = new RecordedInstallerGenerationPlan.AssetIdentity("tokenizer", assetPath,
           sha256(assetPath), Files.size(assetPath), provenance);
+      List<RecordedInstallerGenerationPlan.AssetIdentity> assets = new java.util.ArrayList<>();
+      assets.add(asset);
+      RecordedInstallerGenerationPlan.ChatSelection chatSelection =
+          RecordedInstallerGenerationPlan.ChatSelection.none();
+      if (selectChat) {
+        Files.writeString(chatPath, "chat-model", StandardCharsets.UTF_8);
+        Path companionPath = root.resolve("mmproj.gguf").toAbsolutePath().normalize();
+        Files.writeString(companionPath, "chat-asset", StandardCharsets.UTF_8);
+        assets.add(new RecordedInstallerGenerationPlan.AssetIdentity("chat/chat.gguf",
+            chatPath, sha256(chatPath), Files.size(chatPath), provenance));
+        assets.add(new RecordedInstallerGenerationPlan.AssetIdentity("chat/mmproj.gguf",
+            companionPath, sha256(companionPath), Files.size(companionPath), provenance));
+        chatSelection = RecordedInstallerGenerationPlan.ChatSelection.selected(
+            "chat/chat.gguf", List.of("chat/mmproj.gguf"));
+      }
       var scope = new RecordedRootPlan(sourceGeneration, List.of(
           new RecordedRootPlan.Root(root.resolve("documents"), "documents", true, false,
               List.of(), List.of())));
-      RecordedInstallerGenerationPlan plan = new RecordedInstallerGenerationPlan(
+      plan = new RecordedInstallerGenerationPlan(
+          RecordedInstallerGenerationPlan.OPERATION_ID,
+          RecordedInstallerGenerationPlan.Profile.INSTALLER_GENERATION,
+          RecordedInstallerGenerationPlan.SOURCE,
           operationKey, sourceGeneration, scope, target, new SettingsWitness(0, null),
           RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
               tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(candidateSettings)),
-          List.of(model), List.of(asset), provenance);
+          List.of(model), assets, legacy ? null : chatSelection, provenance);
 
       operations = new SqliteOperationStore(root.resolve("operations.db"));
       settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
@@ -204,7 +293,7 @@ final class RecordedInstallerGenerationBootProjectionTest {
               RecordedInstallerGenerationPlan.OPERATION_ID, ARGUMENTS, false), accepted.context,
           accepted.provenance);
       OperationPreparation preparation = new OperationPreparation(ARGUMENTS,
-          RecordedInstallerGenerationPlan.SCHEMA, plan.toReplayPayload(),
+          plan.replaySchema(), plan.toReplayPayload(),
           OperationPreparation.Content.METADATA);
       runner.savePreparation(request, RecordedParentFixture.prepare(request, NONCE, preparation));
       var acceptedAttempt = runner.acceptPrepared(request, NONCE);

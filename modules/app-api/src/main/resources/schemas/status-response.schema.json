@@ -563,9 +563,18 @@
               "evidence" : {
                 "type" : "string"
               },
+              "footprintBytes" : {
+                "type" : "integer"
+              },
+              "freeBytes" : {
+                "type" : "integer"
+              },
               "mode" : {
                 "type" : "string",
                 "enum" : [ "BESIDE", "IN_PLACE" ]
+              },
+              "reason" : {
+                "type" : "string"
               },
               "reasonCode" : {
                 "type" : "string"

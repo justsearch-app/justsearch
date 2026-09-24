@@ -456,6 +456,8 @@ public final class KnowledgeServer implements Closeable {
   private final RecordedIngestionLifecycle recordedIngestionLifecycle;
   private final io.justsearch.core.component.ComponentHandle indexComponent;
   private final io.justsearch.core.component.ComponentHandle encoderComponent;
+  private final java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine>
+      deviceMemoryLine;
   private RecordedIngestionLifecycle.Attachment recordedIngestionAttachment;
   private volatile ResolvedConfig startupConfiguration;
   /** Accepted B configuration, independent of the A snapshot while Green is built. */
@@ -549,7 +551,26 @@ public final class KnowledgeServer implements Closeable {
       ResolvedConfig startupConfiguration,
       java.util.function.Supplier<ResolvedConfig> liveConfiguration,
       ReentrantReadWriteLock publicationLock) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, startupConfiguration, liveConfiguration, publicationLock,
+        () -> new io.justsearch.core.component.DeviceMemoryLine(null, null));
+  }
+
+  /** The Engine binds physical device memory at its composition root. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration,
+      ReentrantReadWriteLock publicationLock,
+      java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine> deviceMemoryLine) {
     this.publicationLock = Objects.requireNonNull(publicationLock, "publicationLock");
+    this.deviceMemoryLine = Objects.requireNonNull(deviceMemoryLine, "deviceMemoryLine");
     this.startupConfiguration = startupConfiguration;
     this.liveConfiguration = liveConfiguration;
     this.indexComponent = indexComponent;
@@ -2004,6 +2025,29 @@ public final class KnowledgeServer implements Closeable {
         : configuration.ai().masterGpuEnabled() ? HardwareProfile.gpuFull(0)
             : HardwareProfile.cpuOnly();
     var encoderConfiguration = EncoderConfigurationProjection.from(configuration, selection);
+    long footprint = InferenceCompositionRoot.estimateCandidateFootprintBytes(
+        encoderConfiguration, hardware, contract, modelsDir, selection);
+    var memory = Objects.requireNonNull(deviceMemoryLine.get(), "Device memory line")
+        .withCeilingMb(startupConfiguration == null ? null
+            : startupConfiguration.ai().deviceMemoryCeilingMb());
+    var composition = memory.decision(footprint);
+    if (encoderComponent != null) encoderComponent.setLastCompose(composition);
+    if (composition.mode() == io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE) {
+      throw new IOException("Candidate encoder set requires in-place composition: "
+          + composition.reason() + ", free=" + composition.freeBytes()
+          + ", footprint=" + composition.footprintBytes());
+    }
+    return composeSelectedModels(configuration, selection, inputs, dimension, hardware, contract, modelsDir,
+        encoderConfiguration);
+  }
+
+  /** Composes one exact generation-selected model set behind the device-line decision. */
+  private CandidateModels composeSelectedModels(ResolvedConfig configuration,
+      GenerationModelSelection selection,
+      SsotCommitMetadataSource.RuntimeFingerprintInputs inputs,
+      int dimension,
+      HardwareProfile hardware, InstallContract contract, Path modelsDir,
+      EncoderConfigurationProjection encoderConfiguration) throws IOException {
     InferenceSurface surface = InferenceCompositionRoot.compose(encoderConfiguration, hardware,
         contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection);
     var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
@@ -2050,8 +2094,9 @@ public final class KnowledgeServer implements Closeable {
           }
         }
       }
-      if ((inputs.embeddingModel().state()
-              == IndexFingerprint.ModelState.PRESENT && embedding == null)
+      if ((!"bge-m3".equalsIgnoreCase(configuration.ai().sparseModel())
+              && inputs.embeddingModel().state()
+                  == IndexFingerprint.ModelState.PRESENT && embedding == null)
           || (inputs.spladeModel().state()
               == IndexFingerprint.ModelState.PRESENT && splade == null)
           || (inputs.nerModel().state()

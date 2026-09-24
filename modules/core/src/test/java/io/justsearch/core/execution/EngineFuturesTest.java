@@ -47,9 +47,9 @@ class EngineFuturesTest {
   }
 
   @Test
-  void timeoutInterruptsRunningSupplierButDoesNotPretendItHasExited() throws Exception {
+  void timeoutLeavesRunningSupplierUninterruptedAndRetainsOwnershipUntilExit() throws Exception {
     var entered = new CountDownLatch(1);
-    var interrupted = new CountDownLatch(1);
+    var interrupted = new java.util.concurrent.atomic.AtomicBoolean();
     var release = new CountDownLatch(1);
     var exited = new CountDownLatch(1);
     var releaseCalls = new AtomicInteger();
@@ -58,14 +58,14 @@ class EngineFuturesTest {
         var result = EngineFutures.supplyAsync(() -> {
           entered.countDown();
           try { release.await(); }
-          catch (InterruptedException expected) { interrupted.countDown(); await(release); }
+          catch (InterruptedException unexpected) { interrupted.set(true); await(release); }
           return 1;
         }, executor, () -> { releaseCalls.incrementAndGet(); exited.countDown(); });
         assertTrue(entered.await(5, TimeUnit.SECONDS));
         result.orTimeout(20, TimeUnit.MILLISECONDS);
-        assertTrue(interrupted.await(5, TimeUnit.SECONDS));
         assertInstanceOf(TimeoutException.class, assertThrows(CompletionException.class, result::join).getCause());
         assertEquals(1, exited.getCount());
+        assertFalse(interrupted.get(), "timeout must not interrupt native work");
         release.countDown();
         assertTrue(exited.await(5, TimeUnit.SECONDS));
         assertEquals(1, releaseCalls.get());
@@ -146,7 +146,7 @@ class EngineFuturesTest {
   private static void assertRunningCleanupFailureIsContained(boolean timeout) throws Exception {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
-    var interrupted = new CountDownLatch(1);
+    var interrupted = new java.util.concurrent.atomic.AtomicBoolean();
     var cleanupCalls = new AtomicInteger();
     var threadCount = new AtomicInteger();
     var escaped = new java.util.concurrent.atomic.AtomicReference<Throwable>();
@@ -160,7 +160,7 @@ class EngineFuturesTest {
         var result = EngineFutures.supplyAsync(() -> {
           entered.countDown();
           try { release.await(); }
-          catch (InterruptedException expected) { interrupted.countDown(); await(release); }
+          catch (InterruptedException unexpected) { interrupted.set(true); await(release); }
           return 42;
         }, executor, () -> {
           cleanupCalls.incrementAndGet();
@@ -169,11 +169,11 @@ class EngineFuturesTest {
         assertTrue(entered.await(5, TimeUnit.SECONDS));
         if (timeout) {
           result.orTimeout(20, TimeUnit.MILLISECONDS);
-          assertTrue(interrupted.await(5, TimeUnit.SECONDS));
           assertInstanceOf(TimeoutException.class,
               assertThrows(java.util.concurrent.ExecutionException.class,
                   () -> result.get(5, TimeUnit.SECONDS)).getCause());
           assertEquals(0, cleanupCalls.get(), "timeout is not actual exit");
+          assertFalse(interrupted.get(), "timeout must not interrupt native work");
         }
         release.countDown();
         if (!timeout) assertEquals(42, result.get(5, TimeUnit.SECONDS));
@@ -188,7 +188,7 @@ class EngineFuturesTest {
   @Test
   void interruptedWaitCancelsSupplierButRetainsOwnershipUntilActualExit() throws Exception {
     var entered = new CountDownLatch(1);
-    var interrupted = new CountDownLatch(1);
+    var interrupted = new java.util.concurrent.atomic.AtomicBoolean();
     var release = new CountDownLatch(1);
     var exited = new CountDownLatch(1);
     var releases = new AtomicInteger();
@@ -199,7 +199,7 @@ class EngineFuturesTest {
         entered.countDown();
         while (release.getCount() != 0) {
           try { release.await(); }
-          catch (InterruptedException expected) { interrupted.countDown(); }
+          catch (InterruptedException unexpected) { interrupted.set(true); }
         }
         return 42;
       }, executor, () -> { releases.incrementAndGet(); exited.countDown(); });
@@ -214,7 +214,7 @@ class EngineFuturesTest {
         Throwable failure = observed.get(3, TimeUnit.SECONDS);
         assertInstanceOf(InterruptedException.class, assertInstanceOf(CompletionException.class, failure).getCause());
         assertTrue(flag.get(), "the caller retains its interruption signal");
-        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
+        assertFalse(interrupted.get(), "cancelled waiter must not interrupt its child");
         assertEquals(0, releases.get(), "a cancellation request is not actual task exit");
         release.countDown();
         assertTrue(exited.await(3, TimeUnit.SECONDS));

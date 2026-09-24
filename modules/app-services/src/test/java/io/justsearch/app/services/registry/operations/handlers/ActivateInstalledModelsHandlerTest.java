@@ -171,7 +171,7 @@ final class ActivateInstalledModelsHandlerTest {
         first.candidateSettings(), new SettingsWitness(5, OPERATION_KEY),
         first.encodedSettings(), first.hotKeys(), first.componentKeys(),
         first.generationBoundKeys(), first.restartRequiredKeys(), first.models(),
-        first.assets(), first.provenance());
+        first.assets(), first.chatSelection(), first.provenance());
     when(install.prepareInstalledGenerationCandidate()).thenReturn(
         Optional.of(first), Optional.of(changed));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
@@ -323,7 +323,8 @@ final class ActivateInstalledModelsHandlerTest {
         RecordedInstallerGenerationPlan.CandidateSettings.fromJson(json), Set.of(),
         Map.of("index", Set.of("justsearch.embed.onnx.model_path")),
         generationBound ? Set.of("justsearch.embed.onnx.model_path") : Set.of(), Set.of(),
-        List.of(model), List.of(asset), provenance);
+        List.of(model), List.of(asset), RecordedInstallerGenerationPlan.ChatSelection.none(),
+        provenance);
   }
 
   private static IndexTargetSnapshot target() {

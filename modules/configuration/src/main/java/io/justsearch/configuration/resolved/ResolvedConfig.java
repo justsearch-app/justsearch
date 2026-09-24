@@ -195,7 +195,10 @@ public record ResolvedConfig(
       // D1: preserve the two shared inputs that derive every per-role GPU decision. These are
       // projections of existing keys, not new settings.
       boolean masterGpuEnabled,
-      boolean gpuAccelerationAllowed) {
+      boolean gpuAccelerationAllowed,
+      // D1-14: optional nonnegative cap for the device-memory line used by encoder composition.
+      // Null means the reported device capacity is unmodified; zero is an explicit cap.
+      Long deviceMemoryCeilingMb) {
 
     /** BGE-M3 multi-vector retrieval configuration. */
     public record BgeM3(

@@ -2,6 +2,7 @@
 package io.justsearch.app.services.registry.executor;
 
 import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
+import io.justsearch.app.api.UiSettings;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -32,6 +33,7 @@ public final class RecordedInstallerAssetVerifier {
    */
   public static void verify(RecordedInstallerGenerationPlan plan) {
     Objects.requireNonNull(plan, "plan");
+    verifyChatCoverage(plan);
     Map<Path, ExpectedIdentity> identities = new HashMap<>();
     for (RecordedInstallerGenerationPlan.ModelIdentity model : plan.models()) {
       verify(new ExpectedIdentity(model.path(), model.sizeBytes(), model.sha256(),
@@ -40,6 +42,36 @@ public final class RecordedInstallerAssetVerifier {
     for (RecordedInstallerGenerationPlan.AssetIdentity asset : plan.assets()) {
       verify(new ExpectedIdentity(asset.path(), asset.sizeBytes(), asset.sha256(),
           "asset " + asset.assetId()), identities);
+    }
+  }
+
+  private static void verifyChatCoverage(RecordedInstallerGenerationPlan plan) {
+    final UiSettings candidate;
+    try {
+      candidate = tools.jackson.databind.json.JsonMapper.builder().build()
+          .readValue(plan.candidateSettings().canonicalJson(), UiSettings.class);
+    } catch (RuntimeException invalid) {
+      throw new IllegalArgumentException("Installer candidate chat settings are invalid", invalid);
+    }
+    String chatPath = candidate.getLlmModelPath();
+    var selection = plan.chatSelection();
+    if (selection == null) {
+      // The v2 producer recorded no installer chat intent. A nonempty chat path may be inherited
+      // or copied from an installation, and neither its selected bytes nor companions are proven.
+      if (chatPath != null && !chatPath.isBlank()) {
+        throw new IllegalArgumentException(
+            "Legacy installer activation has an unproven chat selection");
+      }
+      return;
+    }
+    if (!selection.selected()) return;
+    if (!selection.modelAssetId().startsWith("chat/")) {
+      throw new IllegalArgumentException("Selected installer chat model lacks chat asset ownership");
+    }
+    for (String companion : selection.companionAssetIds()) {
+      if (!companion.startsWith("chat/")) {
+        throw new IllegalArgumentException("Selected installer chat companion lacks chat asset ownership");
+      }
     }
   }
 

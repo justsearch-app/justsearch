@@ -869,6 +869,38 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
   }
 
+  /**
+   * Removes A's query-side native references after the serving owner has drained issued views.
+   * Green's detached producer registry is deliberately left to its own caller: it can continue
+   * lexical indexing with an empty candidate set while the replacement encoders are composed.
+   */
+  public void enterTextOnlyCandidateBuild() {
+    if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
+      throw new IllegalStateException("No detached candidate producer is available");
+    }
+    encoderBindings.publish(EncoderBindings.Snapshot.empty());
+    wireEmbeddingProvider(null);
+    wireSpladeIdfQueryEncoder(null);
+    wireSearchReranker(null);
+    wireCitationScorer(null);
+    searchService.setClusterSnapshotSupplier(null);
+    searchService.setChunkRerankerConfig(null);
+    searchService.setCitationScorerConfig(null);
+    healthService.setBgeM3Encoder(null);
+    wireStageEnabled(false, false, false);
+    wirePolicySnapshotSupplier(null);
+    gpuDiagnostics = null;
+    ingestService.setSpladeOrtCudaStatusSupplier(null);
+    ingestService.setSpladeModelPathSupplier(null);
+    ingestService.setEmbedOrtCudaStatusSupplier(null);
+    ingestService.setEmbedBackendSupplier(null);
+    ingestService.setEmbedGpuLayersSupplier(null);
+    ingestService.setOrtCudaStatusSupplier(null);
+    ingestService.setNerOrtCudaStatusSupplier(null);
+    ingestService.setCitationOrtCudaStatusSupplier(null);
+    ingestService.setBgeM3OrtCudaStatusSupplier(null);
+  }
+
   /** Bind B's write-side compatibility proof without changing A's query admission. */
   public void wireCandidateEmbeddingCompatController(EmbeddingCompatibilityController candidate) {
     if (candidateConfiguration == null || indexingLoop == null

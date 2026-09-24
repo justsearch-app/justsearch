@@ -22,6 +22,7 @@ import java.time.Clock;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -101,6 +102,62 @@ final class RecordedInstallerAssetVerifierTest {
     assertTrue(failure.getMessage().contains("model embedding/fp32"), failure::getMessage);
   }
 
+  @Test
+  void legacyChatPathWithoutRecordedOwnershipRefusesButNoChatAndExplicitNoneRemainSafe()
+      throws IOException {
+    Path model = write("embedding.onnx", "model-bytes");
+    Path tokenizer = write("tokenizer.json", "asset-bytes");
+    Path chat = write("chat.gguf", "chat-model");
+    RecordedInstallerGenerationPlan base = plan(
+        List.of(model("embedding", "fp32", model, "model-bytes")),
+        List.of(asset("tokenizer", tokenizer, "asset-bytes")));
+    var candidate = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+        tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+            Map.of("llmModelPath", chat.toString())));
+    RecordedInstallerGenerationPlan legacy = new RecordedInstallerGenerationPlan(
+        base.operationId(), base.profile(), base.source(), base.operationKey(),
+        base.sourceGeneration(), base.scope(), base.target(), base.settingsWitness(),
+        candidate, base.models(), base.assets(), null, base.acquisition());
+    IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+        () -> RecordedInstallerAssetVerifier.verify(legacy));
+    assertTrue(failure.getMessage().contains("unproven chat selection"));
+    assertDoesNotThrow(() -> RecordedInstallerAssetVerifier.verify(base),
+        "explicit NONE must not annex an inherited chat path");
+    RecordedInstallerGenerationPlan inherited = new RecordedInstallerGenerationPlan(
+        base.operationId(), base.profile(), base.source(), base.operationKey(),
+        base.sourceGeneration(), base.scope(), base.target(), base.settingsWitness(),
+        candidate, base.models(), base.assets(),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), base.acquisition());
+    assertDoesNotThrow(() -> RecordedInstallerAssetVerifier.verify(inherited));
+  }
+
+  @Test
+  void selectedChatCompanionDriftRefuses() throws IOException {
+    Path model = write("embedding.onnx", "model-bytes");
+    Path tokenizer = write("tokenizer.json", "asset-bytes");
+    Path chat = write("chat.gguf", "chat-model");
+    Path companion = write("mmproj.gguf", "chat-asset");
+    RecordedInstallerGenerationPlan base = plan(
+        List.of(model("embedding", "fp32", model, "model-bytes")),
+        List.of(asset("tokenizer", tokenizer, "asset-bytes"),
+            asset("chat/chat.gguf", chat, "chat-model"),
+            asset("chat/mmproj.gguf", companion, "chat-asset")));
+    var candidate = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+        tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+            Map.of("llmModelPath", chat.toString())));
+    RecordedInstallerGenerationPlan selected = new RecordedInstallerGenerationPlan(
+        base.operationId(), base.profile(), base.source(), base.operationKey(),
+        base.sourceGeneration(), base.scope(), base.target(), base.settingsWitness(),
+        candidate, base.models(), base.assets(),
+        RecordedInstallerGenerationPlan.ChatSelection.selected("chat/chat.gguf",
+            List.of("chat/mmproj.gguf")), base.acquisition());
+    assertDoesNotThrow(() -> RecordedInstallerAssetVerifier.verify(selected));
+    Files.writeString(companion, "CHAT-asset");
+    IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+        () -> RecordedInstallerAssetVerifier.verify(selected));
+    assertTrue(failure.getMessage().contains("chat/mmproj.gguf"));
+  }
+
   private Path write(String fileName, String contents) throws IOException {
     Path path = temp.resolve(fileName).toAbsolutePath().normalize();
     Files.writeString(path, contents);
@@ -118,7 +175,7 @@ final class RecordedInstallerAssetVerifierTest {
             root, "documents", true, false, List.of(), List.of()))),
         new IndexTargetSnapshot(sha256("{}"), "{}"), new SettingsWitness(1, operationKey),
         RecordedInstallerGenerationPlan.CandidateSettings.fromJson("{}"), models, assets,
-        provenance());
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance());
   }
 
   private static RecordedInstallerGenerationPlan.ModelIdentity model(
