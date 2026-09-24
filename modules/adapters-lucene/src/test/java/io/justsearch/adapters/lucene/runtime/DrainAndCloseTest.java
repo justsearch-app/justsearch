@@ -152,10 +152,8 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
    * lands in the final commit; a write started after drain returns throws ISE.
    */
   @Test
-  // Timing-sensitive: signals writerStarted before indexSingle, then relies on a fixed 10ms
-  // sleep to assume the writer holds the readLock when drain runs. Deterministic only with a
-  // production pause-hook mid-critical-section; on Linux CI the writer can arrive after draining
-  // starts and (correctly) get runtime_draining. Runs on the windows-native lane (tempdoc 668).
+  // Windows-native exercises the real Lucene directory and holds the existing write barrier
+  // explicitly, so drain begins only after the earlier write and its read lease are observable.
   @Tag("windows")
   void drainAndCloseWaitsForInFlightWriter() throws Exception {
     Path indexPath = tempDir.resolve("drain-inflight");
@@ -168,16 +166,14 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
             .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
-    // Start a writer that holds the readLock for ~200ms by simulating slow validation
-    // via a tight loop that submits one doc then sleeps. The drainAndClose call must wait
-    // for the writer's readLock to release before acquiring its writeLock.
-    CountDownLatch writerStarted = new CountDownLatch(1);
+    CountDownLatch writeCompletedUnderLease = new CountDownLatch(1);
+    CountDownLatch releaseWriter = new CountDownLatch(1);
     AtomicReference<Throwable> writerError = new AtomicReference<>();
     Thread writer =
         new Thread(
             () -> {
+              runtime.session().writeBarrier.readLock().lock();
               try {
-                writerStarted.countDown();
                 runtime
                     .indexingCoordinator()
                     .indexSingle(
@@ -186,26 +182,49 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
                                 SchemaFields.DOC_ID, "early",
                                 SchemaFields.DOC_UID, "early#0",
                                 SchemaFields.CONTENT, "early body")));
+                writeCompletedUnderLease.countDown();
+                if (!releaseWriter.await(10, TimeUnit.SECONDS)) {
+                  throw new AssertionError("test did not release the held write-barrier lease");
+                }
               } catch (Throwable t) {
                 writerError.set(t);
+              } finally {
+                runtime.session().writeBarrier.readLock().unlock();
               }
             },
             "drain-test-writer");
     writer.start();
+    AtomicReference<Throwable> drainError = new AtomicReference<>();
+    Thread drainer = new Thread(() -> {
+      try {
+        runtime.drainAndClose(Duration.ofSeconds(10));
+      } catch (Throwable failure) {
+        drainError.set(failure);
+      }
+    }, "drain-test-closer");
+    try {
+      assertTrue(writeCompletedUnderLease.await(10, TimeUnit.SECONDS),
+          "the earlier write must finish while its barrier lease is held");
+      drainer.start();
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (!runtime.session().draining && System.nanoTime() < deadline) Thread.onSpinWait();
+      assertTrue(runtime.session().draining, "drain must enter while the writer retains its lease");
+      assertTrue(drainer.isAlive(), "drain must wait for the held read lease");
+    } finally {
+      releaseWriter.countDown();
+      writer.join(10_000L);
+      if (drainer.isAlive()) drainer.join(10_000L);
+    }
 
-    // Wait until the writer thread has started (so its lock-acquire is in flight).
-    assertTrue(
-        writerStarted.await(5, TimeUnit.SECONDS), "writer thread should start within 5s");
-    // Tiny pause to let writer reach indexSingle. The writeBarrier readLock is acquired before
-    // the index call returns; drainAndClose's writeLock will block until writer releases.
-    Thread.sleep(10);
-
-    runtime.drainAndClose(Duration.ofSeconds(5));
-    writer.join(5_000L);
+    assertFalse(writer.isAlive(), "the held writer must release its lease");
+    assertFalse(drainer.isAlive(), "drain must complete after the writer releases its lease");
+    assertNull(drainError.get(), "drain failed: " + drainError.get());
 
     assertNull(
         writerError.get(),
         "writer that started before drain should complete cleanly; got: " + writerError.get());
+    assertThrows(IndexRuntimeIOException.class, () -> runtime.indexingCoordinator().indexSingle(
+        new IndexDocument(Map.of(SchemaFields.DOC_ID, "late", SchemaFields.DOC_UID, "late#0"))));
 
     // Reopen and verify the doc landed in the final commit.
     var reopened =
