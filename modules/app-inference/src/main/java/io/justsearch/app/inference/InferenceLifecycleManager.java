@@ -368,6 +368,11 @@ public class InferenceLifecycleManager
     return configuredInference();
   }
 
+  /** The managed server's profile, or retained configuration while Offline. */
+  public String servingChatProfileId() {
+    return servingInference().chatProfileId();
+  }
+
   public boolean hasVisionCapability() {
     InferenceConfig cfg = servingInference();
     boolean configHasVision = cfg != null && cfg.mmprojPath() != null;
@@ -875,7 +880,7 @@ public class InferenceLifecycleManager
       Objects.requireNonNull(publication, "publication");
       synchronized (owner.runner.lock()) {
         if (logicalPublication == null) {
-          logicalPublication = owner.prepareLogicalPublication(enabled, priorMode);
+          logicalPublication = owner.prepareLogicalPublication(this);
         }
         validateForCommit();
         publication.run();
@@ -1094,9 +1099,17 @@ public class InferenceLifecycleManager
   }
 
   private TransitionRunner.PreparedPublication prepareLogicalPublication(
-      boolean enabled, Mode priorMode) {
+      PreparedConfigApply prepared) {
+    boolean enabled = prepared.enabled;
+    Mode priorMode = prepared.priorMode;
     Mode target = enabled ? Mode.ONLINE : priorMode == Mode.ONLINE ? Mode.OFFLINE : priorMode;
     InferenceRuntimeView next = runner.view().withPhase(target);
+    // The previous /props model id can outlive a private B start when the new server reports
+    // no model alias. Its managed launch witness gives the exact model installed at commit.
+    if (enabled) {
+      next = next.withModelId(
+          prepared.candidate.context().inference().modelPath().getFileName().toString());
+    }
     if (!enabled) next = next.withExternal(false);
     return runner.preparePublication(target, next, TransitionReason.CONFIG_APPLY);
   }

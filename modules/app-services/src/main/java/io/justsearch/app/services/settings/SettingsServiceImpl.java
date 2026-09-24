@@ -22,6 +22,7 @@ public final class SettingsServiceImpl implements SettingsService {
   private final OperationAttemptRunner attempts;
   private final io.justsearch.app.api.EngineAdmissionService engineAdmission;
   private final Runnable chatEnabledChanged;
+  private final java.util.function.Supplier<String> servingRefreshProfileId;
   // Replaces the controller's blocking whole-write monitor. Callbacks cannot wait on themselves.
   private final java.util.concurrent.atomic.AtomicBoolean publicWriteActive = new java.util.concurrent.atomic.AtomicBoolean();
   private final Map<String, Long> latestUiModeIntentByClient =
@@ -41,10 +42,22 @@ public final class SettingsServiceImpl implements SettingsService {
 
   public SettingsServiceImpl(UiSettingsStore store, OperationAttemptRunner attempts,
       Runnable chatEnabledChanged, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    this(store, attempts, chatEnabledChanged, engineAdmission, () -> null);
+  }
+
+  public SettingsServiceImpl(UiSettingsStore store, OperationAttemptRunner attempts,
+      Runnable chatEnabledChanged, io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      java.util.function.Supplier<String> servingRefreshProfileId) {
     this.store = Objects.requireNonNull(store, "store");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.chatEnabledChanged = Objects.requireNonNull(chatEnabledChanged, "chatEnabledChanged");
     this.engineAdmission = engineAdmission;
+    this.servingRefreshProfileId = Objects.requireNonNull(servingRefreshProfileId,
+        "servingRefreshProfileId");
+  }
+
+  @Override public String servingRefreshProfileId() {
+    return servingRefreshProfileId.get();
   }
 
   @Override
@@ -58,9 +71,18 @@ public final class SettingsServiceImpl implements SettingsService {
   public OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
       String modeIntentHeader, io.justsearch.core.context.EngineContext context,
       OperationRecordHandle record, boolean refreshInference) {
+    return applyAccepted(input, modeIntentHeader, context, record,
+        refreshInference ? new SettingsCandidateContext(null, true) : SettingsCandidateContext.NONE);
+  }
+
+  @Override
+  public OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
+      String modeIntentHeader, io.justsearch.core.context.EngineContext context,
+      OperationRecordHandle record, SettingsCandidateContext candidateContext) {
     Objects.requireNonNull(input, "input");
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(record, "accepted record");
+    Objects.requireNonNull(candidateContext, "candidateContext");
     if (input.witness() == null || engineAdmission == null || context.workId().isEmpty()) {
       throw new IllegalArgumentException("Accepted reconfigure requires a witness and exact admitted work");
     }
@@ -85,7 +107,7 @@ public final class SettingsServiceImpl implements SettingsService {
       if (invalidPath != null) throw refused("INVALID_PATH", invalidPath);
       try (var work = engineAdmission.attach(context)) {
         result = attempts.applySettings(record, patch.witness(), candidate,
-            refreshInference ? new SettingsCandidateContext(null, true) : SettingsCandidateContext.NONE,
+            candidateContext,
             work);
       } catch (io.justsearch.app.api.EngineAdmissionException refusal) {
         if (!engineAdmission.isClosing()) throw refusal;

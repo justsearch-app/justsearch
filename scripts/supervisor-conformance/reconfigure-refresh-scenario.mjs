@@ -49,6 +49,12 @@ export async function exerciseReconfigureRefresh(c) {
   const statusBefore = json(statusBeforeResponse, 'inference status before refresh');
   requireThat(Number.isSafeInteger(statusBefore.generation) && statusBefore.generation > 0,
     `standard model had no serving generation: ${statusBeforeResponse.text}`);
+  const modelsBeforeResponse = await request(apiPort, '/v1/models');
+  const modelsBefore = json(modelsBeforeResponse, 'models before refresh');
+  const modelBefore = modelsBefore.data?.[0]?.id;
+  requireThat(modelsBeforeResponse.status === 200 && typeof modelBefore === 'string'
+    && statusBefore.activeModelId === modelBefore,
+  `inference status did not name the physical model before refresh: ${statusBeforeResponse.text} / ${modelsBeforeResponse.text}`);
   const settingsResponse = await request(apiPort, '/api/settings/v2');
   requireThat(settingsResponse.status === 200, `settings read failed: ${settingsResponse.text}`);
   const settings = json(settingsResponse, 'settings before refresh');
@@ -67,6 +73,11 @@ export async function exerciseReconfigureRefresh(c) {
   const statusAfter = json(statusAfterResponse, 'inference status after refresh');
   requireThat(statusAfterResponse.status === 200 && statusAfter.generation > statusBefore.generation,
     `refresh did not publish a new serving generation: ${statusAfterResponse.text}`);
+  const modelsAfterResponse = await request(apiPort, '/v1/models');
+  const modelsAfter = json(modelsAfterResponse, 'models after refresh');
+  requireThat(modelsAfterResponse.status === 200
+    && modelsAfter.data?.[0]?.id === modelBefore && statusAfter.activeModelId === modelBefore,
+  `refresh changed or mislabeled the physical model: ${statusAfterResponse.text} / ${modelsAfterResponse.text}`);
   await query('query after refresh');
   const settingsAfterResponse = await request(apiPort, '/api/settings/v2');
   const settingsAfter = json(settingsAfterResponse, 'settings after refresh');
@@ -75,5 +86,6 @@ export async function exerciseReconfigureRefresh(c) {
   `refresh did not commit the exact successor witness: ${settingsAfterResponse.text}`);
   console.log('PASS reconfigure-refresh', JSON.stringify({ operationKey,
     beforeGeneration: statusBefore.generation, afterGeneration: statusAfter.generation,
+    physicalModel: modelBefore,
     beforeWitness: settings.witness, afterWitness: settingsAfter.witness }));
 }

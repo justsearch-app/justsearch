@@ -6,7 +6,7 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-24)
 
-### D1-4 accepted inference refresh slice (local, not pushed)
+### D1-4 accepted inference refresh slice and model-identity follow-up
 
 The local `bc4527f36` checkpoint adds two D1-4 component-boundary regressions
 on top of pushed `d64339ef8`. The current uncommitted slice routes Brain's
@@ -57,7 +57,7 @@ gate because `OPEN_BRAIN` was newly exported but used only inside
 `--gate dead-code` now pass without a baseline change. The system integration
 job reached terminal success before the next push.
 
-The following local D1-4 slice adds a harness-only `settings-mid-compose`
+Checkpoint `f5d81ac1f` is pushed to PR727. It adds a harness-only `settings-mid-compose`
 boundary after the generative owner prepares and before the settings file
 commit. The owner-order regression and affected PMD/Spotless/installDist passed
 at `tmp/3070-mid-compose-focused.txt`; the full 358-task integrated gate passed
@@ -73,11 +73,45 @@ closed. Earlier `tmp/3071`–`3072` exercised only nonstarting Offline refresh;
 the physical mid-compose proof. Frontend typecheck, 45 focused readiness tests
 and the local dead-code gate pass after the export correction.
 
-Browser-driven Brain Reload proof, retained differing-model assets and the
-remaining D1/D2/E/F acceptance stay open. The
-shared dev MCP preflight still expects the retired Worker distribution; the
-installed proof used the existing private supervisor harness with
-identity-checked teardown.
+Retained differing-model assets and the remaining D1/D2/E/F acceptance stay
+open. The installed mid-compose proof used the private supervisor harness with
+identity-checked teardown; the later browser run used the owned shared dev
+stack from this worktree.
+
+An owned dev-stack run `8c98e2d4-ef06-4db8-a161-07fb510f2a5e` at
+`f5d81ac1f` exercised the actual Brain Reload button. The Head inference
+generation advanced 2 → 3; official stop reported `portsClosed: true`.
+The same run exposed a model-identity projection defect during a compact to
+standard profile switch: `/v1/models` and a real completion reported the
+physical Qwen 9B server while `/api/inference/status` retained Qwen 4B as
+`activeModelId`. The committed runtime-status projection read the configured
+9B identity, but the inference view carried A's stale `/props` model ID.
+A local D1-4 fix prepares B's managed model identity in the logical publication
+snapshot without exposing it before commitment. The A/B regression passes at
+`tmp/3080-model-projection-focused.txt`; integrated and installed proof for
+this follow-up is now recorded below. Do not count the first browser run as a
+clean standard-model status proof.
+
+The next installed check exposed a second D1-4 defect: Reload of a transient
+standard profile selected the persisted compact profile again. The physical
+9B-to-4B change is preserved at `tmp/3087-reconfigure-refresh-model-identity-clean.txt`.
+Accepted `core.reconfigure` preparation now freezes the serving profile beside
+refresh intent (replay schema v2, with v1 recovery compatibility). The settings
+owner composes the frozen profile and refresh together; committed recovery
+replays both affected keys before the runner terminalizes. The inference owner
+publishes the candidate's managed model ID with B, never during private prep.
+The first integrated run `tmp/3090-refresh-profile-integrated.txt` caught an
+executor test still expecting the retired boolean-only settings call. Its
+accepted-context assertion was corrected and passed at
+`tmp/3091-reconfigure-executor-focused.txt`. The repeated 358-task integrated
+gate passed at `tmp/3092-refresh-profile-integrated.txt`. Installed standard
+proof `tmp/3093-reconfigure-refresh-physical-standard.txt` passed with real
+completions, generation 1 → 2, exact successor settings witness and the same
+physical Qwen 9B ID in `/v1/models` and `/api/inference/status` on both sides.
+The private stack stopped with ports closed; official quick health then reported
+ABSENT and inference REFUSED. This is local proof on dirty source atop
+`f5d81ac1f`; it needs a checkpoint and hosted proof before being reused as
+committed-revision evidence.
 
 ### Active checkpoint `d64339ef8` and D1-4 continuation
 

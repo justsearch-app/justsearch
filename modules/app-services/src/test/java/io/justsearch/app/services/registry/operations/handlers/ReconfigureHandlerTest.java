@@ -16,10 +16,12 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.settings.SettingsV2;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.settings.UiSettingsV2;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.configuration.model.ChatModelProfile;
 import java.time.Clock;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -98,6 +100,37 @@ final class ReconfigureHandlerTest {
   }
 
   @Test
+  void refreshFreezesTheServingProfileBeforeAcceptance() {
+    String key = key();
+    CapturingSettings owner = new CapturingSettings();
+    owner.servingProfileId = "standard";
+    ReconfigureHandler handler = new ReconfigureHandler(() -> owner);
+    OperationPreparation prepared = handler.prepare(arguments(settings(key), null, true),
+        PROVENANCE, CONTEXT);
+    owner.servingProfileId = "compact";
+
+    handler.executePrepared(prepared, PROVENANCE, CONTEXT, record(key));
+
+    assertEquals(new SettingsCandidateContext(ChatModelProfile.STANDARD, true),
+        owner.candidateContext);
+    assertTrue(prepared.replayPayloadJson().contains("standard"));
+  }
+
+  @Test
+  void legacyAcceptedRefreshRetainsItsOriginalNoProfileMeaning() {
+    String key = key();
+    String arguments = arguments(settings(key), null, true);
+    CapturingSettings owner = new CapturingSettings();
+    ReconfigureHandler handler = new ReconfigureHandler(() -> owner);
+    OperationPreparation legacy = new OperationPreparation(arguments, "settings-reconfigure-v1",
+        arguments, OperationPreparation.Content.METADATA);
+
+    handler.executePrepared(legacy, PROVENANCE, CONTEXT, record(key));
+
+    assertEquals(new SettingsCandidateContext(null, true), owner.candidateContext);
+  }
+
+  @Test
   void replayAndAcceptedRecordMustRetainTheOperationKey() {
     String key = key();
     ReconfigureHandler handler = new ReconfigureHandler(() -> new CapturingSettings());
@@ -154,6 +187,10 @@ final class ReconfigureHandlerTest {
     private final AtomicReference<EngineContext> context = new AtomicReference<>();
     private final AtomicReference<OperationRecordHandle> record = new AtomicReference<>();
     private boolean refreshInference;
+    private String servingProfileId;
+    private SettingsCandidateContext candidateContext;
+
+    @Override public String servingRefreshProfileId() { return servingProfileId; }
 
     @Override public OperationResult applyAccepted(SettingsV2 input, String modeIntentHeader,
         EngineContext context, OperationRecordHandle record) {
@@ -167,6 +204,14 @@ final class ReconfigureHandlerTest {
     @Override public OperationResult applyAccepted(SettingsV2 input, String modeIntentHeader,
         EngineContext context, OperationRecordHandle record, boolean refreshInference) {
       this.refreshInference = refreshInference;
+      return applyAccepted(input, modeIntentHeader, context, record);
+    }
+
+    @Override public OperationResult applyAccepted(SettingsV2 input, String modeIntentHeader,
+        EngineContext context, OperationRecordHandle record,
+        SettingsCandidateContext candidateContext) {
+      this.candidateContext = candidateContext;
+      this.refreshInference = candidateContext.forceGenerativeRefresh();
       return applyAccepted(input, modeIntentHeader, context, record);
     }
 

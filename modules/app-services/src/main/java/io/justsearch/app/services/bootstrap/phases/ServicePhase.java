@@ -272,7 +272,8 @@ public final class ServicePhase {
     RuntimeReconciler settingsReconciler = runtimeReconciler;
     SettingsService settings = new SettingsServiceImpl(in.settingsStore(), in.attempts(), () -> {
       if (settingsReconciler != null) settingsReconciler.specChanged();
-    }, in.engineAdmission());
+    }, in.engineAdmission(), () -> in.inferenceManager() == null
+        ? null : in.inferenceManager().servingChatProfileId());
 
     // §31 Phase 1.B-D: helper impls in app-services.
     AiInstallService aiInstallHelper =

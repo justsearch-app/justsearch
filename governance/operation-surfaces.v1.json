@@ -839,6 +839,15 @@
       "note": "Lane F C2-6 serializes the settings-file witness and projects recovery verdicts from the existing operation row. It never writes operation state; the runner terminalizes before releasing the fence."
     },
     {
+      "id": "reconfigure-accepted-handler",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ReconfigureHandler.java",
+      "guard": "test:ReconfigureHandlerTest",
+      "consumesProjection": "operation-record-type",
+      "note": "Lane F D1 reads the accepted reconfigure row and its frozen preparation to recover the candidate refresh intent. SettingsCommitCoordinator and the shared runner retain publication and terminal-write authority."
+    },
+    {
       "id": "settings-candidate-preparation",
       "kind": "consumer",
       "lang": "java",

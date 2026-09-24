@@ -95,6 +95,7 @@ final class OperationExecutorImplTest {
     var operation = new io.justsearch.app.services.registry.operations.CoreOperationCatalog()
         .findById(new OperationRef("core.reconfigure")).orElseThrow();
     var service = org.mockito.Mockito.mock(io.justsearch.app.api.SettingsService.class);
+    org.mockito.Mockito.when(service.servingRefreshProfileId()).thenReturn("standard");
     var handler = new io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler(() -> service);
     handlers.register(operation.id(), handler);
     String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
@@ -108,12 +109,16 @@ final class OperationExecutorImplTest {
         context, ExecutorTag.UI, Instant.now(), Optional.empty());
     org.mockito.Mockito.when(service.applyAccepted(org.mockito.ArgumentMatchers.eq(settings),
         org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.any(),
-        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(true))).thenAnswer(call -> {
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(
+            io.justsearch.app.api.settings.SettingsCandidateContext.class))).thenAnswer(call -> {
           var row = operationStore.find(key).orElseThrow();
           var accepted = operationStore.acceptedPreparation(row.id()).orElseThrow();
           var physical = io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler
               .acceptedCandidateContext(row, accepted);
           assertTrue(physical.forceGenerativeRefresh());
+          assertEquals(io.justsearch.configuration.model.ChatModelProfile.STANDARD,
+              physical.chatProfile());
+          assertEquals(physical, call.getArgument(4));
           var settingsOwner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(
               new io.justsearch.app.services.settings.UiSettingsStore(
                   io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.READ_WRITE,
@@ -134,7 +139,9 @@ final class OperationExecutorImplTest {
     assertTrue(result.success());
     org.mockito.Mockito.verify(service).applyAccepted(org.mockito.ArgumentMatchers.eq(settings),
         org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.any(),
-        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(true));
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(
+            new io.justsearch.app.api.settings.SettingsCandidateContext(
+                io.justsearch.configuration.model.ChatModelProfile.STANDARD, true)));
   }
 
   @org.junit.jupiter.params.ParameterizedTest

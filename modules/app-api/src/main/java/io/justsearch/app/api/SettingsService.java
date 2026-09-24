@@ -7,6 +7,9 @@ import io.justsearch.agent.api.registry.OperationResult;
 
 /** Settings producers route through the existing accepted operation owner. */
 public interface SettingsService {
+  /** Serving profile captured before acceptance for an explicit inference refresh. */
+  default String servingRefreshProfileId() { return null; }
+
   /**
    * Accept one fresh internal attempt for a caller-owned candidate and its captured full witness.
    * Internal producers do not reuse a public ingress key; the parent operation owns their retry.
@@ -46,6 +49,18 @@ public interface SettingsService {
       throw new UnsupportedOperationException("Generative reconfigure refresh is unavailable");
     }
     return applyAccepted(input, modeIntentHeader, context, record);
+  }
+
+  /** Execute the accepted refresh using its frozen transient model profile. */
+  default OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
+      String modeIntentHeader, io.justsearch.core.context.EngineContext context,
+      OperationRecordHandle record,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    if (candidateContext.hasChatProfile()) {
+      throw new UnsupportedOperationException("Accepted profile refresh is unavailable");
+    }
+    return applyAccepted(input, modeIntentHeader, context, record,
+        candidateContext.forceGenerativeRefresh());
   }
 
   /** Freeze the readable witness or absent-history quarantine identity without an effect. */

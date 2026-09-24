@@ -954,8 +954,14 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         throw new IllegalStateException("Committed settings witness changed during boot recovery");
       }
       ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(snapshot.settings()), "Recovered config");
-      var affected = Map.<String, java.util.Set<String>>of("generative",
-          recoveredContext.hasChatProfile() ? java.util.Set.of("chatProfile") : java.util.Set.of("modelRefresh"));
+      var generativeKeys = new java.util.TreeSet<String>();
+      if (recoveredContext.hasChatProfile()) {
+        generativeKeys.add("chatProfile");
+      }
+      if (recoveredContext.forceGenerativeRefresh()) {
+        generativeKeys.add("modelRefresh");
+      }
+      var affected = Map.<String, java.util.Set<String>>of("generative", java.util.Set.copyOf(generativeKeys));
       prepared = Objects.requireNonNull(components.prepare(snapshot.settings(), desired, affected,
           recoveredContext), "Recovered component transaction");
       SettingsComponentComposer.Prepared chosen = prepared;

@@ -143,6 +143,42 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
+  void preparedModelSwitchPublishesCandidateIdentityInsteadOfIncumbentProps() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    Path bModel = directory.resolve("candidate-b.gguf");
+    Files.writeString(bModel, "test candidate");
+    InferenceConfig b = new InferenceConfig(a.serverExecutable(), bModel, null,
+        a.serverPort(), 8192, 0, false);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.propsObserver.onModelIdObserved("model.gguf", server.active.get().context());
+      assertEquals("model.gguf", manager.lastKnownModelId());
+      server.onHealth = result -> {
+        if (result.context().inference() == b) {
+          server.propsObserver.onModelIdObserved("candidate-b.gguf", result.context());
+          assertEquals("model.gguf", manager.lastKnownModelId(),
+              "private B's props must not publish before settings commitment");
+        }
+      };
+
+      var prepared = manager.prepareResolvedConfig(b, resolvedB);
+      assertEquals("model.gguf", manager.lastKnownModelId(),
+          "candidate preparation must not expose B before settings commitment");
+      prepared.withLifecycleLock(prepared::installAfterSettingsCommit);
+      prepared.retireAfterSettingsCommit();
+
+      assertEquals("candidate-b.gguf", manager.lastKnownModelId());
+      assertSame(b, server.active.get().context().inference());
+    }
+  }
+
+  @Test
   void preparedCandidateDeathRefusesCommitAndRestoresIncumbent() throws Exception {
     InferenceConfig a = config(0, 4096);
     InferenceConfig b = config(0, 8192);
@@ -947,6 +983,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
     return TestResolvedConfigHelper.fromEntries(
         java.util.Map.of(
             "justsearch.llm.reasoning_budget", Integer.toString(identity.charAt(0)),
+            "justsearch.data.dir", directory.resolve("data").toString(),
             "policy.gpu_acceleration_enabled", Boolean.toString(gpuAllowed)));
   }
 
@@ -1063,6 +1100,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
     private final MockedConstruction<LlamaServerOps> construction;
     private Consumer<LlamaServerOps.StartRequest> onStart = request -> {};
     private Consumer<LlamaServerOps.StartResult> onHealth = result -> {};
+    private PropsObserver propsObserver;
     private Consumer<BooleanSupplier> recovery;
     private Consumer<BooleanSupplier> terminal;
 
@@ -1072,6 +1110,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
           mockConstruction(
               LlamaServerOps.class,
               (server, context) -> {
+                propsObserver = (PropsObserver) context.arguments().get(5);
                 recovery = (Consumer<BooleanSupplier>) context.arguments().get(6);
                 terminal = (Consumer<BooleanSupplier>) context.arguments().get(7);
                 when(server.startLlamaServer(any()))

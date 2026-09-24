@@ -3,12 +3,15 @@ package io.justsearch.app.services.registry.executor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.agent.api.encryption.StoreCipher;
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
@@ -27,6 +30,7 @@ import io.justsearch.app.services.settings.SettingsComponentComposer;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.core.context.EngineContext;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -61,7 +65,9 @@ final class ReconfigureRefreshRecoveryTest {
         Optional.empty());
     UUID nonce = UUID.randomUUID();
     var codec = new PreparedInvocationCodec(StoreCipher.disabled());
-    var handler = new ReconfigureHandler(() -> null);
+    SettingsService source = mock(SettingsService.class);
+    when(source.servingRefreshProfileId()).thenReturn("standard");
+    var handler = new ReconfigureHandler(() -> source);
     var prepared = handler.prepare(arguments, provenance, context);
     var envelope = codec.freeze(key, nonce, descriptor, prepared, context, provenance);
     try (var operations = new SqliteOperationStore(db)) {
@@ -87,7 +93,8 @@ final class ReconfigureRefreshRecoveryTest {
         @Override public Prepared prepare(UiSettings ui, ResolvedConfig resolved,
             Map<String, Set<String>> affected, SettingsCandidateContext recovered) {
           assertTrue(recovered.forceGenerativeRefresh());
-          assertEquals(Set.of("modelRefresh"), affected.get("generative"));
+          assertEquals(ChatModelProfile.STANDARD, recovered.chatProfile());
+          assertEquals(Set.of("modelRefresh", "chatProfile"), affected.get("generative"));
           assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
           return new Prepared() {
             @Override public void validate() {}

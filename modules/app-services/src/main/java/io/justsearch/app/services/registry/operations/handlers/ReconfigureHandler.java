@@ -17,6 +17,7 @@ import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsV2;
 import io.justsearch.app.services.registry.executor.PreparedInvocationCodec;
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.configuration.model.ChatModelProfile;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -32,7 +33,8 @@ import tools.jackson.databind.JsonNode;
  * runner; this handler never accepts or starts a nested settings operation.
  */
 public final class ReconfigureHandler implements OperationHandler {
-  public static final String SCHEMA = "settings-reconfigure-v1";
+  public static final String SCHEMA = "settings-reconfigure-v2";
+  private static final String LEGACY_SCHEMA = "settings-reconfigure-v1";
   private final Supplier<SettingsService> supplier;
 
   public ReconfigureHandler(Supplier<SettingsService> supplier) {
@@ -53,8 +55,10 @@ public final class ReconfigureHandler implements OperationHandler {
     } catch (RuntimeException malformed) {
       throw invalidArguments();
     }
+    String profileId = envelope.refreshInference() ? service().servingRefreshProfileId() : null;
+    if (profileId != null) ChatModelProfile.resolve(profileId);
     return new OperationPreparation(argumentsJson, SCHEMA,
-        HandlerJson.MAPPER.writeValueAsString(envelope));
+        HandlerJson.MAPPER.writeValueAsString(new ReplayEnvelope(envelope, profileId)));
   }
 
   @Override
@@ -63,22 +67,37 @@ public final class ReconfigureHandler implements OperationHandler {
   }
 
   private static Envelope validatedEnvelope(OperationPreparation prepared) {
+    return validatedReplay(prepared).intent();
+  }
+
+  private static ReplayEnvelope validatedReplay(OperationPreparation prepared) {
     Objects.requireNonNull(prepared, "prepared");
     if (prepared.content() != OperationPreparation.Content.METADATA
-        || !SCHEMA.equals(prepared.replaySchema())) {
+        || (!SCHEMA.equals(prepared.replaySchema())
+            && !LEGACY_SCHEMA.equals(prepared.replaySchema()))) {
       throw new IllegalArgumentException("Reconfigure preparation schema mismatch");
     }
     Envelope publicEnvelope = decodeEnvelope(prepared.argumentsJson());
-    Envelope replayEnvelope;
+    ReplayEnvelope replay;
     try {
-      replayEnvelope = decodeEnvelope(prepared.replayPayloadJson());
+      if (LEGACY_SCHEMA.equals(prepared.replaySchema())) {
+        replay = new ReplayEnvelope(decodeEnvelope(prepared.replayPayloadJson()), null);
+      } else {
+        replay = HandlerJson.MAPPER.readValue(prepared.replayPayloadJson(), ReplayEnvelope.class);
+      }
     } catch (RuntimeException malformed) {
       throw new IllegalArgumentException("Invalid reconfigure preparation");
     }
-    if (!publicEnvelope.equals(replayEnvelope)) {
+    if (replay == null || replay.intent() == null || !publicEnvelope.equals(replay.intent())) {
       throw new IllegalArgumentException("Reconfigure preparation differs from its invocation");
     }
-    return replayEnvelope;
+    if (replay.servingProfileId() != null) {
+      if (!replay.intent().refreshInference()) {
+        throw new IllegalArgumentException("Non-refresh reconfigure cannot carry a model profile");
+      }
+      ChatModelProfile.resolve(replay.servingProfileId());
+    }
+    return replay;
   }
 
   /** The settings owner verifies a physical refresh against this exact accepted invocation. */
@@ -88,13 +107,16 @@ public final class ReconfigureHandler implements OperationHandler {
         || !"core.reconfigure".equals(row.descriptor().operationRef())) {
       throw new IllegalArgumentException("Reconfigure candidate row mismatch");
     }
-    Envelope envelope = validatedEnvelope(
+    ReplayEnvelope replay = validatedReplay(
         PreparedInvocationCodec.decodeAcceptedReconfigureMetadata(row, accepted));
+    Envelope envelope = replay.intent();
     if (!row.key().equals(envelope.settings().operationKey())) {
       throw new IllegalArgumentException("Reconfigure candidate operation identity mismatch");
     }
     return envelope.refreshInference()
-        ? new SettingsCandidateContext(null, true) : SettingsCandidateContext.NONE;
+        ? new SettingsCandidateContext(replay.servingProfileId() == null ? null
+            : ChatModelProfile.resolve(replay.servingProfileId()), true)
+        : SettingsCandidateContext.NONE;
   }
 
   @Override
@@ -108,15 +130,19 @@ public final class ReconfigureHandler implements OperationHandler {
   @Override
   public OperationExecution executePrepared(OperationPreparation prepared,
       InvocationProvenance provenance, EngineContext context, OperationRecordHandle record) {
-    validatePreparation(prepared);
+    ReplayEnvelope replay = validatedReplay(prepared);
     Objects.requireNonNull(record, "accepted reconfigure record");
-    Envelope envelope = decodeEnvelope(prepared.replayPayloadJson());
+    Envelope envelope = replay.intent();
     if (!record.key().equals(envelope.settings().operationKey())) {
       throw new IllegalArgumentException("Reconfigure operation identity mismatch");
     }
     return OperationExecution.finished(
         service().applyAccepted(envelope.settings(), envelope.modeIntent(),
-            Objects.requireNonNull(context, "context"), record, envelope.refreshInference()));
+            Objects.requireNonNull(context, "context"), record,
+            envelope.refreshInference()
+                ? new SettingsCandidateContext(replay.servingProfileId() == null ? null
+                    : ChatModelProfile.resolve(replay.servingProfileId()), true)
+                : SettingsCandidateContext.NONE));
   }
 
   private SettingsService service() {
@@ -172,4 +198,7 @@ public final class ReconfigureHandler implements OperationHandler {
 
   /** Public input and durable replay use the same typed values. */
   public record Envelope(SettingsV2 settings, String modeIntent, boolean refreshInference) {}
+
+  /** Replay-only profile frozen from the serving runtime before the row is accepted. */
+  private record ReplayEnvelope(Envelope intent, String servingProfileId) {}
 }
