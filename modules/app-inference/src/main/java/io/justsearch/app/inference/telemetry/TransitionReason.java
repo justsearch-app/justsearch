@@ -21,7 +21,7 @@ public enum TransitionReason {
   VDU_EXIT("vdu_exit"),
   /** Boot-time auto-start of the inference runtime when no operator action was needed. */
   AUTO_START("auto_start"),
-  /** Operator hit {@code POST /api/admin/inference/reload} (smoke-gate / manual reload path). */
+  /** An operator requested a runtime refresh through the accepted reconfigure path. */
   ADMIN_TRIGGERED("admin_triggered"),
   /** JVM shutdown / process termination path. */
   SHUTDOWN("shutdown"),

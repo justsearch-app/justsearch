@@ -681,51 +681,6 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
-  "id" : "core.reload-inference",
-  "type" : "operation",
-  "presentation" : {
-    "labelKey" : "ops.reload-inference.label",
-    "descriptionKey" : "ops.reload-inference.description"
-  },
-  "intf" : {
-    "inputs" : {
-      "type" : "object",
-      "properties" : { }
-    },
-    "result" : {
-      "type" : "object",
-      "properties" : {
-        "mode" : {
-          "type" : "string"
-        }
-      }
-    },
-    "errors" : [ ],
-    "uiHints" : { }
-  },
-  "policy" : {
-    "risk" : "MEDIUM",
-    "confirm" : {
-      "kind" : "INLINE"
-    },
-    "audit" : "METADATA_ONLY",
-    "undoSupported" : false,
-    "inverseOperationId" : null
-  },
-  "availability" : { },
-  "lineage" : {
-    "affects" : [ ],
-    "supersedes" : [ ]
-  },
-  "provenance" : {
-    "tier" : "CORE",
-    "contributorId" : "core",
-    "version" : "1.0"
-  },
-  "executors" : [ "UI" ],
-  "audience" : "USER",
-  "consumers" : [ ]
-}, {
   "id" : "core.switch-inference-mode",
   "type" : "operation",
   "presentation" : {
@@ -1385,6 +1340,9 @@
         },
         "modeIntent" : {
           "type" : [ "string", "null" ]
+        },
+        "refreshInference" : {
+          "type" : "boolean"
         }
       }
     },

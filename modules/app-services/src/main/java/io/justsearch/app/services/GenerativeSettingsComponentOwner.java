@@ -92,8 +92,11 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
           Files.isRegularFile(mmproj) ? mmproj : null, inference.serverPort(),
           inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id());
     }
-    EngineComponentSnapshot.Component preparedObservation =
-        preparedObservation(desired, inference, enabled);
+    EngineComponentSnapshot.Component before = observation.snapshot();
+    EngineComponentSnapshot.Component nonServingObservation =
+        preparedObservation(desired, inference, enabled, false, before);
+    EngineComponentSnapshot.Component servingObservation = enabled
+        ? preparedObservation(desired, inference, true, true, before) : nonServingObservation;
 
     if (manager == null) {
       if (enabled) {
@@ -101,10 +104,9 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
             "Managed generative inference was not composed at process boot",
             Map.of("changedKeys", Set.copyOf(changedKeys), "chatEnabled", true), null);
       }
-      return new AbsentPreparedOwner(preparedObservation);
+      return new AbsentPreparedOwner(nonServingObservation);
     }
 
-    EngineComponentSnapshot.Component before = observation.snapshot();
     ComponentState stagingState = before.state() == ComponentState.READY
         ? ComponentState.RELOADING : ComponentState.STARTING;
     if (!observation.transitionIfUnchanged(before, stagingState,
@@ -115,8 +117,13 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     }
     EngineComponentSnapshot.Component staging = observation.snapshot();
     try {
-      var prepared = manager.prepareResolvedConfig(inference, desired, enabled);
-      return new ManagedPreparedOwner(prepared, preparedObservation, observation, before, staging);
+      // The manager resolves RESTART_IF_ONLINE while holding its lifecycle lock. Selecting one
+      // of these prebuilt observations after preparation does not allocate or inspect runtime.
+      var prepared = manager.prepareResolvedConfig(inference, desired, enabled,
+          candidateContext.forceGenerativeRefresh());
+      return new ManagedPreparedOwner(prepared,
+          prepared.targetsOnline() ? servingObservation : nonServingObservation,
+          observation, before, staging);
     } catch (ModeTransitionException failure) {
       restoreObservation(before, staging);
       throw refused(PREPARATION_REFUSED,
@@ -141,28 +148,31 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
   }
 
   private EngineComponentSnapshot.Component preparedObservation(ResolvedConfig desired,
-      InferenceConfig inference, boolean enabled) {
-    EngineComponentSnapshot.Component previous = observation.snapshot();
-    String version = enabled
-        ? HeadAssembly.generativeAppliedVersion(inference)
+      InferenceConfig inference, boolean enabled, boolean startManaged,
+      EngineComponentSnapshot.Component previous) {
+    String version = enabled ? HeadAssembly.generativeAppliedVersion(inference)
         : HeadAssembly.generativeAbsentVersion(desired, liteMode);
+    boolean configuredOffline = enabled && !startManaged;
     return new EngineComponentSnapshot.Component(
         previous.spec(),
-        enabled ? ComponentState.READY : ComponentState.ABSENT,
-        enabled ? null : LifecycleReasonCode.INFERENCE_DEACTIVATED.code(),
+        startManaged ? ComponentState.READY : ComponentState.ABSENT,
+        startManaged ? null : LifecycleReasonCode.INFERENCE_DEACTIVATED.code(),
         previous.stateSince(),
         previous.stateSinceMonotonicNanos(),
-        version,
+        configuredOffline ? previous.appliedVersion() : version,
         version,
         new ComposeEvidence(
             ComposeEvidence.Mode.IN_PLACE,
-            enabled ? "managed candidate verified" : "generative intent disabled",
+            startManaged ? "managed candidate verified"
+                : configuredOffline ? "generative configuration retained while offline"
+                    : "generative intent disabled",
             null,
             null),
         0,
-        enabled
+        startManaged
             ? "settings candidate verified managed generative serving state"
-            : "settings candidate disables generative serving state");
+            : configuredOffline ? "settings candidate configured for the next Online turn"
+                : "settings candidate disables generative serving state");
   }
 
   private static SettingsCommitOwner.Refused refused(String code, String message,

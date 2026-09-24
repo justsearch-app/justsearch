@@ -4,40 +4,12 @@ package io.justsearch.app.api;
 /**
  * Brain inference runtime control surface exposed to the AppFacade.
  *
- * <p>Slice 3a-2-c continuation (BrainRuntimeSection cluster): backs
- * {@code core.reload-inference} (apply persisted settings to the running
- * inference runtime) and {@code core.switch-inference-mode} (online/indexing
- * toggle). Production wiring: {@code InferenceHandlers} (modules/ui)
- * implements this interface; {@code LocalApiServer} late-binds it onto
- * {@code HeadAssembly} after both are constructed.
- *
- * <p>Why a dedicated service interface rather than extending
- * {@link OnlineAiService}: reloadInference depends on the
- * {@code UiSettingsStore} (modules/ui-side persistence) to read the model
- * path / context length / GPU layers before invoking
- * {@code OnlineAiRuntimeControl.applyRuntimeOverrides}. Pulling that into
- * {@code OnlineAiServiceImpl} would couple inference to settings; the
- * BrainRuntimeService wrapper keeps that coupling at the controller layer
- * where it already exists.
+ * <p>Owns the runtime-intent and offline-processing operations. Settings-driven
+ * generative refresh is owned by the accepted {@code core.reconfigure} transaction.
  *
  * <p>Stability: stable (API contract).
  */
 public interface BrainRuntimeService {
-
-  /**
-   * Apply persisted settings (model path, context length, GPU layers) to the
-   * running inference runtime.
-   *
-   * <p>Must NOT auto-start llama-server when offline — only restarts the
-   * server when already in ONLINE mode. Mirrors the pre-existing
-   * {@code POST /api/inference/reload} contract bit-identically.
-   *
-   * @return the post-apply current mode (e.g., {@code "online"},
-   *     {@code "indexing"}, {@code "offline"}) for the caller to surface
-   * @throws Exception on apply failure (invalid config, missing model,
-   *     subprocess restart failure)
-   */
-  String reloadInference() throws Exception;
 
   /**
    * Record a chat-enabled intent expressed in the legacy mode vocabulary. Validates the mode

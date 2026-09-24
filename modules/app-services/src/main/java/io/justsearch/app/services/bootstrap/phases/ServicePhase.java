@@ -355,8 +355,6 @@ public final class ServicePhase {
     BrainRuntimeService brainRuntime =
         new BrainRuntimeServiceImpl(
             onlineAiService,
-            in.settingsStore(),
-            enterprisePolicy,
             offlineProcessingTrigger,
             // Tempdoc 737 fix pack (fix 4): switchInferenceMode records the chat-enabled intent
             // through the one authority (spec write + reconciler nudge); null in the no-inference

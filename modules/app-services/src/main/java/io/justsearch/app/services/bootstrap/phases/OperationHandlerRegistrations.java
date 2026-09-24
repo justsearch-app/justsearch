@@ -33,7 +33,6 @@ import io.justsearch.app.services.registry.operations.handlers.PreviewExcludesHa
 import io.justsearch.app.services.registry.operations.handlers.ReconcileRootHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReindexHandler;
-import io.justsearch.app.services.registry.operations.handlers.ReloadInferenceHandler;
 import io.justsearch.app.services.registry.operations.handlers.RemoveWatchedRootHandler;
 import io.justsearch.app.services.registry.operations.handlers.RepairAiInstallHandler;
 import io.justsearch.app.services.registry.operations.handlers.ResetSettingsHandler;
@@ -141,9 +140,6 @@ public final class OperationHandlerRegistrations {
     handlers.register(
         CoreOperationCatalog.COPY_DIAGNOSTIC_SUMMARY,
         new CopyDiagnosticSummaryHandler(diagnosticsServiceSupplier));
-    handlers.register(
-        CoreOperationCatalog.RELOAD_INFERENCE,
-        new ReloadInferenceHandler(brainRuntimeServiceSupplier));
     // Tempdoc 737 §12b: the intent-write op (no preconditions) and the superseded
     // switch-inference-mode alias both converge on the one spec-write path.
     handlers.register(

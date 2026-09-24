@@ -460,12 +460,9 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   is wired in a future tempdoc, the queue/generation fields return alongside matching
   `inference.queue.*` / `inference.generation.*` metric definitions.
 
-  Admin trigger: `POST /api/admin/inference/reload` (operator-only; loopback-bound) calls
-  `OnlineAiRuntimeControl.reloadRuntime()` which delegates to
-  `applyRuntimeOverrides(null, null, null, RESTART_IF_ONLINE)` — a no-op when the runtime
-  is offline; otherwise restarts with the current config. Returns
-  `{transitionDurationMs, phase, generationId, reason}`. Mirrors the 406 admin index
-  reload endpoint.
+  Inference refresh is prepared through the accepted `core.reconfigure` operation.
+  The Brain settings surface can submit the current witnessed settings with a
+  refresh intent. The ordinary and admin direct reload routes have been retired.
 
   ArchUnit contract: `InferenceObservabilityArchTest` enforces (a) no class outside
   `io.justsearch.app.services.inference..` (plus `BootstrapInferenceFactory`) depends

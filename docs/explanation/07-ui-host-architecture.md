@@ -90,7 +90,7 @@ The `LocalApiServer` exposes REST endpoints that map to controllers:
 *   **Ingestion progress:** `POST /api/knowledge/ingest` is a flat alias for the prepared `core.ingest-files` operation. Its response supplies `structuredData.operationKey`; `GET /api/operation-history/{operationKey}` reads durable state and committed progress. The former scan SSE endpoint is retired.
 *   **Library Resolve-Hash (ADR-0028):** `POST /api/library/resolve-hash` — the *only* HTTP endpoint allowed to resolve a `pathHash` back to a filename. Diagnostic export endpoints MUST NOT call it (ArchUnit-enforced). Tempdoc 419 / T5.
 *   **Diagnostics — Ingestion ledger:** `GET /api/diagnostics/ingestion/recent`, `GET /api/diagnostics/ingestion/summary` — privacy-safe ingestion outcome reads (path-hash only). Tempdoc 410 §12.
-*   **Inference Control:** `GET /api/inference/status`, `POST /api/inference/mode`, `POST /api/inference/reload`, `POST /api/inference/detach`
+*   **Inference Control:** `GET /api/inference/status`, `POST /api/inference/mode`, `POST /api/inference/detach`. The Brain settings surface requests inference refresh through an accepted `core.reconfigure` preparation.
 *   **Policy:** `GET /api/policy/effective`, `GET /api/policy/validate`, `POST /api/policy/user/create`, `POST /api/policy/user/allowlist/pack-manifest/add`
 *   **AI Install:** `GET /api/ai/install/manifest`, `GET /api/ai/install/status`, `POST /api/ai/install/start`, `POST /api/ai/install/cancel`, `POST /api/ai/install/repair`
 *   **AI Packs:** `POST /api/ai/packs/preflight`, `POST /api/ai/packs/import`, `GET /api/ai/packs/status`, `GET /api/ai/packs/installed`

@@ -912,6 +912,11 @@ public class InferenceLifecycleManager
     public String declaredConfigHash() {
       return candidate == null ? null : candidate.declaredConfigHash();
     }
+
+    /** Whether preparation verified a managed server for Online publication. */
+    public boolean targetsOnline() {
+      return enabled;
+    }
   }
 
   /**
@@ -930,6 +935,13 @@ public class InferenceLifecycleManager
   public PreparedConfigApply prepareResolvedConfig(
       InferenceConfig candidate, ResolvedConfig candidateResolved, boolean enabled)
       throws ModeTransitionException {
+    return prepareResolvedConfig(candidate, candidateResolved, enabled, false);
+  }
+
+  /** For refresh, resolve the Online-only restart under the lifecycle lock. */
+  public PreparedConfigApply prepareResolvedConfig(
+      InferenceConfig candidate, ResolvedConfig candidateResolved, boolean enabled,
+      boolean restartIfOnline) throws ModeTransitionException {
     Objects.requireNonNull(candidateResolved, "candidateResolved");
     if (candidate == null) {
       throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
@@ -948,6 +960,7 @@ public class InferenceLifecycleManager
     boolean transferred = false;
     try {
     synchronized (runner.lock()) {
+      boolean startManaged = enabled && (!restartIfOnline || runner.currentMode() == Mode.ONLINE);
       if (precommitComposition || preparedConfigApply != null) {
         throw modeTransition(
             ModeTransitionException.Reason.ALREADY_TRANSITIONING,
@@ -958,7 +971,7 @@ public class InferenceLifecycleManager
             ModeTransitionException.Reason.ALREADY_TRANSITIONING,
             "Inference runtime is transitioning; try again shortly");
       }
-      if (enabled && runner.currentMode() == Mode.INDEXING) {
+      if (startManaged && runner.currentMode() == Mode.INDEXING) {
         throw modeTransition(
             ModeTransitionException.Reason.ALREADY_TRANSITIONING,
             "Managed inference cannot be enabled while indexing is active");
@@ -972,7 +985,7 @@ public class InferenceLifecycleManager
       var context = new LlamaServerConfigContext(candidate, candidateResolved);
       var request = new LlamaServerOps.StartRequest(
           context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
-      if (enabled) {
+      if (startManaged) {
         validatePrecommitCandidate(request);
       } else {
         try {
@@ -995,7 +1008,7 @@ public class InferenceLifecycleManager
       }
 
       precommitComposition = true;
-      if (!enabled) {
+      if (!startManaged) {
         ConfiguredInference candidateConfiguration = new ConfiguredInference(
             candidate, candidateResolved,
             LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);

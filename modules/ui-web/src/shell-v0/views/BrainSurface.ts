@@ -1344,6 +1344,14 @@ export class BrainSurface extends JfElement {
     return result.structuredData;
   }
 
+  private async refreshInference(): Promise<void> {
+    await saveAbsoluteSettings(
+      (path, init) => authorizedFetch(this.base() + path, init),
+      {},
+      { headers: { 'X-JustSearch-Refresh-Inference': 'true' }, timeoutMs: 180_000 },
+    );
+  }
+
   /**
    * Tempdoc 508-followup §ε2 — host-aware confirm dialog. Falls back
    * to the direct confirmAsync when host_ is absent.
@@ -3306,7 +3314,7 @@ export class BrainSurface extends JfElement {
                   ? { kind: 'blocked' }
                   : AVAILABLE}
               .onActivate=${() =>
-                this.withBusy('inference-switch', () => this.invokeOp('core.reload-inference'))}
+                this.withBusy('inference-switch', () => this.refreshInference())}
             >
               Reload
             </jf-button>

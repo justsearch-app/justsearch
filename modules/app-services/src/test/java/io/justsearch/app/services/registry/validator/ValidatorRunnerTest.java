@@ -129,11 +129,7 @@ final class ValidatorRunnerTest {
         CoreOperationCatalog.APPLY_EXCLUDES,
         new io.justsearch.app.services.registry.operations.handlers.ApplyExcludesHandler(
             () -> null));
-    // Slice 3a-2-c BrainRuntime cluster (reload-inference + switch-inference-mode).
-    handlers.register(
-        CoreOperationCatalog.RELOAD_INFERENCE,
-        new io.justsearch.app.services.registry.operations.handlers.ReloadInferenceHandler(
-            () -> null));
+    // The remaining inference mode operation writes runtime intent.
     handlers.register(
         CoreOperationCatalog.SWITCH_INFERENCE_MODE,
         new io.justsearch.app.services.registry.operations.handlers.SwitchInferenceModeHandler(

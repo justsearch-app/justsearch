@@ -610,58 +610,6 @@ final class InferenceHandlers {
   }
 
   /**
-   * Handles POST /api/inference/reload - applies persisted settings to the running inference
-   * runtime.
-   *
-   * <p>This endpoint MUST NOT auto-start llama-server when the system is offline. It only restarts
-   * the server when already in ONLINE mode.
-   */
-  void handleReloadInferenceConfig(Context ctx) {
-    OnlineAiService onlineAi = onlineAiService;
-    if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
-      ctx.status(503)
-          .json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, "Inference runtime control unavailable", telemetry, ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-
-    if (settingsStore == null) {
-      ctx.status(500)
-          .json(ApiErrorHandler.toResponse(ApiErrorCode.SETTINGS_UNAVAILABLE, "Settings store unavailable", telemetry, ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-
-    // Refresh policy sysprops before any Online-mode path that might check external server adoption
-    // policy.
-    if (enterprisePolicyService != null) {
-      try {
-        enterprisePolicyService.snapshot();
-      } catch (Exception ignored) {
-        // best-effort; do not fail reload on policy snapshot errors
-      }
-    }
-
-    io.justsearch.app.api.UiSettings s = settingsStore.load();
-    try {
-      control.applyRuntimeOverrides(
-          s.getLlmModelPath(),
-          s.getContextLength(),
-          s.configuredGpuLayers(),
-          OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
-      ctx.json(Map.of("success", true, "mode", onlineAi.getCurrentMode()));
-    } catch (Exception e) {
-      log.error("Failed to apply inference runtime config", e);
-      String msg = e.getMessage();
-      if (msg == null || msg.isBlank()) {
-        msg = e.toString();
-      }
-      Map<String, Object> payload = ApiErrorHandler.toResponse(ApiErrorCode.INFERENCE_RELOAD_FAILED, msg, telemetry, ApiErrorHandler.routeOf(ctx));
-      payload.put("mode", onlineAi.getCurrentMode());
-      payload.put("causes", buildCauseChain(e));
-      ctx.status(500).json(payload);
-    }
-  }
-
-  /**
    * Handles POST /api/inference/detach - detaches from an adopted external llama-server instance (if
    * any) and starts a managed llama-server on a new free port.
    */

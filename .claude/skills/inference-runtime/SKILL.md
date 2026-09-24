@@ -826,7 +826,7 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
     *   **Crash Recovery:** If the owned server crashes while in Online mode, it stops and restarts it (with cleanup first). Health checks and crash recovery run on independent schedulers (`healthScheduler`, `recoveryScheduler`), preventing a slow health probe from blocking recovery.
     *   **Mode State Machine:** `ModeStateMachine` validates all mode transitions (`beginTransition` → `complete`/`rollback`, `forceOffline` for emergencies). No raw state assignments — all transitions go through validated operations with precondition checks.
     *   **Effective Runtime Info:** Reads `/props` to capture best-effort runtime `n_ctx` and `model_alias`, which is surfaced via `/api/inference/status` and used as the request `model` id.
-    *   **Hot-apply (current):** The Local API exposes `POST /api/inference/reload`, which re-reads persisted `/api/settings/v2` values and calls `OnlineAiRuntimeControl.applyRuntimeOverrides(...)` with `RESTART_IF_ONLINE`.
+    *   **Inference refresh:** The Brain settings surface submits the current witnessed `/api/settings/v2` values with an explicit refresh intent through accepted `core.reconfigure` preparation. The settings owner applies the refresh to the runtime with `RESTART_IF_ONLINE`.
         * This updates model/context/gpuLayers without a full backend restart.
         * It **must not** auto-start `llama-server` when the system is Offline; it only restarts when already Online.
         * If Online AI adopted an external `llama-server` instance (no process handle), restart is rejected; use `POST /api/inference/detach` to switch to a managed server on a new port.

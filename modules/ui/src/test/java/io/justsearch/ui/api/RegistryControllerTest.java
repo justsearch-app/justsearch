@@ -90,8 +90,9 @@ final class RegistryControllerTest {
     // Tempdoc 899 D5: core.copy-diagnostic-summary added; total 31.
     // Tempdoc 931 §E item 10: core.settle-index added; total 32. D1-4 adds
     // core.reconfigure to the canonical core catalog, bringing this fixture to 33.
-    // Lane F's separately approved installer activation brings it to 34.
-    assertEquals(34, envelope.get("entries").size());
+    // Lane F's separately approved installer activation brings it to 34;
+    // retiring core.reload-inference returns the catalog to 33.
+    assertEquals(33, envelope.get("entries").size());
     assertTrue(envelope.get("entries").toString().contains("core.activate-installed-models"));
   }
 

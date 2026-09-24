@@ -271,7 +271,7 @@ export async function exerciseOperationFault(c) {
       const row = operationRow(operationPath, operationKey);
       return row?.state === 'FAILED' ? row : null;
     });
-    requireThat(failed.failure_reason === 'interrupted_before_settings_commit',
+    requireThat(failed.failure_reason === 'ENGINE_RESTARTED_DURING_APPLY',
       `settings owner must classify the unarmed accepted row: ${JSON.stringify(failed)}`);
     requireThat(sameJson(settingsWitnessOnDisk(data).witness, originalWitness),
       'pre-effect settings recovery must leave the committed witness unchanged');

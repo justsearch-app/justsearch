@@ -102,7 +102,7 @@ final class BrainRuntimeServiceImplTest {
     reconciler.addSpecChangeListener(nudged::incrementAndGet);
     RecordingOnlineAi onlineAi = new RecordingOnlineAi();
     BrainRuntimeServiceImpl svc =
-        new BrainRuntimeServiceImpl(onlineAi, intent.settings(), null, null, spec, reconciler);
+        new BrainRuntimeServiceImpl(onlineAi, null, spec, reconciler);
     return new Fixture(onlineAi, spec, nudged, svc);
   }
 

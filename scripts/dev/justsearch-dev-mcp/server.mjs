@@ -729,7 +729,6 @@ export const API_CALL_ALLOWLIST = [
   // Inference
   { path: '/api/inference/status', methods: ['GET'] },
   { path: '/api/inference/mode', methods: ['POST'] },
-  { path: '/api/inference/reload', methods: ['POST'] },
   // Worker
   { path: '/api/worker/restart', methods: ['POST'] },
   // AI install

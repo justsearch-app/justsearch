@@ -173,7 +173,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(n!.body).toContain('semantic and keyword retrieval are active');
     expect(n!.causes).toEqual(['The local AI model is offline']);
     // Causes + remedy behave exactly as the impairing branch always did.
-    expect(n!.remedy).toEqual({ kind: 'operation', operationId: 'core.reload-inference' });
+    expect(n!.remedy).toEqual({ kind: 'navigate', target: 'core.brain-surface', label: 'Open Brain' });
   });
 
   it('804 §B5: the live-observed pair (inference.offline + lambdamart) words as AI-features-off', () => {
@@ -183,11 +183,11 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     // RE-PINNED, tempdoc 805 §G.2: the AI branch now SCOPES its cause list to AI codes, the same way
     // the reindex branch scopes to rebuild-clearable causes (804 §B5). Pre-805 the LambdaMART row was
     // listed here too — under the "Chat and answer features are unavailable" consequence and the
-    // reload-inference remedy, neither of which it belongs to. It keeps its own calm branch when it is
+    // Brain remedy, neither of which it belongs to. It keeps its own calm branch when it is
     // the whole story (see the §10.3 cosmetic test above).
     expect(n!.causes).toEqual(['The local AI model is offline']);
     expect(n!.causes.join(' ')).not.toContain('LambdaMART');
-    expect(n!.remedy).toEqual({ kind: 'operation', operationId: 'core.reload-inference' });
+    expect(n!.remedy).toEqual({ kind: 'navigate', target: 'core.brain-surface', label: 'Open Brain' });
   });
 
   it('804 §B5: a RETRIEVAL-impairing cause alongside the AI cause keeps the "keyword results" wording', () => {
@@ -574,8 +574,9 @@ describe('readinessNotice — tempdoc 837 worker + inference rows', () => {
     expect(severityForCodes(['inference.crashed'])).toBe('warn');
     expect(severityForCodes(['inference.deactivated'])).toBe('info');
     expect(reasonFor('inference.crashed').remedy).toEqual({
-      kind: 'operation',
-      operationId: 'core.reload-inference',
+      kind: 'navigate',
+      target: 'core.brain-surface',
+      label: 'Open Brain',
     });
   });
 

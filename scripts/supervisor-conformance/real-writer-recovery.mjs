@@ -13,6 +13,8 @@ import {
   exerciseInstallerActivationFault, INSTALLER_FAULT_CASES, writeRetainedInstallerCandidate,
 } from './bulk-fault-scenario.mjs';
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
+import { captureFromLive } from '../codegen/gen-api-client.mjs';
+import { exerciseReconfigureRefresh } from './reconfigure-refresh-scenario.mjs';
 
 const repo = process.cwd();
 const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
@@ -263,7 +265,16 @@ try {
       return response.status === 200 ? response : null;
     } catch { return null; }
   });
-  if (bulkFault) {
+  if (scenario === 'route-capture') {
+    const captured = await captureFromLive(`http://127.0.0.1:${apiPort}`);
+    requireThat(captured.routes.every((route) => ![
+      '/api/inference/reload', '/api/admin/inference/reload',
+    ].includes(route.path)), 'retired inference reload route remained registered');
+    console.log('PASS route-capture', JSON.stringify({ routeCount: captured.count, work }));
+  } else if (scenario === 'reconfigure-refresh') {
+    await exerciseReconfigureRefresh({ apiPort, manifest, request, post, waitFor,
+      requireThat, createOperationKey });
+  } else if (bulkFault) {
     await exerciseBulkFault({ work, data, indexBase, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit,
       scenario, operationKey, output: () => output });

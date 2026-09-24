@@ -62,7 +62,6 @@ final class CoreOperationCatalogTest {
             "core.remove-watched-root",
             "core.preview-excludes",
             "core.apply-excludes",
-            "core.reload-inference",
             "core.switch-inference-mode",
             "core.set-chat-enabled",
             "core.trigger-offline-processing",
@@ -285,10 +284,11 @@ final class CoreOperationCatalogTest {
   }
 
   @Test
-  void reloadInferenceHasMediumRiskInlineConfirm() {
-    Operation op = catalog.findById(CoreOperationCatalog.RELOAD_INFERENCE).orElseThrow();
+  void reconfigureHasMediumRiskAndAcceptsAnExplicitRefreshIntent() {
+    Operation op = catalog.findById(CoreOperationCatalog.RECONFIGURE).orElseThrow();
     assertEquals(RiskTier.MEDIUM, op.policy().risk());
-    assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
+    assertTrue(op.intf().inputs().contains("refreshInference"));
   }
 
   /**

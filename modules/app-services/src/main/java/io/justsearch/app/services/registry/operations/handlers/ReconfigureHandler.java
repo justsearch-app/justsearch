@@ -11,7 +11,11 @@ import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationRecord;
+import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsV2;
+import io.justsearch.app.services.registry.executor.PreparedInvocationCodec;
 import io.justsearch.core.context.EngineContext;
 import java.util.Map;
 import java.util.Objects;
@@ -55,6 +59,10 @@ public final class ReconfigureHandler implements OperationHandler {
 
   @Override
   public void validatePreparation(OperationPreparation prepared) {
+    validatedEnvelope(prepared);
+  }
+
+  private static Envelope validatedEnvelope(OperationPreparation prepared) {
     Objects.requireNonNull(prepared, "prepared");
     if (prepared.content() != OperationPreparation.Content.METADATA
         || !SCHEMA.equals(prepared.replaySchema())) {
@@ -70,12 +78,31 @@ public final class ReconfigureHandler implements OperationHandler {
     if (!publicEnvelope.equals(replayEnvelope)) {
       throw new IllegalArgumentException("Reconfigure preparation differs from its invocation");
     }
+    return replayEnvelope;
+  }
+
+  /** The settings owner verifies a physical refresh against this exact accepted invocation. */
+  public static SettingsCandidateContext acceptedCandidateContext(OperationRecord row,
+      OperationStore.Preparation accepted) {
+    if (row.descriptor().kind() != io.justsearch.agent.api.registry.OperationKind.RECONFIGURE
+        || !"core.reconfigure".equals(row.descriptor().operationRef())) {
+      throw new IllegalArgumentException("Reconfigure candidate row mismatch");
+    }
+    Envelope envelope = validatedEnvelope(
+        PreparedInvocationCodec.decodeAcceptedReconfigureMetadata(row, accepted));
+    if (!row.key().equals(envelope.settings().operationKey())) {
+      throw new IllegalArgumentException("Reconfigure candidate operation identity mismatch");
+    }
+    return envelope.refreshInference()
+        ? new SettingsCandidateContext(null, true) : SettingsCandidateContext.NONE;
   }
 
   @Override
   public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
-    validatePreparation(prepared);
-    return new OperationApprovalPreview("Apply the accepted settings update");
+    Envelope envelope = validatedEnvelope(prepared);
+    return new OperationApprovalPreview(envelope.refreshInference()
+        ? "Refresh the generative runtime with the accepted settings"
+        : "Apply the accepted settings update");
   }
 
   @Override
@@ -89,7 +116,7 @@ public final class ReconfigureHandler implements OperationHandler {
     }
     return OperationExecution.finished(
         service().applyAccepted(envelope.settings(), envelope.modeIntent(),
-            Objects.requireNonNull(context, "context"), record));
+            Objects.requireNonNull(context, "context"), record, envelope.refreshInference()));
   }
 
   private SettingsService service() {
@@ -109,9 +136,14 @@ public final class ReconfigureHandler implements OperationHandler {
     } catch (JacksonException malformed) {
       throw new IllegalArgumentException("Invalid reconfigure envelope");
     }
-    if (root == null || !root.isObject() || root.size() != 2
+    if (root == null || !root.isObject() || (root.size() != 2 && root.size() != 3)
         || !root.has("settings") || !root.has("modeIntent")) {
       throw new IllegalArgumentException("Reconfigure envelope must contain settings and modeIntent");
+    }
+    JsonNode refreshInference = root.get("refreshInference");
+    if ((root.size() == 3 && (refreshInference == null || !refreshInference.isBoolean()))
+        || (root.size() == 2 && refreshInference != null)) {
+      throw new IllegalArgumentException("refreshInference must be a boolean");
     }
     JsonNode modeIntent = root.get("modeIntent");
     if (!modeIntent.isNull() && !modeIntent.isTextual()) {
@@ -119,7 +151,9 @@ public final class ReconfigureHandler implements OperationHandler {
     }
     final Envelope envelope;
     try {
-      envelope = HandlerJson.MAPPER.treeToValue(root, Envelope.class);
+      envelope = new Envelope(HandlerJson.MAPPER.treeToValue(root.get("settings"), SettingsV2.class),
+          modeIntent.isNull() ? null : modeIntent.asText(),
+          refreshInference != null && refreshInference.booleanValue());
     } catch (JacksonException | IllegalArgumentException malformed) {
       throw new IllegalArgumentException("Invalid reconfigure settings envelope");
     }
@@ -137,5 +171,5 @@ public final class ReconfigureHandler implements OperationHandler {
   }
 
   /** Public input and durable replay use the same typed values. */
-  public record Envelope(SettingsV2 settings, String modeIntent) {}
+  public record Envelope(SettingsV2 settings, String modeIntent, boolean refreshInference) {}
 }

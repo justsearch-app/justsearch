@@ -342,11 +342,6 @@ final class InferenceHandlersTest {
     }
 
     @Override
-    public String reloadInference() {
-      throw new UnsupportedOperationException("not used by this test");
-    }
-
-    @Override
     public ModeTransitionOutcome switchInferenceMode(String mode,
         io.justsearch.core.context.EngineContext context, String idempotencyKey) {
       return ModeTransitionOutcome.of(mode, liveMode);

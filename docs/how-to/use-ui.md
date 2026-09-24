@@ -282,9 +282,8 @@ Invoke-RestMethod -Uri "http://localhost:33221/api/debug/chunks?docId=d:\path\to
 # Inference status
 Invoke-RestMethod -Uri http://localhost:33221/api/inference/status
 
-# Hot-apply persisted inference settings (model/context/gpu layers).
-# Note: restarts llama-server only if already Online; if Online AI adopted an external llama-server instance, restart is rejected (use /api/inference/detach).
-Invoke-RestMethod -Method Post -Uri http://localhost:33221/api/inference/reload
+# Refresh persisted inference settings (model/context/gpu layers) from Brain settings.
+# Use the Reload control, which submits an accepted settings operation with a fresh witness.
 
 # Detach from an adopted external llama-server (starts a managed server on a new port; leaves the external process running)
 Invoke-RestMethod -Method Post -Uri http://localhost:33221/api/inference/detach

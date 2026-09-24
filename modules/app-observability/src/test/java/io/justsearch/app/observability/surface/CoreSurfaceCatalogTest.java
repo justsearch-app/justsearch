@@ -169,7 +169,7 @@ final class CoreSurfaceCatalogTest {
           "core.activate-runtime-variant",
           "core.deactivate-runtime-variant",
           "core.switch-inference-mode",
-          "core.reload-inference",
+          "core.reconfigure",
         }) {
       assertTrue(ops.contains(new OperationRef(id)), "Brain must consume " + id);
     }

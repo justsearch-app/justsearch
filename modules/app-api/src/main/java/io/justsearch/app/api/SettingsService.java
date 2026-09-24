@@ -38,6 +38,16 @@ public interface SettingsService {
       String modeIntentHeader, io.justsearch.core.context.EngineContext context,
       OperationRecordHandle record);
 
+  /** Execute the exact accepted reconfigure intent, including an explicit generative refresh. */
+  default OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
+      String modeIntentHeader, io.justsearch.core.context.EngineContext context,
+      OperationRecordHandle record, boolean refreshInference) {
+    if (refreshInference) {
+      throw new UnsupportedOperationException("Generative reconfigure refresh is unavailable");
+    }
+    return applyAccepted(input, modeIntentHeader, context, record);
+  }
+
   /** Freeze the readable witness or absent-history quarantine identity without an effect. */
   OperationPreparation prepareReset(String argumentsJson);
 

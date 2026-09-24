@@ -118,12 +118,6 @@
       "expectedURL": "justsearch://op/core.switch-inference-mode?mode=online"
     },
     {
-      "id": "op-010-reload-inference",
-      "category": "op",
-      "prompt": "Reload the inference runtime.",
-      "expectedURL": "justsearch://op/core.reload-inference"
-    },
-    {
       "id": "op-011-trigger-offline",
       "category": "op",
       "prompt": "Trigger offline processing.",

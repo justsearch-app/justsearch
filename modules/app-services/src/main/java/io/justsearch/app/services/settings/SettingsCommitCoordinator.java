@@ -14,6 +14,7 @@ import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.registry.executor.RecordedInstallerGenerationPlanResolver;
+import io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler;
 import io.justsearch.configuration.resolved.ConfigChangedEvent;
 import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -267,6 +268,14 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       java.util.Optional<OperationStore.Preparation> accepted,
       io.justsearch.app.api.settings.SettingsCandidateContext context) {
     Objects.requireNonNull(context, "candidate context");
+    if (row.descriptor().kind() == OperationKind.RECONFIGURE
+        && "core.reconfigure".equals(row.descriptor().operationRef())) {
+      if (!context.equals(ReconfigureHandler
+          .acceptedCandidateContext(row, accepted.orElseThrow()))) {
+        throw new IllegalArgumentException("Reconfigure candidate intent changed after acceptance");
+      }
+      return;
+    }
     boolean preparedRow = SettingsCandidatePreparation.OPERATION_REF.equals(row.descriptor().operationRef());
     if (preparedRow != !io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(context)) {
       throw new IllegalArgumentException("Settings candidate intent does not match its accepted row");
@@ -817,7 +826,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       catch (RuntimeException failure) {
         var reset = recoveryIntent(armed.getFirst());
         if (reset != null && matchesQuarantine(reset.quarantineFingerprint())) {
-          recoveredDecision = precommitFailure();
+          recoveredDecision = precommitFailure(row);
           fence = new SettingsCommitFence(row.id(), row.key(), new SettingsWitness(0, null),
               null, reset.quarantineFingerprint(), true);
         }
@@ -852,12 +861,28 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           }
           // The file is B, but the transient physical target is still unproven. Keep RUNNING
           // until the fixed owner has been composed and boot installs that exact target.
+        } else if ("core.reconfigure".equals(row.descriptor().operationRef())) {
+          try {
+            var context = ReconfigureHandler.acceptedCandidateContext(row,
+                armed.getFirst().preparation().orElseThrow());
+            if (context.forceGenerativeRefresh()) {
+              // The settings witness proves the file move, not the physical refresh. Recompose
+              // the accepted target before the runner terminalizes this committed attempt.
+              recoveredContext = context;
+            } else {
+              recoveredDecision = new OperationAttemptRunner.Reconciliation.Complete(
+                  new OperationReceipt("SUCCESS", null));
+            }
+          } catch (RuntimeException unavailable) {
+            block(new RecoveryIssue(RecoveryReason.INVALID_PREPARATION, row.id()));
+            return;
+          }
         } else {
           recoveredDecision = new OperationAttemptRunner.Reconciliation.Complete(new OperationReceipt("SUCCESS", null));
         }
       } else if (witness.acceptedRevision() == expected
           && normalResetBaseMatches(armed.getFirst(), witness)) {
-        recoveredDecision = precommitFailure();
+        recoveredDecision = precommitFailure(row);
       } else {
         block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, row.id()));
         return;
@@ -876,7 +901,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     mutex.lock();
     try {
       if (!inspected) throw new IllegalStateException("Settings recovery must inspect the complete row set first");
-      if (row.expectedSettingsRevision() == null) return precommitFailure();
+      if (row.expectedSettingsRevision() == null) return precommitFailure(row);
       return Objects.equals(recoveredId, row.id()) ? recoveredDecision : new OperationAttemptRunner.Reconciliation.Wait();
     } finally { mutex.unlock(); }
   }
@@ -988,8 +1013,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     catch (IOException | RuntimeException unavailable) { return false; }
   }
 
-  private static OperationAttemptRunner.Reconciliation precommitFailure() {
-    return new OperationAttemptRunner.Reconciliation.Failed(new OperationReceipt("interrupted_before_settings_commit", null));
+  private static OperationAttemptRunner.Reconciliation precommitFailure(OperationRecord row) {
+    String reason = row.descriptor().kind() == OperationKind.RECONFIGURE
+        ? "ENGINE_RESTARTED_DURING_APPLY" : "interrupted_before_settings_commit";
+    return new OperationAttemptRunner.Reconciliation.Failed(new OperationReceipt(reason, null));
   }
 
   private void block(RecoveryIssue recovery) {

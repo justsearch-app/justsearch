@@ -676,6 +676,17 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   @Override
+  public OperationResult applySettings(OperationRecordHandle handle,
+      SettingsWitness expected, io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    Objects.requireNonNull(expected, "expected settings witness");
+    return applySettingsOwned(handle, expected, candidate, false,
+        Objects.requireNonNull(work, "work"),
+        Objects.requireNonNull(candidateContext, "candidateContext"));
+  }
+
+  @Override
   public OperationResult applySettingsReset(OperationRecordHandle handle) {
     return applySettingsOwned(handle, null, null, true, null,
         io.justsearch.app.api.settings.SettingsCandidateContext.NONE);

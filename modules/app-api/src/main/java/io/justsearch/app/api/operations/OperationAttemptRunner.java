@@ -195,6 +195,17 @@ public interface OperationAttemptRunner {
     return applySettings(handle, expected, candidate);
   }
 
+  /** Bind the accepted transient intent and the exact admitted cancellation scope together. */
+  default OperationResult applySettings(OperationRecordHandle handle, SettingsWitness expected,
+      io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    if (io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(candidateContext)) {
+      return applySettings(handle, expected, candidate, work);
+    }
+    throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
+  }
+
   /** Fixed reset from this executing attempt's persisted server preparation; no caller authority flags. */
   OperationResult applySettingsReset(OperationRecordHandle handle);
 

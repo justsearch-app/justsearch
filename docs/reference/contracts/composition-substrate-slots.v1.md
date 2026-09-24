@@ -36,7 +36,7 @@ Source-of-truth file paths reference the post-§31-merge repository state (HEAD 
 | Slot | Named production consumer(s) | Verdict |
 |---|---|---|
 | `inference().onlineAi()` | `InferenceHandlers` (5 callsites in `InferenceHandlers.java`); `BrainRuntimeServiceImpl` (constructor parameter); `OfflineCoordinatorBuilder.build` (3rd argument) | healthy (≥ 3) |
-| `inference().brainRuntime()` | `BrainRuntimeController`-side caller (operation handler `ReloadInferenceHandler`, `SwitchInferenceModeHandler`, `TriggerOfflineProcessingHandler` via `OperationHandlerRegistrations.registerWorker`); `LocalApiServer` controller wiring | healthy (≥ 2) |
+| `inference().brainRuntime()` | `BrainRuntimeController`-side caller (`SwitchInferenceModeHandler` and `TriggerOfflineProcessingHandler` via `OperationHandlerRegistrations.registerWorker`); `LocalApiServer` controller wiring | healthy (≥ 2) |
 | `inference().runtimeVariant()` | `ActivateRuntimeVariantHandler`, `DeactivateRuntimeVariantHandler` (operation handlers); `LocalApiServer` controller wiring | healthy (≥ 2) |
 | `inference().packImport()` | `PreflightAiPackHandler`, `ImportAiPackHandler` (operation handlers); `LocalApiServer` controller wiring | healthy (≥ 2) |
 | `inference().brainInstall()` | `StartAiInstallHandler`, `CancelAiInstallHandler`, `RepairAiInstallHandler` (operation handlers); `LocalApiServer` controller wiring | healthy (≥ 3) |

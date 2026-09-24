@@ -237,7 +237,7 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
           new VduCapabilityState());
       coordinator = new OfflineCoordinator(
           executors, admission, inference, reconciler, batch, () -> client, new VduCapabilityState());
-      var brain = new BrainRuntimeServiceImpl(mock(OnlineAiService.class), null, null,
+      var brain = new BrainRuntimeServiceImpl(mock(OnlineAiService.class),
           (context, progress) -> {
             var completion = coordinator.startOfflineProcessing(context, progress);
             coordinatorCompletion.set(completion);

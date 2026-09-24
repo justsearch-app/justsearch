@@ -213,6 +213,31 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
+  void restartIfOnlineRefreshRetainsOfflineConfigurationWithoutStartingServer() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      var prepared = manager.prepareResolvedConfig(b, resolvedB, true, true);
+      assertFalse(prepared.targetsOnline());
+      assertNull(server.active.get());
+      assertTrue(server.starts.isEmpty());
+      assertSame(a, manager.currentConfig());
+
+      prepared.withLifecycleLock(prepared::installAfterSettingsCommit);
+      prepared.retireAfterSettingsCommit();
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      assertSame(b, manager.currentConfig());
+      assertTrue(server.starts.isEmpty());
+    }
+  }
+
+  @Test
   void disableRetainsIncumbentUntilCommitThenRetiresIt() throws Exception {
     InferenceConfig a = config(0, 4096);
     InferenceConfig b = config(0, 8192);

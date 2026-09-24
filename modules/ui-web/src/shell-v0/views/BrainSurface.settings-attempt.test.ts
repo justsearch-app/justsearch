@@ -10,6 +10,7 @@ interface BrainSettings extends HTMLElement {
   llm: { contextWindow?: number; modelPath?: string; maxTokens?: number; gpuLayers?: number };
   runtimeError: string | null;
   patchLlm(patch: BrainSettings['llm']): Promise<void>;
+  refreshInference(): Promise<void>;
 }
 const zero = { acceptedRevision: 0, lastCommittedOperationKey: null };
 function json(body: unknown, status = 200): Response { return new Response(JSON.stringify(body), { status }); }
@@ -22,6 +23,26 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
 
 describe('Brain LLM settings completion', () => {
+  it('refreshes inference through one witnessed reconfigure attempt', async () => {
+    const brain = document.createElement('jf-brain-surface') as BrainSettings;
+    brain.apiBase = '';
+    const send = vi.mocked(authorizedFetch).mockResolvedValueOnce(json({ witness: zero }))
+      .mockImplementationOnce(async (_, init) => completion(init));
+
+    await brain.refreshInference();
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0]?.[0]).toBe('/api/settings/v2');
+    expect(send.mock.calls[1]?.[0]).toBe('/api/settings/v2');
+    const post = send.mock.calls[1]?.[1];
+    expect(post?.headers).toMatchObject({ 'X-JustSearch-Refresh-Inference': 'true' });
+    const body = JSON.parse(String(post?.body));
+    expect(body.witness).toEqual(zero);
+    expect(body.operationKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(body.ui).toBeUndefined();
+    expect(body.llm).toBeUndefined();
+  });
+
   it('preserves unrelated fields and applies only the completed narrow normalized intent', async () => {
     const brain = document.createElement('jf-brain-surface') as BrainSettings;
     brain.apiBase = '';

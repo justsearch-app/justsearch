@@ -137,7 +137,7 @@ public interface OnlineAiRuntimeControl {
 
   /**
    * Tempdoc 412 Phase 5: triggers a config-driven restart (RESTART_IF_ONLINE) without changing
-   * any config values. Used by the admin endpoint {@code POST /api/admin/inference/reload} to
+   * any config values. Used by the managed runtime owner to
    * cycle the inference runtime — operators apply config changes via
    * {@link #applyRuntimeOverrides} when they need to change values; this is the no-arg
    * "restart with same config" affordance.

@@ -6,6 +6,56 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-24)
 
+### D1-4 accepted inference refresh slice (local, not pushed)
+
+The local `bc4527f36` checkpoint adds two D1-4 component-boundary regressions
+on top of pushed `d64339ef8`. The current uncommitted slice routes Brain's
+Reload control through a fresh witnessed `core.reconfigure` with explicit
+refresh intent. Accepted preparation binds that intent, and the settings owner
+forces generative candidate preparation even for unchanged settings. The old
+catalog operation, both direct reload routes and their live producers are
+retired. An installed Head captured 243 routes, down from 245, with exactly
+those two routes removed (`tmp/3047-reconfigure-route-capture.txt`).
+
+The corrected 358-task `spotlessCheck pmdAll test -PincludeStress=true
+:modules:ui:installDist` gate passed at
+`tmp/3046-reconfigure-integrated-repair.txt`. The first run's PMD and catalog
+count failures remain preserved at `tmp/3043-reconfigure-integrated.txt` and
+`tmp/3043-RegistryControllerTest.xml`. Frontend typecheck and all 6,600 unit
+tests passed. An owned installed standard-model run activated the 9B profile,
+completed real model queries before and after the accepted refresh, observed
+inference generation 1 → 2 and the exact successor settings witness, and
+stopped with ports closed (`tmp/3051-reconfigure-refresh-standard.txt`).
+Earlier fixture attempts at `tmp/3048`–`3050` failed on a required-token
+assumption, an operator model-path override, and an incorrect response-shape
+assertion; none established a product failure.
+
+The refute-first review found two runtime gaps. Committed refresh recovery now
+decodes its accepted `core.reconfigure` preparation and waits to recompose the
+generative component before terminalizing; a real SQLite restart cut passes at
+`tmp/3058-refresh-review-focused.txt`. `RESTART_IF_ONLINE` now resolves under
+the inference manager lifecycle lock: an Offline refresh retains configuration
+without starting a server, with focused manager and owner regressions at
+`tmp/3066-refresh-lock-policy-focused.txt`. A separate precommit reconfigure
+regression asserts `ENGINE_RESTARTED_DURING_APPLY` while settings-apply keeps its
+C2 reason. The retired-handler residue in the canonical composition slot map
+was removed. Generated/document/UI checks passed, including frontend typecheck,
+6,600 unit tests, eight measured Brain captures, route capture, docs and client
+regeneration checks. The final 358-task integrated gate passed at
+`tmp/3067-refresh-lock-policy-integrated.txt`; installed standard-model queries
+before and after refresh passed at `tmp/3069-reconfigure-refresh-standard-lock-policy.txt`
+with generation 1 → 2, exact successor witness and identity-checked teardown.
+The first rerun at `tmp/3064` exposed a fixture race: the Head proxy answered a
+query before logical Online publication; waiting for the Online generation
+resolved it at `tmp/3065` and remained green after the lock fix.
+
+The local slice is ready for one hosted checkpoint. D1-4's
+installed mid-compose crash cut, browser-driven Brain Reload proof, retained
+differing-model assets and the remaining D1/D2/E/F acceptance stay open. The
+shared dev MCP preflight still expects the retired Worker distribution; the
+installed proof used the existing private supervisor harness with
+identity-checked teardown.
+
 ### Active checkpoint `d64339ef8` and D1-4 continuation
 
 Checkpoint `d64339ef8` is pushed to PR727. Its 358-task local integrated suite

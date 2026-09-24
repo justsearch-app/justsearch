@@ -47,6 +47,13 @@ export const OPEN_HEALTH: NoticeRemedy = {
   label: 'Open Health',
 };
 
+/** The Brain surface offers the witnessed reconfigure refresh action. */
+export const OPEN_BRAIN: NoticeRemedy = {
+  kind: 'navigate',
+  target: 'core.brain-surface',
+  label: 'Open Brain',
+};
+
 /**
  * The closed cause vocabulary: backend reason code → (wording, remedy?).
  * Codes the backend emits today (`LifecycleReasonCode` + StatusLifecycleHandler's
@@ -108,12 +115,12 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.offline',
     wording: 'The local AI model is offline',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
   },
   { code: 'inference.starting', wording: 'The local AI model is still starting', severity: 'info' },
   // Tempdoc 656 — the AI capability's previously-generic "offline" reason, now specific. No
-  // remedy operation is registered for install/import actions today (unlike
-  // core.reload-inference), so these fall back to the Open-Health reference — same pattern as
+  // remedy operation is registered for install/import actions today, so these fall back to
+  // the Open-Health reference — same pattern as
   // vdu.missing_mmproj / ocr.engine_missing below, rather than pointing at a nonexistent operation.
   {
     code: 'inference.model_not_configured',
@@ -165,7 +172,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.crashed',
     wording: 'The local AI model stopped unexpectedly',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'warn',
   },
   // Tempdoc 837 S5 — the user turned chat off (TransitionReason.USER_SWITCH / ADMIN_TRIGGERED). The
@@ -174,7 +181,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.deactivated',
     wording: 'The local AI model is turned off',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'info',
   },
   {
@@ -184,7 +191,7 @@ const CAUSE_ROWS: ReadonlyArray<{
     // when the user was actually deactivating.
     code: 'inference.activation_failed',
     wording: 'The local AI runtime failed to switch modes',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'warn',
   },
   {
@@ -205,7 +212,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'vdu.ai_offline',
     wording: 'Visual document understanding is waiting for the local AI model',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'info',
   },
   {

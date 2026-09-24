@@ -1272,6 +1272,23 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void interruptedReconfigureBeforeFileMoveUsesEngineApplyFailureReason() throws Exception {
+    Path file = temp.resolve("reconfigure-precommit.json");
+    try (var operations = operations("reconfigure-precommit")) {
+      var row = row(operations, OperationKind.RECONFIGURE);
+      assertTrue(operations.start(row.id()));
+      assertTrue(operations.armSettingsRevision(row.id(), 0));
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      runner(operations, coordinator(settings,
+          new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()))));
+      assertEquals(OperationState.FAILED, operations.find(row.key()).orElseThrow().state());
+      assertEquals("ENGINE_RESTARTED_DURING_APPLY",
+          operations.find(row.key()).orElseThrow().failureReason());
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    }
+  }
+
+  @Test
   void bootContradictoryQuarantinedAndInMemoryRowsWaitAndBlockHealth() throws Exception {
     assertBootWait("boot-contradictory", UiSettingsStore.PersistenceMode.READ_WRITE,
         (settings, key) -> writeWitness(settings, 6, OperationKeys.generate(CLOCK)),

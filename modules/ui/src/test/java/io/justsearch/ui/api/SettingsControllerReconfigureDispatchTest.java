@@ -87,6 +87,42 @@ final class SettingsControllerReconfigureDispatchTest {
   }
 
   @Test
+  void refreshHeaderBecomesAnAcceptedReconfigureIntentWithTheSameWitnessAndKey() throws Exception {
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    SettingsV2 input = new SettingsV2(null, null, null, null,
+        new SettingsWitness(0, null), OperationKeys.generate(Clock.systemUTC()), null, null);
+    ContextFixture fixture = contextFixture(input);
+    when(fixture.context.header(SettingsController.REFRESH_INFERENCE_HEADER)).thenReturn("true");
+    when(dispatcher.dispatch(eq(RECONFIGURE), anyString(), any(InvocationProvenance.class),
+        eq(Optional.empty()), eq(fixture.engineContext), eq(input.operationKey())))
+        .thenReturn(OperationResult.success("Refreshed", Map.of("operationKey", input.operationKey())));
+
+    new SettingsController(null, Path.of("."), null, null, dispatcher, RECONFIGURE)
+        .handleUpdateSettingsV2(fixture.context);
+
+    ArgumentCaptor<String> arguments = ArgumentCaptor.forClass(String.class);
+    verify(dispatcher).dispatch(eq(RECONFIGURE), arguments.capture(),
+        any(InvocationProvenance.class), eq(Optional.empty()), eq(fixture.engineContext),
+        eq(input.operationKey()));
+    JsonNode envelope = JSON.readTree(arguments.getValue());
+    assertTrue(envelope.path("refreshInference").booleanValue());
+    assertEquals(input, JSON.treeToValue(envelope.path("settings"), SettingsV2.class));
+  }
+
+  @Test
+  void malformedRefreshHeaderCannotFallThroughToOrdinarySettings() {
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    ContextFixture fixture = contextFixture(fullSettings());
+    when(fixture.context.header(SettingsController.REFRESH_INFERENCE_HEADER)).thenReturn("false");
+
+    new SettingsController(null, Path.of("."), null, null, dispatcher, RECONFIGURE)
+        .handleUpdateSettingsV2(fixture.context);
+
+    verify(fixture.context).status(400);
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
   void versionConflictFromReconfigureIsProjectedAsConflictAndRetainsOperationKey() {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     SettingsService service = mock(SettingsService.class);

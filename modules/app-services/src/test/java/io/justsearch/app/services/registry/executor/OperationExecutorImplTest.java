@@ -89,6 +89,54 @@ final class OperationExecutorImplTest {
     if (operationStore != null) operationStore.close();
   }
 
+  @Test
+  void acceptedReconfigureRefreshIsBoundToThePersistedMetadataPreparation() {
+    var handlers = new HandlerRegistry();
+    var operation = new io.justsearch.app.services.registry.operations.CoreOperationCatalog()
+        .findById(new OperationRef("core.reconfigure")).orElseThrow();
+    var service = org.mockito.Mockito.mock(io.justsearch.app.api.SettingsService.class);
+    var handler = new io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler(() -> service);
+    handlers.register(operation.id(), handler);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    var settings = new io.justsearch.app.api.settings.SettingsV2(null, null, null, null,
+        new io.justsearch.app.api.settings.SettingsWitness(0, null), key, null, null);
+    String arguments = tools.jackson.databind.json.JsonMapper.builder().build()
+        .writeValueAsString(new io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler
+            .Envelope(settings, null, true));
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+    var provenance = io.justsearch.app.services.intent.EngineProvenance.invocation(
+        context, ExecutorTag.UI, Instant.now(), Optional.empty());
+    org.mockito.Mockito.when(service.applyAccepted(org.mockito.ArgumentMatchers.eq(settings),
+        org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(true))).thenAnswer(call -> {
+          var row = operationStore.find(key).orElseThrow();
+          var accepted = operationStore.acceptedPreparation(row.id()).orElseThrow();
+          var physical = io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler
+              .acceptedCandidateContext(row, accepted);
+          assertTrue(physical.forceGenerativeRefresh());
+          var settingsOwner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(
+              new io.justsearch.app.services.settings.UiSettingsStore(
+                  io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.READ_WRITE,
+                  operationDirectory.resolve("reconfigure-settings.json")),
+              new io.justsearch.configuration.resolved.ConfigStore(
+                  io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(
+                      new io.justsearch.app.api.UiSettings())),
+              () -> {}, candidate -> OperationResult.success("prepared"));
+          settingsOwner.verifyCandidatePreparation(row, Optional.of(accepted), physical);
+          assertThrows(IllegalArgumentException.class, () -> settingsOwner.verifyCandidatePreparation(
+              row, Optional.of(accepted), io.justsearch.app.api.settings.SettingsCandidateContext.NONE));
+          return OperationResult.success("Refreshed");
+        });
+
+    var result = new OperationExecutorImpl(attempts, admission, handlers).dispatch(
+        operation, arguments, provenance, Optional.empty(), context, key);
+
+    assertTrue(result.success());
+    org.mockito.Mockito.verify(service).applyAccepted(org.mockito.ArgumentMatchers.eq(settings),
+        org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(true));
+  }
+
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void keyedRetryLooksUpBeforePreparationAndNeverStartsAnotherEffect(boolean asynchronous) {

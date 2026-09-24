@@ -20,6 +20,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** HTTP projection and request attribution; the accepted settings service owns every mutation. */
 public class SettingsController {
   static final String UI_MODE_INTENT_HEADER = "X-JustSearch-UI-Mode-Intent";
+  static final String REFRESH_INFERENCE_HEADER = "X-JustSearch-Refresh-Inference";
   private static final ObjectMapper MAPPER =
       JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
   private final UiSettingsStore settingsStore;
@@ -77,6 +78,13 @@ public class SettingsController {
 
   /** POST /api/settings/v2 preserves the logical attempt's witness and key. */
   public void handleUpdateSettingsV2(Context ctx) {
+    String refreshHeader = ctx.header(REFRESH_INFERENCE_HEADER);
+    if (refreshHeader != null && !"true".equals(refreshHeader)) {
+      writeRefusal(ctx, OperationResult.failure(
+          "Invalid inference refresh intent", "INVALID_REQUEST", Map.of(), false));
+      return;
+    }
+    boolean refreshInference = refreshHeader != null;
     final SettingsV2 incoming;
     try {
       incoming = MAPPER.readValue(ctx.body(), SettingsV2.class);
@@ -89,6 +97,11 @@ public class SettingsController {
           "Settings commit owner is unavailable", "SETTINGS_RECOVERY_REQUIRED", Map.of(), false));
       return;
     }
+    if (refreshInference && dispatcher == null) {
+      writeRefusal(ctx, OperationResult.failure(
+          "Reconfigure refresh is unavailable", "SETTINGS_RECOVERY_REQUIRED", Map.of(), false));
+      return;
+    }
     try {
       OperationResult response;
       String state;
@@ -99,6 +112,7 @@ public class SettingsController {
         var args = new java.util.LinkedHashMap<String, Object>();
         args.put("settings", incoming);
         args.put("modeIntent", ctx.header(UI_MODE_INTENT_HEADER));
+        if (refreshInference) args.put("refreshInference", true);
         var context = RequestEngineContext.get(ctx);
         var transport = io.justsearch.agent.api.registry.TransportTag.valueOf(context.transport());
         var now = java.time.Instant.now();

@@ -121,8 +121,25 @@ public final class PreparedInvocationCodec {
   }
 
   /** Validate the accepted attribution transition once for all metadata-only recorded producers. */
-  static OperationPreparation decodeAcceptedMetadata(io.justsearch.app.api.operations.OperationRecord row,
+  public static OperationPreparation decodeAcceptedMetadata(io.justsearch.app.api.operations.OperationRecord row,
       io.justsearch.app.api.operations.OperationStore.Preparation stored) {
+    return decodeAcceptedMetadata(row, stored, true);
+  }
+
+  /** Reconfigure's accepted intent has no durable continuation grant to decode. */
+  public static OperationPreparation decodeAcceptedReconfigureMetadata(
+      io.justsearch.app.api.operations.OperationRecord row,
+      io.justsearch.app.api.operations.OperationStore.Preparation stored) {
+    if (row.descriptor().kind() != io.justsearch.agent.api.registry.OperationKind.RECONFIGURE
+        || !"core.reconfigure".equals(row.descriptor().operationRef())) {
+      throw new IllegalArgumentException("Reconfigure metadata binding mismatch");
+    }
+    return decodeAcceptedMetadata(row, stored, false);
+  }
+
+  private static OperationPreparation decodeAcceptedMetadata(
+      io.justsearch.app.api.operations.OperationRecord row,
+      io.justsearch.app.api.operations.OperationStore.Preparation stored, boolean requireAuthorizationBasis) {
     if (stored.payload().sealed()) throw new IllegalArgumentException("Recorded metadata cannot be sealed");
     var envelope = new PreparedInvocationCodec(StoreCipher.disabled()).decode(
         stored.payload(), row.key(), stored.nonce(), row.descriptor());
@@ -137,7 +154,10 @@ public final class PreparedInvocationCodec {
         || !envelope.occurredAt().equals(row.provenanceOccurredAt())) {
       throw new IllegalArgumentException("Recorded ingestion preparation binding mismatch");
     }
-    io.justsearch.app.api.operations.OperationAuthorizationBasis.decode(row.context().grantReference().orElse(null));
+    if (requireAuthorizationBasis) {
+      io.justsearch.app.api.operations.OperationAuthorizationBasis.decode(
+          row.context().grantReference().orElse(null));
+    }
     return preparation;
   }
 

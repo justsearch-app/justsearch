@@ -1,8 +1,8 @@
 {
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
-  "count": 245,
+  "count": 243,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:62aac8e9e8f272e4b909d358fe219f9cf8696dc64825d902eaa3d46937102f49",
+  "routeDigest": "sha256:b578169035e07f9273dd3d3e235a29338303cac22977ff38a366bba0e048470f",
   "routes": [
     {
       "method": "GET",
@@ -1788,20 +1788,6 @@
       "lifecycle": null
     },
     {
-      "method": "POST",
-      "path": "/api/inference/reload",
-      "cohort": "inference",
-      "owningModule": null,
-      "requiredCapabilities": [],
-      "responseSchema": null,
-      "stability": null,
-      "sdkOperationId": null,
-      "requestSchema": null,
-      "queryParameters": null,
-      "responseSchemas": null,
-      "lifecycle": null
-    },
-    {
       "method": "GET",
       "path": "/api/inference/status",
       "cohort": "inference",
@@ -2501,20 +2487,6 @@
     {
       "method": "OPTIONS",
       "path": "/*",
-      "cohort": "other",
-      "owningModule": null,
-      "requiredCapabilities": [],
-      "responseSchema": null,
-      "stability": null,
-      "sdkOperationId": null,
-      "requestSchema": null,
-      "queryParameters": null,
-      "responseSchemas": null,
-      "lifecycle": null
-    },
-    {
-      "method": "POST",
-      "path": "/api/admin/inference/reload",
       "cohort": "other",
       "owningModule": null,
       "requiredCapabilities": [],

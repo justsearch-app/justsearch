@@ -51,6 +51,13 @@ public final class SettingsServiceImpl implements SettingsService {
   public OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
       String modeIntentHeader, io.justsearch.core.context.EngineContext context,
       OperationRecordHandle record) {
+    return applyAccepted(input, modeIntentHeader, context, record, false);
+  }
+
+  @Override
+  public OperationResult applyAccepted(io.justsearch.app.api.settings.SettingsV2 input,
+      String modeIntentHeader, io.justsearch.core.context.EngineContext context,
+      OperationRecordHandle record, boolean refreshInference) {
     Objects.requireNonNull(input, "input");
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(record, "accepted record");
@@ -77,7 +84,9 @@ public final class SettingsServiceImpl implements SettingsService {
       String invalidPath = SettingsPatch.validateIndexPath(candidate.getIndexBasePath());
       if (invalidPath != null) throw refused("INVALID_PATH", invalidPath);
       try (var work = engineAdmission.attach(context)) {
-        result = attempts.applySettings(record, patch.witness(), candidate, work);
+        result = attempts.applySettings(record, patch.witness(), candidate,
+            refreshInference ? new SettingsCandidateContext(null, true) : SettingsCandidateContext.NONE,
+            work);
       } catch (io.justsearch.app.api.EngineAdmissionException refusal) {
         if (!engineAdmission.isClosing()) throw refusal;
         throw refused("ENGINE_CLOSING", "Engine shutdown has closed settings admission");

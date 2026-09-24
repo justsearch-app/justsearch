@@ -77,6 +77,24 @@ final class ReconfigureHandlerTest {
     assertEquals("client:9", owner.modeIntent.get());
     assertSame(CONTEXT, owner.context.get());
     assertSame(record, owner.record.get());
+    assertFalse(owner.refreshInference);
+  }
+
+  @Test
+  void acceptedRefreshIntentReachesTheSettingsOwnerAndCannotBeChangedInReplay() {
+    String key = key();
+    CapturingSettings owner = new CapturingSettings();
+    ReconfigureHandler handler = new ReconfigureHandler(() -> owner);
+    OperationPreparation prepared = handler.prepare(arguments(settings(key), null, true),
+        PROVENANCE, CONTEXT);
+    handler.executePrepared(prepared, PROVENANCE, CONTEXT, record(key));
+
+    assertTrue(owner.refreshInference);
+    assertEquals(settings(key), owner.settings.get());
+    OperationPreparation tampered = new OperationPreparation(prepared.argumentsJson(),
+        prepared.replaySchema(), prepared.replayPayloadJson().replace(
+            "\"refreshInference\":true", "\"refreshInference\":false"), prepared.content());
+    assertThrows(IllegalArgumentException.class, () -> handler.validatePreparation(tampered));
   }
 
   @Test
@@ -102,7 +120,12 @@ final class ReconfigureHandlerTest {
   }
 
   private static String arguments(SettingsV2 settings, String modeIntent) {
-    return HandlerJson.MAPPER.writeValueAsString(new ReconfigureHandler.Envelope(settings, modeIntent));
+    return arguments(settings, modeIntent, false);
+  }
+
+  private static String arguments(SettingsV2 settings, String modeIntent, boolean refreshInference) {
+    return HandlerJson.MAPPER.writeValueAsString(
+        new ReconfigureHandler.Envelope(settings, modeIntent, refreshInference));
   }
 
   private static SettingsV2 settings(String operationKey) {
@@ -130,6 +153,7 @@ final class ReconfigureHandlerTest {
     private final AtomicReference<String> modeIntent = new AtomicReference<>();
     private final AtomicReference<EngineContext> context = new AtomicReference<>();
     private final AtomicReference<OperationRecordHandle> record = new AtomicReference<>();
+    private boolean refreshInference;
 
     @Override public OperationResult applyAccepted(SettingsV2 input, String modeIntentHeader,
         EngineContext context, OperationRecordHandle record) {
@@ -138,6 +162,12 @@ final class ReconfigureHandlerTest {
       this.context.set(context);
       this.record.set(record);
       return result;
+    }
+
+    @Override public OperationResult applyAccepted(SettingsV2 input, String modeIntentHeader,
+        EngineContext context, OperationRecordHandle record, boolean refreshInference) {
+      this.refreshInference = refreshInference;
+      return applyAccepted(input, modeIntentHeader, context, record);
     }
 
     @Override public OperationAttemptRunner.Result applyInternal(io.justsearch.app.api.UiSettings candidate,

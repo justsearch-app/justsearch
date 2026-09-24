@@ -46,7 +46,7 @@ class RuntimeIntentProducerTest {
       fixture.runner().accept(request);
       var runtime = mock(OnlineAiService.class);
       var reconciler = mock(RuntimeReconciler.class);
-      var service = new BrainRuntimeServiceImpl(runtime, fixture.settings(), null, null, fixture.spec(), reconciler);
+      var service = new BrainRuntimeServiceImpl(runtime, null, fixture.spec(), reconciler);
       var outcome = assertTimeoutPreemptively(Duration.ofSeconds(2),
           () -> service.switchInferenceMode("online", context, key));
       assertEquals(ModeTransitionOutcome.STATE_ACCEPTED, outcome.state());
@@ -66,7 +66,7 @@ class RuntimeIntentProducerTest {
       var runtime = mock(OnlineAiService.class);
       when(runtime.getCurrentMode()).thenReturn("online");
       var reconciler = mock(RuntimeReconciler.class);
-      var service = new BrainRuntimeServiceImpl(runtime, fixture.settings(), null, null, fixture.spec(), reconciler);
+      var service = new BrainRuntimeServiceImpl(runtime, null, fixture.spec(), reconciler);
       assertEquals(ModeTransitionOutcome.STATE_CONVERGED,
           service.switchInferenceMode("online", context, key).state());
       Files.writeString(fixture.settings().settingsPath(), "{broken");
@@ -150,7 +150,7 @@ class RuntimeIntentProducerTest {
         return stale;
       }).when(reader).inspect();
       var reconciler = mock(RuntimeReconciler.class);
-      var service = new BrainRuntimeServiceImpl(mock(OnlineAiService.class), reader, null, null,
+      var service = new BrainRuntimeServiceImpl(mock(OnlineAiService.class), null,
           new RuntimeSpecStore(reader, fixture.runner()), reconciler);
       var failure = assertThrows(SettingsCommitOwner.Refused.class,
           () -> service.switchInferenceMode("online", context, null));

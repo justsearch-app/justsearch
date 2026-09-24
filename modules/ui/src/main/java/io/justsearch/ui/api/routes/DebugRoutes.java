@@ -23,8 +23,7 @@ public final class DebugRoutes {
       TimeSeriesController timeSeriesController,
       SessionPoliciesController sessionPoliciesController,
       Handler resetIndexHandler,
-      Handler adminRuntimeReloadHandler,
-      Handler adminInferenceReloadHandler) {
+      Handler adminRuntimeReloadHandler) {
     app.get("/api/debug/state", debugStateController::handleGetState);
     app.get("/api/debug/commit-metadata", debugStateController::handleGetCommitMetadata);
     app.get("/api/debug/effective-config", effectiveConfigController::handleGetEffectiveConfig);
@@ -41,8 +40,5 @@ public final class DebugRoutes {
     // Tempdoc 406 — admin-triggered runtime swap. Triggers a holder swap on the
     // ingest runtime via gRPC ReloadRuntime; returns swap duration in ms.
     app.post("/api/admin/runtime/reload", adminRuntimeReloadHandler);
-    // Tempdoc 412 Phase 5 — admin-triggered inference runtime restart via
-    // OnlineAiRuntimeControl.reloadRuntime() (RESTART_IF_ONLINE).
-    app.post("/api/admin/inference/reload", adminInferenceReloadHandler);
   }
 }

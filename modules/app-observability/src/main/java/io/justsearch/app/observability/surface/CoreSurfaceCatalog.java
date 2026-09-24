@@ -355,7 +355,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
       new OperationRef("core.deactivate-runtime-variant");
   private static final OperationRef OP_SWITCH_INFERENCE_MODE =
       new OperationRef("core.switch-inference-mode");
-  private static final OperationRef OP_RELOAD_INFERENCE = new OperationRef("core.reload-inference");
+  private static final OperationRef OP_RECONFIGURE = new OperationRef("core.reconfigure");
 
   private static final List<Surface> DEFINITIONS =
       List.of(
@@ -465,7 +465,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
                       OP_ACTIVATE_RUNTIME_VARIANT,
                       OP_DEACTIVATE_RUNTIME_VARIANT,
                       OP_SWITCH_INFERENCE_MODE,
-                      OP_RELOAD_INFERENCE),
+                      OP_RECONFIGURE),
                   /* prompts */ Set.of(),
                   /* diagnosticChannels */ Set.<DiagnosticChannelRef>of()),
               BRAIN_MOUNT_TAG,

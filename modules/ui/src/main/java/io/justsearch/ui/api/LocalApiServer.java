@@ -650,14 +650,13 @@ public class LocalApiServer {
         core.policyController(),
         core.diagnosticsController());
     IndexingRoutes.register(app, indexingController);
-    DebugRoutes.register(app, core.debugStateController(), core.effectiveConfigController(), core.chunkInfoController(), this::handleDebugDashboard, core.logLevelController(), core.timeSeriesController(), core.sessionPoliciesController(), this::handleResetIndex, this::handleAdminRuntimeReload, this::handleAdminInferenceReload);
+    DebugRoutes.register(app, core.debugStateController(), core.effectiveConfigController(), core.chunkInfoController(), this::handleDebugDashboard, core.logLevelController(), core.timeSeriesController(), core.sessionPoliciesController(), this::handleResetIndex, this::handleAdminRuntimeReload);
     AiRoutes.register(app, core.previewController(), core.aiInstallController(), core.aiPackController(), core.aiRuntimeController(), core.aiModelsController(), convApi.chatController());
     InferenceRoutes.register(
         app,
         inferenceHandlers::handleInferenceStatus,
         inferenceHandlers::handleGpuCapabilities,
         inferenceHandlers::handleSetInferenceMode,
-        inferenceHandlers::handleReloadInferenceConfig,
         inferenceHandlers::handleDetachExternalInferenceServer,
         inferenceHandlers::handleRestartWorker,
         core.encoderRuntimeController()::handle,
@@ -836,27 +835,6 @@ public class LocalApiServer {
       log.error("admin runtime reload failed", e);
       ctx.status(500).json(Map.of("error", e.getMessage()));
     }
-  }
-
-  /**
-   * Tempdoc 412 Phase 5 — POST /api/admin/inference/reload. Triggers a config-driven restart
-   * of the inference runtime via {@link io.justsearch.app.api.OnlineAiRuntimeControl#reloadRuntime}.
-   * Optional JSON body: {@code {"reason":"<tag>"}}. Returns
-   * {@code {"transitionDurationMs": N, "phase": "<X>", "generationId": Z, "reason": "<tag>"}}.
-   *
-   * <p>Operator-only. Inherits loopback-only safety from the Javalin bind to
-   * {@code 127.0.0.1} (see {@link #handleAdminRuntimeReload}'s analogous comment for the
-   * 0.0.0.0 caveat).
-   *
-   * <p>Returns 503 when the inference runtime is unavailable (AI disabled or not yet
-   * constructed); 500 on unexpected errors.
-   */
-  private void handleAdminInferenceReload(Context ctx) {
-    AdminInferenceReloadHandlers.handleAdminInferenceReload(
-        ctx,
-        HeadAssemblyRef != null ? HeadAssemblyRef.inference().onlineAi() : OnlineAiService.unavailable(),
-        () -> HeadAssemblyRef != null ? HeadAssemblyRef.inferenceSnapshot() : null,
-        log);
   }
 
   public int getPort() {

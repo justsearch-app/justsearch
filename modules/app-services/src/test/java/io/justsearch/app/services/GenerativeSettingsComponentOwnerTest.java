@@ -52,7 +52,8 @@ final class GenerativeSettingsComponentOwnerTest {
         .build();
     var manager = mock(InferenceLifecycleManager.class);
     var prepared = mock(InferenceLifecycleManager.PreparedConfigApply.class);
-    when(manager.prepareResolvedConfig(any(), eq(desired), eq(true))).thenReturn(prepared);
+    when(manager.prepareResolvedConfig(any(), eq(desired), eq(true), eq(false))).thenReturn(prepared);
+    when(prepared.targetsOnline()).thenReturn(true);
     var handle = mock(ComponentHandle.class);
     var spec = new ComponentSpec("generative", false, Set.of(),
         ComponentSpec.ComposeCapability.IN_PLACE, Duration.ofMinutes(3), 1);
@@ -60,7 +61,7 @@ final class GenerativeSettingsComponentOwnerTest {
         Instant.parse("2026-09-23T00:00:00Z"), 1L, "A", "A", null, 0, "A");
     var staging = new EngineComponentSnapshot.Component(spec, ComponentState.RELOADING, null,
         before.stateSince(), before.stateSinceMonotonicNanos(), "A", "A", null, 0, "preparing");
-    when(handle.snapshot()).thenReturn(before, before, staging, staging);
+    when(handle.snapshot()).thenReturn(before, staging);
     when(handle.transitionIfUnchanged(eq(before), eq(ComponentState.RELOADING),
         any(), any())).thenReturn(true);
     var owner = new GenerativeSettingsComponentOwner(manager, handle, directory, false);
@@ -71,7 +72,7 @@ final class GenerativeSettingsComponentOwnerTest {
         new SettingsCandidateContext(ChatModelProfile.COMPACT));
 
     var config = ArgumentCaptor.forClass(InferenceConfig.class);
-    verify(manager).prepareResolvedConfig(config.capture(), eq(desired), eq(true));
+    verify(manager).prepareResolvedConfig(config.capture(), eq(desired), eq(true), eq(false));
     assertEquals(model, config.getValue().modelPath());
     assertEquals(projector, config.getValue().mmprojPath());
     assertEquals(ChatModelProfile.COMPACT.id(), config.getValue().chatProfileId());
@@ -96,6 +97,36 @@ final class GenerativeSettingsComponentOwnerTest {
             new SettingsCandidateContext(ChatModelProfile.COMPACT)));
     assertEquals("GENERATIVE_PREPARATION_REFUSED", refusal.response().errorCode().orElseThrow());
     org.mockito.Mockito.verifyNoInteractions(manager);
+  }
+
+  @Test
+  void refreshWhileOfflineRetainsConfigurationWithoutStartingManagedServer() throws Exception {
+    var desired = ResolvedConfig.builder().putDefault("justsearch.llm.enabled", "true").build();
+    var manager = mock(InferenceLifecycleManager.class);
+    var prepared = mock(InferenceLifecycleManager.PreparedConfigApply.class);
+    when(manager.prepareResolvedConfig(any(), eq(desired), eq(true), eq(true))).thenReturn(prepared);
+    var handle = mock(ComponentHandle.class);
+    var spec = new ComponentSpec("generative", false, Set.of(),
+        ComponentSpec.ComposeCapability.IN_PLACE, Duration.ofMinutes(3), 1);
+    var before = new EngineComponentSnapshot.Component(spec, ComponentState.ABSENT, null,
+        Instant.parse("2026-09-23T00:00:00Z"), 1L, "A", "A", null, 0, "offline");
+    var staging = new EngineComponentSnapshot.Component(spec, ComponentState.STARTING, null,
+        before.stateSince(), before.stateSinceMonotonicNanos(), "A", "A", null, 0, "preparing");
+    when(handle.snapshot()).thenReturn(before, staging);
+    when(handle.transitionIfUnchanged(eq(before), eq(ComponentState.STARTING),
+        any(), any())).thenReturn(true);
+    var settings = new UiSettings();
+    settings.setChatEnabled(true);
+    org.junit.jupiter.api.Assertions.assertTrue(
+        io.justsearch.app.services.bootstrap.phases.InferenceDecision.decideInferenceConfigured(desired, false));
+
+    var candidate = new GenerativeSettingsComponentOwner(manager, handle, directory, false)
+        .prepare(settings, desired, Set.of("modelRefresh"), new SettingsCandidateContext(null, true));
+
+    verify(manager).prepareResolvedConfig(any(), eq(desired), eq(true), eq(true));
+    assertEquals(ComponentState.ABSENT, candidate.observation().state());
+    assertEquals("A", candidate.observation().appliedVersion());
+    org.junit.jupiter.api.Assertions.assertNotEquals("A", candidate.observation().desiredVersion());
   }
 
   @Test

@@ -191,8 +191,6 @@ public final class CoreOperationCatalog implements OperationCatalog {
    * (restarts llama-server when in ONLINE mode). No args. Returns
    * {@code structuredData.mode} (post-apply current mode).
    */
-  public static final OperationRef RELOAD_INFERENCE =
-      new OperationRef("core.reload-inference");
 
   /**
    * Slice 3a-2-c BrainRuntimeSection Switch-to-Online / Switch-to-Indexing
@@ -364,7 +362,6 @@ public final class CoreOperationCatalog implements OperationCatalog {
       removeWatchedRoot(),
       previewExcludes(),
       applyExcludes(),
-      reloadInference(),
       switchInferenceMode(),
       setChatEnabled(),
       triggerOfflineProcessing(),
@@ -873,27 +870,6 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI));
   }
 
-  private static Operation reloadInference() {
-    return new Operation(
-        RELOAD_INFERENCE,
-        Presentation.forId(RELOAD_INFERENCE),
-        Interface.of(
-            "{\"type\":\"object\",\"properties\":{}}",
-            "{\"type\":\"object\",\"properties\":{\"mode\":{\"type\":\"string\"}}}"),
-        new OperationPolicy(
-            RiskTier.MEDIUM,
-            ConfirmStrategy.Inline.INSTANCE,
-            AuditPolicy.METADATA_ONLY,
-            RetryPolicy.noRetry(),
-            Set.of(RequiredCapability.InferenceOnline.INSTANCE),
-            false),
-        OperationAvailability.empty(),
-        OperationLineage.empty(),
-        Binding.of(RELOAD_INFERENCE),
-        Provenance.core("1.0"),
-        Set.of(ExecutorTag.UI));
-  }
-
   private static Operation switchInferenceMode() {
     return new Operation(
         SWITCH_INFERENCE_MODE,
@@ -1216,7 +1192,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
       "{\"type\":\"object\",\"additionalProperties\":false,"
           + "\"required\":[\"settings\",\"modeIntent\"],\"properties\":{"
           + "\"settings\":{\"type\":\"object\",\"required\":[\"witness\",\"operationKey\"]},"
-          + "\"modeIntent\":{\"type\":[\"string\",\"null\"]}}}";
+          + "\"modeIntent\":{\"type\":[\"string\",\"null\"]},"
+          + "\"refreshInference\":{\"type\":\"boolean\"}}}";
 
   private static Operation reconfigure() {
     return new Operation(

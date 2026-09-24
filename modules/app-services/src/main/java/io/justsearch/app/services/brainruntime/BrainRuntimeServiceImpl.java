@@ -2,15 +2,11 @@
 package io.justsearch.app.services.brainruntime;
 
 import io.justsearch.app.api.BrainRuntimeService;
-import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.ModeTransitionOutcome;
-import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
-import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.services.registry.operations.handlers.SetChatEnabledHandler;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
-import io.justsearch.app.services.settings.UiSettingsStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,8 +19,6 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
   private static final Logger log = LoggerFactory.getLogger(BrainRuntimeServiceImpl.class);
 
   private final OnlineAiService onlineAi;
-  private final UiSettingsStore settingsStore;
-  private final EnterprisePolicyService enterprisePolicyService;
   private final java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger;
   // Tempdoc 737 fix pack (fix 4): the runtime-intent authority. switchInferenceMode records the
   // chat-enabled intent through these (spec write + reconciler nudge) instead of a raw switchTo*.
@@ -34,10 +28,8 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
 
   public BrainRuntimeServiceImpl(
       OnlineAiService onlineAi,
-      UiSettingsStore settingsStore,
-      EnterprisePolicyService enterprisePolicyService,
       java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger) {
-    this(onlineAi, settingsStore, enterprisePolicyService, offlineProcessingTrigger, null, null);
+    this(onlineAi, offlineProcessingTrigger, null, null);
   }
 
   /**
@@ -48,41 +40,13 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
    */
   public BrainRuntimeServiceImpl(
       OnlineAiService onlineAi,
-      UiSettingsStore settingsStore,
-      EnterprisePolicyService enterprisePolicyService,
       java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger,
       RuntimeSpecStore runtimeSpecStore,
       RuntimeReconciler runtimeReconciler) {
     this.onlineAi = onlineAi;
-    this.settingsStore = settingsStore;
-    this.enterprisePolicyService = enterprisePolicyService;
     this.offlineProcessingTrigger = offlineProcessingTrigger;
     this.runtimeSpecStore = runtimeSpecStore;
     this.runtimeReconciler = runtimeReconciler;
-  }
-
-  @Override
-  public String reloadInference() throws Exception {
-    if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
-      throw new IllegalStateException("Inference runtime control unavailable");
-    }
-    if (settingsStore == null) {
-      throw new IllegalStateException("Settings store unavailable");
-    }
-    if (enterprisePolicyService != null) {
-      try {
-        enterprisePolicyService.snapshot();
-      } catch (Exception ignored) {
-        // best-effort; do not fail reload on policy snapshot errors
-      }
-    }
-    UiSettings s = settingsStore.load();
-    control.applyRuntimeOverrides(
-        s.getLlmModelPath(),
-        s.getContextLength(),
-        s.configuredGpuLayers(),
-        OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
-    return onlineAi.getCurrentMode();
   }
 
   @Override
