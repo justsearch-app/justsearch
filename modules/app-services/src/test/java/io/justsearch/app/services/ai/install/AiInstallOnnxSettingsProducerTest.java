@@ -24,6 +24,7 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.CandidateIndexSelection;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.RecordedIngestionService;
 import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
@@ -186,8 +187,8 @@ class AiInstallOnnxSettingsProducerTest {
     InvocationProvenance provenance = EngineProvenance.invocation(
         context, ExecutorTag.UI, Instant.parse("2026-09-23T00:00:00Z"), Optional.empty());
     when(indexing.captureServingGeneration(context)).thenReturn("serving-a");
-    when(indexing.captureCandidateIndexTarget(any(), any()))
-        .thenReturn(new IndexTargetSnapshot(sha("{}"), "{}"));
+    when(indexing.captureCandidateIndexSelection(any(), any()))
+        .thenReturn(new CandidateIndexSelection(new IndexTargetSnapshot(sha("{}"), "{}"), Map.of()));
     ActivateInstalledModelsHandler handler = new ActivateInstalledModelsHandler(
         () -> install, ingestion,
         ignored -> List.of(new RootBinding(directory.resolve("watched").toAbsolutePath(), "documents")),
@@ -239,8 +240,8 @@ class AiInstallOnnxSettingsProducerTest {
     InvocationProvenance provenance = EngineProvenance.invocation(
         context, ExecutorTag.UI, Instant.parse("2026-09-23T00:00:00Z"), Optional.empty());
     when(indexing.captureServingGeneration(context)).thenReturn("serving-a");
-    when(indexing.captureCandidateIndexTarget(any(), any()))
-        .thenReturn(new IndexTargetSnapshot(sha("{}"), "{}"));
+    when(indexing.captureCandidateIndexSelection(any(), any()))
+        .thenReturn(new CandidateIndexSelection(new IndexTargetSnapshot(sha("{}"), "{}"), Map.of()));
     ActivateInstalledModelsHandler handler = new ActivateInstalledModelsHandler(
         () -> install, ingestion,
         ignored -> List.of(new RootBinding(directory.resolve("watched").toAbsolutePath(), "documents")),

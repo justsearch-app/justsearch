@@ -1026,6 +1026,15 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
+    public io.justsearch.app.api.operations.CandidateIndexSelection captureCandidateIndexSelection(
+        io.justsearch.configuration.resolved.ResolvedConfig candidate,
+        EngineContext engineContext) {
+        Objects.requireNonNull(candidate, "candidate");
+        return executeIngestRpc("captureCandidateIndexSelection", RpcDeadlineCategory.LONG_RUNNING,
+            service -> service.captureCandidateIndexSelection(candidate), engineContext);
+    }
+
+    @Override
     public boolean reconcileRoot(String pathHash, boolean force, EngineContext engineContext) {
         // Tempdoc 626 §Recency (Move C) — resolve the privacy-safe pathHash to the real root Head-side
         // (raw paths never cross the wire — ADR-0028), then run a per-root force reconcile. A force=true

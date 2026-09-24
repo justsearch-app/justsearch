@@ -6,6 +6,30 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-24)
 
+### Latest checkpoint and D1-12 installed boot evidence
+
+Pushed PR727 checkpoint `61958becc` passed terminal hosted run `35954572417`,
+including system integration. The next D1-12 checkpoint extends
+accepted installer preparation with the complete selected ONNX model map,
+including retained roles, exact hashes, sparse mode and vector dimension.
+Worker boot composes the active manifest's X instead of desired settings Y;
+compatibility and schema status use X's identity. Focused Java checks and
+`:modules:ui:installDist` passed at `tmp/3127-d1-12-status-build.txt`.
+The full 358-task `spotlessCheck pmdAll test -PincludeStress=true
+:modules:ui:installDist` gate passed at `tmp/3132-d1-12-integrated.txt`.
+The installed standard-model pointer-before-settings recovery passed at
+`tmp/3119-d1-12-installed.txt`. A private installed X/Y boot passed at
+`tmp/3128-d1-12-model-x-y-installed.txt`: X encoders READY, exact X embedding
+and schema fingerprints matched the stored values, Y remained pending, and
+text search returned a hit. The private missing-X boot passed at
+`tmp/3129-d1-12-model-missing-x-installed.txt`:
+`UNAVAILABLE/INDEX_MODEL_NOT_INSTALLED` with text search still serving. Both
+stopped with ports closed. The initial X/Y `tmp/3122` run exposed a real
+process-wide fingerprint leak; the earlier `tmp/3120`/`3121` attempts were
+fixture request timeouts. The next boundary is retained-asset audit and
+terminal hosted proof at the coherent checkpoint. D1 side-by-side publication and
+lifetime, then D2/E/F remain open; merge is conditional on stage F acceptance.
+
 ### D1-4 accepted inference refresh slice and model-identity follow-up
 
 The local `bc4527f36` checkpoint adds two D1-4 component-boundary regressions

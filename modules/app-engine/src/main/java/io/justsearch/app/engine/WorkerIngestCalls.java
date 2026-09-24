@@ -101,6 +101,29 @@ final class WorkerIngestCalls implements IngestServiceCalls {
     }
   }
 
+  @Override public io.justsearch.app.api.operations.CandidateIndexSelection captureCandidateIndexSelection(
+      io.justsearch.configuration.resolved.ResolvedConfig candidate) {
+    if (ctx.cancelled()) throw io.justsearch.indexerworker.services.WorkerServiceException.cancelled(
+        "Candidate selection capture cancelled");
+    try {
+      var captured = io.justsearch.indexerworker.services.CandidateIndexTargetCapture
+          .captureWithRuntimeInputs(candidate);
+      java.util.Map<String, io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile>
+          models = new java.util.HashMap<>();
+        for (var entry : captured.selectedModels().entrySet()) {
+        java.nio.file.Path file = java.nio.file.Path.of(entry.getValue().id());
+        models.put(entry.getKey(),
+            new io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile(
+                file, entry.getValue().sha256(), java.nio.file.Files.size(file)));
+      }
+      return new io.justsearch.app.api.operations.CandidateIndexSelection(captured.target(), models);
+    } catch (java.io.IOException unavailable) {
+      throw new io.justsearch.indexerworker.services.WorkerServiceException(
+          io.justsearch.indexerworker.services.WorkerServiceException.Status.UNAVAILABLE,
+          "Candidate index-model files cannot be read", unavailable);
+    }
+  }
+
   @Override
   public io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request) {
     return service.markVduProcessing(request, ctx);

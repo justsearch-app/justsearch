@@ -145,13 +145,25 @@ public final class InferenceCompositionRoot {
       Path modelsDir,
       GpuArbiter arbiter,
       OrtSessionTelemetryEvents events) {
+    return compose(projection, hardware, contract, modelsDir, arbiter, events, null);
+  }
+
+  /** Composes a generation from its bound files while desired settings remain independent. */
+  static InferenceSurface compose(
+      EncoderConfigurationProjection projection,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection) {
     ResolvedConfig cfg = projection.config();
     List<SessionHandle> handles = new ArrayList<>();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requestedRoles = EnumSet.noneOf(EncoderRole.class);
 
     // BGE-M3 replaces the separate Embedding + SPLADE encoders when selected.
-    String sparseModel = cfg.ai().sparseModel();
+    String sparseModel = projection.sparseModel();
     boolean bgeM3Selected = "bge-m3".equalsIgnoreCase(sparseModel);
 
     Optional<EmbeddingAssembly> embedding =
@@ -167,7 +179,8 @@ public final class InferenceCompositionRoot {
                 handles,
                 policies,
                 requestedRoles,
-                events);
+                events,
+                selection);
 
     Optional<NerAssembly> ner =
         composeNerRole(
@@ -180,7 +193,8 @@ public final class InferenceCompositionRoot {
             handles,
             policies,
             requestedRoles,
-            events);
+            events,
+            selection);
 
     Optional<BgeM3Assembly> bgeM3 =
         bgeM3Selected
@@ -194,7 +208,8 @@ public final class InferenceCompositionRoot {
                 handles,
                 policies,
                 requestedRoles,
-                events)
+                events,
+                selection)
             : Optional.empty();
 
     // If BGE-M3 was selected but failed, fall back to SPLADE (matches today's KnowledgeServer
@@ -212,7 +227,8 @@ public final class InferenceCompositionRoot {
                 handles,
                 policies,
                 requestedRoles,
-                events)
+                events,
+                selection)
             : Optional.empty();
 
     Optional<RerankerAssembly> reranker =
@@ -226,7 +242,8 @@ public final class InferenceCompositionRoot {
             handles,
             policies,
             requestedRoles,
-            events);
+            events,
+            selection);
 
     Optional<RerankerAssembly> citation =
         composeCitationRole(
@@ -238,7 +255,8 @@ public final class InferenceCompositionRoot {
             handles,
             policies,
             requestedRoles,
-            events);
+            events,
+            selection);
 
     RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
     PolicySnapshot snapshot = new PolicySnapshot(runtime, policies);
@@ -274,7 +292,8 @@ public final class InferenceCompositionRoot {
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events) {
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection) {
     if (embedCfg.enabled()) {
       requestedRoles.add(EncoderRole.EMBEDDING);
     }
@@ -283,7 +302,8 @@ public final class InferenceCompositionRoot {
     }
     VariantSelection variant =
         resolveVariant(
-            "embedding", contract, hardware, modelsDir, embedCfg.modelPath(), embedCfg.gpuEnabled());
+            "embedding", contract, hardware, modelsDir, embedCfg.modelPath(), embedCfg.gpuEnabled(),
+            selection);
     if (variant == null) {
       log.warn(
           "Embedding: no variant resolved (dev mode without contract or model absent); vector"
@@ -300,13 +320,13 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
-      EmbeddingAssembly assembly =
-          OnnxEmbeddingEncoder.buildAssembly(
-              sessions,
-              embedCfg.modelPath(),
-              embedCfg.contextLength(),
-              embedCfg.lateChunkingContextLength(),
-              cfg.ai().capabilityContractStrict());
+      EmbeddingAssembly assembly = selection == null
+          ? OnnxEmbeddingEncoder.buildAssembly(sessions, embedCfg.modelPath(),
+              embedCfg.contextLength(), embedCfg.lateChunkingContextLength(),
+              cfg.ai().capabilityContractStrict())
+          : OnnxEmbeddingEncoder.buildAssembly(sessions, embedCfg.modelPath(),
+              embedCfg.contextLength(), embedCfg.lateChunkingContextLength(),
+              cfg.ai().capabilityContractStrict(), variant.modelFile());
       handles.add(assembly.sessions());
       policies.put(
           EncoderRole.EMBEDDING,
@@ -335,7 +355,8 @@ public final class InferenceCompositionRoot {
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events) {
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection) {
     if (nerCfg.enabled()) {
       requestedRoles.add(EncoderRole.NER);
     }
@@ -343,7 +364,8 @@ public final class InferenceCompositionRoot {
       return Optional.empty();
     }
     VariantSelection variant =
-        resolveVariant("ner", contract, hardware, modelsDir, nerCfg.modelPath(), nerCfg.gpuEnabled());
+        resolveVariant("ner", contract, hardware, modelsDir, nerCfg.modelPath(),
+            nerCfg.gpuEnabled(), selection);
     if (variant == null) {
       log.info("NER: no variant resolved; NER will be unavailable.");
       return Optional.empty();
@@ -353,9 +375,12 @@ public final class InferenceCompositionRoot {
           compose(
               EncoderRole.NER.consumerName(), EncoderRole.NER, cfg, hardware, variant, arbiter, events);
       Path modelDir = variant.modelFile().getParent();
-      NerAssembly assembly =
-          io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
-              sessions, modelDir, nerCfg.maxSequenceLength(), cfg.ai().capabilityContractStrict());
+      NerAssembly assembly = selection == null
+          ? io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
+              sessions, modelDir, nerCfg.maxSequenceLength(), cfg.ai().capabilityContractStrict())
+          : io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
+              sessions, modelDir, nerCfg.maxSequenceLength(), cfg.ai().capabilityContractStrict(),
+              variant.modelFile());
       handles.add(assembly.sessions());
       policies.put(
           EncoderRole.NER,
@@ -377,7 +402,8 @@ public final class InferenceCompositionRoot {
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events) {
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection) {
     // Selection itself is the request. A disabled/missing BGE-M3 remains observable even when
     // the compatible SPLADE fallback is usable.
     requestedRoles.add(EncoderRole.BGE_M3);
@@ -387,7 +413,8 @@ public final class InferenceCompositionRoot {
     }
     VariantSelection variant =
         resolveVariant(
-            "embedding", contract, hardware, modelsDir, bgeCfg.modelPath(), bgeCfg.gpuEnabled());
+            "embedding", contract, hardware, modelsDir, bgeCfg.modelPath(), bgeCfg.gpuEnabled(),
+            selection);
     if (variant == null) {
       log.warn("BGE-M3: no variant resolved; falling back to SPLADE");
       return Optional.empty();
@@ -426,7 +453,8 @@ public final class InferenceCompositionRoot {
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events) {
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection) {
     if (spladeCfg.enabled()) {
       requestedRoles.add(EncoderRole.SPLADE);
     }
@@ -435,7 +463,8 @@ public final class InferenceCompositionRoot {
     }
     VariantSelection variant =
         resolveVariant(
-            "splade", contract, hardware, modelsDir, spladeCfg.modelPath(), spladeCfg.gpuEnabled());
+            "splade", contract, hardware, modelsDir, spladeCfg.modelPath(),
+            spladeCfg.gpuEnabled(), selection);
     if (variant == null) {
       log.info("SPLADE: no variant resolved; sparse retrieval disabled.");
       return Optional.empty();
@@ -450,7 +479,9 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
-      SpladeAssembly assembly = SpladeEncoder.buildAssembly(sessions, spladeCfg);
+      SpladeAssembly assembly = selection == null
+          ? SpladeEncoder.buildAssembly(sessions, spladeCfg)
+          : SpladeEncoder.buildAssembly(sessions, spladeCfg, variant.modelFile());
       handles.add(assembly.sessions());
       policies.put(
           EncoderRole.SPLADE,
@@ -473,7 +504,8 @@ public final class InferenceCompositionRoot {
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events) {
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection) {
     if (rerankCfg.enabled()) {
       requestedRoles.add(EncoderRole.RERANKER);
     }
@@ -487,7 +519,8 @@ public final class InferenceCompositionRoot {
             hardware,
             modelsDir,
             rerankCfg.modelPath(),
-            rerankCfg.gpuEnabled());
+            rerankCfg.gpuEnabled(),
+            selection);
     if (variant == null) {
       log.info("Search reranker: no variant resolved; reranking disabled.");
       return Optional.empty();
@@ -538,7 +571,8 @@ public final class InferenceCompositionRoot {
       List<SessionHandle> handles,
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events) {
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection) {
     if (citationCfg != null && citationCfg.enabled()) {
       requestedRoles.add(EncoderRole.CITATION);
     }
@@ -552,7 +586,8 @@ public final class InferenceCompositionRoot {
             hardware,
             modelsDir,
             citationCfg.modelPath(),
-            /* gpuEnabled= */ false);
+            /* gpuEnabled= */ false,
+            selection);
     if (variant == null) {
       log.info("Citation scorer: no variant resolved; citation scoring disabled.");
       return Optional.empty();
@@ -623,6 +658,19 @@ public final class InferenceCompositionRoot {
       log.warn("{}: degraded model variant selected — {}", packageId, selection.degradationReason());
     }
     return selection;
+  }
+
+  private static VariantSelection resolveVariant(
+      String packageId,
+      InstallContract contract,
+      HardwareProfile hardware,
+      Path modelsDir,
+      Path configModelPath,
+      boolean gpuEnabled,
+      GenerationModelSelection generation) {
+    return generation == null
+        ? resolveVariant(packageId, contract, hardware, modelsDir, configModelPath, gpuEnabled)
+        : generation.variant(packageId, gpuEnabled).orElse(null);
   }
 
   /**

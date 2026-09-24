@@ -70,6 +70,12 @@ public interface IngestServiceCalls {
     throw new UnsupportedOperationException("Candidate target capture unavailable");
   }
 
+  /** Captures target and exact index-model files together for an installed candidate. */
+  default io.justsearch.app.api.operations.CandidateIndexSelection captureCandidateIndexSelection(
+      io.justsearch.configuration.resolved.ResolvedConfig candidate) {
+    throw new UnsupportedOperationException("Candidate index selection capture unavailable");
+  }
+
   /** {@code IngestService/MarkVduProcessing}. */
   io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request);
 

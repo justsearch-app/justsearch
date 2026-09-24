@@ -110,6 +110,16 @@ public final class BertNerInference implements Closeable {
   public static NerAssembly buildAssembly(
       SessionHandle sessions, Path modelDir, int maxSequenceLength, boolean capabilityContractStrict)
       throws OrtException {
+    return buildAssembly(sessions, modelDir, maxSequenceLength, capabilityContractStrict, null);
+  }
+
+  /** Uses the generation's exact ONNX file for probing, with metadata from its own directory. */
+  public static NerAssembly buildAssembly(
+      SessionHandle sessions, Path modelDir, int maxSequenceLength,
+      boolean capabilityContractStrict, Path exactModelFile) throws OrtException {
+    if (exactModelFile != null && !modelDir.equals(exactModelFile.getParent())) {
+      throw new IllegalArgumentException("NER model file and metadata directory differ");
+    }
     ModelManifest manifest = ModelManifest.loadOrDefault(modelDir);
     Path tokenizerPath = modelDir.resolve(manifest.tokenizer());
     HuggingFaceTokenizer tokenizer;
@@ -142,7 +152,8 @@ public final class BertNerInference implements Closeable {
     // matches alpha.16 Bug C (EmbeddingFingerprint), alpha.19 Bug J-2 (OnnxModelDiscovery
     // fp16 fallback), alpha.20 Bug L (EmbeddingFingerprint cold-restart). Migration now
     // complete across all known encoder sites.
-    Path probePath = manifest.resolveExistingModelFile(modelDir);
+    Path probePath = exactModelFile != null ? exactModelFile
+        : manifest.resolveExistingModelFile(modelDir);
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), probePath);
     boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");

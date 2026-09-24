@@ -454,6 +454,10 @@ public final class WorkerIngestService {
     this.resolvedConfigSupplier = supplier;
   }
 
+  public void setExpectedCommitMetadataSupplier(Supplier<Map<String, Object>> supplier) {
+    statusOps.setExpectedCommitMetadataSupplier(supplier);
+  }
+
   // Tempdoc 931 §E item 8: kept here too (not only forwarded to statusOps) so the VDU chunk
   // regeneration path can read rag.chunk_splade.enabled from the LIVE config on every write.
   private volatile Supplier<io.justsearch.configuration.resolved.ResolvedConfig>

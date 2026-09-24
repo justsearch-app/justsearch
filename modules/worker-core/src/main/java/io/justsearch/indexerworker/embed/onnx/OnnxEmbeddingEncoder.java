@@ -163,12 +163,29 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       int lateChunkingMaxSeqLen,
       boolean capabilityContractStrict)
       throws OrtException {
+    return buildAssembly(sessions, modelDir, maxSeqLen, lateChunkingMaxSeqLen,
+        capabilityContractStrict, null);
+  }
+
+  /** Uses the generation's exact ONNX file for probing, with metadata from its own directory. */
+  public static EmbeddingAssembly buildAssembly(
+      SessionHandle sessions,
+      Path modelDir,
+      int maxSeqLen,
+      int lateChunkingMaxSeqLen,
+      boolean capabilityContractStrict,
+      Path exactModelFile)
+      throws OrtException {
+    if (exactModelFile != null && !modelDir.equals(exactModelFile.getParent())) {
+      throw new IllegalArgumentException("Embedding model file and metadata directory differ");
+    }
     // Tempdoc 397 §14.24 FD-ProbeDeletion: probe input names via the assembler helper.
     // Tempdoc 374 sandbox round 4 issue H: previously hardcoded model.onnx, which
     // broke when Install AI only downloaded model_fp16.onnx on a CUDA-functional
     // host. resolveExistingModelFile picks whichever declared variant is on disk.
     io.justsearch.ort.ModelManifest manifest = io.justsearch.ort.ModelManifest.loadOrDefault(modelDir);
-    Path probeModel = manifest.resolveExistingModelFile(modelDir);
+    Path probeModel = exactModelFile != null ? exactModelFile
+        : manifest.resolveExistingModelFile(modelDir);
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(
             sessions.environment(), probeModel);

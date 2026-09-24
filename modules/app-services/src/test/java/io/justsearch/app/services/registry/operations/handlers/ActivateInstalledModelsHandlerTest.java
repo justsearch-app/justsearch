@@ -21,6 +21,7 @@ import io.justsearch.app.api.BrainInstallService;
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
+import io.justsearch.app.api.operations.CandidateIndexSelection;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.RecordedIngestionService;
 import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
@@ -55,7 +56,7 @@ final class ActivateInstalledModelsHandlerTest {
     when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
     IndexTargetSnapshot target = target();
-    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target);
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(selection(target));
 
     ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
     OperationPreparation prepared = handler.prepare(args(), PROVENANCE, CONTEXT);
@@ -68,6 +69,51 @@ final class ActivateInstalledModelsHandlerTest {
     assertEquals(target, plan.target());
     assertEquals(1, plan.scope().roots().size());
     verify(ingestion, org.mockito.Mockito.never()).execute(any(), any());
+  }
+
+  @Test
+  void freezesRetainedServingModelIdentityWithTheCandidate() {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    InstalledGenerationCandidate candidate = candidate(true);
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
+    Path retainedPath = Path.of("retained-splade.onnx").toAbsolutePath().normalize();
+    var retainedFile = new CandidateIndexSelection.ModelFile(retainedPath, "1".repeat(64), 17);
+    when(indexing.captureCandidateIndexSelection(any(), any()))
+        .thenReturn(new CandidateIndexSelection(target(), Map.of("splade", retainedFile)));
+
+    OperationPreparation prepared = handler(install, indexing,
+        mock(RecordedIngestionService.class)).prepare(args(), PROVENANCE, CONTEXT);
+    var plan = RecordedInstallerGenerationPlan.fromReplayPayload(prepared.replayPayloadJson());
+
+    assertEquals(2, plan.models().size());
+    var retained = plan.models().stream().filter(model -> model.packageId().equals("splade"))
+        .findFirst().orElseThrow();
+    assertEquals(retainedPath, retained.path());
+    assertEquals(retainedFile.sha256(), retained.sha256());
+    assertEquals(retainedFile.sizeBytes(), retained.sizeBytes());
+    assertEquals(RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.CANDIDATE_CAPTURE,
+        retained.provenance().kind());
+    assertEquals("serving-a", retained.provenance().sourceId());
+  }
+
+  @Test
+  void refusesAcquiredModelThatDiffersFromCapturedIndexTarget() {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
+    var different = new CandidateIndexSelection.ModelFile(
+        Path.of("different-embedding.onnx").toAbsolutePath().normalize(), "1".repeat(64), 17);
+    when(indexing.captureCandidateIndexSelection(any(), any()))
+        .thenReturn(new CandidateIndexSelection(target(), Map.of("embedding", different)));
+
+    OperationPreparationRefused refused = assertThrows(OperationPreparationRefused.class,
+        () -> handler(install, indexing, mock(RecordedIngestionService.class))
+            .prepare(args(), PROVENANCE, CONTEXT));
+
+    assertEquals("ACTIVATION_MODEL_TARGET_CONFLICT", refused.refusal().errorCode().orElseThrow());
   }
 
   @Test
@@ -90,7 +136,7 @@ final class ActivateInstalledModelsHandlerTest {
     RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
     when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
-    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target());
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(selection(target()));
     OperationExecution expected = new OperationExecution(OperationResult.success("accepted"),
         new CompletableFuture<OperationResult>());
     when(ingestion.execute(any(), any())).thenReturn(expected);
@@ -117,7 +163,7 @@ final class ActivateInstalledModelsHandlerTest {
     when(install.prepareInstalledGenerationCandidate()).thenReturn(
         Optional.of(first), Optional.of(changed));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
-    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target());
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(selection(target()));
     ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
     OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
 
@@ -135,9 +181,32 @@ final class ActivateInstalledModelsHandlerTest {
     RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
     when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
-    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target(),
-        new IndexTargetSnapshot(
-            "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb", "a"));
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(selection(target()),
+        selection(new IndexTargetSnapshot(
+            "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb", "a")));
+    ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
+    OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
+
+    OperationExecution result = handler.executePrepared(
+        approved, PROVENANCE, CONTEXT, mock(OperationRecordHandle.class));
+
+    assertEquals("ACTIVATION_PREVIEW_STALE", result.response().errorCode().orElseThrow());
+    verify(ingestion, org.mockito.Mockito.never()).execute(any(), any());
+  }
+
+  @Test
+  void changedRetainedModelWithSameIndexTargetRequiresFreshPreview() {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
+    Path retainedPath = Path.of("retained-reranker.onnx").toAbsolutePath().normalize();
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(
+        new CandidateIndexSelection(target(), Map.of("reranker",
+            new CandidateIndexSelection.ModelFile(retainedPath, "1".repeat(64), 17))),
+        new CandidateIndexSelection(target(), Map.of("reranker",
+            new CandidateIndexSelection.ModelFile(retainedPath, "2".repeat(64), 17))));
     ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
     OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
 
@@ -155,7 +224,7 @@ final class ActivateInstalledModelsHandlerTest {
     RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
     when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
-    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target());
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(selection(target()));
     var roots = new AtomicReference<>(List.of(new RootBinding(
         Path.of("activation-root").toAbsolutePath(), "documents")));
     ActivateInstalledModelsHandler handler = new ActivateInstalledModelsHandler(
@@ -178,7 +247,7 @@ final class ActivateInstalledModelsHandlerTest {
     when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn(
         "serving-a", "serving-a", "serving-b", "serving-b");
-    when(indexing.captureCandidateIndexTarget(any(), any())).thenReturn(target());
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(selection(target()));
     ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
     OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
 
@@ -220,5 +289,9 @@ final class ActivateInstalledModelsHandlerTest {
   private static IndexTargetSnapshot target() {
     return new IndexTargetSnapshot(
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "");
+  }
+
+  private static CandidateIndexSelection selection(IndexTargetSnapshot target) {
+    return new CandidateIndexSelection(target, Map.of());
   }
 }

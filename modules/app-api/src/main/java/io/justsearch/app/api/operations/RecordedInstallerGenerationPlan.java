@@ -226,7 +226,8 @@ public record RecordedInstallerGenerationPlan(
       REGISTRY,
       BUNDLED,
       BOOTSTRAP,
-      IMPORTED_PACK
+      IMPORTED_PACK,
+      CANDIDATE_CAPTURE
     }
 
   }

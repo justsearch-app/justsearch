@@ -7,7 +7,10 @@ import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.configuration.resolved.OnnxModelDiscovery;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexerworker.embed.EmbeddingConfig;
+import io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact;
 import io.justsearch.ort.ModelManifest;
+import io.justsearch.reranker.CitationScorerConfig;
+import io.justsearch.reranker.RerankerConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -17,6 +20,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /** Captures the physical index target selected by one candidate configuration snapshot. */
@@ -48,12 +53,13 @@ public final class CandidateIndexTargetCapture {
   public static CaptureResult captureWithRuntimeInputs(ResolvedConfig candidate) throws IOException {
     Objects.requireNonNull(candidate, "candidate");
 
+    CapturedModel embedding = embeddingFingerprint(candidate);
+    CapturedModel splade = spladeFingerprint(candidate);
+    CapturedModel ner = nerFingerprint(candidate);
     SsotCommitMetadataSource.RuntimeFingerprintInputs runtimeInputs =
         new SsotCommitMetadataSource.RuntimeFingerprintInputs(
             effectiveVectorDimension(candidate),
-            embeddingFingerprint(candidate),
-            spladeFingerprint(candidate),
-            nerFingerprint(candidate));
+            embedding.fingerprint(), splade.fingerprint(), ner.fingerprint());
     IndexFingerprint.Inputs inputs =
         new SsotCommitMetadataSource(candidate, runtimeInputs)
             .fingerprintInputs(
@@ -67,18 +73,44 @@ public final class CandidateIndexTargetCapture {
         IndexFingerprint.compute(inputs)
             .orElseThrow(
                 () -> new IllegalStateException("Candidate index target is indeterminate"));
+    Map<String, ModelArtifact> selectedModels = new LinkedHashMap<>();
+    addSelectedModel(selectedModels, "embedding", embedding);
+    addSelectedModel(selectedModels, "splade", splade);
+    addSelectedModel(selectedModels, "ner", ner);
+    RerankerConfig reranker = RerankerConfig.from(candidate);
+    if (reranker.isReady()) {
+      addSelectedModel(selectedModels, "reranker",
+          fingerprintSelectedModel(reranker.modelPath(), "reranker"));
+    }
+    CitationScorerConfig citation = CitationScorerConfig.from(candidate);
+    if (citation.isReady()) {
+      addSelectedModel(selectedModels, "citation-scorer",
+          fingerprintSelectedModel(citation.modelPath(), "citation scorer"));
+    }
     return new CaptureResult(
         new IndexTargetSnapshot(fingerprint, new String(canonicalInputs, StandardCharsets.UTF_8)),
-        runtimeInputs);
+        runtimeInputs, selectedModels);
   }
 
-  /** Candidate target plus the exact model and vector identity captured for its runtime. */
+  private static void addSelectedModel(Map<String, ModelArtifact> selectedModels, String role,
+      CapturedModel model) {
+    if (model.file() != null) {
+      selectedModels.put(role, new ModelArtifact(
+          model.file().toAbsolutePath().normalize().toString(), model.fingerprint().sha()));
+    }
+  }
+
+  private record CapturedModel(IndexFingerprint.ModelFingerprint fingerprint, Path file) {}
+
+  /** Candidate target plus the exact index and query model files selected for its runtime. */
   public record CaptureResult(
       IndexTargetSnapshot target,
-      SsotCommitMetadataSource.RuntimeFingerprintInputs runtimeFingerprintInputs) {
+      SsotCommitMetadataSource.RuntimeFingerprintInputs runtimeFingerprintInputs,
+      Map<String, ModelArtifact> selectedModels) {
     public CaptureResult {
       Objects.requireNonNull(target, "target");
       Objects.requireNonNull(runtimeFingerprintInputs, "runtimeFingerprintInputs");
+      selectedModels = Map.copyOf(selectedModels);
     }
   }
 
@@ -86,17 +118,17 @@ public final class CandidateIndexTargetCapture {
     return "bge-m3".equalsIgnoreCase(candidate.ai().sparseModel()) ? 1024 : null;
   }
 
-  private static IndexFingerprint.ModelFingerprint embeddingFingerprint(ResolvedConfig candidate)
+  private static CapturedModel embeddingFingerprint(ResolvedConfig candidate)
       throws IOException {
     EmbeddingConfig embedding = EmbeddingConfig.from(candidate);
     if (!"auto".equalsIgnoreCase(embedding.backend())
         && !"onnx".equalsIgnoreCase(embedding.backend())) {
-      return IndexFingerprint.ModelFingerprint.notConfigured();
+      return new CapturedModel(IndexFingerprint.ModelFingerprint.notConfigured(), null);
     }
     return fingerprintSelectedModel(embedding.modelPath(), "embedding");
   }
 
-  private static IndexFingerprint.ModelFingerprint spladeFingerprint(ResolvedConfig candidate)
+  private static CapturedModel spladeFingerprint(ResolvedConfig candidate)
       throws IOException {
     Path configured = candidate.ai().splade().modelPath();
     OnnxModelDiscovery.Result discovery =
@@ -110,7 +142,7 @@ public final class CandidateIndexTargetCapture {
     return fingerprintSelectedModel(discovery == null ? null : discovery.modelDir(), "SPLADE");
   }
 
-  private static IndexFingerprint.ModelFingerprint nerFingerprint(ResolvedConfig candidate)
+  private static CapturedModel nerFingerprint(ResolvedConfig candidate)
       throws IOException {
     Path configured = candidate.ai().ner().modelPath();
     OnnxModelDiscovery.Result discovery =
@@ -122,16 +154,17 @@ public final class CandidateIndexTargetCapture {
     return fingerprintSelectedModel(discovery == null ? null : discovery.modelDir(), "NER");
   }
 
-  private static IndexFingerprint.ModelFingerprint fingerprintSelectedModel(
+  private static CapturedModel fingerprintSelectedModel(
       Path modelDir, String role) throws IOException {
     if (modelDir == null) {
-      return IndexFingerprint.ModelFingerprint.notConfigured();
+      return new CapturedModel(IndexFingerprint.ModelFingerprint.notConfigured(), null);
     }
     Path modelFile = ModelManifest.loadOrDefault(modelDir).resolveExistingModelFile(modelDir);
     if (!Files.isRegularFile(modelFile)) {
       throw new IOException(role + " model file is missing: " + modelFile);
     }
-    return IndexFingerprint.ModelFingerprint.present(sha256(modelFile));
+    return new CapturedModel(IndexFingerprint.ModelFingerprint.present(sha256(modelFile)),
+        modelFile);
   }
 
   private static String sha256(Path file) throws IOException {

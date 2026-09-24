@@ -130,6 +130,7 @@ final class IndexStatusOps {
   private volatile Supplier<String> nerModelPathSupplier;
   private volatile Supplier<Boolean> nerGpuEnabledSupplier;
   private volatile Supplier<io.justsearch.configuration.resolved.ResolvedConfig> resolvedConfigSupplier;
+  private volatile Supplier<Map<String, Object>> expectedCommitMetadataSupplier;
   /** Tempdoc 406 — late-bound runtime gauges supplier (swap-aware). */
   private volatile Supplier<LuceneRuntimeTypes.RuntimeGaugesSnapshot> runtimeGaugesSupplier;
 
@@ -276,6 +277,10 @@ final class IndexStatusOps {
   void setResolvedConfigSupplier(
       Supplier<io.justsearch.configuration.resolved.ResolvedConfig> supplier) {
     this.resolvedConfigSupplier = supplier;
+  }
+
+  void setExpectedCommitMetadataSupplier(Supplier<Map<String, Object>> supplier) {
+    this.expectedCommitMetadataSupplier = supplier;
   }
 
   // ==================== StatusResponse builder (341: nested sub-messages) ====================
@@ -1161,7 +1166,8 @@ final class IndexStatusOps {
   /** The metadata this runtime would commit, or an empty map if it cannot be built. */
   private Map<String, Object> expectedCommitMetadataBestEffort() {
     try {
-      return new SsotCommitMetadataSource().build();
+      Supplier<Map<String, Object>> supplier = expectedCommitMetadataSupplier;
+      return supplier == null ? new SsotCommitMetadataSource().build() : supplier.get();
     } catch (Exception e) {
       log.debug("Failed to build expected commit metadata: {}", e.getMessage());
       return Map.of();

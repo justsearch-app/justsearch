@@ -12,6 +12,7 @@ import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact;
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.GpuArbiter;
 import java.io.IOException;
@@ -205,6 +206,32 @@ class InferenceCompositionRootComposeTest {
     assertEquals(Set.of(EncoderRole.EMBEDDING), surface.componentObservation().requestedRoles());
     assertEquals(Set.of(EncoderRole.EMBEDDING), surface.componentObservation().missingRoles());
     assertFalse(surface.componentObservation().compositionSatisfied());
+  }
+
+  @Test
+  void missingActiveModelCannotFallThroughToDesiredModel(@TempDir Path temp) throws IOException {
+    Path x = temp.resolve("active-X/model.onnx").toAbsolutePath().normalize();
+    Path y = temp.resolve("desired-Y/model.onnx").toAbsolutePath().normalize();
+    Files.createDirectories(y.getParent());
+    Files.createFile(y);
+    var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "true",
+        EnvRegistry.EMBED_ONNX_MODEL_PATH.configKey(), y.getParent().toString(),
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "false",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var selection = GenerationModelSelection.accepted(Map.of(
+        "embedding", new ModelArtifact(x.toString(), "a".repeat(64))), "splade", 768);
+    var applied = EncoderConfigurationProjection.from(cfg, selection);
+
+    assertEquals(x.getParent(), applied.embedding().modelPath());
+    assertNotEquals(EncoderConfigurationProjection.from(cfg).digest(), applied.digest());
+    InferenceSurface surface = InferenceCompositionRoot.compose(applied,
+        HardwareProfile.cpuOnly(), null, null, NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, selection);
+    assertEquals(Set.of(EncoderRole.EMBEDDING), surface.componentObservation().missingRoles());
+    assertTrue(selection.hasUnavailableModel());
   }
 
   @Test

@@ -454,6 +454,16 @@ async function prepareApprovedActivationDispatch({ apiPort, input, operationKey,
   requireThat(response.status === 428,
     `installer activation must exercise prepared approval: HTTP ${response.status} ${response.text}`);
   const pending = parseJson(response, 'installer activation preparation');
+  if (pending.preparationNonce == null && typeof pending.pendingId === 'string') {
+    const approval = await post(apiPort, '/api/authorizations/approve',
+      { pendingId: pending.pendingId });
+    const approved = parseJson(approval, 'unprepared installer approval diagnostic');
+    const refused = approval.status === 200 && typeof approved.capsule === 'string'
+      ? await post(apiPort, ACTIVATION_ROUTE, {
+        args: input, idempotencyKey: operationKey, confirmationToken: approved.capsule,
+      }, 90000) : approval;
+    throw new Error(`installer activation failed before prepared approval: ${refused.text}`);
+  }
   requireThat(typeof pending.pendingId === 'string' && typeof pending.preparationNonce === 'string'
     && pending.operationKey === operationKey,
   `installer activation preparation omitted exact key/nonce binding: ${response.text}`);

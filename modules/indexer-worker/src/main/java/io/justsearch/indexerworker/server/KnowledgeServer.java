@@ -306,6 +306,7 @@ public final class KnowledgeServer implements Closeable {
   // owns SessionHandle lifetimes closed on shutdown.
   volatile InferenceSurface inferenceSurface;
   private volatile EncoderSet initialEncoderSet;
+  private volatile GenerationModelSelection initialModelSelection;
   // Phase 3c: WorkerOpsMetricCatalog replaces all worker.* gauge / observable-counter fields.
   // Catalog instance is retained for lifetime; OTel async callbacks fire at flush time.
   @SuppressWarnings("unused")
@@ -898,8 +899,13 @@ public final class KnowledgeServer implements Closeable {
           && (boot.disposition() == IndexGenerationManager.BootDisposition.BUILDING
               || boot.disposition() == IndexGenerationManager.BootDisposition.PROMOTED)) {
         var recorded = (IndexGenerationManager.BootOwnership.Recorded) bootOwnership;
+        var exact = candidate.orElseThrow();
+        String sparseMode = exact.configuration().ai().sparseModel();
+        int vectorDimension = "bge-m3".equalsIgnoreCase(sparseMode)
+            ? 1024 : new io.justsearch.configuration.JustSearchConfigurationLoader()
+                .loadFieldCatalog().vectorDimension();
         genManager.bindRecordedModels(recorded.operationKey(), recorded.source(),
-            recorded.targetFingerprint(), candidate.orElseThrow().models());
+            recorded.targetFingerprint(), exact.models(), sparseMode, vectorDimension);
       }
       IndexGenerationManager.IndexLayout layout = boot.layout();
       this.generationBootOwnership = bootOwnership;
@@ -907,6 +913,8 @@ public final class KnowledgeServer implements Closeable {
       this.indexGenerationManager = genManager;
       this.indexBasePath = layout.basePath();
       this.activeIndexPath = layout.activeGenerationPath();
+      this.initialModelSelection = GenerationModelSelection.from(
+          genManager.manifestForOwnedPath(activeIndexPath)).orElse(null);
       this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
       this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
       IndexGenerationManager.State state = layout.state();
@@ -1077,7 +1085,9 @@ public final class KnowledgeServer implements Closeable {
           if (buildingIndexPath == null
               && "blue_green_migrate".equalsIgnoreCase(schemaMismatchPolicy)) {
             if (storedFp != null && !storedFp.isBlank()) {
-              java.util.Optional<String> currentFp = EmbeddingFingerprint.get();
+              java.util.Optional<String> currentFp = initialModelSelection == null
+                  ? EmbeddingFingerprint.get()
+                  : initialModelSelection.availableFingerprint("embedding");
               if (currentFp.isPresent() && !storedFp.equals(currentFp.get())) {
                 log.warn(
                     "Embedding model fingerprint mismatch on active generation {}. "
@@ -1696,6 +1706,7 @@ public final class KnowledgeServer implements Closeable {
     // 343: Wire resolved config supplier for search config status reporting.
     svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
+    svc.ingestService().setExpectedCommitMetadataSupplier(this::servingExpectedCommitMetadata);
 
     // 516 P3 FINAL CUT: wireMigrationActiveSupplier removed — pre-wired via DWAS 2-arg ctor.
 
@@ -1923,18 +1934,22 @@ public final class KnowledgeServer implements Closeable {
 
   /** Assign the deferred A surface to every still-issued A view before model wiring is released. */
   private void attachInitialEncoderSet(InferenceSurface surface, ResolvedConfig configuration) {
-    int dimension = "bge-m3".equalsIgnoreCase(configuration.ai().sparseModel())
+    var selection = initialModelSelection;
+    String sparseMode = selection == null ? configuration.ai().sparseModel()
+        : selection.sparseModel().orElseThrow();
+    int dimension = selection != null ? selection.vectorDimension().orElseThrow()
+        : "bge-m3".equalsIgnoreCase(sparseMode)
         ? 1024 : new io.justsearch.configuration.JustSearchConfigurationLoader()
             .loadFieldCatalog().vectorDimension();
     var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
-        IndexFingerprint.ModelFingerprint.of(
+        selection != null ? selection.fingerprint("embedding") : IndexFingerprint.ModelFingerprint.of(
             EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()),
-        IndexFingerprint.ModelFingerprint.of(
+        selection != null ? selection.fingerprint("splade") : IndexFingerprint.ModelFingerprint.of(
             SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()),
-        IndexFingerprint.ModelFingerprint.of(
+        selection != null ? selection.fingerprint("ner") : IndexFingerprint.ModelFingerprint.of(
             io.justsearch.indexerworker.ner.NerFingerprint.modelPath().isPresent(),
             io.justsearch.indexerworker.ner.NerFingerprint.get()),
-        "bge-m3".equalsIgnoreCase(configuration.ai().sparseModel()), dimension));
+        "bge-m3".equalsIgnoreCase(sparseMode), dimension));
     publicationLock.writeLock().lock();
     try {
       synchronized (servingViewMonitor) {
@@ -1979,6 +1994,8 @@ public final class KnowledgeServer implements Closeable {
         ? Objects.requireNonNull(new io.justsearch.configuration.JustSearchConfigurationLoader()
             .loadFieldCatalog().vectorDimension(), "Index vector dimension")
         : declaredDimension;
+    var selection = GenerationModelSelection.accepted(accepted.models(),
+        configuration.ai().sparseModel(), dimension);
     Path aiHome = configuration.paths().dataDir();
     InstallContract contract = aiHome == null ? null : InstallContractIO.read(aiHome);
     Path modelsDir = resolveModelsDir(contract, aiHome, configuration);
@@ -1986,9 +2003,9 @@ public final class KnowledgeServer implements Closeable {
         ? contract.hardwareProfile()
         : configuration.ai().masterGpuEnabled() ? HardwareProfile.gpuFull(0)
             : HardwareProfile.cpuOnly();
-    var encoderConfiguration = EncoderConfigurationProjection.from(configuration);
+    var encoderConfiguration = EncoderConfigurationProjection.from(configuration, selection);
     InferenceSurface surface = InferenceCompositionRoot.compose(encoderConfiguration, hardware,
-        contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents);
+        contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection);
     var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
         inputs.embeddingModel(), inputs.spladeModel(), inputs.nerModel(),
         "bge-m3".equalsIgnoreCase(configuration.ai().sparseModel()), dimension));
@@ -2123,7 +2140,15 @@ public final class KnowledgeServer implements Closeable {
       // Tempdoc 397 §14.26 T2-C1/C2: single-entry compose returns a typed surface. Per-encoder
       // wiring below destructures the surface; graceful degradation is preserved via
       // Optional<> on each role.
-      var encoderConfiguration = EncoderConfigurationProjection.from(compositionConfig);
+      var selection = initialModelSelection;
+      if (selection != null
+          && (selection.sparseModel().isEmpty() || selection.vectorDimension().isEmpty())) {
+        throw new IOException("Active generation model mode is unavailable");
+      }
+      this.initialModelSelection = selection;
+      var encoderConfiguration = selection == null
+          ? EncoderConfigurationProjection.from(compositionConfig)
+          : EncoderConfigurationProjection.from(compositionConfig, selection);
       InferenceSurface surface =
           InferenceCompositionRoot.compose(
               encoderConfiguration,
@@ -2131,7 +2156,8 @@ public final class KnowledgeServer implements Closeable {
               contract,
               modelsDir,
               () -> !signalBus.isMainGpuActive(),
-              ortSessionEvents);
+              ortSessionEvents,
+              selection);
       this.inferenceSurface = surface;
       attachInitialEncoderSet(surface, compositionConfig);
 
@@ -2470,7 +2496,10 @@ public final class KnowledgeServer implements Closeable {
       };
       if (!wired) missing.add(role);
     }
-    observation.configurationDigest().ifPresent(encoderComponent::setDesiredVersion);
+    String desiredVersion = startupConfiguration == null
+        ? observation.configurationDigest().orElse(null)
+        : EncoderConfigurationProjection.from(startupConfiguration).digest();
+    if (desiredVersion != null) encoderComponent.setDesiredVersion(desiredVersion);
     if (observation.configurationDigest().isPresent() && missing.isEmpty()) {
       encoderComponent.setAppliedVersion(observation.configurationDigest().orElseThrow());
     }
@@ -2478,7 +2507,9 @@ public final class KnowledgeServer implements Closeable {
         && observation.hasRequestedRoles() && missing.isEmpty();
     boolean intentionallyAbsent = observation.configurationDigest().isPresent()
         && !observation.hasRequestedRoles();
-    String evidence = observation.configurationDigest().isEmpty() ? "encoder_observation_unknown"
+    String evidence = initialModelSelection != null
+        && initialModelSelection.hasUnavailableModel() ? "INDEX_MODEL_NOT_INSTALLED"
+        : observation.configurationDigest().isEmpty() ? "encoder_observation_unknown"
         : missing.isEmpty()
         ? (observation.hasRequestedRoles() ? null : "no_encoder_roles_requested")
         : "missing_roles=" + missing.stream()
@@ -2574,7 +2605,9 @@ public final class KnowledgeServer implements Closeable {
               return rt == null ? Map.of() : rt.latestCommitUserDataBestEffort();
             },
             this::trustworthyDocCountOrThrow,
-            this::trustworthyCompletedEmbeddingCountOrThrow);
+            this::trustworthyCompletedEmbeddingCountOrThrow,
+            () -> initialModelSelection == null ? EmbeddingFingerprint.get()
+                : initialModelSelection.availableFingerprint("embedding"));
     ecc.refresh();
     embeddingCompatController = ecc;
     if (corruptionRecoveryRebuildStarted || isResumedEmptyCorruptionRecovery()) {
@@ -2709,25 +2742,28 @@ public final class KnowledgeServer implements Closeable {
         ? Objects.requireNonNull(recordedCandidateFingerprint,
             "Recorded candidate fingerprint inputs")
         : null;
+    var boundSelection = modelSelectionFor(indexPath);
+    var boundInputs = boundSelection == null ? null
+        : boundSelection.runtimeFingerprintInputs();
     // Load field catalog via centralized configuration loader
     io.justsearch.configuration.JustSearchConfigurationLoader loader =
         new io.justsearch.configuration.JustSearchConfigurationLoader();
     io.justsearch.configuration.FieldCatalogDef catalog = loader.loadFieldCatalog();
 
     // Apply vector dimension override for BGE-M3 (1024-dim vs nomic-embed's 768-dim)
-    String sparseModel = runtimeConfig.ai().sparseModel();
-    if ("bge-m3".equalsIgnoreCase(sparseModel)) {
+    String sparseModel = boundSelection == null ? runtimeConfig.ai().sparseModel()
+        : boundSelection.sparseModel().orElseThrow();
+    if (boundSelection != null) {
+      catalog = catalog.withVectorDimension(boundSelection.vectorDimension().orElseThrow());
+    } else if ("bge-m3".equalsIgnoreCase(sparseModel)) {
       catalog = catalog.withVectorDimension(1024);
       log.info("Field catalog: vector dimension overridden to 1024 (BGE-M3 active)");
     }
 
     // Create runtime with embedding + SPLADE fingerprint overlays
     java.util.function.Supplier<io.justsearch.indexing.runtime.CommitMetadataSource>
-        metadataSupplier = runtimeFingerprints == null
-            ? () -> new EmbeddingMetadataOverlay(
-                new SsotCommitMetadataSource(runtimeConfig), fingerprintSupplier,
-                SpladeFingerprint::get)
-            : () -> {
+        metadataSupplier = runtimeFingerprints != null
+            ? () -> {
               var inputs = runtimeFingerprints.runtimeFingerprintInputs();
               return new EmbeddingMetadataOverlay(
                   new SsotCommitMetadataSource(runtimeConfig, inputs),
@@ -2737,7 +2773,14 @@ public final class KnowledgeServer implements Closeable {
                         : candidateEcc.fingerprintForCommit();
                   },
                   () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
-            };
+            } : boundInputs != null
+            ? () -> new EmbeddingMetadataOverlay(
+                new SsotCommitMetadataSource(runtimeConfig, boundInputs),
+                () -> java.util.Optional.ofNullable(boundInputs.embeddingModel().sha()),
+                () -> java.util.Optional.ofNullable(boundInputs.spladeModel().sha()))
+            : () -> new EmbeddingMetadataOverlay(
+                new SsotCommitMetadataSource(runtimeConfig), fingerprintSupplier,
+                SpladeFingerprint::get);
 
     IndexSchema schema =
         new IndexSchema(
@@ -2764,6 +2807,20 @@ public final class KnowledgeServer implements Closeable {
     return builder;
   }
 
+  private GenerationModelSelection modelSelectionFor(Path indexPath) {
+    try {
+      return GenerationModelSelection.from(
+          indexGenerationManager.manifestForOwnedPath(indexPath)).orElse(null);
+    } catch (IOException invalid) {
+      if (initialModelSelection == null
+          && generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native
+          && Files.notExists(indexPath.resolve(".justsearch-index-generation.json"))) {
+        return null;
+      }
+      throw new java.io.UncheckedIOException("Generation model identity is unavailable", invalid);
+    }
+  }
+
   /**
    * The vector dimension the {@code FieldMapper} actually builds vector fields with, published
    * process-wide so {@code index_fingerprint} records the dimension in force rather than the
@@ -2782,6 +2839,14 @@ public final class KnowledgeServer implements Closeable {
    */
   private Map<String, Object> expectedCommitMetadata(
       java.util.function.Supplier<java.util.Optional<String>> fingerprintSupplier) {
+    var selection = initialModelSelection;
+    if (selection != null) {
+      var inputs = selection.runtimeFingerprintInputs();
+      return new EmbeddingMetadataOverlay(
+          new SsotCommitMetadataSource(startupConfiguration, inputs),
+          () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
+          () -> java.util.Optional.ofNullable(inputs.spladeModel().sha())).build();
+    }
     return new EmbeddingMetadataOverlay(
             new SsotCommitMetadataSource(startupConfiguration),
             fingerprintSupplier,
@@ -2789,13 +2854,32 @@ public final class KnowledgeServer implements Closeable {
         .build();
   }
 
+  private Map<String, Object> servingExpectedCommitMetadata() {
+    LuceneRuntime serving = searchLifecycle;
+    Path path = serving == null ? activeIndexPath : serving.openedIndexPath();
+    var selection = modelSelectionFor(path);
+    ResolvedConfig config = recordedCandidate != null && (path.equals(buildingIndexPath)
+        || (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED
+            && path.equals(activeIndexPath)))
+        ? recordedCandidate.configuration() : startupConfiguration;
+    if (selection == null) {
+      return new SsotCommitMetadataSource(config).build();
+    }
+    var inputs = selection.runtimeFingerprintInputs();
+    return new EmbeddingMetadataOverlay(new SsotCommitMetadataSource(config, inputs),
+        () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
+        () -> java.util.Optional.ofNullable(inputs.spladeModel().sha())).build();
+  }
+
   private LuceneRuntimeBuilder buildReadOnlyRuntime(Path indexPath) {
     readOnlyOpens.incrementAndGet();
     io.justsearch.configuration.JustSearchConfigurationLoader loader =
         new io.justsearch.configuration.JustSearchConfigurationLoader();
     io.justsearch.configuration.FieldCatalogDef catalog = loader.loadFieldCatalog();
-    String sparseModel = startupConfiguration.ai().sparseModel();
-    if ("bge-m3".equalsIgnoreCase(sparseModel)) {
+    var selection = modelSelectionFor(indexPath);
+    if (selection != null) {
+      catalog = catalog.withVectorDimension(selection.vectorDimension().orElseThrow());
+    } else if ("bge-m3".equalsIgnoreCase(startupConfiguration.ai().sparseModel())) {
       catalog = catalog.withVectorDimension(1024);
     }
     LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath)

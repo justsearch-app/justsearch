@@ -85,6 +85,7 @@ final class EncoderConfigurationProjection {
           key(EnvRegistry.ORT_INTRA_OP_THREADS));
 
   private final ResolvedConfig cfg;
+  private final String sparseModel;
   private final EmbeddingConfig embedding;
   private final SpladeConfig splade;
   private final NerConfig ner;
@@ -94,6 +95,7 @@ final class EncoderConfigurationProjection {
 
   private EncoderConfigurationProjection(
       ResolvedConfig cfg,
+      String sparseModel,
       EmbeddingConfig embedding,
       SpladeConfig splade,
       NerConfig ner,
@@ -101,6 +103,7 @@ final class EncoderConfigurationProjection {
       RerankerConfig reranker,
       CitationScorerConfig citation) {
     this.cfg = cfg;
+    this.sparseModel = sparseModel;
     this.embedding = embedding;
     this.splade = splade;
     this.ner = ner;
@@ -112,6 +115,7 @@ final class EncoderConfigurationProjection {
   static EncoderConfigurationProjection from(ResolvedConfig cfg) {
     return new EncoderConfigurationProjection(
         cfg,
+        cfg.ai().sparseModel(),
         EmbeddingConfig.from(cfg),
         SpladeConfig.from(cfg),
         NerConfig.from(cfg),
@@ -120,12 +124,51 @@ final class EncoderConfigurationProjection {
         CitationScorerConfig.from(cfg));
   }
 
+  /** Active generation paths and role presence override the desired model discovery snapshot. */
+  static EncoderConfigurationProjection from(
+      ResolvedConfig cfg, GenerationModelSelection selection) {
+    EncoderConfigurationProjection desired = from(cfg);
+    String mode = selection.sparseModel().orElse(cfg.ai().sparseModel());
+    Path embeddingDir = selection.metadataDirectory("embedding").orElse(null);
+    Path spladeDir = selection.metadataDirectory("splade").orElse(null);
+    Path nerDir = selection.metadataDirectory("ner").orElse(null);
+    Path rerankerDir = selection.metadataDirectory("reranker").orElse(null);
+    Path citationDir = selection.metadataDirectory("citation-scorer").orElse(null);
+    var e = desired.embedding;
+    var s = desired.splade;
+    var n = desired.ner;
+    var b = desired.bgeM3;
+    var r = desired.reranker;
+    var c = desired.citation;
+    return new EncoderConfigurationProjection(cfg, mode,
+        new EmbeddingConfig(embeddingDir != null, embeddingDir, e.backend(), e.gpuEnabled(),
+            e.gpuDeviceId(), e.gpuMemLimitBytes(), e.contextLength(), e.lateChunkingEnabled(),
+            e.lateChunkingContextLength()),
+        new SpladeConfig(spladeDir != null, spladeDir, s.maxSequenceLength(), s.gpuEnabled(),
+            s.gpuDeviceId(), s.gpuMemLimitBytes(), s.queryMode(), s.activation()),
+        new NerConfig(nerDir != null, nerDir, n.maxSequenceLength(), n.confidenceThreshold(),
+            n.gpuEnabled(), n.gpuDeviceId(), n.gpuMemLimitBytes()),
+        new BgeM3Config(embeddingDir != null && "bge-m3".equalsIgnoreCase(mode), embeddingDir,
+            b.maxSequenceLength(), b.gpuEnabled(), b.gpuDeviceId(), b.gpuMemLimitBytes()),
+        new RerankerConfig(rerankerDir != null, rerankerDir, r.topK(), r.deadlineBudgetMs(),
+            r.minHitsThreshold(), r.maxSequenceLength(), r.gpuEnabled(), r.gpuDeviceId(),
+            r.maxAvgDocLengthChars(), r.judgeBlendEnabled(), r.judgeBlendAlpha(),
+            r.judgeArbitrationEnabled(), r.judgeArbitrationAlphaDiverge(),
+            r.judgeArbitrationSkipEnabled()),
+        new CitationScorerConfig(citationDir != null, citationDir, c.threshold(),
+            c.maxSequenceLength(), c.deadlineBudgetMs()));
+  }
+
   static Set<String> dependencies() {
     return DEPENDENCIES;
   }
 
   ResolvedConfig config() {
     return cfg;
+  }
+
+  String sparseModel() {
+    return sparseModel;
   }
 
   EmbeddingConfig embedding() {
@@ -173,7 +216,7 @@ final class EncoderConfigurationProjection {
         values,
         EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED,
         cfg.ai().gpuAccelerationAllowed());
-    put(values, EnvRegistry.SPARSE_MODEL, cfg.ai().sparseModel());
+    put(values, EnvRegistry.SPARSE_MODEL, sparseModel);
     put(values, EnvRegistry.SPLADE_ENABLED, splade.enabled());
     put(values, EnvRegistry.SPLADE_MODEL_PATH, path(splade.modelPath()));
     put(values, EnvRegistry.SPLADE_MAX_SEQ_LEN, splade.maxSequenceLength());

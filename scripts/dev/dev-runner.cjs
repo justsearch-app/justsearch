@@ -545,8 +545,10 @@ function resolveAiDevEnv() {
     if (fs.existsSync(mainModels)) env.JUSTSEARCH_MODELS_DIR = mainModels;
     else if (fs.existsSync(localModels)) env.JUSTSEARCH_MODELS_DIR = localModels;
   }
-  // Auto-detect SPLADE model under the resolved models dir (models/splade/naver-splade-v3/)
-  if (!process.env.JUSTSEARCH_SPLADE_MODEL_PATH) {
+  // The supervisor fixture prepares its own candidate settings. Injecting a higher-priority
+  // model path here would silently replace that candidate with the shared development model.
+  if (!process.env.JUSTSEARCH_SPLADE_MODEL_PATH
+      && process.env.JUSTSEARCH_SUPERVISOR_HARNESS !== '1') {
     const modelsBase = env.JUSTSEARCH_MODELS_DIR || path.join(repoRoot, 'models');
     const spladeDir = path.join(modelsBase, 'splade', 'naver-splade-v3');
     const required = ['model.onnx', 'tokenizer.json', 'vocab.txt'];

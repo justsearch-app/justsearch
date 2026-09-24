@@ -137,22 +137,35 @@ public final class IndexGenerationManager {
       String source,
       long created_at_ms,
       String target_index_fingerprint,
-      @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, ModelArtifact> models) {
+      @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, ModelArtifact> models,
+      @JsonInclude(JsonInclude.Include.NON_NULL) String sparse_model,
+      @JsonInclude(JsonInclude.Include.NON_NULL) Integer vector_dimension) {
     public GenerationManifest {
       models = models == null ? Map.of() : Map.copyOf(models);
       if (models.size() > 128 || models.keySet().stream().anyMatch(role ->
           !role.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}"))) {
         throw new IllegalArgumentException("Invalid generation model roles");
       }
+      if (sparse_model != null && !sparse_model.matches("[a-z0-9-]{1,64}")) {
+        throw new IllegalArgumentException("Invalid generation sparse model mode");
+      }
+      if (vector_dimension != null && (vector_dimension <= 0 || vector_dimension > 16_384)) {
+        throw new IllegalArgumentException("Invalid generation vector dimension");
+      }
     }
 
     public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs) {
-      this(formatVersion, generationId, source, createdAtMs, null, Map.of());
+      this(formatVersion, generationId, source, createdAtMs, null, Map.of(), null, null);
     }
 
     public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
         String targetIndexFingerprint) {
-      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, Map.of());
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, Map.of(), null, null);
+    }
+
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
+        String targetIndexFingerprint, Map<String, ModelArtifact> models) {
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, models, null, null);
     }
   }
 
@@ -690,10 +703,20 @@ public final class IndexGenerationManager {
   /** Bind the accepted installer files to an existing recorded Green before any runtime opens. */
   public GenerationManifest bindRecordedModels(String operationKey, String source,
       String targetFingerprint, Map<String, ModelArtifact> models) throws IOException {
+    return bindRecordedModels(operationKey, source, targetFingerprint, models, null, null);
+  }
+
+  /** Bind the accepted files and effective index-model mode to recorded Green. */
+  public GenerationManifest bindRecordedModels(String operationKey, String source,
+      String targetFingerprint, Map<String, ModelArtifact> models, String sparseModel,
+      Integer vectorDimension) throws IOException {
     if (models == null || models.isEmpty() || models.size() > 128
         || models.keySet().stream().anyMatch(role -> role == null
             || !role.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}"))) {
       throw new IOException("Recorded generation model binding is invalid");
+    }
+    if ((sparseModel == null) != (vectorDimension == null)) {
+      throw new IOException("Recorded generation model mode is incomplete");
     }
     Map<String, ModelArtifact> accepted = Map.copyOf(models);
     try (var ignored = stateControl()) {
@@ -720,11 +743,15 @@ public final class IndexGenerationManager {
         if (!accepted.equals(manifest.models())) {
           throw new IOException("Recorded generation models differ from accepted preparation");
         }
-        return manifest;
+        if (sparseModel == null || (sparseModel.equals(manifest.sparse_model())
+            && vectorDimension.equals(manifest.vector_dimension()))) return manifest;
+        if (manifest.sparse_model() != null || manifest.vector_dimension() != null) {
+          throw new IOException("Recorded generation model mode differs from accepted preparation");
+        }
       }
       GenerationManifest bound = new GenerationManifest(manifest.format_version(),
           manifest.generation_id(), manifest.source(), manifest.created_at_ms(),
-          manifest.target_index_fingerprint(), accepted);
+          manifest.target_index_fingerprint(), accepted, sparseModel, vectorDimension);
       byte[] bytes = RECORDED_JSON.writeValueAsBytes(bound);
       if (bytes.length > 16_384) {
         throw new IOException("Recorded generation model manifest exceeds its ownership limit");

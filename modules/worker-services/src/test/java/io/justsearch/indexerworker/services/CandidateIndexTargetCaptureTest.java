@@ -50,6 +50,10 @@ final class CandidateIndexTargetCaptureTest {
         sha256("splade"),
         detailed.runtimeFingerprintInputs().spladeModel().sha());
     assertEquals(sha256("ner"), detailed.runtimeFingerprintInputs().nerModel().sha());
+    assertEquals(models.resolve("embedding/model.onnx").toAbsolutePath().normalize().toString(),
+        detailed.selectedModels().get("embedding").id());
+    assertEquals(sha256("embedding-a"), detailed.selectedModels().get("embedding").sha256());
+    assertEquals(3, detailed.selectedModels().size());
   }
 
   @Test
@@ -74,6 +78,28 @@ final class CandidateIndexTargetCaptureTest {
     } finally {
       IndexFingerprint.resetModelFingerprintProviders();
     }
+  }
+
+  @Test
+  void detailedCaptureFreezesRetainedQueryModelsAlongsideIndexModels() throws Exception {
+    Path models = createModelSet("query-models", "embedding-a");
+    createModel(models.resolve("reranker"), "reranker-a", false);
+    createModel(models.resolve("citation"), "citation-a", false);
+    ResolvedConfig candidate = new ResolvedConfigBuilder()
+        .putDefault("justsearch.embed.backend", "onnx")
+        .putDefault("justsearch.embed.onnx.model_path", models.resolve("embedding").toString())
+        .putDefault("justsearch.splade.model_path", models.resolve("splade").toString())
+        .putDefault("justsearch.ner.model_path", models.resolve("ner").toString())
+        .putDefault("justsearch.rerank.model_path", models.resolve("reranker").toString())
+        .putDefault("justsearch.citation.scorer.model_path", models.resolve("citation").toString())
+        .build();
+
+    var detailed = CandidateIndexTargetCapture.captureWithRuntimeInputs(candidate);
+
+    assertEquals(5, detailed.selectedModels().size());
+    assertEquals(sha256("reranker-a"), detailed.selectedModels().get("reranker").sha256());
+    assertEquals(sha256("citation-a"),
+        detailed.selectedModels().get("citation-scorer").sha256());
   }
 
   @Test

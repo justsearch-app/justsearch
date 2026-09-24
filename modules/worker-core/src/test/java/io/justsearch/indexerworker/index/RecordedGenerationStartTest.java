@@ -57,20 +57,43 @@ final class RecordedGenerationStartTest {
     Map<String, IndexGenerationManager.ModelArtifact> accepted = Map.of(
         "embedding", new IndexGenerationManager.ModelArtifact(modelPath, "a".repeat(64)));
 
-    var bound = manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted);
+    var bound = manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted, "splade", 768);
     assertEquals(accepted, bound.models());
+    assertEquals("splade", bound.sparse_model());
+    assertEquals(768, bound.vector_dimension());
     assertEquals(accepted, manager.manifestForOwnedPath(generation(base, KEY)).models());
     String manifest = Files.readString(generation(base, KEY).resolve(MANIFEST));
-    assertEquals(bound, manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted));
+    assertEquals(bound, manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted,
+        "splade", 768));
     assertEquals(manifest, Files.readString(generation(base, KEY).resolve(MANIFEST)));
     assertThrows(IOException.class, () -> manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT,
         Map.of("embedding", new IndexGenerationManager.ModelArtifact(modelPath, "c".repeat(64)))));
+    assertThrows(IOException.class, () -> manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT,
+        accepted, "bge-m3", 1024));
     assertEquals(manifest, Files.readString(generation(base, KEY).resolve(MANIFEST)));
 
     manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, source);
     var reopened = new IndexGenerationManager(base);
-    assertEquals(accepted, reopened.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted).models());
+    assertEquals(accepted, reopened.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted,
+        "splade", 768).models());
     assertEquals(manifest, Files.readString(generation(base, KEY).resolve(MANIFEST)));
+  }
+
+  @Test
+  void acceptedReplayAddsModeToEarlierModelOnlyBinding() throws Exception {
+    Path base = temp.resolve("model-mode-upgrade");
+    var manager = new IndexGenerationManager(base);
+    String source = manager.initializeOrLoad().state().active_generation();
+    manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, source);
+    String file = temp.resolve("retained/model.onnx").toAbsolutePath().normalize().toString();
+    var models = Map.of("embedding", new IndexGenerationManager.ModelArtifact(file, "a".repeat(64)));
+    assertNull(manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, models).sparse_model());
+
+    var upgraded = manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, models, "splade", 768);
+    assertEquals("splade", upgraded.sparse_model());
+    assertEquals(768, upgraded.vector_dimension());
+    assertEquals(upgraded, new IndexGenerationManager(base)
+        .manifestForOwnedPath(generation(base, KEY)));
   }
 
   @Test

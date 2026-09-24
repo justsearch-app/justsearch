@@ -236,8 +236,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       } catch (RuntimeException invalid) {
         throw new IOException("Recorded candidate configuration is invalid", invalid);
       }
-      var actual = CandidateIndexTargetCapture.capture(configuration);
-      if (!installer.target().equals(actual)) {
+      var actual = CandidateIndexTargetCapture.captureWithRuntimeInputs(configuration);
+      if (!installer.target().equals(actual.target())) {
         throw new IOException("Recorded candidate target changed since acceptance");
       }
       Map<String, IndexGenerationManager.ModelArtifact> models = new HashMap<>();
@@ -248,7 +248,13 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           throw new IOException("Recorded candidate has duplicate model roles");
         }
       }
-      return Optional.of(new RecordedCandidate(configuration, actual, models));
+      for (var entry : actual.selectedModels().entrySet()) {
+        var previous = models.putIfAbsent(entry.getKey(), entry.getValue());
+        if (previous != null && !previous.equals(entry.getValue())) {
+          throw new IOException("Recorded candidate installer file differs from its index target");
+        }
+      }
+      return Optional.of(new RecordedCandidate(configuration, actual.target(), models));
     }
   }
 

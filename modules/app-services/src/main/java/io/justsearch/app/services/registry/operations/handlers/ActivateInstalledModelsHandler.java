@@ -11,6 +11,7 @@ import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.BrainInstallService;
 import io.justsearch.app.api.IndexingService;
+import io.justsearch.app.api.operations.CandidateIndexSelection;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.operations.RecordedIngestionService;
@@ -21,6 +22,8 @@ import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.context.EngineContext;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
@@ -83,9 +86,33 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
     // Bind the candidate to the serving generation around the Worker target capture. A target
     // from the newly resolved model paths must never be paired with a different serving source.
     String sourceGeneration = worker.captureServingGeneration(context);
-    var target = worker.captureCandidateIndexTarget(resolved, context);
+    CandidateIndexSelection selected = worker.captureCandidateIndexSelection(resolved, context);
+    var target = selected.target();
     if (!sourceGeneration.equals(worker.captureServingGeneration(context))) {
       throw new IllegalStateException("Serving generation changed while preparing installed-model activation");
+    }
+
+    List<RecordedInstallerGenerationPlan.ModelIdentity> models =
+        new ArrayList<>(candidate.models());
+    Map<String, RecordedInstallerGenerationPlan.ModelIdentity> byPackage = new HashMap<>();
+    for (var model : models) byPackage.put(model.packageId(), model);
+    var retainedProvenance = new RecordedInstallerGenerationPlan.AcquisitionProvenance(
+        RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.CANDIDATE_CAPTURE,
+        sourceGeneration, target.fingerprint());
+    for (var entry : selected.models().entrySet()) {
+      var file = entry.getValue();
+      var existing = byPackage.get(entry.getKey());
+      if (existing != null) {
+        if (!existing.path().equals(file.path()) || !existing.sha256().equals(file.sha256())
+            || existing.sizeBytes() != file.sizeBytes()) {
+          throw refused("Installed model " + entry.getKey() + " differs from the selected target",
+              "ACTIVATION_MODEL_TARGET_CONFLICT");
+        }
+      } else {
+        models.add(new RecordedInstallerGenerationPlan.ModelIdentity(entry.getKey(),
+            file.path().getFileName().toString(), file.path(), file.sha256(),
+            file.sizeBytes(), retainedProvenance));
+      }
     }
 
     var planned = bindings.stream().map(root -> new RecordedRootPlan.Root(
@@ -97,7 +124,7 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
         target,
         candidate.settingsWitness(),
         candidate.encodedSettings(),
-        candidate.models(),
+        models,
         candidate.assets(),
         candidate.provenance());
     return new OperationPreparation(argumentsJson, RecordedInstallerGenerationPlan.SCHEMA,

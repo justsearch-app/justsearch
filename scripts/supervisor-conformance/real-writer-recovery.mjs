@@ -24,6 +24,24 @@ const operationFault = new Set(['ingest-before-accept', 'settings-before-accept'
   'ingest-client-disconnect', 'settings-mid-compose']).has(scenario);
 const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
+const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
+function readActiveGenerationManifest(base) {
+  const active = JSON.parse(fs.readFileSync(path.join(base, 'state.json'), 'utf8'));
+  return JSON.parse(fs.readFileSync(path.join(base, 'indices', active.active_generation,
+    '.justsearch-index-generation.json'), 'utf8'));
+}
+function findRetainedModelsRoot() {
+  let current = repo;
+  for (;;) {
+    const candidate = path.join(current, 'models');
+    if (fs.existsSync(path.join(candidate, 'onnx', 'gte-multilingual-base', 'model_fp16.onnx'))) {
+      return candidate;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) throw new Error('retained alternate model Y is unavailable');
+    current = parent;
+  }
+}
 const operationKey = operationFault || bulkFault || installerFault ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
@@ -143,6 +161,43 @@ if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
   // Exercise that model instead of disabling embeddings and bypassing verification.
   delete env.JUSTSEARCH_AI_EMBED_ENABLED;
   delete env.AI_OFFLINE;
+}
+if (modelBoot) {
+  delete env.JUSTSEARCH_AI_EMBED_ENABLED;
+  delete env.JUSTSEARCH_NER_ENABLED;
+  delete env.JUSTSEARCH_SPLADE_ENABLED;
+  delete env.AI_OFFLINE;
+  env.JUSTSEARCH_EMBED_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_NER_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_SPLADE_GPU_ENABLED = 'false';
+  const settingsPath = path.join(data, 'ui', 'settings.json');
+  const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const active = readActiveGenerationManifest(indexBase);
+  const modelX = active?.models?.embedding?.id;
+  if (!modelX || !path.resolve(modelX).startsWith(path.resolve(work, 'installer-models'))) {
+    throw new Error('model boot fixture does not have the active generation bound to X');
+  }
+  if (scenario === 'model-x-y-boot') {
+    const modelYDir = path.join(work, 'desired-model-y');
+    fs.mkdirSync(modelYDir, { recursive: true });
+    const source = path.join(findRetainedModelsRoot(), 'onnx', 'gte-multilingual-base');
+    if (!fs.existsSync(path.join(modelYDir, 'model.onnx'))) {
+      fs.linkSync(path.join(source, 'model_fp16.onnx'), path.join(modelYDir, 'model.onnx'));
+    }
+    if (!fs.existsSync(path.join(modelYDir, 'tokenizer.json'))) {
+      fs.linkSync(path.join(source, 'tokenizer.json'), path.join(modelYDir, 'tokenizer.json'));
+    }
+    fs.writeFileSync(path.join(modelYDir, 'model_manifest.json'),
+      '{"cpu":"model.onnx","capabilities":{"cpu_precision":"fp16"}}\n');
+    saved.settings.embedOnnxModelPath = modelYDir;
+    fs.writeFileSync(settingsPath, `${JSON.stringify(saved, null, 2)}\n`);
+  } else {
+    const missing = `${modelX}.held-absent`;
+    if (!fs.existsSync(modelX) && !fs.existsSync(missing)) {
+      throw new Error('model boot fixture cannot move X to a private absent path');
+    }
+    if (fs.existsSync(modelX) && !fs.existsSync(missing)) fs.renameSync(modelX, missing);
+  }
 }
 const runner = path.join(repo, 'scripts', 'dev', 'dev-runner.cjs');
 const child = spawn(process.execPath, [
@@ -284,6 +339,57 @@ try {
       candidate: installerCandidate,
       readJson, waitFor, request, post, requireThat, requireOperationSuccess, matchingHit,
       scenario, operationKey, output: () => output });
+  } else if (modelBoot) {
+    const initialStatus = await waitFor('model binding boot status', 60000, async () => {
+      try {
+        const response = await request(apiPort, '/api/status', {}, 15000);
+        return response.status === 200 ? JSON.parse(response.text) : null;
+      } catch { return null; }
+    });
+    console.log('MODEL_BOOT_STATUS', JSON.stringify({ scenario,
+      compatibility: initialStatus.worker.compatibility,
+      encoders: initialStatus.readiness.engineComponents.encoders }));
+    const file = path.join(work, 'installer-root-a', 'installer-0.txt');
+    const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
+    const search = await waitFor('model binding text search', 60000, async () => {
+      try {
+        const response = await post(apiPort, '/api/knowledge/search',
+          { query: marker, limit: 10, mode: 'text' }, 15000);
+        return response.status === 200 && matchingHit(response, file, marker) ? response : null;
+      } catch { return null; }
+    });
+    const status = await waitFor('model binding settled status', 60000, async () => {
+      try {
+        const response = await request(apiPort, '/api/status', {}, 15000);
+        if (response.status !== 200) return null;
+        const value = JSON.parse(response.text);
+        return value.components.encoders.state === 'STARTING' ? null : value;
+      } catch { return null; }
+    });
+    const active = readActiveGenerationManifest(indexBase);
+    if (scenario === 'model-x-y-boot') {
+      requireThat(status.worker.compatibility.embeddingCompatState === 'COMPATIBLE',
+        'serving X was marked incompatible with desired Y');
+      requireThat(status.worker.compatibility.embeddingFingerprintCurrent
+        === active.models.embedding.sha256, 'serving X lost its exact model fingerprint');
+      requireThat(status.worker.compatibility.indexSchemaFpCurrent
+        === status.worker.compatibility.indexSchemaFpStored,
+      'serving X status reported the desired Y schema');
+      requireThat(status.components.encoders.state === 'READY',
+        'serving X encoders did not become READY');
+      requireThat(status.readiness.engineComponents.encoders.appliedVersion
+        !== status.readiness.engineComponents.encoders.desiredVersion,
+      'desired Y was not reported as pending');
+    } else {
+      requireThat(status.worker.compatibility.embeddingCompatState === 'UNAVAILABLE',
+        'missing X did not make embedding compatibility unavailable');
+      requireThat(status.readiness.engineComponents.encoders.evidence === 'INDEX_MODEL_NOT_INSTALLED',
+        'missing X did not publish the required model-unavailable evidence');
+    }
+    console.log('MODEL_BINDING_BOOT_PASS', JSON.stringify({ scenario, marker,
+      compatibility: status.worker.compatibility,
+      encoders: status.readiness.engineComponents.encoders,
+      search: JSON.parse(search.text).results.length }));
   } else if (operationFault) {
     await exerciseOperationFault({ work, data, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor,

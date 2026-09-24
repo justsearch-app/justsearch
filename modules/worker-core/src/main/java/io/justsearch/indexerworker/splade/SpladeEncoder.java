@@ -192,12 +192,21 @@ public final class SpladeEncoder implements Closeable {
    */
   public static SpladeAssembly buildAssembly(SessionHandle sessions, SpladeConfig config)
       throws OrtException {
+    return buildAssembly(sessions, config, null);
+  }
+
+  /** Uses the generation's exact ONNX file for probing, with metadata from its own directory. */
+  public static SpladeAssembly buildAssembly(
+      SessionHandle sessions, SpladeConfig config, Path exactModelFile) throws OrtException {
+    if (exactModelFile != null && !config.modelPath().equals(exactModelFile.getParent())) {
+      throw new IllegalArgumentException("SPLADE model file and metadata directory differ");
+    }
     // Tempdoc 397 §14.24 FD-ProbeDeletion: probe input + output names via the assembler helper.
     // Tempdoc 374 sandbox round 4 issue H: resolve via ModelManifest so the probe
     // hits whichever variant Install AI actually placed on disk (FP32 model.onnx
     // vs FP16 model_fp16.onnx).
-    Path probeModel =
-        io.justsearch.ort.ModelManifest.loadOrDefault(config.modelPath())
+    Path probeModel = exactModelFile != null ? exactModelFile
+        : io.justsearch.ort.ModelManifest.loadOrDefault(config.modelPath())
             .resolveExistingModelFile(config.modelPath());
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(
