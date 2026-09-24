@@ -27,8 +27,8 @@ pointer-before-settings cut at `tmp/3246` reached the Engine crash but its
 observer hit a short SQLite writer lock. The observer now waits for that lock;
 the rerun passed at `tmp/3247-installed-mixed-inplace.txt`, with one COMPLETE
 row, matched pointer/settings witness, two search hits and closed private
-ports. No hosted proof applies to this unpushed revision yet. The accepted-write lexical A projection during
-Green build, every installed refusal cut, the simulated floor run and D1-14
+ports. No hosted proof applies to this unpushed revision yet. The accepted-write
+lexical A projection during Green build, installed refusal cuts and D1-14
 acceptance remain open.
 
 A second read-only lifecycle review found that an unpublished successor after
@@ -37,8 +37,19 @@ unavailable A was mistaken for a READY source, lexical view retirement did not
 notify streams, and B promotion omitted compatibility/disambiguation bindings.
 The corrections also close partially constructed candidate wrappers. Focused
 tests and static checks passed at `tmp/3250-lifecycle-final-focused.txt` after
-`tmp/3248` identified a PMD initializer issue. Full integrated and installed
-proof of this newest correction remains open.
+`tmp/3248` identified a PMD initializer issue. The complete 358-task
+stress-enabled integrated gate passed on checkpoint `4971fbb9f` at
+`tmp/3251-lifecycle-checkpoint-integrated.txt`. A standard installed CPU
+pointer-before-settings crash recovered with one COMPLETE row, matching
+pointer/settings and two text hits at `tmp/3253-installed-cpu-seed.txt`.
+The first no-crash A/B probe at `tmp/3254` found that its beside-only vector
+assertion did not fit the actual in-place mode; it had already proven A text
+visibility. The corrected fixture requires A vector service before B, a
+one-megabyte device-memory ceiling, A text visibility plus `RELOADING` and
+unavailable vectors at the held cut, then B's real vector service after live
+promotion. It passed at `tmp/3256-model-live-forced-inplace.txt`, with
+different A/B model SHA-256 values, one accepted operation, settings revision
+2 and closed private ports. Hosted proof of this checkpoint is pending.
 
 ### Current hosted and D1-14 boundary
 

@@ -451,7 +451,7 @@ export async function exerciseInstallerActivationFault(c) {
 /** Keep the installed A root intact while activating a second, separately owned model root. */
 export async function exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort,
   operationKey, readJson, waitFor, request, post, requireThat, matchingHit,
-  distinctModelB = false }) {
+  distinctModelB = false, inPlaceModelB = false }) {
   const runtime = path.join(data, 'runtime');
   const reachedFile = path.join(runtime, 'operation-fault-reached.json');
   const releaseFile = path.join(runtime, 'operation-fault-release');
@@ -465,6 +465,16 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   'side-by-side model fixture requires a private installed serving A');
   requireThat(operationRows(operationPath, operationKey).length === 0,
     'side-by-side activation key is already present');
+  const file = path.join(work, 'installer-root-a', 'installer-0.txt');
+  const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
+  await waitFor('installed A serves a real vector query before B', 120000, async () => {
+    try {
+      const response = await post(apiPort, '/api/knowledge/search',
+        { query: marker, limit: 10, mode: 'vector' }, 30000);
+      return response.status === 200 && JSON.parse(response.text).results?.length > 0
+        ? response : null;
+    } catch { return null; }
+  });
   const bRoot = path.join(work, 'installer-models-b', operationKey);
   const candidateContract = structuredClone(oldContract);
   const shippedRegistry = distinctModelB ? readJson(path.join(process.cwd(),
@@ -515,8 +525,6 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     args: input, idempotencyKey: operationKey,
     confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
   }, sessionHeaders(manifest));
-  const file = path.join(work, 'installer-root-a', 'installer-0.txt');
-  const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
   try {
     const reached = await waitFor('settled B before activation marker', 170000,
       () => readJson(reachedFile));
@@ -542,14 +550,26 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       { query: marker, limit: 10, mode: 'text' }, 30000);
     const vectorSearch = await post(apiPort, '/api/knowledge/search',
       { query: marker, limit: 10, mode: 'vector' }, 30000);
+    const statusReply = await request(apiPort, '/api/status', {}, 15000);
+    const status = statusReply.status === 200 ? JSON.parse(statusReply.text) : null;
+    const vectorOutcome = inPlaceModelB
+      ? vectorSearch.status === 400
+        && JSON.parse(vectorSearch.text).errorCode === 'INVALID_REQUEST'
+        && vectorSearch.text.includes('NO_EMBEDDING_SERVICE')
+        && status?.components?.encoders?.state === 'RELOADING'
+      : vectorSearch.status === 200
+        && JSON.parse(vectorSearch.text).results?.length > 0;
     requireThat(textSearch.status === 200 && matchingHit(textSearch, file, marker)
-      && vectorSearch.status === 200
-      && JSON.parse(vectorSearch.text).results?.length > 0,
-    `serving A failed a query while B was settled: ${textSearch.text} ${vectorSearch.text}`);
+      && vectorOutcome,
+    `serving A violated ${inPlaceModelB ? 'in-place' : 'beside'} mode while B was settled: ${JSON.stringify({
+      text: textSearch.text, vector: vectorSearch.text, encoders: status?.components?.encoders,
+    })}`);
     console.log('MODEL_LIVE_AB_CUT', JSON.stringify({ operationKey, sourceGeneration,
       buildingGeneration: bGeneration, aModel: sourceManifest.models.embedding,
       bModel: bManifest.models.embedding, unitsCompleted: inFlight.units_completed,
-      unitsFailed: inFlight.units_failed, vectorHits: JSON.parse(vectorSearch.text).results.length }));
+      unitsFailed: inFlight.units_failed, mode: inPlaceModelB ? 'IN_PLACE' : 'BESIDE',
+      encoderState: status?.components?.encoders?.state,
+      vectorHits: inPlaceModelB ? 0 : JSON.parse(vectorSearch.text).results.length }));
   } finally {
     fs.writeFileSync(releaseFile, 'release');
   }
