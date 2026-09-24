@@ -74,6 +74,38 @@ final class RecordedGenerationStartTest {
   }
 
   @Test
+  void modelManifestRejectsInvalidRolesAndFileIdentities() {
+    String modelPath = temp.resolve("model.onnx").toAbsolutePath().normalize().toString();
+    var model = new IndexGenerationManager.ModelArtifact(modelPath, "a".repeat(64));
+    assertThrows(IllegalArgumentException.class,
+        () -> new IndexGenerationManager.GenerationManifest(2, "g-example", SOURCE, 1L,
+            FINGERPRINT, Map.of("unknown/role", model)));
+    assertThrows(IllegalArgumentException.class,
+        () -> new IndexGenerationManager.ModelArtifact("relative/model.onnx", "a".repeat(64)));
+    assertThrows(IllegalArgumentException.class,
+        () -> new IndexGenerationManager.ModelArtifact(modelPath, "not-a-digest"));
+  }
+
+  @Test
+  void oversizedAcceptedModelMapRefusesBeforeManifestReplacement() throws Exception {
+    Path base = temp.resolve("oversized-model-map");
+    var manager = new IndexGenerationManager(base);
+    String source = manager.initializeOrLoad().state().active_generation();
+    manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, source);
+    Path manifestPath = generation(base, KEY).resolve(MANIFEST);
+    String initial = Files.readString(manifestPath);
+    String modelPath = temp.resolve("models/long-retained-artifact/model.onnx")
+        .toAbsolutePath().normalize().toString();
+    var model = new IndexGenerationManager.ModelArtifact(modelPath, "a".repeat(64));
+    Map<String, IndexGenerationManager.ModelArtifact> oversized = new java.util.HashMap<>();
+    for (int i = 0; i < 128; i++) oversized.put("role" + i, model);
+
+    assertThrows(IOException.class,
+        () -> manager.bindRecordedModels(KEY, SOURCE, FINGERPRINT, oversized));
+    assertEquals(initial, Files.readString(manifestPath));
+  }
+
+  @Test
   void createsExactTargetIsIdempotentAndSurvivesPromotionAndNewManager() throws Exception {
     Path base = temp.resolve("exact-start");
     var manager = new IndexGenerationManager(base);

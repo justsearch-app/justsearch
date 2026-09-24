@@ -140,6 +140,10 @@ public final class IndexGenerationManager {
       @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, ModelArtifact> models) {
     public GenerationManifest {
       models = models == null ? Map.of() : Map.copyOf(models);
+      if (models.size() > 128 || models.keySet().stream().anyMatch(role ->
+          !role.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}"))) {
+        throw new IllegalArgumentException("Invalid generation model roles");
+      }
     }
 
     public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs) {
@@ -155,8 +159,13 @@ public final class IndexGenerationManager {
   /** Exact installed file selected for one encoder role in a generation. */
   public record ModelArtifact(String id, String sha256) {
     public ModelArtifact {
-      if (id == null || id.isBlank() || !Path.of(id).isAbsolute()
-          || !Path.of(id).normalize().toString().equals(id)
+      Path selected;
+      try {
+        selected = Path.of(id);
+      } catch (java.nio.file.InvalidPathException | NullPointerException invalid) {
+        throw new IllegalArgumentException("Invalid generation model artifact path", invalid);
+      }
+      if (!selected.isAbsolute() || !selected.normalize().toString().equals(id)
           || sha256 == null || !sha256.matches("[0-9a-f]{64}")) {
         throw new IllegalArgumentException("Invalid generation model artifact identity");
       }
@@ -716,8 +725,12 @@ public final class IndexGenerationManager {
       GenerationManifest bound = new GenerationManifest(manifest.format_version(),
           manifest.generation_id(), manifest.source(), manifest.created_at_ms(),
           manifest.target_index_fingerprint(), accepted);
+      byte[] bytes = RECORDED_JSON.writeValueAsBytes(bound);
+      if (bytes.length > 16_384) {
+        throw new IOException("Recorded generation model manifest exceeds its ownership limit");
+      }
       io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(manifestPath,
-          RECORDED_JSON.writeValueAsBytes(bound));
+          bytes);
       return bound;
     }
   }
