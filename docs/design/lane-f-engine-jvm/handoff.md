@@ -30,6 +30,19 @@ fixture request timeouts. The next boundary is retained-asset audit and
 terminal hosted proof at the coherent checkpoint. D1 side-by-side publication and
 lifetime, then D2/E/F remain open; merge is conditional on stage F acceptance.
 
+After the `ccbe9df4a` push, the retained-asset follow-up freezes
+supporting metadata files for retained selected models in the accepted plan
+and refuses replacement of differing supporting bytes in candidate directories.
+The exact hash-addressed ONNX repair remains allowed. Focused tests, PMD and
+Spotless passed at `tmp/3139-d1-12-retained-assets-final-focused.txt`; the
+358-task full gate passed at `tmp/3140-d1-12-retained-assets-integrated.txt`.
+Installed standard-model pointer-before-settings recovery passed at the exact
+follow-up source in `tmp/3141-d1-12-retained-assets-exact-installed.txt`,
+including exact settings witness, one terminal operation, two text hits and
+closed ports. Hosted run `35960460879` for `ccbe9df4a` completed SUCCESS,
+including system integration. The retained-asset follow-up still needs its own
+hosted proof after push.
+
 ### D1-4 accepted inference refresh slice and model-identity follow-up
 
 The local `bc4527f36` checkpoint adds two D1-4 component-boundary regressions

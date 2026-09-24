@@ -29,6 +29,7 @@ import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.core.context.EngineContext;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -38,8 +39,10 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 final class ActivateInstalledModelsHandlerTest {
+  @TempDir Path temp;
   private static final EngineContext CONTEXT = TestEngineContexts.internal();
   private static final InvocationProvenance PROVENANCE = EngineProvenance.invocation(
       CONTEXT, ExecutorTag.UI, Instant.parse("2026-09-23T00:00:00Z"), Optional.empty());
@@ -72,13 +75,17 @@ final class ActivateInstalledModelsHandlerTest {
   }
 
   @Test
-  void freezesRetainedServingModelIdentityWithTheCandidate() {
+  void freezesRetainedServingModelIdentityWithTheCandidate() throws Exception {
     BrainInstallService install = mock(BrainInstallService.class);
     IndexingService indexing = mock(IndexingService.class);
     InstalledGenerationCandidate candidate = candidate(true);
     when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
-    Path retainedPath = Path.of("retained-splade.onnx").toAbsolutePath().normalize();
+    Path retainedPath = temp.resolve("retained-splade/model.onnx");
+    Files.createDirectories(retainedPath.getParent());
+    Files.writeString(retainedPath, "retained-model");
+    Path tokenizer = retainedPath.getParent().resolve("tokenizer.json");
+    Files.writeString(tokenizer, "retained-tokenizer");
     var retainedFile = new CandidateIndexSelection.ModelFile(retainedPath, "1".repeat(64), 17);
     when(indexing.captureCandidateIndexSelection(any(), any()))
         .thenReturn(new CandidateIndexSelection(target(), Map.of("splade", retainedFile)));
@@ -96,6 +103,11 @@ final class ActivateInstalledModelsHandlerTest {
     assertEquals(RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.CANDIDATE_CAPTURE,
         retained.provenance().kind());
     assertEquals("serving-a", retained.provenance().sourceId());
+    var support = plan.assets().stream().filter(asset -> asset.assetId().equals(
+        "splade/tokenizer.json")).findFirst().orElseThrow();
+    assertEquals(tokenizer, support.path());
+    assertEquals(RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.CANDIDATE_CAPTURE,
+        support.provenance().kind());
   }
 
   @Test
@@ -195,13 +207,15 @@ final class ActivateInstalledModelsHandlerTest {
   }
 
   @Test
-  void changedRetainedModelWithSameIndexTargetRequiresFreshPreview() {
+  void changedRetainedModelWithSameIndexTargetRequiresFreshPreview() throws Exception {
     BrainInstallService install = mock(BrainInstallService.class);
     IndexingService indexing = mock(IndexingService.class);
     RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
     when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
     when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
-    Path retainedPath = Path.of("retained-reranker.onnx").toAbsolutePath().normalize();
+    Path retainedPath = temp.resolve("retained-reranker/model.onnx");
+    Files.createDirectories(retainedPath.getParent());
+    Files.writeString(retainedPath, "retained-model");
     when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(
         new CandidateIndexSelection(target(), Map.of("reranker",
             new CandidateIndexSelection.ModelFile(retainedPath, "1".repeat(64), 17))),
@@ -209,6 +223,32 @@ final class ActivateInstalledModelsHandlerTest {
             new CandidateIndexSelection.ModelFile(retainedPath, "2".repeat(64), 17))));
     ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
     OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
+
+    OperationExecution result = handler.executePrepared(
+        approved, PROVENANCE, CONTEXT, mock(OperationRecordHandle.class));
+
+    assertEquals("ACTIVATION_PREVIEW_STALE", result.response().errorCode().orElseThrow());
+    verify(ingestion, org.mockito.Mockito.never()).execute(any(), any());
+  }
+
+  @Test
+  void changedRetainedTokenizerRequiresFreshPreview() throws Exception {
+    BrainInstallService install = mock(BrainInstallService.class);
+    IndexingService indexing = mock(IndexingService.class);
+    RecordedIngestionService ingestion = mock(RecordedIngestionService.class);
+    when(install.prepareInstalledGenerationCandidate()).thenReturn(Optional.of(candidate(true)));
+    when(indexing.captureServingGeneration(CONTEXT)).thenReturn("serving-a");
+    Path retainedPath = temp.resolve("retained-splade/model.onnx");
+    Files.createDirectories(retainedPath.getParent());
+    Files.writeString(retainedPath, "retained-model");
+    Path tokenizer = retainedPath.getParent().resolve("tokenizer.json");
+    Files.writeString(tokenizer, "tokenizer-A");
+    var selection = new CandidateIndexSelection(target(), Map.of("splade",
+        new CandidateIndexSelection.ModelFile(retainedPath, "1".repeat(64), 17)));
+    when(indexing.captureCandidateIndexSelection(any(), any())).thenReturn(selection);
+    ActivateInstalledModelsHandler handler = handler(install, indexing, ingestion);
+    OperationPreparation approved = handler.prepare(args(), PROVENANCE, CONTEXT);
+    Files.writeString(tokenizer, "tokenizer-B");
 
     OperationExecution result = handler.executePrepared(
         approved, PROVENANCE, CONTEXT, mock(OperationRecordHandle.class));

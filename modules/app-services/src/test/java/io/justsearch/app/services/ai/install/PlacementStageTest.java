@@ -71,18 +71,41 @@ class PlacementStageTest {
 
   @Test
   void placeReplacesCorruptCandidateWithoutReplacingServingTarget() throws Exception {
-    Path target = tempDir.resolve(CANDIDATE_TARGET_PATH);
+    Path downloaded = tempDir.resolve("downloaded-model.onnx");
+    Files.writeString(downloaded, "candidate", StandardCharsets.UTF_8);
+    String sha = DownloadExecutor.sha256(downloaded);
+    String targetPath = "onnx/embed/candidates/" + sha + "/model.onnx";
+    Path target = tempDir.resolve(targetPath);
     Files.createDirectories(target.getParent());
     Files.writeString(target, "corrupt", StandardCharsets.UTF_8);
     Path partial = InstallPlanner.partialPathFor(target);
-    Files.writeString(partial, "candidate", StandardCharsets.UTF_8);
+    Files.copy(downloaded, partial);
 
-    String sha = DownloadExecutor.sha256(partial);
-    String failure = new PlacementStage(tempDir).place(candidateDownload(sha, 9));
+    String failure = new PlacementStage(tempDir).place(new InstallPlan.PlannedDownload(
+        "embedding", "https://example.invalid/model.onnx", targetPath, sha, 9, true));
 
     assertNull(failure);
     assertEquals("candidate", Files.readString(target));
     assertFalse(Files.exists(partial));
+  }
+
+  @Test
+  void placeRefusesDifferentSupportingFileInRetainedCandidateDirectory() throws Exception {
+    Path target = tempDir.resolve(CANDIDATE_TARGET_PATH).getParent().resolve("tokenizer.json");
+    Files.createDirectories(target.getParent());
+    Files.writeString(target, "old-tokenizer", StandardCharsets.UTF_8);
+    Path partial = InstallPlanner.partialPathFor(target);
+    Files.writeString(partial, "new-tokenizer", StandardCharsets.UTF_8);
+    String sha = DownloadExecutor.sha256(partial);
+    String relative = tempDir.relativize(target).toString().replace('\\', '/');
+
+    String failure = new PlacementStage(tempDir).place(new InstallPlan.PlannedDownload(
+        "embedding", "https://example.invalid/tokenizer.json", relative, sha,
+        Files.size(partial), false));
+
+    assertTrue(failure.contains("different bytes"));
+    assertEquals("old-tokenizer", Files.readString(target));
+    assertTrue(Files.exists(partial));
   }
 
   private static InstallPlan.PlannedDownload download(String sha, long size) {
@@ -91,9 +114,4 @@ class PlacementStageTest {
         TARGET_PATH, sha, size, true);
   }
 
-  private static InstallPlan.PlannedDownload candidateDownload(String sha, long size) {
-    return new InstallPlan.PlannedDownload(
-        "embedding", "https://example.invalid/model.onnx",
-        CANDIDATE_TARGET_PATH, sha, size, true);
-  }
 }

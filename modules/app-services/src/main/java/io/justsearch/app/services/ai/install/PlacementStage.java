@@ -67,11 +67,12 @@ final class PlacementStage {
         try {
           DownloadExecutor.verify(targetFile, dl.sizeBytes(), dl.sha256());
         } catch (Exception mismatch) {
-          if (!isCandidateOwnedTarget(targetFile)) {
+          if (!isRepairableModelTarget(targetFile, dl.sha256())) {
             return "Failed to finalize: refusing to replace existing target with different bytes";
           }
-          // A retained candidate is disposable preparation. Verify the replacement before the
-          // move, then replace only this candidate path; serving assets never enter this branch.
+          // A corrupt ONNX file can be repaired only under its own content-addressed directory.
+          // Supporting files may belong to a serving generation even in that directory; changing
+          // their bytes in place would change that generation's model context on its next boot.
           if (Files.isSymbolicLink(partialFile)) {
             return "Failed to finalize: refusing symbolic-link staging file " + partialFile;
           }
@@ -123,6 +124,12 @@ final class PlacementStage {
     } catch (AtomicMoveNotSupportedException e) {
       Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
     }
+  }
+
+  private boolean isRepairableModelTarget(Path target, String expectedSha256) {
+    return isCandidateOwnedTarget(target)
+        && target.getFileName().toString().endsWith(".onnx")
+        && target.getParent().getFileName().toString().equalsIgnoreCase(expectedSha256);
   }
 
   /** The planner's retained ONNX shape: models/.../candidates/<full SHA-256>/<file>. */

@@ -19,6 +19,7 @@ import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifier;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.context.EngineContext;
 import java.util.List;
@@ -94,6 +95,8 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
 
     List<RecordedInstallerGenerationPlan.ModelIdentity> models =
         new ArrayList<>(candidate.models());
+    List<RecordedInstallerGenerationPlan.AssetIdentity> assets =
+        new ArrayList<>(candidate.assets());
     Map<String, RecordedInstallerGenerationPlan.ModelIdentity> byPackage = new HashMap<>();
     for (var model : models) byPackage.put(model.packageId(), model);
     var retainedProvenance = new RecordedInstallerGenerationPlan.AcquisitionProvenance(
@@ -112,6 +115,13 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
         models.add(new RecordedInstallerGenerationPlan.ModelIdentity(entry.getKey(),
             file.path().getFileName().toString(), file.path(), file.sha256(),
             file.sizeBytes(), retainedProvenance));
+        try {
+          assets.addAll(RecordedInstallerAssetVerifier.captureSupportingAssets(
+              entry.getKey(), file.path(), retainedProvenance));
+        } catch (IllegalArgumentException invalid) {
+          throw refused("Retained model assets are unavailable: " + entry.getKey(),
+              "ACTIVATION_ASSET_INVALID");
+        }
       }
     }
 
@@ -125,7 +135,7 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
         candidate.settingsWitness(),
         candidate.encodedSettings(),
         models,
-        candidate.assets(),
+        assets,
         candidate.provenance());
     return new OperationPreparation(argumentsJson, RecordedInstallerGenerationPlan.SCHEMA,
         plan.toReplayPayload());
