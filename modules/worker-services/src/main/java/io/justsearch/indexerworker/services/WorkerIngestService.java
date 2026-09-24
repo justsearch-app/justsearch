@@ -220,6 +220,9 @@ public final class WorkerIngestService {
             indexingLoop,
             signalBus,
             migrationSwitchingMaxDurationMs);
+    this.statusOps.setOpenedRuntimePaths(
+        searchLifecycle == null ? null : searchLifecycle.openedIndexPath(),
+        ingestLifecycle == null ? null : ingestLifecycle.openedIndexPath());
     this.syncOps = new SyncDirectoryOps(
         ingestLifecycle != null ? ingestLifecycle.readPathOps() : null,
         ingestLifecycle != null ? ingestLifecycle.pruneOps() : null,

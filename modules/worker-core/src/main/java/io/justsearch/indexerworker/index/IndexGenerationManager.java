@@ -447,6 +447,35 @@ public final class IndexGenerationManager {
     return resolveGenerationPath(genId);
   }
 
+  /** Identity of the generation directory an already-open runtime actually uses. */
+  public String generationIdForOpenedPath(Path openedPath) throws IOException {
+    if (openedPath == null) throw new IOException("Opened generation path is unavailable");
+    Path exact = normalize(openedPath);
+    if (exact.getFileName() == null) throw new IOException("Opened generation path has no identity");
+    String generationId = requireSafeGenerationId(exact.getFileName().toString(), "opened generation");
+    if (!exact.equals(resolveGenerationPathReadOnly(generationId))
+        || !Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Opened runtime is outside the owned generation directory");
+    }
+    Path manifestPath = exact.resolve(GENERATION_MANIFEST);
+    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(manifestPath) > 16_384) {
+      throw new IOException("Opened generation manifest is unavailable");
+    }
+    final GenerationManifest manifest;
+    try {
+      manifest = JSON.readValue(
+          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
+          GenerationManifest.class);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Opened generation manifest is invalid", malformed);
+    }
+    if (manifest == null || !generationId.equals(manifest.generation_id())) {
+      throw new IOException("Opened generation manifest names another directory");
+    }
+    return generationId;
+  }
+
   /**
    * Builds a generation id guaranteed unique on disk (tempdoc 628 G4 / obs #484).
    *

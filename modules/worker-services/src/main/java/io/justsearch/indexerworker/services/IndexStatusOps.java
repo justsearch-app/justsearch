@@ -105,6 +105,8 @@ final class IndexStatusOps {
   private final IndexingLoop indexingLoop;
   private final WorkerSignalBus signalBus;
   private final long migrationSwitchingMaxDurationMs;
+  private Path openedSearchPath;
+  private Path openedIngestPath;
 
   private static final long INDEX_SIZE_CACHE_TTL_MS = 30_000L;
 
@@ -176,6 +178,22 @@ final class IndexStatusOps {
 
   void setEmbeddingCompatController(EmbeddingCompatibilityController controller) {
     this.embeddingCompatController = controller;
+  }
+
+  /** Bind the exact runtime directories before this service is published. */
+  void setOpenedRuntimePaths(Path searchPath, Path ingestPath) {
+    openedSearchPath = searchPath;
+    openedIngestPath = ingestPath;
+  }
+
+  private String openedGenerationId(Path path) {
+    if (path == null || indexGenerationManager == null) return "";
+    try {
+      return indexGenerationManager.generationIdForOpenedPath(path);
+    } catch (IOException invalid) {
+      log.debug("Opened runtime generation identity is unavailable: {}", invalid.getMessage());
+      return "";
+    }
   }
 
   void setOrtCudaStatusSupplier(Supplier<OrtCudaStatus> supplier) {
@@ -600,20 +618,8 @@ final class IndexStatusOps {
       }
     }
 
-    String servingSearchGenerationId =
-        stateSnapshot == null || stateSnapshot.active_generation() == null
-            ? ""
-            : stateSnapshot.active_generation();
-    String servingIngestGenerationId =
-        stateSnapshot == null || stateSnapshot.active_generation() == null
-            ? ""
-            : ((ingestCountOps != null
-                    && searchCountOps != null
-                    && ingestCountOps != searchCountOps)
-                ? (stateSnapshot.building_generation() == null
-                    ? ""
-                    : stateSnapshot.building_generation())
-                : stateSnapshot.active_generation());
+    String servingSearchGenerationId = openedGenerationId(openedSearchPath);
+    String servingIngestGenerationId = openedGenerationId(openedIngestPath);
 
     // tempdoc 628 Stage C: surface WHY a rebuild is running (the building generation's manifest source,
     // e.g. "corrupt_index_rebuild") so the Head can word the transition.

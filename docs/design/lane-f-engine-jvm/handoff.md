@@ -109,9 +109,42 @@ proof `tmp/3093-reconfigure-refresh-physical-standard.txt` passed with real
 completions, generation 1 → 2, exact successor settings witness and the same
 physical Qwen 9B ID in `/v1/models` and `/api/inference/status` on both sides.
 The private stack stopped with ports closed; official quick health then reported
-ABSENT and inference REFUSED. This is local proof on dirty source atop
-`f5d81ac1f`; it needs a checkpoint and hosted proof before being reused as
-committed-revision evidence.
+ABSENT and inference REFUSED. This source is checkpoint `386cd5575`, pushed to
+PR727. Hosted run `35949287953` finished SUCCESS at that SHA, including
+system integration, Windows-native, public claims and all other jobs. It
+reached terminal system integration before the next checkpoint push.
+
+The next D1-12 implementation boundary is still open. `EncoderSet.ModelIdentity`
+and `CandidateIndexTargetCapture` hold Green's captured hashes, and the accepted
+installer plan retains exact model paths and SHA-256 values. However
+`IndexGenerationManager.GenerationManifest` still has no `models` map, and boot
+initialization composes A from desired process configuration and global model
+fingerprint providers. A boot with manifest X and desired settings Y, plus the
+missing-X text-search fallback, therefore lack the specified implementation and
+proof. Continue from stage D1-12 and the accepted installer identity rather than
+claiming the fresh-install six-cut fixture proves retained differing-model A/B.
+
+### D1-10 opened-runtime status slice (uncommitted)
+
+The production Worker status path now binds the search and ingest runtimes'
+opened directories and reports each generation from its validated manifest.
+The pointer remains the separately reported active generation. A real A/Green
+runtime test keeps the old service alive after pointer promotion and observes
+pointer Green, search Blue, ingest Green; a newly composed service reports
+Green/Green. Focused tests passed at `tmp/3095-served-generation-focused.txt`;
+affected PMD and Spotless passed at `tmp/3096-served-generation-static.txt`.
+The 358-task integrated gate passed at `tmp/3097-served-generation-integrated.txt`.
+Review then removed the helper's test-only pointer fallback so no served ID
+comes from the pointer, and added a negative manifest-identity check. Final
+focused tests, PMD and Spotless passed at
+`tmp/3098-served-generation-final-focused.txt`. The full `3097` run predates
+that final focused correction. The installed recorded migration with real
+retained ONNX assets passed at `tmp/3099-served-generation-installed-migration.txt`:
+the status endpoint named the open Blue/Blue runtimes before rebuild and
+Green/Green after live promotion, alongside the existing search, queue,
+retirement and rollback checks. Its private stack stopped with ports closed;
+official quick health then reported ABSENT and inference REFUSED. Hosted proof
+for this slice remains required before closing D1-10.
 
 ### Active checkpoint `d64339ef8` and D1-4 continuation
 

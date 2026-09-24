@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +23,24 @@ import org.junit.jupiter.api.Test;
  * to "no green was promoted" (the cutover never stamped/verified), not a generation-selection bug.
  */
 class IndexGenerationManagerRestartTest {
+
+  @Test
+  void openedPathIdentityRejectsAnotherGenerationsManifest() throws Exception {
+    Path base = Files.createTempDirectory("genmgr-opened-identity");
+    IndexGenerationManager manager = new IndexGenerationManager(base);
+    String blue = manager.initializeOrLoad().activeGenerationId();
+    String green = manager.startMigration("opened-identity").building_generation();
+    Path bluePath = manager.resolveGenerationPathStrict(blue);
+    Path greenPath = manager.resolveGenerationPathStrict(green);
+
+    assertEquals(blue, manager.generationIdForOpenedPath(bluePath));
+    assertEquals(green, manager.generationIdForOpenedPath(greenPath));
+    Files.copy(bluePath.resolve(".justsearch-index-generation.json"),
+        greenPath.resolve(".justsearch-index-generation.json"), StandardCopyOption.REPLACE_EXISTING);
+    assertThrows(java.io.IOException.class, () -> manager.generationIdForOpenedPath(greenPath));
+    assertThrows(java.io.IOException.class,
+        () -> manager.generationIdForOpenedPath(base.resolve("outside")));
+  }
 
   @Test
   @DisplayName("A promoted generation survives a restart — a fresh manager opens it via state.json (B-1)")

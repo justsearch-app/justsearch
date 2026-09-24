@@ -13,6 +13,7 @@ import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexing.SchemaFields;
@@ -104,6 +105,38 @@ final class MidMigrationCompatSurfaceTest extends io.justsearch.adapters.lucene.
     assertFalse(status.getCompatibility().getReindexRequired());
   }
 
+  @Test
+  void committedPointerDoesNotRelabelAnOldOpenServingRuntime(@TempDir Path tempDir)
+      throws Exception {
+    Path base = tempDir.resolve("generations");
+    IndexGenerationManager generations = new IndexGenerationManager(base);
+    var initial = generations.initializeOrLoad();
+    var building = generations.startMigration("status-runtime-identity");
+    String blueId = initial.activeGenerationId();
+    String greenId = building.building_generation();
+    Path bluePath = generations.resolveGenerationPathStrict(blueId);
+    Path greenPath = generations.resolveGenerationPathStrict(greenId);
+    blue = open(bluePath, null, 2);
+    green = open(greenPath, null, 1);
+
+    WorkerIngestService oldService = serviceOf(green, blue, base, bluePath);
+    var before = oldService.indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+    assertEquals(blueId, before.getMigration().getServingSearchGenerationId());
+    assertEquals(greenId, before.getMigration().getServingIngestGenerationId());
+
+    generations.promoteBuildingGenerationToActive();
+    var committed = oldService.indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+    assertEquals(greenId, committed.getMigration().getActiveGenerationId());
+    assertEquals(blueId, committed.getMigration().getServingSearchGenerationId(),
+        "pointer commitment cannot relabel an issued Blue service");
+    assertEquals(greenId, committed.getMigration().getServingIngestGenerationId());
+
+    var successor = serviceOf(green, green, base, greenPath)
+        .indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+    assertEquals(greenId, successor.getMigration().getServingSearchGenerationId());
+    assertEquals(greenId, successor.getMigration().getServingIngestGenerationId());
+  }
+
   private RunningRuntime open(Path path, String fingerprintOverride, int docs)
       throws Exception {
     Map<String, Object> meta = new HashMap<>(new SsotCommitMetadataSource().build());
@@ -135,12 +168,18 @@ final class MidMigrationCompatSurfaceTest extends io.justsearch.adapters.lucene.
   /** Drives the production {@code indexStatus} RPC over the real service wiring. */
   private static StatusResponse statusOf(
       RunningRuntime ingest, io.justsearch.adapters.lucene.runtime.LuceneRuntime search, Path dir) {
+    return serviceOf(ingest, search, null, dir)
+        .indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+  }
+
+  private static WorkerIngestService serviceOf(
+      RunningRuntime ingest, io.justsearch.adapters.lucene.runtime.LuceneRuntime search,
+      Path indexBase, Path servingPath) {
     JobQueue jobQueue = mock(JobQueue.class);
     when(jobQueue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     when(jobQueue.pendingBytes()).thenReturn(JobQueue.PendingBytes.EMPTY);
 
-    WorkerIngestService service =
-        new WorkerIngestService(
+    return new WorkerIngestService(
             jobQueue,
             null,
             // Non-null: buildCore reads the heartbeat unguarded, and WorkerIngestService turns any
@@ -148,13 +187,11 @@ final class MidMigrationCompatSurfaceTest extends io.justsearch.adapters.lucene.
             // fail on an empty string instead of on the value under test.
             mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
             IndexingPacing.unthrottled(),
-            null,
-            dir,
+            indexBase,
+            servingPath,
             ingest,
             search,
             null,
             0L);
-
-    return service.indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
   }
 }

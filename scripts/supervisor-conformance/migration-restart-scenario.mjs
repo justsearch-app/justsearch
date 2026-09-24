@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 // Installed-process regression, sharing the existing supervisor fixture's owned launch/cleanup.
 export async function exerciseMigrationRestart(c) {
   const { work, data, indexBase, first, manifest, apiPort, readJson,
-    post, requireThat, requireOperationSuccess, createOperationKey, matchingHit } = c;
+    request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit } = c;
   const deadline = Date.now() + 270000;
   const waitFor = (label, budget, probe) =>
     c.waitFor(label, Math.max(1, Math.min(budget, deadline - Date.now())), probe);
@@ -69,6 +69,12 @@ export async function exerciseMigrationRestart(c) {
   });
   const generationFile = path.join(indexBase, 'state.json');
   const blue = readJson(generationFile).active_generation;
+  const blueStatusResponse = await request(apiPort, '/api/knowledge/status');
+  const blueStatus = JSON.parse(blueStatusResponse.text);
+  requireThat(blueStatusResponse.status === 200
+    && blueStatus.servingSearchGenerationId === blue
+    && blueStatus.servingIngestGenerationId === blue,
+  `pre-migration status did not name the open Blue runtimes: ${blueStatusResponse.text}`);
   // Only A belongs to the accepted watched roots. B remains a real Blue-only document;
   // distinct generations therefore prove reader replacement without racing filesystem deletion.
   const rebuildKey = createOperationKey();
@@ -117,6 +123,12 @@ export async function exerciseMigrationRestart(c) {
         && walk.sealed_at != null && walk.acknowledged_revision === walk.revision ? { row, walk } : null;
     } finally { jobs.close(); operations.close(); }
   });
+  const greenStatusResponse = await request(promoted.manifest.head.apiPort, '/api/knowledge/status');
+  const greenStatus = JSON.parse(greenStatusResponse.text);
+  requireThat(greenStatusResponse.status === 200
+    && greenStatus.servingSearchGenerationId === `g-${rebuildKey}`
+    && greenStatus.servingIngestGenerationId === `g-${rebuildKey}`,
+  `live promotion status did not name the open Green runtimes: ${greenStatusResponse.text}`);
   // The retirement reaper runs every two minutes. Publication may precede the runner's
   // terminal receipt, so allow the first post-settlement reaper tick to perform exact deletion.
   const retired = await waitFor('settled predecessor removed after live cutover', 150000, () => {

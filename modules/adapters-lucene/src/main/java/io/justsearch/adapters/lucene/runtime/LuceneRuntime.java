@@ -2,6 +2,7 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import java.nio.file.Path;
 import java.util.Map;
 
 /**
@@ -36,6 +37,9 @@ public sealed interface LuceneRuntime extends AutoCloseable
    * (the holder-swap pattern: build new, swap field, close old).
    */
   LuceneRuntimeBuilder origin();
+
+  /** Physical index directory this exact runtime opened. */
+  Path openedIndexPath();
 
   /** Exact bounded executor bundle used by this runtime session. */
   LuceneExecutorRegistrations executorRegistrations();

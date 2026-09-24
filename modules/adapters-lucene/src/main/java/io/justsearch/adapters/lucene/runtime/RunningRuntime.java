@@ -2,6 +2,7 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
@@ -76,6 +77,10 @@ public final class RunningRuntime implements LuceneRuntime {
   @Override
   public LuceneRuntimeBuilder origin() {
     return origin;
+  }
+
+  @Override public Path openedIndexPath() {
+    return session.indexPath;
   }
 
   @Override

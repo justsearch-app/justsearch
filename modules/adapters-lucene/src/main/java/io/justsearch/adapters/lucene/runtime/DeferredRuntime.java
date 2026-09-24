@@ -109,6 +109,10 @@ public final class DeferredRuntime implements LuceneRuntime {
     return origin;
   }
 
+  @Override public java.nio.file.Path openedIndexPath() {
+    return session.indexPath;
+  }
+
   @Override
   public LuceneExecutorRegistrations executorRegistrations() {
     return session.executorRegistrations;
