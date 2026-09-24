@@ -128,9 +128,17 @@ compile, Spotless and PMD passed. The full 358-task integrated gate passed at
 the embedding, NER and SPLADE file paths and SHA-256 values through pointer
 commit, recovery and terminal success; settings witness and search converged,
 and the private stack stopped with ports closed. Official quick health afterward
-reported ABSENT, inference REFUSED and no foreign runs. This is the next
-checkpoint. Native generation creation and boot still compose A from desired
-process configuration and global model fingerprint providers. A boot with
+reported ABSENT, inference REFUSED and no foreign runs. Checkpoint `8a6b22332`
+is pushed to PR727. Its hosted run `35953229613` had build, Worker, platform,
+Windows-native, public-claims and other completed jobs green at the 2026-09-24
+04:04 UTC check; system integration was still running. Do not push the next
+checkpoint until that job reaches a terminal result. Local commit `e4dea2fd5`
+then bounded the manifest's accepted role map and serialized size before
+replacement, preserving the old manifest on refusal. Focused Worker-core
+tests and static checks passed at `tmp/3105-generation-manifest-limit-focused.txt`;
+this local commit has no hosted proof yet. Native generation creation and boot
+still compose A from desired process configuration and global model fingerprint
+providers. A boot with
 manifest X and desired settings Y still lacks the specified implementation and
 proof, as does the missing-X text-search fallback. Continue from stage D1-12
 and the accepted installer identity rather than claiming the fresh-install
