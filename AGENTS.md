@@ -34,6 +34,13 @@ create a stopping point. Preserve decisions and authorization across compaction;
 a pending approval blocks only dependent actions. Distinguish platform
 interruptions from voluntary stops. Explanations are not automatically handoffs.
 
+Settle technical judgment yourself (implementation, test intent, design detail,
+in-assignment scope); the owner cannot review agent-speed work. When unsure, get
+an independent refutation, proceed, and log a one-line reason in the governing
+tempdoc or design. Ask the owner only about product choices, scope or cost beyond
+the assignment, and irreversible or outward actions: once, with options, a
+recommendation and the default if unanswered; reversible work proceeds meanwhile.
+
 An explicitly authorized migration can supersede a named shipped architecture
 rule within its assigned scope. Record the target, superseded rule, and proof in
 the governing design; trust boundaries and permissions still apply.
@@ -51,8 +58,10 @@ needs an active tempdoc; all acceptance items bind. Orient with Codex
 ## Implementation discipline
 
 - Fix root causes; never hide failure by deleting validation, weakening tests,
-  suppressing warnings, or broadening catches. If a failing test's intent seems
-  wrong, explain why and ask before changing it.
+  suppressing warnings, or broadening catches. If a failing test's intent is
+  wrong or an approved design changed it, assert the intended behavior and cite
+  the decision; without one, get an independent refutation first. Don't ask the
+  owner.
 - Find the source of truth before introducing another representation. Decide
   whether the new form is a projection or an intentional fork.
 - Establish why results occurred, including expected-looking results.

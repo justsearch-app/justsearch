@@ -9,9 +9,9 @@
     ".claude/rules/context-efficiency.md": 1877,
     ".claude/rules/hooks-reference.md": 2822,
     ".claude/rules/slice-execution.md": 4562,
-    "AGENTS.md": 8573
+    "AGENTS.md": 9170
   },
-  "totalCeiling": 60185,
+  "totalCeiling": 60782,
   "bumps": [
     {
       "file": "CLAUDE.md",
@@ -194,6 +194,13 @@
       "to": 8573,
       "reason": "951: name companion/archivist roles, state cap-as-anomaly-guard and child-sandbox-inheritance in the shared contract",
       "ts": "2026-09-10T18:04:35.052Z"
+    },
+    {
+      "file": "AGENTS.md",
+      "from": 8573,
+      "to": 9170,
+      "reason": "owner decision 2026-09-25: agents settle technical judgment (incl. test intent) via independent refutation and escalate only product, scope/cost and irreversible choices as a decision with a default",
+      "ts": "2026-09-25T00:14:07.090Z"
     }
   ]
 }
