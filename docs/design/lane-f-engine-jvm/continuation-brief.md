@@ -21,22 +21,26 @@ re-cut condition is retired. [Design](design.md#16-what-must-be-measured-and-the
 
 **Current D1-9 boundary:** `fc5b444d6` remains the last fully hosted runtime
 checkpoint; six installed installer pointer/settings crash cuts and the
-standard-model A/B file-mutation path passed there. `7f469d044` is the latest
-pushed checkpoint: its hosted system integration and Windows native jobs passed,
-but the manual-pointer test raced automatic cutover. The local test correction
-is not yet hosted. [Handoff](handoff.md) names the exact artifacts.
+standard-model A/B file-mutation path passed there. The `b971982c0` gap
+checkpoint's hosted CI failed the Public claims UI fixture gate and
+three bulk crash scenarios' stale v2 evidence assertion, each retried three
+times. Both failures are reproduced and corrected in the subsequent checkpoint;
+its hosted verification is due. The prior
+`7f469d044` hosted run's manual-pointer race was corrected in this checkpoint.
+[Handoff](handoff.md) names the exact artifacts and red/green local proof.
 
-**2026-09-25 gap batch:** the uncommitted D1-9/D1-11 gap decision retains a
+**2026-09-25 gap batch:** the committed D1-9/D1-11 gap decision retains a
 nonterminal `COMPLETE_WITH_GAPS` row, publishes a candidate-bound gap hash,
 restores A for an in-place wait, and requires a distinct HIGH/DURABLE webview
 approval after Green drains. Serial `test`, compile/installDist, Spotless, PMD,
 stress, UI typecheck/unit and generation checks passed locally. Installed
 standard-model A answered a real vector query while B awaited acceptance;
 hash-bound approval promoted that B and duplicate acceptance had no second
-effect (`tmp/3477`). HEAD `27adef9f0` includes the escalation-policy and
+effect (`tmp/3477`). The gap checkpoint `b971982c0` includes the escalation-policy and
 docs-only improvement merges; the policy's two instruction checks passed and
-the improvement merge changed no tested runtime source. The gap code remains uncommitted and
-unhosted. Installed in-place recovery, no-file projection, positive
+the improvement merge changed no tested runtime source. The gap code is
+pushed; its hosted run was red on the two fixture assertions addressed above.
+Installed in-place recovery, no-file projection, positive
 cancel/abandon and gap crash cuts are still open. The owner-authorized
 improvement package `59da2bc4d` is merged at this batch boundary before the
 next installed D1 round. Nothing here releases later D1/D2/E/F acceptance.
@@ -62,7 +66,11 @@ constants, and preserves the historical reconciliation token for released
 updaters; the gate, 78 self-test assertions and 33 Rust updater tests pass.
 WP5's design/E/F documentation corrections are present. [Handoff](handoff.md)
 has exact proof and remaining gaps. The release-wrapper compatibility baseline
-is still WP2 work before E; no later acceptance is waived.
+is still WP2 work before E; no later acceptance is waived. The next D1-16
+slice has a passing installed baseline plus six named pending feature
+scenarios at `tmp/3497` (three AI-tagged), and its UI gap-decision capture has measured proof
+at `tmp/ui-shot-gap`; [handoff](handoff.md) distinguishes those local results
+from the red preceding hosted run and the next required hosted verification.
 
 ## Adopted remaining-work order (2026-09-25)
 

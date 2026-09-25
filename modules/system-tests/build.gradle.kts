@@ -193,6 +193,8 @@ val integrationTest = tasks.register<Test>("integrationTest") {
 
   testClassesDirs = sourceSets["integrationTest"].output.classesDirs
   classpath = sourceSets["integrationTest"].runtimeClasspath
+  // D1-16 owns this class in its separately budgeted task below.
+  filter.excludeTestsMatching("io.justsearch.systemtests.supervision.EngineLifecycleE2ETest")
 
   useJUnitPlatform {
     if (!includeAiTests && !includeAgentTests) {
@@ -324,6 +326,28 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     // this advisory lane would redden the job exactly as R3 intended to prevent.
     logger.warn("Test retry extension not found (develocity.testRetry / retry) — R3's " +
         "failOnPassedAfterRetry=false override for integrationTest did not apply")
+  }
+}
+
+// Lane F D1-16: lifecycle scenarios have a separate, explicit budget so the
+// existing integration tier's timeout cannot cut off its own fixture diagnostics.
+tasks.register<Test>("lifecycleIntegrationTest") {
+  description = "Runs installed Engine lifecycle scenarios for Lane F feature acceptance."
+  group = "verification"
+  dependsOn(":modules:ui:installDist")
+  inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/barrier-files.mjs"))
+  testClassesDirs = sourceSets["integrationTest"].output.classesDirs
+  classpath = sourceSets["integrationTest"].runtimeClasspath
+  filter.includeTestsMatching("io.justsearch.systemtests.supervision.EngineLifecycleE2ETest")
+  useJUnitPlatform {
+    if (!includeAiTests) excludeTags("ai")
+  }
+  timeout.set(Duration.ofMinutes(30))
+  testLogging {
+    events("passed", "skipped", "failed")
+    showStandardStreams = true
   }
 }
 

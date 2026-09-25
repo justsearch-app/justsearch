@@ -321,12 +321,27 @@ def _surfaces_catalog_body() -> str:
 # non-`enriching` variant still serves.
 _ROUTES: tuple[tuple[str, str], ...] = (
     ("/api/diagnostics/ingestion/summary", '{"rollups": [], "count": 0}'),
+    ("/api/operation-history/", '{"historySince": 0, "state": "unknown"}'),
     ("/api/indexing-roots/substrate", _BODY_INDEXED_ROOTS),
     ("/api/registry/surfaces", _surfaces_catalog_body()),
     ("/api/registry/operations", _help_operations_catalog_body()),
     ("/api/registry/resources", _empty_catalog("Resource")),
     ("/api/registry/diagnostic-channels", _empty_catalog("DiagnosticChannel")),
 )
+
+_GAP_BUILDING_GENERATION = "g-0199abc1-2345-7abc-8abc-0123456789ab"
+_GAP_OUTCOME = json.dumps({
+    "historySince": 0,
+    "state": "running",
+    "phase": "awaiting_acceptance",
+    "result": {
+        "gapListHash": "a" * 64,
+        "gaps": [
+            {"unitId": "notes/old-draft.txt", "reason": "CANDIDATE_PROJECTION_MISSING"},
+            {"unitId": "notes/deleted-draft.txt", "reason": "DELETE_NOT_APPLIED"},
+        ],
+    },
+})
 
 # Seed: dismiss the first-run 'welcome' walkthrough (id per canonicalManifest.ts) so
 # the overlay never clutters the deterministic capture, and pin the inspector tab.
@@ -667,6 +682,11 @@ def _status_body(variant: str) -> str:
 
     `degraded-detailed` needs the identical readiness state — the banner it expands is the same
     one this transform gives something to render."""
+    if variant == "gap-decision":
+        d = json.loads(_BODY_STATUS)
+        d["worker"]["migration"]["migrationState"] = "AWAITING_ACCEPTANCE"
+        d["worker"]["migration"]["buildingGenerationId"] = _GAP_BUILDING_GENERATION
+        return json.dumps(d)
     if variant == "enriching":
         d = json.loads(_BODY_STATUS)
         core = d["worker"]["core"]
@@ -833,6 +853,8 @@ def fixture_body(url: str, variant: str = "default") -> str:
         return _thread_body(variant)
     if "/api/chat/agent/tools" in url and variant == "agent-run":
         return _AGENT_TOOLS_BODY
+    if "/api/operation-history/" in url and variant == "gap-decision":
+        return _GAP_OUTCOME
     for needle, body in _ROUTES:
         if needle in url:
             return body

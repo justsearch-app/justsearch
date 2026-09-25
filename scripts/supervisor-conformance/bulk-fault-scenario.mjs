@@ -1093,14 +1093,18 @@ function assertFinal({ final, cut, prepared, files, hashes, operationKey, select
     && queueReceipt.supersededEvents === 0
     && final.walk.acknowledged_revision === final.walk.revision,
   `bulk recovery did not seal and ACK its exact successful receipt: ${JSON.stringify(final.walk)}`);
-  requireThat(operationEvidence.version === 2
+  // D1-9's captured-gap witness widened the operation projection to v3. This
+  // fresh successful operation must persist the exact empty gap set alongside
+  // the unchanged queue v2 receipt and settlement hash binding.
+  requireThat(operationEvidence.version === 3
     && operationEvidence.targetFingerprint === plan.target.fingerprint
     && operationEvidence.capture?.manifestSha256 === final.walk.manifest_sha256
     && operationEvidence.capture?.plannedUnits === 2
     && operationEvidence.sealedRevision === final.walk.revision
     && operationEvidence.settlementSha256 === queueReceipt.settlementSha256
     && operationEvidence.failedEvents === 0 && operationEvidence.supersededEvents === 0
-    && operationEvidence.refusalCode == null,
+    && operationEvidence.refusalCode == null
+    && Array.isArray(operationEvidence.capturedGaps) && operationEvidence.capturedGaps.length === 0,
   `operation checkpoint is not bound to the exact queue settlement: ${JSON.stringify(operationEvidence)}`);
   requireExactMembers(final.jobs, files, hashes, true, requireThat);
   requireThat(cut.jobs.every(before => final.jobs.some(after => samePath(after.path, before.path)

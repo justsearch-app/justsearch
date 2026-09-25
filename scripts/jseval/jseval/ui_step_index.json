@@ -66,7 +66,7 @@
   "shell-v0/views/security/atRestCard.ts": ["security", "security-light", "health", "health-light"],
   "shell-v0/views/HealthSurface.ts": ["health", "health-light", "health-completion", "health-recovery"],
   "shell-v0/aggregate-substrate/strategies/healthEventActivityRow.ts": ["health-completion"],
-  "shell-v0/views/LibrarySurface.ts": ["library", "library-light", "skeleton-library", "library-enriching", "library-ingestion"],
+  "shell-v0/views/LibrarySurface.ts": ["library", "library-light", "skeleton-library", "library-enriching", "library-ingestion", "library-gap-decision"],
   "shell-v0/components/IngestionSummary.ts": ["library-ingestion"],
   "shell-v0/components/ingestionSummaryPresentation.ts": ["library-ingestion"],
   "shell-v0/state/searchState.ts": ["search-failure"],

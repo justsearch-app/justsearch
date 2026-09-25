@@ -84,7 +84,33 @@ belongs to WP2 before E. WP5 corrected the complexity labels and rollback
 scope, added five descriptive paired development measures and the final PR
 subsystem-map requirement. The two owner-requested agent-instruction checks,
 runtime manifest closure and module-dependency check pass at this boundary.
-No current-batch hosted claim follows from these local runs.
+The pushed checkpoint is `b971982c0`. Its hosted
+[CI run 36087239338](https://github.com/justsearch-app/justsearch/actions/runs/36087239338)
+completed with two red jobs. Windows-native, search-worker, app-ui and the
+other fact lanes passed. Public claims failed only its
+`check-ui-step-coverage` step because the new Library strict operation-history
+read had no deterministic fixture route. The local correction maps a
+schema-valid route and records the `library-gap-decision` screenshot step;
+`check-ui-step-coverage`, 23 focused fixture tests and the measured capture
+pass, with zero console errors, zero axe violations and no overflow at
+`tmp/ui-shot-gap/library-gap-decision.measure.json`.
+
+The hosted integration tier failed nine attempts of three bulk crash
+scenarios: `bulk-partial-capture`, `bulk-state-before-binding` and
+`bulk-promotion-before-terminal` each retried three times. Its saved XML at
+`tmp/3499-hosted-integration/` shows every failure at one harness assertion:
+the operation's `processing_history_counts_json` carried version 3 and an
+empty `capturedGaps`, while `assertFinal` still required version 2. The
+D1-9/D1-11 gap witness deliberately widened new operation evidence to v3;
+the queue receipt remains v2. Local `tmp/3500-bulk-before.txt` reproduced the
+same assertion against the installed distribution. The corrected assertion
+requires v3 plus an exact empty gap set and retains the target, manifest,
+revision and settlement digest checks. All three fresh installed scenarios
+passed at `tmp/3501-bulk-after.txt` and `tmp/3502-bulk-*.txt`, each with
+`BULK_FAULT_PASS`, STOP 0 and no remaining shared stack. This test-intent
+correction follows the selected D1-9 gap-witness version, rather than
+weakening the settlement proof. The UI and harness corrections require a
+new hosted checkpoint; run 36087239338 is not acceptance.
 
 The D1-9/D1-11 gap decision, WP1 transition barrier and WP2 register gate
 share `KnowledgeServer` and the recoverability register. One integrated
@@ -94,10 +120,12 @@ source/schema combinations. This is the in-scope exception to D1 §4's
 item-by-item commit plan. The accepted owner policy makes technical test
 intent and this commit boundary the lane owner's judgment.
 
-Branch HEAD is `27adef9f0` after merging the owner-authorized escalation
+The gap runtime checkpoint is `b971982c0` after merging the owner-authorized escalation
 policy `57fd2e1aa` and docs-only improvement package `59da2bc4d`; the gap
-implementation remains uncommitted. The package changed no tested runtime
-source after the local/installed gap runs. Both
+implementation and WP1/WP2 2a/WP5 boundary are committed and pushed. The
+package changed no tested runtime source after the local/installed gap runs.
+`origin/main` was fetched at this checkpoint and was already an ancestor
+(`HEAD...origin/main` 198/0), so there was no new main merge commit. Both
 `agent-instructions-sync --check` and `check-always-loaded-budget` passed.
 The previous pushed `7f469d044` hosted run
 [`36059941295`](https://github.com/justsearch-app/justsearch/actions/runs/36059941295)
@@ -108,7 +136,18 @@ hold preserves that cut. The new rename guard then exposed a paused-candidate
 rename in the fixture. Under the owner's test-intent decision, it now performs
 the production rename before migration, retains the durable UID/chunk/pointer
 proof, and refuses a second rename during migration. The focused classes passed
-at `tmp/3467`; this correction is local, not hosted.
+at `tmp/3467`; the correction is in `b971982c0`. The hosted search-worker
+job passed it, while the separate integration failures above remain open.
+
+**D1-16 skeleton underway:** a dedicated 30-minute
+`lifecycleIntegrationTest` task now drives the installed migration restart
+baseline through the existing `exerciseMigrationRestart` module and leaves
+the later §16 clauses as named, explicitly skipped methods. The task passed
+one active scenario, three skips, three AI-tagged pending methods excluded by
+default, and zero failures at `tmp/3497-d1-16-tagged-harness.txt`; focused
+Spotless and PMD passed in the same run. These pending methods are open D1-16 feature acceptance,
+not green scenario claims. This D1-16 skeleton is a separate checkpoint from
+the preceding gap runtime and does not close its pending clauses.
 
 The recorded gap decision keeps the bulk row nonterminal in
 `COMPLETE_WITH_GAPS`, exposes the current candidate gap-list hash on the outcome

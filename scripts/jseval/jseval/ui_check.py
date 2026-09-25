@@ -1003,6 +1003,16 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         assert "CLOUD_PLACEHOLDER" not in await panel.inner_text()
         await panel.scroll_into_view_if_needed()
 
+    async def setup_library_gap_decision(page):
+        await _goto_surface(page, S.RAIL_SURFACE_LIBRARY)
+        decision = page.locator(".gap-decision")
+        await decision.get_by_role("heading", name="New index — activation requires your decision").wait_for(
+            timeout=15_000)
+        await decision.get_by_text("notes/old-draft.txt: CANDIDATE_PROJECTION_MISSING").wait_for()
+        await decision.get_by_text("notes/deleted-draft.txt: DELETE_NOT_APPLIED").wait_for()
+        await decision.get_by_role("button", name="Accept gaps and activate").wait_for()
+        await decision.scroll_into_view_if_needed()
+
     def _density_setup(density: str):
         async def setup(page):
             # Density is the Accessibility discrete slider and persists in the FE-local profile.
@@ -2174,6 +2184,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         Step("health-recovery", setup=setup_health_recovery, isolated=True),
         Step("search-failure", setup=setup_search_failure, isolated=True),
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),
+        Step("library-gap-decision", setup=setup_library_gap_decision, isolated=True,
+             fixtures_variant="gap-decision"),
         # --- Shared-browser chain (demo flow) ---
         Step("search-results",       setup=setup_search_results),
         Step("command-mode",         setup=setup_command_mode,       depends_on="search-results"),

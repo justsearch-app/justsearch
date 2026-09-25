@@ -109,3 +109,26 @@ class TestInstallPreviewScenario:
             "retrieval-core": "Core retrieval", "retrieval-enrichment": "Retrieval enrichment",
         }
         assert json.loads(ui_fixtures.fixture_body("http://x/api/ai/install/plan-preview")) == {}
+
+
+class TestOperationHistoryFixture:
+    def test_unknown_operation_is_schema_valid_without_implying_gap_approval(self):
+        schema = json.loads((_repo_root() / "SSOT/schemas/operation-outcome-view.v1.json")
+                            .read_text(encoding="utf-8"))
+        body = json.loads(ui_fixtures.fixture_body("http://x/api/operation-history/fixture-key"))
+        jsonschema.Draft202012Validator(schema).validate(body)
+        assert body == {"historySince": 0, "state": "unknown"}
+
+    def test_gap_decision_variant_binds_the_status_generation_and_outcome(self):
+        status = json.loads(ui_fixtures.fixture_body("http://x/api/status", "gap-decision"))
+        migration = status["worker"]["migration"]
+        assert migration["migrationState"] == "AWAITING_ACCEPTANCE"
+        assert migration["buildingGenerationId"].startswith("g-")
+        schema = json.loads((_repo_root() / "SSOT/schemas/operation-outcome-view.v1.json")
+                            .read_text(encoding="utf-8"))
+        body = json.loads(ui_fixtures.fixture_body(
+            "http://x/api/operation-history/" + migration["buildingGenerationId"][2:], "gap-decision"))
+        jsonschema.Draft202012Validator(schema).validate(body)
+        assert body["phase"] == "awaiting_acceptance"
+        assert len(body["result"]["gapListHash"]) == 64
+        assert len(body["result"]["gaps"]) == 2
