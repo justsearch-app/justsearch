@@ -1,0 +1,289 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.app.engine;
+
+import io.justsearch.agent.api.registry.ExecutorTag;
+import io.justsearch.agent.api.registry.HandlerRegistry;
+import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.OperationDispatchPlan;
+import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.agent.api.registry.SourceTier;
+import io.justsearch.agent.api.registry.TransportTag;
+import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.app.api.indexing.ProjectionDurability;
+import io.justsearch.app.api.indexing.ProjectionSeedSource;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
+import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.api.operations.RecordedBulkPlan;
+import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
+import io.justsearch.app.observability.operations.SqliteOperationStore;
+import io.justsearch.app.services.bootstrap.OperationAuthority;
+import io.justsearch.app.services.intent.EngineProvenance;
+import io.justsearch.app.services.registry.executor.OperationExecutorImpl;
+import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
+import io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver;
+import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
+import io.justsearch.app.services.registry.operations.handlers.BulkReindexHandler;
+import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
+import io.justsearch.indexerworker.WorkerConfig;
+import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.server.KnowledgeServer;
+import io.justsearch.ipc.PipelineConfigs;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+
+/** Run with the installed UI distribution jars against an isolated, retained standard-model A. */
+public final class InstalledProjectionRound {
+  private static final Clock CLOCK = Clock.systemUTC();
+  private static final long WAIT_MS = 180_000;
+
+  private InstalledProjectionRound() {}
+
+  public static void main(String[] args) throws Exception {
+    if (args.length != 5) {
+      throw new IllegalArgumentException(
+          "Expected data, index, models root, watched root and vector query file");
+    }
+    Path data = Path.of(args[0]).toAbsolutePath();
+    Path index = Path.of(args[1]).toAbsolutePath();
+    Path models = Path.of(args[2]).toAbsolutePath();
+    Path watched = Path.of(args[3]).toAbsolutePath();
+    String query = Files.readString(Path.of(args[4])).split("\\s+", 2)[0];
+    String marker = "installedprojection" + System.nanoTime();
+    AcceptedProjection oldUpdate = projection("updated", 1, marker + "old");
+    AcceptedProjection newUpdate = projection("updated", 2, marker + "new");
+    AcceptedProjection oldDelete = projection("deleted", 1, marker + "deleted");
+    AcceptedProjection delete = new AcceptedProjection("installed-fixture", "deleted", 2,
+        AcceptedProjection.Kind.DELETE, null);
+    AcceptedProjection addition = projection("added", 1, marker + "added");
+    HeldSource source = new HeldSource(List.of(oldUpdate, oldDelete));
+    CountDownLatch restart = new CountDownLatch(1);
+    String key;
+
+    try (Epoch first = open(data, index, models, restart, source)) {
+      require(await(() -> vectorReady(first.client, query), WAIT_MS),
+          "installed standard-model A did not answer VECTOR search");
+      System.out.println("INSTALLED_PROJECTION_A_VECTOR "
+          + first.client.search(query, 10, PipelineConfigs.VECTOR, context()).getResultsCount());
+      Operation operation = new CoreOperationCatalog()
+          .findByIdValue(CoreOperationCatalog.BULK_REINDEX.value()).orElseThrow();
+      HandlerRegistry handlers = new HandlerRegistry();
+      handlers.register(CoreOperationCatalog.BULK_REINDEX,
+          new BulkReindexHandler(RecordedBulkPlan.Profile.USER_BULK,
+              first.root.recordedIngestion(), ignored -> List.of(new RootBinding(watched, "documents")),
+              first::client, List::of));
+      OperationAuthority authority = first.root.authority();
+      OperationExecutorImpl executor = new OperationExecutorImpl(first.root.operationAttempts(),
+          first.root.admission(), handlers, null, Map.of(), CLOCK, authority.trust(),
+          authority.sources(), null, authority.capsules());
+      EngineContext origin = context();
+      var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+          Instant.now(CLOCK), Optional.empty());
+      String arguments = "{\"corpusIds\":[\"documents\"]}";
+      key = OperationKeys.generate(CLOCK);
+      var prepared = (OperationDispatchPlan.Ready) executor.prepare(operation, arguments,
+          provenance, origin, key, true);
+      String capsule = authority.capsules().mintPrepared(operation.id().value(), arguments,
+          SourceTier.valueOf(origin.sourceTier()), key, prepared.preparationNonce());
+      require(executor.dispatch(operation, arguments, provenance, Optional.of(capsule),
+          origin, key, prepared.preparationNonce()).success(), "bulk dispatch failed");
+      require(restart.await(WAIT_MS, TimeUnit.MILLISECONDS), "bulk did not request restart");
+      var row = first.operations.find(key).orElseThrow();
+      var plan = new RecordedBulkPlanResolver().resolve(row,
+          first.operations.acceptedPreparation(row.id()).orElseThrow());
+      require(plan.projectionSourceIds().equals(List.of("installed-fixture")),
+          "accepted source set was not frozen");
+      first.handoff();
+    }
+
+    source.holdNext();
+    try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
+      require(source.awaitHeld(WAIT_MS), "B did not enumerate registered source");
+      source.setRows(List.of(newUpdate, delete, addition));
+      second.client.indexAndReturn(newUpdate, ProjectionDurability.NRT, context());
+      second.client.deleteAndAcknowledge(delete, ProjectionDurability.NRT, context());
+      second.client.indexAndReturn(addition, ProjectionDurability.NRT, context());
+      require(searchable(second.client, marker + "new"), "A missed accepted update");
+      require(searchable(second.client, marker + "added"), "A missed accepted addition");
+      source.release();
+      require(await(() -> second.operations.find(key)
+          .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
+          "B did not promote after exact replay");
+      require(("g-" + key).equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "wrong candidate promoted");
+      require(searchable(second.client, marker + "new"), "B missed accepted update");
+      require(searchable(second.client, marker + "added"), "B missed accepted addition");
+      require(!searchable(second.client, marker + "old"), "B retained old revision");
+      require(!searchable(second.client, marker + "deleted"), "B retained deleted projection");
+    } finally {
+      source.release();
+    }
+    try (Epoch third = open(data, index, models, new CountDownLatch(1), source)) {
+      require(third.operations.find(key).orElseThrow().state() == OperationState.COMPLETE,
+          "third boot lost operation terminal state");
+      require(searchable(third.client, marker + "new"), "third boot lost update");
+      require(searchable(third.client, marker + "added"), "third boot lost addition");
+      require(!searchable(third.client, marker + "deleted"), "third boot resurrected deletion");
+      require(await(() -> vectorReady(third.client, query), WAIT_MS),
+          "promoted B did not answer VECTOR search");
+      System.out.println("INSTALLED_PROJECTION_B_VECTOR "
+          + third.client.search(query, 10, PipelineConfigs.VECTOR, context()).getResultsCount());
+    }
+    System.out.println("INSTALLED_PROJECTION_PASS " + key);
+  }
+
+  private static AcceptedProjection projection(String id, long revision, String content) {
+    return new AcceptedProjection("installed-fixture", id, revision,
+        AcceptedProjection.Kind.UPSERT, "{\"content\":\"" + content + "\"}");
+  }
+
+  private static EngineContext context() {
+    return EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+        "installed-projection-round", Optional.of("fixture-session"), Optional.empty(),
+        TransportTag.BUTTON, EngineContext.Survival.DURABLE,
+        EngineContext.Urgency.BACKGROUND);
+  }
+
+  private static boolean searchable(KnowledgeClient client, String marker) {
+    return client.search(marker, 10, context()).getResultsCount() > 0;
+  }
+
+  private static boolean vectorReady(KnowledgeClient client, String query) {
+    var response = client.search(query, 10, PipelineConfigs.VECTOR, context());
+    return response.getResultsCount() > 0
+        && "VECTOR".equals(response.getSearchTrace().getEffectiveMode());
+  }
+
+  private static boolean await(BooleanSupplier condition, long timeoutMs)
+      throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+    do {
+      if (condition.getAsBoolean()) return true;
+      Thread.sleep(100);
+    } while (System.nanoTime() < deadline);
+    return condition.getAsBoolean();
+  }
+
+  private static void require(boolean result, String message) {
+    if (!result) throw new AssertionError(message);
+  }
+
+  private static Epoch open(Path data, Path index, Path models, CountDownLatch restart,
+      HeldSource source)
+      throws Exception {
+    ConfigStore.setGlobal(new ConfigStore(new ResolvedConfigBuilder().contributeBaseSources()
+        .putDefault("justsearch.data.dir", data.toString())
+        .putDefault("justsearch.index.base_path", index.toString())
+        .putDefault("justsearch.models.dir", models.toString()).build()));
+    var operations = new SqliteOperationStore(data.resolve("operations.db"));
+    var attempts = new OperationAttemptRunnerImpl(operations, CLOCK,
+        Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null,
+        new RecordedIngestPlanResolver());
+    var authority = OperationAuthority.load(data);
+    var root = new EngineRoot(operations, attempts,
+        (gauge, executors, ingestion, indexComponent, encoderComponent) ->
+            new KnowledgeServer(executors, WorkerConfig.load(),
+                new InProcessWorkerSignalBus(gauge),
+                io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion,
+                indexComponent, encoderComponent), 30_000L, 5_000,
+        code -> { throw new AssertionError("terminal writer exited " + code); },
+        restart::countDown, authority);
+    try {
+      root.registerProjectionSeedSource(source);
+      KnowledgeClient client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+      return new Epoch(root, operations, client);
+    } catch (Throwable failure) {
+      root.close();
+      root.executors().close();
+      operations.close();
+      throw failure;
+    }
+  }
+
+  private record Epoch(EngineRoot root, SqliteOperationStore operations,
+      KnowledgeClient client) implements AutoCloseable {
+    void handoff() {
+      root.admission().beginClosing();
+      root.operationAttempts().beginClosing();
+      root.admission().cancelInteractive("requested restart");
+      root.quiesceProducers();
+      require(root.admission().activeWorkCount() == 0, "first epoch kept admitted work");
+      require(root.operationAttempts().awaitDrained(java.time.Duration.ZERO),
+          "first epoch kept a live runner");
+    }
+
+    @Override public void close() throws java.io.IOException {
+      try {
+        root.close();
+      } finally {
+        try {
+          root.executors().close();
+        } finally {
+          operations.close();
+        }
+      }
+    }
+  }
+
+  private static final class HeldSource implements ProjectionSeedSource {
+    private final AtomicReference<List<AcceptedProjection>> rows;
+    private volatile CountDownLatch entered;
+    private volatile CountDownLatch release;
+
+    HeldSource(List<AcceptedProjection> initial) {
+      rows = new AtomicReference<>(List.copyOf(initial));
+    }
+
+    @Override public String sourceId() { return "installed-fixture"; }
+
+    void setRows(List<AcceptedProjection> next) { rows.set(List.copyOf(next)); }
+
+    void holdNext() {
+      entered = new CountDownLatch(1);
+      release = new CountDownLatch(1);
+    }
+
+    boolean awaitHeld(long timeoutMs) throws InterruptedException {
+      return entered.await(timeoutMs, TimeUnit.MILLISECONDS);
+    }
+
+    void release() {
+      CountDownLatch pending = release;
+      if (pending != null) pending.countDown();
+    }
+
+    @Override public void enumerate(Consumer<AcceptedProjection> sink) throws java.io.IOException {
+      List<AcceptedProjection> snapshot = rows.get();
+      CountDownLatch pending = release;
+      if (pending != null) {
+        entered.countDown();
+        try {
+          if (!pending.await(WAIT_MS, TimeUnit.MILLISECONDS)) {
+            throw new java.io.IOException("source hold timed out");
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new java.io.IOException("source hold interrupted", interrupted);
+        }
+      }
+      snapshot.forEach(sink);
+    }
+  }
+}

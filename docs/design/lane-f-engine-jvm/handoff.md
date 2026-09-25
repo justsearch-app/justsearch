@@ -415,6 +415,62 @@ repository's stress switch is `-PincludeStress=true`. This gate covers the
 refusal terminal witness, stale alias retirement, register correction,
 no-file source replay and third-boot importer fix together. Hosted and
 installed registered-source proof remain open.
+
+The `3e39e3c9f` checkpoint was pushed to PR727 after the full `tmp/3631`
+gate and register-family gates at `tmp/3632`; instruction sync/budget checks
+passed at `tmp/3633`–`tmp/3634`. `origin/main` had zero commits ahead.
+[Hosted CI 36116815327](https://github.com/justsearch-app/justsearch/actions/runs/36116815327)
+completed: Public claims, system integration, build, UI, search Worker and
+other fact lanes passed. Windows-native alone failed two initial modes of
+`WindowsParserContainmentTest`. The completed job log is `tmp/3646` and its
+XML is under `tmp/3649-windows-native-artifact/`: both `recycle` and `timeout`
+spent the fixture's 20-second response clock before a native PID was written;
+later modes passed on the same runner. Local focused Windows execution passed
+without a cold load (`tmp/3648`). Raising the slow native fixture from six to
+25 seconds reproduced the old-budget failure at `tmp/3651` (XML preserved).
+The new test-only 60-second sandbox response budget and 120-second JUnit
+limit retain the observed-live-child, timeout, recycle and child-exit checks;
+the five focused Windows cases pass at `tmp/3652`. The test intent remains
+containment after a live native descendant, with room for hosted cold startup.
+This is the owner policy's technical judgment, not a waived Windows gate.
+The exact follow-on source also passed `spotlessCheck pmdAll build -x test`
+at `tmp/3656` (333 tasks, exit 0); the installed fixture itself compiled
+against distribution jars at `tmp/3654` and passed at `tmp/3655`.
+
+The installed registered-source round compiled
+`scripts/supervisor-conformance/InstalledProjectionRound.java` against the
+`3e39e3c9f` `:modules:ui:installDist` jars. It copied only data, UI settings
+and index from retained standard-model A under `tmp/3580` into a fresh
+`tmp/3653-installed-projection/`, while the real model assets remained at
+their retained paths. The fixture registers a source through
+`EngineRoot.registerProjectionSeedSource`, freezes its identity in accepted
+bulk preparation, holds old enumeration during B, accepts newer update,
+delete and addition, promotes B and reopens it. `tmp/3655` exits 0 with
+`INSTALLED_PROJECTION_A_VECTOR 10`, `B_VECTOR 10` and final PASS; both query
+responses are checked for `SearchTrace.effectiveMode=VECTOR`. The exact B
+pointer is IDLE, the operation row is COMPLETE, and no fixture JVM remains.
+The launcher used `javac -cp 'modules/ui/build/install/ui/lib/*' -d
+tmp/3653-installed-projection/classes
+scripts/supervisor-conformance/InstalledProjectionRound.java`, then `java`
+with `-cp 'tmp/3653-installed-projection/classes;modules/ui/build/install/ui/lib/*'`,
+data/index/models-root/watched-root/query-file arguments, and JVM data/index
+properties. The citation scorer model path came from copied A's generation
+manifest as `-Djustsearch.citation.scorer.model_path=<parent of model ID>`;
+this preserves the active generation's exact model identity outside the
+worktree. The retained seed directory is `tmp/3580-installer-before-marker`;
+only its data, settings and index were copied, never mutated. An independent
+read of `tmp/3653` found state `IDLE`, active B equal to the operation key,
+the B manifest source set `installed-fixture`, and its SQLite operation row
+`COMPLETE/settled`. The B manifest carries no `models` map despite the traced
+real vector search on third boot; D1-13's per-generation model-identity
+acceptance must decide whether same-model bulk should persist that map.
+Earlier `tmp/3638`, `tmp/3640` and `tmp/3642` were fixture configuration
+negatives: the standalone root initially omitted the models root and the
+active generation's citation model path. The selected generation manifest
+named that citation path outside this worktree; providing the same exact
+path as a JVM config input resolved the mismatch. These negatives are not
+runtime acceptance claims. NRT no-file writes still need D2-5's durable
+covering-commit path; the source-gap and crash cuts remain open.
 The review also confirmed no production caller yet registers a no-file source.
 Its suggestion to wire project-memory into the shipped composition now conflicts
 with [the C2 consumer record](evidence/C2/project-memory-consumer.md#6-d2-durable-deletion-is-lane-f-work):

@@ -34,8 +34,12 @@ while B builds, promotes B, and reopens it on a third boot. That reopen
 exposed and corrected file identity import of the reserved `projection:` ID.
 The complete 358-task serial stress/static/distribution gate passed at
 `tmp/3631`. The current no-file fixture uses NRT pending D2-5's durable
-covering-commit contract. Installed standard-model registered-source and
-hosted proof remain open; [handoff](handoff.md) has the red/green logs.
+covering-commit contract. The installed standard-model registered-source
+round passed at `tmp/3655` with traced VECTOR hits on A and reopened B.
+The `3e39e3c9f` hosted run passed system integration and Public claims, but
+Windows-native exposed a cold parser fixture timeout. Its deterministic
+red/green correction is pending the next checkpoint. [Handoff](handoff.md)
+has the logs and remaining source-gap/crash cuts.
 
 **Current owner re-cut (2026-09-24):** Finish D1-9 streaming correction and
 proofs first. D1/D2 scope remains intact. E's paired branch/main gate contains

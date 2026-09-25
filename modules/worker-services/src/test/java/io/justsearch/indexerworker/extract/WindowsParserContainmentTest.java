@@ -21,7 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @org.junit.jupiter.api.Tag("windows")
 @EnabledOnOs(OS.WINDOWS)
-@Timeout(45)
+@Timeout(120)
 final class WindowsParserContainmentTest {
   @TempDir Path tempDir;
 
@@ -38,15 +38,15 @@ final class WindowsParserContainmentTest {
     ProcessHandle nativeChild = null;
     try (PersistentExtractionSandbox sandbox = new PersistentExtractionSandbox(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(), command,
-        // This response clock includes cold JVM/native bootstrap. A hosted cold launch can
-        // exceed ten seconds before the native fixture writes its PID; retain enough headroom
-        // to observe the child before exercising each real retirement path.
-        TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), Duration.ofSeconds(20),
+        // This response clock includes cold JVM/native bootstrap. Hosted Windows launch exceeded
+        // 20 seconds before the fixture wrote its PID; keep the actual containment assertion
+        // after that live-child observation rather than letting startup consume its clock.
+        TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), Duration.ofSeconds(60),
         1, termination.equals("recycle") ? 1 : 500, null)) {
       java.util.concurrent.FutureTask<ExtractionArtifact> pending =
           new java.util.concurrent.FutureTask<>(() -> sandbox.extract(request));
       Thread caller = Thread.ofVirtual().start(pending);
-      long deadline = System.nanoTime() + Duration.ofSeconds(25).toNanos();
+      long deadline = System.nanoTime() + Duration.ofSeconds(65).toNanos();
       while (!Files.exists(pidFile) && System.nanoTime() < deadline && !pending.isDone()) {
         Thread.sleep(20);
       }
@@ -61,10 +61,10 @@ final class WindowsParserContainmentTest {
       Files.writeString(Path.of(request + ".release"), "parent observed live child");
       if (termination.equals("timeout")) {
         var failure = assertThrows(java.util.concurrent.ExecutionException.class,
-            () -> pending.get(25, TimeUnit.SECONDS));
+            () -> pending.get(75, TimeUnit.SECONDS));
         assertTrue(failure.getCause() instanceof TimeboxedContentExtractor.ExtractionTimeoutException);
       } else {
-        assertEquals("native child was alive", pending.get(25, TimeUnit.SECONDS).result().content());
+        assertEquals("native child was alive", pending.get(75, TimeUnit.SECONDS).result().content());
       }
       caller.join(Duration.ofSeconds(1));
       if (termination.equals("recycle")) {
@@ -111,10 +111,10 @@ final class WindowsParserContainmentTest {
     }
   }
 
-  /** Deterministically exercises cold startup beyond the former five-second fixture budget. */
+  /** Deterministically exercises hosted cold startup beyond the former 20-second budget. */
   public static final class SlowNativeChild {
     public static void main(String[] args) throws Exception {
-      Thread.sleep(6_000);
+      Thread.sleep(25_000);
       NativeChild.main(args);
     }
   }
