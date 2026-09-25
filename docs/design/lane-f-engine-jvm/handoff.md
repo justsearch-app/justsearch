@@ -556,6 +556,73 @@ already an ancestor; its merge command returned up to date. Both
 `agent-instructions-sync --check` and `check-always-loaded-budget` passed.
 Hosted proof for this new guard, forced source-gap cuts, positive
 cancel/abandon and D2-5 durable writes remain open.
+
+**Forced source-gap process cut, 2026-09-25, local follow-on.** The installed
+fixture now has `--gap-halt` and `--gap-resume` modes. The first process writes
+only a fixture key/hash/source marker, forces that file, then calls
+`Runtime.halt(73)` at `AWAITING_ACCEPTANCE` while A still answers VECTOR and the
+pointer still names A. A separate JVM registers the same source identity,
+re-enumerates it, refuses the pre-crash hash as `GAP_LIST_STALE`, records a fresh
+HIGH/DURABLE approval, promotes exact B, and reopens B on a fourth boot. The
+first dry run (`tmp/3683`–`tmp/3684`) proved the pointer and decision path but
+the fixture closed Engine with live recovered admission; its refusal was
+retained. The corrected fixture uses the existing quiescent handoff after
+promotion. A new copy of retained standard-model A at
+`tmp/3685-installed-gap-halt/` passed: `tmp/3685-installed-gap-halt-trace.txt`
+exited intentionally with code 73 after A VECTOR 10, and
+`tmp/3686-installed-gap-resume-trace.txt` exited 0 with A VECTOR 1, reopened B
+VECTOR 10 and `INSTALLED_PROJECTION_GAP_RESUME_PASS`. Independent disk/SQLite
+inspection found IDLE, active `g-<bulk key>`, the bulk
+`FAILED/settled/PROMOTED_WITH_GAPS`, old decision `FAILED/GAP_LIST_STALE` and
+new decision `COMPLETE`. This is an abrupt fixture JVM cut; other D1-9 crash
+cuts and D2-5 durable writes remain open. The
+`724fb7ae7` hosted [run 36127904750](https://github.com/justsearch-app/justsearch/actions/runs/36127904750)
+completed with every job green, including system integration, Windows-native,
+Public claims and both unit lanes. The next source batch remains local until
+its own coherent gate.
+
+**Positive pre-pointer cancel, 2026-09-25, local follow-on.** The real Engine
+test `RecordedBulkEngineRestartTest.cancellingAcceptedBulkRetiresItsCandidateAndReopensOnlyA`
+now admits an accepted bulk under its cancellable owner, seeds a searchable A,
+creates B, cancels before pointer commitment and reopens twice. It passed at
+`tmp/3690-positive-cancel-seeded.txt`: the recovered row is `CANCELLED`, A is
+still searchable, B is physically absent and the previous alias is clear. The
+installed standard-model `--cancel` round passed at
+`tmp/3692-installed-cancel-trace.txt` with A VECTOR 10 before cancellation,
+A VECTOR 10 after recovered B retirement, and
+`INSTALLED_PROJECTION_CANCEL_PASS`; its runner checked the same row, pointer,
+alias and B absence. The earlier local red fixtures in `tmp/3687`–`tmp/3689`
+incorrectly awaited successor-owned cleanup in the old Engine, read before
+asynchronous serving publication, then omitted the A seed; each was corrected
+before the passing run. The broad 358-task stress/static/distribution gate passed
+at `tmp/3693` (14m44s, exit 0). A subsequent proposed held-enumerator assertion
+failed in `tmp/3694-failure` because the first Engine intentionally hands off
+after creating B and before the successor begins source enumeration.
+`RecordedIngestionCoordinator.finishBulkStart` checkpoints BUILDING, and
+`driveBulk` will not advance that started bulk on the same physical attachment.
+The corrected fixture asserts exact B and A's still-committed pointer at the
+restart request instead; this is the actual stable precommit boundary. This is
+the one-line owner judgment for the failed assertion, with its XML retained.
+The corrected focused Engine test passed at
+`tmp/3696-positive-cancel-precommit-pointer.txt`. The matching installed
+standard-model round compiled against the distribution at `tmp/3697`, then
+passed from a fresh retained-A seed at
+`tmp/3699-installed-cancel-precommit-pointer.txt` (A VECTOR 10 before and after,
+exact B retired). An independent disk/SQLite read found IDLE with only source A
+under `index/indices`, no previous alias and the exact bulk key
+`CANCELLED/settled` with reason `cancelled`. The first Java launch used the fixture's unqualified class
+name and exited before any Engine started (`tmp/3698`); the corrected launch
+used its package-qualified name. Recovered cleanup currently waits for the existing
+120-second maintenance tick, so the focused run took 2m19s. D1-9 sets no
+cancellation deadline. The independent review refuted an immediate startup
+tick because it can close the producer before serving publication; owner
+judgment is to retain the proven ordering for this checkpoint and account for
+the observed latency in any timed recovery claim. Other D1-9 crash cuts and
+D2-5 durable writes remain open. The full gate at `tmp/3693` ran on unchanged
+production source before the extra pointer assertion; the focused test and
+installed round cover that assertion. Hosted proof for this local follow-on
+remains due.
+
 The review also confirmed no production caller yet registers a no-file source.
 Its suggestion to wire project-memory into the shipped composition now conflicts
 with [the C2 consumer record](evidence/C2/project-memory-consumer.md#6-d2-durable-deletion-is-lane-f-work):

@@ -210,6 +210,96 @@ final class RecordedBulkEngineRestartTest {
   }
 
   @Test
+  void cancellingAcceptedBulkRetiresItsCandidateAndReopensOnlyA() throws Exception {
+    Path dataDirectory = Files.createDirectories(temporaryDirectory.resolve("cancel-data"));
+    Path watchedRoot = Files.createDirectories(temporaryDirectory.resolve("cancel-watched"));
+    Path modelsDirectory = Files.createDirectories(temporaryDirectory.resolve("cancel-models"));
+    String marker = "recordedbulkcancel" + System.nanoTime();
+    Path retained = watchedRoot.resolve("retained.txt");
+    Files.writeString(retained, marker);
+    writeWatchedRoots(dataDirectory, watchedRoot);
+    String key;
+    String sourceGeneration;
+    CountDownLatch restart = new CountDownLatch(1);
+
+    try (EngineEpoch first = openEpoch(dataDirectory, modelsDirectory, restart)) {
+      first.client().submitBatch(List.of(retained), TestEngineContexts.BACKGROUND);
+      assertTrue(awaitSearchable(first.client(), marker, WAIT_MS),
+          "A must own the accepted document before its rebuild is cancelled");
+      sourceGeneration = first.client().captureServingGeneration(TestEngineContexts.BACKGROUND);
+      Operation operation = new CoreOperationCatalog()
+          .findByIdValue(CoreOperationCatalog.BULK_REINDEX.value()).orElseThrow();
+      var handlers = new HandlerRegistry();
+      handlers.register(CoreOperationCatalog.BULK_REINDEX,
+          new BulkReindexHandler(RecordedBulkPlan.Profile.USER_BULK,
+              first.root().recordedIngestion(),
+              ignored -> List.of(new RootBinding(watchedRoot, "documents")),
+              first::client, List::of));
+      var authority = first.root().authority();
+      var executor = new OperationExecutorImpl(first.root().operationAttempts(),
+          first.root().admission(), handlers, null, Map.of(), CLOCK,
+          authority.trust(), authority.sources(), null, authority.capsules());
+      EngineContext origin = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "recorded-bulk-cancel-test", Optional.of("cancel-session"), Optional.empty(),
+          TransportTag.BUTTON, EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.BACKGROUND);
+      var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+          Instant.now(CLOCK), Optional.empty());
+      String arguments = "{\"corpusIds\":[\"documents\"]}";
+      key = OperationKeys.generate(CLOCK);
+      var prepared = (OperationDispatchPlan.Ready) executor.prepare(operation, arguments,
+          provenance, origin, key, true);
+      String approval = authority.capsules().mintPrepared(operation.id().value(), arguments,
+          SourceTier.valueOf(origin.sourceTier()), key, prepared.preparationNonce());
+      try (var owner = first.root().admission().admit(origin, false)) {
+        assertTrue(executor.dispatch(operation, arguments, provenance, Optional.of(approval),
+            owner.context(), key, prepared.preparationNonce()).success());
+        assertTrue(restart.await(WAIT_MS, TimeUnit.MILLISECONDS),
+            "accepted bulk did not create a candidate before cancellation");
+        var beforeCancel = new IndexGenerationManager(dataDirectory.resolve("index"))
+            .readStateBestEffort();
+        assertEquals("g-" + key, beforeCancel.building_generation());
+        assertEquals(sourceGeneration, beforeCancel.active_generation(),
+            "the requested handoff must leave A committed until its successor runs");
+        owner.cancel("cancel accepted bulk before pointer commitment");
+        var row = first.operations().find(key).orElseThrow();
+        assertEquals(OperationState.RUNNING, row.state(),
+            "the old Engine must hand off the durable refusal before physical cleanup");
+        assertEquals("cancelled", first.operations().bulkReindexProgress(row.id())
+            .orElseThrow().refusalCode());
+      }
+      first.requestedRestartHandoff();
+    }
+
+    try (EngineEpoch recovered = openEpoch(dataDirectory, modelsDirectory, new CountDownLatch(1))) {
+      assertTrue(await(() -> recovered.operations().find(key)
+          .map(row -> row.state() == OperationState.CANCELLED).orElse(false), WAIT_MS),
+          "recovered cancellation did not reach its terminal writer");
+      recovered.requestedRestartHandoff();
+    }
+    var state = new IndexGenerationManager(dataDirectory.resolve("index"))
+        .readStateBestEffort();
+    assertEquals(sourceGeneration, state.active_generation());
+    assertTrue(state.previous_generation() == null,
+        "candidate refusal must release the stale source alias after retiring B");
+    assertFalse(Files.exists(dataDirectory.resolve("index/indices/g-" + key)),
+        "cancelled candidate still owns a physical generation");
+    try (EngineEpoch reopened = openEpoch(dataDirectory, modelsDirectory, new CountDownLatch(1))) {
+      assertEquals(OperationState.CANCELLED, reopened.operations().find(key).orElseThrow().state());
+      assertTrue(await(() -> {
+        try {
+          return sourceGeneration.equals(reopened.client()
+              .captureServingGeneration(TestEngineContexts.BACKGROUND));
+        } catch (RuntimeException stillOpening) {
+          return false;
+        }
+      }, WAIT_MS), "reopened A never regained serving generation authority");
+      assertTrue(awaitSearchable(reopened.client(), marker, WAIT_MS),
+          "retained A stopped serving the accepted document after candidate cancellation");
+    }
+  }
+
+  @Test
   void registeredNoFileSourceReplaysNewerUpdateDeleteAndAdditionAcrossBuildRestart()
       throws Exception {
     Path dataDirectory = Files.createDirectories(temporaryDirectory.resolve("projection-data"));

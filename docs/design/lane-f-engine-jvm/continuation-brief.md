@@ -55,7 +55,25 @@ The corrected complete serial gate passed at `tmp/3679`; a second fresh
 installed standard-model handoff passed at `tmp/3681`, including distinct stale
 and approved decision rows and exact B on disk. Its predecessor red gates
 were fixture preconditions, preserved and explained in [handoff](handoff.md).
-Hosted proof of the current guard is the next checkpoint requirement.
+The current guard's hosted run `36127904750` passed every job. The new local
+abrupt source-gap and cancellation follow-on still needs its own hosted gate.
+The next local installed follow-on (`tmp/3685`–`tmp/3686`) now proves an abrupt
+fixture JVM halt at the source-gap wait and a separate-process recovery through
+old-hash refusal, fresh recorded approval and fourth-boot B VECTOR. The first
+dry run exposed a fixture close without quiescent handoff; the corrected fresh
+round passed. [Handoff](handoff.md) records the pointer and SQLite results.
+The real Engine positive pre-pointer cancel test passed at `tmp/3690`, and the
+installed standard-model round passed at `tmp/3692` with A VECTOR 10 before
+and after recovered cancellation, exact B physically retired, previous alias
+clear and the durable row `CANCELLED`. The complete 358-task local gate passed
+at `tmp/3693`. A proposed source-enumeration hold failed because the first
+Engine hands off before that enumeration; its XML is in `tmp/3694-failure`.
+The corrected exact A-pointer/B-candidate assertion passed focused at
+`tmp/3696` and installed with standard models at `tmp/3699`. Recovered cleanup waits for the existing
+120-second maintenance tick; D1-9 has no cancellation deadline, and the owner
+retained startup publication ordering after independent review. Remaining
+D1-9 crash cuts, D2-5 covering commits and hosted proof for this local source
+batch are still in scope. [Handoff](handoff.md) names the evidence.
 
 **Current owner re-cut (2026-09-24):** Finish D1-9 streaming correction and
 proofs first. D1/D2 scope remains intact. E's paired branch/main gate contains

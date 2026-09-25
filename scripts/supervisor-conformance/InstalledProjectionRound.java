@@ -38,8 +38,10 @@ import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.ipc.PipelineConfigs;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -56,20 +58,38 @@ import java.util.function.Consumer;
 public final class InstalledProjectionRound {
   private static final Clock CLOCK = Clock.systemUTC();
   private static final long WAIT_MS = 180_000;
+  private static final String GAP_CUT_FILE = "installed-projection-gap-cut.txt";
 
   private InstalledProjectionRound() {}
 
   public static void main(String[] args) throws Exception {
     if (args.length != 5 && (args.length != 6
-        || !("--gap".equals(args[5]) || "--gap-restart".equals(args[5])))) {
+        || !("--gap".equals(args[5]) || "--gap-restart".equals(args[5])
+            || "--gap-halt".equals(args[5]) || "--gap-resume".equals(args[5])
+            || "--cancel".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap or --gap-restart");
+          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume or --cancel");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
     Path models = Path.of(args[2]).toAbsolutePath();
     Path watched = Path.of(args[3]).toAbsolutePath();
     String query = Files.readString(Path.of(args[4])).split("\\s+", 2)[0];
+    if (args.length == 6 && "--cancel".equals(args[5])) {
+      runCancel(data, index, models, watched, query);
+      return;
+    }
+    if (args.length == 6 && "--gap-resume".equals(args[5])) {
+      List<String> cut = Files.readAllLines(data.resolve(GAP_CUT_FILE));
+      require(cut.size() == 4, "forced gap cut marker is incomplete");
+      HeldSource recoveredSource = new HeldSource(List.of(
+          projection("updated", 1, cut.get(3) + "old"),
+          projection("deleted", 1, cut.get(3) + "deleted")));
+      recoveredSource.failEnumerationAfterFirst();
+      resumeGap(data, index, models, recoveredSource, cut.get(0), query,
+          cut.get(2), cut.get(1), "GAP_RESUME");
+      return;
+    }
     String marker = "installedprojection" + System.nanoTime();
     AcceptedProjection oldUpdate = projection("updated", 1, marker + "old");
     AcceptedProjection newUpdate = projection("updated", 2, marker + "new");
@@ -119,6 +139,10 @@ public final class InstalledProjectionRound {
 
     if (args.length == 6 && "--gap-restart".equals(args[5])) {
       runGapRestart(data, index, models, source, key, query);
+      return;
+    }
+    if (args.length == 6 && "--gap-halt".equals(args[5])) {
+      runGapHalt(data, index, models, source, key, query, marker);
       return;
     }
     if (args.length == 6) {
@@ -213,6 +237,83 @@ public final class InstalledProjectionRound {
     System.out.println("INSTALLED_PROJECTION_GAP_PASS " + key);
   }
 
+  private static void runCancel(Path data, Path index, Path models, Path watched,
+      String query) throws Exception {
+    String original = new IndexGenerationManager(index)
+        .readStateBestEffort().active_generation();
+    HeldSource source = new HeldSource(List.of(projection("retained", 1, "cancel-fixture")));
+    CountDownLatch restart = new CountDownLatch(1);
+    String key;
+    try (Epoch first = open(data, index, models, restart, source)) {
+      require(await(() -> vectorReady(first.client, query), WAIT_MS),
+          "A did not answer VECTOR before candidate cancellation");
+      System.out.println("INSTALLED_PROJECTION_CANCEL_A_BEFORE_VECTOR "
+          + first.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+      Operation operation = new CoreOperationCatalog()
+          .findByIdValue(CoreOperationCatalog.BULK_REINDEX.value()).orElseThrow();
+      HandlerRegistry handlers = new HandlerRegistry();
+      handlers.register(CoreOperationCatalog.BULK_REINDEX,
+          new BulkReindexHandler(RecordedBulkPlan.Profile.USER_BULK,
+              first.root.recordedIngestion(),
+              ignored -> List.of(new RootBinding(watched, "documents")),
+              first::client, List::of));
+      OperationAuthority authority = first.root.authority();
+      OperationExecutorImpl executor = new OperationExecutorImpl(first.root.operationAttempts(),
+          first.root.admission(), handlers, null, Map.of(), CLOCK, authority.trust(),
+          authority.sources(), null, authority.capsules());
+      EngineContext origin = context();
+      var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+          Instant.now(CLOCK), Optional.empty());
+      String arguments = "{\"corpusIds\":[\"documents\"]}";
+      key = OperationKeys.generate(CLOCK);
+      var prepared = (OperationDispatchPlan.Ready) executor.prepare(operation, arguments,
+          provenance, origin, key, true);
+      String capsule = authority.capsules().mintPrepared(operation.id().value(), arguments,
+          SourceTier.valueOf(origin.sourceTier()), key, prepared.preparationNonce());
+      try (var owner = first.root.admission().admit(origin, false)) {
+        require(executor.dispatch(operation, arguments, provenance, Optional.of(capsule),
+            owner.context(), key, prepared.preparationNonce()).success(),
+            "installed cancel bulk dispatch failed");
+        require(restart.await(WAIT_MS, TimeUnit.MILLISECONDS),
+            "installed cancel bulk did not create B before restart");
+        var beforeCancel = new IndexGenerationManager(index).readStateBestEffort();
+        require(("g-" + key).equals(beforeCancel.building_generation())
+            && original.equals(beforeCancel.active_generation()),
+            "installed cancel must retain exact A and an uncommitted accepted B");
+        owner.cancel("cancel accepted bulk before pointer commitment");
+        var row = first.operations.find(key).orElseThrow();
+        require(row.state() == OperationState.RUNNING
+            && "cancelled".equals(first.operations.bulkReindexProgress(row.id())
+                .orElseThrow().refusalCode()),
+            "installed cancel did not durably checkpoint precommit refusal");
+      }
+      first.handoff();
+    }
+
+    try (Epoch recovered = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> recovered.operations.find(key)
+          .map(row -> row.state() == OperationState.CANCELLED).orElse(false), WAIT_MS),
+          "recovered installed cancellation did not terminalize");
+      recovered.handoff();
+    }
+    var state = new IndexGenerationManager(index).readStateBestEffort();
+    require(original.equals(state.active_generation()) && state.previous_generation() == null,
+        "cancelled installed candidate did not leave exact A alone");
+    require(!Files.exists(index.resolve("indices/g-" + key)),
+        "cancelled installed candidate still owns B");
+    try (Epoch reopened = open(data, index, models, new CountDownLatch(1), source)) {
+      require(reopened.operations.find(key).orElseThrow().state() == OperationState.CANCELLED,
+          "reopened A lost terminal cancellation");
+      require(await(() -> vectorReady(reopened.client, query), WAIT_MS),
+          "reopened A did not answer VECTOR after B retirement");
+      System.out.println("INSTALLED_PROJECTION_CANCEL_A_AFTER_VECTOR "
+          + reopened.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+    }
+    System.out.println("INSTALLED_PROJECTION_CANCEL_PASS " + key);
+  }
+
   private static void runGapRestart(Path data, Path index, Path models, HeldSource source,
       String key, String query) throws Exception {
     String original = new IndexGenerationManager(index)
@@ -229,7 +330,37 @@ public final class InstalledProjectionRound {
       require(vectorReady(second.client, query), "A did not answer VECTOR at first gap wait");
       second.handoff();
     }
+    resumeGap(data, index, models, source, key, query, original, firstHash, "GAP_RESTART");
+  }
 
+  private static void runGapHalt(Path data, Path index, Path models, HeldSource source,
+      String key, String query, String marker) throws Exception {
+    String original = new IndexGenerationManager(index)
+        .readStateBestEffort().active_generation();
+    source.failEnumerationAfterFirst();
+    try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> "awaiting_acceptance".equals(second.operations.outcome(key).phase()),
+          WAIT_MS), "incomplete source did not enter the durable gap wait before process halt");
+      String firstHash = second.operations.outcome(key).result().gapListHash();
+      require(firstHash != null, "forced gap cut has no hash");
+      require(original.equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "forced gap cut promoted B before approval");
+      require(vectorReady(second.client, query), "A did not answer VECTOR before process halt");
+      Path cut = data.resolve(GAP_CUT_FILE);
+      Files.writeString(cut, key + "\n" + firstHash + "\n" + original + "\n" + marker + "\n",
+          StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+      try (FileChannel channel = FileChannel.open(cut, StandardOpenOption.WRITE)) {
+        channel.force(true);
+      }
+      System.out.println("INSTALLED_PROJECTION_GAP_HALT_READY " + key);
+      System.out.flush();
+      Runtime.getRuntime().halt(73);
+    }
+    throw new AssertionError("forced gap cut returned after halt");
+  }
+
+  private static void resumeGap(Path data, Path index, Path models, HeldSource source,
+      String key, String query, String original, String firstHash, String label) throws Exception {
     String approvedKey;
     try (Epoch third = open(data, index, models, new CountDownLatch(1), source)) {
       require(await(() -> "awaiting_acceptance".equals(third.operations.outcome(key).phase()),
@@ -241,7 +372,7 @@ public final class InstalledProjectionRound {
       require(original.equals(new IndexGenerationManager(index)
           .readStateBestEffort().active_generation()), "restart promoted B before approval");
       require(vectorReady(third.client, query), "A did not answer VECTOR after gap-wait restart");
-      System.out.println("INSTALLED_PROJECTION_GAP_RESTART_A_VECTOR "
+      System.out.println("INSTALLED_PROJECTION_" + label + "_A_VECTOR "
           + third.client.search(query, 10, PipelineConfigs.VECTOR, context())
               .getResultsCount());
       GapDecision stale = decideGap(third, key, firstHash);
@@ -266,6 +397,7 @@ public final class InstalledProjectionRound {
           "refreshed decision did not complete");
       require(("g-" + key).equals(new IndexGenerationManager(index)
           .readStateBestEffort().active_generation()), "wrong B promoted after restart");
+      third.handoff();
     }
 
     try (Epoch fourth = open(data, index, models, new CountDownLatch(1), source)) {
@@ -275,11 +407,11 @@ public final class InstalledProjectionRound {
           "fourth boot lost recorded approval");
       require(await(() -> vectorReady(fourth.client, query), WAIT_MS),
           "reopened B did not answer VECTOR after gap-wait restart");
-      System.out.println("INSTALLED_PROJECTION_GAP_RESTART_B_VECTOR "
+      System.out.println("INSTALLED_PROJECTION_" + label + "_B_VECTOR "
           + fourth.client.search(query, 10, PipelineConfigs.VECTOR, context())
               .getResultsCount());
     }
-    System.out.println("INSTALLED_PROJECTION_GAP_RESTART_PASS " + key);
+    System.out.println("INSTALLED_PROJECTION_" + label + "_PASS " + key);
   }
 
   private static GapDecision decideGap(Epoch epoch, String key, String hash) {
