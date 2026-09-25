@@ -14,6 +14,7 @@ import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.api.operations.RecordedGapAcceptancePlan;
 import io.justsearch.app.api.operations.RecordedBulkPlan;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
@@ -24,6 +25,7 @@ import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
 import io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.BulkReindexHandler;
+import io.justsearch.app.services.registry.operations.handlers.AcceptGapsHandler;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -57,9 +59,9 @@ public final class InstalledProjectionRound {
   private InstalledProjectionRound() {}
 
   public static void main(String[] args) throws Exception {
-    if (args.length != 5) {
+    if (args.length != 5 && (args.length != 6 || !"--gap".equals(args[5]))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root and vector query file");
+          "Expected data, index, models root, watched root, vector query file and optional --gap");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
@@ -113,6 +115,11 @@ public final class InstalledProjectionRound {
       first.handoff();
     }
 
+    if (args.length == 6) {
+      runGap(data, index, models, source, key, query);
+      return;
+    }
+
     source.holdNext();
     try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
       require(source.awaitHeld(WAIT_MS), "B did not enumerate registered source");
@@ -147,6 +154,77 @@ public final class InstalledProjectionRound {
           + third.client.search(query, 10, PipelineConfigs.VECTOR, context()).getResultsCount());
     }
     System.out.println("INSTALLED_PROJECTION_PASS " + key);
+  }
+
+  private static void runGap(Path data, Path index, Path models, HeldSource source,
+      String key, String query) throws Exception {
+    String original = new IndexGenerationManager(index)
+        .readStateBestEffort().active_generation();
+    source.failEnumerationAfterFirst();
+    String decisionKey;
+    try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> "awaiting_acceptance".equals(second.operations.outcome(key).phase()),
+          WAIT_MS), "incomplete registered source did not await candidate-bound approval");
+      var outcome = second.operations.outcome(key);
+      require(second.operations.find(key).orElseThrow().state()
+          == OperationState.COMPLETE_WITH_GAPS, "gap wait lost recoverable operation state");
+      require(outcome.result().gaps().stream()
+          .anyMatch(gap -> "PROJECTION_SOURCE_INCOMPLETE".equals(gap.reason())),
+          "incomplete source gap was not reported");
+      String hash = outcome.result().gapListHash();
+      require(hash != null, "gap list hash was not recorded");
+      require(original.equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "B promoted without approval");
+      require(vectorReady(second.client, query), "A stopped answering VECTOR while B waited");
+      System.out.println("INSTALLED_PROJECTION_GAP_A_VECTOR "
+          + second.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+
+      Operation decision = new CoreOperationCatalog()
+          .findByIdValue(CoreOperationCatalog.ACCEPT_GAPS.value()).orElseThrow();
+      HandlerRegistry handlers = new HandlerRegistry();
+      handlers.register(CoreOperationCatalog.ACCEPT_GAPS,
+          new AcceptGapsHandler(second.root.recordedIngestion()));
+      OperationAuthority authority = second.root.authority();
+      OperationExecutorImpl executor = new OperationExecutorImpl(second.root.operationAttempts(),
+          second.root.admission(), handlers, null, Map.of(), CLOCK, authority.trust(),
+          authority.sources(), null, authority.capsules());
+      EngineContext origin = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "installed-projection-gap-round", Optional.of("fixture-session"), Optional.empty(),
+          TransportTag.BUTTON, EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.FOREGROUND);
+      var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+          Instant.now(CLOCK), Optional.empty());
+      String arguments = new RecordedGapAcceptancePlan(key, hash).toReplayPayload();
+      decisionKey = OperationKeys.generate(CLOCK);
+      var prepared = (OperationDispatchPlan.Ready) executor.prepare(decision, arguments,
+          provenance, origin, decisionKey, true);
+      String capsule = authority.capsules().mintPrepared(decision.id().value(), arguments,
+          SourceTier.valueOf(origin.sourceTier()), decisionKey, prepared.preparationNonce());
+      require(executor.dispatch(decision, arguments, provenance, Optional.of(capsule),
+          origin, decisionKey, prepared.preparationNonce()).success(),
+          "distinct recorded gap approval dispatch failed");
+      require(await(() -> second.operations.find(key)
+          .map(row -> row.state() == OperationState.FAILED && row.receipt() != null
+              && "PROMOTED_WITH_GAPS".equals(row.receipt().code())).orElse(false), WAIT_MS),
+          "approved gap did not promote exact B");
+      require(second.operations.find(decisionKey).orElseThrow().state() == OperationState.COMPLETE,
+          "recorded gap decision did not complete");
+      require(("g-" + key).equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "wrong gap candidate promoted");
+    }
+    try (Epoch third = open(data, index, models, new CountDownLatch(1), source)) {
+      require(third.operations.find(key).orElseThrow().state() == OperationState.FAILED,
+          "third boot lost promoted-with-gaps diagnostic");
+      require(third.operations.find(decisionKey).orElseThrow().state() == OperationState.COMPLETE,
+          "third boot lost recorded decision");
+      require(await(() -> vectorReady(third.client, query), WAIT_MS),
+          "promoted gap B did not answer VECTOR search");
+      System.out.println("INSTALLED_PROJECTION_GAP_B_VECTOR "
+          + third.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+    }
+    System.out.println("INSTALLED_PROJECTION_GAP_PASS " + key);
   }
 
   private static AcceptedProjection projection(String id, long revision, String content) {
@@ -246,6 +324,7 @@ public final class InstalledProjectionRound {
     private final AtomicReference<List<AcceptedProjection>> rows;
     private volatile CountDownLatch entered;
     private volatile CountDownLatch release;
+    private volatile boolean failEnumerationAfterFirst;
 
     HeldSource(List<AcceptedProjection> initial) {
       rows = new AtomicReference<>(List.copyOf(initial));
@@ -254,6 +333,8 @@ public final class InstalledProjectionRound {
     @Override public String sourceId() { return "installed-fixture"; }
 
     void setRows(List<AcceptedProjection> next) { rows.set(List.copyOf(next)); }
+
+    void failEnumerationAfterFirst() { failEnumerationAfterFirst = true; }
 
     void holdNext() {
       entered = new CountDownLatch(1);
@@ -282,6 +363,10 @@ public final class InstalledProjectionRound {
           Thread.currentThread().interrupt();
           throw new java.io.IOException("source hold interrupted", interrupted);
         }
+      }
+      if (failEnumerationAfterFirst) {
+        sink.accept(snapshot.get(0));
+        throw new java.io.IOException("registered source failed after first projection");
       }
       snapshot.forEach(sink);
     }

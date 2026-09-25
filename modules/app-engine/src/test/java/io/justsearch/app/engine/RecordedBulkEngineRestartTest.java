@@ -22,6 +22,7 @@ import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.app.api.operations.BulkReindexProgress;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.api.operations.RecordedGapAcceptancePlan;
 import io.justsearch.app.api.operations.RecordedBulkPlan;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
@@ -32,6 +33,7 @@ import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
 import io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.BulkReindexHandler;
+import io.justsearch.app.services.registry.operations.handlers.AcceptGapsHandler;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.context.EngineContext;
@@ -301,6 +303,102 @@ final class RecordedBulkEngineRestartTest {
     }
   }
 
+  @Test
+  void incompleteRegisteredSourceWaitsOnAForExactRecordedApproval() throws Exception {
+    Path dataDirectory = Files.createDirectories(temporaryDirectory.resolve("source-gap-data"));
+    Path watchedRoot = Files.createDirectories(temporaryDirectory.resolve("source-gap-watched"));
+    Path modelsDirectory = Files.createDirectories(temporaryDirectory.resolve("source-gap-models"));
+    Files.writeString(watchedRoot.resolve("file.txt"), "captured source gap file");
+    writeWatchedRoots(dataDirectory, watchedRoot);
+    String marker = "sourcegap" + System.nanoTime();
+    var source = new HeldProjectionSource(List.of(projection("gap-document", 1, marker)));
+    CountDownLatch requestedRestart = new CountDownLatch(1);
+    String operationKey;
+
+    try (EngineEpoch first = openEpoch(dataDirectory, modelsDirectory, requestedRestart, source)) {
+      Operation operation = new CoreOperationCatalog()
+          .findByIdValue(CoreOperationCatalog.BULK_REINDEX.value()).orElseThrow();
+      var handlers = new HandlerRegistry();
+      handlers.register(CoreOperationCatalog.BULK_REINDEX,
+          new BulkReindexHandler(RecordedBulkPlan.Profile.USER_BULK,
+              first.root().recordedIngestion(),
+              ignored -> List.of(new RootBinding(watchedRoot, "documents")),
+              first::client, List::of));
+      var authority = first.root().authority();
+      var executor = new OperationExecutorImpl(first.root().operationAttempts(),
+          first.root().admission(), handlers, null, Map.of(), CLOCK,
+          authority.trust(), authority.sources(), null, authority.capsules());
+      EngineContext origin = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "source-gap-restart-test", Optional.of("source-gap-session"),
+          Optional.empty(), TransportTag.BUTTON, EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.BACKGROUND);
+      var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+          Instant.now(CLOCK), Optional.empty());
+      String arguments = "{\"corpusIds\":[\"documents\"]}";
+      operationKey = OperationKeys.generate(CLOCK);
+      var prepared = (OperationDispatchPlan.Ready) executor.prepare(operation, arguments,
+          provenance, origin, operationKey, true);
+      String approval = authority.capsules().mintPrepared(operation.id().value(), arguments,
+          SourceTier.valueOf(origin.sourceTier()), operationKey, prepared.preparationNonce());
+      assertTrue(executor.dispatch(operation, arguments, provenance, Optional.of(approval),
+          origin, operationKey, prepared.preparationNonce()).success());
+      assertTrue(requestedRestart.await(WAIT_MS, TimeUnit.MILLISECONDS));
+      first.requestedRestartHandoff();
+    }
+
+    source.failEnumerationAfterFirst();
+    try (EngineEpoch second = openEpoch(dataDirectory, modelsDirectory,
+        new CountDownLatch(1), source)) {
+      assertTrue(await(() -> "awaiting_acceptance".equals(second.operations()
+          .outcome(operationKey).phase()), WAIT_MS),
+          "an incomplete source must wait for the user's candidate-bound decision");
+      var outcome = second.operations().outcome(operationKey);
+      assertEquals(OperationState.COMPLETE_WITH_GAPS,
+          second.operations().find(operationKey).orElseThrow().state());
+      assertTrue(outcome.result().gaps().stream()
+          .anyMatch(gap -> gap.reason().equals("PROJECTION_SOURCE_INCOMPLETE")));
+      String gapHash = outcome.result().gapListHash();
+      assertNotNull(gapHash);
+      assertTrue(await(() -> "AWAITING_ACCEPTANCE".equals(new IndexGenerationManager(
+          dataDirectory.resolve("index")).readStateBestEffort().migration_state()), WAIT_MS));
+      assertFalse(("g-" + operationKey).equals(new IndexGenerationManager(
+          dataDirectory.resolve("index")).readStateBestEffort().active_generation()));
+
+      Operation decision = new CoreOperationCatalog()
+          .findByIdValue(CoreOperationCatalog.ACCEPT_GAPS.value()).orElseThrow();
+      var handlers = new HandlerRegistry();
+      handlers.register(CoreOperationCatalog.ACCEPT_GAPS,
+          new AcceptGapsHandler(second.root().recordedIngestion()));
+      var authority = second.root().authority();
+      var executor = new OperationExecutorImpl(second.root().operationAttempts(),
+          second.root().admission(), handlers, null, Map.of(), CLOCK,
+          authority.trust(), authority.sources(), null, authority.capsules());
+      EngineContext webview = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "source-gap-decision-test", Optional.of("source-gap-session"),
+          Optional.empty(), TransportTag.BUTTON, EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.FOREGROUND);
+      var provenance = EngineProvenance.invocation(webview, ExecutorTag.UI,
+          Instant.now(CLOCK), Optional.empty());
+      String arguments = new RecordedGapAcceptancePlan(operationKey, gapHash).toReplayPayload();
+      String decisionKey = OperationKeys.generate(CLOCK);
+      var prepared = (OperationDispatchPlan.Ready) executor.prepare(decision, arguments,
+          provenance, webview, decisionKey, true);
+      String approval = authority.capsules().mintPrepared(decision.id().value(), arguments,
+          SourceTier.valueOf(webview.sourceTier()), decisionKey, prepared.preparationNonce());
+      assertTrue(executor.dispatch(decision, arguments, provenance, Optional.of(approval),
+          webview, decisionKey, prepared.preparationNonce()).success());
+      assertTrue(await(() -> second.operations().find(operationKey)
+          .map(row -> row.state() == OperationState.FAILED && row.receipt() != null
+              && "PROMOTED_WITH_GAPS".equals(row.receipt().code())).orElse(false), WAIT_MS),
+          "the accepted source gap did not promote its exact candidate");
+      assertEquals(OperationState.COMPLETE,
+          second.operations().find(decisionKey).orElseThrow().state(),
+          "the distinct webview decision has its own completed operation row");
+      assertEquals("g-" + operationKey, new IndexGenerationManager(dataDirectory.resolve("index"))
+          .readStateBestEffort().active_generation());
+    }
+  }
+
   private static AcceptedProjection projection(String documentId, long revision, String content) {
     return new AcceptedProjection("fixture-memory", documentId, revision,
         AcceptedProjection.Kind.UPSERT,
@@ -311,6 +409,7 @@ final class RecordedBulkEngineRestartTest {
     private final AtomicReference<List<AcceptedProjection>> rows;
     private volatile CountDownLatch entered;
     private volatile CountDownLatch release;
+    private volatile boolean failEnumerationAfterFirst;
 
     HeldProjectionSource(List<AcceptedProjection> initial) {
       rows = new AtomicReference<>(List.copyOf(initial));
@@ -334,6 +433,8 @@ final class RecordedBulkEngineRestartTest {
       if (pending != null) pending.countDown();
     }
 
+    void failEnumerationAfterFirst() { failEnumerationAfterFirst = true; }
+
     @Override public void enumerate(Consumer<AcceptedProjection> sink) throws java.io.IOException {
       List<AcceptedProjection> snapshot = rows.get();
       CountDownLatch pending = release;
@@ -347,6 +448,10 @@ final class RecordedBulkEngineRestartTest {
           Thread.currentThread().interrupt();
           throw new java.io.IOException("Projection enumeration interrupted", interrupted);
         }
+      }
+      if (failEnumerationAfterFirst && !snapshot.isEmpty()) {
+        sink.accept(snapshot.getFirst());
+        throw new java.io.IOException("registered source stopped after a partial enumeration");
       }
       snapshot.forEach(sink);
     }

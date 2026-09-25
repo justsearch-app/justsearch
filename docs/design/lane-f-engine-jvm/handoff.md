@@ -436,6 +436,11 @@ This is the owner policy's technical judgment, not a waived Windows gate.
 The exact follow-on source also passed `spotlessCheck pmdAll build -x test`
 at `tmp/3656` (333 tasks, exit 0); the installed fixture itself compiled
 against distribution jars at `tmp/3654` and passed at `tmp/3655`.
+The subsequent `e046fc340` checkpoint completed
+[hosted CI 36119660449](https://github.com/justsearch-app/justsearch/actions/runs/36119660449)
+with every job green, including system integration, Windows-native and Public
+claims. This establishes the hosted gate for that exact checkpoint; the newer
+registered-source gap test and installed fixture are a local follow-on batch.
 
 The installed registered-source round compiled
 `scripts/supervisor-conformance/InstalledProjectionRound.java` against the
@@ -470,7 +475,35 @@ active generation's citation model path. The selected generation manifest
 named that citation path outside this worktree; providing the same exact
 path as a JVM config input resolved the mismatch. These negatives are not
 runtime acceptance claims. NRT no-file writes still need D2-5's durable
-covering-commit path; the source-gap and crash cuts remain open.
+covering-commit path; source-gap crash cuts remain open. The new real Engine
+`incompleteRegisteredSourceWaitsOnAForExactRecordedApproval` test passed at
+`tmp/3661` after a first assertion expected the wrong terminal state at
+`tmp/3659` (XML retained). The selected protocol ends the approved bulk row
+as `FAILED/PROMOTED_WITH_GAPS`, an explicit diagnostic; the distinct HIGH-risk
+webview `core.accept-gaps` operation is `COMPLETE`. The test verifies an
+incomplete source marker and exact gap hash, A pointer retention, the recorded
+decision and exact B promotion. The installed extension compiled at
+`tmp/3662-installed-projection-gap-compile.txt` against the same distribution
+jars. Its fresh copied standard-model A at `tmp/3662-installed-projection-gap/`
+passed `tmp/3663-installed-source-gap-trace.txt`: A VECTOR 10 initially,
+A VECTOR 1 during `awaiting_acceptance`, B VECTOR 10 after the third boot,
+then `INSTALLED_PROJECTION_GAP_PASS`. The source emits one row and throws;
+the candidate remains on A until the distinct approved decision, whose row
+and the terminal bulk diagnostic survive the third boot. Disk state is IDLE
+with exact B active and `projection_source_ids:[installed-fixture]`. An
+independent SQLite read after fixture exit found `core.bulk-reindex` as
+`FAILED/settled/PROMOTED_WITH_GAPS` and `core.accept-gaps` as `COMPLETE`. The
+test-intent correction follows the D1-9 gap decision, with no production
+relaxation. This proof does not close source-gap crash cuts, positive
+cancel/abandon, D2-5 durable covering commits or D1-13 model identity: the
+B manifest still has no `models` map.
+The exact follow-on tree passed the full serial `spotlessCheck pmdAll test
+-PincludeStress=true :modules:ui:installDist --max-workers=1 --continue`
+gate at `tmp/3665-source-gap-integrated.txt`: 358 tasks, two executed, 356
+up-to-date, exit 0 in 15m43s. The app-engine XML reports all three
+`RecordedBulkEngineRestartTest` cases passed, including the new source-gap
+round. The focused test/static gate passed earlier at `tmp/3664`. `origin/main`
+had zero commits ahead at the checkpoint fetch.
 The review also confirmed no production caller yet registers a no-file source.
 Its suggestion to wire project-memory into the shipped composition now conflicts
 with [the C2 consumer record](evidence/C2/project-memory-consumer.md#6-d2-durable-deletion-is-lane-f-work):
