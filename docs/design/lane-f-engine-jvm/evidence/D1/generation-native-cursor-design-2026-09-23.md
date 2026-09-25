@@ -37,8 +37,8 @@ and then proposed pointer rollback if re-pointing failed. Replace that order:
 1. Finish bulk plan, replay and candidate readiness. Build/wire the target services
    and validate model identity before promotion. Establish runnable producer
    ownership before the commitment point; prefer reusing Green's existing loop.
-   If a successor task is necessary, prepare/claim it through the existing runner
-   and hold its effects behind activation. No fallible executor submit/start may
+   The current live cutover transfers the already prepared producer to Green;
+   no separate ingest successor task is created. No fallible executor submit/start may
    be required after durable promotion. Do not park a candidate on an executor
    thread needed for the incumbent or final replay to finish.
 2. Enter the mutation-routing owner's final cutover fence, stopping new effects
@@ -49,10 +49,10 @@ and then proposed pointer rollback if re-pointing failed. Replace that order:
    projection upsert/delete front must join the same mutation boundary.
 3. With intake fenced, verify final document revisions/hashes and gaps. There is
    no admission window between that check and promotion. Candidate construction,
-   required Green commit/refresh and successor-row preparation happen before the
+   required Green commit/refresh and producer-transfer preparation happen before the
    durable pointer change. A final Green marker is not evidence it is already
    the serving generation. Failure before promotion leaves Blue authoritative.
-   Cancel/release a prepared successor through its existing runner before retiring
+   Release the prepared producer transfer before retiring
    candidate resources; it must not start Green effects after precommit abandonment.
 4. Acquire the existing generation-manager state guard before publication write,
    after runtimeSwapLock; do not wait for mutation completion while holding
@@ -67,18 +67,22 @@ and then proposed pointer rollback if re-pointing failed. Replace that order:
    binding. Do not treat an exception after a committed move as no effect.
 5. Install only prepared serving/service/registry references, then release
    publication and mutation intake. Subsequent accepted effects route to Green.
-   The already-prepared successor continues; candidate/private status disappears.
-6. Persist reindex completion and predecessor/successor accounting through the
+   The already-prepared Green writer continues; candidate/private status disappears.
+6. Persist reindex completion and predecessor accounting through the
    runner. A crash or row-write error after promotion is committed activation
    recovery, not a failed uncommitted attempt or permission to swap directories
    back. Boot reconstructs serving Green from pointer plus strict manifests and
-   reconciles the same rows; it does not create a second successor.
+   reconciles the same row; it does not create a second writer.
    No durable “in-memory view installed” bit is needed: every boot reconstructs
    the runtime from the committed generation regardless of where the previous
    process died. Keep readiness unavailable until that construction succeeds.
-   The existing C2 row/recorded target binding must identify the same successor
-   before promotion; missing/corrupt linkage refuses readiness/reconciliation
-   rather than inventing a second row. Live publication failure also closes new
+   The accepted reindex row, recorded target binding, exact reopened writable B,
+   sealed queue and settled replay identify the successor. A recognized open bulk row
+   with missing preparation or inconsistent binding fences boot; complete row absence
+   cannot be diagnosed through that row. Absent B writer or replay settlement keeps
+   an open reindex row nonterminal.
+   A later retained-history expiry after a terminal reindex does not invalidate B.
+   Live publication failure also closes new
    affected captures and enters ordered recovery before releasing mutation routing.
 7. Retire Blue after all request/cursor/resource holds end. Its retained state is
    observable but does not make successful Green activation fail. Prune only after

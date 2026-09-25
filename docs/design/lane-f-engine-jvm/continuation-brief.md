@@ -43,6 +43,17 @@ failures/errors) and explicit compile passed at `tmp/3736`. This source still
 needs its own hosted gate. D1-9's other cuts
 and D2-5 durable covering commits remain open.
 
+**D1-8/D1-9 successor-witness correction (2026-09-25, local WIP):** A source
+review found C2's proposed standalone successor ingest row was never used.
+Live cutover prepares the Green writer and producer transfer before the
+pointer; the accepted reindex row, exact writable B and settled replay supply
+the recovery witness. The owner amended the C2/D1 contract under §17.6,
+retiring `SUCCESSOR_ROW_MISSING` without weakening the fail-closed checks.
+Focused writer/replay and recorded-boot negative tests passed at `tmp/3737`–
+`tmp/3738`. Independent review corrected three overclaims, and an installed
+pointer-after round proved predecessor capacity refusal before B recovery at
+`tmp/3741`–`tmp/3742`. This WIP still needs its own checkpoint and hosted proof.
+
 **Current local D1-9 follow-on (2026-09-25):** The exact refused B now stays
 bound to its recoverable operation until physical retirement, scoped journal
 empty and stale predecessor alias release are witnessed. A real Engine

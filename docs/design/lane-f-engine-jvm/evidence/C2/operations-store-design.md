@@ -21,7 +21,7 @@ changed this design.
 |---|---|---|
 | `OperationExecutorImpl.dispatch` (every catalog operation: HTTP, MCP, agent tools) | app-services | acceptance, completion |
 | ingest requests, boot and recovery walks through `KnowledgeClient.scanRoot` | app-services | acceptance |
-| per-unit checkpoints from the ingest loop; the reindex plan capture and successor ingest acceptance at activation *(D1)* | worker-services, indexer-worker | checkpoint, acceptance |
+| per-unit checkpoints from the ingest loop; the reindex plan capture and exact Green writer/producer preparation at activation *(D1, corrected 2026-09-25)* | worker-services, indexer-worker | checkpoint; the runner already accepted the reindex row |
 | `BackgroundRunService.schedule` and its timer fire | app-agent | acceptance, running, typed refusal |
 | settings apply | ui at C2, the reconfigure handler at D1 | acceptance, completion |
 
@@ -95,7 +95,7 @@ migration and remains intact; it is not classified as corruption or truncated.
 | `gaps_json TEXT`, `processing_history_json TEXT`, `processing_history_counts_json TEXT` | reindex: the full gap list; a capped sample (200) plus counts of failed and superseded units |
 | `gaps_accepted_at INTEGER`, `gaps_accepted_by TEXT`, `gaps_list_hash TEXT` | written by the `accept-gaps` operation; a stale list is refused by hash *(D1)* |
 | `journal_replayed_entries INTEGER` | evidence stamp at reindex completion *(D1)* |
-| `superseded_from INTEGER` | successor ingest row: the ingest row it replaces *(D1)* |
+| `superseded_from INTEGER` | Legacy reserved column retained for v1-to-current table-copy compatibility; no activation successor row reads or writes it. |
 
 `operations_meta` (one row): `history_since_ms`, `created_at_ms`, `schema_note`.
 
@@ -155,7 +155,7 @@ See [C2-2 implementation plan](C2-2-plan.md) for the source evidence and checks.
   durable; generic `operation` uses the context. The955 amendment supersedes kind alone
   determining survival for every special operation. The handler receives an `OperationRecordHandle` (id,
   key and checkpoint only) through the dispatch context and never calls `accept` for
-  its own row; it may accept child rows under fresh Engine-minted keys (the successor ingest row).
+  its own row; it may accept finite per-root child rows under fresh Engine-minted keys.
   A row is written for every dispatched call, keyed or unkeyed; `AuditPolicy.NONE`
   suppresses history projection only. September13 R4 supersedes the unkeyed audit
   exemption. *(D1's "one row per dispatch" item.)*
@@ -163,10 +163,8 @@ See [C2-2 implementation plan](C2-2-plan.md) for the source evidence and checks.
   for a root with no open row. The 60-second periodic sync is maintenance and gets no row. On
   boot, a `RUNNING` ingest row for a root is resumed by the recovery walk, never re-minted. The
   Head side accepts before the port call into the worker and passes the record id down as the
-  scan id (the hollow `scanId`, C2.md I5). A successor ingest row at activation is accepted
-  from the index half with an Engine-minted key, client kind `INTERNAL`, survival `DURABLE`,
-  urgency `BACKGROUND`, identity = root set plus Green's generation id, and `superseded_from`
-  *(D1)*.
+  scan id (the hollow `scanId`, C2.md I5). D1's live activation reuses and transfers the
+  already prepared Green writer/producer. It does not accept another ingest row.
 - **Scheduled runs.** `ACCEPTED` at schedule time, `RUNNING` after admission at timer fire, an
   admission or executor refusal at fire time becomes `FAILED` with the typed reason (closes the
   C2 scheduled-outcome dependency).
@@ -196,27 +194,40 @@ before the async index fork or the default sweep. Attaching/running an owner rec
 is a separate readiness action; an owned kind waits
 for its reconciler even when interactive. Durable rows are never touched by the default.
 
-Registered reconcilers *(D1, cited here for the row shapes they need)*: reindex (pointer equals
-`building_generation_id` and a successor ingest row exists in `ACCEPTED` or `RUNNING` advances the
-row to `COMPLETE`; pointer equals building id with no successor row is `FAILED`
-`SUCCESSOR_ROW_MISSING`, reported, never fabricated; pointer still Blue resumes replay); ingest
-(a row whose generation is not the active pointer becomes `COMPLETE` with reason
-`superseded_by_generation`); settings-apply and reconfigure use the committed-settings
+Registered reconcilers *(D1, corrected 2026-09-25 for the actual live writer ownership)*:
+reindex (pointer equals the accepted building id, the exact B writer is reopened, its
+recorded target/binding is valid, queue settlement is sealed and replay has settled before
+the row advances to `COMPLETE`; a pointer on B without a writable B or settled replay leaves
+the row nonterminal for recovery; a recognized open bulk row with invalid preparation or
+binding fences boot; pointer still Blue resumes replay); ingest
+(a changed generation revokes permission and follows recorded recovery refusal rather than
+reporting success); settings-apply and reconfigure use the committed-settings
 witness in section1.8. A reconfigure interrupted before that commit becomes `FAILED`
-`ENGINE_RESTARTED_DURING_APPLY`; one interrupted after commit completes by reconciliation. Cancel or abandon of a reindex cancels
-an `ACCEPTED` successor row on the path that abandons the generation.
+`ENGINE_RESTARTED_DURING_APPLY`; one interrupted after commit completes by reconciliation.
+Cancel or abandon of a reindex prevents pointer commitment, closes the prepared transfer
+lease and fences new claims. The recorded row remains until candidate retirement and an
+empty scoped journal are witnessed; recovery may finish this cleanup on a later tick.
 
 ### 1.7 Activation order *(D1)*
 
-1. Accept the successor ingest row (`ACCEPTED`, generation = Green's building id).
-2. `state.json` pointer swap (the effect).
-3. In-memory runtime re-point.
-4. Start Green's ingest loop; the successor row goes `RUNNING`.
-5. Complete the reindex row (`journal_replayed_entries` stamped).
-6. Mark the old ingest row `COMPLETE` with reason `superseded_by_generation`.
+1. Accept and seal the reindex row's exact plan, target and queue settlement. Prepare
+   Green's writer, services, producer transfer and final replay before commitment.
+2. `state.json` pointer swap (the effect) under the generation and publication guards.
+3. Install the prepared in-memory serving view and producer owner without fallible
+   postcommit construction; recover forward on a committed or ambiguous pointer.
+4. Reopen exact writable Green on boot and settle replay before the runner completes
+   the reindex row. Changed-generation finite ingest rows take their recorded refusal path.
 
-Nothing shares a transaction; the effect is an atomic file move. Acceptance precedes effect at
-step 1, and "pointer swapped, successor missing" is unreachable.
+Nothing shares a transaction; the effect is an atomic file move. The accepted reindex
+row and prepared physical writer precede it. The prior proposed standalone successor
+ingest row duplicated the live producer and was never activated. D1's exact writable-B,
+sealed-queue and replay checks replace that mechanism and preserve the crash guarantee.
+`SUCCESSOR_ROW_MISSING` is retired as a live diagnostic; there is no such row. A
+recognized open reindex row with missing preparation or an inconsistent binding fences
+boot. Complete row absence cannot be diagnosed as that linkage failure. A terminal
+reindex may later expire
+under ordinary operation-history retention while the recorded active generation remains
+usable. This correction is indexed by design §0 under §17.6.
 
 ### 1.8 The accepted-settings revision port (amended 2026-09-12)
 

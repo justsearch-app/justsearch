@@ -19,6 +19,40 @@ re-cut trigger is retired; merge `origin/main` at each checkpoint. See
 
 ## Current D1-9/D1-11 gap batch (2026-09-25)
 
+**D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
+independent source review confirmed that C2's specified activation successor
+`INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were
+never implemented. The current cutover instead prepares the exact Green writer
+and producer transfer before the pointer, and the accepted reindex row binds
+the generation and settled queue. On reboot, a writable B, exact recorded
+binding and settled replay are required before the runner terminalizes that
+row. The owner chose to supersede the duplicate successor-row mechanism under
+§17.6 because a second row would add an owner for an already running producer;
+the fail-closed physical and replay conditions remain. The governing C2/D1
+sections are amended. Focused tests for promoted pointer with no B writer and
+unsettled replay passed at `tmp/3737-successor-witness-negative.txt` (two
+methods, three invocations). Promoted-boot bad binding and terminal-history expiry tests passed at
+`tmp/3738-successor-boot-witness.txt` (three tests). These are local proof;
+the independent refute-first review caught and corrected overclaims about
+complete row loss, changed-generation ingest outcomes and cancellation timing.
+The dated design correction still needs a checkpoint and hosted evidence.
+
+**Retained predecessor capacity, 2026-09-25 (local WIP).** The installed
+standard-model pointer-after process cut at `tmp/3741` intentionally exited 1
+with B committed and A retained. The separate JVM at `tmp/3742` first called
+`startFreshMigration` on the retained state and observed the exact predecessor
+capacity refusal without moving the pointer, then recovered B, answered VECTOR
+10 and completed the operation. The fixture compiled at `tmp/3739`. This
+proves the installed post-pointer capacity branch; its before-pointer diagnostic
+branch has not been rerun after the fixture addition.
+Stop requested by the owner before the next implementation batch. The pushed
+`b065f15a9` hosted run is
+[36145039780](https://github.com/justsearch-app/justsearch/actions/runs/36145039780);
+wait for its final status before pushing this successor-witness/capacity WIP,
+then give the new revision its own hosted run. No PR merge is authorized before
+stage F acceptance. Resume D1-9's remaining mutation/abandon cuts and the
+minimal D2-5 identity/projection seam from the adopted WP3 order.
+
 **No-file pointer cuts and citation readiness correction, 2026-09-25.**
 Checkpoint `82bb0d8fe` is pushed; hosted CI
 [36139539723](https://github.com/justsearch-app/justsearch/actions/runs/36139539723)

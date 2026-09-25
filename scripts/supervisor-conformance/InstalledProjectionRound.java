@@ -376,6 +376,25 @@ public final class InstalledProjectionRound {
       HeldSource source, String key, String original, String marker, String query,
       String label)
       throws Exception {
+    if ("POINTER".equals(label)) {
+      var generations = new IndexGenerationManager(index);
+      var retained = generations.readStateBestEffort();
+      boolean beforePointer = ("g-" + key).equals(retained.building_generation());
+      require(beforePointer || ("g-" + key).equals(retained.active_generation()),
+          "pointer cut lost its exact recorded candidate");
+      try {
+        generations.startFreshMigration("distinct-candidate-during-pointer-recovery");
+        throw new AssertionError("retained generation allowed a distinct second candidate");
+      } catch (java.io.IOException refusal) {
+        require(refusal.getMessage().contains(beforePointer
+                ? "candidate is already active or retained" : "Previous generation still occupies build capacity"),
+            "distinct migration refused for the wrong reason: " + refusal.getMessage());
+      }
+      require(retained.equals(generations.readStateBestEffort()),
+          "refused distinct migration changed the generation pointer");
+      System.out.println("INSTALLED_PROJECTION_POINTER_CAPACITY_REFUSAL "
+          + (beforePointer ? "building" : "predecessor"));
+    }
     try (Epoch recovered = open(data, index, models, new CountDownLatch(1), source)) {
       require(await(() -> recovered.operations.find(key)
           .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
