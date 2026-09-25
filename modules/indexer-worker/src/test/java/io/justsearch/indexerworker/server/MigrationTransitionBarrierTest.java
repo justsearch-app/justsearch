@@ -31,6 +31,21 @@ final class MigrationTransitionBarrierTest {
   }
 
   @Test
+  void projectionReplayCutRequiresAnInstalledHarnessSelfExit() {
+    String point = "migration-after-first-projection-replay";
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", point)::get));
+    assertThrows(IllegalArgumentException.class,
+        () -> new MigrationTransitionBarrier.Controlled(point));
+    assertFalse(MigrationTransitionBarrier.fromEnvironment(data,
+        Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", point,
+            "JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT", "1")::get)
+        == MigrationTransitionBarrier.NO_HOOK);
+  }
+
+  @Test
   void installedHandshakeReportsExactGenerationAndDoesNotRetrigger() throws Exception {
     var hook = MigrationTransitionBarrier.fromEnvironment(data,
         Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",

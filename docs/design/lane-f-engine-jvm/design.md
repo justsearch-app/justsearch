@@ -3,7 +3,7 @@ title: "Lane F: one Engine JVM, with process boundaries that follow runtime and 
 type: design
 status: "LOCKED with dated amendments; A/B/C1/C2 accepted; D1 in progress, D2/E/F open. Remaining solvable design resolved 2026-09-23; implementation and production proof remain. Draft PR727, merge at F."
 created: 2026-09-06
-updated: 2026-09-23
+updated: 2026-09-25
 lane: F (decision re-examination programme, wave 4)
 model: Sol continuation; Astra design resolution 2026-09-23
 category: engine / process-boundary
@@ -28,6 +28,8 @@ This document is the lane's contract: the design and the considerations that sha
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-25: D1-9 adds a harness-only eighth migration point after the first actual candidate projection UPSERT, before later journal rows, candidate commit and pointer publication. The seven transition points cannot witness a death inside replay. Only supervised self-exit may select this point; a marker failure aborts promotion. A separate installed standard-model JVM re-drains the retained journal and promotes B. The first write is uncommitted at the cut, so the proof is full replay after loop interruption, not persistence of a partial prefix. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [handoff evidence](handoff.md).
 
 - 2026-09-25: D1-9's physical gap-approval fence now refuses while source enumeration is in flight, before stamping the current candidate witness. Restarted enumeration writes the existing journal outside mutation admission; a prior visible wait cannot authorize an in-flight marker replacement. The replacement keeps the same logical unit/reason but changes its row-bound evidence and requires a new recorded HIGH/DURABLE decision. A held-source Engine regression, installed standard-model handoff and one abrupt fixture-process gap cut prove the local path; other crash cuts remain. [D1-9 handoff correction](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
 

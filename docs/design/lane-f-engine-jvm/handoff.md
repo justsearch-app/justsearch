@@ -19,6 +19,44 @@ re-cut trigger is retired; merge `origin/main` at each checkpoint. See
 
 ## Current D1-9/D1-11 gap batch (2026-09-25)
 
+**Mid-replay process cut, 2026-09-25 (uncommitted follow-on to `bfebf9186`).**
+Independent read-only review found that WP1's seven transition points are all
+before or after full candidate replay. A narrow strict-promotion callback now
+reuses `MigrationTransitionBarrier` after the first actual candidate projection
+UPSERT, before the next row, commit, verification and pointer move. A held
+barrier there would own final mutation admission, so the eighth point requires
+supervised self-exit. Marker-write failure propagates outside the broad replay
+gap catch and aborts promotion. This avoids extending every replay context or
+adding a journal. The first UPSERT is uncommitted at the cut; the assertion is
+interruption within the loop and complete re-drain, not a durable partial prefix.
+Focused replay/barrier tests passed at `tmp/3702-replay-cut-focused.txt` after
+the initial test-only searcher-refresh red at `tmp/3701`. Installed distribution
+and fixture compilation passed at `tmp/3704` and `tmp/3709`.
+
+The first installed attempt `tmp/3707` hit a stale migration reached marker
+and release file inherited from its copied seed; it was a fixture precondition
+failure, not execution of the new cut. The corrected copy `tmp/3708` removed
+only those two stale files. `tmp/3710-installed-replay-halt-trace.txt` exited 1
+through the selected harness point. Its reached marker names B
+`g-01a0d895-5d5a-739f-9eec-ee0ce7e59ee0`; independent inspection at the
+cut found A active in SWITCHING and three scoped rows (two `PROJECTION`, one
+`PROJECTION_SOURCE`). The separate JVM `tmp/3711-installed-replay-resume-trace.txt`
+exited 0 with `INSTALLED_PROJECTION_REPLAY_PASS` and B VECTOR 10. A further
+independent SQLite/state read found B active in IDLE, zero `switch_buffer` rows
+and its recorded bulk `COMPLETE/settled`; no fixture JVM remained. The full
+serial `spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist
+--max-workers=1 --continue` gate passed at `tmp/3712-replay-cut-integrated.txt`
+in 22m25s: 358 tasks, 22 executed, 336 up to date. The affected Engine and
+Indexer Worker XMLs have 409 and 838 tests respectively, with zero failures or
+errors. `regen-all --check` passed at `tmp/3713`, docs validation at `tmp/3714`,
+and both instruction sync/budget checks passed. Explicit `build -x test`
+passed in 1m8s at `tmp/3718-replay-cut-compile.txt` (333 tasks); a final
+`origin/main` merge returned already up to date. The previous `bfebf9186` hosted run
+[36134737632](https://github.com/justsearch-app/justsearch/actions/runs/36134737632)
+finished success in all 13 jobs, including Windows-native and system integration.
+This new source still needs its own hosted run. D1-9
+other crash cuts, D2-5 covering commits and D1-13's manifest model map remain.
+
 **WP1/WP2 2a/WP5 boundary, 2026-09-25.** The migration transition harness
 now shares one atomic reached/release protocol with operation faults. Its seven
 named points preserve the live monitor, and a resumed before-SWITCHING hold

@@ -4447,6 +4447,16 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
+  private void migrationReplayCut() {
+    try {
+      migrationTransitionForPublication("migration-after-first-projection-replay");
+    } catch (IOException barrierFailure) {
+      // This cut is only selected for a harness self-exit. If its reached marker cannot be
+      // written, abort the whole promotion attempt rather than treating it as a replay gap.
+      throw new IllegalStateException("Migration replay barrier failed", barrierFailure);
+    }
+  }
+
   private static IndexGenerationManager.MigrationState parseMigrationState(String raw) {
     return KnowledgeServerMigrationOps.parseMigrationState(raw);
   }
@@ -4973,7 +4983,8 @@ public final class KnowledgeServer implements Closeable {
             new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 jobQueue, green, signalBus, indexingPacing, indexBasePath, buildingIndexPath,
                 JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
-                buildingGeneration, this::projectionSourceReady, approvedGapVersions));
+                buildingGeneration, this::projectionSourceReady, approvedGapVersions),
+            this::migrationReplayCut);
         if (replay.isEmpty()) {
           if (recorded != null) {
             // A partial pass may have committed projection revisions after an incomplete source

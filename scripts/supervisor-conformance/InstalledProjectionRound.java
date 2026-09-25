@@ -36,6 +36,7 @@ import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.ipc.PipelineConfigs;
 import java.nio.channels.FileChannel;
@@ -59,6 +60,7 @@ public final class InstalledProjectionRound {
   private static final Clock CLOCK = Clock.systemUTC();
   private static final long WAIT_MS = 180_000;
   private static final String GAP_CUT_FILE = "installed-projection-gap-cut.txt";
+  private static final String REPLAY_CUT_FILE = "installed-projection-replay-cut.txt";
 
   private InstalledProjectionRound() {}
 
@@ -66,15 +68,21 @@ public final class InstalledProjectionRound {
     if (args.length != 5 && (args.length != 6
         || !("--gap".equals(args[5]) || "--gap-restart".equals(args[5])
             || "--gap-halt".equals(args[5]) || "--gap-resume".equals(args[5])
-            || "--cancel".equals(args[5])))) {
+            || "--cancel".equals(args[5]) || "--replay-halt".equals(args[5])
+            || "--replay-resume".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume or --cancel");
+          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --replay-halt or --replay-resume");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
     Path models = Path.of(args[2]).toAbsolutePath();
     Path watched = Path.of(args[3]).toAbsolutePath();
     String query = Files.readString(Path.of(args[4])).split("\\s+", 2)[0];
+    if (args.length == 6 && "--replay-halt".equals(args[5])) {
+      require(!Files.exists(data.resolve("runtime/migration-barrier-reached.json"))
+          && !Files.exists(data.resolve("runtime/migration-barrier-release")),
+          "projection replay fixture has a stale migration barrier marker");
+    }
     if (args.length == 6 && "--cancel".equals(args[5])) {
       runCancel(data, index, models, watched, query);
       return;
@@ -88,6 +96,16 @@ public final class InstalledProjectionRound {
       recoveredSource.failEnumerationAfterFirst();
       resumeGap(data, index, models, recoveredSource, cut.get(0), query,
           cut.get(2), cut.get(1), "GAP_RESUME");
+      return;
+    }
+    if (args.length == 6 && "--replay-resume".equals(args[5])) {
+      List<String> cut = Files.readAllLines(data.resolve(REPLAY_CUT_FILE));
+      require(cut.size() == 3, "projection replay cut marker is incomplete");
+      HeldSource recoveredSource = new HeldSource(List.of(
+          projection("updated", 1, cut.get(2) + "old"),
+          projection("deleted", 1, cut.get(2) + "deleted")));
+      resumeReplay(data, index, models, recoveredSource, cut.get(0), cut.get(1),
+          cut.get(2), query);
       return;
     }
     String marker = "installedprojection" + System.nanoTime();
@@ -143,6 +161,10 @@ public final class InstalledProjectionRound {
     }
     if (args.length == 6 && "--gap-halt".equals(args[5])) {
       runGapHalt(data, index, models, source, key, query, marker);
+      return;
+    }
+    if (args.length == 6 && "--replay-halt".equals(args[5])) {
+      runReplayHalt(data, index, models, source, key, marker);
       return;
     }
     if (args.length == 6) {
@@ -312,6 +334,68 @@ public final class InstalledProjectionRound {
               .getResultsCount());
     }
     System.out.println("INSTALLED_PROJECTION_CANCEL_PASS " + key);
+  }
+
+  private static void runReplayHalt(Path data, Path index, Path models,
+      HeldSource source, String key, String marker) throws Exception {
+    require("migration-after-first-projection-replay".equals(
+        System.getenv("JUSTSEARCH_MIGRATION_BARRIER_POINT"))
+        && "1".equals(System.getenv("JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT"))
+        && "1".equals(System.getenv("JUSTSEARCH_SUPERVISOR_HARNESS")),
+        "projection replay cut requires the gated self-exit barrier");
+    var state = new IndexGenerationManager(index).readStateBestEffort();
+    require(("g-" + key).equals(state.building_generation()),
+        "projection replay cut lost its exact candidate");
+    Path cut = data.resolve(REPLAY_CUT_FILE);
+    Files.writeString(cut, key + "\n" + state.active_generation() + "\n" + marker + "\n",
+        StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+    try (FileChannel channel = FileChannel.open(cut, StandardOpenOption.WRITE)) {
+      channel.force(true);
+    }
+    try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
+      Path reached = data.resolve("runtime/migration-barrier-reached.json");
+      require(await(() -> Files.exists(reached), WAIT_MS),
+          "candidate never applied its first no-file projection before the process cut");
+      Thread.sleep(1_000);
+    }
+    throw new AssertionError("projection replay barrier returned without halting the JVM");
+  }
+
+  private static void resumeReplay(Path data, Path index, Path models,
+      HeldSource source, String key, String original, String marker, String query)
+      throws Exception {
+    try (Epoch recovered = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> recovered.operations.find(key)
+          .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
+          "recovered no-file replay did not complete");
+      var state = new IndexGenerationManager(index).readStateBestEffort();
+      require(("g-" + key).equals(state.active_generation())
+          && !original.equals(state.active_generation()),
+          "recovered no-file replay did not promote exact B");
+      require(searchable(recovered.client, marker + "old"),
+          "recovered B lacks first no-file projection");
+      require(searchable(recovered.client, marker + "deleted"),
+          "recovered B lacks later no-file projection");
+      recovered.handoff();
+    }
+    try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+      queue.open();
+      require(queue.listSwitchBufferOpsStrictForGeneration("g-" + key).isEmpty(),
+          "promoted no-file candidate retained replayed journal versions");
+    }
+    try (Epoch reopened = open(data, index, models, new CountDownLatch(1), source)) {
+      require(reopened.operations.find(key).orElseThrow().state() == OperationState.COMPLETE,
+          "fourth boot lost completed replay operation");
+      require(searchable(reopened.client, marker + "old")
+          && searchable(reopened.client, marker + "deleted"),
+          "fourth boot lost recovered no-file projections");
+      require(await(() -> vectorReady(reopened.client, query), WAIT_MS),
+          "reopened replay B did not answer VECTOR search");
+      System.out.println("INSTALLED_PROJECTION_REPLAY_B_VECTOR "
+          + reopened.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+    }
+    System.out.println("INSTALLED_PROJECTION_REPLAY_PASS " + key);
   }
 
   private static void runGapRestart(Path data, Path index, Path models, HeldSource source,

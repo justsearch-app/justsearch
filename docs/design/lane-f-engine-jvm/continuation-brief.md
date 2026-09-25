@@ -26,6 +26,17 @@ passed at `tmp/3586`. Installed non-file source/gap and hosted rounds remain.
 [Handoff](handoff.md) has the checkpoint revision, exact logs and
 remaining cuts. D1-9 is not accepted; continue from this slice before D2-5.
 
+**Latest D1-9 mid-replay cut (2026-09-25):** A harness-only eighth migration
+point halts a supervised JVM after its first candidate projection UPSERT while
+another projection remains in the journal. The corrected installed standard-model
+`--replay-halt`/`--replay-resume` pair passed at `tmp/3710`–`tmp/3711`:
+the cut left A active and three scoped journal rows; the separate process
+re-drained the journal, promoted B, reopened it with VECTOR 10, and left the
+journal empty. The full serial stress/static/distribution gate passed at
+`tmp/3712`; hosted proof for this source is next. This covers interruption
+inside strict replay; D1-9's other cuts
+and D2-5 durable covering commits remain open.
+
 **Current local D1-9 follow-on (2026-09-25):** The exact refused B now stays
 bound to its recoverable operation until physical retirement, scoped journal
 empty and stale predecessor alias release are witnessed. A real Engine

@@ -115,6 +115,64 @@ final class ProjectionCandidateReplayTest extends LuceneExecutorTestBase {
   }
 
   @Test
+  void firstProjectionCutLeavesLaterVersionAndJournalForRestartReplay() throws Exception {
+    Path base = tempDir.resolve("mid-replay-index");
+    var manager = new IndexGenerationManager(base);
+    manager.initializeOrLoad();
+    String candidateId = manager.startMigration("manual", java.util.List.of("memory"))
+        .building_generation();
+    Path candidatePath = manager.resolveGenerationPathStrict(candidateId);
+    Path jobs = tempDir.resolve("mid-replay-jobs.db");
+    var schema = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(0),
+        () -> Map.of(), ignored -> {});
+    var config = new ResolvedConfigBuilder().build();
+    var first = new AcceptedProjection("memory", "first", 1,
+        AcceptedProjection.Kind.UPSERT, "{\"content\":\"first replay unit\"}");
+    var later = new AcceptedProjection("memory", "later", 1,
+        AcceptedProjection.Kind.UPSERT, "{\"content\":\"later replay unit\"}");
+    ProjectionSeedSource source = new ProjectionSeedSource() {
+      @Override public String sourceId() { return "memory"; }
+      @Override public void enumerate(java.util.function.Consumer<AcceptedProjection> sink) {
+        sink.accept(first);
+        sink.accept(later);
+      }
+    };
+
+    for (int boot = 0; boot < 2; boot++) {
+      try (var queue = new SqliteJobQueue(jobs);
+          var green = schema.atPath(candidatePath).withConfig(config)
+              .withExecutorRegistrations(testLuceneExecutors()).open()) {
+        queue.open();
+        green.commitOps().stopCommitTimer();
+        KnowledgeServerMigrationOps.seedProjectionSource(queue, candidateId, source);
+        var replay = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+            queue, green, null, IndexingPacing.unthrottled(), base, candidatePath,
+            new ObjectMapper(), () -> false, () -> true, LoggerFactory.getLogger(getClass()),
+            Long.MAX_VALUE, candidateId, "memory"::equals);
+        if (boot == 0) {
+          assertEquals("first projection cut", assertThrows(IllegalStateException.class,
+              () -> KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(replay, () -> {
+                green.commitOps().maybeRefreshBlocking();
+                assertEquals("first replay unit", green.documentFieldOps().getDocumentField(
+                    first.indexId(), SchemaFields.CONTENT));
+                assertNull(green.documentFieldOps().getDocumentField(
+                    later.indexId(), SchemaFields.CONTENT));
+                throw new IllegalStateException("first projection cut");
+              })).getMessage());
+          assertEquals(3, queue.listSwitchBufferOpsStrictForGeneration(candidateId).size(),
+              "an interrupted replay must retain both exact projections and its source marker");
+        } else {
+          assertTrue(KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(replay).isPresent());
+          assertEquals("first replay unit", green.documentFieldOps().getDocumentField(
+              first.indexId(), SchemaFields.CONTENT));
+          assertEquals("later replay unit", green.documentFieldOps().getDocumentField(
+              later.indexId(), SchemaFields.CONTENT));
+        }
+      }
+    }
+  }
+
+  @Test
   void olderSourceSeedCannotOverwriteConcurrentUpdateAndDeleteOnCandidate() throws Exception {
     Path base = tempDir.resolve("index");
     var manager = new IndexGenerationManager(base);

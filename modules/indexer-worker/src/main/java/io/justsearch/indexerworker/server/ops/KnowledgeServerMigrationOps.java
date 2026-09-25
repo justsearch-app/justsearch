@@ -671,7 +671,14 @@ public final class KnowledgeServerMigrationOps {
 
   public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
       DrainSwitchBufferContext context) {
-    var result = drainSwitchBuffer(context, true, false);
+    return prepareSwitchReplayForPromotion(context, () -> {});
+  }
+
+  /** Only the candidate promotion caller supplies a harness cut inside its ordered replay. */
+  public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
+      DrainSwitchBufferContext context, Runnable firstCandidateProjectionApplied) {
+    var result = drainSwitchBuffer(context, true, false, true,
+        Objects.requireNonNull(firstCandidateProjectionApplied, "firstCandidateProjectionApplied"));
     return result.applied() ? java.util.Optional.of(new StrictReplay(result.versions()))
         : java.util.Optional.empty();
   }
@@ -760,6 +767,12 @@ public final class KnowledgeServerMigrationOps {
 
   private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
       boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, includeUnscoped, () -> {});
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
+      Runnable firstCandidateProjectionApplied) {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return new ReplayOutcome(false, List.of());
     }
@@ -788,6 +801,7 @@ public final class KnowledgeServerMigrationOps {
     ArrayList<io.justsearch.indexerworker.queue.SwitchBufferUpsert> toEnqueue = new ArrayList<>();
     boolean mutatedLucene = false;
     boolean allApplied = true;
+    boolean firstCandidateProjectionObserved = false;
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
       if (op.op() == null || op.payload() == null) {
@@ -815,6 +829,7 @@ public final class KnowledgeServerMigrationOps {
         allApplied = false;
         continue;
       }
+      boolean appliedProjection = false;
       switch (kind) {
         case "PROJECTION_SOURCE" -> {
           String marker = "projection-source:" + payload.length() + ":" + payload;
@@ -863,6 +878,9 @@ public final class KnowledgeServerMigrationOps {
                       .toIndexDocument(projection));
             }
             mutatedLucene = true;
+            // A delete of an already-absent document has no physical write to witness.
+            appliedProjection = projection.kind()
+                == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT;
           } catch (Exception failure) {
             allApplied = false;
             context.log().warn("Buffered projection replay failed; retaining candidate journal key={}",
@@ -1183,6 +1201,13 @@ public final class KnowledgeServerMigrationOps {
           allApplied = false;
           context.log().warn("Unknown switch buffer op '{}': key={}", kind, op.key());
         }
+      }
+      if (appliedProjection && exactRead && !removeAfterReplay
+          && !firstCandidateProjectionObserved) {
+        firstCandidateProjectionObserved = true;
+        // The harness cut lives after one physical write but before the remaining exact
+        // versions, commit, verification and journal cleanup. Ordinary runs invoke a no-op.
+        firstCandidateProjectionApplied.run();
       }
     }
 

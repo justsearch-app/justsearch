@@ -29,7 +29,9 @@ public final class MigrationTransitionBarrier {
   private static final Set<String> POINTS = Set.of(
       "migration-green-drained", "migration-before-switching", "migration-switching-entered",
       "migration-before-pointer-commit", "migration-after-pointer-commit",
-      "migration-before-live-activation", "migration-after-live-activation");
+      "migration-before-live-activation", "migration-after-live-activation",
+      "migration-after-first-projection-replay");
+  private static final String REPLAY_HALT_POINT = "migration-after-first-projection-replay";
 
   public static Hook fromEnvironment(Path dataDir, Function<String, String> env) {
     String point = env.apply("JUSTSEARCH_MIGRATION_BARRIER_POINT");
@@ -42,6 +44,9 @@ public final class MigrationTransitionBarrier {
       throw new IllegalArgumentException("Invalid migration barrier selection");
     }
     boolean selfExit = "1".equals(selfExitText);
+    if (REPLAY_HALT_POINT.equals(point) && !selfExit) {
+      throw new IllegalArgumentException("Projection replay barrier requires a harness self-exit");
+    }
     Path reached = HarnessBarrierProtocol.reached(dataDir, "migration-barrier");
     AtomicBoolean claimed = new AtomicBoolean();
     return transition -> {
@@ -67,6 +72,9 @@ public final class MigrationTransitionBarrier {
 
     public Controlled(String point) {
       if (!POINTS.contains(point)) throw new IllegalArgumentException("Unknown migration point");
+      if (REPLAY_HALT_POINT.equals(point)) {
+        throw new IllegalArgumentException("Projection replay cut requires a process halt");
+      }
       this.point = point;
     }
 
