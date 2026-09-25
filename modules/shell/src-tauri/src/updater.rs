@@ -1003,6 +1003,13 @@ fn validate_descriptor(descriptor: &ReleaseDescriptor) -> Result<(), String> {
 fn validate_store_compatibility(descriptor: &ReleaseDescriptor) -> Result<(), String> {
     let local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER)
         .map_err(|error| format!("Embedded store compatibility register is invalid: {error}"))?;
+    validate_store_compatibility_against(local, descriptor)
+}
+
+fn validate_store_compatibility_against(
+    local: LocalStoreRegister,
+    descriptor: &ReleaseDescriptor,
+) -> Result<(), String> {
     let mut release_owners = HashMap::new();
     for compatibility in &descriptor.compatibility {
         if compatibility.owner_id.trim().is_empty()
@@ -2362,6 +2369,47 @@ mod tests {
         let mut descriptor = test_descriptor(current_store_compatibility());
         descriptor.compatibility[0].reconciliation_strategy = "CHANGED".into();
         assert!(validate_store_compatibility(&descriptor)
+            .unwrap_err()
+            .contains("ownership or recovery strategy"));
+    }
+
+    #[test]
+    fn ui_settings_v4_successor_reads_legacy_v1_without_changing_strategy_identity() {
+        let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
+        let old = local
+            .durable_stores
+            .iter_mut()
+            .find(|store| store.id == "ui-settings")
+            .unwrap();
+        assert_eq!(old.current_version, 4);
+        assert_eq!(old.reconciliation, "READ_V0_OR_V1_AND_WRITE_V1");
+        old.current_version = 1;
+
+        let mut compatibility = current_store_compatibility();
+        let successor = compatibility
+            .iter_mut()
+            .find(|store| store.owner_id == "ui-settings")
+            .unwrap();
+        assert_eq!(successor.format_version, 4);
+        successor.readable_source_versions = vec![0, 1, 2, 3, 4];
+        let accepted = test_descriptor(compatibility.clone());
+        validate_store_compatibility_against(local, &accepted).unwrap();
+
+        let mut wrong_strategy = test_descriptor(compatibility);
+        wrong_strategy
+            .compatibility
+            .iter_mut()
+            .find(|store| store.owner_id == "ui-settings")
+            .unwrap()
+            .reconciliation_strategy = "READ_V0_TO_V4_AND_WRITE_V4".into();
+        let mut old_local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
+        old_local
+            .durable_stores
+            .iter_mut()
+            .find(|store| store.id == "ui-settings")
+            .unwrap()
+            .current_version = 1;
+        assert!(validate_store_compatibility_against(old_local, &wrong_strategy)
             .unwrap_err()
             .contains("ownership or recovery strategy"));
     }

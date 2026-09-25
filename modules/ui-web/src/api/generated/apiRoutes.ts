@@ -221,6 +221,7 @@ export const API_ROUTES = {
   "POST /api/indexing-roots/preview": { method: "POST", path: "/api/indexing-roots/preview", cohort: "indexing", requiredCapabilities: [] },
   "POST /api/indexing/excludes/apply": { method: "POST", path: "/api/indexing/excludes/apply", cohort: "indexing", requiredCapabilities: ["WORKER"] },
   "POST /api/indexing/gc": { method: "POST", path: "/api/indexing/gc", cohort: "indexing", requiredCapabilities: ["WORKER"] },
+  "POST /api/indexing/migration/accept-gaps": { method: "POST", path: "/api/indexing/migration/accept-gaps", cohort: "indexing", requiredCapabilities: ["WORKER"] },
   "POST /api/indexing/migration/cutover": { method: "POST", path: "/api/indexing/migration/cutover", cohort: "indexing", requiredCapabilities: ["WORKER"] },
   "POST /api/indexing/migration/pause": { method: "POST", path: "/api/indexing/migration/pause", cohort: "indexing", requiredCapabilities: ["WORKER"] },
   "POST /api/indexing/migration/resume": { method: "POST", path: "/api/indexing/migration/resume", cohort: "indexing", requiredCapabilities: ["WORKER"] },

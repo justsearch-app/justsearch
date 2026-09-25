@@ -184,6 +184,12 @@
       "consumers": ["modules/ui-web/src/api/types/registry.ts"]
     },
     {
+      "name": "OperationOutcomeView",
+      "schema": "SSOT/schemas/operation-outcome-view.v1.json",
+      "outFile": "operation-outcome-view.ts",
+      "consumers": ["modules/ui-web/src/shell-v0/views/LibrarySurface.ts"]
+    },
+    {
       "name": "InferenceStatusResponse",
       "schema": "SSOT/schemas/inference-status-response.v1.json",
       "outFile": "inference-status-response.ts",

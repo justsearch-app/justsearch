@@ -29,6 +29,12 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-25: WP2 2a binds literal durable-store versions to code constants and corrects `ui-settings` to schema 4 with readable predecessors 0–3. Its reconciliation token remains byte-for-byte stable for released updaters; the token names the strategy, while version fields name actual formats. [Release-safety correction](improvements/WP2-release-safety.md), [release sequencing](#171-why-this-shape).
+
+- 2026-09-25: WP5 corrects the complexity ledger's causal labels, bounds rollback to pre-release withdrawal, and adds descriptive paired development measures plus a subsystem map for the final PR. The seven E merge-gate groups do not change. [Owning corrections](#13-what-is-lost-honestly), [E record](stages/E.md#8-the-record-evidencee), [F-8](stages/F.md#f-8--pr-1-to-green-and-ready).
+
+- 2026-09-25: D1's migration transition harness uses one shared file handshake and seven named points. A held `migration-before-switching` point rechecks MIGRATING and the same source/building identities under the mutation fence before entering SWITCHING; a held pre-pointer point cancels and unwinds before a manual pointer crash cut. The independent WP1 review showed that the pre-pointer holder owns the generation lock, so a test observes `state.json` externally during the hold. [WP1 correction](improvements/WP1-migration-transition-barrier.md), [D1 item](stages/D1.md#01-corrections-found-while-implementing-appended-per-item).
+
 - 2026-09-24: The owner re-cut §16/§17's acceptance ownership while preserving D1/D2 feature scope. Stage E pairs only seven rows against `main`; all other §16 conditions become one-sided D1/D2 feature acceptance. Floor-machine, other-OS, representative-change and collector bake-off work is conditional on the corresponding claim or a response-time failure. The owner sets soak duration. The old main-development re-cut trigger is retired; merge `main` at each checkpoint. [E runbook](stages/E.md), [D1 map](stages/D1.md#6-section-16-rows-d1-must-leave-exercisable), [D2 map](stages/D2.md#6-section-16-rows-d2-must-leave-exercisable).
 
 - 2026-09-23: D1 adopts a separate approved Install AI generation activation after download. The ordinary settings refusal remains; the accepted REINDEX candidate freezes settings, models and source identity, and a committed generation pointer requires settings roll-forward under the existing composite owner. This supersedes C2's direct ONNX path write for generation-bound candidates and changes the user-visible activation flow. [Owning generation protocol](evidence/D1/generation-native-cursor-design-2026-09-23.md#7-installer-produced-generation-candidate-2026-09-23-amendment); [C2 producer inventory](evidence/C2/C2-6-plan.md#2026-09-14-installer-model-and-pack-producer-cut).
@@ -916,6 +922,12 @@ independently of any merge and post-enrichment latency dominated by GPU contenti
 measured only the Head (RSS 377 MB idle, 436 MB loaded, live heap 13 to 68 MB); there has been
 no paired single-versus-split run. The gains below are expected, not measured.
 
+The E record also reports full-suite wall time, stack start to first search,
+verification-profile boot time, whether hot reload covers the whole Engine,
+and production Java line counts by API front/core/edges on both trees. These
+describe the development-cost claim without adding another merge gate; the
+representative-change exercise remains conditional under §16.
+
 - **Agentic retrieval at in-process cost.** An agent turn issuing dozens of small searches,
   fetches and rerank calls today pays serialization and a retry policy on each; in one JVM they
   are port calls. Cheaper calls are not more useful answers: the agent-utility evidence shows
@@ -1462,6 +1474,7 @@ which made every source change under a captured unit a failure):
   present as "no results", so a rebuild with failed units stays `complete with gaps`, not
   active, and names the units, until re-run or accepted. There is no partial activation.
 - *Publication and activation (2026-09-23).* The [publication/lifetime protocol](evidence/D1/publication-and-lifetime-design-2026-09-23.md) fixes atomic capture plus resource retention. The [generation protocol](evidence/D1/generation-native-cursor-design-2026-09-23.md) prepares all fallible services before strict durable promotion, fences final mutation replay and recovers forward after a witnessed commit. Two disk generations include a retained predecessor: another rebuild refuses until actual deletion frees capacity.
+- *Transition observation (2026-09-25).* Harness-selected migration holds use the same atomic reached/release handshake as operation fault cuts. A resumed before-SWITCHING hold rechecks MIGRATING and exact source/building identities under final mutation admission, so a stale monitor observation cannot resurrect a stopped or changed candidate. The true pre-pointer hold is inside the publication fence; cancellation unwinds it before commitment, while post-pointer holds use the existing roll-forward classification.
 - *Cursors.* A search cursor holds a snapshot of the old generation; activation retires the
   generation but does not tear down readers a live cursor holds (no reader outlives a request
   today: `SearcherManager` acquire and release per call, and `searchAfter` is stateless, so
@@ -2011,9 +2024,9 @@ cheap constraint and does not by itself justify an execution model:
 |---|---|---|
 | eliminated | the wire, the MMF bus, port handoff, config forwarding, argv builders, `RemoteKnowledgeClient`, restart-as-reload | the structural saving; counted by the sweep (16) |
 | compensation for a property the split gave free | supervisor, shutdown owner, executor partition, memory budget, admission, component readiness, child reconciliation, the stuck-component policy | required to preserve current behaviour; each must justify itself against the loss it replaces |
-| required by the merge's own consequences | a usable in-process reload path (the Worker restart was the reload path; 7.4), the operation outcome query (a crash now takes the API with the work; 7.6), ingestion's per-file recovery kept working under the new lifecycle (its resume today rides the `jobs` table and the Worker restart) | required: without them the merged Engine is worse than the split at something the split did for free. Stated at the strength the merge needs: a reload path, not a global atomic version; per-file recovery, not a general resume contract |
+| required by the merge's own consequences | a usable in-process reload path (the Worker restart was the reload path; 7.4), the operation outcome query (the unknown outcome of an in-flight Worker write predates the merge, while the merge also loses the API connection; 7.6), ingestion's per-file recovery kept working under the new lifecycle (its resume today rides the `jobs` table and the Worker restart) | required: without them the merged Engine is worse than the split at something the split did for free. The outcome-query obligation widens because the connection now dies too; it did not originate with the merge. Stated at the strength the merge needs: a reload path, not a global atomic version; per-file recovery, not a general resume contract |
 | cheap constraint that prevents a foreseeable mistake | engine context as a type with its two work axes (3.4), provenance where a slot exists, the port catalogue, `generation-bound` settings, the three lifetimes (7.5), acceptance-before-effect (7.5), the authority pins (11), the platform module rule, the egress factory as a record stream, the generative interface with an empty interceptor slot | pinned: an interface, a column or a rule. "A page of code" is the declaration cost, not the whole cost: each is an invariant every later change must preserve, and 16's representative-change row is where that cost is observed rather than assumed |
-| independent capability investment | the applied configuration revision with dependency-scoped coherence through the register (7.4), the operations table with its general resume contract for finite operations (batch extraction, self-benchmark; 7.5), the generation cutover contract (7.4), immediate index-and-return with its durability choice, the `bench` profile | a separate value proposition (11), decided by the owner to ship in this lane (15); credited as capability work, never as a benefit of merging, and measured in 16's positive-benefit row only through what the merge itself delivers. Authorisation to build these and proof that the merge needs them are different propositions, and the ledger keeps them in different rows |
+| independent capability investment | the applied configuration revision with dependency-scoped coherence through the register (7.4), the operations table with its general resume contract for finite operations (batch extraction, self-benchmark; 7.5), the generation cutover contract and accepted-write journal (7.4, fixing a pre-existing Blue/Green gap), foreground/background encoder fairness (4, fixing the split Worker's unfair gate), immediate index-and-return with its durability choice, the `bench` profile | a separate value proposition (11), decided by the owner to ship in this lane (15); credited as capability work, never as a benefit of merging, and measured in 16's positive-benefit row only through what the merge itself delivers. Authorisation to build these and proof that the merge needs them are different propositions, and the ledger keeps them in different rows |
 
 The measure in 10 (unrelated knowledge per ordinary change) cuts across all five rows: an
 agent no longer needs gRPC, and now meets the registry, applied versions, checkpoints,
@@ -2224,7 +2237,9 @@ recovery are run only if the corresponding claim is made, and unrun shapes
 cannot be claimed. Representative
 changes are measured only if a lower-coordination-cost claim is made. G1 is
 the default collector; run a collector comparison only if a response-time row
-fails.
+fails. The five descriptive development measures in [E §8](stages/E.md#8-the-record-evidencee)
+are paired context for the benefit claim; they neither add a gate nor trigger
+the conditional representative-change exercise.
 
 **Gate for the default flip: a joint seven-group envelope**, single versus split
 (the lane branch at stage E against `main` after PR 0, 17):
@@ -2288,11 +2303,23 @@ What does not fall away: every stage is verified before the next starts, every s
 independent review of its diff range recorded in the managed review record, and every stage
 ends with a recorded continuation decision by the delegated orchestrator (17.6). A stop between steps is a checkpoint,
 not a merge; nothing in the programme rules says otherwise. The paired measurement is the
-branch against `main`; rollback is one revert; a failed gate leaves the code on a branch, which
-is cleaner than a dead flag on `main`. The one cost accepted and recorded: while the branch is
+branch against `main`; before merge, withdrawal is one revert of the squash; a failed gate
+leaves the code on a branch, which is cleaner than a dead flag on `main`. After a release,
+recovery is fix-forward through the updater and dead-Engine path: settings schema 4, the new
+`operations.db` and `jobs.db` v21 have changed persisted state (WP2). The one cost accepted
+and recorded: while the branch is
 open there is no hotfix path for split-mode code on `main`, which an alpha with a quiet `main`
 can afford. Drift is held by `git merge origin/main` at every checkpoint
 (never a rebase of a pushed branch, `agent-lessons.md`; owner decision 2026-09-24).
+
+The durable-store register's `currentVersion` and readable predecessors are the
+versions the installed updater compares and the release descriptor publishes.
+`versionSource` binds these declarations to literal code constants. The
+`ui-settings` reconciliation string remains its historical updater strategy
+identifier even as the settings envelope advances to v4: released binaries
+compare that identifier exactly, and a renamed string would reject a readable
+upgrade before the version check. The format and version fields state the
+current bytes; the frozen strategy identifier preserves the upgrade path.
 
 ### 17.2 PR 0: launch flags on split
 

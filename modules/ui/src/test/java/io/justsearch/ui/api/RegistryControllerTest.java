@@ -60,7 +60,7 @@ final class RegistryControllerTest {
   }
 
   @Test
-  @DisplayName("/api/registry/operations returns envelope with 32 seed entries")
+  @DisplayName("/api/registry/operations returns the complete core seed catalog")
   void operationsEnvelope() throws Exception {
     // Slice 445: CoreOperationCatalog now seeds 26 entries — slice 3a-2-c's 23
     // plus core.cancel-indexing-job, core.retry-indexing-job, core.resolve-path-hash
@@ -91,8 +91,9 @@ final class RegistryControllerTest {
     // Tempdoc 931 §E item 10: core.settle-index added; total 32. D1-4 adds
     // core.reconfigure to the canonical core catalog, bringing this fixture to 33.
     // Lane F's separately approved installer activation brings it to 34;
-    // retiring core.reload-inference returns the catalog to 33.
-    assertEquals(33, envelope.get("entries").size());
+    // retiring core.reload-inference returns the catalog to 33. D1-11's
+    // core.accept-gaps decision brings it to 34.
+    assertEquals(34, envelope.get("entries").size());
     assertTrue(envelope.get("entries").toString().contains("core.activate-installed-models"));
   }
 

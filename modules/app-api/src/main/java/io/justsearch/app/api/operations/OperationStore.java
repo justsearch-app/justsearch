@@ -151,6 +151,34 @@ public interface OperationStore extends AutoCloseable {
     throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
   }
 
+  enum BulkGapDecision { UNOBSERVED, NONE, AWAITING_ACCEPTANCE, ACCEPTED }
+
+  /**
+   * Nonterminal transition for the exact settled gap list. A changed list cannot inherit a
+   * previous decision. The generation owner calls this before it may commit the pointer.
+   */
+  default BulkGapDecision awaitBulkGapDecision(long id, java.util.List<OperationOutcomeView.Gap> gaps) {
+    throw new UnsupportedOperationException("Bulk gap decisions are unavailable");
+  }
+
+  /** Read the retained decision while the physical candidate waits with A serving. */
+  default BulkGapDecision currentBulkGapDecision(long id) {
+    throw new UnsupportedOperationException("Bulk gap decisions are unavailable");
+  }
+
+  /** Current durable candidate decision list; absent only before its first observation. */
+  default java.util.Optional<java.util.List<OperationOutcomeView.Gap>> bulkGapWitness(long id) {
+    throw new UnsupportedOperationException("Bulk gap witness is unavailable");
+  }
+
+  enum BulkGapAcceptance { ACCEPTED, GAP_LIST_STALE, NOT_AWAITING }
+
+  /** Webview-authorized owner decision for one exact reindex key and current gap-list hash. */
+  default BulkGapAcceptance acceptBulkGaps(String reindexKey, String gapsListHash,
+      String acceptedBy) {
+    throw new UnsupportedOperationException("Bulk gap acceptance is unavailable");
+  }
+
   /**
    * Re-checkpoint each running durable row's current committed cursor and counts atomically.
    * The store clock stamps the checkpoint; no snapshot can overwrite newer unit progress.

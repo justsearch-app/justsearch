@@ -206,7 +206,7 @@ final class RecordedBulkEngineRestartTest {
         Map.of("justsearch.models.dir", modelsDirectory.toAbsolutePath().toString()));
     var operations = new SqliteOperationStore(dataDirectory.resolve("operations.db"));
     var attempts = new OperationAttemptRunnerImpl(operations, CLOCK,
-        Set.of(OperationKind.INGEST, OperationKind.REINDEX), null,
+        Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null,
         new RecordedIngestPlanResolver());
     var authority = OperationAuthority.load(dataDirectory);
     var root = new EngineRoot(operations, attempts,

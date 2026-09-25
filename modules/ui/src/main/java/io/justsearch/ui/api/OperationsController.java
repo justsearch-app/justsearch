@@ -56,10 +56,11 @@ public final class OperationsController {
   static final String INGEST_PATH = "/api/knowledge/ingest";
   static final String REINDEX_PATH = "/api/indexing/reindex";
   static final String MIGRATION_START_PATH = "/api/indexing/migration/start";
+  static final String ACCEPT_GAPS_PATH = "/api/indexing/migration/accept-gaps";
   static final String SETTINGS_PATH = "/api/settings/v2";
   static final String UNDO_PATH = "/api/undo/{id}";
 
-  private enum InputForm { ENVELOPE, INGEST, REINDEX, MIGRATION_START }
+  private enum InputForm { ENVELOPE, INGEST, REINDEX, MIGRATION_START, ACCEPT_GAPS }
 
   /** Matched-route classification shares the dispatch catalog; it grants no authority. */
   Optional<Operation> admissionOperation(Context ctx) {
@@ -69,6 +70,8 @@ public final class OperationsController {
       case REINDEX_PATH -> resolveOperation("core.reindex");
       case MIGRATION_START_PATH -> resolveOperation(
           io.justsearch.app.services.registry.operations.CoreOperationCatalog.REBUILD_INDEX.value());
+      case ACCEPT_GAPS_PATH -> resolveOperation(
+          io.justsearch.app.services.registry.operations.CoreOperationCatalog.ACCEPT_GAPS.value());
       case SETTINGS_PATH -> resolveOperation(
           io.justsearch.app.services.registry.operations.CoreOperationCatalog.RECONFIGURE.value());
       case INVOKE_PATH, UNDO_PATH -> resolveOperation(ctx.pathParam("id"));
@@ -157,6 +160,13 @@ public final class OperationsController {
         io.justsearch.app.services.registry.operations.CoreOperationCatalog.REBUILD_INDEX.value(),
         InputForm.MIGRATION_START,
         202);
+  }
+
+  /** Flat-input alias for the recorded, webview-only gap decision. */
+  public void handleAcceptGaps(Context ctx) {
+    handleInvocation(ctx,
+        io.justsearch.app.services.registry.operations.CoreOperationCatalog.ACCEPT_GAPS.value(),
+        InputForm.ACCEPT_GAPS);
   }
 
   private void handleInvocation(Context ctx, String idValue, InputForm inputForm) {

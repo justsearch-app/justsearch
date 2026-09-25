@@ -173,6 +173,10 @@ final class ValidatorRunnerTest {
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
             ignored -> List.of(), io.justsearch.app.api.IndexingService::unavailable, List::of));
     handlers.register(
+        CoreOperationCatalog.ACCEPT_GAPS,
+        new io.justsearch.app.services.registry.operations.handlers.AcceptGapsHandler(
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable()));
+    handlers.register(
         CoreOperationCatalog.CANCEL_AI_INSTALL,
         new io.justsearch.app.services.registry.operations.handlers.CancelAiInstallHandler(
             () -> null));

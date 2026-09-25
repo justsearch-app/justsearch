@@ -287,31 +287,36 @@ export function checkDurableStoreRegister({
     failures.push(...checkPathAgreement({ root, row, label, readableSources, readSource }));
     failures.push(...checkEncryptionDisposition({ row, label, authoredCatalogDirs }));
     if (row.id === 'jobs-db' || row.id === 'operations-db') {
-      const constantName = row.id === 'jobs-db' ? 'TARGET_VERSION' : 'VERSION';
-      if (typeof row.versionAuthority !== 'string' || !row.versionAuthority.trim()
-          || !pathExists(resolve(root, row.versionAuthority))) {
-        failures.push(`${label}: versionAuthority must resolve to the ${row.id} schema source.`);
+      if (!row.versionSource) failures.push(`${label}: versionSource is required for SQLite stores.`);
+    }
+    if (row.versionSource !== undefined) {
+      const { file, symbol } = row.versionSource ?? {};
+      if (typeof file !== 'string' || !file.trim() || !pathExists(resolve(root, file))) {
+        failures.push(`${label}: versionSource.file must resolve to the schema source.`);
+      } else if (typeof symbol !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(symbol)) {
+        failures.push(`${label}: versionSource.symbol must name a Java version constant.`);
+      } else if (row.versionAuthority && file !== row.versionAuthority) {
+        failures.push(`${label}: versionSource.file must equal versionAuthority.`);
       } else {
         try {
-          const code = stripJavaComments(readSource(resolve(root, row.versionAuthority)),
-            { stripLiterals: true });
-          // This authority uses positive decimal literals. Reject other Java bases rather
-          // than interpreting (for example) octal 017 as decimal 17.
-          const declaration = row.id === 'jobs-db'
-            ? /^\s*public\s+static\s+final\s+int\s+TARGET_VERSION\s*=\s*([1-9](?:[\d_]*\d)?)\s*;\s*$/gm
-            : /^\s*static\s+final\s+int\s+VERSION\s*=\s*([1-9](?:[\d_]*\d)?)\s*;\s*$/gm;
+          const code = stripJavaComments(readSource(resolve(root, file)), { stripLiterals: true });
+          // Only a single positive decimal literal is an auditable schema version. In
+          // particular, do not reinterpret octal, hex, an expression, or prose as one.
+          const declaration = new RegExp(
+            `^\\s*(?:(?:public|private|protected)\\s+)?static\\s+final\\s+int\\s+${symbol}`
+              + '\\s*=\\s*([1-9](?:[\\d_]*\\d)?)\\s*;\\s*$', 'gm');
           const declarations = [...code.matchAll(declaration)];
           if (declarations.length !== 1) {
-            failures.push(`${label}: versionAuthority must declare exactly one literal ${constantName}.`);
+            failures.push(`${label}: versionSource must declare exactly one literal ${symbol}.`);
           } else {
             const target = Number(declarations[0][1].replaceAll('_', ''));
-            if (!Number.isSafeInteger(target) || target <= 0 || row.currentVersion !== target) {
+            if (!Number.isSafeInteger(target) || row.currentVersion !== target) {
               failures.push(`${label}: currentVersion ${row.currentVersion} disagrees with `
-                  + `${row.versionAuthority} ${constantName} ${target}.`);
+                + `${file} ${symbol} ${target}.`);
             }
           }
         } catch (error) {
-          failures.push(`${label}: cannot read versionAuthority ${row.versionAuthority}: ${error.message}.`);
+          failures.push(`${label}: cannot read versionSource ${file}: ${error.message}.`);
         }
       }
     }

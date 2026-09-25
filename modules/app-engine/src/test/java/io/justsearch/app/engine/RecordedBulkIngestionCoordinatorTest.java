@@ -32,6 +32,7 @@ import io.justsearch.app.api.operations.OperationAuthorizationBasis;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationState;
@@ -114,7 +115,8 @@ final class RecordedBulkIngestionCoordinatorTest {
     sqliteQueue.open();
     var admission = new EngineAdmissionController(4, 8, 1);
     var attempts = new OperationAttemptRunnerImpl(operations, CLOCK,
-        Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+        Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
+        null, new RecordedIngestPlanResolver());
     var coordinator = new RecordedIngestionCoordinator(operations, attempts, admission, authority);
     coordinatorRef.set(coordinator);
     JobQueue queue = acknowledgeGate(sqliteQueue, rejectQueueAcknowledgement);
@@ -331,6 +333,125 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertEquals("SUCCESS", stillCompleted.receipt().code());
       assertEquals(1, stillCompleted.unitsCompleted());
       assertAcknowledged(harness.queue, harness.key);
+    }
+  }
+
+  @Test
+  void unsupersededGapCannotAuthorizeRecordedPromotion() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("gap-awaiting-acceptance"))) {
+      harness.replacePhysical(buildingRuntime(harness.key));
+      harness.coordinator.maintain();
+      JobQueue.IndexJob claim = harness.queue.pollPending(1).getFirst();
+      harness.queue.markClaimFailed(claim, IngestionOutcome.of(
+          IngestionOutcomeClass.PARSER_FAILED, "PARSER_FAILED", IngestionRetryPolicy.NONE), null);
+
+      assertEquals(RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE,
+          harness.coordinator.recordedGapDecision(harness.key,
+              new RecordedIngestionLifecycle.JournalWitness(List.of(), Set.of())),
+          "the monitor must seal the gap before entering successor preparation");
+      assertFalse(harness.coordinator.beforeRecordedPromotion(harness.key, harness.queue),
+          "an unsuperseded accepted unit must wait for a keyed gap decision before pointer B");
+      assertEquals(OperationState.COMPLETE_WITH_GAPS,
+          harness.operations.find(harness.key).orElseThrow().state());
+      assertEquals("awaiting_acceptance",
+          harness.operations.outcome(harness.key).phase());
+      assertEquals(1, harness.progress().settlement().gaps().size());
+      assertEquals(0, harness.promotions.get());
+
+      String hash = harness.progress().gapsListHash();
+      assertEquals(hash, harness.operations.outcome(harness.key).result().gapListHash());
+      harness.closeOwner();
+      harness.runtime.set(buildingRuntime(harness.key));
+      harness.openOwner(true, false);
+      assertEquals(OperationState.COMPLETE_WITH_GAPS,
+          harness.operations.find(harness.key).orElseThrow().state(),
+          "recovery must keep the durable user wait visible before the monitor resumes");
+      assertEquals(RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE,
+          harness.coordinator.recordedGapDecision(harness.key),
+          "an interrupted user wait resumes the same durable gap list and candidate");
+      assertEquals(OperationStore.BulkGapAcceptance.GAP_LIST_STALE,
+          harness.operations.acceptBulkGaps(harness.key, "f".repeat(64), "webview-user"));
+      assertEquals(OperationState.COMPLETE_WITH_GAPS,
+          harness.operations.find(harness.key).orElseThrow().state());
+      assertEquals(OperationStore.BulkGapAcceptance.ACCEPTED,
+          harness.operations.acceptBulkGaps(harness.key, hash, "webview-user"));
+      assertEquals(OperationState.RUNNING,
+          harness.operations.find(harness.key).orElseThrow().state());
+      assertTrue(harness.coordinator.beforeRecordedPromotion(harness.key, harness.queue),
+          "the exact keyed gap decision may resume the same accepted promotion");
+
+      var laterFailure = new OperationOutcomeView.Gap("b".repeat(64),
+          "CANDIDATE_PROJECTION_MISSING");
+      assertEquals(RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE,
+          harness.coordinator.recordedGapDecision(harness.key,
+              new RecordedIngestionLifecycle.JournalWitness(List.of(laterFailure), Set.of())),
+          "a later failed candidate projection must revoke the old approval");
+      String refreshedHash = harness.operations.outcome(harness.key).result().gapListHash();
+      assertFalse(hash.equals(refreshedHash));
+      assertEquals(OperationState.COMPLETE_WITH_GAPS,
+          harness.operations.find(harness.key).orElseThrow().state());
+      assertFalse(harness.coordinator.beforeRecordedPromotion(harness.key, harness.queue));
+      assertEquals(OperationStore.BulkGapAcceptance.GAP_LIST_STALE,
+          harness.operations.acceptBulkGaps(harness.key, hash, "webview-user"));
+      assertEquals(OperationStore.BulkGapAcceptance.ACCEPTED,
+          harness.operations.acceptBulkGaps(harness.key, refreshedHash, "webview-user"));
+      String capturedUnit = harness.progress().settlement().gaps().getFirst().unitId();
+      assertEquals(RecordedIngestionLifecycle.GapDecision.NONE,
+          harness.coordinator.recordedGapDecision(harness.key,
+              new RecordedIngestionLifecycle.JournalWitness(List.of(),
+                  Set.of(capturedUnit, laterFailure.unitId()))),
+          "later exact success supersedes both failed projection obligations");
+      assertEquals(OperationStore.BulkGapAcceptance.NOT_AWAITING,
+          harness.operations.acceptBulkGaps(harness.key, refreshedHash, "webview-user"));
+      assertTrue(harness.coordinator.beforeRecordedPromotion(harness.key, harness.queue));
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
+      harness.coordinator.maintain();
+      assertEquals("SUCCESS", harness.operations.find(harness.key).orElseThrow().receipt().code(),
+          "covered captured and candidate gaps cannot leave a false promoted-with-gaps receipt");
+    }
+  }
+
+  @Test
+  void candidateOnlyGapControlsPromotedReceiptAndFencedApprovalRejectsStaleHash()
+      throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("candidate-only-gap"))) {
+      harness.completeOneCapturedClaim();
+      var lateGap = new OperationOutcomeView.Gap("unit:candidate", "CANDIDATE_PROJECTION_MISSING");
+      var witness = new RecordedIngestionLifecycle.JournalWitness(List.of(lateGap), Set.of());
+      assertEquals(RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE,
+          harness.coordinator.recordedGapDecision(harness.key, witness));
+      String firstHash = harness.operations.outcome(harness.key).result().gapListHash();
+      EngineContext webview = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "gap-owner", Optional.of("bulk-session"), Optional.empty(), TransportTag.BUTTON,
+          EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+      assertFalse(harness.coordinator.acceptGaps(harness.key, firstHash, webview).success(),
+          "an attachment without the physical witness fence cannot authorize approval");
+      var changedGap = new OperationOutcomeView.Gap("unit:later", "PROJECTION_WITNESS_MISSING");
+      var latest = new RecordedIngestionLifecycle.JournalWitness(List.of(lateGap, changedGap), Set.of());
+      var fenceCalls = new AtomicInteger();
+      harness.replacePhysical(buildingRuntime(harness.key), decision -> {
+        fenceCalls.incrementAndGet();
+        return decision.apply(latest);
+      });
+      harness.runtime.set(new RecordedIngestionLifecycle.BulkRuntime(
+          IndexGenerationManager.BootDisposition.FENCED, SERVING_GENERATION,
+          "g-" + harness.key, "AWAITING_ACCEPTANCE", null, false));
+      assertFalse(harness.coordinator.acceptGaps(harness.key, firstHash, webview).success(),
+          "a fenced generation cannot borrow an old gap witness");
+      harness.runtime.set(buildingRuntime(harness.key));
+      OperationResult stale = harness.coordinator.acceptGaps(harness.key, firstHash, webview);
+      assertFalse(stale.success());
+      assertEquals("GAP_LIST_STALE", stale.errorCode().orElseThrow());
+      String currentHash = harness.operations.outcome(harness.key).result().gapListHash();
+      assertFalse(firstHash.equals(currentHash));
+      assertTrue(harness.coordinator.acceptGaps(harness.key, currentHash, webview).success());
+      assertEquals(3, fenceCalls.get(), "every decision requires a fresh physical witness");
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
+      harness.coordinator.maintain();
+      OperationRecord terminal = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.FAILED, terminal.state());
+      assertEquals("PROMOTED_WITH_GAPS", terminal.receipt().code(),
+          "candidate-only approved gaps must not finish as full success");
     }
   }
 
@@ -825,7 +946,8 @@ final class RecordedBulkIngestionCoordinatorTest {
       }
       operationOwner = operationStoreWithCrashCut(operations);
       attempts = new OperationAttemptRunnerImpl(operationOwner, CLOCK,
-          Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
+          null, new RecordedIngestPlanResolver());
       sqliteQueue = new SqliteJobQueue(directory.resolve("jobs.db"), operationKey -> {
         RecordedIngestionCoordinator current = coordinatorRef.get();
         return current == null ? JobQueue.RecordedClaimDecision.DENY
@@ -987,10 +1109,15 @@ final class RecordedBulkIngestionCoordinatorTest {
     }
 
     void replacePhysical(RecordedIngestionLifecycle.BulkRuntime replacementRuntime) throws Exception {
+      replacePhysical(replacementRuntime, null);
+    }
+
+    void replacePhysical(RecordedIngestionLifecycle.BulkRuntime replacementRuntime,
+        RecordedIngestionLifecycle.CheckedGapAcceptance gapAcceptance) throws Exception {
       attachment.close();
       runtime.set(replacementRuntime);
       attachment = coordinator.attach(queue, () -> Optional.of(SERVING_GENERATION), () -> true,
-          () -> Optional.of(runtime.get()));
+          () -> Optional.of(runtime.get()), gapAcceptance);
       bindBulkProducer();
     }
 

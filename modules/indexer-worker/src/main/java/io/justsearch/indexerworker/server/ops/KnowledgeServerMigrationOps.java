@@ -20,6 +20,7 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.server.RecordedIngestionLifecycle;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.indexerworker.services.WorkerServiceException;
@@ -55,12 +56,24 @@ public final class KnowledgeServerMigrationOps {
 
   @FunctionalInterface
   public interface CheckedSwitchingTransition {
-    void run() throws IOException, InterruptedException;
+    void run(IndexGenerationManager.State observed) throws IOException, InterruptedException;
   }
 
   @FunctionalInterface
   public interface CheckedLiveCutover {
     IndexGenerationManager.State promote() throws IOException, InterruptedException;
+
+    default boolean recorded() { return false; }
+
+    default RecordedIngestionLifecycle.GapDecision gapDecision() {
+      return RecordedIngestionLifecycle.GapDecision.NONE;
+    }
+
+    default boolean enterGapWait() throws IOException, InterruptedException { return false; }
+
+    default boolean resumeAcceptedGapBuild() throws IOException, InterruptedException { return false; }
+
+    default void transition(String point) throws IOException, InterruptedException {}
   }
 
   public record CutoverContext(
@@ -88,7 +101,7 @@ public final class KnowledgeServerMigrationOps {
       Runnable requestedRestartAction,
       Path dataDir,
       Logger log,
-      io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion,
+      RecordedIngestionLifecycle.CheckedPromotion promotion,
       CheckedSwitchingTransition switchingTransition,
       CheckedLiveCutover liveCutover) {
     public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
@@ -98,7 +111,7 @@ public final class KnowledgeServerMigrationOps {
         Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
         BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
         Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
-        io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion,
+        RecordedIngestionLifecycle.CheckedPromotion promotion,
         CheckedSwitchingTransition switchingTransition) {
       this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
           migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
@@ -114,13 +127,13 @@ public final class KnowledgeServerMigrationOps {
         Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
         BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
         Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
-        io.justsearch.indexerworker.server.RecordedIngestionLifecycle.CheckedPromotion promotion) {
+        RecordedIngestionLifecycle.CheckedPromotion promotion) {
       this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
           migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
           migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
           finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
           flushTelemetryAction, requestedRestartAction, dataDir, log, promotion,
-          () -> indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING), null);
+          observed -> indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING), null);
     }
 
     public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
@@ -226,6 +239,21 @@ public final class KnowledgeServerMigrationOps {
           continue;
         }
 
+        if (ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE) {
+          if (context.liveCutover() != null && !context.liveCutover().enterGapWait()) {
+            Thread.sleep(1_000);
+            continue;
+          }
+          if (context.liveCutover() != null
+              && context.liveCutover().gapDecision()
+                  == RecordedIngestionLifecycle.GapDecision.ACCEPTED) {
+            context.liveCutover().resumeAcceptedGapBuild();
+          } else {
+            Thread.sleep(1_000);
+          }
+          continue;
+        }
+
         if (!context.migrationEnumeratorDoneSupplier().getAsBoolean()) {
           Thread.sleep(1_000);
           continue;
@@ -240,7 +268,10 @@ public final class KnowledgeServerMigrationOps {
           context.log().info(
               "Migration nearing completion (queueDepth={}). Entering SWITCHING cutover fence...",
               depth);
-          context.switchingTransition().run();
+          if (context.liveCutover() != null) {
+            context.liveCutover().transition("migration-before-switching");
+          }
+          context.switchingTransition().run(state);
           Thread.sleep(250);
           continue;
         }
@@ -282,30 +313,42 @@ public final class KnowledgeServerMigrationOps {
             "Migration drain criteria met in SWITCHING (queueDepth={}). Finalizing cutover...",
             depth);
 
-        long failedJobs;
-        try {
-          failedJobs = context.jobQueue().failureSummary().failedCount();
-        } catch (Exception e) {
-          context.log().warn(
-              "Migration cutover blocked: failed jobs count is unreadable (keeping Blue active): {}",
-              e.getMessage());
-          context
-              .indexGenerationManager()
-              .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
-          context.drainSwitchBufferAction().run();
-          return;
+        if (context.liveCutover() == null || !context.liveCutover().recorded()) {
+          long failedJobs;
+          try {
+            failedJobs = context.jobQueue().failureSummary().failedCount();
+          } catch (Exception e) {
+            context.log().warn(
+                "Migration cutover blocked: failed jobs count is unreadable (keeping Blue active): {}",
+                e.getMessage());
+            context
+                .indexGenerationManager()
+                .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+            context.drainSwitchBufferAction().run();
+            return;
+          }
+          if (context.migrationCutoverMaxFailedJobs() >= 0
+              && failedJobs > context.migrationCutoverMaxFailedJobs()) {
+            context.log().warn(
+                "Migration cutover blocked: failedJobs={} exceeds maxFailedJobs={} (keeping Blue active)",
+                failedJobs,
+                context.migrationCutoverMaxFailedJobs());
+            context
+                .indexGenerationManager()
+                .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+            context.drainSwitchBufferAction().run();
+            return;
+          }
         }
-        if (context.migrationCutoverMaxFailedJobs() >= 0
-            && failedJobs > context.migrationCutoverMaxFailedJobs()) {
-          context.log().warn(
-              "Migration cutover blocked: failedJobs={} exceeds maxFailedJobs={} (keeping Blue active)",
-              failedJobs,
-              context.migrationCutoverMaxFailedJobs());
-          context
-              .indexGenerationManager()
-              .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
-          context.drainSwitchBufferAction().run();
-          return;
+
+        // The recorded owner seals the exact walk and persists its gap witness before any
+        // successor preparation. A user wait must not enter the promotion callback, whose
+        // preparation treats missing approval as a pre-pointer refusal.
+        if (context.liveCutover() != null && context.liveCutover().recorded()
+            && context.liveCutover().gapDecision()
+                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) {
+          if (!context.liveCutover().enterGapWait()) Thread.sleep(250);
+          continue;
         }
 
         LuceneRuntime ingestLifecycle = context.ingestLifecycleSupplier().get();
@@ -329,6 +372,10 @@ public final class KnowledgeServerMigrationOps {
         if (context.liveCutover() != null) {
           IndexGenerationManager.State promoted = context.liveCutover().promote();
           if (promoted == null) {
+            if (context.liveCutover().gapDecision()
+                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) {
+              context.liveCutover().enterGapWait();
+            }
             Thread.sleep(250);
             continue;
           }

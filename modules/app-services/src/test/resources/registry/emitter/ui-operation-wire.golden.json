@@ -93,6 +93,58 @@
   "audience" : "OPERATOR",
   "consumers" : [ ]
 }, {
+  "id" : "core.accept-gaps",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.accept-gaps.label",
+    "descriptionKey" : "ops.accept-gaps.description",
+    "iconHint" : "warning",
+    "category" : "destructive"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "reindexKey" : {
+          "type" : "string",
+          "minLength" : 36,
+          "maxLength" : 36
+        },
+        "gapListHash" : {
+          "type" : "string",
+          "pattern" : "^[0-9a-f]{64}$"
+        }
+      },
+      "required" : [ "reindexKey", "gapListHash" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "OPERATOR",
+  "consumers" : [ ]
+}, {
   "id" : "core.rebuild-index",
   "type" : "operation",
   "presentation" : {

@@ -17,6 +17,7 @@ import io.justsearch.app.services.registry.operations.handlers.ActivateRuntimeVa
 import io.justsearch.app.services.registry.operations.handlers.AddWatchedRootHandler;
 import io.justsearch.app.services.registry.operations.handlers.AllowlistAddDigestHandler;
 import io.justsearch.app.services.registry.operations.handlers.ApplyExcludesHandler;
+import io.justsearch.app.services.registry.operations.handlers.AcceptGapsHandler;
 import io.justsearch.app.services.registry.operations.handlers.BulkReindexHandler;
 import io.justsearch.app.services.registry.operations.handlers.CancelAiInstallHandler;
 import io.justsearch.app.services.registry.operations.handlers.CancelIndexingJobHandler;
@@ -93,6 +94,7 @@ public final class OperationHandlerRegistrations {
         new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.USER_BULK,
             recordedIngestion, context -> recordedRoots.snapshotBindings(), indexingServiceSupplier,
             io.justsearch.app.services.worker.KnowledgeClient::captureRecordedExcludePatterns));
+    handlers.register(CoreOperationCatalog.ACCEPT_GAPS, new AcceptGapsHandler(recordedIngestion));
     handlers.register(
         CoreOperationCatalog.REBUILD_INDEX,
         new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.RECOVERY_REBUILD,

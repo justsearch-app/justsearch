@@ -29,6 +29,7 @@ import io.justsearch.ipc.UpdatePathsResponse;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.lucene.search.MatchAllDocsQuery;
@@ -490,6 +491,16 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
     runtime.commitOps().maybeRefreshBlocking();
     assertEquals(uid, runtime.documentFieldOps().getDocumentField(oldPath, SchemaFields.DOC_UID));
     assertEquals(null, runtime.documentFieldOps().getDocumentField(newPath, SchemaFields.DOC_UID));
+    Path statePath = tempDir.resolve("switching-index-base/state.json");
+    String state = Files.readString(statePath);
+    for (String phase : List.of("AWAITING_ACCEPTANCE", "MIGRATING")) {
+      Files.writeString(statePath, state.replace("\"SWITCHING\"", "\"" + phase + "\""));
+      WorkerServiceException refused = renameExpectingError(service, oldPath, newPath);
+      assertEquals(WorkerServiceException.Status.UNAVAILABLE, refused.status(), phase);
+      assertEquals(uid, identityStore.lookup(oldHash).orElseThrow().docUid(), phase);
+      assertTrue(identityStore.lookup(newHash).isEmpty(), phase);
+      assertEquals(uid, runtime.documentFieldOps().getDocumentField(oldPath, SchemaFields.DOC_UID), phase);
+    }
   }
 
   private void openStoresAndRuntime() throws Exception {

@@ -381,6 +381,7 @@ final class ResourceApiModule implements ApiModule {
     app.post(OperationsController.INGEST_PATH, operationsController::handleIngest);
     app.post(OperationsController.REINDEX_PATH, operationsController::handleReindex);
     app.post(OperationsController.MIGRATION_START_PATH, operationsController::handleMigrationStart);
+    app.post(OperationsController.ACCEPT_GAPS_PATH, operationsController::handleAcceptGaps);
     app.post(OperationsController.UNDO_PATH, operationsController::handleUndo);
 
     // Tempdoc 429 §E.8.a + §F.9 closure: registry catalog endpoints.

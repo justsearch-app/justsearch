@@ -32,11 +32,15 @@ import io.justsearch.indexerworker.recovery.IndexRecoveryPolicy;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.app.api.status.MigrationSource;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.indexerworker.liveness.LivenessWindows;
 import io.justsearch.indexerworker.util.IndexRootLock;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
+import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerSafeMetrics;
 import io.justsearch.indexing.SchemaFields;
@@ -51,6 +55,7 @@ import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.RepoRootLocator;
+import io.justsearch.configuration.SystemAccess;
 import io.justsearch.ort.GpuSessionConfig;
 import io.justsearch.ort.NativeSessionHandle;
 import io.justsearch.telemetry.JvmRuntimeGauges;
@@ -324,6 +329,7 @@ public final class KnowledgeServer implements Closeable {
   private Thread sentinelThread;
   private Thread migrationEnumeratorThread;
   private Thread migrationCutoverThread;
+  private MigrationTransitionBarrier.Hook migrationTransitionHook;
   private volatile boolean running;
   private volatile Consumer<Throwable> terminalWriterFaultHandler =
       failure -> log.error("Terminal writer failure has no Engine fault handler", failure);
@@ -468,6 +474,7 @@ public final class KnowledgeServer implements Closeable {
   private WorkerServiceConfiguration candidateServiceConfiguration;
   private volatile CandidateModels candidateModels;
   private volatile boolean recordedCandidateInPlace;
+  private volatile boolean gapWaitProducerPaused;
   private volatile boolean recordedRefusalCleanupPending;
   private volatile WorkerAppServices inPlaceLexicalServices;
   private volatile EncoderSet.ModelIdentity inPlaceSourceIdentity;
@@ -609,6 +616,8 @@ public final class KnowledgeServer implements Closeable {
     this.executors = Objects.requireNonNull(executors, "executors");
     this.config = config;
     this.dataDir = config.dataDir();
+    this.migrationTransitionHook = MigrationTransitionBarrier.fromEnvironment(
+        this.dataDir, SystemAccess::rawEnvVar);
     this.injectedSignalBus = signalBus;
     this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
     this.luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
@@ -982,10 +991,13 @@ public final class KnowledgeServer implements Closeable {
       // If a migration is already in progress, honor state.json and wire Blue/Green accordingly.
       IndexGenerationManager.MigrationState ms =
           parseMigrationState(state == null ? null : state.migration_state());
+      gapWaitProducerPaused = ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE
+          && recordedCandidate != null;
       String buildingGenId = state == null ? null : state.building_generation();
       boolean inProgress =
           (ms == IndexGenerationManager.MigrationState.MIGRATING
               || ms == IndexGenerationManager.MigrationState.SWITCHING
+              || ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE
               || ms == IndexGenerationManager.MigrationState.FAILED)
               && buildingGenId != null
               && !buildingGenId.isBlank();
@@ -1469,7 +1481,7 @@ public final class KnowledgeServer implements Closeable {
     currentRecordedServingGeneration();
     recordedIngestionAttachment = Objects.requireNonNull(recordedIngestionLifecycle.attach(
         jobQueue, this::currentRecordedServingGeneration, this::recordedWorkerOnline,
-        this::currentRecordedBulkRuntime),
+        this::currentRecordedBulkRuntime, this::withCandidateGapAcceptanceFence),
         "recorded ingestion attachment");
   }
 
@@ -2825,28 +2837,19 @@ public final class KnowledgeServer implements Closeable {
       EncoderSet initial = initialEncoderSet;
       if (initial != null) initial.releaseModelReady();
       for (ServingLease lease : modelWiringLeases) lease.close();
-      if (recordedCandidate != null
+      if (recordedCandidate != null && gapWaitProducerPaused) {
+        if (appServices instanceof DefaultWorkerAppServices producer) {
+          producer.parkCandidateProducerModels();
+          producer.startIndexingLoop();
+        }
+        log.info("Recorded Green waits for gap acceptance with A's models serving");
+      } else if (recordedCandidate != null
           && generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING
           && !closeStarted) {
         try {
           CandidateModels selected = composeRecordedCandidateModels();
           candidateModels = selected;
-          if (!(appServices instanceof DefaultWorkerAppServices current)) {
-            throw new IllegalStateException("Recorded Green has no candidate producer services");
-          }
-          var candidateFingerprint = recordedCandidateFingerprint.runtimeFingerprintInputs()
-              .embeddingModel();
-          var candidateEcc = new EmbeddingCompatibilityController(
-              () -> ingestLifecycle.latestCommitUserDataBestEffort(),
-              this::trustworthyDocCountOrThrow,
-              this::trustworthyCompletedEmbeddingCountOrThrow,
-              () -> java.util.Optional.ofNullable(candidateFingerprint.sha()));
-          candidateEcc.refresh();
-          candidateEmbeddingCompatController = candidateEcc;
-          retainProducerModels(current, selected.owner());
-          current.wireCandidateProducer(selected.embedding(), selected.bindings());
-          current.wireCandidateEmbeddingCompatController(candidateEcc);
-          current.startIndexingLoop();
+          wireRecordedCandidateProducer(selected);
           log.info("Recorded Green candidate model set ready for indexing");
         } catch (Exception failure) {
           recomposeSourceAfterCandidateRefusal(failure);
@@ -2856,6 +2859,27 @@ public final class KnowledgeServer implements Closeable {
         }
       }
     }
+  }
+
+  private void wireRecordedCandidateProducer(CandidateModels selected) throws IOException {
+    if (!(appServices instanceof DefaultWorkerAppServices current)) {
+      throw new IOException("Recorded Green has no candidate producer services");
+    }
+    if (candidateEmbeddingCompatController == null) {
+      var candidateFingerprint = recordedCandidateFingerprint.runtimeFingerprintInputs()
+          .embeddingModel();
+      var candidateEcc = new EmbeddingCompatibilityController(
+          () -> ingestLifecycle.latestCommitUserDataBestEffort(),
+          this::trustworthyDocCountOrThrow,
+          this::trustworthyCompletedEmbeddingCountOrThrow,
+          () -> java.util.Optional.ofNullable(candidateFingerprint.sha()));
+      candidateEcc.refresh();
+      candidateEmbeddingCompatController = candidateEcc;
+    }
+    retainProducerModels(current, selected.owner());
+    current.wireCandidateProducer(selected.embedding(), selected.bindings());
+    current.wireCandidateEmbeddingCompatController(candidateEmbeddingCompatController);
+    current.startIndexingLoop();
   }
 
   /** Latch release also happens on failure; only the actual composed-and-wired surface certifies readiness. */
@@ -4268,6 +4292,30 @@ public final class KnowledgeServer implements Closeable {
     modelReadyLatch.countDown();
   }
 
+  void installMigrationBarrierForTests(MigrationTransitionBarrier.Hook hook) {
+    if (running || migrationCutoverThread != null) {
+      throw new IllegalStateException("Migration barrier must be injected before start");
+    }
+    migrationTransitionHook = Objects.requireNonNull(hook, "hook");
+  }
+
+  private void migrationTransition(String point) throws IOException, InterruptedException {
+    if (migrationTransitionHook == MigrationTransitionBarrier.NO_HOOK) return;
+    var state = indexGenerationManager.readStateBestEffort();
+    migrationTransitionHook.await(new MigrationTransitionBarrier.Transition(point,
+        state == null ? null : state.active_generation(),
+        state == null ? null : state.building_generation()));
+  }
+
+  private void migrationTransitionForPublication(String point) throws IOException {
+    try {
+      migrationTransition(point);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Migration publication barrier interrupted", interrupted);
+    }
+  }
+
   private static IndexGenerationManager.MigrationState parseMigrationState(String raw) {
     return KnowledgeServerMigrationOps.parseMigrationState(raw);
   }
@@ -4304,9 +4352,38 @@ public final class KnowledgeServer implements Closeable {
                            throw new IOException("Live cutover requires its prepared serving successor");
                          },
                          this::enterSwitchingWithMutationAdmission,
-                         generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
-                             ? () -> promoteServingSuccessor(recorded)
-                             : () -> promoteServingSuccessor(null)));
+                         new KnowledgeServerMigrationOps.CheckedLiveCutover() {
+                           @Override public boolean recorded() {
+                             return generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded;
+                           }
+
+                           @Override public IndexGenerationManager.State promote()
+                               throws IOException, InterruptedException {
+                             return promoteServingSuccessor(
+                                 generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+                                     ? recorded : null);
+                           }
+
+                           @Override public RecordedIngestionLifecycle.GapDecision gapDecision() {
+                             if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)) {
+                               return RecordedIngestionLifecycle.GapDecision.NONE;
+                             }
+                             return recordedIngestionLifecycle.recordedGapDecision(
+                                 recorded.operationKey(), candidateJournalWitness());
+                           }
+
+                           @Override public boolean enterGapWait() throws IOException, InterruptedException {
+                             return holdInPlaceCandidateForGapDecision();
+                           }
+
+                           @Override public boolean resumeAcceptedGapBuild() throws IOException, InterruptedException {
+                             return resumeInPlaceCandidateAfterGapDecision();
+                           }
+
+                           @Override public void transition(String point) throws IOException, InterruptedException {
+                             migrationTransition(point);
+                           }
+                         }));
               } finally {
                 try { reconcileRefusedRecordedCandidate(); }
                 catch (RuntimeException failure) {
@@ -4322,6 +4399,161 @@ public final class KnowledgeServer implements Closeable {
   private boolean recordedCandidatePrecommitRefused() {
     return generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
         && recordedIngestionLifecycle.recordedPrecommitRefused(recorded.operationKey());
+  }
+
+  /** An approval is stamped only against the Green witness held stable by this physical fence. */
+  io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance
+      withCandidateGapAcceptanceFence(java.util.function.Function<
+          RecordedIngestionLifecycle.JournalWitness,
+          io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance> decision)
+          throws IOException, InterruptedException {
+    runtimeSwapLock.lock();
+    try {
+      var state = indexGenerationManager.readStateBestEffort();
+      if (closeStarted || state == null
+          || !"AWAITING_ACCEPTANCE".equals(state.migration_state())
+          || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)
+          || !(appServices instanceof DefaultWorkerAppServices producer)) {
+        throw new IOException("Candidate gap decision has no active physical owner");
+      }
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        if (fence == null || !producer.mutationAdmission().replayCertain()) {
+          throw new IOException("Candidate gap witness cannot be fenced");
+        }
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (true) {
+          var counts = jobQueue.jobStateCountsStrict();
+          if (counts.processingCount() == 0 && counts.pendingReadyCount() == 0
+              && counts.pendingBackoffCount() == 0) break;
+          if (closeStarted || System.nanoTime() >= deadline) {
+            throw new IOException("Accepted candidate writes have not settled for gap decision");
+          }
+          Thread.sleep(100);
+        }
+        if (!producer.pauseProducerForCutover(10_000)) {
+          throw new IOException("Candidate writer cannot pause for gap decision");
+        }
+        try {
+          return decision.apply(candidateJournalWitness());
+        } finally {
+          producer.resumeProducerAfterCutover();
+        }
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Final Green file witnesses are read by the Worker, never inferred from Head queue counts. */
+  RecordedIngestionLifecycle.JournalWitness candidateJournalWitness() {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal)
+        || indexGenerationManager == null || ingestLifecycle == null) {
+      throw new IllegalStateException("Candidate journal or Green runtime is unavailable");
+    }
+    IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+    if (state == null || state.building_generation() == null) {
+      throw new IllegalStateException("Candidate generation is unavailable");
+    }
+    List<OperationOutcomeView.Gap> gaps = new ArrayList<>();
+    Set<String> covered = new LinkedHashSet<>();
+    for (var op : journal.listSwitchBufferOpsStrictForGeneration(state.building_generation())) {
+      if ("UPSERT".equals(op.op())) {
+        SwitchBufferUpsert upsert = SwitchBufferUpsert.decode(op.payload());
+        String unit = DocumentIdentityStore.pathHash(upsert.path());
+        if (upsert.sourceSha256() == null) {
+          gaps.add(new OperationOutcomeView.Gap(unit, "PROJECTION_WITNESS_MISSING"));
+        } else if (!journal.matchesAcceptedFileProjection(
+            upsert.path(), upsert.unitRevision(), upsert.sourceSha256())
+            || !upsert.sourceSha256().equals(ingestLifecycle.documentFieldOps()
+                .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) {
+          gaps.add(new OperationOutcomeView.Gap(unit, "CANDIDATE_PROJECTION_MISSING"));
+        } else {
+          covered.add(unit);
+        }
+      } else if ("DELETE".equals(op.op())) {
+        String unit = DocumentIdentityStore.pathHash(op.payload());
+        if (ingestLifecycle.documentFieldOps()
+            .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) {
+          gaps.add(new OperationOutcomeView.Gap(unit, "DELETE_NOT_APPLIED"));
+        } else {
+          covered.add(unit);
+        }
+      }
+    }
+    return new RecordedIngestionLifecycle.JournalWitness(gaps, covered);
+  }
+
+  /** The operator wait has no deadline; release B's native set and restore A before resting. */
+  boolean holdInPlaceCandidateForGapDecision() throws IOException, InterruptedException {
+    runtimeSwapLock.lock();
+    try {
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state != null && "AWAITING_ACCEPTANCE".equals(state.migration_state())
+          && !recordedCandidateInPlace) return true;
+      if (!(appServices instanceof DefaultWorkerAppServices producer)) {
+        throw new IOException("Gap wait lost its Green producer");
+      }
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        if (fence == null) return false;
+        if (recordedCandidateInPlace) {
+          if (!producer.pauseProducerForCutover(10_000)) return false;
+          try {
+            producer.parkCandidateProducerModels();
+            gapWaitProducerPaused = true;
+            recomposeSourceAfterCandidateRefusal(new IOException("Candidate awaits gap acceptance"));
+            if (recordedCandidateInPlace) {
+              // B is parked and the component reports UNAVAILABLE. Retain an unbounded wait so
+              // the monitor can retry A composition instead of timing out in SWITCHING.
+              indexGenerationManager.updateMigrationState(
+                  IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+              return false;
+            }
+          } finally {
+            producer.resumeProducerAfterCutover();
+          }
+        }
+        indexGenerationManager.updateMigrationState(
+            IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+        return true;
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Rebuild B under the original device-line decision before leaving the unbounded wait. */
+  private boolean resumeInPlaceCandidateAfterGapDecision() throws IOException, InterruptedException {
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted || recordedCandidateInPlace) return false;
+      if (!(appServices instanceof DefaultWorkerAppServices producer)) return false;
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        if (fence == null) return false;
+        if (gapWaitProducerPaused) {
+          if (!producer.pauseProducerForCutover(10_000)) return false;
+          try {
+            CandidateModels selected = composeRecordedCandidateModels();
+            candidateModels = selected;
+            wireRecordedCandidateProducer(selected);
+            gapWaitProducerPaused = false;
+          } catch (IOException | RuntimeException failure) {
+            producer.parkCandidateProducerModels();
+            recomposeSourceAfterCandidateRefusal(failure);
+            log.warn("Accepted gap candidate cannot resume yet; A remains serving", failure);
+            return false;
+          } finally {
+            producer.resumeProducerAfterCutover();
+          }
+        }
+        indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+        return true;
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
   }
 
   /** The application has durably refused B while A is still the pointer. Retire Green first. */
@@ -4409,7 +4641,8 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /** State transition and producer admission use one lock order: runtime, mutation, generation. */
-  private void enterSwitchingWithMutationAdmission() throws IOException, InterruptedException {
+  private void enterSwitchingWithMutationAdmission(IndexGenerationManager.State observed)
+      throws IOException, InterruptedException {
     runtimeSwapLock.lock();
     try {
       if (closeStarted || !(appServices instanceof DefaultWorkerAppServices services)) {
@@ -4424,7 +4657,12 @@ public final class KnowledgeServer implements Closeable {
           indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
           throw new IOException("Migration has an unrecorded watcher mutation; rescan before retry");
         }
+        var state = indexGenerationManager.readStateBestEffort();
+        if (state == null || !"MIGRATING".equals(state.migration_state())
+            || !Objects.equals(observed.active_generation(), state.active_generation())
+            || !Objects.equals(observed.building_generation(), state.building_generation())) return;
         indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+        migrationTransition("migration-switching-entered");
       }
     } finally {
       runtimeSwapLock.unlock();
@@ -4477,6 +4715,9 @@ public final class KnowledgeServer implements Closeable {
         if (!current.mutationAdmission().replayCertain()) {
           throw new IOException("Unrecorded watcher mutation prevents certified promotion");
         }
+        if (recorded != null && recordedIngestionLifecycle.recordedGapDecision(
+            recorded.operationKey(), candidateJournalWitness())
+                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) return null;
         var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
             new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 jobQueue, green, signalBus, indexingPacing, indexBasePath, buildingIndexPath,
@@ -4498,14 +4739,18 @@ public final class KnowledgeServer implements Closeable {
         var settled = jobQueue.jobStateCountsStrict();
         if (settled.processingCount() != 0 || settled.pendingReadyCount() != 0
             || settled.pendingBackoffCount() != 0 || !current.mutationAdmission().replayCertain()
-            || (migrationCutoverMaxFailedJobs >= 0
+            || (recorded == null && migrationCutoverMaxFailedJobs >= 0
                 && settled.failedCount() > migrationCutoverMaxFailedJobs)
             || !finalizeEmbeddingRebuildBeforeCutover()) return null;
+        migrationTransition("migration-green-drained");
         current.commitActiveLexicalProjectionForCutover();
         green.commitOps().commitWithBuildState(
             LuceneRuntimeTypes.BuildState.COMPLETE,
             io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
         if (!verifyGreenCommitMetadataBestEffort()) return null;
+        if (recorded != null && recordedIngestionLifecycle.recordedGapDecision(
+            recorded.operationKey(), candidateJournalWitness())
+                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) return null;
 
         Path successorPath = buildingIndexPath;
         ServingLease heldSource = captureServingView();
@@ -4537,7 +4782,7 @@ public final class KnowledgeServer implements Closeable {
               var counts = jobQueue.jobStateCountsStrict();
               if (counts.processingCount() != 0 || counts.pendingReadyCount() != 0
                   || counts.pendingBackoffCount() != 0
-                  || (migrationCutoverMaxFailedJobs >= 0
+                  || (recorded == null && migrationCutoverMaxFailedJobs >= 0
                       && counts.failedCount() > migrationCutoverMaxFailedJobs)) {
                 throw new IOException("Green changed during cutover preparation");
               }
@@ -4572,8 +4817,10 @@ public final class KnowledgeServer implements Closeable {
                     IndexGenerationManager.State promoted;
                     try {
                       if (projection != null) projection.admitBeforePointer();
+                      migrationTransitionForPublication("migration-before-pointer-commit");
                       promoted = recordedPromotion == null
                           ? nativePromotion.promote() : recordedPromotion.promote();
+                      migrationTransitionForPublication("migration-after-pointer-commit");
                       // Settings are the roll-forward projection of this committed pointer.
                       // Keep capture excluded until the accepted candidate is durably installed.
                       if (projection != null) projection.afterPointerCommitted();
@@ -4602,6 +4849,7 @@ public final class KnowledgeServer implements Closeable {
                       fence.install(preparedServices.mutationOwnerToken());
                       throw new IOException("Live promotion returned no generation");
                     }
+                    migrationTransitionForPublication("migration-before-live-activation");
                     fence.install(preparedServices.mutationOwnerToken());
                     transfer.install();
                     current.clearActiveLexicalProjectionAfterCutover();
@@ -4644,6 +4892,7 @@ public final class KnowledgeServer implements Closeable {
                     committedProjection.set(projection);
                     published.set(true);
                     if (recordedCandidate != null) publishEncoderComposition();
+                    migrationTransitionForPublication("migration-after-live-activation");
                     return promoted;
                   } finally {
                     publicationLock.writeLock().unlock();

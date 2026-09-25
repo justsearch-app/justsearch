@@ -252,6 +252,18 @@ hour of sandbox time.
 
 ## 8. The record (evidence/E/)
 
+- `development-cost.md` reports five descriptive paired measures on `main` and
+  the branch. They do not add a merge gate or trigger the conditional
+  representative-change exercise. Use the same machine and frozen corpus:
+
+  | measure | command or owned instrument |
+  |---|---|
+  | Full-suite wall clock | `Measure-Command { ./gradlew.bat test --max-workers=1 }`, with revision, cache state and result |
+  | Stack start to first successful search | `python -m jseval run --dataset scifact --modes lexical --pipeline --start-backend --clean --max-queries 1 --timeline tmp/start-first-search.tsv` from `scripts/jseval/`; record launcher and first successful query timestamps in jseval's result. Add that field to jseval if absent before reporting a number. |
+  | Verification-profile boot | D2-2's `dev-runner --profile verification` boot receipt, timed to the first ready API response; D2-2 must land the flag and receipt before this row runs. |
+  | Whole-Engine hot reload | `justsearch-dev reload` on an owned stack after a small class change in each Engine half; record whether one reload covers both, its revision and result. |
+  | Production Java lines by ring | `rg --files modules -g '*.java' -g '!**/test/**'`; classify the tracked production paths through the stage F subsystem map, then count physical lines with `Measure-Object -Line` for API front, core and edges separately. Keep generated sources separate. |
+
 - values.json fixes the seven groups' bounds, corpus, G1/heap, soak duration
   supplied by the owner and hang values before their runs.
 - One directory for each E1-E7 group holds commands, branch and main revisions,

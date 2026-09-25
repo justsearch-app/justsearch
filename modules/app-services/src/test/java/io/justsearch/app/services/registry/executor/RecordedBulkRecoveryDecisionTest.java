@@ -120,15 +120,18 @@ final class RecordedBulkRecoveryDecisionTest {
   }
 
   @Test
-  void inactiveAndCompleteWithGapsRowsCannotContinue(@TempDir Path temp) throws IOException {
+  void inactiveRowsRefuseWhileCompleteWithGapsCanContinue(@TempDir Path temp) throws IOException {
     Fixture fixture = fixture(temp.resolve("inactive"), RecordedBulkPlan.Profile.USER_BULK,
         OperationState.RUNNING, List.of(), List.of(), TransportTag.SYSTEM_INTERNAL);
 
     for (OperationState state : List.of(OperationState.COMPLETE, OperationState.FAILED,
-        OperationState.CANCELLED, OperationState.COMPLETE_WITH_GAPS)) {
+        OperationState.CANCELLED)) {
       assertRefused("RECOVERY_OPERATION_INACTIVE", fixture.authority().evaluateRecordedBulk(
           withState(fixture.row(), state), fixture.preparation()));
     }
+    assertInstanceOf(OperationAuthority.RecordedBulkRecoveryDecision.Authorized.class,
+        fixture.authority().evaluateRecordedBulk(
+            withState(fixture.row(), OperationState.COMPLETE_WITH_GAPS), fixture.preparation()));
   }
 
   @Test
@@ -260,7 +263,9 @@ final class RecordedBulkRecoveryDecisionTest {
 
   private static OperationRecord withState(OperationRecord row, OperationState state) {
     return new OperationRecord(row.id(), row.key(), row.descriptor(), row.context(), row.executor(),
-        row.initiator(), row.correlationId(), state, state == OperationState.ACCEPTED ? "accepted" : "terminal",
+        row.initiator(), row.correlationId(), state,
+        state == OperationState.ACCEPTED ? "accepted"
+            : state == OperationState.COMPLETE_WITH_GAPS ? "awaiting_acceptance" : "terminal",
         row.checkpointCursor(), row.unitsCompleted(), row.unitsFailed(), row.attempts(), row.acceptedAt(),
         row.startedAt(), row.updatedAt(), row.completedAt(), row.failureReason(), row.receipt(),
         row.historyMode(), row.provenanceOccurredAt(), row.expectedSettingsRevision());

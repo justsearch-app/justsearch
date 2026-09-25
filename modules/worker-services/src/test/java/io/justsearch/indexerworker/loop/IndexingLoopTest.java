@@ -812,7 +812,7 @@ class IndexingLoopTest {
     }
 
     @Test
-    void greenClaimProjectsLexicalDocumentToActiveGenerationBeforeGreen() throws Exception {
+    void parkedGreenClaimProjectsLexicalDocumentToActiveGenerationBeforeGreen() throws Exception {
       Path file = Files.writeString(Files.createTempFile("js-active-lexical", ".txt"), "body");
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
@@ -827,7 +827,9 @@ class IndexingLoopTest {
       invokeWriteExtractedJob(loop, extractedJob(file, "body"));
 
       var lexical = org.mockito.ArgumentCaptor.forClass(IndexDocument.class);
+      var candidate = org.mockito.ArgumentCaptor.forClass(IndexDocument.class);
       verify(activeWrites).indexSingle(lexical.capture());
+      verify(queue.indexingCoordinator).indexSingle(candidate.capture());
       var order = inOrder(activeWrites, queue.indexingCoordinator);
       order.verify(activeWrites).indexSingle(any());
       order.verify(queue.indexingCoordinator).indexSingle(any());
@@ -836,7 +838,13 @@ class IndexingLoopTest {
           lexical.getValue().fields().get(SchemaFields.EMBEDDING_STATUS));
       assertFalse(lexical.getValue().fields().containsKey(SchemaFields.VECTOR),
           "B's embedding must never be written into A");
+      assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
+          candidate.getValue().fields().get(SchemaFields.EMBEDDING_STATUS));
+      assertFalse(candidate.getValue().fields().containsKey(SchemaFields.VECTOR),
+          "the parked producer cannot reuse B's unloaded native set");
       assertNull(queue.lastOutcome, "neither generation may acknowledge before commit");
+      invokeFinishIdleCommit(loop);
+      assertTrue(queue.done, "A and Green commits must precede the durable queue ACK");
       loop.commitActiveLexicalSource(
           CommitReason.MIGRATION_CUTOVER);
       verify(activeCommits).commitAndTrack(

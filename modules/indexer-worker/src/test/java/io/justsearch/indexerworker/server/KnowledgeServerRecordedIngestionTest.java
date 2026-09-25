@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -228,6 +229,127 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  @DisplayName("final journal witness distinguishes failed Green projection from exact success")
+  void journalGapWitnessTracksExactGreenProjection(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    KnowledgeServer server = helperServer(layout);
+    var manager = org.mockito.Mockito.mock(IndexGenerationManager.class);
+    String generation = "g-candidate";
+    org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
+        new IndexGenerationManager.State(1, "g-source", generation, null, "SWITCHING", false,
+            null, null, System.currentTimeMillis(), null, null, null));
+    var queue = org.mockito.Mockito.mock(
+        io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
+    var green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var fields = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    org.mockito.Mockito.when(green.documentFieldOps()).thenReturn(fields);
+    Path path = tempDir.resolve("later.txt").toAbsolutePath();
+    String hash = "a".repeat(64);
+    var upsert = new io.justsearch.indexerworker.queue.SwitchBufferUpsert(
+        path.toString(), "notes", null, "accepted-revision", hash);
+    var version = new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp(
+        generation, "path:" + path, "UPSERT", upsert.encode(), 1L, "journal-v1");
+    org.mockito.Mockito.when(queue.listSwitchBufferOpsStrictForGeneration(generation))
+        .thenReturn(List.of(version));
+    setField(server, "indexGenerationManager", manager);
+    setField(server, "jobQueue", queue);
+    setField(server, "ingestLifecycle", green);
+    try {
+      var missing = server.candidateJournalWitness();
+      assertEquals(1, missing.gaps().size());
+      assertEquals("CANDIDATE_PROJECTION_MISSING", missing.gaps().getFirst().reason());
+      assertTrue(missing.coveredUnitIds().isEmpty());
+
+      org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
+          path.toString(), "accepted-revision", hash)).thenReturn(true);
+      org.mockito.Mockito.when(fields.getDocumentField(path.toString(),
+          io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(hash);
+      var settled = server.candidateJournalWitness();
+      assertTrue(settled.gaps().isEmpty());
+      assertEquals(Set.of(io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(
+          path.toString())), settled.coveredUnitIds());
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
+  @DisplayName("a refused producer park cannot durably advertise the unbounded gap wait")
+  void gapWaitRequiresPhysicalProducerParkBeforeStateChange(@TempDir Path tempDir)
+      throws Exception {
+    KnowledgeServer server = helperServer(preparedLayout(tempDir));
+    var manager = org.mockito.Mockito.mock(IndexGenerationManager.class);
+    org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
+        new IndexGenerationManager.State(1, "g-source", "g-candidate", null, "SWITCHING",
+            false, null, null, System.currentTimeMillis(), null, null, null));
+    var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    Object owner = new Object();
+    org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
+    org.mockito.Mockito.when(producer.mutationAdmission()).thenReturn(
+        new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
+    org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(false);
+    server.appServices = producer;
+    setField(server, "indexGenerationManager", manager);
+    setField(server, "recordedCandidateInPlace", true);
+    try {
+      assertFalse(server.holdInPlaceCandidateForGapDecision());
+      org.mockito.Mockito.verify(manager, org.mockito.Mockito.never())
+          .updateMigrationState(IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+      org.mockito.Mockito.verify(producer, org.mockito.Mockito.never())
+          .parkCandidateProducerModels();
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
+  @DisplayName("candidate gap approval drains accepted Green work before freezing its witness")
+  void gapAcceptanceFenceDrainsBeforeProducerPause(@TempDir Path tempDir) throws Exception {
+    KnowledgeServer server = helperServer(preparedLayout(tempDir));
+    var manager = org.mockito.Mockito.mock(IndexGenerationManager.class);
+    org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
+        new IndexGenerationManager.State(1, "g-source", "g-candidate", null,
+            "AWAITING_ACCEPTANCE", false, null, null, System.currentTimeMillis(), null, null, null));
+    var queue = org.mockito.Mockito.mock(
+        io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
+    org.mockito.Mockito.when(queue.jobStateCountsStrict()).thenReturn(
+        new JobQueue.JobStateCounts(1, 1, 0, 0, 0),
+        new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    org.mockito.Mockito.when(queue.listSwitchBufferOpsStrictForGeneration("g-candidate"))
+        .thenReturn(List.of());
+    var green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    Object owner = new Object();
+    org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
+    org.mockito.Mockito.when(producer.mutationAdmission()).thenReturn(
+        new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
+    org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+    server.appServices = producer;
+    setField(server, "indexGenerationManager", manager);
+    setField(server, "jobQueue", queue);
+    setField(server, "ingestLifecycle", green);
+    setField(server, "generationBootOwnership",
+        new IndexGenerationManager.BootOwnership.Recorded("recorded-key", "g-source",
+            "test", "a".repeat(64), true));
+    try {
+      var result = server.withCandidateGapAcceptanceFence(witness -> {
+        assertTrue(witness.gaps().isEmpty());
+        return io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance.ACCEPTED;
+      });
+      assertEquals(io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance.ACCEPTED,
+          result);
+      var order = org.mockito.Mockito.inOrder(queue, producer);
+      order.verify(queue, org.mockito.Mockito.times(2)).jobStateCountsStrict();
+      order.verify(producer).pauseProducerForCutover(10_000);
+      order.verify(queue).listSwitchBufferOpsStrictForGeneration("g-candidate");
+      order.verify(producer).resumeProducerAfterCutover();
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
   @DisplayName("refused recorded candidate retains Green when accepted A projection is missing")
   void refusalDoesNotAbandonUnprovedAcceptedMutation(@TempDir Path tempDir) throws Exception {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);
@@ -289,6 +411,84 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.verify(queue, org.mockito.Mockito.never())
         .removeReplayedSwitchBufferOps(org.mockito.ArgumentMatchers.anyList());
     org.mockito.Mockito.verify(producer).resumeProducerAfterCutover();
+  }
+
+  @Test
+  @DisplayName("refused recorded candidate transfers an accepted file to A before abandonment")
+  void refusalTransfersAcceptedMutationBeforeAbandoningCandidate(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    var lifecycle = org.mockito.Mockito.mock(RecordedIngestionLifecycle.class);
+    var server = new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
+    String operation = "01994180-0000-7000-8000-000000000199";
+    String active = "g-source";
+    String building = "g-" + operation;
+    var manager = org.mockito.Mockito.mock(IndexGenerationManager.class);
+    org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
+        new IndexGenerationManager.State(1, active, building, null, "SWITCHING", false,
+            null, null, System.currentTimeMillis(), null, null, null));
+    org.mockito.Mockito.when(manager.resolveGenerationPathStrict(active))
+        .thenReturn(layout.activePath());
+    org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
+    var source = org.mockito.Mockito.mock(RunningRuntime.class);
+    var green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    var commits = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.CommitOps.class);
+    org.mockito.Mockito.when(source.documentFieldOps()).thenReturn(fields);
+    org.mockito.Mockito.when(source.commitOps()).thenReturn(commits);
+    var owner = new Object();
+    var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    org.mockito.Mockito.when(producer.mutationAdmission()).thenReturn(
+        new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
+    org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
+    org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+    var closed = new AtomicBoolean();
+    org.mockito.Mockito.doAnswer(invocation -> { closed.set(true); return null; })
+        .when(producer).close();
+    org.mockito.Mockito.when(producer.producerClosed()).thenAnswer(ignored -> closed.get());
+    var queue = org.mockito.Mockito.mock(
+        io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
+    var file = Files.writeString(tempDir.resolve("accepted.txt"), "accepted").toAbsolutePath();
+    String hash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    var upsert = new io.justsearch.indexerworker.queue.SwitchBufferUpsert(
+        file.toString(), null, null, "accepted-revision", hash);
+    var version = new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp(
+        building, "path:" + file, "UPSERT", upsert.encode(), 1, "v1");
+    org.mockito.Mockito.when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
+    org.mockito.Mockito.when(queue.jobStateCountsStrict()).thenReturn(
+        new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
+        file.toString(), "accepted-revision", hash)).thenReturn(true);
+    org.mockito.Mockito.when(fields.getDocumentField(file.toString(),
+        io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(hash);
+    org.mockito.Mockito.when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
+    server.appServices = producer;
+    setField(server, "recordedRefusalCleanupPending", true);
+    setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
+        operation, active, "recorded-test", "a".repeat(64), true));
+    setField(server, "indexGenerationManager", manager);
+    setField(server, "activeIndexPath", layout.activePath());
+    setField(server, "searchLifecycle", source);
+    setField(server, "ingestLifecycle", green);
+    setField(server, "jobQueue", queue);
+    var restarted = new AtomicBoolean();
+    setField(server, "migrationRestartAction", (Runnable) () -> restarted.set(true));
+
+    var reconcile = KnowledgeServer.class.getDeclaredMethod("reconcileRefusedRecordedCandidate");
+    reconcile.setAccessible(true);
+    reconcile.invoke(server);
+
+    var order = org.mockito.Mockito.inOrder(producer, queue, green, manager);
+    order.verify(producer).commitActiveLexicalProjectionForCutover();
+    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash);
+    order.verify(queue).removeReplayedSwitchBufferOps(List.of(version));
+    order.verify(producer).close();
+    order.verify(green).close();
+    order.verify(manager).abandonBuildingGeneration("recorded candidate refused");
+    assertTrue(closed.get());
+    assertTrue(restarted.get());
   }
 
   @Test

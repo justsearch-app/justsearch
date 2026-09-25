@@ -16,6 +16,7 @@ import io.justsearch.app.api.indexing.FailedJobsResponse;
 import io.justsearch.app.api.knowledge.FolderBrowseResponse;
 import io.justsearch.app.api.knowledge.FolderFilesResponse;
 import io.justsearch.app.api.knowledge.SearchTrace;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.run.LiveRunsResponse;
 import io.justsearch.app.api.settings.SettingsV2;
 import io.justsearch.app.api.status.InferenceStatusResponse;
@@ -180,6 +181,13 @@ final class WireRecordSchemaGenTest {
   @DisplayName("SettingsV2")
   void settingsV2() throws IOException {
     captureOrVerify(SettingsV2.class, "settings-v2.v1.json");
+  }
+
+  /** The Library's recorded gap action consumes the live operation-history outcome. */
+  @Test
+  @DisplayName("OperationOutcomeView")
+  void operationOutcomeView() throws IOException {
+    captureOrVerify(OperationOutcomeView.class, "operation-outcome-view.v1.json");
   }
 
   private static void captureOrVerify(Class<?> type, String fileName) throws IOException {

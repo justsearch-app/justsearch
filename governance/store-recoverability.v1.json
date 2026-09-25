@@ -45,18 +45,23 @@
       ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "JSON envelope v1 around legacy UiSettings object",
-      "currentVersion": 1,
+      "format": "JSON envelope v4 around UiSettings object",
+      "currentVersion": 4,
       "readableLegacyVersions": [
-        0
+        0,
+        1,
+        2,
+        3
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
       "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite.",
       "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1",
+      "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v4 and reads v0-v3; currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
@@ -117,6 +122,7 @@
         0
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/intent/DurableGrantStore.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/intent/DurableGrantStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/intent/DurableGrantStoreTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -151,6 +157,7 @@
         0
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/PluginAllowlistStore.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/settings/PluginAllowlistStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PluginAllowlistStoreTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -186,6 +193,7 @@
         0
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/FeedbackCaptureSettings.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/FeedbackCaptureSettings.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/feedback/FeedbackCaptureSettingsTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -217,6 +225,7 @@
       "currentVersion": 1,
       "readableLegacyVersions": [],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/ai/pack/InstalledPacksStore.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/ai/pack/InstalledPacksStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/ai/pack/InstalledPacksStoreTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -248,6 +257,7 @@
       "currentVersion": 2,
       "readableLegacyVersions": [],
       "versionAuthority": "modules/configuration/src/main/java/io/justsearch/configuration/model/InstallContractIO.java",
+      "versionSource": { "file": "modules/configuration/src/main/java/io/justsearch/configuration/model/InstallContractIO.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/configuration/src/test/java/io/justsearch/configuration/model/InstallContractIOTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -343,6 +353,7 @@
         0
       ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/FileMemoryStore.java",
+      "versionSource": { "file": "modules/app-agent/src/main/java/io/justsearch/agent/FileMemoryStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/FileMemoryStoreTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -377,6 +388,7 @@
         0
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
       "atomicity": "ATOMIC_META_REPLACE_AND_APPEND_ONLY_MESSAGES",
@@ -414,6 +426,7 @@
         3
       ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/AgentRunStore.java",
+      "versionSource": { "file": "modules/app-agent/src/main/java/io/justsearch/agent/AgentRunStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/AgentRunStoreSchemaUpcasterTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
       "atomicity": "ATOMIC_META_REPLACE_AND_SINGLE_APPEND",
@@ -451,6 +464,7 @@
         0
       ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/RunEventStore.java",
+      "versionSource": { "file": "modules/app-agent/src/main/java/io/justsearch/agent/RunEventStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/RunEventStoreTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
       "atomicity": "ATOMIC_META_REPLACE_AND_SINGLE_APPEND",
@@ -485,6 +499,7 @@
         1
       ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/tools/FileOperationLog.java",
+      "versionSource": { "file": "modules/app-agent/src/main/java/io/justsearch/agent/tools/FileOperationLog.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogTest.java",
       "versionNote": "v2 (tempdoc 909 items 7/8) added executed[].destinationDigest - the content identity a COPY-undo must match before it deletes the file. Purely additive: no field was removed or re-shaped, so v0 and v1 journals still read (FileOperationLogTest.legacyV1JournalRemainsReadable). A v1 entry's ABSENT digest is load-bearing rather than a gap: it is what tells the undo it cannot prove identity, so it preserves the file instead of deleting it. The bump exists so an OLDER app refuses a v2 journal loudly instead of undoing it under v1's weaker guarantee.",
       "writeMode": "FULL_REWRITE",
@@ -520,6 +535,7 @@
         0
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/NdjsonAppendStore.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/NdjsonAppendStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/feedback/NdjsonAppendStoreTest.java",
       "writeMode": "APPEND_ONLY",
       "atomicity": "SINGLE_APPEND",
@@ -582,6 +598,7 @@
         0
       ],
       "versionAuthority": "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WatchedRootsFormat.java",
+      "versionSource": { "file": "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WatchedRootsFormat.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootsStoreTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -644,6 +661,7 @@
         20
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
+      "versionSource": { "file": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java", "symbol": "TARGET_VERSION" },
       "futureVersionRefusalTest": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
       "writeMode": "TRANSACTIONAL",
       "atomicity": "TRANSACTIONAL",
@@ -693,6 +711,7 @@
         1
       ],
       "versionAuthority": "modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java",
+      "versionSource": { "file": "modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java", "symbol": "STATE_FORMAT_VERSION" },
       "futureVersionRefusalTest": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java",
       "writeMode": "GENERATION_SWAP",
       "atomicity": "ATOMIC_REPLACE",
@@ -767,6 +786,7 @@
         0
       ],
       "versionAuthority": "modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/EntityClusterStore.java",
+      "versionSource": { "file": "modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/EntityClusterStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/EntityClusterStoreTest.java",
       "writeMode": "TRANSACTIONAL",
       "atomicity": "TRANSACTIONAL",
@@ -1271,6 +1291,7 @@
       "currentVersion": 1,
       "readableLegacyVersions": [],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/InstallAttemptMemory.java",
+      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/InstallAttemptMemory.java", "symbol": "VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/InstallAttemptMemoryTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
@@ -1511,7 +1532,8 @@
     },
     {
       "id": "operation-fault-harness-barrier",
-      "pathVerification": "LITERAL",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "HarnessBarrierProtocol composes the runtime path from the selected operation-fault family and reached/pending/release suffixes.",
       "encryption": "NOT_APPLICABLE",
       "encryptionNote": "Opt-in installed-test coordination only: operation keys, phase, receipt cursor/counters and PID, with no document content, credentials or user settings. The release file carries a timestamp but is consumed only as a presence signal. Normal product startup does not create these files.",
       "owner": "HEAD",
@@ -1527,8 +1549,31 @@
       "corruptionPolicy": "FAIL_LOUD",
       "reconciliation": "The selected harness run preserves the reached marker across its forced restart so the successor cannot retrigger the same barrier. The Engine directly writes pending JSON and atomically moves it to reached; the harness directly writes the release timestamp, whose contents the Engine never parses. The Engine checks presence only; the harness parses and validates exact phase/key/PID before killing. Malformed evidence fails that test rather than authorizing a kill. Each new case gets a fresh data directory; no product recovery or upgrade consumes this evidence. A pending write is never treated as reached.",
       "status": "READY",
-      "implementationSources": ["modules/ui/src/main/java/io/justsearch/ui/OperationFaultBarrier.java", "scripts/supervisor-conformance/operation-fault-scenario.mjs"],
+      "implementationSources": ["modules/ui/src/main/java/io/justsearch/ui/OperationFaultBarrier.java", "modules/core/src/main/java/io/justsearch/core/harness/HarnessBarrierProtocol.java", "scripts/supervisor-conformance/operation-fault-scenario.mjs"],
       "tests": ["modules/ui/src/test/java/io/justsearch/ui/OperationFaultBarrierTest.java", "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/OperationResumeE2ETest.java"],
+      "fixtures": []
+    },
+    {
+      "id": "migration-transition-harness-barrier",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "HarnessBarrierProtocol composes the runtime path from the selected migration-barrier family and reached/pending/release suffixes.",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Opt-in installed-test coordination only: transition point, generation ids and PID; no content or credentials.",
+      "owner": "WORKER",
+      "root": "DATA_DIR",
+      "ownedPaths": ["runtime/migration-barrier-reached.json", "runtime/migration-barrier-reached.pending", "runtime/migration-barrier-release"],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "RESET",
+      "format": "Unversioned installed-test transition marker JSON and release presence signal",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REACHED_PUBLICATION_AND_SINGLE_WRITE_PENDING_RELEASE",
+      "corruptionPolicy": "FAIL_LOUD",
+      "reconciliation": "The selected harness run preserves the reached marker across a forced restart. The Engine atomically publishes the marker and waits for a release presence signal; a pending marker is never reached evidence. The harness validates point, generation ids and PID before any crash cut. Normal startup never selects this barrier.",
+      "status": "READY",
+      "implementationSources": ["modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/MigrationTransitionBarrier.java", "modules/core/src/main/java/io/justsearch/core/harness/HarnessBarrierProtocol.java"],
+      "tests": ["modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/MigrationTransitionBarrierTest.java"],
       "fixtures": []
     },
     {
@@ -1551,6 +1596,7 @@
       "currentVersion": 5,
       "readableLegacyVersions": [1, 2, 3, 4],
       "versionAuthority": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
+      "versionSource": { "file": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java", "symbol": "VERSION" },
       "futureVersionRefusalTest": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
       "writeMode": "TRANSACTIONAL",
       "atomicity": "TRANSACTIONAL",

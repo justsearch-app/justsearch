@@ -5,6 +5,7 @@ import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import java.io.IOException;
 import io.justsearch.app.api.settings.SettingsWitness;
@@ -111,6 +112,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       }
       OperationRecord row = current(control);
       if (row.state() != OperationState.RUNNING
+          && !(row.state() == OperationState.COMPLETE_WITH_GAPS
+              && control.kind == OperationKind.REINDEX)
           || row.context().survival() != EngineContext.Survival.DURABLE
           || (control.kind != OperationKind.INGEST && control.kind != OperationKind.REINDEX)) {
         throw new IllegalStateException("Only a pending durable ingestion body can be handed off");
@@ -366,6 +369,20 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         throw new IllegalStateException("Bulk checkpoint refused for a terminal, unstarted or conflicting operation");
       }
     } catch (RuntimeException | Error failure) {
+      persistenceFailed(control, OperationState.RUNNING, failure);
+      throw failure;
+    }
+  }
+
+  @Override
+  public OperationStore.BulkGapDecision awaitBulkGapDecision(
+      OperationRecordHandle handle, List<OperationOutcomeView.Gap> gaps) {
+    if (!(handle instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
+        || control.kind != OperationKind.REINDEX || !control.started.get() || control.done.isDone()) {
+      throw new IllegalArgumentException("Bulk gap decision requires this runner's live reindex capability");
+    }
+    try { return store.awaitBulkGapDecision(control.id, gaps); }
+    catch (RuntimeException | Error failure) {
       persistenceFailed(control, OperationState.RUNNING, failure);
       throw failure;
     }

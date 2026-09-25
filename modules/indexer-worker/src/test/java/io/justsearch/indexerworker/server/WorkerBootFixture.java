@@ -122,6 +122,18 @@ final class WorkerBootFixture {
     }
   }
 
+  /** Read a seeded field before a migration server can rewrite that generation. */
+  static String readDocumentField(Path path, String docId, String field) throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        RunningRuntime runtime = IndexSchema.fromCatalog(
+                productionCatalog(), () -> new SsotCommitMetadataSource().build(),
+                new JsonSchemaCommitMetadataValidator())
+            .atPath(path).withExecutorRegistrations(luceneExecutors).open()) {
+      return runtime.documentFieldOps().getDocumentField(docId, field);
+    }
+  }
+
   /** Publishes a config pinning the data dir, the index base and the mismatch policy. */
   static void publishConfig(Path dataDir, Path indexBase, String policy) {
     publishConfig(dataDir, indexBase, policy, Map.of());

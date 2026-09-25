@@ -96,13 +96,14 @@ test('build and verify a closed descriptor/latest/artifact set', async () => {
   assert.equal(verified.descriptor.artifact.keyId, 'artifact-2026-01');
 });
 
-test('compatibility baseline keeps the installed row set and uses current readable versions', async () => {
+test('compatibility baseline preserves the frozen strategy while version 4 reads version 1', async () => {
   const f = await fixture();
   const register = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+  register.durableStores[0].reconciliation = 'READ_V0_OR_V1_AND_WRITE_V1';
   const compatibilityBaselinePath = path.join(path.dirname(f.outDir), 'baseline.json');
   await writeFile(compatibilityBaselinePath, JSON.stringify(register));
-  register.durableStores[0].currentVersion = 2;
-  register.durableStores[0].readableLegacyVersions = [0, 1];
+  register.durableStores[0].currentVersion = 4;
+  register.durableStores[0].readableLegacyVersions = [0, 1, 2, 3];
   register.durableStores.push({ ...register.durableStores[0], id: 'operations-db' });
   await writeFile(f.compatibilityRegisterPath, JSON.stringify(register));
   const { descriptor } = await buildReleaseAssets({
@@ -116,8 +117,10 @@ test('compatibility baseline keeps the installed row set and uses current readab
     metadataKeyId: 'metadata-2026-01',
   });
   assert.deepEqual(descriptor.compatibility.map((row) => row.ownerId), ['preferences']);
-  assert.equal(descriptor.compatibility[0].formatVersion, 2);
-  assert.deepEqual(descriptor.compatibility[0].readableSourceVersions, [0, 1, 2]);
+  assert.equal(descriptor.compatibility[0].formatVersion, 4);
+  assert.deepEqual(descriptor.compatibility[0].readableSourceVersions, [0, 1, 2, 3, 4]);
+  assert.equal(descriptor.compatibility[0].reconciliationStrategy,
+    'READ_V0_OR_V1_AND_WRITE_V1');
   await verifyReleaseAssets({ ...f, releaseDir: f.outDir });
 });
 

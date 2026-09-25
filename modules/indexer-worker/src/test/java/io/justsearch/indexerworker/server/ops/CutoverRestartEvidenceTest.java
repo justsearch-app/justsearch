@@ -10,7 +10,9 @@ import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import io.justsearch.adapters.lucene.runtime.CleanShutdownMarker;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.server.RecordedIngestionLifecycle;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -91,7 +93,7 @@ final class CutoverRestartEvidenceTest {
         }, tempDir, LoggerFactory.getLogger(CutoverRestartEvidenceTest.class),
         () -> {
           throw new AssertionError("live owner replaces the legacy promotion callback");
-        }, () -> {}, () -> {
+        }, observed -> {}, () -> {
           live.set(true);
           try (var promotion = manager.beginNativePromotion(blue, green)) {
             return promotion.promote();
@@ -101,6 +103,98 @@ final class CutoverRestartEvidenceTest {
     KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);
 
     assertTrue(live.get());
+    assertEquals(green, manager.readStateBestEffort().active_generation());
+  }
+
+  @Test
+  void recordedGapWaitRetainsBlueAndGreenBeyondSwitchingDeadline(@TempDir Path tempDir)
+      throws Exception {
+    var manager = new IndexGenerationManager(tempDir.resolve("index"));
+    String blue = manager.initializeOrLoad().state().active_generation();
+    String green = manager.startMigration("recorded").building_generation();
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+    var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.failureSummary())
+        .thenThrow(new IllegalStateException("recorded operation owns exact gap settlement"));
+    var decisions = new java.util.concurrent.atomic.AtomicInteger();
+    var promotions = new java.util.concurrent.atomic.AtomicInteger();
+    var sourceRestorations = new java.util.concurrent.atomic.AtomicInteger();
+    var candidateResumes = new java.util.concurrent.atomic.AtomicInteger();
+    var accepted = new AtomicBoolean();
+    var lateGap = new AtomicBoolean();
+    var cutover = new KnowledgeServerMigrationOps.CheckedLiveCutover() {
+      @Override public boolean recorded() { return true; }
+
+      @Override public boolean enterGapWait() throws IOException {
+        if (IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE.name().equals(
+            manager.readStateBestEffort().migration_state())) return true;
+        int attempt = sourceRestorations.incrementAndGet();
+        if (attempt == 1) {
+          assertEquals(IndexGenerationManager.MigrationState.SWITCHING.name(),
+              manager.readStateBestEffort().migration_state(),
+              "a refused physical restoration must not publish the unbounded wait");
+          return false;
+        }
+        if (lateGap.get()) {
+          assertEquals(IndexGenerationManager.MigrationState.SWITCHING.name(),
+              manager.readStateBestEffort().migration_state(),
+              "a gap found inside promotion still requires physical A restoration");
+          lateGap.set(false);
+        }
+        manager.updateMigrationState(IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+        return true;
+      }
+
+      @Override public boolean resumeAcceptedGapBuild() throws IOException {
+        assertTrue(sourceRestorations.get() > 1,
+            "an accepted gap cannot resume B before A's wait transition settles");
+        if (candidateResumes.incrementAndGet() == 1) return false;
+        manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+        return true;
+      }
+
+      @Override public RecordedIngestionLifecycle.GapDecision gapDecision() {
+        decisions.incrementAndGet();
+        if (lateGap.get()) return RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE;
+        if (accepted.get()) return RecordedIngestionLifecycle.GapDecision.ACCEPTED;
+        if (!IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE.name().equals(
+            manager.readStateBestEffort().migration_state())) {
+          return RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE;
+        }
+        if (!accepted.get()) {
+          assertEquals(IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE.name(),
+              manager.readStateBestEffort().migration_state());
+          assertEquals(blue, manager.readStateBestEffort().active_generation());
+          assertEquals(green, manager.readStateBestEffort().building_generation());
+          accepted.set(true);
+        }
+        return RecordedIngestionLifecycle.GapDecision.ACCEPTED;
+      }
+
+      @Override public IndexGenerationManager.State promote() throws IOException {
+        assertTrue(accepted.get(), "successor preparation must follow the durable user decision");
+        if (promotions.getAndIncrement() == 0) {
+          lateGap.set(true);
+          return null;
+        }
+        try (var promotion = manager.beginNativePromotion(blue, green)) {
+          return promotion.promote();
+        }
+      }
+    };
+    var context = new KnowledgeServerMigrationOps.CutoverContext(
+        manager, queue, () -> true, () -> true, () -> null, 0, 5_000, 0,
+        () -> mock(RunningRuntime.class), () -> true, () -> true, () -> {}, () -> {},
+        () -> { throw new AssertionError("live cutover cannot request a restart"); },
+        tempDir, LoggerFactory.getLogger(CutoverRestartEvidenceTest.class),
+        () -> { throw new AssertionError("recorded live cutover owns promotion"); },
+        observed -> {}, cutover);
+
+    KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);
+
+    assertEquals(2, promotions.get());
+    assertEquals(3, sourceRestorations.get());
+    assertEquals(3, candidateResumes.get());
     assertEquals(green, manager.readStateBestEffort().active_generation());
   }
 
@@ -156,7 +250,7 @@ final class CutoverRestartEvidenceTest {
     String blue = manager.initializeOrLoad().state().active_generation();
     manager.startMigration("manual");
     manager.setMigrationPaused(true, "test");
-    org.mockito.Mockito.doThrow(new java.io.IOException("transient state write failure"))
+    org.mockito.Mockito.doThrow(new IOException("transient state write failure"))
         .doCallRealMethod().when(manager).updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
     if (unreadableFirstState) {
       org.mockito.Mockito.doReturn(null).doCallRealMethod().when(manager).readStateBestEffort();
@@ -166,7 +260,7 @@ final class CutoverRestartEvidenceTest {
     var runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
     var context = new KnowledgeServerMigrationOps.CutoverContext(
         manager, mock(JobQueue.class), active::get, () -> false,
-        () -> new java.io.IOException("incomplete coverage"), 0, 60_000, -1,
+        () -> new IOException("incomplete coverage"), 0, 60_000, -1,
         () -> runtime, () -> { throw new AssertionError("failed scan cannot certify embeddings"); },
         () -> { throw new AssertionError("failed scan cannot verify Green"); },
         () -> drained.set(true), () -> {},

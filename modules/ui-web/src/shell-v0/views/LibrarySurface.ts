@@ -43,6 +43,7 @@ import {
   indexedRootViewSchema,
   type IndexedRootView,
 } from '../../api/generated/schema-types/indexed-root-view.js';
+import { operationOutcomeViewSchema } from '../../api/generated/schema-types/operation-outcome-view.js';
 // Tempdoc 599 §9.1 — the ONE per-folder status derivation; the row glyph + meta line project from it.
 import {
   folderStatus,
@@ -97,6 +98,9 @@ const listResponseSchema = z
     count: z.number().optional(),
   })
   .loose();
+
+type GapDecisionView = { reindexKey: string; gapListHash: string;
+  gaps: readonly { unitId: string; reason: string }[] };
 
 /**
  * Tempdoc 804 §B9 (round-10 F8) — how a watched-folder row NAMES itself.
@@ -158,6 +162,9 @@ export class LibrarySurface extends JfElement {
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
     otherSources: { state: true },
+    gapDecision: { state: true },
+    gapDecisionBusy: { state: true },
+    gapDecisionError: { state: true },
   };
 
   declare apiBase: string;
@@ -220,6 +227,13 @@ export class LibrarySurface extends JfElement {
    * entirely, not an empty shell.
    */
   declare otherSources: OtherSourcesSnapshot;
+  declare gapDecision: GapDecisionView | null;
+  declare gapDecisionBusy: boolean;
+  declare gapDecisionError: string | null;
+  private observedGapKey: string | null = null;
+  private gapRequestSerial = 0;
+  private gapLoading = false;
+  private lastGapReadAtMs = 0;
 
   private aiUnsub: (() => void) | null = null;
   /**
@@ -261,6 +275,9 @@ export class LibrarySurface extends JfElement {
     this.enrichmentPending = false;
     this.enrichmentBlocked = false;
     this.otherSources = EMPTY_OTHER_SOURCES;
+    this.gapDecision = null;
+    this.gapDecisionBusy = false;
+    this.gapDecisionError = null;
   }
 
   // Tempdoc 571 §11 / 578: Library is a host surface — it delegates layout to <jf-surface-tabs>
@@ -314,6 +331,17 @@ export class LibrarySurface extends JfElement {
       color: var(--text-warning);
       font-size: var(--font-size-sm);
     }
+    .gap-decision {
+      margin-bottom: 1rem;
+      padding: 1rem;
+      border: 1px solid var(--accent-warning-30);
+      border-radius: 0.5rem;
+      background: var(--accent-warning-08);
+    }
+    .gap-decision h3 { margin: 0 0 0.5rem; font-size: var(--font-size-md); }
+    .gap-decision p { margin: 0 0 0.75rem; font-size: var(--font-size-sm); }
+    .gap-decision ul { max-height: 12rem; overflow-y: auto; padding-left: 1.25rem; }
+    .gap-decision li { font-size: var(--font-size-sm); overflow-wrap: anywhere; }
     .cards {
       display: grid;
       gap: 0.5rem;
@@ -533,6 +561,7 @@ export class LibrarySurface extends JfElement {
     // transition renders as "Rebuilding…", not "No watched folders".
     this.aiUnsub = subscribeAiState((s) => {
       this.provisional = s.stability.kind === 'provisional';
+      this.observeGapDecision(s.status?.worker?.migration);
       // Tempdoc 813 §4 — the per-root second tier needs to know which stages apply; take it from the
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
       const progress = selectIndexingProgress(
@@ -582,6 +611,7 @@ export class LibrarySurface extends JfElement {
     this.memberTabUnsub = null;
     this.aiUnsub?.();
     this.aiUnsub = null;
+    this.gapRequestSerial++;
     if (this.previewTimer !== null) {
       window.clearTimeout(this.previewTimer);
       this.previewTimer = null;
@@ -787,6 +817,74 @@ export class LibrarySurface extends JfElement {
       body: init?.body as string | undefined,
       signal: init?.signal ?? undefined,
     });
+  }
+
+  private observeGapDecision(migration: { migrationState?: string | null;
+    buildingGenerationId?: string | null } | null | undefined): void {
+    const building = migration?.buildingGenerationId ?? '';
+    const key = migration?.migrationState === 'AWAITING_ACCEPTANCE'
+      && /^g-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(building)
+      ? building.slice(2) : null;
+    if (key !== this.observedGapKey) {
+      this.observedGapKey = key;
+      this.gapDecision = null;
+      this.gapDecisionError = null;
+      this.gapRequestSerial++;
+      this.lastGapReadAtMs = 0;
+    }
+    if (key && !this.gapLoading && Date.now() - this.lastGapReadAtMs >= 4_000) {
+      void this.loadGapDecision(key);
+    }
+  }
+
+  private async loadGapDecision(key: string): Promise<void> {
+    this.gapLoading = true;
+    this.lastGapReadAtMs = Date.now();
+    const serial = ++this.gapRequestSerial;
+    try {
+      const response = await this.doFetch(`/api/operation-history/${encodeURIComponent(key)}`);
+      if (!response.ok) throw new Error(`Could not read migration gaps (HTTP ${response.status})`);
+      const outcome = parseWireContract(operationOutcomeViewSchema,
+        await response.json(), '/api/operation-history/{operationKey}');
+      if (serial !== this.gapRequestSerial || key !== this.observedGapKey) return;
+      if (outcome.phase !== 'awaiting_acceptance') {
+        this.gapDecision = null;
+        return;
+      }
+      const result = outcome.result;
+      if (!result?.gapListHash || !/^[0-9a-f]{64}$/.test(result.gapListHash)
+          || !result.gaps?.length || result.gaps.some((gap) => !gap.unitId || !gap.reason)) {
+        throw new Error('Migration gap decision is incomplete');
+      }
+      this.gapDecision = { reindexKey: key, gapListHash: result.gapListHash,
+        gaps: result.gaps.map((gap) => ({ unitId: gap.unitId!, reason: gap.reason! })) };
+      this.gapDecisionError = null;
+    } catch (failure) {
+      if (serial === this.gapRequestSerial && key === this.observedGapKey) {
+        this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+      }
+    } finally {
+      this.gapLoading = false;
+    }
+  }
+
+  private async acceptCurrentGaps(): Promise<void> {
+    const decision = this.gapDecision;
+    if (!decision || this.gapDecisionBusy) return;
+    this.gapDecisionBusy = true;
+    this.gapDecisionError = null;
+    try {
+      const result = await this.host_.data.invokeOperation('core.accept-gaps', {
+        reindexKey: decision.reindexKey, gapListHash: decision.gapListHash,
+      }, { consented: true });
+      if (!result.success) throw new Error(result.message ?? 'Migration gap acceptance failed');
+      await this.loadGapDecision(decision.reindexKey);
+    } catch (failure) {
+      await this.loadGapDecision(decision.reindexKey);
+      this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      this.gapDecisionBusy = false;
+    }
   }
 
   private async loadExcludes(): Promise<void> {
@@ -1275,6 +1373,7 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
+      ${this.renderGapDecision()}
       ${!this.isTauri
         ? html`<div class="browser-banner">
             ${icon({ name: 'alert-circle', size: 14 })}
@@ -1395,6 +1494,23 @@ export class LibrarySurface extends JfElement {
         ></textarea>
       </div>
     `;
+  }
+
+  private renderGapDecision(): TemplateResult | typeof nothing {
+    if (!this.observedGapKey) return nothing;
+    const decision = this.gapDecision;
+    return html`<section class="gap-decision" aria-label="Migration gaps">
+      <h3>New index — activation requires your decision</h3>
+      ${decision ? html`
+        <p>${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} could not be
+          included in the new index. Your current index stays available until you accept this list.</p>
+        <ul>${decision.gaps.map((gap) => html`<li>${gap.unitId}: ${gap.reason}</li>`)}</ul>
+        <jf-button label="Accept gaps and activate" variant="primary"
+          .disabled=${this.gapDecisionBusy}
+          .onActivate=${() => void this.acceptCurrentGaps()}>Accept gaps and activate</jf-button>
+      ` : html`<p>Reading the migration gap list…</p>`}
+      ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}</p>` : nothing}
+    </section>`;
   }
 }
 

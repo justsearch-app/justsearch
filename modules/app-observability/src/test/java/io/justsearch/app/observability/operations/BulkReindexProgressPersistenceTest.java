@@ -95,7 +95,7 @@ final class BulkReindexProgressPersistenceTest {
     var capturing = capturing(row.key(), target);
     try (var store = store(path)) {
       assertTrue(store.checkpointBulkReindex(row.id(), capturing));
-      assertEquals(2, scalar(path,
+      assertEquals(3, scalar(path,
           "SELECT json_extract(processing_history_counts_json, '$.version') FROM operations WHERE id=" + row.id()));
       assertEquals("null", stringScalar(path,
           "SELECT json_type(processing_history_counts_json, '$.refusalCode') FROM operations WHERE id=" + row.id()));
@@ -177,6 +177,56 @@ final class BulkReindexProgressPersistenceTest {
     assertEquals(legacyEvidence, stringScalar(path,
         "SELECT processing_history_counts_json FROM operations WHERE id=" + row.id()),
         "reading legacy evidence must not silently rewrite it");
+  }
+
+  @Test
+  void legacyVersionTwoSettlementKeepsCapturedEvidenceWhileCurrentGapWaitSurvivesResume()
+      throws Exception {
+    Path path = temp.resolve("legacy-v2-gap-wait.db");
+    String key = OperationKeys.generate(clock);
+    var target = target("{\"legacy\":2}");
+    var capture = new BulkReindexProgress.Capture(hash("legacy-v2-manifest"), 1);
+    var capturedGap = new OperationOutcomeView.Gap("unit:captured", "EXTRACTION_FAILED");
+    var currentGap = new OperationOutcomeView.Gap("unit:candidate", "CANDIDATE_PROJECTION_MISSING");
+    var settlement = new BulkReindexProgress.Settlement(2, hash("legacy-v2-receipt"), 1, 0,
+        List.of(capturedGap), List.of());
+    var progress = settled(key, target, capture, settlement);
+    OperationRecord row;
+    try (var store = store(path)) {
+      row = acceptAndStart(store, key, "core.bulk-reindex", DURABLE_CONTEXT);
+      assertTrue(store.checkpointBulkReindex(row.id(), capturing(key, target)));
+      assertTrue(store.checkpointBulkReindex(row.id(), new BulkReindexProgress("g-" + key,
+          target, BulkReindexProgress.Phase.BUILDING, capture, null)));
+      assertTrue(store.checkpointBulkReindex(row.id(), progress));
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + path);
+        var update = connection.prepareStatement("""
+            UPDATE operations SET processing_history_counts_json =
+              json_remove(json_set(processing_history_counts_json, '$.version', 2), '$.capturedGaps')
+            WHERE id = ?
+            """)) {
+      update.setLong(1, row.id());
+      assertEquals(1, update.executeUpdate());
+    }
+    try (var store = store(path)) {
+      assertEquals(Optional.of(progress), store.bulkReindexProgress(row.id()));
+      assertEquals(Optional.empty(), store.bulkGapWitness(row.id()));
+      assertEquals(io.justsearch.app.api.operations.OperationStore.BulkGapDecision.AWAITING_ACCEPTANCE,
+          store.awaitBulkGapDecision(row.id(), List.of(currentGap)));
+      assertEquals(Optional.of(progress), store.bulkReindexProgress(row.id()),
+          "v2's captured settlement must be frozen before replacing its decision list");
+      assertEquals(Optional.of(List.of(currentGap)), store.bulkGapWitness(row.id()));
+      assertTrue(store.resume(row.id()));
+      assertEquals(OperationState.COMPLETE_WITH_GAPS, store.find(key).orElseThrow().state());
+      assertEquals("awaiting_acceptance", store.outcome(key).phase());
+      assertEquals(io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance.GAP_LIST_STALE,
+          store.acceptBulkGaps(key, progress.gapsListHash(), "webview"));
+      assertEquals(io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance.ACCEPTED,
+          store.acceptBulkGaps(key, BulkReindexProgress.hashGapList(List.of(currentGap)), "webview"));
+      assertEquals(OperationState.RUNNING, store.find(key).orElseThrow().state());
+    }
+    assertEquals(3, scalar(path,
+        "SELECT json_extract(processing_history_counts_json, '$.version') FROM operations WHERE id=" + row.id()));
   }
 
   @Test

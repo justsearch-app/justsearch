@@ -1,6 +1,6 @@
 # Lane F continuation brief
 
-Updated 2026-09-23 after design resolution for a Sol orchestrator. This is the successor's
+Updated 2026-09-25 after the owner re-cut and improvement merge. This is the successor's
 entry point; [handoff](handoff.md) owns current evidence and
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
@@ -19,15 +19,81 @@ re-cut condition is retired. [Design](design.md#16-what-must-be-measured-and-the
 [E runbook](stages/E.md), [D1 map](stages/D1.md#6-section-16-rows-d1-must-leave-exercisable),
 [D2 map](stages/D2.md#6-section-16-rows-d2-must-leave-exercisable).
 
-**Current D1-9 boundary:** `fc5b444d6` passed the serial 358-task local gate,
-hosted run 36055201547 (including system integration) and the standard-model
-installed A/B file-mutation path. Six current-revision installed installer
-pointer/settings crash cuts passed at `tmp/3389` and `tmp/3392`–`tmp/3396`;
-the [handoff](handoff.md) names each artifact. The next D1-9 work is no-file
-projection admission/replay, nonterminal gap acceptance and positive
-cancel/abandon transfer. Two refused-candidate transfer regressions passed
-focused checks locally; they were not in hosted run 36055201547. This paragraph is status,
-not a release of any later D1/D2/E/F acceptance.
+**Current D1-9 boundary:** `fc5b444d6` remains the last fully hosted runtime
+checkpoint; six installed installer pointer/settings crash cuts and the
+standard-model A/B file-mutation path passed there. `7f469d044` is the latest
+pushed checkpoint: its hosted system integration and Windows native jobs passed,
+but the manual-pointer test raced automatic cutover. The local test correction
+is not yet hosted. [Handoff](handoff.md) names the exact artifacts.
+
+**2026-09-25 gap batch:** the uncommitted D1-9/D1-11 gap decision retains a
+nonterminal `COMPLETE_WITH_GAPS` row, publishes a candidate-bound gap hash,
+restores A for an in-place wait, and requires a distinct HIGH/DURABLE webview
+approval after Green drains. Serial `test`, compile/installDist, Spotless, PMD,
+stress, UI typecheck/unit and generation checks passed locally. Installed
+standard-model A answered a real vector query while B awaited acceptance;
+hash-bound approval promoted that B and duplicate acceptance had no second
+effect (`tmp/3477`). HEAD `27adef9f0` includes the escalation-policy and
+docs-only improvement merges; the policy's two instruction checks passed and
+the improvement merge changed no tested runtime source. The gap code remains uncommitted and
+unhosted. Installed in-place recovery, no-file projection, positive
+cancel/abandon and gap crash cuts are still open. The owner-authorized
+improvement package `59da2bc4d` is merged at this batch boundary before the
+next installed D1 round. Nothing here releases later D1/D2/E/F acceptance.
+
+**2026-09-25 improvement boundary:** WP1's seven-point migration barrier and
+shared operation handshake are implemented. The first installed standard-model
+seed and live A/B watcher/accepted-write run with the named before-SWITCHING
+hold passed at `tmp/3481`–`tmp/3482`, including STOP 0. The identity repeat
+passed 20/20 fresh runs with zero XML failures at `tmp/3483`; after the
+environment-access funnel correction, the exact-source repeat passed another
+20/20 fresh runs, 20 XMLs, zero failures or errors at `tmp/3492`;
+the current distribution's installed gap approval passed again at
+`tmp/3485`–`tmp/3486`. The 358-task full serial stress/static/distribution
+gate passed on the exact corrected source at `tmp/3489`; its first run found
+and fixed one direct environment access at `tmp/3487`–`tmp/3488`. Hosted proof
+is still due.
+`build -x test` passed at `tmp/3490`; UI typecheck and 6,601 unit tests
+passed, with unit output at `tmp/3491`. The installed distribution predates
+only the raw environment funnel change, which retains identical lookup
+semantics for the harness keys; the exact-source local gates cover it.
+WP2 2a corrects `ui-settings` to version 4, binds eligible store rows to code
+constants, and preserves the historical reconciliation token for released
+updaters; the gate, 78 self-test assertions and 33 Rust updater tests pass.
+WP5's design/E/F documentation corrections are present. [Handoff](handoff.md)
+has exact proof and remaining gaps. The release-wrapper compatibility baseline
+is still WP2 work before E; no later acceptance is waived.
+
+## Adopted remaining-work order (2026-09-25)
+
+The owner authorized [WP3](improvements/WP3-remaining-work-plan.md) after the
+gap-decision batch. The improvement package is merged in this worktree. Proceed
+in this order while retaining every D1/D2 acceptance item:
+
+1. WP1 transition barrier, WP2 2a register/version-source correction, and WP5
+   document corrections before the next installed D1 transition round.
+2. D1-16 lifecycle harness skeleton with named pending/failing feature scenarios.
+3. D1-9 and D1-8 no-file replay, cancel/abandon, live activation order and
+   remaining crash cuts through that harness. Pull forward only the minimal
+   D2-5 identity/projection port seam required by D1-9; D2-5 durability and
+   deletion acknowledgement remain D2 acceptance.
+4. D1-14/D1-13 gap and cancel backfill, installed floor-cap, A recompose and
+   held native lease, then D1-12 full Flow B; land WP4 containment with this work.
+5. The settled D1-4 connected publication/lifetime path below.
+6. Interleave D1-15 reason codes, D1-6 restart-required/`core.restart-worker`
+   retirement, D1-7 deadlines/recovery/escalation and D1-2/D1-10 hosted proof
+   while installed or hosted rounds run; never run a second Gradle build.
+7. D1-17 sweep and D1 feature acceptance; D2 profiles/library/ephemeral stores
+   first, then gate/timings, durable write/cursors/MCP harness, and D2-10.
+8. WP2 remaining release safety before E; then E's seven paired rows plus its
+   downgrade/dead-Engine rounds, then F's sweep, report and conditional merge.
+
+Before each integrated gate, check touched schema generators, store
+recoverability, runtime manifest closure when runtime files change,
+`regen-all --check`, and Spotless/PMD. If a batch exceeds twice its estimate or
+an item needs a third substantive correction, record the plan delta and obtain
+an independent refutation before the next correction. A timing failure after
+WP1 is barrier evidence to investigate, not an automatic timeout increase.
 
 ## Assignment and authorization
 
@@ -67,47 +133,15 @@ writer per file and a stable deliverable with proof; read-only exploration/revie
 can proceed independently. Check module access and actual owner identity before
 dispatching an implementation task. Unsettled ownership returns to root.
 
-## Batch 1: close the candidate-context verification slice
+## Prior candidate-context slice
 
-**Outcome:** corrected candidate-context behavior has all required local,
-installed and hosted proof, or each remaining failure is explicitly open with
-its cause. This closes that slice only, not D1-4 or stage D1.
+The candidate-context correction is recorded in
+[its plan and proof](evidence/D1/candidate-context-plan-2026-09-22.md) and the
+handoff. Its previous execution sequence is closed; do not restart that slice
+from the historical `2459`–`2464` inventory. Reuse hosted or installed proof
+only while its source content and assumptions still match.
 
-Start from [candidate plan and proof](evidence/D1/candidate-context-plan-2026-09-22.md)
-and the handoff's2459-2464 inventory. Root owns
-`modules/app-inference`, any regression corrections, and existing dead-code/config
-audit owners. Do not start D1-4 implementation while this batch is being corrected.
-
-1. Inspect the correction revision's hosted results early and verify job/test
-   selection. Pre-correction CI35678039813 is red; its passing jobs alone do not
-   close corrected-revision proof. Reuse only documented content-equivalent checks.
-2. Run from the worktree:
-   `./gradlew.bat spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist --continue --console=plain`.
-   Capture the complete log and native exit code. Preserve XML before any focused
-   rerun, including failed and unperformed tasks. Existing local collectors are
-   `tmp/c2-capture-generation.py LABEL REVISION COMMAND` (expects `tmp/LABEL.txt`)
-   and `tmp/c2-source-inventory.py LABEL [COMMIT]`. Inspect their argument semantics:
-   the latter inventories selected changed Java/proto files, not the whole tree.
-   A docs-only HEAD can legitimately yield no changed Java files; preserve actual
-   tested HEAD, the22800c842 code baseline and any subsequent correction delta.
-3. Correct concrete failures with one consolidated list. Search ordinary calls,
-   method references, fixtures and relevant allowlists before changing a seam;
-   compile affected tests and run relevant focused audits before another full run.
-   Preserve existing positive/negative-control evidence when still applicable.
-4. Load dev-stack and jseval skills. Use the official owned stack from the freshly
-   installed worktree distribution, retained data and standard model profile.
-   Run the runtime-client smoke and a real-model query; preserve revision/profile,
-   results and source provenance. Officially stop and verify `portsClosed`.
-   Earlier215af/2434 installed evidence is not this slice's proof.
-5. Reconcile named acceptance with local, installed and hosted results; checkpoint
-   and push corrections within existing authorization, then continue Batch2.
-
-Escalate a newly exposed ownership/design issue to the root's decision process;
-do not waive a red check or treat it as a reason to ask for routine permission.
-Resource contention blocks dependent runtime work only. No new benchmark, model
-selection, unrelated refactor or weaker audit is part of this batch.
-
-## Batch 2: implement the selected D1-4 publication and lifetime protocol
+## D1-4 publication and lifetime contract (adopted batch 5)
 
 The remaining solvable design has been settled by the preceding Astra task.
 Read the [decision index](evidence/design-resolution-2026-09-23.md), then the linked
@@ -161,10 +195,8 @@ over coupled changes as needed; this never excuses a defect.
 
 ## Continue and retain only current state
 
-After these batches continue all remaining D1/D2/E/F acceptance, including Flow A
-bulk evidence/ACK and gap activation, Flow B/model-binding gaps, native quiescence,
-D2 profile/library/durability work, E proof and F publication. These two batches
-are the first continuation steps, not a reduced lane scope.
+After the adopted batches continue all remaining D1/D2/E/F acceptance. The
+sequence above changes order, not scope or acceptance.
 
 Update the owning decision and the handoff once per coherent batch. Record its
 accepted outcome, substantive correction rounds, invalidated verification and

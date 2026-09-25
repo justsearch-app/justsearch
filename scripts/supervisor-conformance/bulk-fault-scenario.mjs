@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import identity from '../dev/lib/process-identity.cjs';
+import { barrierFiles } from './barrier-files.mjs';
 
 export const BULK_FAULT_CASES = Object.freeze({
   'bulk-partial-capture': Object.freeze({
@@ -52,7 +53,141 @@ export const INSTALLER_FAULT_CASES = Object.freeze({
 const OPERATION_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SESSION_HEADER = 'X-JustSearch-Session';
 const START_ROUTE = '/api/indexing/migration/start';
+const ACCEPT_GAPS_ROUTE = '/api/indexing/migration/accept-gaps';
 const ACTIVATION_ROUTE = '/api/operations/core.activate-installed-models/invoke';
+
+/** Installed standard-model proof that an unsuperseded gap waits on A for a distinct user decision. */
+export async function exerciseBulkGapApproval(c) {
+  const { work, data, indexBase, first, manifest, apiPort, readJson, waitFor, request,
+    post, requireThat, matchingHit, createOperationKey, operationKey } = c;
+  requireThat(OPERATION_KEY.test(operationKey) && first.incarnation === 1,
+    'gap fixture needs a fresh recorded operation on its owned Engine');
+  const { reachedFile, releaseFile } = barrierFiles(data);
+  const operationPath = path.join(data, 'operations.db');
+  const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
+  const sourceManifest = readJson(path.join(indexBase, 'indices', sourceGeneration,
+    '.justsearch-index-generation.json'));
+  const servingFile = path.join(work, 'installer-root-a', 'installer-0.txt');
+  requireThat(sourceManifest?.models?.embedding?.sha256 && fs.existsSync(servingFile),
+    'gap fixture requires a previously installed standard-model A');
+  const servingMarker = fs.readFileSync(servingFile, 'utf8').split(/\s+/)[0];
+  await waitFor('installed A serves a real vector query before the gap build', 120000,
+    async () => {
+      try {
+        const response = await post(apiPort, '/api/knowledge/search',
+          { query: servingMarker, limit: 10, mode: 'vector' }, 30000);
+        return response.status === 200 && JSON.parse(response.text).results?.length > 0
+          ? response : null;
+      } catch { return null; }
+    });
+
+  const firstFile = path.join(work, 'bulk-root-a', 'a.txt');
+  const missingFile = path.join(work, 'bulk-root-b', 'b.txt');
+  fs.writeFileSync(firstFile, `bulk-gap-kept-${operationKey} capybara\n`);
+  fs.writeFileSync(missingFile, `bulk-gap-missing-${operationKey} capybara\n`);
+  const input = { reason: 'manual', idempotencyKey: operationKey };
+  const prepared = await prepareApprovedDispatch({ apiPort, input, post, requireThat });
+  const dispatched = startHeldPost(apiPort, START_ROUTE, {
+    ...input, confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
+  }, sessionHeaders(manifest));
+  let reached;
+  try {
+    reached = await waitFor('gap fixture closed capture before Green work', 170000,
+      () => readJson(reachedFile));
+    const cut = snapshot({ operationPath, jobsPath: path.join(data, 'jobs.db'),
+      indexBase, operationKey });
+    requireThat(reached.phase === 'bulk-before-building-checkpoint'
+      && reached.operationKey === operationKey
+      && cut.walk?.enumeration_outcome === 'COMPLETE'
+      && cut.walk.planned_units === 2
+      && cut.state.active_generation === sourceGeneration
+      && cut.state.building_generation === `g-${operationKey}`,
+    `gap fixture missed its captured pre-build cut: ${JSON.stringify({ reached, cut })}`);
+    fs.unlinkSync(missingFile);
+  } finally {
+    fs.writeFileSync(releaseFile, 'release');
+  }
+  const dispatch = await dispatched.settled;
+  requireThat(!dispatch.error,
+    `gap fixture dispatch failed at transport: ${dispatch.error?.message}`);
+  const waiting = await waitFor('unsuperseded gap waits without publishing B', 180000, async () => {
+    const row = operationRows(operationPath, operationKey)[0];
+    const state = readJson(path.join(indexBase, 'state.json'));
+    if (row?.state === 'FAILED' || row?.state === 'CANCELLED') {
+      throw new Error(`gap fixture terminated before user decision: ${row.failure_reason}`);
+    }
+    // The durable bulk phase remains settled. The outcome projector exposes the
+    // nonterminal decision as wire phase awaiting_acceptance below.
+    if (row?.state !== 'COMPLETE_WITH_GAPS' || row.phase !== 'settled'
+      || state?.active_generation !== sourceGeneration
+      || state?.building_generation !== `g-${operationKey}`
+      || state?.migration_state !== 'AWAITING_ACCEPTANCE') return null;
+    const response = await request(apiPort, `/api/operation-history/${operationKey}`, {}, 15000);
+    if (response.status !== 200) return null;
+    const outcome = parseJson(response, 'gap outcome');
+    return outcome.phase === 'awaiting_acceptance'
+      && outcome.state === 'running'
+      && /^[0-9a-f]{64}$/.test(outcome.result?.gapListHash ?? '')
+      && outcome.result?.gaps?.some(gap => gap.reason && gap.unitId)
+      ? { row, state, outcome } : null;
+  });
+  const aText = await post(apiPort, '/api/knowledge/search',
+    { query: servingMarker, limit: 10, mode: 'text' }, 30000);
+  const aVector = await waitFor('serving A vector leg recovers during gap wait', 120000,
+    async () => {
+      try {
+        const response = await post(apiPort, '/api/knowledge/search',
+          { query: servingMarker, limit: 10, mode: 'vector' }, 30000);
+        return response.status === 200 && JSON.parse(response.text).results?.length > 0
+          ? response : null;
+      } catch { return null; }
+    });
+  requireThat(aText.status === 200 && matchingHit(aText, servingFile, servingMarker)
+    && aVector.status === 200 && JSON.parse(aVector.text).results?.length > 0,
+  `serving A lost text or semantic search during gap wait: ${aText.text} ${aVector.text}`);
+
+  const acceptanceKey = createOperationKey();
+  const acceptanceInput = { reindexKey: operationKey,
+    gapListHash: waiting.outcome.result.gapListHash, idempotencyKey: acceptanceKey };
+  const initial = await request(apiPort, ACCEPT_GAPS_ROUTE, {
+    method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify(acceptanceInput),
+  }, 30000);
+  const pending = parseJson(initial, 'gap acceptance preparation');
+  requireThat(initial.status === 428 && pending.operationKey === acceptanceKey
+    && typeof pending.pendingId === 'string' && typeof pending.preparationNonce === 'string',
+  `gap acceptance lacked a distinct prepared HIGH/DURABLE decision: ${initial.text}`);
+  const approved = await post(apiPort, '/api/authorizations/approve',
+    { pendingId: pending.pendingId }, 30000);
+  const capsule = parseJson(approved, 'gap acceptance approval').capsule;
+  requireThat(approved.status === 200 && typeof capsule === 'string',
+    `gap acceptance approval failed: ${approved.text}`);
+  const accept = await request(apiPort, ACCEPT_GAPS_ROUTE, {
+    method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify({
+      ...acceptanceInput, confirmationToken: capsule,
+      preparationNonce: pending.preparationNonce,
+    }),
+  }, 30000);
+  requireThat(accept.status === 200 && parseJson(accept, 'accepted gaps').success === true,
+    `authorized gap decision did not succeed: ${accept.text}`);
+  const promoted = await waitFor('approved gap promotes the same candidate', 180000, () => {
+    const row = operationRows(operationPath, operationKey)[0];
+    const state = readJson(path.join(indexBase, 'state.json'));
+    return row?.state === 'FAILED' && row.failure_reason === 'PROMOTED_WITH_GAPS'
+      && state?.active_generation === `g-${operationKey}`
+      && state?.migration_state === 'IDLE' ? { row, state } : null;
+  });
+  const duplicate = await request(apiPort, ACCEPT_GAPS_ROUTE, {
+    method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify(acceptanceInput),
+  }, 30000);
+  requireThat(duplicate.status === 200 && operationRows(operationPath, acceptanceKey).length === 1
+    && readJson(path.join(indexBase, 'state.json'))?.active_generation === `g-${operationKey}`,
+  `duplicate acceptance changed the durable decision: ${duplicate.text}`);
+  console.log('BULK_GAP_APPROVAL_PASS', JSON.stringify({ operationKey, acceptanceKey,
+    sourceGeneration, promotedGeneration: promoted.state.active_generation,
+    gapListHash: waiting.outcome.result.gapListHash,
+    gaps: waiting.outcome.result.gaps, aVectorHits: JSON.parse(aVector.text).results.length,
+    terminalState: promoted.row.state, terminalReason: promoted.row.failure_reason }));
+}
 
 /** Installed-process proof for the three recorded bulk crash boundaries. */
 export async function exerciseBulkFault(c) {
@@ -71,8 +206,7 @@ export async function exerciseBulkFault(c) {
   const waitFor = (label, budget, probe) =>
     c.waitFor(label, Math.max(1, Math.min(budget, deadline - Date.now())), probe);
   const runtime = path.join(data, 'runtime');
-  const reachedFile = path.join(runtime, 'operation-fault-reached.json');
-  const releaseFile = path.join(runtime, 'operation-fault-release');
+  const { reachedFile, releaseFile } = barrierFiles(data);
   requireThat(!fs.existsSync(reachedFile) && !fs.existsSync(releaseFile),
     'bulk fault fixture must start without a reached or release marker');
 
@@ -261,8 +395,7 @@ export async function exerciseInstallerActivationFault(c) {
   const waitFor = (label, budget, probe) =>
     c.waitFor(label, Math.max(1, Math.min(budget, deadline - Date.now())), probe);
   const runtime = path.join(data, 'runtime');
-  const reachedFile = path.join(runtime, 'operation-fault-reached.json');
-  const releaseFile = path.join(runtime, 'operation-fault-release');
+  const { reachedFile, releaseFile } = barrierFiles(data);
   requireThat(!fs.existsSync(reachedFile) && !fs.existsSync(releaseFile),
     'installer activation fixture must start without a reached or release marker');
 
@@ -458,8 +591,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   watcherDeleteDuringBuild = false,
   extraBuildFiles = 0 }) {
   const runtime = path.join(data, 'runtime');
-  const reachedFile = path.join(runtime, 'operation-fault-reached.json');
-  const releaseFile = path.join(runtime, 'operation-fault-release');
+  const { reachedFile, releaseFile } = barrierFiles(data);
+  const migrationBarrier = barrierFiles(data, 'migration-barrier');
   const operationPath = path.join(data, 'operations.db');
   const jobsPath = path.join(data, 'jobs.db');
   const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
@@ -544,37 +677,18 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
     const acceptedMarker = 'lexicalbridgecobalt';
-    if (watcherDeleteDuringBuild) {
-      // The native watcher polls on its own cadence. Hold MIGRATING while it observes both
-      // filesystem edges; an unpaused candidate can enter SWITCHING between them.
-      let lastPauseObservation = 'candidate has not entered MIGRATING';
-      await waitFor('pause MIGRATING candidate for watcher mutations', 120000, async () => {
-        const state = readJson(path.join(indexBase, 'state.json'));
-        const live = readJson(path.join(runtime, 'manifest.json'));
-        if (state?.migration_state === 'SWITCHING') {
-          throw new Error(`candidate reached SWITCHING before watcher pause: ${lastPauseObservation}`);
-        }
-        lastPauseObservation = `state=${state?.migration_state} generation=${state?.building_generation}`
-          + ` livePort=${live?.head?.apiPort}`;
-        if (state?.migration_state !== 'MIGRATING'
-          || state.building_generation !== `g-${operationKey}`
-          || !live?.head?.apiPort) return null;
-        try {
-          const response = await request(live.head.apiPort, '/api/indexing/migration/pause', {
-            method: 'POST', headers: sessionHeaders(live),
-            body: JSON.stringify({ reason: 'installed watcher A/B verification' }),
-          }, 10000);
-          const paused = readJson(path.join(indexBase, 'state.json'));
-          lastPauseObservation = `http=${response.status} ${response.text}`
-            + ` paused=${paused?.migration_paused} state=${paused?.migration_state}`;
-          return response.status === 202 && paused?.migration_state === 'MIGRATING'
-            && paused.migration_paused === true ? paused : null;
-        } catch (error) {
-          lastPauseObservation = `request error=${error.message}`;
-          return null;
-        }
-      });
-      console.log('MODEL_LIVE_AB_PAUSED', lastPauseObservation);
+    if (acceptedWriteDuringBuild) {
+      const held = await waitFor('migration monitor held before SWITCHING', 300000,
+        () => readJson(migrationBarrier.reachedFile));
+      const state = readJson(path.join(indexBase, 'state.json'));
+      const live = readJson(path.join(runtime, 'manifest.json'));
+      requireThat(held.point === 'migration-before-switching'
+        && held.sourceGeneration === sourceGeneration
+        && held.buildingGeneration === `g-${operationKey}`
+        && held.pid === live?.pid && state?.migration_state === 'MIGRATING'
+        && state?.migration_paused !== true,
+      `migration barrier did not hold the expected live candidate: ${JSON.stringify({ held, state, live })}`);
+      console.log('MODEL_LIVE_AB_TRANSITION_HELD', JSON.stringify(held));
     }
     if (acceptedWriteDuringBuild) {
       await waitFor('MIGRATING B with a live A producer after restart', 120000, async () => {
@@ -678,15 +792,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
         aTextHits: JSON.parse(visibleInA.text).results?.length ?? 0,
       }));
     }
-    if (watcherDeleteDuringBuild) {
-      const live = readJson(path.join(runtime, 'manifest.json'));
-      requireThat(live?.head?.apiPort, 'paused watcher fixture lost its live Head');
-      const resumed = await request(live.head.apiPort, '/api/indexing/migration/resume', {
-        method: 'POST', headers: sessionHeaders(live), body: '{}',
-      }, 10000);
-      requireThat(resumed.status === 202,
-        `watcher fixture could not resume candidate: ${resumed.status} ${resumed.text}`);
-    }
+    if (acceptedWriteDuringBuild) fs.writeFileSync(migrationBarrier.releaseFile, 'release');
     const reached = await waitFor('settled B before activation marker',
       acceptedWriteDuringBuild ? 300000 : 170000,
       () => readJson(reachedFile));
@@ -740,6 +846,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       encoderState: status?.components?.encoders?.state,
       vectorHits: actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
   } finally {
+    if (acceptedWriteDuringBuild) fs.writeFileSync(migrationBarrier.releaseFile, 'release');
     fs.writeFileSync(releaseFile, 'release');
   }
   await dispatched.settled;

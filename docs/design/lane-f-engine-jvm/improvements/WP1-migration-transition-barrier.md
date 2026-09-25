@@ -1,8 +1,8 @@
 # WP1: deterministic barrier for the migration and cutover lifecycle
 
-Type: test infrastructure with a production-inert seam. No product behavior changes, so no
-design §0 amendment is required. Record it in the handoff and in `stages/D1.md` §0.1 as an
-enabling item for the D1-8, D1-9 and D1-14 installed proofs.
+Type: test infrastructure with a production-inert seam plus a state recheck after a held
+before-SWITCHING point. The latter guards a real monitor race, so the dated design §0 and
+§7.4 lines record it. Record the enabling proof in the handoff and `stages/D1.md` §0.1.
 
 ## Problem
 
@@ -63,12 +63,14 @@ still ahead (D1-8 crash cuts 3 to 6, D1-9 gap, cancel and abandon, D1-14 refusal
      - `migration-after-live-activation`.
    - **Cross-process mode** (installed fixtures) uses the shared file protocol and reports
      the point and generation ids in `reached`.
-   - **In-process mode** (JUnit): the same interface, injected through the constructor or
-     composition, backed by a latch. It is never selected from the environment.
+   - **In-process mode** (JUnit): a checked hook injected before start, backed by a latch.
+     `release()` continues ordinary promotion; `cancel()` throws `InterruptedException`
+     through the monitor and unwinds before pointer commitment. It is never selected from
+     the environment.
 3. **Retire the workarounds in the same change:**
    - delete `disableAutomaticMigrationCutoverForTests` and `automaticMigrationCutoverEnabled`
-     (uncommitted WIP; migrate `DocumentIdentityBootImportTest` to hold at
-     `migration-before-pointer-commit`);
+     (uncommitted WIP; migrate `DocumentIdentityBootImportTest` to cancel an exact
+     `migration-before-pointer-commit` hold, then close and manually promote);
    - replace fixture uses of `setMigrationPaused` *as a test barrier*. The production
      pause feature stays.
 4. **Client side:** extend the existing `scripts/supervisor-conformance/*.mjs` barrier client
@@ -81,7 +83,7 @@ still ahead (D1-8 crash cuts 3 to 6, D1-9 gap, cancel and abandon, D1-14 refusal
 |---|---|---|---|
 | 1.1 | Extract `HarnessBarrierProtocol`; `OperationFaultBarrier` delegates | R | `OperationFaultBarrierTest` unchanged and green; no module-deps change |
 | 1.2 | `MigrationTransitionBarrier` with the seven points, env gate and in-process variant | R | unit tests: selecting a point without the harness gate throws; the default is the `NO_HOOK` sentinel; the in-process latch holds and releases |
-| 1.3 | Call sites in the cutover loop, pointer commit and live activation | R | a **holding test**: with the hook at `migration-before-pointer-commit`, the monitor runs at least 3 poll cycles and `state.json`'s active pointer does not change until release |
+| 1.3 | Call sites in the cutover loop, pointer commit and live activation | R | a **holding test**: externally read `state.json` over at least 3 normal poll intervals while `migration-before-pointer-commit` holds the monitor; active pointer stays A until release or checked cancellation |
 | 1.4 | Migrate `DocumentIdentityBootImportTest`; delete the kill switch | R | the class passes 20 consecutive runs locally (`--tests`, `cleanTest --no-build-cache`); hosted search-worker job green |
 | 1.5 | Fixture clients: the installed A/B watcher and crash-cut scenarios use named points instead of pause flags or sleeps | R | the next installed D1-8/9/14 round passes without timing changes. Record first-try pass or fail per scenario in the handoff |
 | 1.6 | Register the new runtime reached-file variant if its name differs | R | `check-runtime-manifest-closure` green |
@@ -92,3 +94,17 @@ integrated gate at the batch boundary, then hosted.
 
 **Estimate:** about 1 session. **Re-plan trigger:** if a point cannot be placed without
 restructuring the cutover loop's locking, stop and record why before changing lock order.
+
+## 2026-09-25 source correction
+
+Independent review of `KnowledgeServer` and `IndexGenerationManager` found that the true
+pre-pointer point holds `runtimeSwapLock`, publication write lock and generation
+`STATE_CONTROL`. Thus `DocumentIdentityBootImportTest` cannot call `close()` or another
+manager's `promoteBuildingGenerationToActive()` while that hook is held. The checked
+cancel outcome first unwinds all promotion guards, after which the existing manual pointer
+crash cut remains valid. One monitor thread runs the loop, so a held callback cannot permit
+three further monitor polls; three external state-file observations prove pointer stability.
+This is a correction to the package's proposed test mechanism, not an acceptance waiver.
+The held before-SWITCHING callback carries its observed source/building pair into
+the final mutation fence; the transition runs only if MIGRATING and both identities
+still match, so a replaced candidate cannot inherit a stale monitor decision.

@@ -26,6 +26,9 @@
         "executionId" : {
           "type" : "string"
         },
+        "gapListHash" : {
+          "type" : "string"
+        },
         "gaps" : {
           "type" : "array",
           "items" : {

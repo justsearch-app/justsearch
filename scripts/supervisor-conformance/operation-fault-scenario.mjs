@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import identity from '../dev/lib/process-identity.cjs';
+import { barrierFiles } from './barrier-files.mjs';
 
 const CASES = Object.freeze({
   'ingest-before-accept': { parentKind: 'ingest', phase: 'before-accept', recovery: 'retry' },
@@ -42,8 +43,7 @@ export async function exerciseOperationFault(c) {
   const originalIdentity = captureEngineIdentity(first, data, requireThat);
 
   const runtime = path.join(data, 'runtime');
-  const reachedFile = path.join(runtime, 'operation-fault-reached.json');
-  const releaseFile = path.join(runtime, 'operation-fault-release');
+  const { reachedFile, releaseFile } = barrierFiles(data);
   requireThat(!fs.existsSync(reachedFile) && !fs.existsSync(releaseFile),
     'operation fault fixture must start without a reached or release marker');
 

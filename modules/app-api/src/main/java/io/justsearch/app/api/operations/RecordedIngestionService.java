@@ -13,6 +13,12 @@ public interface RecordedIngestionService {
   /** Called only from a registered prepared parent's winning runner body with its admitted context. */
   OperationExecution execute(OperationRecordHandle parent, EngineContext context);
 
+  /** User decision on the exact current nonterminal reindex gap list. */
+  default io.justsearch.agent.api.registry.OperationResult acceptGaps(
+      String reindexKey, String gapsListHash, EngineContext context) {
+    throw new UnsupportedOperationException("Recorded gap acceptance is unavailable");
+  }
+
   /** Existing operations maintenance cadence retries deferred admission and flushes committed progress. */
   void maintain();
 

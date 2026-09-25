@@ -122,6 +122,29 @@ final class OperationsControllerTest {
   }
 
   @Test
+  void gapAcceptanceAliasPreservesExactDecisionAndDispatchControls() throws Exception {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
+    String reindexKey = "0194f72c-0000-7000-8000-000000000001";
+    String hash = "a".repeat(64);
+    var nonce = java.util.UUID.randomUUID();
+    when(dispatcher.dispatch(any(), any(), any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce)))
+        .thenReturn(OperationResult.success("Migration gaps accepted"));
+    var ctx = mockContext("core.accept-gaps", "{\"reindexKey\":\"" + reindexKey
+        + "\",\"gapListHash\":\"" + hash + "\",\"idempotencyKey\":\"" + key
+        + "\",\"preparationNonce\":\"" + nonce
+        + "\",\"confirmationToken\":\"capsule\"}");
+
+    controller.handleAcceptGaps(ctx);
+
+    verify(dispatcher).dispatch(
+        org.mockito.ArgumentMatchers.argThat(op -> op.id().equals(CoreOperationCatalog.ACCEPT_GAPS)),
+        eq("{\"reindexKey\":\"" + reindexKey + "\",\"gapListHash\":\"" + hash + "\"}"),
+        any(), eq(Optional.of("capsule")), any(), eq(key), eq(nonce));
+    verify(ctx).status(200);
+    assertTrue(capture(ctx).path("success").asBoolean());
+  }
+
+  @Test
   void migrationStartAliasMapsUnknownAndMissingReasonToManualAndLeavesOtherFieldsForSchema() throws Exception {
     when(dispatcher.dispatch(any(), any(), any(), any(), any()))
         .thenReturn(OperationResult.failure("Invalid bulk rebuild arguments", "BAD_REQUEST", Map.of(), false));

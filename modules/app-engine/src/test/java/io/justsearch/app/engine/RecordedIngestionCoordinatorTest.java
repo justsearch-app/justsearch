@@ -239,7 +239,7 @@ final class RecordedIngestionCoordinatorTest {
       f.operations.finish(child.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null));
       f.attachment.close();
       f.admission.freezeAdmission("receipt-only proof");
-      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
           null, new RecordedIngestPlanResolver());
       var coordinator = new RecordedIngestionCoordinator(f.operations, resumed, f.admission, f.authority);
       try (var attachment = coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true)) {
@@ -470,7 +470,7 @@ final class RecordedIngestionCoordinatorTest {
     f.attachment.close();
     f.admission.freezeAdmission("receipt-only parent outcome recovery");
     var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK,
-        Set.of(OperationKind.INGEST, OperationKind.REINDEX), null,
+        Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null,
         new RecordedIngestPlanResolver());
     return new RecordedIngestionCoordinator(f.operations, resumed, f.admission, f.authority);
   }
@@ -519,7 +519,7 @@ final class RecordedIngestionCoordinatorTest {
       for (int index = 0; index < 3; index++) accepted.add(f.accept(f.request()).accepted());
       f.attachment.close();
       var freeze = f.admission.freezeAdmission("hold ingestion activation");
-      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
           null, new RecordedIngestPlanResolver());
       var coordinator = new RecordedIngestionCoordinator(f.operations, resumed, f.admission, f.authority);
       try (var attachment = coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true)) {
@@ -565,7 +565,7 @@ final class RecordedIngestionCoordinatorTest {
       corruptOperation(temp.resolve("operations.db"), first.parent().key(), "preparation_payload", "lost-parent-binding");
       assertFalse(f.operations.openRecords().stream().anyMatch(row -> row.key().equals(first.child().key())),
           "terminal unacknowledged child is absent from the captured recovery cohort");
-      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
           null, new RecordedIngestPlanResolver());
       var coordinator = new RecordedIngestionCoordinator(f.operations, resumed, f.admission, f.authority);
       try (var attachment = coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true)) {
@@ -600,7 +600,7 @@ final class RecordedIngestionCoordinatorTest {
       f.queue.beginRecordedWalk(secondKey, CanonicalOperationArguments.digest(secondPlan.toReplayPayload()), true);
       f.attachment.close();
       corruptOperation(temp.resolve("operations.db"), first.child().key(), "client_id", "wrong-child-attribution");
-      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+      var resumed = new OperationAttemptRunnerImpl(f.operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
           null, new RecordedIngestPlanResolver());
       var coordinator = new RecordedIngestionCoordinator(f.operations, resumed, f.admission, f.authority);
       List<String> terminals = new ArrayList<>();
@@ -814,7 +814,7 @@ final class RecordedIngestionCoordinatorTest {
       f.attachment.close();
       f.queue.close();
       var recoveredRunner = new OperationAttemptRunnerImpl(f.operations, CLOCK,
-          Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null, new RecordedIngestPlanResolver());
       var recovered = new RecordedIngestionCoordinator(f.operations, recoveredRunner, f.admission, f.authority);
       try (var reopened = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
         reopened.open();
@@ -909,7 +909,7 @@ final class RecordedIngestionCoordinatorTest {
     var admission = new EngineAdmissionController(2, 2, 1);
     var authority = OperationAuthority.load(temp.resolve("authority"));
     try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
-      var runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
           null, new RecordedIngestPlanResolver());
       var recovered = new RecordedIngestionCoordinator(operations, runner, admission, authority);
       try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
@@ -1042,7 +1042,7 @@ final class RecordedIngestionCoordinatorTest {
       }
       var admission = new EngineAdmissionController(2, 2, 1);
       var runner = new OperationAttemptRunnerImpl(old.operations, CLOCK,
-          Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null, new RecordedIngestPlanResolver());
       var recovered = new RecordedIngestionCoordinator(old.operations, runner, admission, old.authority);
       try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
         queue.open();
@@ -1145,7 +1145,7 @@ final class RecordedIngestionCoordinatorTest {
       f.operations.checkpoint(row.id(), marker, 0, 0);
       var unresolved = f.queue.recordedWalk(childKey.get()).orElseThrow();
       var runner = new OperationAttemptRunnerImpl(f.operations, CLOCK,
-          Set.of(OperationKind.INGEST, OperationKind.REINDEX), null, new RecordedIngestPlanResolver());
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null, new RecordedIngestPlanResolver());
       var recoveredAdmission = new EngineAdmissionController(2, 2, 1);
       var recovered = new RecordedIngestionCoordinator(f.operations, runner, recoveredAdmission, f.authority);
       try (var attachment = recovered.attach(f.queue, () -> Optional.of(GENERATION), () -> true)) {
@@ -1185,7 +1185,7 @@ final class RecordedIngestionCoordinatorTest {
           if (selected && tripped.compareAndSet(false, true)) throw new RefusalCrash();
           return result;
         });
-    var runner = new OperationAttemptRunnerImpl(port, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+    var runner = new OperationAttemptRunnerImpl(port, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
         null, new RecordedIngestPlanResolver());
     var recovered = new RecordedIngestionCoordinator(port, runner, new EngineAdmissionController(2, 2, 1), old.authority);
     try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
@@ -1722,7 +1722,7 @@ final class RecordedIngestionCoordinatorTest {
               "schemaVersion", 1, "roots", List.of(Map.of("path", directory.toAbsolutePath().toString())))));
       authority = OperationAuthority.load(authorityDirectory);
       operations = new SqliteOperationStore(directory.resolve("operations.db"));
-      runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX),
+      runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
           null, new RecordedIngestPlanResolver());
       coordinator = new RecordedIngestionCoordinator(operations, runner, admission, authority);
       queue = new SqliteJobQueue(directory.resolve("jobs.db"), key -> fixtureClaimOwner.get() ? JobQueue.RecordedClaimDecision.ALLOW : coordinator.recordedClaimDecision(key));

@@ -115,6 +115,12 @@ public interface OperationAttemptRunner {
     throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
   }
 
+  /** Nonterminal gap decision on this runner's live reindex attempt. */
+  default OperationStore.BulkGapDecision awaitBulkGapDecision(
+      OperationRecordHandle handle, java.util.List<OperationOutcomeView.Gap> gaps) {
+    throw new UnsupportedOperationException("Bulk gap decisions are unavailable");
+  }
+
   /**
    * Prepare and arm the exact accepted installer-generation settings projection at its final
    * cutover boundary. The returned collaborator is non-terminal; the recorded owner decides from

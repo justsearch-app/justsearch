@@ -27,16 +27,21 @@ public record OperationOutcomeView(@JsonProperty(required = true) State state, S
 
   /** Metadata receipt or a pending generation's gap list; never an arbitrary handler response. */
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record Result(String code, String executionId, List<Gap> gaps) {
+  public record Result(String code, String executionId, List<Gap> gaps, String gapListHash) {
     public Result {
       if (code != null) new OperationReceipt(code, executionId);
       else if (executionId != null) throw new IllegalArgumentException("Execution id requires a receipt code");
       gaps = gaps == null ? null : List.copyOf(gaps);
+      if (gapListHash != null && (gaps == null || gaps.isEmpty()
+          || !gapListHash.matches("[0-9a-f]{64}"))) {
+        throw new IllegalArgumentException("Gap-list hash requires a nonempty settled gap list");
+      }
     }
   }
 
   /** Stable document/unit identity and a safe reason code; the generation owner supplies these. */
-  public record Gap(@JsonProperty(required = true) String unitId, @JsonProperty(required = true) String reason) {
+  public record Gap(@JsonProperty(required = true) String unitId, @JsonProperty(required = true) String reason)
+      implements io.justsearch.agent.api.registry.PreciseWire {
     public Gap {
       if (unitId == null || !unitId.matches("[A-Za-z0-9_.:/-]{1,128}")) {
         throw new IllegalArgumentException("Gap unit id must be a bounded identifier");

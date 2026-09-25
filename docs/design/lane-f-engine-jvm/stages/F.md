@@ -210,6 +210,12 @@ it points at a file under `evidence/`; `docs-validate` green.
 
 ### F-8 — PR 1 to green-and-ready
 
+The final PR body includes a compact subsystem map with columns **module or
+area**, **stages that changed it**, **managed review record IDs covering those
+commits**, and **acceptance rows that exercise it**. It is the reader's route
+through the large squash diff; every mapped row links the review and proof
+records rather than claiming that a file count is review evidence.
+
 Merge `origin/main` once more (17.6, before the final proof), the full suite with stress, both
 supervisor adapters, the installed-process tier, the kernel, ui-web gates, `regen-all --check`;
 the PR title and body under the squash-message gate's limits with the public narrative (17.6:

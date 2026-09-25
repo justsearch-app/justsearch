@@ -90,3 +90,22 @@ Read-only audit of `7f469d044` against `origin/main`. **V** = the reviewer re-ch
 **Estimate:** about 2 sessions of code plus the sandbox time at E. **Re-plan trigger:** if
 2a.1 shows the register is intentionally decoupled from code versions *and* the updater
 depends on that, stop and write the finding up for the owner before changing either.
+
+## 2026-09-25 2a implementation correction
+
+`updater.rs` compares `currentVersion` to the successor's readable source versions, so
+`ui-settings` must declare v4 and readable 0–3. The first gated run with `versionSource`
+failed on the real 1-versus-4 mismatch; after correction, the register gate and 78
+self-test assertions passed. Literal version constants on the SQLite and JSON rows are
+bound through the same optional source check.
+
+Independent refutation found that the updater also exact-compares the register's
+`reconciliation` string before version readability. Renaming the historical
+`READ_V0_OR_V1_AND_WRITE_V1` token to include v4 would make released v0.2.0/v0.3.0
+updaters reject this successor despite its ability to read v1. The token is therefore a
+frozen strategy identifier for read-in-place upcast and full rewrite; the row's format,
+`currentVersion`, predecessors and `versionSource` state the actual version. The Rust
+legacy-local positive/negative test and release-descriptor projection test cover this
+boundary. The production release wrapper still needs an inherited-register baseline
+argument before stage E, since its current invocation omits the generator's optional
+`--compat-baseline`; this remains WP2 work, not a completed release claim.

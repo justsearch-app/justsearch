@@ -2079,6 +2079,23 @@
         ]
       }
     },
+    "/api/indexing/migration/accept-gaps": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/indexing/migration/accept-gaps",
+        "tags": [
+          "indexing"
+        ],
+        "x-owning-module": "ResourceApiModule",
+        "x-required-capabilities": [
+          "WORKER"
+        ]
+      }
+    },
     "/api/indexing/migration/cutover": {
       "post": {
         "responses": {
@@ -3895,8 +3912,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 243,
-    "routeDigest": "sha256:b578169035e07f9273dd3d3e235a29338303cac22977ff38a366bba0e048470f"
+    "routeCount": 244,
+    "routeDigest": "sha256:c153c1e7f03f9ead391e957100a350d243cdbd0ed328aac0b2602ed4a91c7c6a"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

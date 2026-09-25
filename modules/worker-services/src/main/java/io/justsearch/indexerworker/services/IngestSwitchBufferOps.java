@@ -62,7 +62,8 @@ final class IngestSwitchBufferOps {
     if (indexGenerationManager == null) return null;
     try {
       IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
-      if (state == null || !"MIGRATING".equalsIgnoreCase(state.migration_state())) return null;
+      if (state == null || (!"MIGRATING".equalsIgnoreCase(state.migration_state())
+          && !"AWAITING_ACCEPTANCE".equalsIgnoreCase(state.migration_state()))) return null;
       if (state.building_generation() == null || state.building_generation().isBlank()) {
         throw switchingUnavailable();
       }
@@ -83,7 +84,8 @@ final class IngestSwitchBufferOps {
       if (state == null) return null;
       String phase = state.migration_state();
       if (!"MIGRATING".equalsIgnoreCase(phase)
-          && !"SWITCHING".equalsIgnoreCase(phase)) return null;
+          && !"SWITCHING".equalsIgnoreCase(phase)
+          && !"AWAITING_ACCEPTANCE".equalsIgnoreCase(phase)) return null;
       if (state.building_generation() == null || state.building_generation().isBlank()) {
         throw switchingUnavailable();
       }

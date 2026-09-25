@@ -10,6 +10,7 @@ import { exerciseOperationResume } from './operation-resume-scenario.mjs';
 import { exerciseOperationFault } from './operation-fault-scenario.mjs';
 import {
   exerciseBulkFault, BULK_FAULT_CASES,
+  exerciseBulkGapApproval,
   exerciseInstallerActivationFault, INSTALLER_FAULT_CASES, writeRetainedInstallerCandidate,
   exerciseLiveModelAB,
 } from './bulk-fault-scenario.mjs';
@@ -24,6 +25,7 @@ const operationFault = new Set(['ingest-before-accept', 'settings-before-accept'
   'ingest-after-effect-before-checkpoint', 'settings-after-effect-before-checkpoint',
   'ingest-client-disconnect', 'settings-mid-compose']).has(scenario);
 const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
+const bulkGapApproval = scenario === 'bulk-gap-approval';
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
 const modelLiveAB = scenario === 'model-live-a-b';
@@ -31,8 +33,8 @@ const acceptedWriteDuringBuild = modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1';
 const watcherDeleteDuringBuild = acceptedWriteDuringBuild
   && process.env.JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE === '1';
-// Create the finite MIGRATING load after A's vector readiness check, so the
-// candidate can be paused without placing a long queue ahead of the watcher probe.
+// Create the finite MIGRATING load after A's vector readiness check. The named
+// before-SWITCHING barrier holds the monitor while the watcher probe runs.
 const extraBuildFiles = watcherDeleteDuringBuild ? 300 : acceptedWriteDuringBuild ? 80 : 0;
 const distinctModelB = modelLiveAB && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1';
 const inPlaceModelB = distinctModelB
@@ -56,16 +58,17 @@ function findRetainedModelsRoot() {
     current = parent;
   }
 }
-const operationKey = operationFault || bulkFault || installerFault || modelLiveAB
+const operationKey = operationFault || bulkFault || bulkGapApproval || installerFault || modelLiveAB
   ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
   : path.join(repo, 'tmp', 'lane-f-takeover', `writer-live-${Date.now()}`);
 const state = path.join(work, 'state');
 const data = path.join(work, 'data');
-if (modelLiveAB) {
+if (modelLiveAB || bulkGapApproval) {
   // This owned installed fixture previously exercised a different crash cut.
-  for (const marker of ['operation-fault-reached.json', 'operation-fault-release']) {
+  for (const marker of ['operation-fault-reached.json', 'operation-fault-release',
+    'migration-barrier-reached.json', 'migration-barrier-release']) {
     fs.rmSync(path.join(data, 'runtime', marker), { force: true });
   }
 }
@@ -110,6 +113,8 @@ delete env.JUSTSEARCH_OPERATION_FAULT_KEY;
 delete env.JUSTSEARCH_OPERATION_FAULT_KIND;
 delete env.JUSTSEARCH_OPERATION_FAULT_POINT;
 delete env.JUSTSEARCH_OPERATION_FAULT_SELF_EXIT;
+delete env.JUSTSEARCH_MIGRATION_BARRIER_POINT;
+delete env.JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT;
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
     || operationFault || lockScenario) {
@@ -133,10 +138,11 @@ if (operationFault) {
     : scenario.endsWith('before-checkpoint') ? 'after-effect'
       : scenario === 'settings-mid-compose' ? 'settings-mid-compose' : 'after-accept';
 }
-if (bulkFault) {
+if (bulkFault || bulkGapApproval) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
-  env.JUSTSEARCH_OPERATION_FAULT_POINT = BULK_FAULT_CASES[scenario].phase;
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = bulkGapApproval
+    ? 'bulk-before-building-checkpoint' : BULK_FAULT_CASES[scenario].phase;
   const roots = ['bulk-root-a', 'bulk-root-b'].map(name => ({ path: path.join(work, name) }));
   for (const root of roots) fs.mkdirSync(root.path, { recursive: true });
   fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({ schemaVersion: 1, roots }));
@@ -168,6 +174,9 @@ if (modelLiveAB) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = 'installer-before-marker';
+  if (acceptedWriteDuringBuild) {
+    env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-before-switching';
+  }
   if (distinctModelB) {
     env.JUSTSEARCH_GPU_ENABLED = 'true';
     env.JUSTSEARCH_EMBED_GPU_ENABLED = 'true';
@@ -366,6 +375,10 @@ try {
   } else if (scenario === 'reconfigure-refresh') {
     await exerciseReconfigureRefresh({ apiPort, manifest, request, post, waitFor,
       requireThat, createOperationKey });
+  } else if (bulkGapApproval) {
+    await exerciseBulkGapApproval({ work, data, indexBase, first, manifest, apiPort,
+      readJson, waitFor, request, post, requireThat, matchingHit, createOperationKey,
+      operationKey });
   } else if (bulkFault) {
     await exerciseBulkFault({ work, data, indexBase, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit,

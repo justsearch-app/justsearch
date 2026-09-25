@@ -4,6 +4,8 @@ package io.justsearch.indexerworker.server;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
+import io.justsearch.app.api.operations.OperationOutcomeView;
+import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.io.Closeable;
 import java.io.IOException;
@@ -41,6 +43,33 @@ public interface RecordedIngestionLifecycle {
 
   /** Durable owner decision that this recorded B can no longer commit its pointer. */
   default boolean recordedPrecommitRefused(String operationKey) { return false; }
+
+  /** The recorded owner's durable decision on a settled, nonempty gap list. */
+  enum GapDecision { NONE, AWAITING_ACCEPTANCE, ACCEPTED }
+
+  default GapDecision recordedGapDecision(String operationKey) { return GapDecision.NONE; }
+
+  record JournalWitness(java.util.List<OperationOutcomeView.Gap> gaps,
+      java.util.Set<String> coveredUnitIds) {
+    public JournalWitness {
+      gaps = java.util.List.copyOf(gaps);
+      coveredUnitIds = java.util.Set.copyOf(coveredUnitIds);
+    }
+  }
+
+  /** The Worker holds its mutation/producer fence through the owner's durable decision. */
+  @FunctionalInterface
+  interface CheckedGapAcceptance {
+    OperationStore.BulkGapAcceptance withCandidateWitness(
+        java.util.function.Function<JournalWitness, OperationStore.BulkGapAcceptance> decision)
+        throws IOException, InterruptedException;
+  }
+
+  /** Worker-observed final Green projection gaps accompany the sealed captured-walk witness. */
+  default GapDecision recordedGapDecision(String operationKey,
+      JournalWitness journal) {
+    return recordedGapDecision(operationKey);
+  }
 
   /** Persist sealed operation evidence outside queue locking before recorded promotion. */
   default boolean beforeRecordedPromotion(String operationKey, JobQueue queue) {
@@ -132,6 +161,12 @@ public interface RecordedIngestionLifecycle {
   default Attachment attach(JobQueue queue, CheckedServingGeneration currentServingGeneration,
       BooleanSupplier workerOnline, CheckedBulkRuntime bulkRuntime) throws IOException {
     return attach(queue, currentServingGeneration, workerOnline);
+  }
+
+  default Attachment attach(JobQueue queue, CheckedServingGeneration currentServingGeneration,
+      BooleanSupplier workerOnline, CheckedBulkRuntime bulkRuntime,
+      CheckedGapAcceptance gapAcceptance) throws IOException {
+    return attach(queue, currentServingGeneration, workerOnline, bulkRuntime);
   }
 
   @FunctionalInterface

@@ -72,6 +72,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
 
   public static final OperationRef RESTART_WORKER = new OperationRef("core.restart-worker");
   public static final OperationRef BULK_REINDEX = new OperationRef("core.bulk-reindex");
+  public static final OperationRef ACCEPT_GAPS = new OperationRef("core.accept-gaps");
   /**
    * Slice 447-followup-bulk-reindex-recovery (Option A) + §X.11.5 Phase 7: parameterless
    * full-corpus rebuild wrapper. {@link #BULK_REINDEX} requires a {@code corpusIds}
@@ -351,6 +352,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
   private final List<Operation> definitions = List.of(
       restartWorker(),
       bulkReindex(),
+      acceptGaps(),
       rebuildIndex(),
       pingBackend(),
       clearFailedJobs(),
@@ -446,6 +448,24 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI, ExecutorTag.AGENT),
         // Slice 481 §7 step 2: admin migration; not user-self-service.
         Audience.OPERATOR);
+  }
+
+  private static Operation acceptGaps() {
+    return new Operation(
+        ACCEPT_GAPS,
+        Presentation.forId(ACCEPT_GAPS, Optional.of("warning"), Optional.of("destructive")),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "reindexKey":{"type":"string","minLength":36,"maxLength":36},
+              "gapListHash":{"type":"string","pattern":"^[0-9a-f]{64}$"}},
+             "required":["reindexKey","gapListHash"]}
+            """),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(ACCEPT_GAPS),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.OPERATOR);
   }
 
   /**

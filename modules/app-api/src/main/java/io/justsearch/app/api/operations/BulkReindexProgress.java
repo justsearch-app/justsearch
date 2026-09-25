@@ -3,6 +3,11 @@ package io.justsearch.app.api.operations;
 
 import io.justsearch.agent.api.registry.OperationResult;
 import java.util.HashSet;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -64,6 +69,30 @@ public record BulkReindexProgress(String generationId, IndexTargetSnapshot targe
 
   public long unitsFailed() {
     return phase == Phase.SETTLED ? settlement.gaps().size() : 0;
+  }
+
+  /** Stable hash of the current decision list, independent of queue enumeration order. */
+  public String gapsListHash() {
+    if (phase != Phase.SETTLED) throw new IllegalStateException("Bulk gaps are not settled");
+    return hashGapList(settlement.gaps());
+  }
+
+  public static String hashGapList(List<OperationOutcomeView.Gap> gaps) {
+    Objects.requireNonNull(gaps, "gaps");
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      digest.update("justsearch:bulk-gaps:v1\n".getBytes(StandardCharsets.UTF_8));
+      gaps.stream().sorted(Comparator.comparing(OperationOutcomeView.Gap::unitId))
+          .forEach(gap -> {
+            digest.update(gap.unitId().getBytes(StandardCharsets.UTF_8));
+            digest.update((byte) 0);
+            digest.update(gap.reason().getBytes(StandardCharsets.UTF_8));
+            digest.update((byte) '\n');
+          });
+      return HexFormat.of().formatHex(digest.digest());
+    } catch (NoSuchAlgorithmException unavailable) {
+      throw new IllegalStateException("SHA-256 is unavailable", unavailable);
+    }
   }
 
   public String cursor() {

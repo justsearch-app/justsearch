@@ -15,6 +15,7 @@ import io.justsearch.app.api.operations.BulkReindexProgress;
 import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.services.registry.executor.RecordedBulkPlanResolver;
 import io.justsearch.app.services.registry.executor.RecordedInstallerGenerationPlanResolver;
+import io.justsearch.app.services.registry.executor.RecordedGapAcceptancePlanResolver;
 import io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifier;
 import io.justsearch.app.api.operations.CanonicalOperationArguments;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
@@ -396,9 +397,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   @Override
   public Attachment attach(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online,
       CheckedBulkRuntime bulkRuntime) throws IOException {
+    return attach(queue, generation, online, bulkRuntime, null);
+  }
+
+  @Override
+  public Attachment attach(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online,
+      CheckedBulkRuntime bulkRuntime, CheckedGapAcceptance gapAcceptance) throws IOException {
     synchronized (lock) {
       if (attached != null) throw new IOException("Recorded ingestion still owns its prior queue");
-      Attached physical = new Attached(queue, generation, online, bulkRuntime);
+      Attached physical = new Attached(queue, generation, online, bulkRuntime, gapAcceptance);
       attached = physical;
       try {
         physical.queueSubscription = queue.subscribeRecordedWalks(key -> {
@@ -576,6 +583,16 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     });
     for (Parent parent : List.copyOf(parents.values())) drive(parent, physical, openChildParents, unknownChild[0]);
     for (Bulk bulk : List.copyOf(bulks.values())) driveBulk(bulk, physical);
+    attempts.reconcile(OperationKind.ACCEPT_GAPS, row -> {
+      final io.justsearch.app.api.operations.RecordedGapAcceptancePlan plan;
+      try {
+        plan = new RecordedGapAcceptancePlanResolver().resolve(row, preparation(row));
+      } catch (RuntimeException invalid) {
+        return failed("RECOVERY_BINDING_INVALID");
+      }
+      return new Reconciliation.Resume(handle -> OperationExecution.finished(
+          acceptGaps(plan.reindexKey(), plan.gapListHash(), row.context())));
+    });
     attempts.reconcile(OperationKind.REINDEX,
         row -> isBulk(row) ? reconcileBulk(row, physical)
             : reconcileParent(row, physical, openChildParents, unknownChild[0]));
@@ -1167,6 +1184,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     return progress;
   }
 
+  /** Captured settlement stays immutable; the last candidate observation owns promotion's gaps. */
+  private List<OperationOutcomeView.Gap> effectiveBulkGaps(
+      OperationRecord row, BulkReindexProgress progress) {
+    return operations.bulkGapWitness(row.id()).orElseGet(() -> progress.settlement().gaps());
+  }
+
   private JobQueue.WalkProgress bulkWalk(Bulk bulk, Attached physical) {
     var walk = physical.queue.recordedWalk(bulk.row.key()).orElseThrow(
         () -> new JobQueue.RecordedWalkGapException("Captured bulk walk disappeared"));
@@ -1216,6 +1239,88 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         .map(progress -> progress.refusalCode() != null).orElse(false);
   }
 
+  @Override public GapDecision recordedGapDecision(String operationKey) {
+    synchronized (lock) {
+      Bulk bulk = bulks.get(operationKey);
+      Attached physical = attached;
+      if (bulk == null || physical == null || !bulkClaimAllowed(bulk)
+          || !checkpointBulkSettlement(bulk, physical)) return GapDecision.NONE;
+      return gapDecision(operations.currentBulkGapDecision(bulk.row.id()));
+    }
+  }
+
+  @Override public GapDecision recordedGapDecision(String operationKey, JournalWitness journal) {
+    Objects.requireNonNull(journal, "journal");
+    synchronized (lock) {
+      Bulk bulk = bulks.get(operationKey);
+      Attached physical = attached;
+      if (bulk == null || physical == null || !bulkClaimAllowed(bulk)
+          || !checkpointBulkSettlement(bulk, physical)) return GapDecision.NONE;
+      Map<String, OperationOutcomeView.Gap> current = new java.util.TreeMap<>();
+      for (var gap : bulkProgress(bulk).settlement().gaps()) {
+        if (!journal.coveredUnitIds().contains(gap.unitId())) current.put(gap.unitId(), gap);
+      }
+      for (var gap : journal.gaps()) current.put(gap.unitId(), gap);
+      return gapDecision(attempts.awaitBulkGapDecision(bulk.handle,
+          List.copyOf(current.values())));
+    }
+  }
+
+  private static GapDecision gapDecision(OperationStore.BulkGapDecision decision) {
+    return switch (decision) {
+      case UNOBSERVED, NONE -> GapDecision.NONE;
+      case AWAITING_ACCEPTANCE -> GapDecision.AWAITING_ACCEPTANCE;
+      case ACCEPTED -> GapDecision.ACCEPTED;
+    };
+  }
+
+  @Override public OperationResult acceptGaps(String reindexKey, String gapsListHash,
+      EngineContext context) {
+    if (context == null || context.clientKind() != EngineContext.ClientKind.WEBVIEW) {
+      return OperationResult.failure("Only the webview can accept migration gaps",
+          "GAP_ACCEPTANCE_REQUIRES_USER", Map.of(), false);
+    }
+    final OperationStore.BulkGapAcceptance decision;
+    try {
+      Attached physical = attached;
+      if (physical == null) {
+        decision = OperationStore.BulkGapAcceptance.NOT_AWAITING;
+      } else if (physical.gapAcceptance == null) {
+        decision = OperationStore.BulkGapAcceptance.NOT_AWAITING;
+      } else {
+        decision = physical.gapAcceptance.withCandidateWitness(journal -> {
+          synchronized (lock) {
+            Bulk bulk = bulks.get(reindexKey);
+            if (bulk == null || bulk.physical != physical || physical.stopping) {
+              return OperationStore.BulkGapAcceptance.NOT_AWAITING;
+            }
+            if (recordedGapDecision(reindexKey, journal) != GapDecision.AWAITING_ACCEPTANCE) {
+              return OperationStore.BulkGapAcceptance.NOT_AWAITING;
+            }
+            return operations.acceptBulkGaps(reindexKey, gapsListHash, context.clientId());
+          }
+        });
+      }
+    }
+    catch (IllegalArgumentException invalid) {
+      return OperationResult.failure("Invalid gap decision", "BAD_REQUEST", Map.of(), false);
+    } catch (IOException unavailable) {
+      return OperationResult.failure("Candidate gap witness is unavailable",
+          "GAP_ACCEPTANCE_UNAVAILABLE", Map.of(), true);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return OperationResult.failure("Candidate gap decision was interrupted",
+          "GAP_ACCEPTANCE_UNAVAILABLE", Map.of(), true);
+    }
+    return switch (decision) {
+      case ACCEPTED -> OperationResult.success("Migration gaps accepted");
+      case GAP_LIST_STALE -> OperationResult.failure("Migration gap list changed",
+          "GAP_LIST_STALE", Map.of(), false);
+      case NOT_AWAITING -> OperationResult.failure("Migration is not awaiting gap acceptance",
+          "GAP_ACCEPTANCE_UNAVAILABLE", Map.of(), false);
+    };
+  }
+
   @Override public boolean beforeRecordedPromotion(String operationKey, JobQueue queue) {
     synchronized (lock) {
       Bulk bulk = bulks.get(operationKey);
@@ -1223,6 +1328,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (bulk == null || physical == null || physical.queue != queue || !bulkClaimAllowed(bulk)) return false;
       if (bulkProgress(bulk).refusalCode() != null) return false;
       if (!checkpointBulkSettlement(bulk, physical)) return false;
+      var decision = operations.currentBulkGapDecision(bulk.row.id());
+      if (decision == OperationStore.BulkGapDecision.AWAITING_ACCEPTANCE) return false;
+      if (decision == OperationStore.BulkGapDecision.UNOBSERVED
+          && !bulkProgress(bulk).settlement().gaps().isEmpty()) return false;
       return bulkAuthorized(bulk) && installerAssetsValid(bulk.plan) && bulkClaimAllowed(bulk);
     }
   }
@@ -1345,7 +1454,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
             && promotedTarget(row.key(), runtime)) {
           requireBulkSettlement(row, plan, physical, progress.orElseThrow());
           if (!installerProjectionCommitted(plan)) return new Reconciliation.Wait();
-          return progress.orElseThrow().settlement().gaps().isEmpty()
+          return effectiveBulkGaps(row, progress.orElseThrow()).isEmpty()
               ? new Reconciliation.Complete(new OperationReceipt("SUCCESS", null))
               : failed("PROMOTED_WITH_GAPS");
         }
@@ -1361,7 +1470,11 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return physical.queue.hasIssuedRecordedClaims(row.key()) ? new Reconciliation.Wait()
           : failed(RecordedIngestionSettlement.UNAVAILABLE);
     }
-    if (row.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS) {
+    boolean settledForUserDecision = operations.bulkReindexProgress(row.id())
+        .map(progress -> progress.phase() == BulkReindexProgress.Phase.SETTLED
+            && !effectiveBulkGaps(row, progress).isEmpty()).orElse(false);
+    if (row.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS
+        && !settledForUserDecision) {
       return reconcileBulkRefusal(row, plan, physical, RecordedIngestionSettlement.EXHAUSTED);
     }
     return new Reconciliation.Resume(handle -> {
@@ -1477,7 +1590,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         if (promotedTarget(row.key(), runtime)) {
           requireBulkSettlement(row, bulk.plan, physical, progress);
           if (!installerProjectionCommitted(bulk.plan)) return;
-          if (progress.settlement().gaps().isEmpty()) {
+          if (effectiveBulkGaps(row, progress).isEmpty()) {
             bulk.completion.complete(OperationResult.success("Bulk rebuild completed"));
           } else {
             finish(bulk.completion, new OperationReceipt("PROMOTED_WITH_GAPS", null));
@@ -1781,8 +1894,9 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     if (progress.phase() == BulkReindexProgress.Phase.SETTLED) {
       requireBulkSettlement(row, plan, physical, progress);
-      if ((row.state() == OperationState.COMPLETE && !progress.settlement().gaps().isEmpty())
-          || ("PROMOTED_WITH_GAPS".equals(code) && progress.settlement().gaps().isEmpty())) {
+      var effectiveGaps = effectiveBulkGaps(row, progress);
+      if ((row.state() == OperationState.COMPLETE && !effectiveGaps.isEmpty())
+          || ("PROMOTED_WITH_GAPS".equals(code) && effectiveGaps.isEmpty())) {
         throw new JobQueue.RecordedWalkGapException("Terminal bulk completion contradicts its gaps");
       }
     } else if (progress.phase() != BulkReindexProgress.Phase.CAPTURING || progress.refusalCode() == null
@@ -1902,6 +2016,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     final CheckedServingGeneration generation;
     final BooleanSupplier online;
     final CheckedBulkRuntime bulkRuntime;
+    final CheckedGapAcceptance gapAcceptance;
     final RecordedIngestionSettlement settlement;
     volatile boolean stopping;
     boolean flushing;
@@ -1915,8 +2030,9 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     JobQueue.WalkSubscription queueSubscription;
     AutoCloseable operationSubscription;
     Attached(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online,
-        CheckedBulkRuntime bulkRuntime) {
+        CheckedBulkRuntime bulkRuntime, CheckedGapAcceptance gapAcceptance) {
       this.bulkRuntime = Objects.requireNonNull(bulkRuntime, "bulkRuntime");
+      this.gapAcceptance = gapAcceptance;
       this.queue = Objects.requireNonNull(queue, "queue"); this.generation = Objects.requireNonNull(generation, "generation");
       this.online = Objects.requireNonNull(online, "online"); this.settlement = new RecordedIngestionSettlement(operations, queue);
     }

@@ -900,6 +900,16 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
   }
 
+  /** Green keeps projecting accepted text to A while its native set is unloaded for a gap wait. */
+  public void parkCandidateProducerModels() {
+    if (candidateConfiguration == null || indexingLoop == null
+        || producerEncoderBindings == encoderBindings) {
+      throw new IllegalStateException("No detached candidate producer is available");
+    }
+    producerEncoderBindings.publish(EncoderBindings.Snapshot.empty());
+    indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(null);
+  }
+
   /**
    * A separate lexical query view over the same read runtime. Issued calls keep this service's
    * original model bindings until their serving leases leave; Green keeps its writer owner.

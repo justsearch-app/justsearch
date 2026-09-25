@@ -17,7 +17,138 @@ re-cut trigger is retired; merge `origin/main` at each checkpoint. See
 [design §16](design.md#16-what-must-be-measured-and-the-gate-for-flipping-the-default),
 [E](stages/E.md), and the D1/D2 §6 maps.
 
-## Latest checkpoint (2026-09-24)
+## Current D1-9/D1-11 gap batch (2026-09-25)
+
+**WP1/WP2 2a/WP5 boundary, 2026-09-25.** The migration transition harness
+now shares one atomic reached/release protocol with operation faults. Its seven
+named points preserve the live monitor, and a resumed before-SWITCHING hold
+checks MIGRATING plus the observed source/building generation identities under
+final mutation admission. The test-only monitor kill switch and pause-flag
+fixture barrier are removed. Focused Worker and UI barrier tests, Spotless and
+PMD passed; the first identity bootstrap repeat had 20/20 fresh XMLs with zero
+failures (`tmp/3480-wp1-identity-repeat/`). After the identity recheck was
+added, focused `DocumentIdentityBootImportTest` and
+`CutoverRestartEvidenceTest` plus Spotless passed. A second 20-run repeat
+passed after the identity recheck: 20/20 fresh `cleanTest --no-build-cache`
+runs, 20 XMLs, zero test failures or errors
+(`tmp/3483-wp1-identity-repeat/`). After the one-line environment funnel
+correction, the exact-source repeat also passed 20/20 fresh runs, 20 XMLs,
+zero failures and errors (`tmp/3492-wp1-identity-repeat/`).
+
+The rebuilt installed distribution seeded standard-model A through the
+`installer-before-marker` pointer/settings crash cut at
+`tmp/3481-wp1-installer-seed.txt`: terminal assertion passed, the supervisor
+recovered a counted Engine exit, and STOP 0 closed owned ports. Reusing that
+retained A, the first `model-live-a-b` watcher/accepted-write run with the
+named `migration-before-switching` hold passed at
+`tmp/3482-wp1-installed-live-ab.txt`. The marker identified the live PID and
+exact source/building pair; deletion and accepted write were visible on A;
+held B had 302 completed units, zero failures and the in-place encoder
+`RELOADING`; promotion produced settings revision 2 and a real B vector result.
+Both runs used the distribution built after the WP1 source change. The old
+fixture pause responses and timing assumptions are no longer its evidence.
+The same current distribution seeded another standard-model A through
+`installer-before-marker` (`tmp/3485-gap-installer-seed.txt`), then passed the
+installed gap wait and approval at `tmp/3486-gap-current-installed.txt`:
+one missing captured unit, A real vector search, exact gap hash approval,
+same B promotion, duplicate acceptance with no second effect, and STOP 0.
+The final terminal row retained `PROMOTED_WITH_GAPS` as a diagnostic.
+The first 358-task full serial stress gate (`tmp/3487-gap-wp1-integrated.txt`)
+completed with one failure: `SystemAccessFunnelTest` found the new
+`KnowledgeServer` constructor's direct `System::getenv`. Its original XML is
+preserved at `tmp/3487-failure-xml/`. The harness selector now uses the
+existing process-global `SystemAccess.rawEnvVar`; focused audit, barrier and
+Spotless checks passed at `tmp/3488-sysaccess-focused.txt`. A full exact-source
+rerun passed at `tmp/3489-gap-wp1-integrated-green.txt`: 358 tasks, 21
+executed, 337 up-to-date, exit 0, including stress tests and the formerly red
+audit gate. The first red run remains diagnostic, not integrated acceptance.
+`build -x test --max-workers=1` passed at `tmp/3490-build-no-test.txt`;
+UI typecheck and its 491-file, 6601-test unit suite passed, with the latter
+captured at `tmp/3491-ui-unit.txt`. The installed rounds preceded only the
+environment funnel correction: `SystemAccess.rawEnvVar` delegates to the same
+`System.getenv` lookup for these fixed nonblank keys. The focused funnel test,
+full exact-source gate and final 20-run identity proof cover that source
+change; the installed proof is reused under that unchanged environment
+semantics, not represented as a post-correction installed rerun.
+
+WP2 2a's `versionSource` gate first failed against the real `ui-settings`
+1-versus-4 drift, then passed with `currentVersion: 4`, readable legacy 0–3,
+and literal code-version checks on every eligible SQLite/JSON row. The
+historical reconciliation string stays byte-for-byte stable because released
+updaters compare it before readable versions; independent review found this
+compatibility constraint. `check-store-recoverability` passed 47 rows and its
+self-test passed 78 assertions; Rust updater tests passed 33 including the
+legacy v1→v4 positive and changed-token negative. The release generator's
+production wrapper still omits the optional inherited-register baseline and
+belongs to WP2 before E. WP5 corrected the complexity labels and rollback
+scope, added five descriptive paired development measures and the final PR
+subsystem-map requirement. The two owner-requested agent-instruction checks,
+runtime manifest closure and module-dependency check pass at this boundary.
+No current-batch hosted claim follows from these local runs.
+
+The D1-9/D1-11 gap decision, WP1 transition barrier and WP2 register gate
+share `KnowledgeServer` and the recoverability register. One integrated
+checkpoint commit keeps every recorded tree buildable; splitting these
+interdependent edits into item commits would leave unverified intermediate
+source/schema combinations. This is the in-scope exception to D1 §4's
+item-by-item commit plan. The accepted owner policy makes technical test
+intent and this commit boundary the lane owner's judgment.
+
+Branch HEAD is `27adef9f0` after merging the owner-authorized escalation
+policy `57fd2e1aa` and docs-only improvement package `59da2bc4d`; the gap
+implementation remains uncommitted. The package changed no tested runtime
+source after the local/installed gap runs. Both
+`agent-instructions-sync --check` and `check-always-loaded-budget` passed.
+The previous pushed `7f469d044` hosted run
+[`36059941295`](https://github.com/justsearch-app/justsearch/actions/runs/36059941295)
+passed system integration, Windows native and its other jobs, but search-worker
+failed `DocumentIdentityBootImportTest.blueUidIsImportedBeforePausedMigrationReindexesIntoGreen`:
+the manual pointer crash cut raced automatic cutover. The test-only monitor
+hold preserves that cut. The new rename guard then exposed a paused-candidate
+rename in the fixture. Under the owner's test-intent decision, it now performs
+the production rename before migration, retains the durable UID/chunk/pointer
+proof, and refuses a second rename during migration. The focused classes passed
+at `tmp/3467`; this correction is local, not hosted.
+
+The recorded gap decision keeps the bulk row nonterminal in
+`COMPLETE_WITH_GAPS`, exposes the current candidate gap-list hash on the outcome
+wire, requires a separate HIGH/DURABLE webview `core.accept-gaps` preparation,
+and resumes the same Green after exact approval. Immutable captured settlement
+and the effective candidate gap witness have separate store projections;
+terminal recovery reads the latter. An in-place wait parks B and recomposes A,
+and the Worker fences approval after Green's accepted queue drains and its
+producer pauses. Recovery retains the visible gap wait. The initial failing
+owner regression is at `tmp/3399`; focused Engine, Worker, store and schema
+checks passed at `tmp/3450`, `tmp/3453`–`tmp/3455`.
+
+The serial runs then exposed catalog/validator fixtures and the old terminal
+recovery test (`tmp/3456`), the paused rename (`tmp/3460`), and the UI catalog
+count (`tmp/3468`). All were corrected while retaining their intended
+guarantees. The complete serial `test --max-workers=1` gate passed at
+`tmp/3471-gap-full-test.txt` (10m54s). Failure XML is preserved under
+`tmp/3456-app-services-test-results/`, `tmp/3460-indexer-worker-test-results/`
+and `tmp/3468-ui-test-results/`. `build -x test` and UI `installDist` passed at
+`tmp/3473`; Spotless, PMD and the selected stress test passed at `tmp/3478`.
+`regen-all --check --except notices` passed at `tmp/3461`; UI typecheck/unit
+passed at `tmp/3462`–`tmp/3463`. Earlier live Head capture had 244 routes;
+five affected Library captures reported no axe violations or console errors.
+
+A fresh installed standard-model A passed installer marker recovery at
+`tmp/3476-gap-installer-baseline.txt`. On that retained A,
+`tmp/3477-gap-installed.txt` passed: one captured file disappeared after
+closure; the row waited as `COMPLETE_WITH_GAPS`, the wire answered
+`running/awaiting_acceptance` with one hash-bound gap, real vector search
+answered on A, separately approved accept-gaps promoted the same B, duplicate
+acceptance had no second effect, and STOP 0 closed owned ports. The committed
+pointer's terminal row is `FAILED` with `PROMOTED_WITH_GAPS`, preserving the
+diagnostic. The first fixture run `tmp/3475` timed out because it expected the
+durable bulk phase to change from `settled`; the retained DB/pointer held the
+correct wait. The wire projector owns `awaiting_acceptance`, and the corrected
+fixture passed. Dev preflight's standalone Worker executable check is stale
+against Lane F's library Worker; the UI dist and installed harness are the
+applicable executable proof. Installed in-place A recovery, no-file projection,
+positive cancel/abandon, gap crash cuts and hosted proof remain open. Do not
+count this WIP as D1-9 completion.
 
 PR727's last fully hosted runtime checkpoint is `fc5b444d6`; the following
 chronology retains earlier failures and corrections. The 358-task local integrated gate passed at

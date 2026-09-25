@@ -1578,8 +1578,8 @@ public final class WorkerIngestService {
 
     // Rename is a two-authority mutation (identity store plus Lucene). Unlike simple path
     // upserts/deletes, the existing switch buffer cannot replay both halves atomically. Refuse
-    // during the narrow cutover fence before touching either authority and let the caller retry.
-    if (switchBufferOps.isSwitching()) {
+    // throughout a candidate build before touching either authority and let the caller retry.
+    if (switchBufferOps.buildingGenerationForFileAdmission() != null) {
       throw IngestSwitchBufferOps.switchingUnavailable();
     }
 

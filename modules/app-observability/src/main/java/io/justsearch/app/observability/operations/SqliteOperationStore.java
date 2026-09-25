@@ -654,7 +654,8 @@ public final class SqliteOperationStore implements OperationStore {
       // Select only the public projection columns: identity and prepared content stay private.
       try (var query = connection.prepareStatement("""
           SELECT m.history_since_ms, o.state, o.phase, o.accepted_at, o.completed_at,
-            o.units_completed, o.units_failed, o.failure_reason, o.result_json, o.gaps_json
+            o.units_completed, o.units_failed, o.failure_reason, o.result_json, o.gaps_json,
+            o.gaps_list_hash
           FROM operations_meta m LEFT JOIN operations o ON o.operation_key = ?
           WHERE m.singleton = 1
           """)) {
@@ -687,12 +688,13 @@ public final class SqliteOperationStore implements OperationStore {
     if (state == OperationState.COMPLETE_WITH_GAPS) {
       String gaps = row.getString("gaps_json");
       if (gaps != null) result = new OperationOutcomeView.Result(null, null,
-          List.of(JSON.readValue(gaps, OperationOutcomeView.Gap[].class)));
+          List.of(JSON.readValue(gaps, OperationOutcomeView.Gap[].class)),
+          row.getString("gaps_list_hash"));
     } else {
       String receiptJson = row.getString("result_json");
       if (receiptJson != null) {
         OperationReceipt receipt = JSON.readValue(receiptJson, OperationReceipt.class);
-        result = new OperationOutcomeView.Result(receipt.code(), receipt.executionId(), null);
+        result = new OperationOutcomeView.Result(receipt.code(), receipt.executionId(), null, null);
       }
     }
     return new OperationOutcomeView(wireState,
@@ -776,9 +778,11 @@ public final class SqliteOperationStore implements OperationStore {
   public boolean resume(long id) {
     return locked(() -> {
       try (var update = connection.prepareStatement("""
-          UPDATE operations SET state = 'RUNNING', started_at = COALESCE(started_at, ?),
+          UPDATE operations SET state = CASE WHEN state = 'COMPLETE_WITH_GAPS'
+            THEN state ELSE 'RUNNING' END, started_at = COALESCE(started_at, ?),
             updated_at = ?, attempts = attempts + 1
-          WHERE id = ? AND state IN ('ACCEPTED', 'RUNNING')
+          WHERE id = ? AND (state IN ('ACCEPTED', 'RUNNING')
+            OR (state = 'COMPLETE_WITH_GAPS' AND kind = 'reindex'))
           """)) {
         long now = clock.millis();
         update.setLong(1, now); update.setLong(2, now); update.setLong(3, id);
@@ -851,14 +855,16 @@ public final class SqliteOperationStore implements OperationStore {
             || bound.capture() != null && !bound.capture().equals(progress.capture())) return false;
       }
       var settlement = progress.settlement();
-      var evidence = new BulkEvidence(2, progress.target().fingerprint(), progress.capture(),
+      var evidence = new BulkEvidence(3, progress.target().fingerprint(), progress.capture(),
           settlement == null ? null : settlement.revision(),
           settlement == null ? null : settlement.sha256(),
           settlement == null ? 0 : settlement.failedEvents(),
-          settlement == null ? 0 : settlement.supersededEvents(), progress.refusalCode());
+          settlement == null ? 0 : settlement.supersededEvents(), progress.refusalCode(),
+          settlement == null ? null : settlement.gaps());
       try (var update = connection.prepareStatement("""
           UPDATE operations SET phase = ?, building_generation_id = ?, target_settings_json = ?,
-            gaps_json = ?, processing_history_json = ?, processing_history_counts_json = ?,
+            gaps_json = CASE WHEN gaps_list_hash IS NULL THEN ? ELSE gaps_json END,
+            processing_history_json = ?, processing_history_counts_json = ?,
             checkpoint_cursor = ?, units_completed = ?, units_failed = ?, updated_at = MAX(updated_at, ?)
           WHERE id = ? AND state = 'RUNNING'
           """)) {
@@ -883,6 +889,184 @@ public final class SqliteOperationStore implements OperationStore {
     return locked(() -> bulkProgressRow(id));
   }
 
+  @Override
+  public BulkGapDecision awaitBulkGapDecision(long id, List<OperationOutcomeView.Gap> gaps) {
+    Objects.requireNonNull(gaps, "gaps");
+    if (gaps.stream().map(OperationOutcomeView.Gap::unitId).distinct().count() != gaps.size()) {
+      throw new IllegalArgumentException("Gap units must be unique");
+    }
+    String gapsListHash = BulkReindexProgress.hashGapList(gaps);
+    return locked(() -> transaction(() -> {
+      OperationRecord row = rowById(id);
+      var progress = bulkProgressRow(id).orElseThrow(
+          () -> new IllegalStateException("Bulk gap decision has no progress"));
+      if (!bulkRow(row) || progress.phase() != BulkReindexProgress.Phase.SETTLED
+          || row.state().terminal()) {
+        throw new IllegalStateException("Bulk gap decision has no matching open settlement");
+      }
+      var captured = progress.settlement();
+      var evidence = new BulkEvidence(3, progress.target().fingerprint(), progress.capture(),
+          captured.revision(), captured.sha256(), captured.failedEvents(),
+          captured.supersededEvents(), progress.refusalCode(), captured.gaps());
+      try (var update = connection.prepareStatement(
+          "UPDATE operations SET processing_history_counts_json = ? WHERE id = ?")) {
+        update.setString(1, BULK_JSON.writeValueAsString(evidence));
+        update.setLong(2, id);
+        if (update.executeUpdate() != 1) throw new SQLException("Bulk gap evidence disappeared");
+      }
+      try (var query = connection.prepareStatement(
+          "SELECT gaps_list_hash, gaps_accepted_at FROM operations WHERE id = ?")) {
+        query.setLong(1, id);
+        try (var found = query.executeQuery()) {
+          if (!found.next()) throw new IllegalStateException("Bulk gap row disappeared");
+          String storedHash = found.getString(1);
+          Long acceptedAt = nullableLong(found, "gaps_accepted_at");
+          if (!Objects.equals(storedHash, gapsListHash)) {
+            try (var update = connection.prepareStatement("""
+                UPDATE operations SET state = ?, gaps_json = ?, gaps_list_hash = ?,
+                  gaps_accepted_at = NULL, gaps_accepted_by = NULL, updated_at = ?
+                WHERE id = ? AND state IN ('RUNNING', 'COMPLETE_WITH_GAPS')
+                """)) {
+              update.setString(1, gaps.isEmpty() ? "RUNNING" : "COMPLETE_WITH_GAPS");
+              update.setString(2, BULK_JSON.writeValueAsString(gaps));
+              update.setString(3, gapsListHash);
+              update.setLong(4, clock.millis());
+              update.setLong(5, id);
+              if (update.executeUpdate() != 1) throw new IllegalStateException("Bulk gap witness changed after closure");
+            }
+            return gaps.isEmpty() ? BulkGapDecision.NONE : BulkGapDecision.AWAITING_ACCEPTANCE;
+          }
+          if (gaps.isEmpty()) return BulkGapDecision.NONE;
+          if (acceptedAt != null) return BulkGapDecision.ACCEPTED;
+        }
+      }
+      if (row.state() == OperationState.RUNNING) {
+        try (var update = connection.prepareStatement("""
+            UPDATE operations SET state = 'COMPLETE_WITH_GAPS',
+              gaps_list_hash = ?, updated_at = ? WHERE id = ? AND state = 'RUNNING'
+            """)) {
+          update.setString(1, gapsListHash);
+          update.setLong(2, clock.millis());
+          update.setLong(3, id);
+          if (update.executeUpdate() != 1) throw new IllegalStateException("Bulk gap wait was refused");
+        }
+      } else if (row.state() != OperationState.COMPLETE_WITH_GAPS) {
+        throw new IllegalStateException("Bulk gap row is not awaiting acceptance");
+      }
+      return BulkGapDecision.AWAITING_ACCEPTANCE;
+    }));
+  }
+
+  @Override
+  public BulkGapDecision currentBulkGapDecision(long id) {
+    return locked(() -> transaction(() -> {
+      OperationRecord row = rowById(id);
+      if (!bulkRow(row) || row.state().terminal()) {
+        throw new IllegalStateException("Bulk gap decision has no open owner");
+      }
+      try (var query = connection.prepareStatement(
+          "SELECT gaps_list_hash, gaps_accepted_at, gaps_json FROM operations WHERE id = ?")) {
+        query.setLong(1, id);
+        try (var found = query.executeQuery()) {
+          if (!found.next()) throw new SQLException("Bulk gap row disappeared");
+          if (found.getString(1) == null) return BulkGapDecision.UNOBSERVED;
+          if (nullableLong(found, "gaps_accepted_at") != null) return BulkGapDecision.ACCEPTED;
+          String gapsJson = found.getString("gaps_json");
+          boolean hasGaps = gapsJson != null
+              && JSON.readValue(gapsJson, OperationOutcomeView.Gap[].class).length > 0;
+          if (!hasGaps) return BulkGapDecision.NONE;
+          if (row.state() == OperationState.RUNNING) {
+            try (var update = connection.prepareStatement(
+                "UPDATE operations SET state = 'COMPLETE_WITH_GAPS', updated_at = ? "
+                    + "WHERE id = ? AND state = 'RUNNING' AND gaps_accepted_at IS NULL")) {
+              update.setLong(1, clock.millis());
+              update.setLong(2, id);
+              if (update.executeUpdate() != 1) throw new SQLException("Bulk gap wait cannot resume");
+            }
+          }
+          return BulkGapDecision.AWAITING_ACCEPTANCE;
+        }
+      }
+    }));
+  }
+
+  @Override
+  public java.util.Optional<List<OperationOutcomeView.Gap>> bulkGapWitness(long id) {
+    return locked(() -> {
+      if (!bulkRow(rowById(id))) throw new IllegalArgumentException("Bulk gap witness requires reindex");
+      try (var query = connection.prepareStatement(
+          "SELECT gaps_json, gaps_list_hash FROM operations WHERE id = ?")) {
+        query.setLong(1, id);
+        try (var found = query.executeQuery()) {
+          if (!found.next()) throw new SQLException("Bulk gap row disappeared");
+          String hash = found.getString("gaps_list_hash");
+          if (hash == null) return java.util.Optional.empty();
+          String json = found.getString("gaps_json");
+          if (json == null) throw new SQLException("Bulk gap list disappeared");
+          List<OperationOutcomeView.Gap> gaps = List.of(
+              JSON.readValue(json, OperationOutcomeView.Gap[].class));
+          if (!hash.equals(BulkReindexProgress.hashGapList(gaps))) {
+            throw new SQLException("Bulk gap witness hash differs from its list");
+          }
+          return java.util.Optional.of(gaps);
+        }
+      }
+    });
+  }
+
+  @Override
+  public BulkGapAcceptance acceptBulkGaps(String reindexKey, String gapsListHash,
+      String acceptedBy) {
+    OperationKeys.timestampMillis(reindexKey);
+    if (gapsListHash == null || !gapsListHash.matches("[0-9a-f]{64}")
+        || acceptedBy == null || acceptedBy.isBlank() || acceptedBy.length() > 256
+        || acceptedBy.chars().anyMatch(Character::isISOControl)) {
+      throw new IllegalArgumentException("Invalid bulk gap acceptance identity");
+    }
+    return locked(() -> transaction(() -> {
+      var found = findRow(reindexKey);
+      if (found.isEmpty() || !bulkRow(found.orElseThrow())) return BulkGapAcceptance.NOT_AWAITING;
+      OperationRecord row = found.orElseThrow();
+      var progress = bulkProgressRow(row.id());
+      if (progress.isEmpty() || progress.orElseThrow().phase() != BulkReindexProgress.Phase.SETTLED) {
+        return BulkGapAcceptance.NOT_AWAITING;
+      }
+      try (var query = connection.prepareStatement(
+          "SELECT gaps_list_hash, gaps_accepted_at, gaps_json FROM operations WHERE id = ?")) {
+        query.setLong(1, row.id());
+        try (var details = query.executeQuery()) {
+          if (!details.next()) return BulkGapAcceptance.NOT_AWAITING;
+          String storedHash = details.getString(1);
+          if (storedHash == null) return BulkGapAcceptance.NOT_AWAITING;
+          String currentGaps = details.getString("gaps_json");
+          if (currentGaps == null
+              || JSON.readValue(currentGaps, OperationOutcomeView.Gap[].class).length == 0) {
+            return BulkGapAcceptance.NOT_AWAITING;
+          }
+          if (!storedHash.equals(gapsListHash)) return BulkGapAcceptance.GAP_LIST_STALE;
+          if (nullableLong(details, "gaps_accepted_at") != null) {
+            return BulkGapAcceptance.ACCEPTED;
+          }
+        }
+      }
+      if (row.state() != OperationState.COMPLETE_WITH_GAPS) return BulkGapAcceptance.NOT_AWAITING;
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET state = 'RUNNING', gaps_accepted_at = ?, gaps_accepted_by = ?,
+            updated_at = ? WHERE id = ? AND state = 'COMPLETE_WITH_GAPS' AND gaps_list_hash = ?
+              AND gaps_accepted_at IS NULL
+          """)) {
+        long now = clock.millis();
+        update.setLong(1, now);
+        update.setString(2, acceptedBy);
+        update.setLong(3, now);
+        update.setLong(4, row.id());
+        update.setString(5, gapsListHash);
+        if (update.executeUpdate() != 1) throw new IllegalStateException("Bulk gap acceptance raced");
+      }
+      return BulkGapAcceptance.ACCEPTED;
+    }));
+  }
+
   private static boolean bulkRow(OperationRecord row) {
     return row.descriptor().kind() == OperationKind.REINDEX
         && row.context().survival() == EngineContext.Survival.DURABLE
@@ -894,15 +1078,25 @@ public final class SqliteOperationStore implements OperationStore {
   /** Versioned projection in the existing counts column; the queue retains the underlying ledger. */
   private record BulkEvidenceV1(int version, String targetFingerprint, BulkReindexProgress.Capture capture,
       Long sealedRevision, String settlementSha256, long failedEvents, long supersededEvents) {}
+  private record BulkEvidenceV2(int version, String targetFingerprint, BulkReindexProgress.Capture capture,
+      Long sealedRevision, String settlementSha256, long failedEvents, long supersededEvents,
+      String refusalCode) {}
   private record BulkEvidence(int version, String targetFingerprint, BulkReindexProgress.Capture capture,
-      Long sealedRevision, String settlementSha256, long failedEvents, long supersededEvents, String refusalCode) {}
+      Long sealedRevision, String settlementSha256, long failedEvents, long supersededEvents,
+      String refusalCode, List<OperationOutcomeView.Gap> capturedGaps) {}
 
   private static BulkEvidence readBulkEvidence(String counts) {
     var tree = BULK_JSON.readTree(counts);
     if (tree != null && tree.path("version").asInt() == 1) {
       var legacy = BULK_JSON.readValue(counts, BulkEvidenceV1.class);
       return new BulkEvidence(2, legacy.targetFingerprint(), legacy.capture(), legacy.sealedRevision(),
-          legacy.settlementSha256(), legacy.failedEvents(), legacy.supersededEvents(), null);
+          legacy.settlementSha256(), legacy.failedEvents(), legacy.supersededEvents(), null, null);
+    }
+    if (tree != null && tree.path("version").asInt() == 2) {
+      var legacy = BULK_JSON.readValue(counts, BulkEvidenceV2.class);
+      return new BulkEvidence(2, legacy.targetFingerprint(), legacy.capture(), legacy.sealedRevision(),
+          legacy.settlementSha256(), legacy.failedEvents(), legacy.supersededEvents(),
+          legacy.refusalCode(), null);
     }
     return BULK_JSON.readValue(counts, BulkEvidence.class);
   }
@@ -927,14 +1121,17 @@ public final class SqliteOperationStore implements OperationStore {
             throw new IllegalArgumentException("Invalid bulk progress ownership or partial projection");
           }
           var evidence = readBulkEvidence(counts);
-          if (evidence == null || evidence.version() != 2
+          if (evidence == null || (evidence.version() != 2 && evidence.version() != 3)
               || (evidence.sealedRevision() == null) != (evidence.settlementSha256() == null)
-              || evidence.sealedRevision() == null && (evidence.failedEvents() != 0 || evidence.supersededEvents() != 0)) {
+              || evidence.sealedRevision() == null && (evidence.failedEvents() != 0 || evidence.supersededEvents() != 0)
+              || evidence.version() == 3 && (evidence.sealedRevision() == null) != (evidence.capturedGaps() == null)) {
             throw new IllegalArgumentException("Invalid bulk evidence version or settlement binding");
           }
           var parsedPhase = java.util.Arrays.stream(BulkReindexProgress.Phase.values())
               .filter(candidate -> candidate.wire().equals(phase)).findFirst().orElseThrow();
-          var parsedGaps = List.of(BULK_JSON.readValue(gaps, OperationOutcomeView.Gap[].class));
+          var parsedGaps = evidence.version() == 3 && evidence.capturedGaps() != null
+              ? evidence.capturedGaps()
+              : List.of(BULK_JSON.readValue(gaps, OperationOutcomeView.Gap[].class));
           var parsedHistory = List.of(BULK_JSON.readValue(history, BulkReindexProgress.ProcessingEvent[].class));
           if (evidence.sealedRevision() == null && (!parsedGaps.isEmpty() || !parsedHistory.isEmpty())) {
             throw new IllegalArgumentException("Unsealed bulk progress cannot contain terminal evidence");

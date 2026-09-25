@@ -1,8 +1,8 @@
 {
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
-  "count": 243,
+  "count": 244,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:b578169035e07f9273dd3d3e235a29338303cac22977ff38a366bba0e048470f",
+  "routeDigest": "sha256:c153c1e7f03f9ead391e957100a350d243cdbd0ed328aac0b2602ed4a91c7c6a",
   "routes": [
     {
       "method": "GET",
@@ -1534,6 +1534,22 @@
       "path": "/api/indexing/gc",
       "cohort": "indexing",
       "owningModule": null,
+      "requiredCapabilities": [
+        "WORKER"
+      ],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/indexing/migration/accept-gaps",
+      "cohort": "indexing",
+      "owningModule": "ResourceApiModule",
       "requiredCapabilities": [
         "WORKER"
       ],

@@ -127,6 +127,7 @@ public final class IndexGenerationManager {
     IDLE,
     MIGRATING,
     SWITCHING,
+    AWAITING_ACCEPTANCE,
     FAILED
   }
 
@@ -328,7 +329,7 @@ public final class IndexGenerationManager {
         if (observed != null && isRecordedIdentity(observed.active_generation())) {
           boolean noBuilding = observed.building_generation() == null || observed.building_generation().isBlank();
           boolean nativeMigration = !noBuilding && !isRecordedIdentity(observed.building_generation())
-              && observed.migration_state() != null && Set.of("MIGRATING", "SWITCHING", "FAILED").contains(observed.migration_state());
+              && observed.migration_state() != null && Set.of("MIGRATING", "SWITCHING", "AWAITING_ACCEPTANCE", "FAILED").contains(observed.migration_state());
           boolean completed = noBuilding && MigrationState.IDLE.name().equals(observed.migration_state());
           if (observed.format_version() != STATE_FORMAT_VERSION || !completed && !nativeMigration) {
             return new BootLayout(strictBootLayout(observed), BootDisposition.FENCED);
@@ -368,7 +369,8 @@ public final class IndexGenerationManager {
       if (idle) return new BootLayout(layout, BootDisposition.CAPTURING);
       if (target.equals(building) && recorded.captureComplete()
           && (MigrationState.MIGRATING.name().equals(state.migration_state())
-              || MigrationState.SWITCHING.name().equals(state.migration_state()))) {
+              || MigrationState.SWITCHING.name().equals(state.migration_state())
+              || MigrationState.AWAITING_ACCEPTANCE.name().equals(state.migration_state()))) {
         requireRecordedGeneration(resolveGenerationPathReadOnly(target), target, recorded.source(),
             recorded.targetFingerprint(), false);
         return new BootLayout(layout, BootDisposition.BUILDING);
@@ -574,7 +576,8 @@ public final class IndexGenerationManager {
           || (normalized.building_generation() != null && !normalized.building_generation().isBlank()))) {
         throw new IOException("A migration candidate is already active or retained; resolve it before starting another");
       }
-      if (ms == MigrationState.MIGRATING || ms == MigrationState.SWITCHING) {
+      if (ms == MigrationState.MIGRATING || ms == MigrationState.SWITCHING
+          || ms == MigrationState.AWAITING_ACCEPTANCE) {
         return normalized;
       }
       // If a prior migration failed but a building generation exists, don't create a new one implicitly.
@@ -668,7 +671,8 @@ public final class IndexGenerationManager {
         requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false);
         return current;
       }
-      if ((phase == MigrationState.MIGRATING || phase == MigrationState.SWITCHING) && target.equals(building)) {
+      if ((phase == MigrationState.MIGRATING || phase == MigrationState.SWITCHING
+          || phase == MigrationState.AWAITING_ACCEPTANCE) && target.equals(building)) {
         requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false);
         return current;
       }

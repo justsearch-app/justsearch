@@ -171,6 +171,15 @@ final class DefaultWorkerAppServicesProducerTransferTest {
       assertSame(spladeB, producerBindings(incumbent).spladeEncoder());
       assertNotSame(queryBindings(incumbent), producerBindings(incumbent));
 
+      incumbent.parkCandidateProducerModels();
+      assertFalse(producerEmbeddingProvider(incumbent).isAvailable(),
+          "Green must use the no-op provider after B is unloaded for approval");
+      assertNull(producerBindings(incumbent).spladeEncoder());
+      assertSame(providerA, queryEmbeddingProvider(incumbent),
+          "parking Green must retain A's semantic query binding");
+      incumbent.wireCandidateProducer(
+          providerB, new EncoderBindings.Snapshot(spladeB, null, null, null));
+
       DefaultWorkerAppServices successor =
           incumbent.prepareServingSuccessor(fixture.greenContext());
       try (DefaultWorkerAppServices.ProducerTransfer transfer =

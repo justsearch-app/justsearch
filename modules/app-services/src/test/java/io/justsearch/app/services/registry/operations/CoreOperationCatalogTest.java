@@ -34,7 +34,7 @@ final class CoreOperationCatalogTest {
   }
 
   @Test
-  void definitionsContainExactlyTwentySevenSeedEntries() {
+  void definitionsContainTheExpectedSeedEntries() {
     // Slice 445: TABULAR Resource cluster — added cancel-indexing-job,
     // retry-indexing-job, resolve-path-hash (item Operations + privacy resolver).
     // Slice 447-followup §X.11.5 Phase 7: added core.rebuild-index parameterless
@@ -71,6 +71,7 @@ final class CoreOperationCatalogTest {
             "core.import-ai-pack",
             "core.start-ai-install",
             "core.activate-installed-models",
+            "core.accept-gaps",
             "core.cancel-ai-install",
             "core.repair-ai-install",
             "core.create-user-policy",

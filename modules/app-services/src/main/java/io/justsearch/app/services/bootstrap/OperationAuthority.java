@@ -247,7 +247,8 @@ public final class OperationAuthority {
     final TransportTag transport;
     try {
       if (row.state() != OperationState.ACCEPTED
-          && row.state() != OperationState.RUNNING) {
+          && row.state() != OperationState.RUNNING
+          && row.state() != OperationState.COMPLETE_WITH_GAPS) {
         return bulkRefused("RECOVERY_OPERATION_INACTIVE");
       }
       plan = new RecordedBulkPlanResolver().resolve(row, stored);
@@ -294,7 +295,8 @@ public final class OperationAuthority {
     final Operation operation;
     final TransportTag transport;
     try {
-      if (row.state() != OperationState.ACCEPTED && row.state() != OperationState.RUNNING) {
+      if (row.state() != OperationState.ACCEPTED && row.state() != OperationState.RUNNING
+          && row.state() != OperationState.COMPLETE_WITH_GAPS) {
         return installerRefused("RECOVERY_OPERATION_INACTIVE");
       }
       plan = new RecordedInstallerGenerationPlanResolver().resolve(row, stored);
