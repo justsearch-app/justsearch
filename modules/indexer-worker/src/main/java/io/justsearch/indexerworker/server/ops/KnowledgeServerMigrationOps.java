@@ -168,7 +168,30 @@ public final class KnowledgeServerMigrationOps {
       BooleanSupplier vduReplayAllowed,
       Logger log,
       long deadlineNanos,
-      String replayGeneration) {
+      String replayGeneration,
+      java.util.function.Predicate<String> projectionSourceReady,
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions) {
+    public DrainSwitchBufferContext {
+      approvedGapVersions = Set.copyOf(approvedGapVersions);
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos,
+        String replayGeneration, java.util.function.Predicate<String> projectionSourceReady) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, projectionSourceReady, Set.of());
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos,
+        String replayGeneration) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, ignored -> false);
+    }
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
         Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
@@ -339,16 +362,6 @@ public final class KnowledgeServerMigrationOps {
             context.drainSwitchBufferAction().run();
             return;
           }
-        }
-
-        // The recorded owner seals the exact walk and persists its gap witness before any
-        // successor preparation. A user wait must not enter the promotion callback, whose
-        // preparation treats missing approval as a pre-pointer refusal.
-        if (context.liveCutover() != null && context.liveCutover().recorded()
-            && context.liveCutover().gapDecision()
-                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) {
-          if (!context.liveCutover().enterGapWait()) Thread.sleep(250);
-          continue;
         }
 
         LuceneRuntime ingestLifecycle = context.ingestLifecycleSupplier().get();
@@ -589,7 +602,53 @@ public final class KnowledgeServerMigrationOps {
   }
 
   public static void drainSwitchBufferBestEffort(DrainSwitchBufferContext context) {
-    drainSwitchBuffer(context, false, true);
+    // A candidate may need this revision after a crash or an aborted promotion. In particular,
+    // a no-file DELETE is the only retained ordering witness for a delayed older UPSERT.
+    drainSwitchBuffer(context, false, context.replayGeneration() == null);
+  }
+
+  /** Record the registered source before streaming its complete set into the existing journal. */
+  public static void seedProjectionSource(SwitchBufferCapableQueue queue, String generation,
+      io.justsearch.app.api.indexing.ProjectionSeedSource source) throws IOException {
+    String sourceId = Objects.requireNonNull(source.sourceId(), "sourceId");
+    if (sourceId.isBlank() || sourceId.length() > 256 || generation == null
+        || generation.isBlank()) {
+      throw new IOException("Projection seed source or candidate identity is invalid");
+    }
+    String marker = "projection-source:" + sourceId.length() + ":" + sourceId;
+    if (!queue.putSwitchBufferForGeneration(generation, marker, "PROJECTION_SOURCE", sourceId)) {
+      throw new IOException("Projection source marker was not durable: " + sourceId);
+    }
+    try {
+      source.enumerate(projection -> {
+        try {
+          if (!sourceId.equals(projection.sourceId())) {
+            throw new IllegalArgumentException("Projection seed crossed source ownership");
+          }
+          var admission = queue.admitProjectionForGeneration(generation, projection.encode());
+          if (admission == SwitchBufferCapableQueue.ProjectionAdmission.CONFLICT) {
+            throw new IllegalStateException("Projection seed conflicts with an accepted revision");
+          }
+        } catch (RuntimeException admissionFailure) {
+          throw new ProjectionAdmissionFailure(admissionFailure);
+        }
+      });
+    } catch (ProjectionAdmissionFailure fatal) {
+      throw new IOException("Projection seed admission failed: " + sourceId, fatal.getCause());
+    } catch (IOException | RuntimeException incomplete) {
+      throw new ProjectionSeedIncompleteException(sourceId, incomplete);
+    }
+  }
+
+  private static final class ProjectionAdmissionFailure extends RuntimeException {
+    private ProjectionAdmissionFailure(Throwable cause) { super(cause); }
+  }
+
+  /** Marker was durable, but the source could not certify its complete enumeration. */
+  public static final class ProjectionSeedIncompleteException extends IOException {
+    public ProjectionSeedIncompleteException(String sourceId, Throwable cause) {
+      super("Projection source enumeration incomplete: " + sourceId, cause);
+    }
   }
 
   /** The final fence must observe an exact, wholly applied replay before it may promote. */
@@ -749,11 +808,67 @@ public final class KnowledgeServerMigrationOps {
         }
         toEnqueue.clear();
       }
+      // These exact row revisions and gap reasons were accepted from the current full Green
+      // witness under the final fence. Keep their versions for post-pointer deletion only.
+      if (context.approvedGapVersions().contains(op)) continue;
       if (payload.isBlank() || (!"UPSERT".equals(kind) && context.ingestLifecycle() == null)) {
         allApplied = false;
         continue;
       }
       switch (kind) {
+        case "PROJECTION_SOURCE" -> {
+          String marker = "projection-source:" + payload.length() + ":" + payload;
+          if (op.generation() == null || op.generation().isBlank()
+              || !marker.equals(op.key())
+              || !context.projectionSourceReady().test(payload)) {
+            allApplied = false;
+            context.log().warn("Projection source is missing or incomplete: {}", payload);
+          }
+        }
+        case "PROJECTION" -> {
+          try {
+            var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(payload);
+            if (op.generation() == null || op.generation().isBlank()
+                || !op.key().equals(projection.journalKey())
+                || context.ingestLifecycle() == null) {
+              throw new IllegalStateException("Projection replay lacks its exact candidate or key");
+            }
+            var fields = context.ingestLifecycle().documentFieldOps();
+            String currentId = fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID);
+            String currentSource = fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID);
+            String currentRevision = fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION);
+            if (currentId != null && (!projection.indexId().equals(currentId)
+                || !projection.sourceId().equals(currentSource) || currentRevision == null)) {
+              throw new IllegalStateException("Projection replay found an unowned candidate document");
+            }
+            long candidateRevision = currentRevision == null ? -1 : Long.parseLong(currentRevision);
+            if (candidateRevision > projection.sourceRevision()) break;
+            if (candidateRevision == projection.sourceRevision()
+                && projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT) {
+              String digest = fields.getDocumentField(
+                  projection.indexId(), SchemaFields.PROJECTION_DIGEST);
+              if (!projection.fieldsDigest().equals(digest)) {
+                throw new IllegalStateException("Equal projection revision has different fields");
+              }
+              break;
+            }
+            if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+              context.ingestLifecycle().indexingCoordinator()
+                  .deleteByIdAndChunks(projection.indexId());
+            } else {
+              context.ingestLifecycle().indexingCoordinator().indexSingle(
+                  io.justsearch.indexerworker.services.ProjectionDocumentMapper
+                      .toIndexDocument(projection));
+            }
+            mutatedLucene = true;
+          } catch (Exception failure) {
+            allApplied = false;
+            context.log().warn("Buffered projection replay failed; retaining candidate journal key={}",
+                op.key(), failure);
+          }
+        }
         case "UPSERT" -> {
           if (!payload.isBlank()) {
             try {
@@ -1094,6 +1209,10 @@ public final class KnowledgeServerMigrationOps {
       }
     }
 
+    if (allApplied) {
+      allApplied = verifyBufferedProjections(context, ops);
+    }
+
     if (allApplied && ops.stream().anyMatch(op -> isVduBufferKind(op.op()))
         && !context.vduReplayAllowed().getAsBoolean()) {
       allApplied = false;
@@ -1183,6 +1302,42 @@ public final class KnowledgeServerMigrationOps {
       }
     }
     return true;
+  }
+
+  /** Candidate journal rows clear only after exact reader-visible projection or absence. */
+  private static boolean verifyBufferedProjections(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
+    if (ops.stream().noneMatch(op -> "PROJECTION".equalsIgnoreCase(op.op())
+        && !context.approvedGapVersions().contains(op))) return true;
+    if (context.ingestLifecycle() == null) return false;
+    try {
+      context.ingestLifecycle().commitOps().maybeRefreshBlocking();
+      var fields = context.ingestLifecycle().documentFieldOps();
+      for (var op : ops) {
+        if (!"PROJECTION".equalsIgnoreCase(op.op())) continue;
+        if (context.approvedGapVersions().contains(op)) continue;
+        var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(op.payload());
+        if (!projection.journalKey().equals(op.key())) return false;
+        String currentRevision = fields.getDocumentField(
+            projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION);
+        if (currentRevision != null
+            && Long.parseLong(currentRevision) > projection.sourceRevision()) continue;
+        if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+          if (fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID) != null) return false;
+        } else if (!Long.toString(projection.sourceRevision()).equals(currentRevision)
+            || !projection.sourceId().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID))
+            || !projection.fieldsDigest().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_DIGEST))) {
+          return false;
+        }
+      }
+      return true;
+    } catch (RuntimeException unreadable) {
+      context.log().warn("Buffered projection evidence is unreadable; retaining replay versions",
+          unreadable);
+      return false;
+    }
   }
 
   private static boolean isVduBufferKind(String kind) {

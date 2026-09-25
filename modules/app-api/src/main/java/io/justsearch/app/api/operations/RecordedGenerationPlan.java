@@ -7,5 +7,7 @@ public sealed interface RecordedGenerationPlan
   String source();
   RecordedRootPlan scope();
   IndexTargetSnapshot target();
+  /** Null identifies an accepted legacy plan with no frozen source-set witness. */
+  java.util.List<String> projectionSourceIds();
   String planHash();
 }

@@ -21,6 +21,7 @@ export interface OperationOutcomeView {
     executionId?: string;
     gapListHash?: string;
     gaps?: ({
+      evidenceId?: string;
       reason: string;
       unitId: string;
     })[];
@@ -40,6 +41,7 @@ export const operationOutcomeViewSchema = z.strictObject({
     "executionId": z.string().optional(),
     "gapListHash": z.string().optional(),
     "gaps": z.array(z.strictObject({
+      "evidenceId": z.string().optional(),
       "reason": z.string(),
       "unitId": z.string(),
     })).optional(),

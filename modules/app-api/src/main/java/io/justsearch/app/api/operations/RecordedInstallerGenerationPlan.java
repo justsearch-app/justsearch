@@ -47,15 +47,21 @@ public record RecordedInstallerGenerationPlan(
     List<ModelIdentity> models,
     List<AssetIdentity> assets,
     ChatSelection chatSelection,
-    AcquisitionProvenance acquisition) implements RecordedGenerationPlan {
+    AcquisitionProvenance acquisition,
+    List<String> projectionSourceIds) implements RecordedGenerationPlan {
 
+  /** Existing v3 envelope, retained as the public legacy schema alias. */
   public static final String SCHEMA = "recorded-installer-generation-v3";
+  public static final String SCHEMA_V4 = "recorded-installer-generation-v4";
+  public static final String LEGACY_SCHEMA_V3 = SCHEMA;
   public static final String LEGACY_SCHEMA_V2 = "recorded-installer-generation-v2";
   public static final String OPERATION_ID = "core.activate-installed-models";
   public static final String SOURCE = "installer_model_activation";
   public static final int MAX_CANDIDATE_SETTINGS_BYTES = 131_072;
   public static final int MAX_MODELS = 128;
   public static final int MAX_ASSETS = 1024;
+  public static final int MAX_PROJECTION_SOURCE_IDS = 64;
+  public static final int MAX_PROJECTION_SOURCE_ID_LENGTH = 256;
 
   private static final Set<String> V2_FIELDS = Set.of(
       "operationId", "profile", "source", "operationKey", "sourceGeneration", "scope", "target",
@@ -63,6 +69,10 @@ public record RecordedInstallerGenerationPlan(
   private static final Set<String> V3_FIELDS = Set.of(
       "operationId", "profile", "source", "operationKey", "sourceGeneration", "scope", "target",
       "settingsWitness", "candidateSettings", "models", "assets", "chatSelection", "acquisition");
+  private static final Set<String> V4_FIELDS = Set.of(
+      "operationId", "profile", "source", "operationKey", "sourceGeneration", "scope", "target",
+      "settingsWitness", "candidateSettings", "models", "assets", "chatSelection", "acquisition",
+      "projectionSourceIds");
   private static final Set<String> CANDIDATE_FIELDS = Set.of("sha256", "canonicalJson");
   private static final Set<String> WITNESS_FIELDS = Set.of("acceptedRevision", "lastCommittedOperationKey");
   private static final Set<String> MODEL_FIELDS = Set.of(
@@ -104,6 +114,7 @@ public record RecordedInstallerGenerationPlan(
     Objects.requireNonNull(candidateSettings, "candidateSettings");
     models = immutableSorted(models, MAX_MODELS, "models");
     assets = immutableSorted(assets, MAX_ASSETS, "assets");
+    projectionSourceIds = normalizeProjectionSourceIds(projectionSourceIds);
     if (models.isEmpty()) {
       throw new IllegalArgumentException("Installer activation requires a model identity");
     }
@@ -114,6 +125,17 @@ public record RecordedInstallerGenerationPlan(
       validateChatSelection(chatSelection, candidateSettings, assets);
     }
     Objects.requireNonNull(acquisition, "acquisition");
+  }
+
+  /** Existing full constructor denotes the v3 accepted envelope. */
+  public RecordedInstallerGenerationPlan(String operationId, Profile profile, String source,
+      String operationKey, String sourceGeneration, RecordedRootPlan scope,
+      IndexTargetSnapshot target, SettingsWitness settingsWitness,
+      CandidateSettings candidateSettings, List<ModelIdentity> models,
+      List<AssetIdentity> assets, ChatSelection chatSelection,
+      AcquisitionProvenance acquisition) {
+    this(operationId, profile, source, operationKey, sourceGeneration, scope, target,
+        settingsWitness, candidateSettings, models, assets, chatSelection, acquisition, null);
   }
 
   /** Convenience constructor with an explicit installer chat selection. */
@@ -130,7 +152,25 @@ public record RecordedInstallerGenerationPlan(
       AcquisitionProvenance acquisition) {
     this(OPERATION_ID, Profile.INSTALLER_GENERATION, SOURCE, operationKey, sourceGeneration, scope,
         target, settingsWitness, candidateSettings, models, assets,
-        Objects.requireNonNull(chatSelection, "chatSelection"), acquisition);
+        Objects.requireNonNull(chatSelection, "chatSelection"), acquisition, null);
+  }
+
+  /** Creates an installer activation preparation with an explicit frozen source-owner set. */
+  public RecordedInstallerGenerationPlan(
+      String operationKey,
+      String sourceGeneration,
+      RecordedRootPlan scope,
+      IndexTargetSnapshot target,
+      SettingsWitness settingsWitness,
+      CandidateSettings candidateSettings,
+      List<ModelIdentity> models,
+      List<AssetIdentity> assets,
+      ChatSelection chatSelection,
+      AcquisitionProvenance acquisition,
+      List<String> projectionSourceIds) {
+    this(OPERATION_ID, Profile.INSTALLER_GENERATION, SOURCE, operationKey, sourceGeneration, scope,
+        target, settingsWitness, candidateSettings, models, assets,
+        Objects.requireNonNull(chatSelection, "chatSelection"), acquisition, projectionSourceIds);
   }
 
   /** Creates a transient preparation with an explicit installer chat selection. */
@@ -146,7 +186,7 @@ public record RecordedInstallerGenerationPlan(
       AcquisitionProvenance acquisition) {
     this(OPERATION_ID, Profile.INSTALLER_GENERATION, SOURCE, null, sourceGeneration, scope,
         target, settingsWitness, candidateSettings, models, assets,
-        Objects.requireNonNull(chatSelection, "chatSelection"), acquisition);
+        Objects.requireNonNull(chatSelection, "chatSelection"), acquisition, null);
   }
 
   public enum Profile {
@@ -355,16 +395,18 @@ public record RecordedInstallerGenerationPlan(
   private RecordedInstallerGenerationPlan withOperationKey(String operationKey) {
     return new RecordedInstallerGenerationPlan(operationId, profile, source, operationKey,
         sourceGeneration, scope, target, settingsWitness, candidateSettings, models, assets,
-        chatSelection, acquisition);
+        chatSelection, acquisition, projectionSourceIds);
   }
 
   /** Stored envelope schema for this plan; null chat intent is reserved for decoded legacy v2. */
   public String replaySchema() {
-    return chatSelection == null ? LEGACY_SCHEMA_V2 : SCHEMA;
+    if (projectionSourceIds != null) return SCHEMA_V4;
+    return chatSelection == null ? LEGACY_SCHEMA_V2 : LEGACY_SCHEMA_V3;
   }
 
   public static boolean isSupportedSchema(String replaySchema) {
-    return SCHEMA.equals(replaySchema) || LEGACY_SCHEMA_V2.equals(replaySchema);
+    return SCHEMA_V4.equals(replaySchema) || SCHEMA.equals(replaySchema)
+        || LEGACY_SCHEMA_V2.equals(replaySchema);
   }
 
   public String toReplayPayload() {
@@ -387,6 +429,9 @@ public record RecordedInstallerGenerationPlan(
       encoded.put("chatSelection", chatSelectionMap(chatSelection));
     }
     encoded.put("acquisition", provenanceMap(acquisition));
+    if (projectionSourceIds != null) {
+      encoded.put("projectionSourceIds", projectionSourceIds);
+    }
     String payload = JSON.writeValueAsString(encoded);
     new OperationPreparation("{}", replaySchema(), payload);
     return payload;
@@ -397,7 +442,26 @@ public record RecordedInstallerGenerationPlan(
   }
 
   public static RecordedInstallerGenerationPlan fromReplayPayload(String payload) {
-    return fromReplayPayload(SCHEMA, payload);
+    if (payload == null || payload.isBlank()) {
+      throw new IllegalArgumentException("Installer generation payload is required");
+    }
+    final Object decoded;
+    try {
+      decoded = JSON.readValue(payload, Object.class);
+    } catch (RuntimeException malformed) {
+      throw new IllegalArgumentException("Invalid installer generation plan JSON", malformed);
+    }
+    if (!(decoded instanceof Map<?, ?> fields)) {
+      throw new IllegalArgumentException("Installer generation plan fields do not match schema");
+    }
+    String schema = fields.keySet().equals(V4_FIELDS) ? SCHEMA_V4
+        : fields.keySet().equals(V3_FIELDS) ? SCHEMA
+        : fields.keySet().equals(V2_FIELDS) ? LEGACY_SCHEMA_V2
+        : null;
+    if (schema == null) {
+      throw new IllegalArgumentException("Installer generation plan fields do not match schema");
+    }
+    return fromReplayPayload(schema, payload);
   }
 
   /** Strict decoder for a prepared envelope, including its externally stored schema tag. */
@@ -415,7 +479,12 @@ public record RecordedInstallerGenerationPlan(
     } catch (RuntimeException malformed) {
       throw new IllegalArgumentException("Invalid installer generation plan JSON", malformed);
     }
-    Set<String> expectedFields = SCHEMA.equals(replaySchema) ? V3_FIELDS : V2_FIELDS;
+    Set<String> expectedFields = switch (replaySchema) {
+      case SCHEMA_V4 -> V4_FIELDS;
+      case SCHEMA -> V3_FIELDS;
+      case LEGACY_SCHEMA_V2 -> V2_FIELDS;
+      default -> throw new IllegalArgumentException("Installer generation schema mismatch");
+    };
     if (!(decoded instanceof Map<?, ?> fields) || !fields.keySet().equals(expectedFields)) {
       throw new IllegalArgumentException("Installer generation plan fields do not match schema");
     }
@@ -432,8 +501,10 @@ public record RecordedInstallerGenerationPlan(
           candidate(fields.get("candidateSettings")),
           models(fields.get("models")),
           assets(fields.get("assets")),
-          SCHEMA.equals(replaySchema) ? chatSelection(fields.get("chatSelection")) : null,
-          provenance(fields.get("acquisition")));
+          !LEGACY_SCHEMA_V2.equals(replaySchema) ? chatSelection(fields.get("chatSelection")) : null,
+          provenance(fields.get("acquisition")),
+          SCHEMA_V4.equals(replaySchema)
+              ? projectionSourceIds(fields.get("projectionSourceIds")) : null);
     } catch (RuntimeException malformed) {
       throw new IllegalArgumentException("Invalid installer generation plan binding", malformed);
     }
@@ -445,6 +516,20 @@ public record RecordedInstallerGenerationPlan(
 
   private static List<AssetIdentity> assets(Object value) {
     return list(value, ASSET_FIELDS, "assets", RecordedInstallerGenerationPlan::asset);
+  }
+
+  private static List<String> projectionSourceIds(Object value) {
+    if (!(value instanceof List<?> raw)) {
+      throw new IllegalArgumentException("projectionSourceIds must be an array");
+    }
+    List<String> ids = new ArrayList<>(raw.size());
+    for (Object item : raw) {
+      if (!(item instanceof String id)) {
+        throw new IllegalArgumentException("projectionSourceIds must contain strings");
+      }
+      ids.add(id);
+    }
+    return ids;
   }
 
   private static ChatSelection chatSelection(Object value) {
@@ -584,6 +669,31 @@ public record RecordedInstallerGenerationPlan(
       throw new IllegalArgumentException("Invalid " + label);
     }
     return value;
+  }
+
+  /** Normalize the accepted source-owner set while retaining null as the legacy absent state. */
+  private static List<String> normalizeProjectionSourceIds(List<String> ids) {
+    if (ids == null) return null;
+    if (ids.size() > MAX_PROJECTION_SOURCE_IDS) {
+      throw new IllegalArgumentException("Too many projection source identities");
+    }
+    List<String> normalized = new ArrayList<>(ids.size());
+    int totalLength = 0;
+    for (String id : ids) {
+      if (id == null || id.length() > MAX_PROJECTION_SOURCE_ID_LENGTH) {
+        throw new IllegalArgumentException("Projection source identity must be bounded");
+      }
+      totalLength += id.length();
+      normalized.add(identity(id, "projection source identity"));
+    }
+    if (totalLength > 4_096) {
+      throw new IllegalArgumentException("Projection source identities exceed manifest budget");
+    }
+    normalized.sort(String::compareTo);
+    if (Set.copyOf(normalized).size() != normalized.size()) {
+      throw new IllegalArgumentException("Duplicate projection source identity");
+    }
+    return List.copyOf(normalized);
   }
 
   private static void validateChatSelection(ChatSelection selection,

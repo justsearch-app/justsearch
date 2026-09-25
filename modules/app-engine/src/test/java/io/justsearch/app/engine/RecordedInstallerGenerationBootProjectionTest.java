@@ -43,6 +43,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Boot projection proof for an accepted installer generation after the pointer cut. */
 final class RecordedInstallerGenerationBootProjectionTest {
@@ -82,6 +84,20 @@ final class RecordedInstallerGenerationBootProjectionTest {
       UiSettings second = fixture.reconcile();
       assertSameSettings(fixture.candidateSettings, second);
       assertEquals(new SettingsWitness(1, fixture.operationKey), fixture.settings.inspect().witness());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "authority"})
+  void committedV4PointerRollsForwardFrozenSourceSet(String sourceId) throws Exception {
+    List<String> sources = sourceId.isEmpty() ? List.of() : List.of(sourceId);
+    try (Fixture fixture = new Fixture(temp.resolve("committed-v4-" +
+        (sourceId.isEmpty() ? "empty" : "one")), false, false, sources)) {
+      assertEquals(RecordedInstallerGenerationPlan.SCHEMA_V4, fixture.plan.replaySchema());
+      new IndexGenerationManager(fixture.indexBase).promoteBuildingGenerationToActive();
+      assertSameSettings(fixture.candidateSettings, fixture.reconcile());
+      assertEquals(new SettingsWitness(1, fixture.operationKey), fixture.settings.inspect().witness());
+      assertSameSettings(fixture.candidateSettings, fixture.reconcile());
     }
   }
 
@@ -228,6 +244,10 @@ final class RecordedInstallerGenerationBootProjectionTest {
     }
 
     Fixture(Path root, boolean selectChat, boolean legacy) throws Exception {
+      this(root, selectChat, legacy, null);
+    }
+
+    Fixture(Path root, boolean selectChat, boolean legacy, List<String> sourceIds) throws Exception {
       indexBase = root.resolve("index").toAbsolutePath().normalize();
       settingsPath = root.resolve("ui-settings.json").toAbsolutePath().normalize();
       Files.createDirectories(root);
@@ -243,7 +263,8 @@ final class RecordedInstallerGenerationBootProjectionTest {
 
       var generations = new IndexGenerationManager(indexBase);
       sourceGeneration = generations.initializeOrLoad().activeGenerationId();
-      generations.startRecordedMigration(operationKey, SOURCE, target.fingerprint(), sourceGeneration);
+      generations.startRecordedMigration(operationKey, SOURCE, target.fingerprint(),
+          sourceGeneration, sourceIds);
 
       Path modelPath = root.resolve("fresh-model.onnx");
       Path assetPath = root.resolve("fresh-model.tokenizer");
@@ -281,7 +302,7 @@ final class RecordedInstallerGenerationBootProjectionTest {
           operationKey, sourceGeneration, scope, target, new SettingsWitness(0, null),
           RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
               tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(candidateSettings)),
-          List.of(model), assets, legacy ? null : chatSelection, provenance);
+          List.of(model), assets, legacy ? null : chatSelection, provenance, sourceIds);
 
       operations = new SqliteOperationStore(root.resolve("operations.db"));
       settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);

@@ -1172,6 +1172,9 @@ message MigrationStartRequest {
   string target_index_fingerprint = 4;
   // Exact serving generation frozen in the accepted preparation.
   string expected_source_generation = 5;
+  // Frozen no-file source set. The presence bit distinguishes new empty plans from legacy plans.
+  repeated string projection_source_ids = 6;
+  bool projection_source_ids_present = 7;
 }
 
 message MigrationStartResponse {

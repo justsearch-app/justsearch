@@ -25,6 +25,13 @@ package io.justsearch.app.services.worker;
  */
 public interface IngestServiceCalls {
 
+  /** In-process no-file projection port; the retired gRPC transport cannot claim this call. */
+  default io.justsearch.app.api.indexing.ProjectionReceipt applyProjection(
+      io.justsearch.app.api.indexing.AcceptedProjection projection,
+      io.justsearch.app.api.indexing.ProjectionDurability durability) {
+    throw new UnsupportedOperationException("No-file projection port requires the composed Worker");
+  }
+
   /** {@code IngestService/SubmitBatch}. */
   io.justsearch.ipc.BatchResponse submitBatch(io.justsearch.ipc.BatchRequest request);
 

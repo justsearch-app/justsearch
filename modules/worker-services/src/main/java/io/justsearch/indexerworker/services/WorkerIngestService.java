@@ -134,6 +134,11 @@ public final class WorkerIngestService {
   private final IndexStatusOps statusOps;
   private final SyncDirectoryOps syncOps;
   private final IngestSwitchBufferOps switchBufferOps;
+  /** Serializes one no-file identity's journal admission with its serving projection. */
+  private final java.util.concurrent.locks.ReentrantLock[] projectionLocks =
+      java.util.stream.IntStream.range(0, 64)
+          .mapToObj(ignored -> new java.util.concurrent.locks.ReentrantLock())
+          .toArray(java.util.concurrent.locks.ReentrantLock[]::new);
   private WorkerMutationAdmission mutationAdmission;
   private Object mutationOwner;
   private final MigrationControlOps migrationOps;
@@ -248,6 +253,58 @@ public final class WorkerIngestService {
     try { return mutationAdmission.enter(mutationOwner); }
     catch (IllegalStateException retired) {
       throw WorkerServiceException.unavailable("Mutation producer belongs to a retired generation");
+    }
+  }
+
+  /** D1-9 no-file port. Durable receipts remain refused until D2-5's covering-commit owner lands. */
+  public io.justsearch.app.api.indexing.ProjectionReceipt applyProjection(
+      io.justsearch.app.api.indexing.AcceptedProjection projection,
+      io.justsearch.app.api.indexing.ProjectionDurability durability, CallContext ctx) {
+    java.util.Objects.requireNonNull(projection, "projection");
+    java.util.Objects.requireNonNull(durability, "durability");
+    if (durability == io.justsearch.app.api.indexing.ProjectionDurability.DURABLE) {
+      throw WorkerServiceException.failedPrecondition(
+          "Durable projection receipt requires the D2-5 covering-commit owner");
+    }
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
+      if (ctx.cancelled()) throw WorkerServiceException.cancelled("Projection admission cancelled");
+      var stripe = projectionLocks[Math.floorMod(
+          projection.indexId().hashCode(), projectionLocks.length)];
+      stripe.lock();
+      try {
+        io.justsearch.adapters.lucene.runtime.RunningRuntime serving =
+            searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active
+                && active.isAcceptingWrites() ? active : null;
+        if (serving == null || indexGenerationManager == null) {
+          throw WorkerServiceException.unavailable("Serving projection writer is unavailable");
+        }
+        String generationId = captureServingGeneration(ctx);
+        String building = switchBufferOps.buildingGenerationForFileAdmission();
+        if (building != null) {
+          if (!(jobQueue instanceof SwitchBufferCapableQueue buffer)) {
+            throw IngestSwitchBufferOps.switchBufferUnavailable();
+          }
+          var admitted = buffer.admitProjectionForGeneration(building, projection.encode());
+          if (admitted == SwitchBufferCapableQueue.ProjectionAdmission.STALE) {
+            throw WorkerServiceException.failedPrecondition("Projection source revision is stale");
+          }
+          if (admitted == SwitchBufferCapableQueue.ProjectionAdmission.CONFLICT) {
+            throw WorkerServiceException.failedPrecondition("Projection source revision conflicts");
+          }
+        }
+        if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+          serving.indexingCoordinator().deleteByIdAndChunks(projection.indexId());
+        } else {
+          serving.indexingCoordinator().indexSingle(
+              ProjectionDocumentMapper.toIndexDocument(projection));
+        }
+        serving.commitOps().maybeRefreshBlocking();
+        return new io.justsearch.app.api.indexing.ProjectionReceipt(
+            projection.sourceId(), projection.documentId(), projection.sourceRevision(),
+            generationId, io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.NRT);
+      } finally {
+        stripe.unlock();
+      }
     }
   }
 

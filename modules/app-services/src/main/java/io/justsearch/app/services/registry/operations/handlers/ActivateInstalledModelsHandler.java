@@ -94,6 +94,7 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
     String sourceGeneration = worker.captureServingGeneration(context);
     CandidateIndexSelection selected = worker.captureCandidateIndexSelection(resolved, context);
     var target = selected.target();
+    List<String> projectionSourceIds = worker.captureProjectionSourceIds(context);
     if (!sourceGeneration.equals(worker.captureServingGeneration(context))) {
       throw new IllegalStateException("Serving generation changed while preparing installed-model activation");
     }
@@ -134,6 +135,10 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
         root.path(), root.collection(), true, false, patterns, List.of())).toList();
     var scope = RecordedRootPlan.partition(sourceGeneration, planned);
     var plan = new RecordedInstallerGenerationPlan(
+        RecordedInstallerGenerationPlan.OPERATION_ID,
+        RecordedInstallerGenerationPlan.Profile.INSTALLER_GENERATION,
+        RecordedInstallerGenerationPlan.SOURCE,
+        null,
         sourceGeneration,
         scope,
         target,
@@ -142,8 +147,8 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
         models,
         assets,
         candidate.chatSelection(),
-        candidate.provenance());
-    return new OperationPreparation(argumentsJson, RecordedInstallerGenerationPlan.SCHEMA,
+        candidate.provenance(), projectionSourceIds);
+    return new OperationPreparation(argumentsJson, plan.replaySchema(),
         plan.toReplayPayload());
   }
 
@@ -190,12 +195,14 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
           "Legacy activation cannot acquire a new chat selection", "ACTIVATION_PREVIEW_STALE",
           Map.of(), false));
     }
+    List<String> currentSources = plan.projectionSourceIds() == null
+        && current.projectionSourceIds().isEmpty() ? null : current.projectionSourceIds();
     if (!plan.equals(new RecordedInstallerGenerationPlan(
         current.operationId(), current.profile(), current.source(), plan.operationKey(),
         current.sourceGeneration(), current.scope(), current.target(),
         current.settingsWitness(), current.candidateSettings(), current.models(),
         current.assets(), plan.chatSelection() == null ? null : current.chatSelection(),
-        current.acquisition()))) {
+        current.acquisition(), currentSources))) {
       return OperationExecution.finished(OperationResult.failure(
           "Installed activation candidate changed; request a fresh preview",
           "ACTIVATION_PREVIEW_STALE", Map.of(), false));

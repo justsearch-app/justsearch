@@ -26,12 +26,13 @@ public final class RecordedBulkPlanResolver {
             || !continuation.preparationNonce().equals(stored.nonce()))) {
       throw new IllegalArgumentException("Bulk continuation identity mismatch");
     }
-    if (!RecordedBulkPlan.SCHEMA.equals(preparation.replaySchema())
+    if (!RecordedBulkPlan.isSupportedSchema(preparation.replaySchema())
         || !descriptor.hasSameIdentity(OperationDescriptor.invocation(
             OperationKind.REINDEX, profile.operationRef(), preparation.argumentsJson(), false))) {
       throw new IllegalArgumentException("Bulk preparation identity mismatch");
     }
-    var plan = RecordedBulkPlan.fromReplayPayload(preparation.replayPayloadJson());
+    var plan = RecordedBulkPlan.fromReplayPayload(preparation.replaySchema(),
+        preparation.replayPayloadJson());
     if (plan.profile() != profile
         || !plan.source().equals(RecordedBulkPlan.sourceForArguments(profile, preparation.argumentsJson()))) {
       throw new IllegalArgumentException("Bulk profile/source differs from its public invocation");

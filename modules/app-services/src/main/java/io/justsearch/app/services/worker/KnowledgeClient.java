@@ -145,6 +145,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     private final IpcTelemetry telemetry;
     private final IngestRpcExecutor ingestRpcExecutor;
     private final MigrationOps migrationOps;
+    private volatile List<String> projectionSourceIds = List.of();
+
+    /** Immutable projection of sources registered with the embedded Engine before publication. */
+    public final void bindProjectionSourceIds(List<String> sourceIds) {
+        projectionSourceIds = List.copyOf(sourceIds);
+    }
     private final VduOps vduOps;
     private final SyncOps syncOps;
     private final SearchRpcOps searchRpcOps;
@@ -522,6 +528,30 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     // ========== Ingest Service ==========
+
+    /** Applies a source-owned no-file document through the composed Worker. */
+    public io.justsearch.app.api.indexing.ProjectionReceipt indexAndReturn(
+            io.justsearch.app.api.indexing.AcceptedProjection projection,
+            io.justsearch.app.api.indexing.ProjectionDurability durability,
+            EngineContext engineContext) {
+        if (projection.kind() != io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT) {
+            throw new IllegalArgumentException("indexAndReturn requires an UPSERT projection");
+        }
+        return executeIngestRpc("indexAndReturn", RpcDeadlineCategory.STANDARD,
+            calls -> calls.applyProjection(projection, durability), engineContext);
+    }
+
+    /** Removes a source-owned no-file identity with the requested visibility. */
+    public io.justsearch.app.api.indexing.ProjectionReceipt deleteAndAcknowledge(
+            io.justsearch.app.api.indexing.AcceptedProjection projection,
+            io.justsearch.app.api.indexing.ProjectionDurability durability,
+            EngineContext engineContext) {
+        if (projection.kind() != io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+            throw new IllegalArgumentException("deleteAndAcknowledge requires a DELETE projection");
+        }
+        return executeIngestRpc("deleteAndAcknowledge", RpcDeadlineCategory.STANDARD,
+            calls -> calls.applyProjection(projection, durability), engineContext);
+    }
 
     /**
      * Submits a batch of files for indexing.
@@ -1068,13 +1098,26 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     @Override
     public IndexingService.MigrationOutcome startMigration(String reason, EngineContext engineContext) {
-        return migrationOps.startMigration(reason, engineContext);
+        return migrationOps.startMigration(reason, projectionSourceIds, engineContext);
+    }
+
+    @Override
+    public List<String> captureProjectionSourceIds(EngineContext engineContext) {
+        return projectionSourceIds;
     }
 
     @Override
     public IndexingService.MigrationOutcome startRecordedMigration(String operationKey, String reason,
             String targetIndexFingerprint, String expectedSourceGeneration, EngineContext engineContext) {
         return migrationOps.startRecordedMigration(operationKey, reason, targetIndexFingerprint, expectedSourceGeneration, engineContext);
+    }
+
+    @Override
+    public IndexingService.MigrationOutcome startRecordedMigration(String operationKey, String reason,
+            String targetIndexFingerprint, String expectedSourceGeneration,
+            List<String> expectedSourceIds, EngineContext engineContext) {
+        return migrationOps.startRecordedMigration(operationKey, reason, targetIndexFingerprint,
+                expectedSourceGeneration, expectedSourceIds, engineContext);
     }
 
     @Override

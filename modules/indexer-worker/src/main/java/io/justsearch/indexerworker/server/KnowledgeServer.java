@@ -261,6 +261,11 @@ public final class KnowledgeServer implements Closeable {
   private volatile boolean closeStarted;
   private volatile boolean migrationEnumeratorDone;
   private volatile Throwable migrationEnumeratorFailure;
+  private volatile List<io.justsearch.app.api.indexing.ProjectionSeedSource> projectionSeedSources =
+      List.of();
+  record ProjectionSeedCompletion(String generation, String sourceId) {}
+  private final Set<ProjectionSeedCompletion> completedProjectionSeeds =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
   WorkerSignalBus signalBus;
@@ -980,6 +985,7 @@ public final class KnowledgeServer implements Closeable {
       this.buildingIndexPath = null;
       this.migrationEnumeratorDone = false;
       this.migrationEnumeratorFailure = null;
+      this.completedProjectionSeeds.clear();
 
       logConfiguration();
 
@@ -1056,7 +1062,9 @@ public final class KnowledgeServer implements Closeable {
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
             publishIngestLifecycle(buildIndexRuntime(buildingIndexPath, fpSupplier).withoutRecovery()
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open());
-            this.migrationEnumeratorDone = true;
+            // File work was already enumerated for this candidate. Registered no-file sources
+            // must be enumerated again from their authority before a resumed promotion.
+            this.migrationEnumeratorDone = expectedProjectionSourceIds().isEmpty();
           } else {
             this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery().openReadOnly();
             publishIngestLifecycle(this.searchLifecycle);
@@ -1111,7 +1119,8 @@ public final class KnowledgeServer implements Closeable {
                 activeIndexPath,
                 IndexRecoveryMarker.readReason(activeIndexPath));
             this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).openReadOnly();
-            IndexGenerationManager.State migrated = genManager.startMigration(MigrationSource.CORRUPT_INDEX_REBUILD.wire());
+            IndexGenerationManager.State migrated = genManager.startMigration(
+                MigrationSource.CORRUPT_INDEX_REBUILD.wire(), registeredProjectionSourceIds());
             String greenGenId = migrated == null ? null : migrated.building_generation();
             if (greenGenId == null || greenGenId.isBlank()) {
               throw new IOException(
@@ -1167,7 +1176,8 @@ public final class KnowledgeServer implements Closeable {
 
                 // Green: create a new generation and start a writable runtime.
                 IndexGenerationManager.State migrated =
-                    genManager.startMigration(MigrationSource.EMBEDDING_MODEL_CHANGE.wire());
+                    genManager.startMigration(MigrationSource.EMBEDDING_MODEL_CHANGE.wire(),
+                        registeredProjectionSourceIds());
                 String greenGenId =
                     migrated == null ? null : migrated.building_generation();
                 if (greenGenId == null || greenGenId.isBlank()) {
@@ -1255,7 +1265,8 @@ public final class KnowledgeServer implements Closeable {
               this.searchLifecycle = blue;
 
               // Green: create a new generation and start a writable runtime.
-              IndexGenerationManager.State migrated = genManager.startMigration(MigrationSource.SCHEMA_MISMATCH.wire());
+              IndexGenerationManager.State migrated = genManager.startMigration(
+                  MigrationSource.SCHEMA_MISMATCH.wire(), registeredProjectionSourceIds());
               String greenGenId =
                   migrated == null ? null : migrated.building_generation();
               if (greenGenId == null || greenGenId.isBlank()) {
@@ -1370,6 +1381,7 @@ public final class KnowledgeServer implements Closeable {
       // Recorded recovery cannot run until the actual serving generation and owner are attached.
       attachRecordedIngestion();
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+        if (!expectedProjectionSourceIds().isEmpty()) startMigrationEnumeratorBestEffort(rc, false);
         startMigrationCutoverMonitorBestEffort();
       }
       recoverStuckJobsAdmitted(jobQueue, null);
@@ -4299,6 +4311,74 @@ public final class KnowledgeServer implements Closeable {
     migrationTransitionHook = Objects.requireNonNull(hook, "hook");
   }
 
+  /** Composition binds source owners before boot can resume or create a candidate. */
+  public synchronized void installProjectionSeedSources(
+      List<io.justsearch.app.api.indexing.ProjectionSeedSource> sources) {
+    if (running || migrationEnumeratorThread != null) {
+      throw new IllegalStateException("Projection seed sources must be installed before start");
+    }
+    var copy = List.copyOf(sources);
+    var names = new java.util.HashSet<String>();
+    if (copy.size() > 64) throw new IllegalArgumentException("Too many projection seed sources");
+    for (var source : copy) {
+      String id = Objects.requireNonNull(source.sourceId(), "sourceId");
+      if (id.isBlank() || id.length() > 256
+          || id.chars().anyMatch(Character::isISOControl) || !names.add(id)) {
+        throw new IllegalArgumentException("Projection source identities must be unique and bounded");
+      }
+    }
+    projectionSeedSources = copy;
+  }
+
+  private List<String> registeredProjectionSourceIds() {
+    return IndexGenerationManager.checkedProjectionSourceIds(
+        projectionSeedSources.stream().map(
+            io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId).toList());
+  }
+
+  /** Read the durable pre-pointer source set; a legacy manifest is safe only with no sources. */
+  private List<String> expectedProjectionSourceIds() throws IOException {
+    if (indexGenerationManager == null || buildingIndexPath == null) {
+      throw new IOException("Projection candidate manifest is unavailable");
+    }
+    var manifest = indexGenerationManager.manifestForOwnedPath(buildingIndexPath);
+    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+        && !Objects.equals(recorded.projectionSourceIds(), manifest.projection_source_ids())) {
+      throw new IOException("Recorded candidate source set differs from accepted preparation");
+    }
+    if (manifest.projection_source_ids() == null) {
+      if (!projectionSeedSources.isEmpty()) {
+        throw new IOException("Legacy candidate has no frozen projection source set");
+      }
+      return List.of();
+    }
+    if (!manifest.projection_source_ids().containsAll(registeredProjectionSourceIds())) {
+      throw new IOException("Candidate predates a registered projection source");
+    }
+    return manifest.projection_source_ids();
+  }
+
+  private boolean projectionSourceReady(String sourceId) {
+    return buildingIndexPath != null && completedProjectionSeeds.contains(
+            new ProjectionSeedCompletion(buildingIndexPath.getFileName().toString(), sourceId))
+        && projectionSeedSources.stream().anyMatch(source -> source.sourceId().equals(sourceId));
+  }
+
+  private boolean nativeProjectionSourcesReadyForPromotion() throws IOException {
+    List<String> expected = expectedProjectionSourceIds();
+    if (expected.isEmpty()) return true;
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal)) return false;
+    var marked = new java.util.HashSet<String>();
+    for (var op : journal.listSwitchBufferOpsStrictForGeneration(
+        buildingIndexPath.getFileName().toString())) {
+      if ("PROJECTION_SOURCE".equals(op.op()) && expected.contains(op.payload())
+          && ("projection-source:" + op.payload().length() + ":" + op.payload()).equals(op.key())) {
+        marked.add(op.payload());
+      }
+    }
+    return marked.containsAll(expected) && expected.stream().allMatch(this::projectionSourceReady);
+  }
+
   private void migrationTransition(String point) throws IOException, InterruptedException {
     if (migrationTransitionHook == MigrationTransitionBarrier.NO_HOOK) return;
     var state = indexGenerationManager.readStateBestEffort();
@@ -4447,6 +4527,51 @@ public final class KnowledgeServer implements Closeable {
 
   /** Final Green file witnesses are read by the Worker, never inferred from Head queue counts. */
   RecordedIngestionLifecycle.JournalWitness candidateJournalWitness() {
+    return candidateJournalSnapshot().witness();
+  }
+
+  private record CandidateJournalSnapshot(
+      RecordedIngestionLifecycle.JournalWitness witness,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, OperationOutcomeView.Gap> rowGaps) {
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> acceptedVersions() {
+      Map<String, OperationOutcomeView.Gap> effective = new HashMap<>();
+      for (var gap : witness.gaps()) effective.put(gap.unitId(), gap);
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> selected = new java.util.HashSet<>();
+      for (var entry : rowGaps.entrySet()) {
+        if (entry.getValue().equals(effective.get(entry.getValue().unitId()))) {
+          selected.add(entry.getKey());
+        }
+      }
+      return Set.copyOf(selected);
+    }
+  }
+
+  private static void addCandidateGap(List<OperationOutcomeView.Gap> gaps,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, OperationOutcomeView.Gap> rowGaps,
+      SwitchBufferCapableQueue.SwitchBufferOp row, String unit, String reason) {
+    var gap = new OperationOutcomeView.Gap(unit, reason,
+        row == null ? null : candidateRowEvidence(row));
+    gaps.add(gap);
+    if (row != null) rowGaps.put(row, gap);
+  }
+
+  /** Approval covers the exact durable row effect, even when its safe reason code is unchanged. */
+  private static String candidateRowEvidence(SwitchBufferCapableQueue.SwitchBufferOp row) {
+    try {
+      var digest = java.security.MessageDigest.getInstance("SHA-256");
+      digest.update("justsearch:candidate-gap-row:v1\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      for (String part : List.of(row.generation(), row.key(), row.op(), row.payload(),
+          row.revision())) {
+        digest.update(part.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+      }
+      return java.util.HexFormat.of().formatHex(digest.digest());
+    } catch (java.security.NoSuchAlgorithmException unavailable) {
+      throw new IllegalStateException("SHA-256 is unavailable", unavailable);
+    }
+  }
+
+  private CandidateJournalSnapshot candidateJournalSnapshot() {
     if (!(jobQueue instanceof SwitchBufferCapableQueue journal)
         || indexGenerationManager == null || ingestLifecycle == null) {
       throw new IllegalStateException("Candidate journal or Green runtime is unavailable");
@@ -4456,18 +4581,27 @@ public final class KnowledgeServer implements Closeable {
       throw new IllegalStateException("Candidate generation is unavailable");
     }
     List<OperationOutcomeView.Gap> gaps = new ArrayList<>();
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, OperationOutcomeView.Gap> rowGaps =
+        new java.util.LinkedHashMap<>();
     Set<String> covered = new LinkedHashSet<>();
+    final List<String> expectedSources;
+    try {
+      expectedSources = expectedProjectionSourceIds();
+    } catch (IOException unavailable) {
+      throw new IllegalStateException("Candidate source-set witness is unavailable", unavailable);
+    }
+    Set<String> markedSources = new LinkedHashSet<>();
     for (var op : journal.listSwitchBufferOpsStrictForGeneration(state.building_generation())) {
       if ("UPSERT".equals(op.op())) {
         SwitchBufferUpsert upsert = SwitchBufferUpsert.decode(op.payload());
         String unit = DocumentIdentityStore.pathHash(upsert.path());
         if (upsert.sourceSha256() == null) {
-          gaps.add(new OperationOutcomeView.Gap(unit, "PROJECTION_WITNESS_MISSING"));
+          addCandidateGap(gaps, rowGaps, op, unit, "PROJECTION_WITNESS_MISSING");
         } else if (!journal.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256())
             || !upsert.sourceSha256().equals(ingestLifecycle.documentFieldOps()
                 .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) {
-          gaps.add(new OperationOutcomeView.Gap(unit, "CANDIDATE_PROJECTION_MISSING"));
+          addCandidateGap(gaps, rowGaps, op, unit, "CANDIDATE_PROJECTION_MISSING");
         } else {
           covered.add(unit);
         }
@@ -4475,13 +4609,54 @@ public final class KnowledgeServer implements Closeable {
         String unit = DocumentIdentityStore.pathHash(op.payload());
         if (ingestLifecycle.documentFieldOps()
             .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) {
-          gaps.add(new OperationOutcomeView.Gap(unit, "DELETE_NOT_APPLIED"));
+          addCandidateGap(gaps, rowGaps, op, unit, "DELETE_NOT_APPLIED");
+        } else {
+          covered.add(unit);
+        }
+      } else if ("PROJECTION_SOURCE".equals(op.op())) {
+        String sourceId = op.payload();
+        if (!expectedSources.contains(sourceId)
+            || !("projection-source:" + sourceId.length() + ":" + sourceId).equals(op.key())) {
+          throw new IllegalStateException("Candidate journal has an unexpected projection source");
+        }
+        markedSources.add(sourceId);
+        String unit = DocumentIdentityStore.pathHash("projection-source:" + sourceId);
+        if (projectionSourceReady(sourceId)) covered.add(unit);
+        else addCandidateGap(gaps, rowGaps, op, unit, "PROJECTION_SOURCE_INCOMPLETE");
+      } else if ("PROJECTION".equals(op.op())) {
+        var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(op.payload());
+        if (!expectedSources.contains(projection.sourceId())
+            || !projection.journalKey().equals(op.key())) {
+          throw new IllegalStateException("Candidate journal has an unexpected projection revision");
+        }
+        String unit = DocumentIdentityStore.pathHash(projection.indexId());
+        var fields = ingestLifecycle.documentFieldOps();
+        String docId = fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID);
+        if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+          if (docId == null) covered.add(unit);
+          else addCandidateGap(gaps, rowGaps, op, unit, "PROJECTION_DELETE_NOT_APPLIED");
+        } else if (!projection.indexId().equals(docId)
+            || !projection.sourceId().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID))
+            || !Long.toString(projection.sourceRevision()).equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION))
+            || !projection.fieldsDigest().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_DIGEST))) {
+          addCandidateGap(gaps, rowGaps, op, unit, "CANDIDATE_PROJECTION_MISSING");
         } else {
           covered.add(unit);
         }
       }
     }
-    return new RecordedIngestionLifecycle.JournalWitness(gaps, covered);
+    for (String sourceId : expectedSources) {
+      if (!markedSources.contains(sourceId)) {
+        addCandidateGap(gaps, rowGaps, null,
+            DocumentIdentityStore.pathHash("projection-source:" + sourceId),
+            "PROJECTION_SOURCE_MARKER_MISSING");
+      }
+    }
+    return new CandidateJournalSnapshot(
+        new RecordedIngestionLifecycle.JournalWitness(gaps, covered), Map.copyOf(rowGaps));
   }
 
   /** The operator wait has no deadline; release B's native set and restore A before resting. */
@@ -4600,7 +4775,7 @@ public final class KnowledgeServer implements Closeable {
                       jobQueue, source, signalBus, indexingPacing, indexBasePath, activeIndexPath,
                       JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
                       System.nanoTime() + TimeUnit.SECONDS.toNanos(10),
-                      state.building_generation()))) {
+                      state.building_generation(), ignored -> true))) {
                 throw new IOException("Refused candidate still has unproved source mutations");
               }
               // Producer close joins the actual Green writer before its B model lease can leave.
@@ -4715,15 +4890,34 @@ public final class KnowledgeServer implements Closeable {
         if (!current.mutationAdmission().replayCertain()) {
           throw new IOException("Unrecorded watcher mutation prevents certified promotion");
         }
+        if (recorded == null && !nativeProjectionSourcesReadyForPromotion()) return null;
+        Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions = Set.of();
         if (recorded != null && recordedIngestionLifecycle.recordedGapDecision(
-            recorded.operationKey(), candidateJournalWitness())
-                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) return null;
+            recorded.operationKey()) == RecordedIngestionLifecycle.GapDecision.ACCEPTED) {
+          // Only an already accepted decision may authorize loss before replay. Rebind it to
+          // the full current witness and each exact journal revision under this final fence.
+          var snapshot = candidateJournalSnapshot();
+          if (recordedIngestionLifecycle.recordedGapDecision(
+              recorded.operationKey(), snapshot.witness())
+                  == RecordedIngestionLifecycle.GapDecision.ACCEPTED) {
+            approvedGapVersions = snapshot.acceptedVersions();
+          }
+        }
         var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
             new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 jobQueue, green, signalBus, indexingPacing, indexBasePath, buildingIndexPath,
                 JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
-                buildingGeneration));
-        if (replay.isEmpty()) return null;
+                buildingGeneration, this::projectionSourceReady, approvedGapVersions));
+        if (replay.isEmpty()) {
+          if (recorded != null) {
+            // A partial pass may have committed projection revisions after an incomplete source
+            // marker. Refresh before sealing the exact gap witness for user acceptance.
+            green.commitOps().maybeRefreshBlocking();
+            recordedIngestionLifecycle.recordedGapDecision(
+                recorded.operationKey(), candidateJournalWitness());
+          }
+          return null;
+        }
 
         // Replay can enqueue file work. The already-running Green writer drains it while new
         // producer effects wait at the fence; the pause acknowledges its final batch boundary.
@@ -4793,7 +4987,7 @@ public final class KnowledgeServer implements Closeable {
                 try (var recordedPromotion = recorded == null ? null
                          : indexGenerationManager.beginRecordedPromotion(
                              recorded.operationKey(), recorded.source(), recorded.targetFingerprint(),
-                             recorded.sourceGeneration());
+                             recorded.sourceGeneration(), recorded.projectionSourceIds());
                      var nativePromotion = recorded == null
                          ? indexGenerationManager.beginNativePromotion(sourceGeneration, buildingGeneration)
                          : null) {
@@ -5067,7 +5261,10 @@ public final class KnowledgeServer implements Closeable {
             JSON,
             KnowledgeServer::chunkSpladeEnabled,
             () -> vduReplayAllowed(running, capturedServing, capturedPath),
-            log));
+            log,
+            Long.MAX_VALUE,
+            buildingIndexPath == null ? null : buildingIndexPath.getFileName().toString(),
+            this::projectionSourceReady));
   }
 
 
@@ -5092,6 +5289,10 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void startMigrationEnumeratorBestEffort(ResolvedConfig rc) {
+    startMigrationEnumeratorBestEffort(rc, true);
+  }
+
+  private void startMigrationEnumeratorBestEffort(ResolvedConfig rc, boolean enumerateFiles) {
     if (migrationEnumeratorThread != null) {
       return;
     }
@@ -5124,9 +5325,49 @@ public final class KnowledgeServer implements Closeable {
                       "Migration enumerator: models not ready after 120s, "
                           + "proceeding without inline embedding/SPLADE");
                 }
-                List<Path> roots = loadMigrationRoots(rc);
+                List<Path> roots = enumerateFiles ? loadMigrationRoots(rc) : List.of();
                 migrationEnumeratorRootsTotal.set(roots.size());
-                int totalEnqueued = enqueueAllFilesUnderRoots(roots);
+                int totalEnqueued = enumerateFiles ? enqueueAllFilesUnderRoots(roots) : 0;
+                List<String> expectedSources = expectedProjectionSourceIds();
+                // Completion is candidate-local. Drop retired candidates even when the next
+                // one has no registered sources, so repeated live activations stay bounded.
+                String buildingGeneration = buildingIndexPath == null ? null
+                    : buildingIndexPath.getFileName().toString();
+                completedProjectionSeeds.removeIf(completion ->
+                    !Objects.equals(completion.generation(), buildingGeneration));
+                if (!expectedSources.isEmpty()) {
+                  if (!(jobQueue instanceof SwitchBufferCapableQueue scoped)
+                      || buildingIndexPath == null) {
+                    throw new IOException("Projection seed requires a writable candidate journal");
+                  }
+                  var state = indexGenerationManager.readStateBestEffort();
+                  String generation = buildingIndexPath.getFileName().toString();
+                  if (state == null || !generation.equals(state.building_generation())) {
+                    throw new IOException("Projection seed candidate identity changed");
+                  }
+                  for (String sourceId : expectedSources) {
+                    var source = projectionSeedSources.stream()
+                        .filter(candidate -> sourceId.equals(candidate.sourceId()))
+                        .findFirst().orElse(null);
+                    if (source == null) {
+                      if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) {
+                        throw new IOException("Native candidate lost projection source: " + sourceId);
+                      }
+                      log.warn("Recorded projection source is unavailable: {}", sourceId);
+                      continue;
+                    }
+                    try {
+                      KnowledgeServerMigrationOps.seedProjectionSource(scoped, generation, source);
+                      completedProjectionSeeds.add(new ProjectionSeedCompletion(generation, sourceId));
+                    } catch (KnowledgeServerMigrationOps.ProjectionSeedIncompleteException incomplete) {
+                      if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) {
+                        throw incomplete;
+                      }
+                      log.warn("Recorded projection source awaits gap decision: {}", sourceId,
+                          incomplete);
+                    }
+                  }
+                }
                 log.info(
                     "Migration enumerator finished. roots={} enqueuedFiles={}",
                     roots.size(),

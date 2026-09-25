@@ -523,6 +523,13 @@ class KnowledgeServerTest {
         Path data = Files.createDirectory(tempDir.resolve(Boolean.toString(malformed)));
         if (malformed) Files.writeString(data.resolve("watched_roots.json"), "{broken");
         KnowledgeServer server = createServerWithDataDir(data);
+        var generations = new io.justsearch.indexerworker.index.IndexGenerationManager(
+            data.resolve("index"));
+        generations.initializeOrLoad();
+        var candidate = generations.startMigration("enumeration-test", List.of());
+        setField(server, "indexGenerationManager", generations);
+        setField(server, "buildingIndexPath", generations.resolveGenerationPathStrict(
+            candidate.building_generation()));
         setField(server, "jobQueue", org.mockito.Mockito.mock(JobQueue.class));
         setField(server, "running", true);
         setField(server, "modelReadyLatch", new java.util.concurrent.CountDownLatch(0));
@@ -774,6 +781,9 @@ class KnowledgeServerTest {
 
     // Initialize atomic fields that are final and need values
     initializeAtomicFields(server);
+    // CALLS_REAL_METHODS bypasses field initializers; preserve the empty source registry invariant.
+    setField(server, "projectionSeedSources", List.of());
+    setField(server, "completedProjectionSeeds", java.util.concurrent.ConcurrentHashMap.newKeySet());
 
     return server;
   }

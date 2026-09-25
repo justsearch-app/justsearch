@@ -1251,8 +1251,8 @@ function assertInstallerChatSelection({ plan, preparationPayload, cut, final, ca
   requireThat, label }) {
   if (!candidate.mixedChat) return;
   const envelope = parseStoredJson(preparationPayload, `${label} installer preparation envelope`);
-  requireThat(envelope.preparation?.replaySchema === 'recorded-installer-generation-v3',
-    `${label} installer activation did not retain the v3 generation plan: ${JSON.stringify(envelope)}`);
+  requireThat(envelope.preparation?.replaySchema === 'recorded-installer-generation-v4',
+    `${label} installer activation did not retain the v4 generation plan: ${JSON.stringify(envelope)}`);
   const selection = plan.chatSelection;
   requireThat(selection?.modelAssetId === candidate.chatModelAssetId
       && Array.isArray(selection.companionAssetIds)

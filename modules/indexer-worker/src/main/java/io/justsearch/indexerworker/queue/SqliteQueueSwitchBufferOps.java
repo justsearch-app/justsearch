@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.telemetry.Telemetry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -186,6 +187,46 @@ final class SqliteQueueSwitchBufferOps {
       if (onWriteFailure != null) onWriteFailure.run();
       throw failure;
     }
+  }
+
+  /** Caller holds the queue transaction and its write reservation before this read. */
+  SwitchBufferCapableQueue.ProjectionAdmission admitProjectionInTransaction(
+      Connection conn, String generation, AcceptedProjection incoming) throws SQLException {
+    if (generation == null || generation.isBlank()) {
+      throw new IllegalArgumentException("Projection requires a building generation");
+    }
+    String key = incoming.journalKey();
+    try (PreparedStatement query = conn.prepareStatement(
+        "SELECT op, payload FROM switch_buffer WHERE generation = ? AND key = ?")) {
+      query.setString(1, generation);
+      query.setString(2, key);
+      try (ResultSet row = query.executeQuery()) {
+        if (row.next()) {
+          if (!"PROJECTION".equals(row.getString(1))) {
+            throw new IllegalStateException("Projection journal key has another operation kind");
+          }
+          AcceptedProjection prior = AcceptedProjection.decode(row.getString(2));
+          if (!key.equals(prior.journalKey())) {
+            throw new IllegalStateException("Projection journal key and payload disagree");
+          }
+          if (incoming.sourceRevision() < prior.sourceRevision()) {
+            return SwitchBufferCapableQueue.ProjectionAdmission.STALE;
+          }
+          if (incoming.sourceRevision() == prior.sourceRevision()) {
+            return incoming.sameEffect(prior)
+                ? SwitchBufferCapableQueue.ProjectionAdmission.DUPLICATE
+                : SwitchBufferCapableQueue.ProjectionAdmission.CONFLICT;
+          }
+        }
+      }
+    }
+    try {
+      writeForGeneration(conn, generation, key, "PROJECTION", incoming.encode());
+    } catch (SQLException failure) {
+      if (onWriteFailure != null) onWriteFailure.run();
+      throw failure;
+    }
+    return SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED;
   }
 
   private boolean putWithGeneration(String generation, String key, String op, String payload) {

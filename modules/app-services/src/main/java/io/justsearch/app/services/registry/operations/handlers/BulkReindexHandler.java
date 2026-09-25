@@ -53,13 +53,15 @@ public final class BulkReindexHandler implements OperationHandler {
     IndexingService service = Objects.requireNonNull(indexing.get(), "Indexing service unavailable");
     String generation = captureSourceGeneration(service, context);
     var target = service.captureIndexTarget(context);
+    List<String> projectionSourceIds = List.copyOf(service.captureProjectionSourceIds(context));
     if (!generation.equals(captureSourceGeneration(service, context))) {
       throw new IllegalStateException("Serving generation changed while preparing rebuild");
     }
     var planned = bindings.stream().map(root -> new RecordedRootPlan.Root(
         root.path(), root.collection(), true, false, patterns, List.of())).toList();
-    var plan = new RecordedBulkPlan(profile, source, RecordedRootPlan.partition(generation, planned), target);
-    return new OperationPreparation(argumentsJson, RecordedBulkPlan.SCHEMA, plan.toReplayPayload());
+    var plan = new RecordedBulkPlan(profile, source, RecordedRootPlan.partition(generation, planned), target,
+        projectionSourceIds);
+    return new OperationPreparation(argumentsJson, plan.replaySchema(), plan.toReplayPayload());
   }
 
   @Override public void validatePreparation(OperationPreparation prepared) {
@@ -91,10 +93,11 @@ public final class BulkReindexHandler implements OperationHandler {
   private RecordedBulkPlan frozenPlan(OperationPreparation prepared) {
     Objects.requireNonNull(prepared, "prepared");
     if (prepared.content() != OperationPreparation.Content.METADATA
-        || !RecordedBulkPlan.SCHEMA.equals(prepared.replaySchema())) {
+        || !RecordedBulkPlan.isSupportedSchema(prepared.replaySchema())) {
       throw new IllegalArgumentException("Bulk reindex requires a metadata bulk plan");
     }
-    var plan = RecordedBulkPlan.fromReplayPayload(prepared.replayPayloadJson());
+    var plan = RecordedBulkPlan.fromReplayPayload(prepared.replaySchema(),
+        prepared.replayPayloadJson());
     if (plan.profile() != profile
         || !plan.source().equals(RecordedBulkPlan.sourceForArguments(profile, prepared.argumentsJson()))) {
       throw new IllegalArgumentException("Bulk plan differs from its prepared invocation");

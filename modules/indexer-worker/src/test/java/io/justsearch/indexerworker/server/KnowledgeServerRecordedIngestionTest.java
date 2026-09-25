@@ -49,6 +49,157 @@ final class KnowledgeServerRecordedIngestionTest {
   private static final String PLAN_HASH = "a".repeat(64);
 
   @Test
+  void restartedCandidateNamesMissingAndIncompleteSourceMarkers(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    String sourceGeneration = layout.genManager().readStateBestEffort().active_generation();
+    String operationKey = "01994180-0000-7000-8000-000000000156";
+    var state = layout.genManager().startRecordedMigration(operationKey,
+        "recorded-bulk-test", "b".repeat(64), sourceGeneration, List.of("authority"));
+    var reopened = new IndexGenerationManager(layout.indexBase());
+    KnowledgeServer server = helperServer(layout);
+    SqliteJobQueue queue = new SqliteJobQueue(layout.dataDir().resolve("projection-gap.db"),
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW);
+    queue.open();
+    setField(server, "indexGenerationManager", reopened);
+    setField(server, "buildingIndexPath",
+        reopened.resolveGenerationPathStrict(state.building_generation()));
+    setField(server, "jobQueue", queue);
+    RunningRuntime green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var fields = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    org.mockito.Mockito.when(green.documentFieldOps()).thenReturn(fields);
+    setField(server, "ingestLifecycle", green);
+    try {
+      var missing = server.candidateJournalWitness();
+      assertEquals(List.of("PROJECTION_SOURCE_MARKER_MISSING"),
+          missing.gaps().stream().map(gap -> gap.reason()).toList());
+      assertTrue(queue.putSwitchBufferForGeneration(state.building_generation(),
+          "projection-source:9:authority", "PROJECTION_SOURCE", "authority"));
+      var incomplete = server.candidateJournalWitness();
+      assertEquals(List.of("PROJECTION_SOURCE_INCOMPLETE"),
+          incomplete.gaps().stream().map(gap -> gap.reason()).toList());
+      var revision = new io.justsearch.app.api.indexing.AcceptedProjection("authority", "doc", 5,
+          io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+          "{\"title\":\"candidate\"}");
+      assertEquals(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED,
+          queue.admitProjectionForGeneration(state.building_generation(), revision.encode()));
+      assertTrue(server.candidateJournalWitness().gaps().stream().anyMatch(gap ->
+          "CANDIDATE_PROJECTION_MISSING".equals(gap.reason())));
+      org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
+          io.justsearch.indexing.SchemaFields.DOC_ID)).thenReturn(revision.indexId());
+      org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
+          io.justsearch.indexing.SchemaFields.PROJECTION_SOURCE_ID)).thenReturn(revision.sourceId());
+      org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
+          io.justsearch.indexing.SchemaFields.PROJECTION_SOURCE_REVISION)).thenReturn("5");
+      org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
+          io.justsearch.indexing.SchemaFields.PROJECTION_DIGEST)).thenReturn(revision.fieldsDigest());
+      assertFalse(server.candidateJournalWitness().gaps().stream().anyMatch(gap ->
+          "CANDIDATE_PROJECTION_MISSING".equals(gap.reason())));
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
+  void nativePromotionRequiresDurableSourceMarker(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    var state = layout.genManager().startMigration("native-source-cut", List.of("authority"));
+    KnowledgeServer server = helperServer(layout);
+    server.installProjectionSeedSources(List.of(new io.justsearch.app.api.indexing.ProjectionSeedSource() {
+      @Override public String sourceId() { return "authority"; }
+      @Override public void enumerate(
+          java.util.function.Consumer<io.justsearch.app.api.indexing.AcceptedProjection> sink) {}
+    }));
+    SqliteJobQueue queue = new SqliteJobQueue(layout.dataDir().resolve("native-source.db"),
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW);
+    queue.open();
+    setField(server, "indexGenerationManager", layout.genManager());
+    setField(server, "buildingIndexPath", layout.genManager().resolveGenerationPathStrict(
+        state.building_generation()));
+    setField(server, "jobQueue", queue);
+    var completed = KnowledgeServer.class.getDeclaredField("completedProjectionSeeds");
+    completed.setAccessible(true);
+    @SuppressWarnings("unchecked") Set<KnowledgeServer.ProjectionSeedCompletion> completedIds =
+        (Set<KnowledgeServer.ProjectionSeedCompletion>) completed.get(server);
+    completedIds.add(new KnowledgeServer.ProjectionSeedCompletion(
+        state.building_generation(), "authority"));
+    var ready = KnowledgeServer.class.getDeclaredMethod("nativeProjectionSourcesReadyForPromotion");
+    ready.setAccessible(true);
+    try {
+      assertFalse((boolean) ready.invoke(server), "enumeration alone cannot replace marker durability");
+      assertTrue(queue.putSwitchBufferForGeneration(state.building_generation(),
+          "projection-source:9:authority", "PROJECTION_SOURCE", "authority"));
+      assertTrue((boolean) ready.invoke(server));
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
+  void completedSourceFromPriorCandidateCannotCertifyIncompleteSuccessor(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    var manager = layout.genManager();
+    String sourceGeneration = manager.readStateBestEffort().active_generation();
+    var first = manager.startRecordedMigration("01994180-0000-7000-8000-000000000157",
+        "recorded-bulk-test", "b".repeat(64), sourceGeneration, List.of("authority"));
+    KnowledgeServer server = helperServer(layout);
+    server.installProjectionSeedSources(List.of(new io.justsearch.app.api.indexing.ProjectionSeedSource() {
+      @Override public String sourceId() { return "authority"; }
+      @Override public void enumerate(
+          java.util.function.Consumer<io.justsearch.app.api.indexing.AcceptedProjection> sink) {}
+    }));
+    SqliteJobQueue queue = new SqliteJobQueue(layout.dataDir().resolve("successive-sources.db"),
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW);
+    queue.open();
+    setField(server, "indexGenerationManager", manager);
+    setField(server, "jobQueue", queue);
+    RunningRuntime green = org.mockito.Mockito.mock(RunningRuntime.class);
+    org.mockito.Mockito.when(green.documentFieldOps()).thenReturn(org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class));
+    setField(server, "ingestLifecycle", green);
+    var completed = KnowledgeServer.class.getDeclaredField("completedProjectionSeeds");
+    completed.setAccessible(true);
+    @SuppressWarnings("unchecked") Set<KnowledgeServer.ProjectionSeedCompletion> completedIds =
+        (Set<KnowledgeServer.ProjectionSeedCompletion>) completed.get(server);
+    completedIds.add(new KnowledgeServer.ProjectionSeedCompletion(
+        first.building_generation(), "authority"));
+    try (var promotion = manager.beginRecordedPromotion(
+        "01994180-0000-7000-8000-000000000157", "recorded-bulk-test", "b".repeat(64),
+        sourceGeneration, List.of("authority"))) {
+      promotion.promote();
+    }
+    manager.retirePreviousGeneration(first.building_generation(), sourceGeneration);
+    var second = manager.startRecordedMigration("01994180-0000-7000-8000-000000000158",
+        "recorded-bulk-test", "b".repeat(64), first.building_generation(),
+        List.of("authority"));
+    setField(server, "buildingIndexPath", manager.resolveGenerationPathStrict(
+        second.building_generation()));
+    var partial = new io.justsearch.app.api.indexing.ProjectionSeedSource() {
+      @Override public String sourceId() { return "authority"; }
+      @Override public void enumerate(
+          java.util.function.Consumer<io.justsearch.app.api.indexing.AcceptedProjection> sink) {
+        sink.accept(new io.justsearch.app.api.indexing.AcceptedProjection(
+            "authority", "partial-document", 1,
+            io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+            "{\"content\":\"partial\"}"));
+        throw new IllegalStateException("second source stopped after one revision");
+      }
+    };
+    assertThrows(io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps
+        .ProjectionSeedIncompleteException.class, () ->
+            io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.seedProjectionSource(
+                queue, second.building_generation(), partial));
+    try {
+      assertTrue(server.candidateJournalWitness().gaps().stream().anyMatch(gap ->
+          "PROJECTION_SOURCE_INCOMPLETE".equals(gap.reason())));
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
   @DisplayName("real boot attaches before recorded recovery and closes attachment after services")
   void realBootAttachesBeforeRecoveryAndClosesAfterDrain(@TempDir Path tempDir) throws Exception {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);
@@ -238,6 +389,9 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
         new IndexGenerationManager.State(1, "g-source", generation, null, "SWITCHING", false,
             null, null, System.currentTimeMillis(), null, null, null));
+    Path candidatePath = tempDir.resolve(generation);
+    org.mockito.Mockito.when(manager.manifestForOwnedPath(candidatePath)).thenReturn(
+        new IndexGenerationManager.GenerationManifest(2, generation, "test", 1));
     var queue = org.mockito.Mockito.mock(
         io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
     var green = org.mockito.Mockito.mock(RunningRuntime.class);
@@ -253,6 +407,7 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.when(queue.listSwitchBufferOpsStrictForGeneration(generation))
         .thenReturn(List.of(version));
     setField(server, "indexGenerationManager", manager);
+    setField(server, "buildingIndexPath", candidatePath);
     setField(server, "jobQueue", queue);
     setField(server, "ingestLifecycle", green);
     try {
@@ -260,6 +415,16 @@ final class KnowledgeServerRecordedIngestionTest {
       assertEquals(1, missing.gaps().size());
       assertEquals("CANDIDATE_PROJECTION_MISSING", missing.gaps().getFirst().reason());
       assertTrue(missing.coveredUnitIds().isEmpty());
+      assertNotNull(missing.gaps().getFirst().evidenceId());
+      var replacement = new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp(
+          generation, "path:" + path, "UPSERT", upsert.encode(), 2L, "journal-v2");
+      org.mockito.Mockito.when(queue.listSwitchBufferOpsStrictForGeneration(generation))
+          .thenReturn(List.of(replacement));
+      var changed = server.candidateJournalWitness();
+      assertEquals(missing.gaps().getFirst().unitId(), changed.gaps().getFirst().unitId());
+      assertEquals(missing.gaps().getFirst().reason(), changed.gaps().getFirst().reason());
+      assertNotEquals(missing.gaps().getFirst().evidenceId(), changed.gaps().getFirst().evidenceId(),
+          "a replaced row with the same visible gap must require a new approval");
 
       org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
           path.toString(), "accepted-revision", hash)).thenReturn(true);
@@ -311,6 +476,9 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
         new IndexGenerationManager.State(1, "g-source", "g-candidate", null,
             "AWAITING_ACCEPTANCE", false, null, null, System.currentTimeMillis(), null, null, null));
+    Path candidatePath = tempDir.resolve("g-candidate");
+    org.mockito.Mockito.when(manager.manifestForOwnedPath(candidatePath)).thenReturn(
+        new IndexGenerationManager.GenerationManifest(2, "g-candidate", "test", 1));
     var queue = org.mockito.Mockito.mock(
         io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
     org.mockito.Mockito.when(queue.jobStateCountsStrict()).thenReturn(
@@ -327,6 +495,7 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
     server.appServices = producer;
     setField(server, "indexGenerationManager", manager);
+    setField(server, "buildingIndexPath", candidatePath);
     setField(server, "jobQueue", queue);
     setField(server, "ingestLifecycle", green);
     setField(server, "generationBootOwnership",

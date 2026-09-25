@@ -2,6 +2,7 @@
 package io.justsearch.app.api.operations;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.app.api.status.MigrationSource;
@@ -24,6 +25,51 @@ final class RecordedBulkPlanTest {
 
     assertEquals(plan, RecordedBulkPlan.fromReplayPayload(plan.toReplayPayload()));
     assertEquals(plan.planHash(), RecordedBulkPlan.fromReplayPayload(plan.toReplayPayload()).planHash());
+  }
+
+  @Test
+  void legacyV1PayloadRemainsAbsentAndByteStable() {
+    RecordedBulkPlan plan = plan(RecordedBulkPlan.Profile.USER_BULK,
+        MigrationSource.USER_REQUESTED_BULK_REINDEX.wire(), scope(true, false));
+    String payload = plan.toReplayPayload();
+
+    assertEquals(RecordedBulkPlan.SCHEMA, plan.replaySchema());
+    assertFalse(payload.contains("projectionSourceIds"));
+    assertEquals(payload, RecordedBulkPlan.fromReplayPayload(RecordedBulkPlan.SCHEMA, payload)
+        .toReplayPayload());
+  }
+
+  @Test
+  void v2SortsAndRetainsAnExplicitlyEmptyProjectionSourceSet() {
+    RecordedBulkPlan plan = new RecordedBulkPlan(RecordedBulkPlan.Profile.USER_BULK,
+        MigrationSource.USER_REQUESTED_BULK_REINDEX.wire(), scope(true, false),
+        new IndexTargetSnapshot(sha256(INPUTS), INPUTS), List.of("zeta", "alpha"));
+
+    assertEquals(RecordedBulkPlan.SCHEMA_V2, plan.replaySchema());
+    assertEquals(List.of("alpha", "zeta"), plan.projectionSourceIds());
+    assertEquals(plan, RecordedBulkPlan.fromReplayPayload(plan.replaySchema(),
+        plan.toReplayPayload()));
+
+    RecordedBulkPlan empty = new RecordedBulkPlan(RecordedBulkPlan.Profile.USER_BULK,
+        MigrationSource.USER_REQUESTED_BULK_REINDEX.wire(), scope(true, false),
+        new IndexTargetSnapshot(sha256(INPUTS), INPUTS), List.of());
+    assertEquals(RecordedBulkPlan.SCHEMA_V2, empty.replaySchema());
+    assertEquals(List.of(), RecordedBulkPlan.fromReplayPayload(empty.replaySchema(),
+        empty.toReplayPayload()).projectionSourceIds());
+  }
+
+  @Test
+  void v2RejectsDuplicateOrUnboundedProjectionSourceIdentities() {
+    assertThrows(IllegalArgumentException.class, () -> new RecordedBulkPlan(
+        RecordedBulkPlan.Profile.USER_BULK,
+        MigrationSource.USER_REQUESTED_BULK_REINDEX.wire(), scope(true, false),
+        new IndexTargetSnapshot(sha256(INPUTS), INPUTS), List.of("duplicate", "duplicate")));
+    assertThrows(IllegalArgumentException.class, () -> new RecordedBulkPlan(
+        RecordedBulkPlan.Profile.USER_BULK,
+        MigrationSource.USER_REQUESTED_BULK_REINDEX.wire(), scope(true, false),
+        new IndexTargetSnapshot(sha256(INPUTS), INPUTS),
+        java.util.stream.IntStream.range(0, RecordedBulkPlan.MAX_PROJECTION_SOURCE_IDS + 1)
+            .mapToObj(index -> "source-" + index).toList()));
   }
 
   @Test

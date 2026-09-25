@@ -66,6 +66,8 @@ final class BulkReindexHandlerTest {
     assertTrue(plan.scope().roots().stream().allMatch(root -> root.force() && !root.singleFile()));
     assertEquals("serving-g1", plan.scope().generation());
     assertEquals(indexing.target, plan.target());
+    assertEquals(List.of(), plan.projectionSourceIds());
+    assertEquals(RecordedBulkPlan.SCHEMA_V2, prepared.replaySchema());
     assertEquals(profile == RecordedBulkPlan.Profile.USER_BULK ? 2 : 0,
         indexing.servingGenerationReads);
     assertEquals(profile == RecordedBulkPlan.Profile.RECOVERY_REBUILD ? 2 : 0,
@@ -73,6 +75,23 @@ final class BulkReindexHandlerTest {
     assertEquals(1, indexing.targetReads);
     assertEquals(0, indexing.startMigrationCalls);
     assertEquals(0, ingestion.executeCalls);
+  }
+
+  @Test
+  void prepareFreezesSortedProjectionSourceIdsFromTheSameIndexingService() {
+    FakeIndexingService indexing = new FakeIndexingService(
+        List.of("serving-g1", "serving-g1"));
+    indexing.projectionSourceIds = List.of("zeta", "alpha");
+    BulkReindexHandler handler = handler(RecordedBulkPlan.Profile.USER_BULK,
+        new FakeIngestionService(), new ArrayList<>(List.of(binding("watched"))),
+        new ArrayList<>(List.of("*.tmp")), indexing);
+
+    OperationPreparation prepared = handler.prepare(USER_ARGUMENTS, provenance(), CONTEXT);
+    RecordedBulkPlan plan = RecordedBulkPlan.fromReplayPayload(prepared.replaySchema(),
+        prepared.replayPayloadJson());
+
+    assertEquals(List.of("alpha", "zeta"), plan.projectionSourceIds());
+    assertEquals(1, indexing.projectionSourceIdsReads);
   }
 
   @Test
@@ -88,6 +107,7 @@ final class BulkReindexHandlerTest {
     assertEquals(2, indexing.servingGenerationReads);
     assertEquals(0, indexing.rebuildGenerationReads);
     assertEquals(1, indexing.targetReads);
+    assertEquals(1, indexing.projectionSourceIdsReads);
     assertEquals(0, indexing.startMigrationCalls);
     assertEquals(0, ingestion.executeCalls);
   }
@@ -243,8 +263,10 @@ final class BulkReindexHandlerTest {
     private int servingGenerationReads;
     private int rebuildGenerationReads;
     private int targetReads;
+    private int projectionSourceIdsReads;
     private int startMigrationCalls;
     private boolean servingGenerationUnavailable;
+    private List<String> projectionSourceIds = List.of();
 
     private FakeIndexingService(List<String> servingGenerations) {
       this(servingGenerations, servingGenerations);
@@ -278,6 +300,11 @@ final class BulkReindexHandlerTest {
     @Override public IndexTargetSnapshot captureIndexTarget(EngineContext context) {
       targetReads++;
       return target;
+    }
+
+    @Override public List<String> captureProjectionSourceIds(EngineContext context) {
+      projectionSourceIdsReads++;
+      return projectionSourceIds;
     }
 
     @Override public MigrationOutcome startMigration(String reason, EngineContext context) {

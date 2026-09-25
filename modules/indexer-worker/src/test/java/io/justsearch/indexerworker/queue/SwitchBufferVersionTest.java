@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.app.api.indexing.AcceptedProjection.Kind;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -60,6 +62,47 @@ final class SwitchBufferVersionTest {
       assertEquals(1, queue.removeReplayedSwitchBufferOpsForGeneration("green-a", a));
       assertEquals(List.of("b"), queue.listSwitchBufferOpsStrictForGeneration("green-b")
           .stream().map(SwitchBufferCapableQueue.SwitchBufferOp::payload).toList());
+    }
+  }
+
+  @Test
+  void noFileProjectionKeepsSourceOrderAndConditionalCleanupAcrossRestart() throws Exception {
+    Path db = tempDir.resolve("projection-revisions.db");
+    var first = new AcceptedProjection("memory", "record-7", 1, Kind.UPSERT,
+        "{\"content\":\"first\",\"title\":\"one\"}");
+    var equivalent = new AcceptedProjection("memory", "record-7", 1, Kind.UPSERT,
+        "{\"title\":\"one\",\"content\":\"first\"}");
+    var conflicting = new AcceptedProjection("memory", "record-7", 1, Kind.UPSERT,
+        "{\"content\":\"different\"}");
+    var deletion = new AcceptedProjection("memory", "record-7", 2, Kind.DELETE, null);
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      assertEquals(SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED,
+          queue.admitProjectionForGeneration("green", first.encode()));
+      var firstSnapshot = queue.listSwitchBufferOpsStrictForGeneration("green");
+      assertEquals(SwitchBufferCapableQueue.ProjectionAdmission.DUPLICATE,
+          queue.admitProjectionForGeneration("green", equivalent.encode()));
+      assertEquals(firstSnapshot, queue.listSwitchBufferOpsStrictForGeneration("green"));
+      assertEquals(SwitchBufferCapableQueue.ProjectionAdmission.CONFLICT,
+          queue.admitProjectionForGeneration("green", conflicting.encode()));
+      assertEquals(SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED,
+          queue.admitProjectionForGeneration("green", deletion.encode()));
+      assertEquals(SwitchBufferCapableQueue.ProjectionAdmission.STALE,
+          queue.admitProjectionForGeneration("green", first.encode()));
+      assertEquals(0, queue.removeReplayedSwitchBufferOps(firstSnapshot));
+      assertEquals(deletion, AcceptedProjection.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload()));
+    }
+    try (var reopened = new SqliteJobQueue(db)) {
+      reopened.open();
+      assertEquals(deletion, AcceptedProjection.decode(
+          reopened.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload()));
+      assertEquals(SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED,
+          reopened.admitProjectionForGeneration("other", first.encode()));
+      assertEquals(SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED,
+          reopened.admitProjectionForGeneration("green", new AcceptedProjection(
+              "memory", "record-7", 3, Kind.UPSERT, "{\"content\":\"restored\"}").encode()));
+      assertEquals(1, reopened.listSwitchBufferOpsStrictForGeneration("other").size());
     }
   }
 

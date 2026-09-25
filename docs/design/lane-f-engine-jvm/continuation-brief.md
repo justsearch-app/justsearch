@@ -5,6 +5,27 @@ entry point; [handoff](handoff.md) owns current evidence and
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
+**Current D1-9 source-set checkpoint (2026-09-25):** The affected
+Worker/Engine suites and full compile passed on the preceding no-file replay
+implementation. Real A/B projection replay and candidate-writer/SQLite reopen
+tests passed. A pre-marker crash refutation then required frozen no-file source
+identities: new bulk/installer plans carry a sorted source set, the Worker
+generation manifest persists it before the building pointer, and recorded
+boot compares it with accepted preparation. The candidate witness now names
+missing/incomplete source markers and exact projection/delete gaps. Focused
+plan, RPC, manifest and witness tests pass locally. A refute-first review found
+lost source IDs in promotion and installer recovery, a v4 marker omission,
+completion leaking across successive B builds, and gap settlement before
+strict replay. A second review proved same-unit, same-reason journal replacement
+could inherit an earlier gap approval; optional row evidence in the durable gap
+hash now revokes that approval. The corrected source passed the serial stress,
+Spotless and PMD gate at `tmp/3578`, and UI typecheck/unit at `tmp/3575`–`tmp/3576`;
+all six installed standard-model installer pointer/settings crash cuts passed
+at `tmp/3580`–`tmp/3585`, and live A/B accepted-file-mutation/vector proof
+passed at `tmp/3586`. Installed non-file source/gap and hosted rounds remain.
+[Handoff](handoff.md) has the checkpoint revision, exact logs and
+remaining cuts. D1-9 is not accepted; continue from this slice before D2-5.
+
 **Current owner re-cut (2026-09-24):** Finish D1-9 streaming correction and
 proofs first. D1/D2 scope remains intact. E's paired branch/main gate contains
 seven groups only: quality and workflow fixture, search/agent response time

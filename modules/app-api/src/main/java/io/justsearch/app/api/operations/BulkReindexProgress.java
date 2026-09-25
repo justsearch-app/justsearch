@@ -81,12 +81,20 @@ public record BulkReindexProgress(String generationId, IndexTargetSnapshot targe
     Objects.requireNonNull(gaps, "gaps");
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      digest.update("justsearch:bulk-gaps:v1\n".getBytes(StandardCharsets.UTF_8));
+      boolean hasRowEvidence = gaps.stream().anyMatch(gap -> gap.evidenceId() != null);
+      digest.update((hasRowEvidence ? "justsearch:bulk-gaps:v2\n" : "justsearch:bulk-gaps:v1\n")
+          .getBytes(StandardCharsets.UTF_8));
       gaps.stream().sorted(Comparator.comparing(OperationOutcomeView.Gap::unitId))
           .forEach(gap -> {
             digest.update(gap.unitId().getBytes(StandardCharsets.UTF_8));
             digest.update((byte) 0);
             digest.update(gap.reason().getBytes(StandardCharsets.UTF_8));
+            if (hasRowEvidence) {
+              digest.update((byte) 0);
+              if (gap.evidenceId() != null) {
+                digest.update(gap.evidenceId().getBytes(StandardCharsets.UTF_8));
+              }
+            }
             digest.update((byte) '\n');
           });
       return HexFormat.of().formatHex(digest.digest());

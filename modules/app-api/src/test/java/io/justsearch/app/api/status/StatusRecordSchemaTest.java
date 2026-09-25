@@ -692,6 +692,9 @@ final class StatusRecordSchemaTest {
         "content",                       // excluded by SearchResultFormatter (too large)
         "content_sha256",                // tempdoc 931 §C.6 — feedback capture key, stripped before the HTTP response
         "source_sha256",                 // source-byte extraction provenance, surfaced through preview
+        "projection_source_id",          // no-file source ownership witness, never a result field
+        "projection_source_revision",    // no-file accepted revision witness for candidate replay
+        "projection_digest",             // no-file exact projection witness for candidate replay
         "created_at",                    // not displayed in search results
         "doc_id",                        // identity — carried as top-level Hit.id, not fields
         "doc_uid",                       // internal dedup key

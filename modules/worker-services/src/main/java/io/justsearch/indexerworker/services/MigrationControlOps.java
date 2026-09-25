@@ -51,10 +51,18 @@ final class MigrationControlOps {
             .setError("Recorded operation key, target fingerprint and source generation must be supplied together")
             .build();
       }
+      if (request.getProjectionSourceIdsCount() > 0
+          && !request.getProjectionSourceIdsPresent()) {
+        return MigrationStartResponse.newBuilder().setAccepted(false)
+            .setError("Projection source identities require an explicit source-set witness")
+            .build();
+      }
       IndexGenerationManager.State next = recorded
           ? indexGenerationManager.startRecordedMigration(request.getRecordedOperationKey(), reason,
-              request.getTargetIndexFingerprint(), request.getExpectedSourceGeneration())
-          : indexGenerationManager.startFreshMigration(reason.isBlank() ? "manual" : reason.trim());
+              request.getTargetIndexFingerprint(), request.getExpectedSourceGeneration(),
+              request.getProjectionSourceIdsPresent() ? request.getProjectionSourceIdsList() : null)
+          : indexGenerationManager.startFreshMigration(reason.isBlank() ? "manual" : reason.trim(),
+              request.getProjectionSourceIdsList());
       String active =
           next == null || next.active_generation() == null ? "" : next.active_generation();
       String building =

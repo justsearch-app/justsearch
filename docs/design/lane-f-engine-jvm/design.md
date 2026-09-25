@@ -29,7 +29,13 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-25: D1-9 binds an approved candidate gap to the immutable generation-journal row effect and revision. An optional `evidenceId` on the existing gap wire preserves legacy two-field gap hashes; evidence-bearing lists use the v2 hash domain. Replacing a row with the same unit and reason revokes prior approval before replay can skip it. This corrects the accepted-row bypass found by independent refutation without another journal or gap writer. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
+
+- 2026-09-25: D1-9 freezes a bounded, sorted no-file source set in each newly accepted bulk/installer preparation and in the Worker generation manifest before `state.json` can name B. Legacy absent and new explicit-empty sets remain distinct. Boot checks the accepted recorded set against the manifest; missing or incomplete source enumeration becomes a named candidate gap, with the exact current witness required again at the final fence. The journal and terminal writer remain the existing owners. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
+
 - 2026-09-25: D1-9 seeds non-file projections from registered source owners, starts the existing generation journal before enumeration, and reruns source enumeration after a BUILDING restart. Blue's Lucene index cannot define the authoritative set or reconstruct every projection; an independent source review refuted that shortcut. [Owning D1 correction](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
+
+- 2026-09-25: D1-9's source-enumeration implementation uses a scoped marker in the existing switch buffer to retain missing-source evidence and retains candidate replay revisions until pointer commitment. The subsequent source-set slice freezes registered identities in accepted preparations and pre-pointer manifests. Exact replay now precedes gap settlement, and source completion is scoped to the candidate generation; installed crash and source-gap proof remains open. [D1-9 boundary](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
 
 - 2026-09-25: WP2 2a binds literal durable-store versions to code constants and corrects `ui-settings` to schema 4 with readable predecessors 0–3. Its reconciliation token remains byte-for-byte stable for released updaters; the token names the strategy, while version fields name actual formats. [Release-safety correction](improvements/WP2-release-safety.md), [release sequencing](#171-why-this-shape).
 

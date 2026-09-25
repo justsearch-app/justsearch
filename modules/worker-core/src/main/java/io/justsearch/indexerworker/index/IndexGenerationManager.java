@@ -78,7 +78,9 @@ public final class IndexGenerationManager {
 
   private static final int STATE_FORMAT_VERSION = 2;
   private static final int MANIFEST_FORMAT_VERSION = 1;
+  private static final int PROJECTION_MANIFEST_FORMAT_VERSION = 2;
   private static final int RECORDED_MANIFEST_FORMAT_VERSION = 2;
+  private static final int RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION = 3;
 
   private static final String STATE_FILE = "state.json";
   private static final String STATE_TMP_FILE = "state.json.tmp";
@@ -140,9 +142,12 @@ public final class IndexGenerationManager {
       String target_index_fingerprint,
       @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, ModelArtifact> models,
       @JsonInclude(JsonInclude.Include.NON_NULL) String sparse_model,
-      @JsonInclude(JsonInclude.Include.NON_NULL) Integer vector_dimension) {
+      @JsonInclude(JsonInclude.Include.NON_NULL) Integer vector_dimension,
+      @JsonInclude(JsonInclude.Include.NON_NULL) List<String> projection_source_ids) {
     public GenerationManifest {
       models = models == null ? Map.of() : Map.copyOf(models);
+      projection_source_ids = projection_source_ids == null ? null
+          : checkedProjectionSourceIds(projection_source_ids);
       if (models.size() > 128 || models.keySet().stream().anyMatch(role ->
           !role.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}"))) {
         throw new IllegalArgumentException("Invalid generation model roles");
@@ -156,18 +161,48 @@ public final class IndexGenerationManager {
     }
 
     public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs) {
-      this(formatVersion, generationId, source, createdAtMs, null, Map.of(), null, null);
+      this(formatVersion, generationId, source, createdAtMs, null, Map.of(), null, null, null);
     }
 
     public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
         String targetIndexFingerprint) {
-      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, Map.of(), null, null);
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, Map.of(), null, null, null);
     }
 
     public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
         String targetIndexFingerprint, Map<String, ModelArtifact> models) {
-      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, models, null, null);
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, models, null, null, null);
     }
+
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
+        String targetIndexFingerprint, Map<String, ModelArtifact> models, String sparseModel,
+        Integer vectorDimension) {
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, models,
+          sparseModel, vectorDimension, null);
+    }
+  }
+
+  /** The explicit source set is a bounded, canonical generation identity. Null means legacy. */
+  public static List<String> checkedProjectionSourceIds(List<String> sourceIds) {
+    Objects.requireNonNull(sourceIds, "projection source IDs");
+    if (sourceIds.size() > 64) throw new IllegalArgumentException("Too many projection sources");
+    var ordered = new ArrayList<String>(sourceIds);
+    int totalLength = 0;
+    for (String id : ordered) {
+      if (id == null || id.isBlank() || id.length() > 256
+          || id.chars().anyMatch(Character::isISOControl)) {
+        throw new IllegalArgumentException("Invalid projection source identity");
+      }
+      totalLength += id.length();
+    }
+    if (totalLength > 4_096) {
+      throw new IllegalArgumentException("Projection sources exceed manifest budget");
+    }
+    ordered.sort(String::compareTo);
+    if (Set.copyOf(ordered).size() != ordered.size()) {
+      throw new IllegalArgumentException("Duplicate projection source identity");
+    }
+    return List.copyOf(ordered);
   }
 
   /** Exact installed file selected for one encoder role in a generation. */
@@ -293,17 +328,25 @@ public final class IndexGenerationManager {
     record Native() implements BootOwnership {}
     record Fenced() implements BootOwnership {}
     record Recorded(String operationKey, String sourceGeneration, String source,
-        String targetFingerprint, boolean captureComplete, boolean continuationAuthorized)
+        String targetFingerprint, boolean captureComplete, boolean continuationAuthorized,
+        List<String> projectionSourceIds)
         implements BootOwnership {
       public Recorded(String operationKey, String sourceGeneration, String source,
           String targetFingerprint, boolean captureComplete) {
-        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete, true);
+        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete, true, null);
+      }
+      public Recorded(String operationKey, String sourceGeneration, String source,
+          String targetFingerprint, boolean captureComplete, boolean continuationAuthorized) {
+        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete,
+            continuationAuthorized, null);
       }
       public Recorded {
         Objects.requireNonNull(operationKey, "operationKey");
         Objects.requireNonNull(sourceGeneration, "sourceGeneration");
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(targetFingerprint, "targetFingerprint");
+        projectionSourceIds = projectionSourceIds == null ? null
+            : checkedProjectionSourceIds(projectionSourceIds);
       }
     }
   }
@@ -357,7 +400,7 @@ public final class IndexGenerationManager {
       }
       if (idle && target.equals(layout.activeGenerationId())) {
         requireRecordedGeneration(layout.activeGenerationPath(), target, recorded.source(),
-            recorded.targetFingerprint(), false);
+            recorded.targetFingerprint(), false, true, recorded.projectionSourceIds());
         return new BootLayout(layout, recorded.captureComplete()
             && recorded.sourceGeneration().equals(state.previous_generation())
             ? BootDisposition.PROMOTED : BootDisposition.FENCED);
@@ -372,7 +415,7 @@ public final class IndexGenerationManager {
               || MigrationState.SWITCHING.name().equals(state.migration_state())
               || MigrationState.AWAITING_ACCEPTANCE.name().equals(state.migration_state()))) {
         requireRecordedGeneration(resolveGenerationPathReadOnly(target), target, recorded.source(),
-            recorded.targetFingerprint(), false);
+            recorded.targetFingerprint(), false, true, recorded.projectionSourceIds());
         return new BootLayout(layout, BootDisposition.BUILDING);
       }
       return new BootLayout(layout, BootDisposition.FENCED);
@@ -558,15 +601,26 @@ public final class IndexGenerationManager {
    * @return the updated normalized state (format_version=2)
    */
   public State startMigration(String source) throws IOException {
-    return startMigration(source, false);
+    return startMigration(source, false, List.of());
   }
 
   /** Start a distinct caller-requested candidate; never report a retained one as newly accepted. */
   public State startFreshMigration(String source) throws IOException {
-    return startMigration(source, true);
+    return startMigration(source, true, List.of());
   }
 
-  private State startMigration(String source, boolean requireFreshCandidate) throws IOException {
+  /** Freeze the registered no-file sources before the new candidate pointer becomes visible. */
+  public State startMigration(String source, List<String> projectionSourceIds) throws IOException {
+    return startMigration(source, false, projectionSourceIds);
+  }
+
+  public State startFreshMigration(String source, List<String> projectionSourceIds) throws IOException {
+    return startMigration(source, true, projectionSourceIds);
+  }
+
+  private State startMigration(String source, boolean requireFreshCandidate,
+      List<String> projectionSourceIds) throws IOException {
+    List<String> expectedSources = checkedProjectionSourceIds(projectionSourceIds);
     try (var ignored = stateControl()) {
       IndexLayout layout = initializeOrLoad();
       State current = layout.state();
@@ -597,7 +651,8 @@ public final class IndexGenerationManager {
       String genId = newUniqueGenerationId();
       Path genPath = resolveGenerationPath(genId);
       Files.createDirectories(genPath);
-      writeGenerationFiles(genPath, genId, source == null || source.isBlank() ? "migration" : source.trim());
+      writeMigrationGenerationFilesStrict(genPath, genId,
+          source == null || source.isBlank() ? "migration" : source.trim(), expectedSources);
 
       State next =
           new State(
@@ -631,6 +686,15 @@ public final class IndexGenerationManager {
   /** Bind source comparison and generation creation under the same control lock. */
   public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint,
       String expectedSourceGeneration) throws IOException {
+    return startRecordedMigration(operationKey, source, targetIndexFingerprint,
+        expectedSourceGeneration, null);
+  }
+
+  /** Null source set preserves legacy accepted plans; an explicit empty set is a new plan. */
+  public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint,
+      String expectedSourceGeneration, List<String> projectionSourceIds) throws IOException {
+    List<String> expectedSources = projectionSourceIds == null ? null
+        : checkedProjectionSourceIds(projectionSourceIds);
     try (var ignored = stateControl()) {
       String target = recordedGenerationId(operationKey);
       if (source == null || source.isBlank() || source.length() > 256
@@ -668,12 +732,14 @@ public final class IndexGenerationManager {
       }
       Path targetPath = resolveGenerationPathReadOnly(target);
       if (phase == MigrationState.IDLE && target.equals(active) && (building == null || building.isBlank())) {
-        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false);
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false,
+            true, expectedSources);
         return current;
       }
       if ((phase == MigrationState.MIGRATING || phase == MigrationState.SWITCHING
           || phase == MigrationState.AWAITING_ACCEPTANCE) && target.equals(building)) {
-        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false);
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false,
+            true, expectedSources);
         return current;
       }
       if (phase != MigrationState.IDLE || building != null && !building.isBlank()) {
@@ -681,12 +747,16 @@ public final class IndexGenerationManager {
       }
       requireBuildCapacity(current, target, false);
       if (Files.exists(targetPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, true);
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, true,
+            true, expectedSources);
       } else {
         Files.createDirectories(indicesDir);
         Files.createDirectory(targetPath);
         long created = System.currentTimeMillis();
-        var manifest = new GenerationManifest(RECORDED_MANIFEST_FORMAT_VERSION, target, source, created, targetIndexFingerprint);
+        var manifest = new GenerationManifest(expectedSources == null
+            ? RECORDED_MANIFEST_FORMAT_VERSION : RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION,
+            target, source, created, targetIndexFingerprint, Map.of(), null, null,
+            expectedSources);
         io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
             targetPath.resolve(GENERATION_SENTINEL), recordedSentinel(target, created).getBytes(StandardCharsets.UTF_8));
         io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
@@ -768,7 +838,8 @@ public final class IndexGenerationManager {
       }
       GenerationManifest bound = new GenerationManifest(manifest.format_version(),
           manifest.generation_id(), manifest.source(), manifest.created_at_ms(),
-          manifest.target_index_fingerprint(), accepted, sparseModel, vectorDimension);
+          manifest.target_index_fingerprint(), accepted, sparseModel, vectorDimension,
+          manifest.projection_source_ids());
       byte[] bytes = RECORDED_JSON.writeValueAsBytes(bound);
       if (bytes.length > 16_384) {
         throw new IOException("Recorded generation model manifest exceeds its ownership limit");
@@ -781,6 +852,18 @@ public final class IndexGenerationManager {
 
   private static void requireRecordedGeneration(Path directory, String target, String source,
       String targetFingerprint, boolean pristine) throws IOException {
+    requireRecordedGeneration(directory, target, source, targetFingerprint, pristine, null);
+  }
+
+  private static void requireRecordedGeneration(Path directory, String target, String source,
+      String targetFingerprint, boolean pristine, List<String> expectedSources) throws IOException {
+    requireRecordedGeneration(directory, target, source, targetFingerprint, pristine,
+        false, expectedSources);
+  }
+
+  private static void requireRecordedGeneration(Path directory, String target, String source,
+      String targetFingerprint, boolean pristine, boolean enforceSourceSet,
+      List<String> expectedSources) throws IOException {
     if (!Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("Recorded generation directory is not an owned regular directory");
     }
@@ -798,7 +881,15 @@ public final class IndexGenerationManager {
     } catch (tools.jackson.core.JacksonException malformed) {
       throw new IOException("Recorded generation manifest is invalid", malformed);
     }
-    if (manifest == null || manifest.format_version() != RECORDED_MANIFEST_FORMAT_VERSION || !target.equals(manifest.generation_id())
+    if (manifest == null || (manifest.format_version() != RECORDED_MANIFEST_FORMAT_VERSION
+        && manifest.format_version() != RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION)
+        || (manifest.format_version() == RECORDED_MANIFEST_FORMAT_VERSION
+            && manifest.projection_source_ids() != null)
+        || (manifest.format_version() == RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION
+            && manifest.projection_source_ids() == null)
+        || (enforceSourceSet
+            && !Objects.equals(expectedSources, manifest.projection_source_ids()))
+        || !target.equals(manifest.generation_id())
         || !source.equals(manifest.source()) || !targetFingerprint.equals(manifest.target_index_fingerprint())
         || manifest.created_at_ms() <= 0) {
       throw new IOException("Recorded generation metadata does not match its accepted target");
@@ -1049,12 +1140,19 @@ public final class IndexGenerationManager {
    */
   public RecordedPromotion beginRecordedPromotion(String operationKey, String source,
       String targetIndexFingerprint, String expectedSourceGeneration) {
+    return beginRecordedPromotion(operationKey, source, targetIndexFingerprint,
+        expectedSourceGeneration, null);
+  }
+
+  public RecordedPromotion beginRecordedPromotion(String operationKey, String source,
+      String targetIndexFingerprint, String expectedSourceGeneration,
+      List<String> projectionSourceIds) {
     Objects.requireNonNull(operationKey, "operationKey");
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(targetIndexFingerprint, "targetIndexFingerprint");
     Objects.requireNonNull(expectedSourceGeneration, "expectedSourceGeneration");
     return new RecordedPromotion(operationKey, source, targetIndexFingerprint,
-        expectedSourceGeneration, stateControl());
+        expectedSourceGeneration, projectionSourceIds, stateControl());
   }
 
   public final class RecordedPromotion implements AutoCloseable {
@@ -1065,17 +1163,20 @@ public final class IndexGenerationManager {
     private final String source;
     private final String targetIndexFingerprint;
     private final String expectedSourceGeneration;
+    private final List<String> projectionSourceIds;
     private final StateControlGuard guard;
     private final Thread owner = Thread.currentThread();
     private boolean attempted;
     private boolean closed;
 
     private RecordedPromotion(String operationKey, String source, String targetIndexFingerprint,
-        String expectedSourceGeneration, StateControlGuard guard) {
+        String expectedSourceGeneration, List<String> projectionSourceIds, StateControlGuard guard) {
       this.operationKey = operationKey;
       this.source = source;
       this.targetIndexFingerprint = targetIndexFingerprint;
       this.expectedSourceGeneration = expectedSourceGeneration;
+      this.projectionSourceIds = projectionSourceIds == null ? null
+          : checkedProjectionSourceIds(projectionSourceIds);
       this.guard = guard;
     }
 
@@ -1086,13 +1187,14 @@ public final class IndexGenerationManager {
       attempted = true;
       try {
         return promoteRecordedGenerationToActive(operationKey, source,
-            targetIndexFingerprint, expectedSourceGeneration);
+            targetIndexFingerprint, expectedSourceGeneration, projectionSourceIds);
       } catch (IOException ambiguous) {
         // A failed state.json move can be reported after the exact pointer is durable. Only the
         // strict recorded boot witness may turn that ambiguous outcome into committed promotion.
         try {
           var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
-              expectedSourceGeneration, source, targetIndexFingerprint, true),
+              expectedSourceGeneration, source, targetIndexFingerprint, true, true,
+              projectionSourceIds),
               targetIndexFingerprint);
           if (observed.disposition() == BootDisposition.PROMOTED) return observed.layout().state();
         } catch (IOException unreadable) {
@@ -1117,7 +1219,8 @@ public final class IndexGenerationManager {
           return CommitWitness.UNRESOLVED;
         }
         var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
-            expectedSourceGeneration, source, targetIndexFingerprint, true),
+            expectedSourceGeneration, source, targetIndexFingerprint, true, true,
+            projectionSourceIds),
             targetIndexFingerprint);
         return switch (observed.disposition()) {
           case BUILDING -> CommitWitness.UNCHANGED;
@@ -1218,10 +1321,12 @@ public final class IndexGenerationManager {
 
   /** Promote only the strict target/source binding validated by the recorded owner. */
   State promoteRecordedGenerationToActive(String operationKey, String source,
-      String targetIndexFingerprint, String expectedSourceGeneration) throws IOException {
+      String targetIndexFingerprint, String expectedSourceGeneration,
+      List<String> projectionSourceIds) throws IOException {
     try (var ignored = stateControl()) {
       var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
-          expectedSourceGeneration, source, targetIndexFingerprint, true), targetIndexFingerprint);
+          expectedSourceGeneration, source, targetIndexFingerprint, true, true,
+          projectionSourceIds), targetIndexFingerprint);
       if (observed.disposition() == BootDisposition.PROMOTED) return observed.layout().state();
       if (observed.disposition() != BootDisposition.BUILDING) {
         throw new IOException("Recorded generation binding changed before promotion");
@@ -1869,6 +1974,23 @@ public final class IndexGenerationManager {
       // Best-effort. These files are guardrails/diagnostics, not required to open Lucene.
       log.warn("Failed to write generation metadata files for {}", genDir, e);
     }
+  }
+
+  /** Candidate identity must be durable before state.json may point at it. */
+  private static void writeMigrationGenerationFilesStrict(Path genDir, String genId,
+      String source, List<String> projectionSourceIds) throws IOException {
+    long created = System.currentTimeMillis();
+    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+        genDir.resolve(GENERATION_SENTINEL), recordedSentinel(genId, created)
+            .getBytes(StandardCharsets.UTF_8));
+    var manifest = new GenerationManifest(PROJECTION_MANIFEST_FORMAT_VERSION,
+        genId, source, created, null, Map.of(), null, null, projectionSourceIds);
+    byte[] bytes = JSON.writeValueAsBytes(manifest);
+    if (bytes.length > 16_384) {
+      throw new IOException("Projection source manifest exceeds its ownership limit");
+    }
+    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+        genDir.resolve(GENERATION_MANIFEST), bytes);
   }
 
   /**

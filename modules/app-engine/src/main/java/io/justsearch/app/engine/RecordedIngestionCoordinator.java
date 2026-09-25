@@ -144,7 +144,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     var boot = generations.initializeForBoot(
         new IndexGenerationManager.BootOwnership.Recorded(row.key(), plan.sourceGeneration(),
-            plan.source(), plan.target().fingerprint(), true), plan.target().fingerprint());
+            plan.source(), plan.target().fingerprint(), true, true,
+            plan.projectionSourceIds()), plan.target().fingerprint());
     if (boot.disposition() != IndexGenerationManager.BootDisposition.PROMOTED) {
       throw new IOException("Installer generation pointer is not the accepted promoted target");
     }
@@ -209,7 +210,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
             && plan.planHash().equals(walk.orElseThrow().planHash())
             && walk.orElseThrow().enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE;
         return new IndexGenerationManager.BootOwnership.Recorded(row.key(), plan.scope().generation(),
-            plan.source(), plan.target().fingerprint(), complete, continuationAuthorized);
+            plan.source(), plan.target().fingerprint(), complete, continuationAuthorized,
+            plan.projectionSourceIds());
       } catch (IllegalArgumentException | JobQueue.RecordedWalkGapException invalid) {
         return new IndexGenerationManager.BootOwnership.Fenced();
       }
@@ -1717,7 +1719,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private void finishBulkStart(Bulk bulk, Attached physical, JobQueue.WalkProgress walk) {
     if (bulk.restartRequested || !bulkAuthorized(bulk)) return;
     var outcome = physical.bulkIndexing.startRecordedMigration(bulk.row.key(), bulk.plan.source(),
-        bulk.plan.target().fingerprint(), bulk.plan.scope().generation(), bulk.work.context());
+        bulk.plan.target().fingerprint(), bulk.plan.scope().generation(),
+        bulk.plan.projectionSourceIds(), bulk.work.context());
     String target = "g-" + bulk.row.key();
     if (!outcome.accepted() || !target.equals(outcome.buildingGenerationId())
         || !bulk.plan.scope().generation().equals(outcome.activeGenerationId())

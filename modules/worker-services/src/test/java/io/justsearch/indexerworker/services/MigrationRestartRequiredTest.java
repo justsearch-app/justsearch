@@ -46,6 +46,26 @@ final class MigrationRestartRequiredTest {
   }
 
   @Test
+  void recordedRequestBindsExplicitSourceSetAndRefusesAbsentReplay(@TempDir Path tempDir)
+      throws Exception {
+    Path indexBase = tempDir.resolve("source-set-index");
+    var manager = new IndexGenerationManager(indexBase);
+    String source = manager.initializeOrLoad().state().active_generation();
+    var explicit = MigrationStartRequest.newBuilder()
+        .setReason("bulk_reindex")
+        .setRecordedOperationKey(OPERATION_KEY)
+        .setTargetIndexFingerprint(TARGET_FINGERPRINT)
+        .setExpectedSourceGeneration(source)
+        .addProjectionSourceIds("authority")
+        .setProjectionSourceIdsPresent(true).build();
+    assertTrue(opsOver(indexBase).startMigration(explicit).getAccepted());
+    assertEquals(java.util.List.of("authority"), manager.manifestForOwnedPath(
+        manager.resolveGenerationPathStrict("g-" + OPERATION_KEY)).projection_source_ids());
+    assertFalse(opsOver(indexBase).startMigration(explicit.toBuilder()
+        .clearProjectionSourceIds().setProjectionSourceIdsPresent(false).build()).getAccepted());
+  }
+
+  @Test
   @DisplayName("startMigration reports restart_required when the caller asked for the restart")
   void startReportsRestartRequired(@TempDir Path tempDir) throws Exception {
     Path indexBase = tempDir.resolve("index");

@@ -217,6 +217,15 @@ public interface IndexingService {
     throw new UnsupportedOperationException("Read-only rebuild generation capture is unavailable");
   }
 
+  /**
+   * Capture the registered source-owner identities for a recorded generation plan. Legacy and
+   * mock implementations have no non-file projection owners and therefore return an explicit
+   * empty list, which is encoded by new plans as a present v2 source set.
+   */
+  default List<String> captureProjectionSourceIds(EngineContext engineContext) {
+    return List.of();
+  }
+
   /** Captures the current physical index target without requiring an idle serving generation. */
   default IndexTargetSnapshot captureIndexTarget(EngineContext engineContext) {
     throw new UnsupportedOperationException("Index target capture unavailable");
@@ -274,6 +283,17 @@ public interface IndexingService {
   default MigrationOutcome startRecordedMigration(String operationKey, String reason,
       String targetIndexFingerprint, String expectedSourceGeneration, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
+  }
+
+  /** A present source set binds new accepted plans; null preserves legacy replay semantics. */
+  default MigrationOutcome startRecordedMigration(String operationKey, String reason,
+      String targetIndexFingerprint, String expectedSourceGeneration,
+      List<String> projectionSourceIds, EngineContext engineContext) {
+    if (projectionSourceIds != null && !projectionSourceIds.isEmpty()) {
+      throw new UnsupportedOperationException("Projection source binding is unavailable");
+    }
+    return startRecordedMigration(operationKey, reason, targetIndexFingerprint,
+        expectedSourceGeneration, engineContext);
   }
 
   /** Requests cutover (best-effort). Implementations may no-op if migration is not in progress. */

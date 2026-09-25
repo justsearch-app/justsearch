@@ -2,6 +2,7 @@
 package io.justsearch.app.api.operations;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
@@ -21,6 +22,20 @@ final class BulkReindexProgressTest {
   private static final String HASH_A = "a".repeat(64);
   private static final String HASH_B = "b".repeat(64);
   private static final String HASH_C = "c".repeat(64);
+
+  @Test
+  void candidateRowEvidenceChangesApprovalHashWithoutChangingLegacyGapHashes() {
+    var legacy = new OperationOutcomeView.Gap("unit:candidate", "CANDIDATE_PROJECTION_MISSING");
+    assertEquals(sha256("justsearch:bulk-gaps:v1\n"
+        + "unit:candidate\0CANDIDATE_PROJECTION_MISSING\n"),
+        BulkReindexProgress.hashGapList(List.of(legacy)));
+    var first = new OperationOutcomeView.Gap(legacy.unitId(), legacy.reason(), "1".repeat(64));
+    var replaced = new OperationOutcomeView.Gap(legacy.unitId(), legacy.reason(), "2".repeat(64));
+    assertNotEquals(BulkReindexProgress.hashGapList(List.of(legacy)),
+        BulkReindexProgress.hashGapList(List.of(first)));
+    assertNotEquals(BulkReindexProgress.hashGapList(List.of(first)),
+        BulkReindexProgress.hashGapList(List.of(replaced)));
+  }
 
   @Test
   void projectsLifecycleCursorsAndSettledUnitCounts() {

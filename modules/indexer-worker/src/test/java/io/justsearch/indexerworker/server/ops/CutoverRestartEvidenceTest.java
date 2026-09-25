@@ -118,6 +118,7 @@ final class CutoverRestartEvidenceTest {
         .thenThrow(new IllegalStateException("recorded operation owns exact gap settlement"));
     var decisions = new java.util.concurrent.atomic.AtomicInteger();
     var promotions = new java.util.concurrent.atomic.AtomicInteger();
+    var preApprovalReplayAttempts = new java.util.concurrent.atomic.AtomicInteger();
     var sourceRestorations = new java.util.concurrent.atomic.AtomicInteger();
     var candidateResumes = new java.util.concurrent.atomic.AtomicInteger();
     var accepted = new AtomicBoolean();
@@ -172,7 +173,15 @@ final class CutoverRestartEvidenceTest {
       }
 
       @Override public IndexGenerationManager.State promote() throws IOException {
-        assertTrue(accepted.get(), "successor preparation must follow the durable user decision");
+        if (!accepted.get()) {
+          // The candidate must attempt strict replay to discover its current gap before a user
+          // decision exists. Only the eventual pointer commitment requires that decision.
+          assertEquals(IndexGenerationManager.MigrationState.SWITCHING.name(),
+              manager.readStateBestEffort().migration_state());
+          preApprovalReplayAttempts.incrementAndGet();
+          lateGap.set(true);
+          return null;
+        }
         if (promotions.getAndIncrement() == 0) {
           lateGap.set(true);
           return null;
@@ -192,6 +201,8 @@ final class CutoverRestartEvidenceTest {
 
     KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);
 
+    assertTrue(preApprovalReplayAttempts.get() > 0,
+        "strict replay must discover candidate gaps before asking for approval");
     assertEquals(2, promotions.get());
     assertEquals(3, sourceRestorations.get());
     assertEquals(3, candidateResumes.get());

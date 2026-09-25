@@ -175,6 +175,27 @@
       "roles": []
     },
     {
+      "id": "projection_source_id",
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "projection_source_revision",
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "projection_digest",
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
       "id": "ocr_present",
       "type": "boolean",
       "stored": true,

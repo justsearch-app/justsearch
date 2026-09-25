@@ -47,6 +47,70 @@ final class RecordedGenerationStartTest {
 
   @TempDir Path temp;
 
+  @ParameterizedTest
+  @ValueSource(strings = {"", "source-a"})
+  void recordedPromotionRetainsTheAcceptedSourceSetThroughCommitWitness(String sourceId)
+      throws Exception {
+    Path base = temp.resolve("projection-promotion-" + (sourceId.isEmpty() ? "empty" : "one"));
+    var manager = new IndexGenerationManager(base);
+    String source = manager.initializeOrLoad().state().active_generation();
+    List<String> sources = sourceId.isEmpty() ? List.of() : List.of(sourceId);
+    manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, source, sources);
+
+    try (var wrong = manager.beginRecordedPromotion(KEY, SOURCE, FINGERPRINT, source,
+        List.of("other-source"))) {
+      assertThrows(IOException.class, wrong::promote);
+      assertEquals(IndexGenerationManager.RecordedPromotion.CommitWitness.UNCHANGED,
+          wrong.inspectCommitWitness());
+    }
+    try (var promotion = manager.beginRecordedPromotion(KEY, SOURCE, FINGERPRINT, source, sources)) {
+      assertEquals(IndexGenerationManager.RecordedPromotion.CommitWitness.UNCHANGED,
+          promotion.inspectCommitWitness());
+      assertEquals(IndexGenerationManager.recordedGenerationId(KEY), promotion.promote().active_generation());
+      assertEquals(IndexGenerationManager.RecordedPromotion.CommitWitness.COMMITTED,
+          promotion.inspectCommitWitness());
+    }
+    var reopened = new IndexGenerationManager(base);
+    assertEquals(IndexGenerationManager.BootDisposition.PROMOTED,
+        reopened.initializeForBoot(new IndexGenerationManager.BootOwnership.Recorded(
+            KEY, source, SOURCE, FINGERPRINT, true, true, sources), FINGERPRINT).disposition());
+    assertThrows(IOException.class, () -> reopened.initializeForBoot(
+        new IndexGenerationManager.BootOwnership.Recorded(
+            KEY, source, SOURCE, FINGERPRINT, true, true, List.of("other-source")), FINGERPRINT));
+  }
+
+  @Test
+  void freezesSourceSetBeforeRecordedPointerAndRetainsItThroughModelBinding() throws Exception {
+    Path base = temp.resolve("projection-source-cut");
+    var manager = new IndexGenerationManager(base);
+    String source = manager.initializeOrLoad().state().active_generation();
+    var created = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, source,
+        List.of("source-b", "source-a"));
+    Path candidate = manager.resolveGenerationPathStrict(created.building_generation());
+    var reopened = new IndexGenerationManager(base);
+    assertEquals(List.of("source-a", "source-b"),
+        reopened.manifestForOwnedPath(candidate).projection_source_ids());
+    assertEquals(created, reopened.startRecordedMigration(KEY, SOURCE, FINGERPRINT, source,
+        List.of("source-a", "source-b")));
+    assertEquals(IndexGenerationManager.BootDisposition.BUILDING,
+        reopened.initializeForBoot(new IndexGenerationManager.BootOwnership.Recorded(
+            KEY, source, SOURCE, FINGERPRINT, true, true,
+            List.of("source-a", "source-b")), FINGERPRINT).disposition());
+    assertThrows(IOException.class, () -> reopened.initializeForBoot(
+        new IndexGenerationManager.BootOwnership.Recorded(KEY, source, SOURCE,
+            FINGERPRINT, true, true, List.of("source-a")), FINGERPRINT));
+    assertThrows(IOException.class, () -> reopened.startRecordedMigration(KEY, SOURCE,
+        FINGERPRINT, source, List.of("source-a")));
+    assertThrows(IOException.class, () -> reopened.startRecordedMigration(KEY, SOURCE,
+        FINGERPRINT, source), "legacy replay cannot erase the accepted source-set witness");
+    String file = temp.resolve("projection/model.onnx").toAbsolutePath().normalize().toString();
+    reopened.bindRecordedModels(KEY, SOURCE, FINGERPRINT,
+        Map.of("embedding", new IndexGenerationManager.ModelArtifact(file, "a".repeat(64))));
+    assertEquals(List.of("source-a", "source-b"),
+        reopened.manifestForOwnedPath(candidate).projection_source_ids());
+    assertEquals(created, reopened.readStateBestEffort());
+  }
+
   @Test
   void acceptedModelsBindOnceAndSurvivePointerPromotion() throws Exception {
     Path base = temp.resolve("model-binding");
@@ -72,7 +136,7 @@ final class RecordedGenerationStartTest {
         accepted, "bge-m3", 1024));
     assertEquals(manifest, Files.readString(generation(base, KEY).resolve(MANIFEST)));
 
-    manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, source);
+    manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, source, null);
     var reopened = new IndexGenerationManager(base);
     assertEquals(accepted, reopened.bindRecordedModels(KEY, SOURCE, FINGERPRINT, accepted,
         "splade", 768).models());
@@ -146,7 +210,8 @@ final class RecordedGenerationStartTest {
     Path targetDirectory = generation(base, KEY);
     String manifestBytes = Files.readString(targetDirectory.resolve(MANIFEST));
     String sentinelBytes = Files.readString(targetDirectory.resolve(SENTINEL));
-    var promoted = manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, expectedSource);
+    var promoted = manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT,
+        expectedSource, null);
     assertEquals(target, promoted.active_generation());
     assertNull(promoted.building_generation());
     assertEquals(expectedSource, promoted.previous_generation());
@@ -154,7 +219,7 @@ final class RecordedGenerationStartTest {
     String promotedStateBytes = Files.readString(base.resolve("state.json"));
 
     assertEquals(promoted,
-        manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, expectedSource),
+        manager.promoteRecordedGenerationToActive(KEY, SOURCE, FINGERPRINT, expectedSource, null),
         "retry against the already-promoted exact target is idempotent");
     assertEquals(promotedStateBytes, Files.readString(base.resolve("state.json")),
         "idempotent promotion does not rewrite the state pointer");
@@ -231,14 +296,16 @@ final class RecordedGenerationStartTest {
         () -> manager.startRecordedMigration(KEY, OTHER_SOURCE, FINGERPRINT));
 
     assertThrows(IOException.class,
-        () -> manager.promoteRecordedGenerationToActive(KEY, OTHER_SOURCE, FINGERPRINT, expectedSource));
+        () -> manager.promoteRecordedGenerationToActive(KEY, OTHER_SOURCE, FINGERPRINT,
+            expectedSource, null));
     assertEquals(stateBytes, Files.readString(base.resolve("state.json")),
         "a source mismatch cannot promote or rewrite the state pointer");
     assertEquals(manifestBytes, Files.readString(target.resolve(MANIFEST)));
     assertEquals(sentinelBytes, Files.readString(target.resolve(SENTINEL)));
 
     assertThrows(IOException.class,
-        () -> manager.promoteRecordedGenerationToActive(KEY, SOURCE, OTHER_FINGERPRINT, expectedSource));
+        () -> manager.promoteRecordedGenerationToActive(KEY, SOURCE, OTHER_FINGERPRINT,
+            expectedSource, null));
     assertEquals(stateBytes, Files.readString(base.resolve("state.json")));
     assertEquals(manifestBytes, Files.readString(target.resolve(MANIFEST)));
     assertEquals(sentinelBytes, Files.readString(target.resolve(SENTINEL)));

@@ -179,7 +179,14 @@ report reproduced `dead-code/silent-growth` in the generated barrel and leaf
 parse through the generated public barrel; the dead-code gate, typecheck, all
 27 UI gates and the 491-file/6,602-test UI suite pass on that source
 (`tmp/3520-ui-unit-generated-import.txt`). No baseline changed. New hosted
-proof is due after this correction is pushed.
+proof is due after this correction is pushed. Checkpoint `e6ec2c0a5` then
+completed [hosted run 36092470563](https://github.com/justsearch-app/justsearch/actions/runs/36092470563):
+system integration, build, Windows-native, app-ui and the other unit jobs passed.
+Public claims failed only `contract-projection/consumer-broken`, because its
+declared Library consumer requires a direct generated leaf import while Knip
+requires the public barrel's type export to be consumed. Library now imports
+the schema from the leaf and the type from the barrel. Local `contract-projection`
+and `dead-code` gates both pass; this one-line correction is unpushed WIP.
 
 **Next D1-9 source seam.** Independent read-only refutation rejected seeding
 non-file projections from Blue: the authoritative project-memory store may hold
@@ -188,6 +195,123 @@ the full projection. D1-9 now records registered source enumeration before
 candidate replay, including restart re-enumeration and an unreadable-source
 gap. The existing `switch_buffer` remains the only candidate journal. This is
 a design decision and source review, not implementation or executed proof.
+
+**Uncommitted no-file implementation, 2026-09-25.** A versioned
+`AcceptedProjection` carries stable source/document identity, monotonic source
+revision, UPSERT/DELETE and canonical fields in the existing generation-scoped
+`switch_buffer`. The Worker reserves index identity and exact revision/digest
+fields; the in-process KnowledgeClient port applies an NRT projection on A and
+conditionally journals it for B. `DURABLE` currently refuses pending D2-5's
+covering-commit owner. Source owners may register before Engine start and stream
+their complete live/tombstone set through a bounded sink; a candidate-scoped
+source marker remains in that same journal until source enumeration completes
+and promotion replay certifies it. On resumed BUILDING, source enumeration
+reruns without repeating the file walk. Best-effort candidate replay now retains
+its journal revisions until pointer commitment; its former cleanup could erase
+a DELETE ordering witness before promotion. Focused queue/replay/Worker-port
+tests, `build -x test`, PMD/Spotless, SSOT sync, recoverability and UI contract
+gates pass at `tmp/3510`, `tmp/3522`–`tmp/3524`, `tmp/3526`–`tmp/3534`.
+The affected Worker/Engine suites are still running at `tmp/3535`.
+The affected Indexer Worker and Engine suites then passed at `tmp/3539` after
+the enumerator fixture was corrected. Real A/B candidate replay and a
+SQLite/candidate-writer reopen passed at `tmp/3537`–`tmp/3538`; concurrent
+newer revisions and deletes survived the seed and replay. This remains local
+implementation proof, not installed D1-9 acceptance.
+
+**Pre-marker crash cut and source gap slice, 2026-09-25, uncommitted.**
+An independent refutation found that marker-only recovery could lose a
+registered source if the process died after the generation pointer but before
+marker admission. New v2 bulk and v4 installer preparations freeze sorted,
+bounded source IDs while preserving legacy absent payloads and plan hashes.
+The in-process client projects the registered set through the additive
+MigrationStartRequest, and the Worker writes it to a generation manifest
+strictly before `state.json` names B. Recorded boot compares the accepted plan
+with that manifest; legacy absence cannot replay over a new explicit set.
+The final candidate journal witness names missing/incomplete source markers,
+exact UPSERT revision/digest mismatches and unapplied DELETEs. Registered
+source enumeration on restart may be incomplete for a recorded candidate and
+then enters the existing hash-bound gap wait; native candidates fail closed.
+Focused plan/handler/resolver, Worker-port, real replay and manifest tests
+passed at `tmp/3545`, `tmp/3547`–`tmp/3550`; `tmp/3548` found and corrected
+one PMD qualifier, while the other static checks passed. The first
+`tmp/3544` plan run exposed an old v3 test assuming the automatic decoder
+could not accept legacy v2 shape; the explicit v3-schema refusal assertion
+now preserves the original security intent. Source-set implementation was
+read-only reviewed for the pre-marker cut. The second refute-first review found
+five coupled defects: frozen IDs dropped at recorded promotion and installer
+pointer/settings recovery; v4 refused by the store marker and installer harness;
+source completion reused by a later B; and a pre-replay gap hash which could
+ask approval for healthy journaled projections. The correction carries IDs
+through strict promotion and recovery, keys completion by generation and source,
+allows v4 in the existing marker, and replays before computing a refreshed
+candidate witness. The judgment is replay-first because journal presence is
+not evidence of loss; any accepted incomplete marker remains bound to the
+recomputed full hash. The first broad diagnostic run at `tmp/3553` passed
+app-api, app-services, worker-core and worker-services, then failed two
+indexer-worker mock fixtures lacking candidate manifests; it predated these
+corrections and is not integrated proof. The fixtures now declare legacy
+manifests. Focused promotion, v4 marker, source-lifetime, partial replay,
+Indexer Worker and Engine owner tests pass at `tmp/3554`–`tmp/3559`; the first
+`tmp/3554` run exposed a fixture trying to allocate B while an unretired
+predecessor still occupied capacity, and the first `tmp/3558` run exposed old
+five-argument migration mocks. Both fixtures were corrected to exercise the
+new protocol. Repository Spotless and PMD passed at `tmp/3557` before the
+latest Engine test changes. The requested escalation policy commit
+`57fd2e1aa` was already an ancestor; instruction sync and always-loaded
+budget checks both passed on this branch. This is still not D1-9 acceptance:
+exact-source integrated, installed no-file restart,
+source-gap approval and final-fence races, positive cancel/abandon, and D2-5
+covering durability remain open.
+
+**Exact approved-row correction, 2026-09-25.** The first full serial gate at
+`tmp/3560` stopped at an obsolete unreferenced-method audit; both legacy
+overloads were retired. Focused exact replay and gap-reason regressions passed
+at `tmp/3561`–`tmp/3564`. The first partial-source fixture at `tmp/3565`
+failed on a null mocked Green field reader; its corrected real partial-source
+scenario and the replay classes passed at `tmp/3566`. A full serial gate
+started at `tmp/3567` but was deliberately stopped after independent review
+proved a changed journal row could inherit approval when its visible unit and
+reason stayed the same. The selected correction adds optional immutable row
+evidence to each candidate gap, changes the hash domain only for evidence-
+bearing lists, and retains legacy hashes and safe reason codes. The reviewer
+refuted synthetic unit IDs and reason suffixes because they disturb unit
+reconciliation or the durable reason contract. The canonical gap schema and
+UI projection were regenerated at `tmp/3568`. The first focused run at
+`tmp/3569` exposed released two-field gaps failing the store's strict
+missing-creator-property reader; a local Gap deserializer now preserves strict
+field/type checks while accepting that released shape. Focused API, Engine and
+Worker tests passed at `tmp/3570`; repository Spotless/PMD passed at
+`tmp/3571`, and generated-file/document checks at `tmp/3573` plus the named
+instruction checks passed. The first exact-source full serial gate at
+`tmp/3572` ran 16m16s and failed one of 830 Indexer Worker tests:
+`CutoverRestartEvidenceTest.recordedGapWaitRetainsBlueAndGreenBeyondSwitchingDeadline`.
+Its original XML is retained at `tmp/3572-failure-xml/`. The fixture required
+approval before any call to the live cutover, contradicting D1-9's selected
+replay-first gap discovery. The revised test now observes one or more
+pre-approval replay attempts with no pointer commitment, then retains its
+two approved cutover attempts, late-gap restoration and eventual promotion.
+The focused class passed at `tmp/3577`. The exact-source full serial
+stress, repository Spotless and PMD rerun passed at `tmp/3578` (355 tasks,
+exit 0). UI typecheck passed at `tmp/3575`; its 491 files and 6,602 tests
+passed at `tmp/3576`. Store recoverability (47 rows), UI coverage, module
+dependency, runtime config, schema generation and canonical-doc checks also
+passed. `tmp/3560`, `tmp/3567` and `tmp/3572` remain diagnostic red/stopped
+runs. `build -x test` and `:modules:ui:installDist` passed at `tmp/3579`;
+the installed behavioral results follow, and hosted proof remains due.
+All six fresh installed standard-model cuts, `installer-before-marker`,
+`installer-before-arm`, `installer-before-pointer`,
+`installer-pointer-before-settings`, `installer-settings-before-publication`
+and `installer-before-receipt`, passed at `tmp/3580`–`tmp/3585`: each had one
+counted transient restart, the same operation completed, pointer and settings
+named B, real search found both indexed files, and STOP 0 closed owned ports.
+The no-file source and gap rounds, and hosted proof remain.
+Reusing `tmp/3580`'s retained standard-model A, the fresh installed live
+`model-live-a-b` round passed at `tmp/3586`: A answered a real vector query;
+the named before-SWITCHING hold captured the exact source/building IDs; a
+watcher deletion and accepted write became visible on A; B promoted with
+settings revision 2, ten real vector hits and both accepted effects; STOP 0
+closed owned ports. This proves the installed file-mutation and model path on
+this source, not the still-missing installed non-file source proof.
 
 The recorded gap decision keeps the bulk row nonterminal in
 `COMPLETE_WITH_GAPS`, exposes the current candidate gap-list hash on the outcome

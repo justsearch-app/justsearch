@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -172,9 +173,11 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertEquals(RecordedBulkPlan.Profile.USER_BULK.defaultSource(), call.getArgument(1));
       assertEquals(target.fingerprint(), call.getArgument(2));
       assertEquals(SERVING_GENERATION, call.getArgument(3));
+      assertEquals(List.of(), call.getArgument(4));
       return new IndexingService.MigrationOutcome(true, true, SERVING_GENERATION,
           "g-" + key, "MIGRATING");
-    }).when(indexing).startRecordedMigration(anyString(), anyString(), anyString(), anyString(), any());
+    }).when(indexing).startRecordedMigration(anyString(), anyString(), anyString(), anyString(),
+        any(), any());
 
     String arguments = "{\"corpusIds\":[\"docs\"]}";
     EngineContext origin = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
@@ -293,7 +296,8 @@ final class RecordedBulkIngestionCoordinatorTest {
     assertEquals(acknowledged.revision(), acknowledged.acknowledgedRevision(),
         "The queue-owned inventory must repair terminal-before-ACK after the acknowledgement path recovers");
     assertTrue(queue.unacknowledgedCapturedWalkKeys(null, 1).isEmpty());
-    verify(indexing, times(1)).startRecordedMigration(anyString(), anyString(), anyString(), anyString(), any());
+    verify(indexing, times(1)).startRecordedMigration(anyString(), anyString(), anyString(),
+        anyString(), any(), any());
 
     } finally {
       JobQueue.IndexJob unfinished = unfinishedClaim.get();
@@ -428,10 +432,11 @@ final class RecordedBulkIngestionCoordinatorTest {
           "an attachment without the physical witness fence cannot authorize approval");
       var changedGap = new OperationOutcomeView.Gap("unit:later", "PROJECTION_WITNESS_MISSING");
       var latest = new RecordedIngestionLifecycle.JournalWitness(List.of(lateGap, changedGap), Set.of());
+      var liveWitness = new AtomicReference<>(latest);
       var fenceCalls = new AtomicInteger();
       harness.replacePhysical(buildingRuntime(harness.key), decision -> {
         fenceCalls.incrementAndGet();
-        return decision.apply(latest);
+        return decision.apply(liveWitness.get());
       });
       harness.runtime.set(new RecordedIngestionLifecycle.BulkRuntime(
           IndexGenerationManager.BootDisposition.FENCED, SERVING_GENERATION,
@@ -446,12 +451,56 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertFalse(firstHash.equals(currentHash));
       assertTrue(harness.coordinator.acceptGaps(harness.key, currentHash, webview).success());
       assertEquals(3, fenceCalls.get(), "every decision requires a fresh physical witness");
+      var changedReason = new OperationOutcomeView.Gap("unit:candidate",
+          "PROJECTION_DELETE_NOT_APPLIED");
+      liveWitness.set(new RecordedIngestionLifecycle.JournalWitness(
+          List.of(changedReason, changedGap), Set.of()));
+      OperationResult staleReason = harness.coordinator.acceptGaps(harness.key, currentHash, webview);
+      assertFalse(staleReason.success(), "approval of one reason cannot authorize a different loss");
+      assertEquals("GAP_LIST_STALE", staleReason.errorCode().orElseThrow());
+      String reasonHash = harness.operations.outcome(harness.key).result().gapListHash();
+      assertFalse(currentHash.equals(reasonHash));
+      assertTrue(harness.coordinator.acceptGaps(harness.key, reasonHash, webview).success());
       harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
       harness.coordinator.maintain();
       OperationRecord terminal = harness.operations.find(harness.key).orElseThrow();
       assertEquals(OperationState.FAILED, terminal.state());
       assertEquals("PROMOTED_WITH_GAPS", terminal.receipt().code(),
           "candidate-only approved gaps must not finish as full success");
+    }
+  }
+
+  @Test
+  void replacedCandidateRowWithSameUnitAndReasonRevokesGapApproval() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("replacement-gap-evidence"))) {
+      harness.completeOneCapturedClaim();
+      var first = new OperationOutcomeView.Gap("unit:candidate", "CANDIDATE_PROJECTION_MISSING",
+          "1".repeat(64));
+      var live = new AtomicReference<>(new RecordedIngestionLifecycle.JournalWitness(
+          List.of(first), Set.of()));
+      harness.replacePhysical(buildingRuntime(harness.key), decision -> decision.apply(live.get()));
+      assertEquals(RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE,
+          harness.coordinator.recordedGapDecision(harness.key, live.get()));
+      String firstHash = harness.operations.outcome(harness.key).result().gapListHash();
+      EngineContext webview = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "gap-owner", Optional.of("bulk-session"), Optional.empty(), TransportTag.BUTTON,
+          EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+      assertTrue(harness.coordinator.acceptGaps(harness.key, firstHash, webview).success());
+      assertEquals(RecordedIngestionLifecycle.GapDecision.ACCEPTED,
+          harness.coordinator.recordedGapDecision(harness.key, live.get()));
+
+      var replacement = new OperationOutcomeView.Gap(first.unitId(), first.reason(),
+          "2".repeat(64));
+      live.set(new RecordedIngestionLifecycle.JournalWitness(List.of(replacement), Set.of()));
+      assertEquals(RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE,
+          harness.coordinator.recordedGapDecision(harness.key, live.get()));
+      String replacementHash = harness.operations.outcome(harness.key).result().gapListHash();
+      assertNotEquals(firstHash, replacementHash);
+      assertEquals("GAP_LIST_STALE", harness.coordinator.acceptGaps(harness.key, firstHash,
+          webview).errorCode().orElseThrow());
+      assertTrue(harness.coordinator.acceptGaps(harness.key, replacementHash, webview).success());
+      assertEquals(RecordedIngestionLifecycle.GapDecision.ACCEPTED,
+          harness.coordinator.recordedGapDecision(harness.key, live.get()));
     }
   }
 
@@ -983,9 +1032,11 @@ final class RecordedBulkIngestionCoordinatorTest {
         assertEquals(RecordedBulkPlan.Profile.USER_BULK.defaultSource(), call.getArgument(1));
         assertEquals(target.fingerprint(), call.getArgument(2));
         assertEquals(SERVING_GENERATION, call.getArgument(3));
+        assertEquals(List.of(), call.getArgument(4));
         return new IndexingService.MigrationOutcome(true, true, SERVING_GENERATION,
             "g-" + operationKey, "MIGRATING");
-      }).when(indexing).startRecordedMigration(anyString(), anyString(), anyString(), anyString(), any());
+      }).when(indexing).startRecordedMigration(anyString(), anyString(), anyString(),
+          anyString(), any(), any());
       bindBulkProducer();
     }
 

@@ -24,6 +24,13 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public io.justsearch.app.api.indexing.ProjectionReceipt applyProjection(
+      io.justsearch.app.api.indexing.AcceptedProjection projection,
+      io.justsearch.app.api.indexing.ProjectionDurability durability) {
+    return service.applyProjection(projection, durability, ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.BatchResponse submitBatch(io.justsearch.ipc.BatchRequest request) {
     return service.submitBatch(request, ctx);
   }

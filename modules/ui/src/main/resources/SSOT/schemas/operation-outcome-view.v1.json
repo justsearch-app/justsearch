@@ -34,6 +34,9 @@
           "items" : {
             "type" : "object",
             "properties" : {
+              "evidenceId" : {
+                "type" : "string"
+              },
               "reason" : {
                 "type" : "string"
               },

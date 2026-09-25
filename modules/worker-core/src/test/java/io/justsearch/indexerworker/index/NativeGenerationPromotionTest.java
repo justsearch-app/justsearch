@@ -8,11 +8,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 final class NativeGenerationPromotionTest {
   @TempDir Path temp;
+
+  @Test
+  void nativeCandidatePersistsExplicitSourceSetBeforePointer() throws Exception {
+    Path base = temp.resolve("source-set");
+    var manager = new IndexGenerationManager(base);
+    String blue = manager.initializeOrLoad().state().active_generation();
+    var created = manager.startMigration("manual", List.of("source-b", "source-a"));
+    var reopened = new IndexGenerationManager(base);
+    assertEquals(blue, reopened.readStateBestEffort().active_generation());
+    assertEquals(created.building_generation(), reopened.readStateBestEffort().building_generation());
+    assertEquals(List.of("source-a", "source-b"), reopened.manifestForOwnedPath(
+        reopened.resolveGenerationPathStrict(created.building_generation())).projection_source_ids());
+  }
 
   @Test
   void commitsOnlyTheExactLiveSourceAndBuildingPair() throws Exception {

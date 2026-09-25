@@ -161,6 +161,30 @@ public final class EngineRoot implements WorkerHost {
 
   private volatile KnowledgeServer server;
   private volatile EngineKnowledgeClient client;
+  private final java.util.List<io.justsearch.app.api.indexing.ProjectionSeedSource>
+      projectionSeedSources = new java.util.ArrayList<>();
+
+  /** Bind a source owner before the index half can resume or create a candidate. */
+  public synchronized void registerProjectionSeedSource(
+      io.justsearch.app.api.indexing.ProjectionSeedSource source) {
+    if (server != null || client != null) {
+      throw new IllegalStateException("Projection seed source registration must precede Engine start");
+    }
+    Objects.requireNonNull(source, "source");
+    String sourceId = source.sourceId();
+    if (projectionSeedSources.stream().anyMatch(existing ->
+        existing.sourceId().equals(sourceId))) {
+      throw new IllegalArgumentException("Duplicate projection source identity");
+    }
+    if (sourceId == null || sourceId.isBlank() || sourceId.length() > 256
+        || sourceId.chars().anyMatch(Character::isISOControl)
+        || projectionSeedSources.size() >= 64
+        || projectionSeedSources.stream().mapToInt(existing -> existing.sourceId().length()).sum()
+            + sourceId.length() > 4096) {
+      throw new IllegalArgumentException("Projection source identity must be bounded");
+    }
+    projectionSeedSources.add(source);
+  }
 
   /**
    * Creates an embedded composition. A caller that can encounter terminal writer faults must own
@@ -376,6 +400,7 @@ public final class EngineRoot implements WorkerHost {
         failure -> acceptTerminalWriterFailure(started, failure));
     started.onMigrationRestart(() -> requestRestart(started));
     try {
+      started.installProjectionSeedSources(projectionSeedSources);
       started.start();
     } catch (IOException | RuntimeException | Error failure) {
       // A failed start may also have failed cleanup. Retain that physical owner until its
@@ -403,6 +428,9 @@ public final class EngineRoot implements WorkerHost {
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
             () -> requestRestart(started), admission, authority.roots(),
             started::captureServingView);
+    built.bindProjectionSourceIds(projectionSeedSources.stream()
+        .map(io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId)
+        .sorted().toList());
     this.client = built;
     try {
       recordedIngestion.bindProducer(built::enumerateRecordedRoot);

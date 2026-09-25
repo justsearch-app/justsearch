@@ -61,6 +61,14 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     throw new UnsupportedOperationException("Generation-scoped switch-buffer writes are unavailable");
   }
 
+  /** Source revision is distinct from the random replacement token used for conditional cleanup. */
+  enum ProjectionAdmission { ACCEPTED, DUPLICATE, STALE, CONFLICT }
+
+  /** Atomically retains the latest accepted no-file projection or delete for one candidate. */
+  default ProjectionAdmission admitProjectionForGeneration(String generation, String payload) {
+    throw new UnsupportedOperationException("Generation-scoped projection admission is unavailable");
+  }
+
   /**
    * Atomically accepts one file job and its generation-scoped UPSERT journal row.
    *

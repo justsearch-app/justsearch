@@ -747,6 +747,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public ProjectionAdmission admitProjectionForGeneration(String generation, String payload) {
+    var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(payload);
+    lock.lock();
+    try {
+      ensureOpen();
+      return inTransaction(() -> switchBufferOps.admitProjectionInTransaction(
+          connection, generation, projection));
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException("Generation-scoped projection admission failed", failure);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public boolean putSyncRoot(String key, SwitchBufferSyncRoot payload) {
     return switchBufferOps.putSyncRoot(key, payload);
   }

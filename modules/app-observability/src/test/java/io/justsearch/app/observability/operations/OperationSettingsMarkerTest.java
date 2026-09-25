@@ -145,6 +145,28 @@ class OperationSettingsMarkerTest {
   }
 
   @Test
+  void installerV4SettingsMarkerSurvivesReopen() throws Exception {
+    Path path = directory.resolve("installer-v4-operations.db");
+    String key = OperationKeys.generate(CLOCK);
+    var activation = new OperationDescriptor(OperationKind.REINDEX,
+        "core.activate-installed-models", "{}");
+    var prepared = new OperationStore.Preparation(UUID.randomUUID(), new OperationPreparedPayload(false,
+        "{\"preparation\":{\"replaySchema\":\"recorded-installer-generation-v4\"}}"));
+    try (var store = new SqliteOperationStore(path)) {
+      store.savePreparation(key, activation, prepared);
+      var row = store.acceptPrepared(key, activation, CONTEXT, null, prepared.nonce()).record();
+      store.start(row.id());
+      assertTrue(store.armInstallerGenerationSettingsRevision(row.id(), 7));
+    }
+    try (var reopened = new SqliteOperationStore(path)) {
+      var row = reopened.find(key).orElseThrow();
+      assertEquals(7L, row.expectedSettingsRevision());
+      assertTrue(reopened.armInstallerGenerationSettingsRevision(row.id(), 7));
+      assertFalse(reopened.armInstallerGenerationSettingsRevision(row.id(), 8));
+    }
+  }
+
+  @Test
   void concurrentMarkersHaveOneWinnerAndFailedWriteLeavesNull() throws Exception {
     Path path = directory.resolve("operations.db");
     try (var store = new SqliteOperationStore(path);

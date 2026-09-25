@@ -48,7 +48,7 @@ final class RecordedInstallerGenerationPlanTest {
     assertEquals(plan.planHash(), restored.planHash());
     assertEquals("core.activate-installed-models", restored.operationId());
     assertEquals("installer_model_activation", restored.source());
-    assertEquals(RecordedInstallerGenerationPlan.SCHEMA, restored.replaySchema());
+    assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V3, restored.replaySchema());
     assertEquals(RecordedInstallerGenerationPlan.ChatSelection.none(), restored.chatSelection());
     assertThrows(UnsupportedOperationException.class, () -> restored.models().clear());
   }
@@ -76,6 +76,7 @@ final class RecordedInstallerGenerationPlanTest {
     assertThrows(IllegalArgumentException.class, () -> RecordedInstallerGenerationPlan.fromReplayPayload(
         valid.replace("\"source\":\"installer_model_activation\",", "")));
     assertThrows(IllegalArgumentException.class, () -> RecordedInstallerGenerationPlan.fromReplayPayload(
+        RecordedInstallerGenerationPlan.SCHEMA,
         valid.replace("\"chatSelection\":{\"companionAssetIds\":[],\"modelAssetId\":null},", "")));
     assertThrows(IllegalArgumentException.class, () -> RecordedInstallerGenerationPlan.fromReplayPayload(
         valid.replace("\"companionAssetIds\":[]", "\"companionAssetIds\":[],\"unexpected\":true")));
@@ -101,7 +102,7 @@ final class RecordedInstallerGenerationPlanTest {
     assertTrue(restored.chatSelection().selected());
     assertEquals("chat/model", restored.chatSelection().modelAssetId());
     assertEquals(List.of("chat/tokenizer"), restored.chatSelection().companionAssetIds());
-    assertEquals(RecordedInstallerGenerationPlan.SCHEMA, restored.replaySchema());
+    assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V3, restored.replaySchema());
 
     var none = new RecordedInstallerGenerationPlan(key(), "g1", scope(), target(), witness(),
         candidateWithChat(chatPath), List.of(model("embedding")), List.of(asset("embedding")),
@@ -131,6 +132,49 @@ final class RecordedInstallerGenerationPlanTest {
         List.of(model("embedding")), assets,
         RecordedInstallerGenerationPlan.ChatSelection.selected(
             "chat/model", List.of("chat/missing-companion")), provenance()));
+  }
+
+  @Test
+  void v4FreezesSortedSourceOwnersAndDistinguishesLegacyAbsentFromExplicitEmpty() {
+    var withSources = new RecordedInstallerGenerationPlan(key(), "g1", scope(), target(), witness(),
+        candidate(), List.of(model("embedding")), List.of(asset("embedding")),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance(), List.of("zeta", "alpha"));
+
+    assertEquals(RecordedInstallerGenerationPlan.SCHEMA_V4, withSources.replaySchema());
+    assertEquals(List.of("alpha", "zeta"), withSources.projectionSourceIds());
+    var restored = RecordedInstallerGenerationPlan.fromReplayPayload(
+        withSources.replaySchema(), withSources.toReplayPayload());
+    assertEquals(withSources, restored);
+    assertTrue(withSources.toReplayPayload().contains("\"projectionSourceIds\":[\"alpha\",\"zeta\"]"));
+
+    var explicitEmpty = new RecordedInstallerGenerationPlan(key(), "g1", scope(), target(), witness(),
+        candidate(), List.of(model("embedding")), List.of(asset("embedding")),
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance(), List.of());
+    assertEquals(RecordedInstallerGenerationPlan.SCHEMA_V4, explicitEmpty.replaySchema());
+    assertEquals(List.of(), RecordedInstallerGenerationPlan.fromReplayPayload(
+        explicitEmpty.replaySchema(), explicitEmpty.toReplayPayload()).projectionSourceIds());
+
+    var legacy = RecordedInstallerGenerationPlan.fromReplayPayload(plan().toReplayPayload());
+    assertEquals(RecordedInstallerGenerationPlan.LEGACY_SCHEMA_V3, legacy.replaySchema());
+    assertNull(legacy.projectionSourceIds());
+    assertFalse(legacy.toReplayPayload().contains("projectionSourceIds"));
+  }
+
+  @Test
+  void v4RejectsUnboundedDuplicateAndControlCharacterSourceOwners() {
+    assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
+        key(), "g1", scope(), target(), witness(), candidate(), List.of(model("embedding")),
+        List.of(asset("embedding")), RecordedInstallerGenerationPlan.ChatSelection.none(),
+        provenance(), List.of("same", "same")));
+    assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
+        key(), "g1", scope(), target(), witness(), candidate(), List.of(model("embedding")),
+        List.of(asset("embedding")), RecordedInstallerGenerationPlan.ChatSelection.none(),
+        provenance(), List.of("bad\nsource")));
+    assertThrows(IllegalArgumentException.class, () -> new RecordedInstallerGenerationPlan(
+        key(), "g1", scope(), target(), witness(), candidate(), List.of(model("embedding")),
+        List.of(asset("embedding")), RecordedInstallerGenerationPlan.ChatSelection.none(),
+        provenance(), java.util.Collections.nCopies(
+            RecordedInstallerGenerationPlan.MAX_PROJECTION_SOURCE_IDS + 1, "source")));
   }
 
   @Test

@@ -32,28 +32,42 @@ final class MigrationOps {
         this.rpc = Objects.requireNonNull(rpc, "rpc");
     }
 
-    MigrationOutcome startMigration(String reason, EngineContext engineContext) {
+    MigrationOutcome startMigration(String reason, java.util.List<String> projectionSourceIds,
+            EngineContext engineContext) {
         return startMigration(
                     MigrationStartRequest.newBuilder()
                             .setReason(reason == null ? "" : reason)
                             .setRestartWorker(true)
+                            .addAllProjectionSourceIds(projectionSourceIds)
+                            .setProjectionSourceIdsPresent(true)
                             .build(), engineContext);
     }
 
     MigrationOutcome startRecordedMigration(String operationKey, String reason,
             String targetIndexFingerprint, String expectedSourceGeneration, EngineContext engineContext) {
+        return startRecordedMigration(operationKey, reason, targetIndexFingerprint,
+                expectedSourceGeneration, null, engineContext);
+    }
+
+    MigrationOutcome startRecordedMigration(String operationKey, String reason,
+            String targetIndexFingerprint, String expectedSourceGeneration,
+            java.util.List<String> projectionSourceIds, EngineContext engineContext) {
         if (operationKey == null || operationKey.isEmpty()
                 || targetIndexFingerprint == null || targetIndexFingerprint.isEmpty()
                 || expectedSourceGeneration == null || expectedSourceGeneration.isBlank()) {
             return new MigrationOutcome(false, false);
         }
-        return startMigration(MigrationStartRequest.newBuilder()
+        var request = MigrationStartRequest.newBuilder()
                 .setReason(reason == null ? "" : reason)
                 .setRestartWorker(true)
                 .setRecordedOperationKey(operationKey)
                 .setTargetIndexFingerprint(targetIndexFingerprint)
-                .setExpectedSourceGeneration(expectedSourceGeneration)
-                .build(), engineContext);
+                .setExpectedSourceGeneration(expectedSourceGeneration);
+        if (projectionSourceIds != null) {
+            request.addAllProjectionSourceIds(projectionSourceIds)
+                    .setProjectionSourceIdsPresent(true);
+        }
+        return startMigration(request.build(), engineContext);
     }
 
     private MigrationOutcome startMigration(MigrationStartRequest req, EngineContext engineContext) {
