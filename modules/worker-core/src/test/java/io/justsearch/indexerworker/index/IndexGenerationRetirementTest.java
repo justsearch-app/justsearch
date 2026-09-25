@@ -42,13 +42,59 @@ final class IndexGenerationRetirementTest {
     Files.delete(marked.resolve(".justsearch-generation.sentinel"));
     Files.delete(marked.resolve(".justsearch-index-generation.json"));
     Files.writeString(marked.resolve("segments_locked-on-first-delete"), "retry payload");
+    assertFalse(manager.refusedRecordedGenerationRetired(KEY, active));
 
     manager.retireRefusedRecordedGeneration(KEY, active);
 
+    assertTrue(manager.refusedRecordedGenerationRetired(KEY, active));
+    assertNull(manager.readStateBestEffort().previous_generation(),
+        "a deleted refused B must release its stale A alias before another build");
     assertFalse(Files.exists(marked));
     assertEquals(1, generationDirectoryCount(base));
+    assertEquals(IndexGenerationManager.recordedGenerationId(NEXT_KEY),
+        manager.startRecordedMigration(NEXT_KEY, SOURCE, FINGERPRINT, active, List.of())
+            .building_generation());
     assertThrows(IOException.class,
         () -> manager.retireRefusedRecordedGeneration(KEY, "g-wrong-source"));
+  }
+
+  @Test
+  void refusedRetirementRetriesAfterDeletionBeforeAliasPointerClear() throws Exception {
+    Path base = temp.resolve("refused-deleted-before-pointer");
+    IndexGenerationManager manager = new IndexGenerationManager(base);
+    String active = manager.initializeOrLoad().activeGenerationId();
+    manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, active, List.of());
+    manager.abandonBuildingGeneration("injected deletion-before-alias-clear cut");
+    manager.pruneMarkedForDeletionBestEffort();
+    assertEquals(1, generationDirectoryCount(base));
+    assertEquals(active, manager.readStateBestEffort().previous_generation());
+
+    new IndexGenerationManager(base).retireRefusedRecordedGeneration(KEY, active);
+
+    assertNull(manager.readStateBestEffort().previous_generation());
+    assertTrue(manager.refusedRecordedGenerationRetired(KEY, active));
+  }
+
+  @Test
+  void refusedRetirementCertifiesAmbiguousPostMoveAliasClear() throws Exception {
+    Path base = temp.resolve("refused-alias-post-move");
+    IndexGenerationManager manager = new IndexGenerationManager(base);
+    String active = manager.initializeOrLoad().activeGenerationId();
+    manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, active, List.of());
+    manager.abandonBuildingGeneration("injected alias post-move cut");
+    AtomicBoolean injected = new AtomicBoolean();
+    IndexGenerationManager ambiguous = new IndexGenerationManager(base, state -> {
+      if (state.previous_generation() == null && active.equals(state.active_generation())
+          && injected.compareAndSet(false, true)) {
+        throw new IOException("injected after durable alias-pointer move");
+      }
+    });
+
+    ambiguous.retireRefusedRecordedGeneration(KEY, active);
+
+    assertTrue(injected.get());
+    assertTrue(ambiguous.refusedRecordedGenerationRetired(KEY, active));
+    assertNull(manager.readStateBestEffort().previous_generation());
   }
 
   @Test

@@ -156,6 +156,12 @@ public interface RecordedIngestionLifecycle {
   @FunctionalInterface
   interface CheckedBulkRuntime {
     Optional<BulkRuntime> current() throws IOException;
+
+    /** Exact physical and journal witness for a durably refused pre-pointer candidate. */
+    default boolean refusalCleanupComplete(String operationKey, String sourceGeneration)
+        throws IOException {
+      return false;
+    }
   }
 
   default Attachment attach(JobQueue queue, CheckedServingGeneration currentServingGeneration,

@@ -1504,7 +1504,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return new Reconciliation.CheckpointBulkAndWait(progress.withRefusal(reason));
     }
     reason = progress.refusalCode();
-    if (found.isEmpty()) return bulkRefusalDecision(reason);
+    if (found.isEmpty()) return refusalCleanupComplete(row.key(), plan, physical)
+        ? bulkRefusalDecision(reason) : new Reconciliation.Wait();
     var walk = found.orElseThrow();
     if (!walk.capturedPlan() || !walk.planHash().equals(plan.planHash())) {
       return failed(RecordedIngestionSettlement.UNAVAILABLE);
@@ -1530,7 +1531,18 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
       requireBulkSettlement(row, plan, physical, progress);
     }
-    return bulkRefusalDecision(reason);
+    return refusalCleanupComplete(row.key(), plan, physical)
+        ? bulkRefusalDecision(reason) : new Reconciliation.Wait();
+  }
+
+  private boolean refusalCleanupComplete(String operationKey, RecordedGenerationPlan plan,
+      Attached physical) {
+    try {
+      return physical.bulkRuntime.refusalCleanupComplete(operationKey, plan.scope().generation());
+    } catch (IOException unavailable) {
+      log.warn("Recorded refusal still awaits its exact Worker cleanup witness", unavailable);
+      return false;
+    }
   }
 
   private static Reconciliation bulkRefusalDecision(String reason) {
@@ -1868,6 +1880,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (bulkProgress(bulk).phase() != BulkReindexProgress.Phase.CAPTURING
           && !checkpointBulkSettlement(bulk, physical)) return;
     }
+    if (!refusalCleanupComplete(bulk.row.key(), bulk.plan, physical)) return;
     finish(bulk.completion, new OperationReceipt(reason, null));
   }
 

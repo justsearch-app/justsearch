@@ -1511,8 +1511,33 @@ public final class KnowledgeServer implements Closeable {
     currentRecordedServingGeneration();
     recordedIngestionAttachment = Objects.requireNonNull(recordedIngestionLifecycle.attach(
         jobQueue, this::currentRecordedServingGeneration, this::recordedWorkerOnline,
-        this::currentRecordedBulkRuntime, this::withCandidateGapAcceptanceFence),
+        new RecordedIngestionLifecycle.CheckedBulkRuntime() {
+          @Override public java.util.Optional<RecordedIngestionLifecycle.BulkRuntime> current()
+              throws IOException {
+            return currentRecordedBulkRuntime();
+          }
+
+          @Override public boolean refusalCleanupComplete(String operationKey,
+              String sourceGeneration) throws IOException {
+            return refusedRecordedCleanupComplete(operationKey, sourceGeneration);
+          }
+        }, this::withCandidateGapAcceptanceFence),
         "recorded ingestion attachment");
+  }
+
+  private boolean refusedRecordedCleanupComplete(String operationKey, String sourceGeneration)
+      throws IOException {
+    if (closeStarted
+        || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+        || !recorded.operationKey().equals(operationKey)
+        || !recorded.sourceGeneration().equals(sourceGeneration)
+        || !recordedCandidatePrecommitRefused()
+        || !(jobQueue instanceof SwitchBufferCapableQueue journal)
+        || !journal.listSwitchBufferOpsStrictForGeneration(
+            IndexGenerationManager.recordedGenerationId(operationKey)).isEmpty()) {
+      return false;
+    }
+    return indexGenerationManager.refusedRecordedGenerationRetired(operationKey, sourceGeneration);
   }
 
   java.util.Optional<String> currentRecordedServingGeneration() throws IOException {
@@ -4837,6 +4862,7 @@ public final class KnowledgeServer implements Closeable {
       runtimeSwapLock.unlock();
     }
     if (restart) {
+      notifyRecordedServicesPublished();
       migrationRestartAction.run();
     }
   }

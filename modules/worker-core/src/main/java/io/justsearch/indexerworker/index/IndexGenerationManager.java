@@ -980,19 +980,60 @@ public final class IndexGenerationManager {
     try (var ignored = stateControl()) {
       String target = recordedGenerationId(operationKey);
       String source = requireSafeGenerationId(sourceGeneration, "recorded source generation");
-      State state = strictBootLayout(readRecordedState()).state();
-      if (!source.equals(state.active_generation())
-          || state.building_generation() != null
-          || !MigrationState.IDLE.name().equals(state.migration_state())
-          || state.previous_generation() != null
-              && !source.equals(state.previous_generation())
-          || protectedGenerationIds(state).contains(target)) {
-        throw new IOException("Refused recorded target is still protected or its source changed");
-      }
+      State current = requireRefusedRecordedRetirementState(target, source);
       // The durable operation key binds the exact target even after state.json lost its building
       // pointer. A partial marked directory can be retried after Windows refused one payload file.
       deleteExactRetiredRepresentation(target, true);
+      if (current.previous_generation() == null) return;
+      // The recorded build used A as its previous pointer, although it never promoted. Release
+      // that alias only after B is physically absent, or a fresh candidate sees false capacity.
+      State released = new State(STATE_FORMAT_VERSION, source, null, null,
+          MigrationState.IDLE.name(), current.migration_paused(), current.pause_reason(),
+          current.paused_at_ms(), System.currentTimeMillis(), current.auto_rebuild_key(),
+          current.auto_rebuild_count(), current.auto_rebuild_first_ms());
+      try {
+        writeState(released);
+      } catch (IOException ambiguous) {
+        try {
+          State observed = requireRefusedRecordedRetirementState(target, source);
+          if (observed.previous_generation() == null
+              && exactRetirementRepresentations(target, true).isEmpty()) return;
+        } catch (IOException unresolved) {
+          ambiguous.addSuppressed(unresolved);
+        }
+        throw ambiguous;
+      }
     }
+  }
+
+  /** Read-only completion witness for the operation owner; no broad GC scan or second marker. */
+  public boolean refusedRecordedGenerationRetired(String operationKey, String sourceGeneration)
+      throws IOException {
+    try (var ignored = stateControl()) {
+      String target = recordedGenerationId(operationKey);
+      String source = requireSafeGenerationId(sourceGeneration, "recorded source generation");
+      State state = strictBootLayout(readRecordedState()).state();
+      if (source.equals(state.active_generation()) && target.equals(state.building_generation())) {
+        return false;
+      }
+      State retirement = requireRefusedRecordedRetirementState(target, source);
+      return retirement.previous_generation() == null
+          && exactRetirementRepresentations(target, true).isEmpty();
+    }
+  }
+
+  private State requireRefusedRecordedRetirementState(String target, String source)
+      throws IOException {
+    State state = strictBootLayout(readRecordedState()).state();
+    if (!source.equals(state.active_generation())
+        || state.building_generation() != null
+        || !MigrationState.IDLE.name().equals(state.migration_state())
+        || state.previous_generation() != null
+            && !source.equals(state.previous_generation())
+        || protectedGenerationIds(state).contains(target)) {
+      throw new IOException("Refused recorded target is still protected or its source changed");
+    }
+    return state;
   }
 
   /** Sets operator pause intent for migration orchestration (best-effort). */

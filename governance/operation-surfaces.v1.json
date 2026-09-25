@@ -945,6 +945,33 @@
       "guard": "test:RecordedIngestionCoordinatorTest",
       "consumesProjection": "operation-record-type",
       "note": "C2-9b.3b.3 stable Engine owner coordinates existing runner attempts and queue receipts, retaining admission through actual terminal persistence and fencing claims across cancellation, recovery and physical replacement. It introduces no terminal writer or durable authority."
+    },
+    {
+      "id": "recorded-gap-acceptance-plan-resolver",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/RecordedGapAcceptancePlanResolver.java",
+      "guard": "test:RecordedBulkIngestionCoordinatorTest",
+      "consumesProjection": "operation-record-type",
+      "note": "D1-11 decodes the accepted gap decision from the existing operation row and preparation. It creates no independent approval or terminal state."
+    },
+    {
+      "id": "recorded-worker-gap-contract",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/RecordedIngestionLifecycle.java",
+      "guard": "test:KnowledgeServerRecordedIngestionTest",
+      "consumesProjection": "operation-outcome-view",
+      "note": "D1-9 carries a bounded Worker journal witness in the existing outcome gap wire shape to the Engine coordinator; it owns no operation row or approval decision."
+    },
+    {
+      "id": "recorded-worker-gap-producer",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "guard": "test:KnowledgeServerRecordedIngestionTest",
+      "consumesProjection": "recorded-worker-gap-contract",
+      "note": "D1-9 computes exact candidate gap evidence from the Worker journal and Lucene owner, then supplies it to the recorded coordinator. Operations.db and its runner remain the only approval and terminal writers."
     }
   ]
 }

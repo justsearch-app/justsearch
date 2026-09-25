@@ -16,6 +16,7 @@ public record AcceptedProjection(
     String sourceId, String documentId, long sourceRevision, Kind kind, String fieldsJson) {
   private static final ObjectMapper JSON = JsonMapper.builder().build();
   private static final int PAYLOAD_VERSION = 1;
+  private static final String INDEX_ID_PREFIX = "projection:";
 
   public enum Kind { UPSERT, DELETE }
 
@@ -87,7 +88,12 @@ public record AcceptedProjection(
 
   /** A key cannot collide with the existing file path namespace. */
   public String journalKey() {
-    return "projection:" + sourceId.length() + ":" + sourceId + ":" + documentId;
+    return INDEX_ID_PREFIX + sourceId.length() + ":" + sourceId + ":" + documentId;
+  }
+
+  /** Reserved namespace; a projection index ID is never a filesystem path identity. */
+  public static boolean isProjectionIndexId(String documentId) {
+    return documentId != null && documentId.startsWith(INDEX_ID_PREFIX);
   }
 
   /** The Worker reserves this namespace for no-file documents in every generation. */

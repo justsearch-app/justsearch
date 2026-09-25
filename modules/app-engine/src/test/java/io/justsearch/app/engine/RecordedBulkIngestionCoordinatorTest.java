@@ -747,6 +747,30 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void refusedBulkRetainsDurableIdentityUntilWorkerWitnessesCandidateRetirement()
+      throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("refusal-retirement-crash-cut"))) {
+      harness.refusalCleanupComplete.set(false);
+      harness.cancellableWork.get().cancel("cancel before physical retirement");
+
+      assertEquals(OperationState.RUNNING, harness.operations.find(harness.key).orElseThrow().state());
+      assertEquals("cancelled", harness.progress().refusalCode());
+      var ownership = assertInstanceOf(IndexGenerationManager.BootOwnership.Recorded.class,
+          harness.coordinator.bootOwnership(harness.queue));
+      assertFalse(ownership.continuationAuthorized());
+      harness.reopen();
+      assertEquals(OperationState.RUNNING, harness.operations.find(harness.key).orElseThrow().state(),
+          "a process restart must retain the refused operation key while B is capacity owning");
+
+      harness.refusalCleanupComplete.set(true);
+      harness.coordinator.maintain();
+      assertEquals(OperationState.CANCELLED,
+          harness.operations.find(harness.key).orElseThrow().state());
+      assertAcknowledged(harness.queue, harness.key);
+    }
+  }
+
+  @Test
   void cancellationWithNoIssuedClaimsFinishesWithoutAnExternalQueueEventAndRetriesRefusalRestartOnce()
       throws Exception {
     try (var harness = new BulkHarness(temp.resolve("cancel-no-issued-claims"))) {
@@ -920,6 +944,7 @@ final class RecordedBulkIngestionCoordinatorTest {
     final AtomicReference<EngineWorkHandle.Registration> cancellationSignal = new AtomicReference<>();
     final CountDownLatch cancellationPublished = new CountDownLatch(1);
     final AtomicBoolean failRetirement = new AtomicBoolean();
+    final AtomicBoolean refusalCleanupComplete = new AtomicBoolean(true);
     final AtomicBoolean rejectAcknowledgement = new AtomicBoolean();
     final AtomicBoolean failFinishAfterRefusal = new AtomicBoolean();
     final AtomicBoolean failRefusalRestartOnce = new AtomicBoolean();
@@ -1020,7 +1045,7 @@ final class RecordedBulkIngestionCoordinatorTest {
             "a durable cancellation marker fences a precommit rebuild while retaining pointer identity");
       }
       attachment = coordinator.attach(queue, () -> Optional.of(SERVING_GENERATION), () -> true,
-          () -> Optional.of(runtime.get()));
+          checkedRuntime());
       indexing = mock(IndexingService.class);
       when(indexing.captureServingGeneration(any())).thenReturn(SERVING_GENERATION);
       when(indexing.captureRebuildGeneration(any())).thenReturn(SERVING_GENERATION);
@@ -1168,8 +1193,22 @@ final class RecordedBulkIngestionCoordinatorTest {
       attachment.close();
       runtime.set(replacementRuntime);
       attachment = coordinator.attach(queue, () -> Optional.of(SERVING_GENERATION), () -> true,
-          () -> Optional.of(runtime.get()), gapAcceptance);
+          checkedRuntime(), gapAcceptance);
       bindBulkProducer();
+    }
+
+    private RecordedIngestionLifecycle.CheckedBulkRuntime checkedRuntime() {
+      return new RecordedIngestionLifecycle.CheckedBulkRuntime() {
+        @Override public Optional<RecordedIngestionLifecycle.BulkRuntime> current() {
+          return Optional.of(runtime.get());
+        }
+
+        @Override public boolean refusalCleanupComplete(String operationKey,
+            String sourceGeneration) {
+          return operationKey.equals(key) && SERVING_GENERATION.equals(sourceGeneration)
+              && refusalCleanupComplete.get();
+        }
+      };
     }
 
     BulkReindexProgress progress() {

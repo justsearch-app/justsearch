@@ -354,7 +354,67 @@ checkpoint and has zero commits ahead of the branch, so no merge was needed.
 Terminal refusal can currently precede physical retirement in the coordinator;
 if that happens before a process crash, `openRecords()` loses the operation
 key and the next boot may classify an orphan as Native/FENCED. This is the
-next D1-9 crash-ordering correction, not a completed recovery claim.
+next D1-9 crash-ordering correction, not a completed recovery claim. That
+checkpoint was committed and pushed as `f2503e7ce` to PR727; hosted
+[CI 36110298622](https://github.com/justsearch-app/justsearch/actions/runs/36110298622)
+is still running. Do not push the following local correction until it finishes.
+
+The local follow-on keeps a durable refused bulk row open until Worker's
+existing attachment reports exact B absent and the B-scoped journal empty.
+The caller still observes immediate cancellation. The first Engine fixture
+run (`tmp/3608`, XML preserved in `tmp/3608-failure-xml/`) reproduced five
+old tests that assumed cleanup had already happened; its physical witness
+fixture and a new crash/reopen negative passed all 16 focused tests at
+`tmp/3609`. Worker/Core proof initially failed because the exact manager
+witness threw while B was still the building pointer (`tmp/3610`, XML
+preserved); it now returns incomplete for that state. Focused real Worker
+boot and exact-retirement tests pass at `tmp/3611`, and Spotless/PMD pass at
+`tmp/3612`. The full serial stress gate passed at `tmp/3613`: 196 tasks,
+eight executed, 188 up-to-date, in 21m 7s. A subsequent exact manager test
+reproduced the stale `previous_generation=A` alias after B deletion, which
+blocked the next recorded candidate (`tmp/3617`, XML preserved). Exact
+retirement now clears that alias only after B's original and marked
+representations are absent, and certifies ambiguous post-move pointer writes.
+The focused capacity regression and both pointer crash cuts pass at
+`tmp/3619`–`tmp/3620`; `tmp/3618` was a transient duplicate local variable
+compile error before this correction. The full `tmp/3613` result predates
+only this exact retirement pointer change and the register-only correction.
+The pushed `f2503e7ce` [hosted run](https://github.com/justsearch-app/justsearch/actions/runs/36110298622)
+completed: system integration, Windows native, build, UI and search Worker
+passed; Public claims alone was red at `operation-surface/undeclared-surface`.
+The completed-job log
+is `tmp/3614-public-claims-job.txt`, and its uploaded SARIF is in
+`tmp/3615-governance-health/`. The three source facts are the accepted gap
+plan resolver's operation row read, Worker's gap witness contract, and
+`KnowledgeServer`'s candidate gap producer. They are projections/consumers
+of the existing operation outcome and row, not new authorities. The exact
+register entries are locally corrected in
+`governance/operation-surfaces.v1.json`; all three register-family gates pass
+at `tmp/3616`. This correction still needs hosted proof.
+The real Engine registered-source fixture now holds an old no-file snapshot
+while B builds, accepts a newer update, delete and addition through the
+public port, checks A and promoted B, and reopens B on a third boot. The first
+attempt (`tmp/3621`) correctly refused NRT's missing durable covering commit;
+an initial NRT seed then exposed a restart fingerprint error (`tmp/3622`), so
+the live mutations run in the second epoch. Shared search markers made an
+initial assertion ambiguous (`tmp/3623`); distinct markers fixed it. The
+two-epoch replay passed at `tmp/3624`–`tmp/3625`. Reopening B first failed
+with Windows `InvalidPathException` (`tmp/3627`, XML retained) because file
+identity boot import normalized the reserved `projection:` ID as a path.
+The focused importer regression reproduced that exception at `tmp/3628`.
+The importer now excludes source-owned projection IDs from file identity
+rows and counts; focused importer and real Engine third-boot tests pass at
+`tmp/3629`. The current no-file test uses NRT because the D2-5 durable
+covering-commit contract is still outstanding. This is local source proof,
+not the installed standard-model source-owner round.
+The exact corrected tree passed the full single-worker Gradle gate at
+`tmp/3631-d1-nofile-integrated.txt`: 358 tasks, exit 0 in 25m 27s, with
+stress-enabled `test`, Spotless, PMD and `:modules:ui:installDist`.
+`tmp/3630` was a command-selection error (`stressTest` is not a task); the
+repository's stress switch is `-PincludeStress=true`. This gate covers the
+refusal terminal witness, stale alias retirement, register correction,
+no-file source replay and third-boot importer fix together. Hosted and
+installed registered-source proof remain open.
 The review also confirmed no production caller yet registers a no-file source.
 Its suggestion to wire project-memory into the shipped composition now conflicts
 with [the C2 consumer record](evidence/C2/project-memory-consumer.md#6-d2-durable-deletion-is-lane-f-work):

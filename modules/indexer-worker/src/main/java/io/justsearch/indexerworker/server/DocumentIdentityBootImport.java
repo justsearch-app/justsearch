@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.server;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import java.nio.file.Path;
@@ -63,29 +64,37 @@ final class DocumentIdentityBootImport {
       return Result.skipped();
     }
 
-    long[] importedAndBatches = new long[2];
+    long[] importedBatchesAndProjections = new long[3];
     DocumentFieldOps.ParentIdentityScanSummary summary =
         scanner.scan(
             BATCH_SIZE,
             batch -> {
               List<DocumentIdentityStore.ImportedIdentity> rows = new ArrayList<>(batch.size());
               for (DocumentFieldOps.StoredDocumentIdentity identity : batch) {
+                if (AcceptedProjection.isProjectionIndexId(identity.docId())) {
+                  importedBatchesAndProjections[2]++;
+                  continue;
+                }
                 String normalizedKey =
                     PathNormalizer.normalizeKey(Path.of(identity.docId()));
                 rows.add(
                     new DocumentIdentityStore.ImportedIdentity(
                         DocumentIdentityStore.pathHash(normalizedKey), identity.docUid()));
               }
-              importedAndBatches[0] += store.importExisting(rows, nowMs);
-              importedAndBatches[1]++;
+              if (!rows.isEmpty()) {
+                importedBatchesAndProjections[0] += store.importExisting(rows, nowMs);
+                importedBatchesAndProjections[1]++;
+              }
             });
+
+    long pathParentsSeen = summary.parentsSeen() - importedBatchesAndProjections[2];
 
     store.recordImport(
         new DocumentIdentityStore.ImportRecord(
             generationId,
             nowMs,
-            summary.parentsSeen(),
-            importedAndBatches[0],
+            pathParentsSeen,
+            importedBatchesAndProjections[0],
             summary.parentsSkipped()));
 
     if (summary.parentsSkipped() > 0) {
@@ -94,23 +103,23 @@ final class DocumentIdentityBootImport {
               + " their doc_id or doc_uid docvalues are missing or blank. Each one mints a fresh"
               + " identity at its next admission, so uid-keyed links to their old identity are lost.",
           summary.parentsSkipped(),
-          summary.parentsSeen(),
+          pathParentsSeen,
           generationId);
     }
     log.info(
         "Document identity import scanned {} serving parent documents in generation {}"
             + " ({} new identities, {} skipped, {} batches)",
-        summary.parentsSeen(),
+        pathParentsSeen,
         generationId,
-        importedAndBatches[0],
+        importedBatchesAndProjections[0],
         summary.parentsSkipped(),
-        importedAndBatches[1]);
+        importedBatchesAndProjections[1]);
 
     return new Result(
         true,
-        summary.parentsSeen(),
-        importedAndBatches[0],
+        pathParentsSeen,
+        importedBatchesAndProjections[0],
         summary.parentsSkipped(),
-        (int) importedAndBatches[1]);
+        (int) importedBatchesAndProjections[1]);
   }
 }

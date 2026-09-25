@@ -16,6 +16,9 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.agent.api.registry.SourceTier;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
+import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.app.api.indexing.ProjectionDurability;
+import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.app.api.operations.BulkReindexProgress;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationState;
@@ -48,7 +51,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -200,8 +205,160 @@ final class RecordedBulkEngineRestartTest {
     }
   }
 
+  @Test
+  void registeredNoFileSourceReplaysNewerUpdateDeleteAndAdditionAcrossBuildRestart()
+      throws Exception {
+    Path dataDirectory = Files.createDirectories(temporaryDirectory.resolve("projection-data"));
+    Path watchedRoot = Files.createDirectories(temporaryDirectory.resolve("projection-watched"));
+    Path modelsDirectory = Files.createDirectories(temporaryDirectory.resolve("projection-models"));
+    Files.writeString(watchedRoot.resolve("file.txt"), "ordinary file in candidate");
+    writeWatchedRoots(dataDirectory, watchedRoot);
+    String marker = "recordedprojection" + System.nanoTime();
+    var oldUpdated = projection("updated", 1, marker + "updatedold");
+    var newUpdated = projection("updated", 2, marker + "updatednew");
+    var oldDeleted = projection("deleted", 1, marker + "deleted");
+    var deleted = new AcceptedProjection("fixture-memory", "deleted", 2,
+        AcceptedProjection.Kind.DELETE, null);
+    var added = projection("added", 1, marker + "added");
+    var source = new HeldProjectionSource(List.of(oldUpdated, oldDeleted));
+    CountDownLatch requestedRestart = new CountDownLatch(1);
+    String operationKey;
+
+    try (EngineEpoch first = openEpoch(dataDirectory, modelsDirectory, requestedRestart, source)) {
+      Operation operation = new CoreOperationCatalog()
+          .findByIdValue(CoreOperationCatalog.BULK_REINDEX.value()).orElseThrow();
+      var handlers = new HandlerRegistry();
+      handlers.register(CoreOperationCatalog.BULK_REINDEX,
+          new BulkReindexHandler(RecordedBulkPlan.Profile.USER_BULK,
+              first.root().recordedIngestion(),
+              ignored -> List.of(new RootBinding(watchedRoot, "documents")),
+              first::client, List::of));
+      var authority = first.root().authority();
+      var executor = new OperationExecutorImpl(first.root().operationAttempts(),
+          first.root().admission(), handlers, null, Map.of(), CLOCK,
+          authority.trust(), authority.sources(), null, authority.capsules());
+      EngineContext origin = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "recorded-projection-restart-test", Optional.of("projection-session"),
+          Optional.empty(), TransportTag.BUTTON, EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.BACKGROUND);
+      var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+          Instant.now(CLOCK), Optional.empty());
+      String arguments = "{\"corpusIds\":[\"documents\"]}";
+      operationKey = OperationKeys.generate(CLOCK);
+      var prepared = (OperationDispatchPlan.Ready) executor.prepare(operation, arguments,
+          provenance, origin, operationKey, true);
+      String approval = authority.capsules().mintPrepared(operation.id().value(), arguments,
+          SourceTier.valueOf(origin.sourceTier()), operationKey, prepared.preparationNonce());
+      assertTrue(executor.dispatch(operation, arguments, provenance, Optional.of(approval),
+          origin, operationKey, prepared.preparationNonce()).success());
+      assertTrue(requestedRestart.await(WAIT_MS, TimeUnit.MILLISECONDS));
+      var row = first.operations().find(operationKey).orElseThrow();
+      var plan = new RecordedBulkPlanResolver().resolve(row,
+          first.operations().acceptedPreparation(row.id()).orElseThrow());
+      assertEquals(List.of("fixture-memory"), plan.projectionSourceIds());
+      first.requestedRestartHandoff();
+    }
+
+    source.holdNextEnumeration();
+    try (EngineEpoch second = openEpoch(dataDirectory, modelsDirectory,
+        new CountDownLatch(1), source)) {
+      assertTrue(source.awaitHeld(WAIT_MS), "the resumed candidate never reached source enumeration");
+      source.setRows(List.of(newUpdated, deleted, added));
+      second.client().indexAndReturn(newUpdated, ProjectionDurability.NRT,
+          TestEngineContexts.BACKGROUND);
+      second.client().deleteAndAcknowledge(deleted, ProjectionDurability.NRT,
+          TestEngineContexts.BACKGROUND);
+      second.client().indexAndReturn(added, ProjectionDurability.NRT,
+          TestEngineContexts.BACKGROUND);
+      assertTrue(awaitSearchable(second.client(), marker + "updatednew", WAIT_MS),
+          "A must show the newer accepted projection while B enumerates");
+      assertTrue(awaitSearchable(second.client(), marker + "added", WAIT_MS));
+      assertFalse(second.client().search(marker + "deleted", 10,
+          TestEngineContexts.FOREGROUND).getResultsCount() > 0);
+      source.releaseEnumeration();
+      assertTrue(await(() -> second.operations().find(operationKey)
+          .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
+          "the candidate never promoted after exact no-file replay");
+      assertEquals("g-" + operationKey, new IndexGenerationManager(dataDirectory.resolve("index"))
+          .readStateBestEffort().active_generation());
+      assertTrue(awaitSearchable(second.client(), marker + "updatednew", WAIT_MS));
+      assertTrue(awaitSearchable(second.client(), marker + "added", WAIT_MS));
+      assertEquals(0, second.client().search(marker + "updatedold", 10,
+          TestEngineContexts.FOREGROUND).getResultsCount());
+      assertEquals(0, second.client().search(marker + "deleted", 10,
+          TestEngineContexts.FOREGROUND).getResultsCount());
+    } finally {
+      source.releaseEnumeration();
+    }
+    try (EngineEpoch reopened = openEpoch(dataDirectory, modelsDirectory,
+        new CountDownLatch(1), source)) {
+      assertEquals(OperationState.COMPLETE,
+          reopened.operations().find(operationKey).orElseThrow().state());
+      assertTrue(awaitSearchable(reopened.client(), marker + "updatednew", WAIT_MS));
+      assertTrue(awaitSearchable(reopened.client(), marker + "added", WAIT_MS));
+      assertEquals(0, reopened.client().search(marker + "deleted", 10,
+          TestEngineContexts.FOREGROUND).getResultsCount());
+    }
+  }
+
+  private static AcceptedProjection projection(String documentId, long revision, String content) {
+    return new AcceptedProjection("fixture-memory", documentId, revision,
+        AcceptedProjection.Kind.UPSERT,
+        "{\"content\":\"" + content + "\",\"title\":\"Projection fixture\"}");
+  }
+
+  private static final class HeldProjectionSource implements ProjectionSeedSource {
+    private final AtomicReference<List<AcceptedProjection>> rows;
+    private volatile CountDownLatch entered;
+    private volatile CountDownLatch release;
+
+    HeldProjectionSource(List<AcceptedProjection> initial) {
+      rows = new AtomicReference<>(List.copyOf(initial));
+    }
+
+    @Override public String sourceId() { return "fixture-memory"; }
+
+    void setRows(List<AcceptedProjection> next) { rows.set(List.copyOf(next)); }
+
+    void holdNextEnumeration() {
+      entered = new CountDownLatch(1);
+      release = new CountDownLatch(1);
+    }
+
+    boolean awaitHeld(long timeoutMillis) throws InterruptedException {
+      return entered.await(timeoutMillis, TimeUnit.MILLISECONDS);
+    }
+
+    void releaseEnumeration() {
+      CountDownLatch pending = release;
+      if (pending != null) pending.countDown();
+    }
+
+    @Override public void enumerate(Consumer<AcceptedProjection> sink) throws java.io.IOException {
+      List<AcceptedProjection> snapshot = rows.get();
+      CountDownLatch pending = release;
+      if (pending != null) {
+        entered.countDown();
+        try {
+          if (!pending.await(WAIT_MS, TimeUnit.MILLISECONDS)) {
+            throw new java.io.IOException("Projection enumeration hold expired");
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new java.io.IOException("Projection enumeration interrupted", interrupted);
+        }
+      }
+      snapshot.forEach(sink);
+    }
+  }
+
   private EngineEpoch openEpoch(Path dataDirectory, Path modelsDirectory,
       CountDownLatch requestedRestart) throws Exception {
+    return openEpoch(dataDirectory, modelsDirectory, requestedRestart, null);
+  }
+
+  private EngineEpoch openEpoch(Path dataDirectory, Path modelsDirectory,
+      CountDownLatch requestedRestart, ProjectionSeedSource projectionSource) throws Exception {
     EngineTestHarness.publishConfig(dataDirectory, dataDirectory.resolve("index"),
         Map.of("justsearch.models.dir", modelsDirectory.toAbsolutePath().toString()));
     var operations = new SqliteOperationStore(dataDirectory.resolve("operations.db"));
@@ -217,6 +374,7 @@ final class RecordedBulkEngineRestartTest {
         code -> { throw new AssertionError("unexpected terminal writer exit " + code); },
         requestedRestart::countDown, authority);
     try {
+      if (projectionSource != null) root.registerProjectionSeedSource(projectionSource);
       KnowledgeClient client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
       return new EngineEpoch(root, operations, client);
     } catch (Throwable failure) {

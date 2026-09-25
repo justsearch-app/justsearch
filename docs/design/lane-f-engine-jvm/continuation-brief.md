@@ -26,6 +26,17 @@ passed at `tmp/3586`. Installed non-file source/gap and hosted rounds remain.
 [Handoff](handoff.md) has the checkpoint revision, exact logs and
 remaining cuts. D1-9 is not accepted; continue from this slice before D2-5.
 
+**Current local D1-9 follow-on (2026-09-25):** The exact refused B now stays
+bound to its recoverable operation until physical retirement, scoped journal
+empty and stale predecessor alias release are witnessed. A real Engine
+registered-source fixture replays newer no-file update, delete and addition
+while B builds, promotes B, and reopens it on a third boot. That reopen
+exposed and corrected file identity import of the reserved `projection:` ID.
+The complete 358-task serial stress/static/distribution gate passed at
+`tmp/3631`. The current no-file fixture uses NRT pending D2-5's durable
+covering-commit contract. Installed standard-model registered-source and
+hosted proof remain open; [handoff](handoff.md) has the red/green logs.
+
 **Current owner re-cut (2026-09-24):** Finish D1-9 streaming correction and
 proofs first. D1/D2 scope remains intact. E's paired branch/main gate contains
 seven groups only: quality and workflow fixture, search/agent response time

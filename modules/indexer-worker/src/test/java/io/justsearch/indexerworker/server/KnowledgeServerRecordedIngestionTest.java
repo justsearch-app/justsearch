@@ -760,10 +760,16 @@ final class KnowledgeServerRecordedIngestionTest {
     setField(refusedBoot, "migrationRestartAction", (Runnable) () -> restarted.set(true));
     try {
       refusedBoot.start();
+      var cleanupWitness = KnowledgeServer.class.getDeclaredMethod(
+          "refusedRecordedCleanupComplete", String.class, String.class);
+      cleanupWitness.setAccessible(true);
+      assertFalse((Boolean) cleanupWitness.invoke(refusedBoot, operation, active),
+          "the recorded target still owns capacity before the refusal drain");
       var reconcile = KnowledgeServer.class
           .getDeclaredMethod("reconcileRefusedRecordedCandidate");
       reconcile.setAccessible(true);
       reconcile.invoke(refusedBoot);
+      assertTrue((Boolean) cleanupWitness.invoke(refusedBoot, operation, active));
       assertTrue(restarted.get(), "refused boot must replay on a writable A then request restart");
       assertFalse(Files.exists(layout.indexBase().resolve("indices").resolve(building)));
       try (var directories = Files.list(layout.indexBase().resolve("indices"))) {
