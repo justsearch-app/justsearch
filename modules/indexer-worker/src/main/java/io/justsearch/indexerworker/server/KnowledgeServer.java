@@ -480,7 +480,6 @@ public final class KnowledgeServer implements Closeable {
   private volatile CandidateModels candidateModels;
   private volatile boolean recordedCandidateInPlace;
   private volatile boolean gapWaitProducerPaused;
-  private volatile boolean recordedRefusalCleanupPending;
   private volatile WorkerAppServices inPlaceLexicalServices;
   private volatile EncoderSet.ModelIdentity inPlaceSourceIdentity;
   private volatile boolean inPlaceSourceHadModels;
@@ -1066,8 +1065,27 @@ public final class KnowledgeServer implements Closeable {
             // must be enumerated again from their authority before a resumed promotion.
             this.migrationEnumeratorDone = expectedProjectionSourceIds().isEmpty();
           } else {
-            this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery().openReadOnly();
-            publishIngestLifecycle(this.searchLifecycle);
+            boolean refusedSourceRecovery = generationBootDisposition
+                == IndexGenerationManager.BootDisposition.FENCED
+                && bootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+                && recordedIngestionLifecycle.recordedPrecommitRefused(recorded.operationKey())
+                && recorded.targetFingerprint().equals(recordedCandidate == null
+                    ? expectedIndexFingerprintOrNull() : recordedCandidate.target().fingerprint())
+                && recorded.sourceGeneration().equals(state.active_generation())
+                && (buildingGenId == null
+                    || IndexGenerationManager.recordedGenerationId(recorded.operationKey())
+                        .equals(buildingGenId));
+            if (refusedSourceRecovery) {
+              // The operation remains fenced from new claims, but A needs its writer to replay
+              // accepted B mutations before B can be retired after a process crash.
+              publishIngestLifecycle(buildIndexRuntime(activeIndexPath, fpSupplier)
+                  .withoutRecovery().withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
+              this.searchLifecycle = this.ingestLifecycle;
+            } else {
+              this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery()
+                  .openReadOnly();
+              publishIngestLifecycle(this.searchLifecycle);
+            }
           }
         }
       } else {
@@ -4733,23 +4751,30 @@ public final class KnowledgeServer implements Closeable {
 
   /** The application has durably refused B while A is still the pointer. Retire Green first. */
   private void reconcileRefusedRecordedCandidate() {
-    if ((recordedCandidate == null && !recordedRefusalCleanupPending)
-        || !recordedCandidatePrecommitRefused() || closeStarted) return;
+    if (!recordedCandidatePrecommitRefused() || closeStarted) return;
     CompletableFuture<ModelContext> composition = deferredModelInit;
     if (composition != null && !composition.isDone()) return;
     boolean restart = false;
     runtimeSwapLock.lock();
     try {
-      if ((recordedCandidate == null && !recordedRefusalCleanupPending) || closeStarted
+      if (closeStarted
           || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
           || !(appServices instanceof DefaultWorkerAppServices producer)) return;
       IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
       if (state == null || !recorded.sourceGeneration().equals(state.active_generation())) return;
-      if (state.building_generation() == null && recordedRefusalCleanupPending) {
-        restart = true;
+      if (state.building_generation() == null) {
+        // A process restart loses the volatile cleanup flag. The refused operation key still
+        // identifies its exact retired B, including the pointer-before-mark crash cut.
+        try {
+          indexGenerationManager.retireRefusedRecordedGeneration(
+              recorded.operationKey(), recorded.sourceGeneration());
+          restart = true;
+        } catch (IOException cleanupFailure) {
+          log.warn("Refused recorded target remains capacity-owning; cleanup will retry",
+              cleanupFailure);
+        }
       } else {
         if (!("g-" + recorded.operationKey()).equals(state.building_generation())) return;
-        recordedRefusalCleanupPending = true;
         try {
           if (!(searchLifecycle instanceof RunningRuntime source)
               || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
@@ -4790,6 +4815,8 @@ public final class KnowledgeServer implements Closeable {
               if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
               if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
               indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
+              indexGenerationManager.retireRefusedRecordedGeneration(
+                  recorded.operationKey(), recorded.sourceGeneration());
               restart = true;
             } finally {
               if (!producer.producerClosed()) producer.resumeProducerAfterCutover();
@@ -4811,7 +4838,6 @@ public final class KnowledgeServer implements Closeable {
     }
     if (restart) {
       migrationRestartAction.run();
-      recordedRefusalCleanupPending = false;
     }
   }
 

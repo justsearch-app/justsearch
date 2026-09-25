@@ -84,16 +84,32 @@ final class KnowledgeServerRecordedIngestionTest {
           "{\"title\":\"candidate\"}");
       assertEquals(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED,
           queue.admitProjectionForGeneration(state.building_generation(), revision.encode()));
-      assertTrue(server.candidateJournalWitness().gaps().stream().anyMatch(gap ->
-          "CANDIDATE_PROJECTION_MISSING".equals(gap.reason())));
+      var firstWitness = server.candidateJournalWitness();
+      var firstGap = firstWitness.gaps().stream().filter(gap ->
+          "CANDIDATE_PROJECTION_MISSING".equals(gap.reason())).findFirst().orElseThrow();
+      var replacement = new io.justsearch.app.api.indexing.AcceptedProjection(
+          "authority", "doc", 6,
+          io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+          "{\"title\":\"different accepted candidate\"}");
+      assertEquals(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED,
+          queue.admitProjectionForGeneration(state.building_generation(), replacement.encode()));
+      var replacedWitness = server.candidateJournalWitness();
+      var replacedGap = replacedWitness.gaps().stream().filter(gap ->
+          "CANDIDATE_PROJECTION_MISSING".equals(gap.reason())).findFirst().orElseThrow();
+      assertEquals(firstGap.unitId(), replacedGap.unitId());
+      assertEquals(firstGap.reason(), replacedGap.reason());
+      assertNotEquals(firstGap.evidenceId(), replacedGap.evidenceId());
+      assertNotEquals(io.justsearch.app.api.operations.BulkReindexProgress.hashGapList(
+          firstWitness.gaps()), io.justsearch.app.api.operations.BulkReindexProgress.hashGapList(
+              replacedWitness.gaps()));
       org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
           io.justsearch.indexing.SchemaFields.DOC_ID)).thenReturn(revision.indexId());
       org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
           io.justsearch.indexing.SchemaFields.PROJECTION_SOURCE_ID)).thenReturn(revision.sourceId());
       org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
-          io.justsearch.indexing.SchemaFields.PROJECTION_SOURCE_REVISION)).thenReturn("5");
+          io.justsearch.indexing.SchemaFields.PROJECTION_SOURCE_REVISION)).thenReturn("6");
       org.mockito.Mockito.when(fields.getDocumentField(revision.indexId(),
-          io.justsearch.indexing.SchemaFields.PROJECTION_DIGEST)).thenReturn(revision.fieldsDigest());
+          io.justsearch.indexing.SchemaFields.PROJECTION_DIGEST)).thenReturn(replacement.fieldsDigest());
       assertFalse(server.candidateJournalWitness().gaps().stream().anyMatch(gap ->
           "CANDIDATE_PROJECTION_MISSING".equals(gap.reason())));
     } finally {
@@ -561,7 +577,6 @@ final class KnowledgeServerRecordedIngestionTest {
         org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
         org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
     server.appServices = producer;
-    setField(server, "recordedRefusalCleanupPending", true);
     setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
         operation, active, "recorded-test", "a".repeat(64), true));
     setField(server, "indexGenerationManager", manager);
@@ -592,14 +607,10 @@ final class KnowledgeServerRecordedIngestionTest {
         WorkerBootFixture.workerConfig(layout.dataDir()), null,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
     String operation = "01994180-0000-7000-8000-000000000199";
-    String active = "g-source";
-    String building = "g-" + operation;
-    var manager = org.mockito.Mockito.mock(IndexGenerationManager.class);
-    org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
-        new IndexGenerationManager.State(1, active, building, null, "SWITCHING", false,
-            null, null, System.currentTimeMillis(), null, null, null));
-    org.mockito.Mockito.when(manager.resolveGenerationPathStrict(active))
-        .thenReturn(layout.activePath());
+    var manager = org.mockito.Mockito.spy(layout.genManager());
+    String active = manager.readStateBestEffort().active_generation();
+    String building = manager.startRecordedMigration(operation, "recorded-test",
+        "a".repeat(64), active, List.of()).building_generation();
     org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
     var source = org.mockito.Mockito.mock(RunningRuntime.class);
     var green = org.mockito.Mockito.mock(RunningRuntime.class);
@@ -634,7 +645,6 @@ final class KnowledgeServerRecordedIngestionTest {
         io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(hash);
     org.mockito.Mockito.when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
     server.appServices = producer;
-    setField(server, "recordedRefusalCleanupPending", true);
     setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
         operation, active, "recorded-test", "a".repeat(64), true));
     setField(server, "indexGenerationManager", manager);
@@ -656,8 +666,112 @@ final class KnowledgeServerRecordedIngestionTest {
     order.verify(producer).close();
     order.verify(green).close();
     order.verify(manager).abandonBuildingGeneration("recorded candidate refused");
+    order.verify(manager).retireRefusedRecordedGeneration(operation, active);
     assertTrue(closed.get());
     assertTrue(restarted.get());
+    assertEquals(active, manager.readStateBestEffort().active_generation());
+    assertEquals(null, manager.readStateBestEffort().building_generation());
+    try (var directories = Files.list(layout.indexBase().resolve("indices"))) {
+      assertEquals(1L, directories.filter(Files::isDirectory).count(),
+          "the refused candidate must be physically pruned before restart");
+    }
+  }
+
+  @Test
+  void refusalRecoveryRetriesExactCandidateAfterPointerWasAlreadyCleared(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    var lifecycle = org.mockito.Mockito.mock(RecordedIngestionLifecycle.class);
+    var server = new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
+    String operation = "01994180-0000-7000-8000-000000000198";
+    var manager = org.mockito.Mockito.spy(layout.genManager());
+    String active = manager.readStateBestEffort().active_generation();
+    manager.startRecordedMigration(operation, "recorded-test", "a".repeat(64), active, List.of());
+    manager.abandonBuildingGeneration("injected pointer-before-prune cut");
+    org.mockito.Mockito.doThrow(new IOException("injected Windows deletion failure"))
+        .doCallRealMethod().when(manager).retireRefusedRecordedGeneration(operation, active);
+    org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
+    server.appServices = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
+        operation, active, "recorded-test", "a".repeat(64), true));
+    setField(server, "indexGenerationManager", manager);
+    var restarted = new AtomicBoolean();
+    setField(server, "migrationRestartAction", (Runnable) () -> restarted.set(true));
+
+    var reconcile = KnowledgeServer.class.getDeclaredMethod("reconcileRefusedRecordedCandidate");
+    reconcile.setAccessible(true);
+    reconcile.invoke(server);
+
+    assertFalse(restarted.get(), "failed physical retirement cannot release capacity or restart");
+    try (var directories = Files.list(layout.indexBase().resolve("indices"))) {
+      assertEquals(2L, directories.filter(Files::isDirectory).count());
+    }
+    reconcile.invoke(server);
+
+    assertTrue(restarted.get());
+    try (var directories = Files.list(layout.indexBase().resolve("indices"))) {
+      assertEquals(1L, directories.filter(Files::isDirectory).count(),
+          "recovery must remove the marked B even after its pointer was cleared");
+    }
+  }
+
+  @Test
+  void refusedRecordedBootReopensSourceWriterToDrainCandidate(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    KnowledgeServer nativeBoot = withoutDeferredModels(helperServer(layout));
+    String fingerprint;
+    try {
+      nativeBoot.start();
+      var fingerprintMethod = KnowledgeServer.class
+          .getDeclaredMethod("expectedIndexFingerprintOrNull");
+      fingerprintMethod.setAccessible(true);
+      fingerprint = (String) fingerprintMethod.invoke(nativeBoot);
+      assertNotNull(fingerprint);
+    } finally {
+      nativeBoot.close();
+    }
+
+    String operation = "01994180-0000-7000-8000-000000000197";
+    IndexGenerationManager manager = layout.genManager();
+    String active = manager.readStateBestEffort().active_generation();
+    String building = manager.startRecordedMigration(operation, "recorded-test", fingerprint,
+        active, List.of()).building_generation();
+    var lifecycle = new RecordedIngestionLifecycle() {
+      @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {
+        return new IndexGenerationManager.BootOwnership.Recorded(operation, active,
+            "recorded-test", fingerprint, true, false, List.of());
+      }
+      @Override public boolean recordedPrecommitRefused(String key) {
+        return operation.equals(key);
+      }
+      @Override public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
+        return JobQueue.RecordedClaimDecision.DENY;
+      }
+      @Override public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
+          java.util.function.BooleanSupplier online) { return () -> {}; }
+    };
+    KnowledgeServer refusedBoot = withoutDeferredModels(new KnowledgeServer(
+        new TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle));
+    var restarted = new AtomicBoolean();
+    setField(refusedBoot, "migrationRestartAction", (Runnable) () -> restarted.set(true));
+    try {
+      refusedBoot.start();
+      var reconcile = KnowledgeServer.class
+          .getDeclaredMethod("reconcileRefusedRecordedCandidate");
+      reconcile.setAccessible(true);
+      reconcile.invoke(refusedBoot);
+      assertTrue(restarted.get(), "refused boot must replay on a writable A then request restart");
+      assertFalse(Files.exists(layout.indexBase().resolve("indices").resolve(building)));
+      try (var directories = Files.list(layout.indexBase().resolve("indices"))) {
+        assertEquals(1L, directories.filter(Files::isDirectory).count());
+      }
+    } finally {
+      refusedBoot.close();
+    }
   }
 
   @Test

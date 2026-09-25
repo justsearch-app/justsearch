@@ -29,6 +29,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-25: A durably refused recorded candidate must keep A writable solely for exact mutation replay on a fenced reboot, then retire only its operation-key B after a witnessed physical deletion. The volatile same-process cleanup flag and best-effort pruning cannot establish restart or capacity release. The remaining terminal-row versus cleanup ordering is an explicit D1-9 proof gap, not an accepted crash cut. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
+
 - 2026-09-25: D1-9 binds an approved candidate gap to the immutable generation-journal row effect and revision. An optional `evidenceId` on the existing gap wire preserves legacy two-field gap hashes; evidence-bearing lists use the v2 hash domain. Replacing a row with the same unit and reason revokes prior approval before replay can skip it. This corrects the accepted-row bypass found by independent refutation without another journal or gap writer. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
 
 - 2026-09-25: D1-9 freezes a bounded, sorted no-file source set in each newly accepted bulk/installer preparation and in the Worker generation manifest before `state.json` can name B. Legacy absent and new explicit-empty sets remain distinct. Boot checks the accepted recorded set against the manifest; missing or incomplete source enumeration becomes a named candidate gap, with the exact current witness required again at the final fence. The journal and terminal writer remain the existing owners. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).

@@ -307,7 +307,62 @@ named B, real search found both indexed files, and STOP 0 closed owned ports.
 The no-file source and gap rounds, and hosted proof remain.
 This exact source-set checkpoint is `331a860bc` on `codex/lane-f-pr1`.
 The installed runs above used its source before commit; no source changed
-between those runs and the commit. Hosted checks are pending for this push.
+between those runs and the commit. Hosted CI 36104445880 completed for the
+`ee8516cf7` evidence-note tip: system integration, build, Windows-native,
+search-worker, app-ui and all other jobs passed except Public claims. That
+job failed its dead-code gate because
+the preceding direct generated-module import left the same schema's generated
+barrel export unused; its contract-projection gate had rejected the earlier
+barrel import. The follow-on local correction makes that gate resolve only
+named barrel imports actually re-exported from the record, restores the
+existing barrel import and checks both declared and undeclared consumers.
+The import parser's 24 tests, both governance gates, UI typecheck, generated
+file check and diff check pass locally. This correction is not in that hosted
+run and will be pushed after the follow-on integrated local gate.
+The next local D1-9 proof exercises an actual SQLite candidate journal and
+Lucene source writer: a refused B transfers a newer projection and delete to
+A, empties only B's journal, and abandons/prunes B. The existing pre-pointer
+approved-row test and two new strict replay crash-cut tests cover retention,
+exact post-pointer retirement without reapplying, and retry of interrupted
+post-pointer removal. Both focused Worker classes and Worker Spotless/PMD
+passed. These are local component proofs; installed no-file source and gap
+approval remain due.
+The production `KnowledgeServer.candidateJournalWitness()` test now replaces
+one missing projection with a different accepted revision and payload under
+the same unit/reason, then proves its `evidenceId` and full gap hash change;
+the focused Worker class passed. This joins the Engine's approval-revocation
+test to the actual Worker witness, while the installed cross-process decision
+still needs proof.
+Independent D1-9 review found that production refusal marked B for deletion
+but did not prune it before restart. The first same-process correction and
+tests passed at `tmp/3595`–`tmp/3597`; review then refuted it as reboot proof
+because the cleanup flag is volatile and best-effort prune gives no deletion
+witness. The follow-on uses the durable recorded operation key and source to
+retire only exact B under generation state control. A fenced refused boot now
+opens A writable solely for accepted-mutation replay while new claims remain
+denied. Focused Worker recovery, exact partial-delete and real refused-boot
+tests pass at `tmp/3599`–`tmp/3602`. The injected deletion-failure retry does
+not restart until B is absent. `tmp/3598` was a full passing serial stress gate
+before this latest boot correction; its exact follow-on `tmp/3603` passed all
+196 Gradle tasks under serial stress in 20m 59s. The first static pass at
+`tmp/3604` exposed PMD's now-unused volatile cleanup flag. Removing that
+field and its test-fixture writes changes no branch or runtime effect. The
+replacement `spotlessCheck pmdAll --continue` gate passed at `tmp/3605`, and
+`build -x test` passed at `tmp/3606`; the affected Worker class passed at
+`tmp/3607` after that source cleanup. `origin/main` was fetched at this
+checkpoint and has zero commits ahead of the branch, so no merge was needed.
+Terminal refusal can currently precede physical retirement in the coordinator;
+if that happens before a process crash, `openRecords()` loses the operation
+key and the next boot may classify an orphan as Native/FENCED. This is the
+next D1-9 crash-ordering correction, not a completed recovery claim.
+The review also confirmed no production caller yet registers a no-file source.
+Its suggestion to wire project-memory into the shipped composition now conflicts
+with [the C2 consumer record](evidence/C2/project-memory-consumer.md#6-d2-durable-deletion-is-lane-f-work):
+project-memory (955) lands after lane F and consumes this port then. The D1-9
+registered-source contract still needs an installed fixture running against
+the built distribution with a real source owner; these component tests do not
+stand in for that proof. This is the one-line ownership judgment for the
+independent review, not a waiver of the no-file acceptance item.
 Reusing `tmp/3580`'s retained standard-model A, the fresh installed live
 `model-live-a-b` round passed at `tmp/3586`: A answered a real vector query;
 the named before-SWITCHING hold captured the exact source/building IDs; a

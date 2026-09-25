@@ -264,6 +264,36 @@ final class SwitchBufferStrictReplayTest {
   }
 
   @Test
+  void committedPointerRetiresApprovedFailedRowWithoutReapplyingIt() {
+    var projection = new AcceptedProjection("memory", "record-7", 5,
+        AcceptedProjection.Kind.UPSERT, "{\"content\":\"unavailable on Green\"}");
+    var approved = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", projection.journalKey(), "PROJECTION", projection.encode(), 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(approved), List.of());
+    when(queue.removeReplayedSwitchBufferOps(List.of(approved))).thenReturn(1);
+
+    assertTrue(KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(queue, "green"));
+    verify(queue).removeReplayedSwitchBufferOps(List.of(approved));
+    verify(runtime, never()).indexingCoordinator();
+  }
+
+  @Test
+  void committedPointerRetriesExactApprovedRowCleanupAfterInterruptedRemoval() {
+    var projection = new AcceptedProjection("memory", "record-7", 5,
+        AcceptedProjection.Kind.DELETE, null);
+    var approved = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", projection.journalKey(), "PROJECTION", projection.encode(), 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(
+        List.of(approved), List.of(approved), List.of());
+    when(queue.removeReplayedSwitchBufferOps(List.of(approved))).thenReturn(0, 1);
+
+    assertFalse(KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(queue, "green"));
+    assertTrue(KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(queue, "green"));
+    verify(queue, org.mockito.Mockito.times(2)).removeReplayedSwitchBufferOps(List.of(approved));
+    verify(runtime, never()).indexingCoordinator();
+  }
+
+  @Test
   void approvedFileUpsertSkipsOnlyItsExactFailedJournalRevision() {
     String file = tempDir.resolve("missing.txt").toAbsolutePath().toString();
     var upsert = new SwitchBufferUpsert(file, "notes", null, "accepted-revision", "a".repeat(64));

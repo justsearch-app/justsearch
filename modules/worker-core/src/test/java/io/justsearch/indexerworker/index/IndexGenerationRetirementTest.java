@@ -11,6 +11,7 @@ import io.justsearch.adapters.lucene.runtime.SafeIndexPathOps;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,6 +23,33 @@ final class IndexGenerationRetirementTest {
   private static final String NEXT_KEY = "01994180-0000-7000-8000-000000000132";
 
   @TempDir Path temp;
+
+  @Test
+  void refusedRecordedTargetRetiresAfterPointerClearAndPartialMarkedDelete() throws Exception {
+    Path base = temp.resolve("refused-pointer-cut");
+    IndexGenerationManager manager = new IndexGenerationManager(base);
+    String active = manager.initializeOrLoad().activeGenerationId();
+    String target = manager.startRecordedMigration(KEY, SOURCE, FINGERPRINT, active, List.of())
+        .building_generation();
+    manager.abandonBuildingGeneration("injected pointer-before-delete cut");
+    Path original = base.resolve("indices").resolve(target);
+    Path marked;
+    try (var entries = Files.list(base.resolve("indices"))) {
+      marked = entries.filter(path -> path.getFileName().toString().startsWith(target + ".del-"))
+          .findFirst().orElse(original);
+    }
+    assertTrue(Files.isDirectory(marked));
+    Files.delete(marked.resolve(".justsearch-generation.sentinel"));
+    Files.delete(marked.resolve(".justsearch-index-generation.json"));
+    Files.writeString(marked.resolve("segments_locked-on-first-delete"), "retry payload");
+
+    manager.retireRefusedRecordedGeneration(KEY, active);
+
+    assertFalse(Files.exists(marked));
+    assertEquals(1, generationDirectoryCount(base));
+    assertThrows(IOException.class,
+        () -> manager.retireRefusedRecordedGeneration(KEY, "g-wrong-source"));
+  }
 
   @Test
   void deletesExactPredecessorBeforeReleasingItsReference() throws Exception {

@@ -970,6 +970,31 @@ public final class IndexGenerationManager {
     }
   }
 
+  /**
+   * Retires the exact target of a durably refused recorded operation after its writer has closed.
+   * The caller owns the refusal proof and must settle accepted mutations on the surviving source
+   * before clearing the building pointer. A retry can finish the pointer-before-mark crash cut.
+   */
+  public void retireRefusedRecordedGeneration(String operationKey, String sourceGeneration)
+      throws IOException {
+    try (var ignored = stateControl()) {
+      String target = recordedGenerationId(operationKey);
+      String source = requireSafeGenerationId(sourceGeneration, "recorded source generation");
+      State state = strictBootLayout(readRecordedState()).state();
+      if (!source.equals(state.active_generation())
+          || state.building_generation() != null
+          || !MigrationState.IDLE.name().equals(state.migration_state())
+          || state.previous_generation() != null
+              && !source.equals(state.previous_generation())
+          || protectedGenerationIds(state).contains(target)) {
+        throw new IOException("Refused recorded target is still protected or its source changed");
+      }
+      // The durable operation key binds the exact target even after state.json lost its building
+      // pointer. A partial marked directory can be retried after Windows refused one payload file.
+      deleteExactRetiredRepresentation(target, true);
+    }
+  }
+
   /** Sets operator pause intent for migration orchestration (best-effort). */
   public State setMigrationPaused(boolean paused, String reason) throws IOException {
     try (var ignored = stateControl()) {
@@ -1454,32 +1479,34 @@ public final class IndexGenerationManager {
   }
 
   private void deleteExactRetiredRepresentation(
-      String generationId, boolean pointerBindsRetirement) throws IOException {
+      String generationId, boolean durablyBound) throws IOException {
     Path original = resolveGenerationPathReadOnly(generationId);
     if (Files.exists(original, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-      requireOwnedRetirementDirectory(original, generationId, false, false);
+      requireOwnedRetirementDirectory(original, generationId, false,
+          durablyBound && Files.exists(original.resolve(DELETE_MARKER),
+              java.nio.file.LinkOption.NOFOLLOW_LINKS));
       SafeIndexPathOps.MarkResult marked = SafeIndexPathOps.markForDeletion(original, indicesDir);
       Path effective = normalize(marked.effectivePath());
       requireOwnedRetirementDirectory(
           effective,
           generationId,
           !effective.getFileName().toString().equals(generationId),
-          false);
+          durablyBound);
     }
 
     for (Path retired :
-        exactRetirementRepresentations(generationId, pointerBindsRetirement)) {
+        exactRetirementRepresentations(generationId, durablyBound)) {
       deleteRetirementPayloadBeforeOwnership(retired);
       io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(retired, log);
     }
-    if (!exactRetirementRepresentations(generationId, pointerBindsRetirement).isEmpty()) {
+    if (!exactRetirementRepresentations(generationId, durablyBound).isEmpty()) {
       throw new IOException(
           "Exact predecessor directory remains after deletion: " + generationId);
     }
   }
 
   private List<Path> exactRetirementRepresentations(
-      String generationId, boolean pointerBindsRetirement) throws IOException {
+      String generationId, boolean durablyBound) throws IOException {
     if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
       return List.of();
     }
@@ -1495,7 +1522,8 @@ public final class IndexGenerationManager {
             entry,
             generationId,
             markedName,
-            markedName && pointerBindsRetirement);
+            durablyBound && (markedName || Files.exists(entry.resolve(DELETE_MARKER),
+                java.nio.file.LinkOption.NOFOLLOW_LINKS)));
         exact.add(entry);
       }
     }
@@ -2132,7 +2160,7 @@ public final class IndexGenerationManager {
 
   /**
    * Best-effort deletion helper for already-marked generations (directories named "*.del-*" or with
-   * a DELETEME marker). Not currently invoked by default; provided for future GC policies.
+   * a DELETEME marker). Called after recorded refusal and during generation startup/GC.
    */
   public void pruneMarkedForDeletionBestEffort() {
     try (var ignored = stateControl()) {

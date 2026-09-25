@@ -21,6 +21,7 @@ import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.ProjectionDocumentMapper;
 import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.indexing.SchemaFields;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -177,5 +178,68 @@ final class ProjectionCandidateReplayTest extends LuceneExecutorTestBase {
           deleted.indexId(), SchemaFields.CONTENT));
       assertEquals(2, queue.listSwitchBufferOpsStrictForGeneration(candidateId).size());
     }
+  }
+
+  @Test
+  void refusedCandidateTransfersExactProjectionVersionsToSourceBeforeAbandonment()
+      throws Exception {
+    Path base = tempDir.resolve("refused-index");
+    var manager = new IndexGenerationManager(base);
+    var active = manager.initializeOrLoad();
+    String candidateId = manager.startMigration("manual", java.util.List.of("memory"))
+        .building_generation();
+    Path candidatePath = manager.resolveGenerationPathStrict(candidateId);
+    var schema = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(0),
+        () -> Map.of(), ignored -> {});
+    var oldUpdated = new AcceptedProjection("memory", "updated", 1,
+        AcceptedProjection.Kind.UPSERT, "{\"content\":\"old\"}");
+    var newUpdated = new AcceptedProjection("memory", "updated", 2,
+        AcceptedProjection.Kind.UPSERT, "{\"content\":\"accepted\"}");
+    var oldDeleted = new AcceptedProjection("memory", "deleted", 1,
+        AcceptedProjection.Kind.UPSERT, "{\"content\":\"must disappear\"}");
+    var newDeleted = new AcceptedProjection("memory", "deleted", 2,
+        AcceptedProjection.Kind.DELETE, null);
+    ProjectionSeedSource source = new ProjectionSeedSource() {
+      @Override public String sourceId() { return "memory"; }
+      @Override public void enumerate(java.util.function.Consumer<AcceptedProjection> sink) {
+        sink.accept(oldUpdated);
+        sink.accept(oldDeleted);
+      }
+    };
+
+    try (var queue = new SqliteJobQueue(tempDir.resolve("refused-jobs.db"));
+        var blue = schema.atPath(active.activeGenerationPath())
+            .withConfig(new ResolvedConfigBuilder().build())
+            .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      queue.open();
+      blue.commitOps().stopCommitTimer();
+      blue.indexingCoordinator().indexSingle(ProjectionDocumentMapper.toIndexDocument(oldUpdated));
+      blue.indexingCoordinator().indexSingle(ProjectionDocumentMapper.toIndexDocument(oldDeleted));
+      blue.commitOps().commitAndTrack(
+          io.justsearch.adapters.lucene.runtime.CommitReason.SWITCH_BUFFER_REPLAY);
+      KnowledgeServerMigrationOps.seedProjectionSource(queue, candidateId, source);
+      assertTrue(queue.putSwitchBufferForGeneration(candidateId, newUpdated.journalKey(),
+          "PROJECTION", newUpdated.encode()));
+      assertTrue(queue.putSwitchBufferForGeneration(candidateId, newDeleted.journalKey(),
+          "PROJECTION", newDeleted.encode()));
+      var replay = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+          queue, blue, null, IndexingPacing.unthrottled(), base,
+          active.activeGenerationPath(), new ObjectMapper(), () -> false, () -> true,
+          LoggerFactory.getLogger(getClass()), Long.MAX_VALUE, candidateId,
+          ignored -> true);
+      assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(replay));
+      assertEquals("accepted", blue.documentFieldOps().getDocumentField(
+          newUpdated.indexId(), SchemaFields.CONTENT));
+      assertEquals("2", blue.documentFieldOps().getDocumentField(
+          newUpdated.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION));
+      assertNull(blue.documentFieldOps().getDocumentField(
+          newDeleted.indexId(), SchemaFields.CONTENT));
+      assertTrue(queue.listSwitchBufferOpsStrictForGeneration(candidateId).isEmpty());
+    }
+    manager.abandonBuildingGeneration("recorded cancellation");
+    manager.pruneMarkedForDeletionBestEffort();
+    assertEquals(active.state().active_generation(), manager.readStateBestEffort().active_generation());
+    assertNull(manager.readStateBestEffort().building_generation());
+    assertFalse(Files.exists(candidatePath), "only the surviving source generation may retain an index");
   }
 }

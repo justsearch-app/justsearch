@@ -12,7 +12,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { importSpecifiers, importsGeneratedModule, matchesGeneratedModule } from './imports.mjs';
+import { importSpecifiers, importsGeneratedModule, importsGeneratedRecord,
+  matchesGeneratedModule } from './imports.mjs';
 
 let passed = 0;
 const failures = [];
@@ -153,6 +154,20 @@ run('the schema-types segment must be a path segment, not a name fragment', () =
 
 run('the barrel `schema-types/index.js` is not a match for any record', () => {
   assert.equal(matchesGeneratedModule('./schema-types/index.js', 'status-response'), false);
+});
+
+run('named generated barrel import proves this record and detects an undeclared consumer', () => {
+  const barrel = "export type { OperationOutcomeView } from './operation-outcome-view.js';\n"
+    + "export { operationOutcomeViewSchema } from './operation-outcome-view.js';\n";
+  const consumer = "import { operationOutcomeViewSchema, type OperationOutcomeView }"
+    + " from '../../api/generated/schema-types/index.js';\n";
+  assert.equal(importsGeneratedRecord(consumer, 'operation-outcome-view', barrel), true);
+  assert.equal(importsGeneratedRecord(consumer, 'other-response', barrel), false);
+  assert.equal(importsGeneratedRecord("// " + consumer, 'operation-outcome-view', barrel), false);
+  assert.equal(importsGeneratedRecord(
+    "import { unrelated } from '../../api/generated/schema-types/index.js';",
+    'operation-outcome-view', barrel), false);
+  assert.equal(importsGeneratedRecord(consumer, 'operation-outcome-view', ''), false);
 });
 
 // ------------------------------------------------------------------- specifier collection

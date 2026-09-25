@@ -43,8 +43,7 @@ import {
   indexedRootViewSchema,
   type IndexedRootView,
 } from '../../api/generated/schema-types/indexed-root-view.js';
-import { operationOutcomeViewSchema } from '../../api/generated/schema-types/operation-outcome-view.js';
-import type { OperationOutcomeView } from '../../api/generated/schema-types/index.js';
+import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api/generated/schema-types/index.js';
 // Tempdoc 599 §9.1 — the ONE per-folder status derivation; the row glyph + meta line project from it.
 import {
   folderStatus,
