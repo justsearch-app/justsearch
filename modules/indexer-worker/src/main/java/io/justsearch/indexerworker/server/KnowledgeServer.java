@@ -4354,6 +4354,14 @@ public final class KnowledgeServer implements Closeable {
     migrationTransitionHook = Objects.requireNonNull(hook, "hook");
   }
 
+  boolean awaitMigrationCutoverExitForTests(long timeout, TimeUnit unit)
+      throws InterruptedException {
+    Thread cutover = migrationCutoverThread;
+    if (cutover == null) return true;
+    cutover.join(unit.toMillis(timeout));
+    return !cutover.isAlive();
+  }
+
   /** Composition binds source owners before boot can resume or create a candidate. */
   public synchronized void installProjectionSeedSources(
       List<io.justsearch.app.api.indexing.ProjectionSeedSource> sources) {
@@ -4538,6 +4546,12 @@ public final class KnowledgeServer implements Closeable {
           || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)
           || !(appServices instanceof DefaultWorkerAppServices producer)) {
         throw new IOException("Candidate gap decision has no active physical owner");
+      }
+      // A recovered row can already show the prior wait while this boot is re-enumerating its
+      // source. The enumerator writes the candidate journal outside mutation admission; do not
+      // stamp an approval until that writer has finished and its full witness is visible.
+      if (migrationEnumeratorRunning.get() || !migrationEnumeratorDone) {
+        throw new IOException("Candidate enumeration has not settled for gap decision");
       }
       try (var fence = producer.mutationAdmission().beginFinalFence(
           producer.mutationOwnerToken(), 10_000)) {

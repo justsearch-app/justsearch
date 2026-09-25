@@ -6,6 +6,7 @@ import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationDispatchPlan;
 import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.agent.api.registry.SourceTier;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.indexing.AcceptedProjection;
@@ -59,9 +60,10 @@ public final class InstalledProjectionRound {
   private InstalledProjectionRound() {}
 
   public static void main(String[] args) throws Exception {
-    if (args.length != 5 && (args.length != 6 || !"--gap".equals(args[5]))) {
+    if (args.length != 5 && (args.length != 6
+        || !("--gap".equals(args[5]) || "--gap-restart".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap");
+          "Expected data, index, models root, watched root, vector query file and optional --gap or --gap-restart");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
@@ -115,6 +117,10 @@ public final class InstalledProjectionRound {
       first.handoff();
     }
 
+    if (args.length == 6 && "--gap-restart".equals(args[5])) {
+      runGapRestart(data, index, models, source, key, query);
+      return;
+    }
     if (args.length == 6) {
       runGap(data, index, models, source, key, query);
       return;
@@ -180,30 +186,10 @@ public final class InstalledProjectionRound {
           + second.client.search(query, 10, PipelineConfigs.VECTOR, context())
               .getResultsCount());
 
-      Operation decision = new CoreOperationCatalog()
-          .findByIdValue(CoreOperationCatalog.ACCEPT_GAPS.value()).orElseThrow();
-      HandlerRegistry handlers = new HandlerRegistry();
-      handlers.register(CoreOperationCatalog.ACCEPT_GAPS,
-          new AcceptGapsHandler(second.root.recordedIngestion()));
-      OperationAuthority authority = second.root.authority();
-      OperationExecutorImpl executor = new OperationExecutorImpl(second.root.operationAttempts(),
-          second.root.admission(), handlers, null, Map.of(), CLOCK, authority.trust(),
-          authority.sources(), null, authority.capsules());
-      EngineContext origin = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
-          "installed-projection-gap-round", Optional.of("fixture-session"), Optional.empty(),
-          TransportTag.BUTTON, EngineContext.Survival.DURABLE,
-          EngineContext.Urgency.FOREGROUND);
-      var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
-          Instant.now(CLOCK), Optional.empty());
-      String arguments = new RecordedGapAcceptancePlan(key, hash).toReplayPayload();
-      decisionKey = OperationKeys.generate(CLOCK);
-      var prepared = (OperationDispatchPlan.Ready) executor.prepare(decision, arguments,
-          provenance, origin, decisionKey, true);
-      String capsule = authority.capsules().mintPrepared(decision.id().value(), arguments,
-          SourceTier.valueOf(origin.sourceTier()), decisionKey, prepared.preparationNonce());
-      require(executor.dispatch(decision, arguments, provenance, Optional.of(capsule),
-          origin, decisionKey, prepared.preparationNonce()).success(),
-          "distinct recorded gap approval dispatch failed");
+      GapDecision approved = decideGap(second, key, hash);
+      require(approved.result.success(),
+          "distinct recorded gap approval dispatch failed: " + approved.result);
+      decisionKey = approved.key;
       require(await(() -> second.operations.find(key)
           .map(row -> row.state() == OperationState.FAILED && row.receipt() != null
               && "PROMOTED_WITH_GAPS".equals(row.receipt().code())).orElse(false), WAIT_MS),
@@ -226,6 +212,103 @@ public final class InstalledProjectionRound {
     }
     System.out.println("INSTALLED_PROJECTION_GAP_PASS " + key);
   }
+
+  private static void runGapRestart(Path data, Path index, Path models, HeldSource source,
+      String key, String query) throws Exception {
+    String original = new IndexGenerationManager(index)
+        .readStateBestEffort().active_generation();
+    source.failEnumerationAfterFirst();
+    String firstHash;
+    try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> "awaiting_acceptance".equals(second.operations.outcome(key).phase()),
+          WAIT_MS), "first incomplete source did not enter the durable gap wait");
+      firstHash = second.operations.outcome(key).result().gapListHash();
+      require(firstHash != null, "first gap witness has no hash");
+      require(original.equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "first gap wait promoted B");
+      require(vectorReady(second.client, query), "A did not answer VECTOR at first gap wait");
+      second.handoff();
+    }
+
+    String approvedKey;
+    try (Epoch third = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> "awaiting_acceptance".equals(third.operations.outcome(key).phase()),
+          WAIT_MS), "Engine restart lost the durable gap wait");
+      require(await(() -> {
+        var enumerator = third.client.getDebugWorkerState(context()).migrationEnumerator();
+        return enumerator.done() && !enumerator.running();
+      }, WAIT_MS), "restarted source enumeration did not settle");
+      require(original.equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "restart promoted B before approval");
+      require(vectorReady(third.client, query), "A did not answer VECTOR after gap-wait restart");
+      System.out.println("INSTALLED_PROJECTION_GAP_RESTART_A_VECTOR "
+          + third.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+      GapDecision stale = decideGap(third, key, firstHash);
+      require(!stale.result.success()
+          && "GAP_LIST_STALE".equals(stale.result.errorCode().orElse(null)),
+          "pre-restart hash authorized changed physical evidence: " + stale.result);
+      require(third.operations.find(stale.key).orElseThrow().state() == OperationState.FAILED,
+          "stale decision did not retain its own failed operation row");
+      String refreshedHash = third.operations.outcome(key).result().gapListHash();
+      require(refreshedHash != null && !refreshedHash.equals(firstHash),
+          "physical witness refresh did not change the exact hash");
+      require(original.equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "stale approval promoted B");
+      GapDecision approved = decideGap(third, key, refreshedHash);
+      require(approved.result.success(), "refreshed recorded approval failed: " + approved.result);
+      approvedKey = approved.key;
+      require(await(() -> third.operations.find(key)
+          .map(row -> row.state() == OperationState.FAILED && row.receipt() != null
+              && "PROMOTED_WITH_GAPS".equals(row.receipt().code())).orElse(false), WAIT_MS),
+          "refreshed approval did not promote B");
+      require(third.operations.find(approvedKey).orElseThrow().state() == OperationState.COMPLETE,
+          "refreshed decision did not complete");
+      require(("g-" + key).equals(new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation()), "wrong B promoted after restart");
+    }
+
+    try (Epoch fourth = open(data, index, models, new CountDownLatch(1), source)) {
+      require(fourth.operations.find(key).orElseThrow().state() == OperationState.FAILED,
+          "fourth boot lost promoted-with-gaps diagnostic");
+      require(fourth.operations.find(approvedKey).orElseThrow().state() == OperationState.COMPLETE,
+          "fourth boot lost recorded approval");
+      require(await(() -> vectorReady(fourth.client, query), WAIT_MS),
+          "reopened B did not answer VECTOR after gap-wait restart");
+      System.out.println("INSTALLED_PROJECTION_GAP_RESTART_B_VECTOR "
+          + fourth.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+    }
+    System.out.println("INSTALLED_PROJECTION_GAP_RESTART_PASS " + key);
+  }
+
+  private static GapDecision decideGap(Epoch epoch, String key, String hash) {
+    Operation decision = new CoreOperationCatalog()
+        .findByIdValue(CoreOperationCatalog.ACCEPT_GAPS.value()).orElseThrow();
+    HandlerRegistry handlers = new HandlerRegistry();
+    handlers.register(CoreOperationCatalog.ACCEPT_GAPS,
+        new AcceptGapsHandler(epoch.root.recordedIngestion()));
+    OperationAuthority authority = epoch.root.authority();
+    OperationExecutorImpl executor = new OperationExecutorImpl(epoch.root.operationAttempts(),
+        epoch.root.admission(), handlers, null, Map.of(), CLOCK, authority.trust(),
+        authority.sources(), null, authority.capsules());
+    EngineContext origin = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+        "installed-projection-gap-round", Optional.of("fixture-session"), Optional.empty(),
+        TransportTag.BUTTON, EngineContext.Survival.DURABLE,
+        EngineContext.Urgency.FOREGROUND);
+    var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+        Instant.now(CLOCK), Optional.empty());
+    String arguments = new RecordedGapAcceptancePlan(key, hash).toReplayPayload();
+    String decisionKey = OperationKeys.generate(CLOCK);
+    var prepared = (OperationDispatchPlan.Ready) executor.prepare(decision, arguments,
+        provenance, origin, decisionKey, true);
+    String capsule = authority.capsules().mintPrepared(decision.id().value(), arguments,
+        SourceTier.valueOf(origin.sourceTier()), decisionKey, prepared.preparationNonce());
+    return new GapDecision(decisionKey, executor.dispatch(decision, arguments, provenance,
+        Optional.of(capsule), origin, decisionKey, prepared.preparationNonce()));
+  }
+
+  private record GapDecision(String key, OperationResult result) {}
 
   private static AcceptedProjection projection(String id, long revision, String content) {
     return new AcceptedProjection("installed-fixture", id, revision,

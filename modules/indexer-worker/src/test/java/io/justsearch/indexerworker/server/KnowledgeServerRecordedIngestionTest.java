@@ -514,6 +514,7 @@ final class KnowledgeServerRecordedIngestionTest {
     setField(server, "buildingIndexPath", candidatePath);
     setField(server, "jobQueue", queue);
     setField(server, "ingestLifecycle", green);
+    setField(server, "migrationEnumeratorDone", true);
     setField(server, "generationBootOwnership",
         new IndexGenerationManager.BootOwnership.Recorded("recorded-key", "g-source",
             "test", "a".repeat(64), true));

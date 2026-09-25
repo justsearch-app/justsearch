@@ -45,6 +45,17 @@ HIGH/DURABLE exact-hash approval and ends with the selected
 `FAILED/PROMOTED_WITH_GAPS` bulk diagnostic. Source-gap crash cuts, positive
 cancel/abandon, D2-5 durable covering commits and D1-13's missing promoted
 manifest model map remain open. [Handoff](handoff.md) has exact evidence.
+The local follow-on now holds a restarted source enumerator and refuses gap
+approval until it finishes; the old hash then becomes stale because the
+source marker has a new exact row revision. A fresh decision promotes B in
+both the focused Engine test (`tmp/3671`) and the rebuilt installed
+standard-model handoff round (`tmp/3674`). This proves graceful Engine
+replacement, while forced source-gap crash cuts remain on the D1-9 queue.
+The corrected complete serial gate passed at `tmp/3679`; a second fresh
+installed standard-model handoff passed at `tmp/3681`, including distinct stale
+and approved decision rows and exact B on disk. Its predecessor red gates
+were fixture preconditions, preserved and explained in [handoff](handoff.md).
+Hosted proof of the current guard is the next checkpoint requirement.
 
 **Current owner re-cut (2026-09-24):** Finish D1-9 streaming correction and
 proofs first. D1/D2 scope remains intact. E's paired branch/main gate contains

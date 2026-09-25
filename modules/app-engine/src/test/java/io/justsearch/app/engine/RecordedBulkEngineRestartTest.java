@@ -3,6 +3,7 @@ package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,6 +22,7 @@ import io.justsearch.app.api.indexing.ProjectionDurability;
 import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.app.api.operations.BulkReindexProgress;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.RecordedGapAcceptancePlan;
 import io.justsearch.app.api.operations.RecordedBulkPlan;
@@ -314,6 +316,11 @@ final class RecordedBulkEngineRestartTest {
     var source = new HeldProjectionSource(List.of(projection("gap-document", 1, marker)));
     CountDownLatch requestedRestart = new CountDownLatch(1);
     String operationKey;
+    String gapHash;
+    String servingGeneration;
+    String gapUnit;
+    String gapReason;
+    String gapEvidence;
 
     try (EngineEpoch first = openEpoch(dataDirectory, modelsDirectory, requestedRestart, source)) {
       Operation operation = new CoreOperationCatalog()
@@ -355,23 +362,45 @@ final class RecordedBulkEngineRestartTest {
       var outcome = second.operations().outcome(operationKey);
       assertEquals(OperationState.COMPLETE_WITH_GAPS,
           second.operations().find(operationKey).orElseThrow().state());
-      assertTrue(outcome.result().gaps().stream()
-          .anyMatch(gap -> gap.reason().equals("PROJECTION_SOURCE_INCOMPLETE")));
-      String gapHash = outcome.result().gapListHash();
+      OperationOutcomeView.Gap sourceGap = outcome.result().gaps().stream()
+          .filter(gap -> gap.reason().equals("PROJECTION_SOURCE_INCOMPLETE"))
+          .findFirst().orElseThrow();
+      gapUnit = sourceGap.unitId();
+      gapReason = sourceGap.reason();
+      gapEvidence = sourceGap.evidenceId();
+      assertNotNull(gapEvidence);
+      gapHash = outcome.result().gapListHash();
       assertNotNull(gapHash);
       assertTrue(await(() -> "AWAITING_ACCEPTANCE".equals(new IndexGenerationManager(
           dataDirectory.resolve("index")).readStateBestEffort().migration_state()), WAIT_MS));
-      assertFalse(("g-" + operationKey).equals(new IndexGenerationManager(
-          dataDirectory.resolve("index")).readStateBestEffort().active_generation()));
+      servingGeneration = new IndexGenerationManager(dataDirectory.resolve("index"))
+          .readStateBestEffort().active_generation();
+      assertFalse(("g-" + operationKey).equals(servingGeneration));
+      second.requestedRestartHandoff();
+    }
+
+    source.holdNextEnumeration();
+    try (EngineEpoch third = openEpoch(dataDirectory, modelsDirectory,
+        new CountDownLatch(1), source)) {
+      assertTrue(source.awaitHeld(WAIT_MS), "restarted source did not reach held enumeration");
+      assertTrue(third.client().getDebugWorkerState(TestEngineContexts.FOREGROUND)
+          .migrationEnumerator().running());
+      assertTrue(await(() -> "awaiting_acceptance".equals(third.operations()
+          .outcome(operationKey).phase()), WAIT_MS),
+          "the durable source-gap wait must survive another Engine restart");
+      assertEquals(gapHash, third.operations().outcome(operationKey).result().gapListHash(),
+          "recovery must retain the exact candidate-bound gap decision");
+      assertEquals(servingGeneration, new IndexGenerationManager(dataDirectory.resolve("index"))
+          .readStateBestEffort().active_generation());
 
       Operation decision = new CoreOperationCatalog()
           .findByIdValue(CoreOperationCatalog.ACCEPT_GAPS.value()).orElseThrow();
       var handlers = new HandlerRegistry();
       handlers.register(CoreOperationCatalog.ACCEPT_GAPS,
-          new AcceptGapsHandler(second.root().recordedIngestion()));
-      var authority = second.root().authority();
-      var executor = new OperationExecutorImpl(second.root().operationAttempts(),
-          second.root().admission(), handlers, null, Map.of(), CLOCK,
+          new AcceptGapsHandler(third.root().recordedIngestion()));
+      var authority = third.root().authority();
+      var executor = new OperationExecutorImpl(third.root().operationAttempts(),
+          third.root().admission(), handlers, null, Map.of(), CLOCK,
           authority.trust(), authority.sources(), null, authority.capsules());
       EngineContext webview = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
           "source-gap-decision-test", Optional.of("source-gap-session"),
@@ -380,22 +409,70 @@ final class RecordedBulkEngineRestartTest {
       var provenance = EngineProvenance.invocation(webview, ExecutorTag.UI,
           Instant.now(CLOCK), Optional.empty());
       String arguments = new RecordedGapAcceptancePlan(operationKey, gapHash).toReplayPayload();
-      String decisionKey = OperationKeys.generate(CLOCK);
+      String unavailableKey = OperationKeys.generate(CLOCK);
       var prepared = (OperationDispatchPlan.Ready) executor.prepare(decision, arguments,
-          provenance, webview, decisionKey, true);
+          provenance, webview, unavailableKey, true);
       String approval = authority.capsules().mintPrepared(decision.id().value(), arguments,
+          SourceTier.valueOf(webview.sourceTier()), unavailableKey, prepared.preparationNonce());
+      try {
+        var unavailable = executor.dispatch(decision, arguments, provenance, Optional.of(approval),
+            webview, unavailableKey, prepared.preparationNonce());
+        assertFalse(unavailable.success(), "a running source enumerator cannot authorize approval");
+        assertEquals("GAP_ACCEPTANCE_UNAVAILABLE", unavailable.errorCode().orElseThrow());
+        assertEquals(OperationState.FAILED,
+            third.operations().find(unavailableKey).orElseThrow().state());
+        assertEquals(servingGeneration, new IndexGenerationManager(dataDirectory.resolve("index"))
+            .readStateBestEffort().active_generation());
+      } finally {
+        source.releaseEnumeration();
+      }
+      assertTrue(await(() -> {
+        var enumerator = third.client().getDebugWorkerState(TestEngineContexts.FOREGROUND)
+            .migrationEnumerator();
+        return enumerator.done() && !enumerator.running();
+      }, WAIT_MS), "restarted source enumeration did not settle");
+
+      String decisionKey = OperationKeys.generate(CLOCK);
+      prepared = (OperationDispatchPlan.Ready) executor.prepare(decision, arguments,
+          provenance, webview, decisionKey, true);
+      approval = authority.capsules().mintPrepared(decision.id().value(), arguments,
           SourceTier.valueOf(webview.sourceTier()), decisionKey, prepared.preparationNonce());
-      assertTrue(executor.dispatch(decision, arguments, provenance, Optional.of(approval),
-          webview, decisionKey, prepared.preparationNonce()).success());
-      assertTrue(await(() -> second.operations().find(operationKey)
+      var decided = executor.dispatch(decision, arguments, provenance, Optional.of(approval),
+          webview, decisionKey, prepared.preparationNonce());
+      assertFalse(decided.success(), "the pre-restart hash must not approve refreshed physical evidence");
+      assertEquals("GAP_LIST_STALE", decided.errorCode().orElseThrow());
+      assertEquals(OperationState.FAILED,
+          third.operations().find(decisionKey).orElseThrow().state());
+      String refreshedHash = third.operations().outcome(operationKey).result().gapListHash();
+      assertNotEquals(gapHash, refreshedHash);
+      OperationOutcomeView.Gap refreshedGap = third.operations().outcome(operationKey).result()
+          .gaps().stream().filter(gap -> gap.reason().equals(gapReason)).findFirst().orElseThrow();
+      assertEquals(gapUnit, refreshedGap.unitId());
+      assertNotEquals(gapEvidence, refreshedGap.evidenceId(),
+          "the same logical gap must bind a distinct reseeded marker revision");
+      assertEquals(servingGeneration, new IndexGenerationManager(dataDirectory.resolve("index"))
+          .readStateBestEffort().active_generation());
+
+      arguments = new RecordedGapAcceptancePlan(operationKey, refreshedHash).toReplayPayload();
+      decisionKey = OperationKeys.generate(CLOCK);
+      prepared = (OperationDispatchPlan.Ready) executor.prepare(decision, arguments,
+          provenance, webview, decisionKey, true);
+      approval = authority.capsules().mintPrepared(decision.id().value(), arguments,
+          SourceTier.valueOf(webview.sourceTier()), decisionKey, prepared.preparationNonce());
+      decided = executor.dispatch(decision, arguments, provenance, Optional.of(approval),
+          webview, decisionKey, prepared.preparationNonce());
+      assertTrue(decided.success(), decided.toString());
+      assertTrue(await(() -> third.operations().find(operationKey)
           .map(row -> row.state() == OperationState.FAILED && row.receipt() != null
               && "PROMOTED_WITH_GAPS".equals(row.receipt().code())).orElse(false), WAIT_MS),
           "the accepted source gap did not promote its exact candidate");
       assertEquals(OperationState.COMPLETE,
-          second.operations().find(decisionKey).orElseThrow().state(),
+          third.operations().find(decisionKey).orElseThrow().state(),
           "the distinct webview decision has its own completed operation row");
       assertEquals("g-" + operationKey, new IndexGenerationManager(dataDirectory.resolve("index"))
           .readStateBestEffort().active_generation());
+    } finally {
+      source.releaseEnumeration();
     }
   }
 

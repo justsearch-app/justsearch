@@ -301,6 +301,8 @@ final class DocumentIdentityBootImportTest {
     } finally {
       barrier.cancel();
     }
+    assertTrue(server.awaitMigrationCutoverExitForTests(30, TimeUnit.SECONDS),
+        "cancelled cutover must release its serving view before this crash cut closes the Worker");
     server.close();
     // server = null: if promoteBuildingGenerationToActive() below throws before the reassignment
     // further down, tearDown() reads this field and must not act on the already-closed server.

@@ -504,6 +504,58 @@ up-to-date, exit 0 in 15m43s. The app-engine XML reports all three
 `RecordedBulkEngineRestartTest` cases passed, including the new source-gap
 round. The focused test/static gate passed earlier at `tmp/3664`. `origin/main`
 had zero commits ahead at the checkpoint fetch.
+The `2f4053cbb` source-gap proof checkpoint was pushed to PR727; its hosted
+CI run [36122603064](https://github.com/justsearch-app/justsearch/actions/runs/36122603064)
+completed with every job green, including system integration, Windows-native
+and Public claims. The enumerator fence below is a later local source change.
+
+**Current source-gap handoff, 2026-09-25.** A second Engine
+handoff while the bulk row was `awaiting_acceptance` initially failed because
+the fixture closed a live index owner (`tmp/3666`, XML retained). Reusing the
+production handoff/quiescence contract reached the approval path but the old
+gap hash returned `GAP_LIST_STALE` (`tmp/3667`–`tmp/3668`, XML retained).
+The independent reviewer confirmed this is required: source re-enumeration
+replaces the marker with a new revision, and approval binds exact row versions.
+The same review found a real race: the prior wait remained visible while the
+new enumerator could still write that journal outside mutation admission.
+`withCandidateGapAcceptanceFence` now refuses approval until enumeration is
+done and no longer running, under its existing runtime lock before the final
+mutation fence. The real Engine test deterministically holds the third-boot
+source, sees `GAP_ACCEPTANCE_UNAVAILABLE` with A retained, releases it, then
+requires old-hash `GAP_LIST_STALE` and a new decision. Its old and new source
+gaps have the same unit and reason but distinct evidence IDs. Focused test
+`tmp/3671` and Spotless/PMD plus distribution `tmp/3672` pass. This is the
+one-line owner judgment: preserving the old hash would let an approval cover
+a newly written physical marker, so the fresh decision is required.
+
+The rebuilt installed `ui` jars and a fresh copy of retained standard-model
+A at `tmp/3673-installed-gap-restart/` passed
+`tmp/3674-installed-gap-restart-trace.txt`: A VECTOR 10 initially, A VECTOR 1
+after the gap-wait Engine handoff, B VECTOR 10 after a fourth boot, then
+`INSTALLED_PROJECTION_GAP_RESTART_PASS` with exit 0. Independent disk and
+SQLite reads found IDLE, exact B active, `installed-fixture` source identity,
+bulk `FAILED/settled/PROMOTED_WITH_GAPS`, old decision
+`FAILED/GAP_LIST_STALE` and new decision `COMPLETE`. The B manifest still
+lacks a `models` map. This is graceful Engine handoff evidence, not a forced
+process crash cut. The broad gate first exposed a Worker mock that omitted the
+settled-enumerator precondition (`tmp/3675`, XML in `tmp/3675-failure`); the
+focused correction passed at `tmp/3676`. A second broad run exposed a
+document-identity crash-cut fixture closing its serving view before a cancelled
+cutover thread exited (`tmp/3677`, XML in `tmp/3677-failure`). It now waits for
+that exact thread to leave before closing, preserving the UID and pointer-cut
+assertions; focused proof passed at `tmp/3678`. The corrected 358-task serial
+stress, Spotless, PMD and installed-distribution gate passed at `tmp/3679`
+(15m26s, exit 0). A new copy of the retained standard-model A at
+`tmp/3680-installed-gap-restart/` passed `tmp/3681` with A VECTOR 10, A VECTOR
+1 after handoff, fourth-boot B VECTOR 10, and exact B IDLE on disk. Its SQLite
+rows show bulk `FAILED/settled/PROMOTED_WITH_GAPS`, stale decision
+`FAILED/GAP_LIST_STALE` and fresh decision `COMPLETE`. This second run waits for
+the restarted enumerator to settle before submitting the old hash, avoiding an
+observation race in the fixture. The owner policy branch `57fd2e1aa` was
+already an ancestor; its merge command returned up to date. Both
+`agent-instructions-sync --check` and `check-always-loaded-budget` passed.
+Hosted proof for this new guard, forced source-gap cuts, positive
+cancel/abandon and D2-5 durable writes remain open.
 The review also confirmed no production caller yet registers a no-file source.
 Its suggestion to wire project-memory into the shipped composition now conflicts
 with [the C2 consumer record](evidence/C2/project-memory-consumer.md#6-d2-durable-deletion-is-lane-f-work):
