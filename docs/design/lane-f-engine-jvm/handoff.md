@@ -19,7 +19,43 @@ re-cut trigger is retired; merge `origin/main` at each checkpoint. See
 
 ## Current D1-9/D1-11 gap batch (2026-09-25)
 
-**Mid-replay process cut, 2026-09-25 (uncommitted follow-on to `bfebf9186`).**
+**No-file pointer cuts and citation readiness correction, 2026-09-25.**
+Checkpoint `82bb0d8fe` is pushed; hosted CI
+[36139539723](https://github.com/justsearch-app/justsearch/actions/runs/36139539723)
+finished success in all 13 jobs. The first installed pointer-before attempt
+`tmp/3721` and independent repeat `tmp/3723` stalled in SWITCHING and timed
+out without a reached marker. Both kept A active and three candidate journal
+rows. The isolated runtime log copied to `tmp/3728` identifies the cause:
+`CitationMatchOps.setCitationScorer` received a real composed scorer while its
+consumer config had no model path; optional fingerprint logging called
+`ModelManifest.loadOrDefault(null)`, aborting deferred readiness before pointer
+publication. A read-only independent review confirmed that the scorer and its
+producer were already wired and the path was diagnostic, not construction
+authority. The owner chose a null-path guard that preserves the scorer and
+skips only that diagnostic hash; D1-13 must later use composer-supplied
+generation identity instead of this consumer log. The new focused regression
+passed at `tmp/3725`; removing the guard made the exact test fail with the
+same NPE at `tmp/3726` (XML preserved), and restoring it plus rebuilding the
+installed distribution, Spotless and PMD passed at `tmp/3727`.
+
+The fixed pointer-before process self-exited at the named barrier
+(`tmp/3731`): A was active in SWITCHING, B matched the frozen key, and two
+`PROJECTION` plus one `PROJECTION_SOURCE` row remained. The separate JVM
+`tmp/3732` exited 0 with exact B, VECTOR 10 on reopened B, an empty journal
+and a `COMPLETE/settled` bulk. The pointer-after process self-exited at its
+named barrier (`tmp/3733`): B was already active with A as predecessor and
+the same three journal rows remained. Its separate JVM `tmp/3734` likewise
+exited 0 with B VECTOR 10, an empty journal, no predecessor alias and the
+bulk `COMPLETE/settled`. Independent SQLite/state reads verified both rounds;
+no fixture JVM remained. The current source passed the full serial
+`spotlessCheck pmdAll test -PincludeStress=true :modules:ui:installDist`
+gate at `tmp/3735-pointer-cuts-integrated.txt` in 24m41s (358 tasks,
+11,991 XML tests, 33 skipped, zero failures/errors). Explicit
+`build -x test` passed at `tmp/3736-pointer-cuts-compile.txt` in 26s
+(333 tasks). Its hosted run remains required. D2-5 durable covering commits and
+later D1 items remain open.
+
+**Mid-replay process cut, 2026-09-25 (checkpoint `82bb0d8fe`).**
 Independent read-only review found that WP1's seven transition points are all
 before or after full candidate replay. A narrow strict-promotion callback now
 reuses `MigrationTransitionBarrier` after the first actual candidate projection

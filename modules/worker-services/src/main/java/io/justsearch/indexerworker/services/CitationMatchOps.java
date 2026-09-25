@@ -113,6 +113,12 @@ final class CitationMatchOps {
     setCrossEncoderProducer(scorer == null ? null : scorer::scoreAll);
     if (scorer != null && citationScorerConfig != null) {
       var config = citationScorerConfig;
+      if (config.modelPath() == null) {
+        // The scorer can be composed from an installed model even when this consumer's
+        // optional path setting is absent. Fingerprint reporting must not abort readiness.
+        log.info("Citation scorer wired (consumer model path unavailable)");
+        return;
+      }
       // Tempdoc 374 sandbox round 4 issue H: resolve via ModelManifest so the
       // fingerprint identifies whichever variant Install AI placed on disk.
       Path modelOnnx =

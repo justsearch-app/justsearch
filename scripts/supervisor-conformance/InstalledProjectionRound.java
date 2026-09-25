@@ -69,19 +69,23 @@ public final class InstalledProjectionRound {
         || !("--gap".equals(args[5]) || "--gap-restart".equals(args[5])
             || "--gap-halt".equals(args[5]) || "--gap-resume".equals(args[5])
             || "--cancel".equals(args[5]) || "--replay-halt".equals(args[5])
-            || "--replay-resume".equals(args[5])))) {
+            || "--replay-resume".equals(args[5]) || "--pointer-before-halt".equals(args[5])
+            || "--pointer-after-halt".equals(args[5])
+            || "--pointer-resume".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --replay-halt or --replay-resume");
+          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt or --pointer-resume");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
     Path models = Path.of(args[2]).toAbsolutePath();
     Path watched = Path.of(args[3]).toAbsolutePath();
     String query = Files.readString(Path.of(args[4])).split("\\s+", 2)[0];
-    if (args.length == 6 && "--replay-halt".equals(args[5])) {
+    if (args.length == 6 && ("--replay-halt".equals(args[5])
+        || "--pointer-before-halt".equals(args[5])
+        || "--pointer-after-halt".equals(args[5]))) {
       require(!Files.exists(data.resolve("runtime/migration-barrier-reached.json"))
           && !Files.exists(data.resolve("runtime/migration-barrier-release")),
-          "projection replay fixture has a stale migration barrier marker");
+          "projection cut fixture has a stale migration barrier marker");
     }
     if (args.length == 6 && "--cancel".equals(args[5])) {
       runCancel(data, index, models, watched, query);
@@ -98,14 +102,15 @@ public final class InstalledProjectionRound {
           cut.get(2), cut.get(1), "GAP_RESUME");
       return;
     }
-    if (args.length == 6 && "--replay-resume".equals(args[5])) {
+    if (args.length == 6 && ("--replay-resume".equals(args[5])
+        || "--pointer-resume".equals(args[5]))) {
       List<String> cut = Files.readAllLines(data.resolve(REPLAY_CUT_FILE));
       require(cut.size() == 3, "projection replay cut marker is incomplete");
       HeldSource recoveredSource = new HeldSource(List.of(
           projection("updated", 1, cut.get(2) + "old"),
           projection("deleted", 1, cut.get(2) + "deleted")));
       resumeReplay(data, index, models, recoveredSource, cut.get(0), cut.get(1),
-          cut.get(2), query);
+          cut.get(2), query, "--pointer-resume".equals(args[5]) ? "POINTER" : "REPLAY");
       return;
     }
     String marker = "installedprojection" + System.nanoTime();
@@ -163,8 +168,15 @@ public final class InstalledProjectionRound {
       runGapHalt(data, index, models, source, key, query, marker);
       return;
     }
-    if (args.length == 6 && "--replay-halt".equals(args[5])) {
-      runReplayHalt(data, index, models, source, key, marker);
+    if (args.length == 6 && ("--replay-halt".equals(args[5])
+        || "--pointer-before-halt".equals(args[5])
+        || "--pointer-after-halt".equals(args[5]))) {
+      String point = switch (args[5]) {
+        case "--pointer-before-halt" -> "migration-before-pointer-commit";
+        case "--pointer-after-halt" -> "migration-after-pointer-commit";
+        default -> "migration-after-first-projection-replay";
+      };
+      runReplayHalt(data, index, models, source, key, marker, point);
       return;
     }
     if (args.length == 6) {
@@ -337,12 +349,11 @@ public final class InstalledProjectionRound {
   }
 
   private static void runReplayHalt(Path data, Path index, Path models,
-      HeldSource source, String key, String marker) throws Exception {
-    require("migration-after-first-projection-replay".equals(
-        System.getenv("JUSTSEARCH_MIGRATION_BARRIER_POINT"))
+      HeldSource source, String key, String marker, String point) throws Exception {
+    require(point.equals(System.getenv("JUSTSEARCH_MIGRATION_BARRIER_POINT"))
         && "1".equals(System.getenv("JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT"))
         && "1".equals(System.getenv("JUSTSEARCH_SUPERVISOR_HARNESS")),
-        "projection replay cut requires the gated self-exit barrier");
+        "projection cut requires the selected gated self-exit barrier");
     var state = new IndexGenerationManager(index).readStateBestEffort();
     require(("g-" + key).equals(state.building_generation()),
         "projection replay cut lost its exact candidate");
@@ -362,7 +373,8 @@ public final class InstalledProjectionRound {
   }
 
   private static void resumeReplay(Path data, Path index, Path models,
-      HeldSource source, String key, String original, String marker, String query)
+      HeldSource source, String key, String original, String marker, String query,
+      String label)
       throws Exception {
     try (Epoch recovered = open(data, index, models, new CountDownLatch(1), source)) {
       require(await(() -> recovered.operations.find(key)
@@ -391,11 +403,11 @@ public final class InstalledProjectionRound {
           "fourth boot lost recovered no-file projections");
       require(await(() -> vectorReady(reopened.client, query), WAIT_MS),
           "reopened replay B did not answer VECTOR search");
-      System.out.println("INSTALLED_PROJECTION_REPLAY_B_VECTOR "
+      System.out.println("INSTALLED_PROJECTION_" + label + "_B_VECTOR "
           + reopened.client.search(query, 10, PipelineConfigs.VECTOR, context())
               .getResultsCount());
     }
-    System.out.println("INSTALLED_PROJECTION_REPLAY_PASS " + key);
+    System.out.println("INSTALLED_PROJECTION_" + label + "_PASS " + key);
   }
 
   private static void runGapRestart(Path data, Path index, Path models, HeldSource source,

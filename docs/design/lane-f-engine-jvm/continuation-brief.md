@@ -33,8 +33,14 @@ another projection remains in the journal. The corrected installed standard-mode
 the cut left A active and three scoped journal rows; the separate process
 re-drained the journal, promoted B, reopened it with VECTOR 10, and left the
 journal empty. The full serial stress/static/distribution gate passed at
-`tmp/3712`; hosted proof for this source is next. This covers interruption
-inside strict replay; D1-9's other cuts
+`tmp/3712`; checkpoint `82bb0d8fe` passed all 13 hosted CI jobs. The subsequent
+installed pointer-before and pointer-after process cuts both recovered exact B
+and emptied their no-file journals (`tmp/3731`–`tmp/3734`). They exposed and
+corrected an optional citation consumer path dereference during deferred model
+readiness; the regression was red on old code and green on the correction.
+The full serial integrated gate passed at `tmp/3735` (11,991 tests, zero
+failures/errors) and explicit compile passed at `tmp/3736`. This source still
+needs its own hosted gate. D1-9's other cuts
 and D2-5 durable covering commits remain open.
 
 **Current local D1-9 follow-on (2026-09-25):** The exact refused B now stays

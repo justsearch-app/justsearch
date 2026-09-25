@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 /**
  * Tests for {@link WorkerSearchService#matchCitations}.
@@ -49,6 +50,17 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
     if (lifecycle != null) {
       lifecycle.close();
     }
+  }
+
+  @Test
+  void composedCitationScorerDoesNotRequireAnExplicitConsumerModelPath() throws Exception {
+    WorkerSearchService service = new WorkerSearchService(lifecycle);
+    service.setCitationScorerConfig(new CitationScorerConfig(true, null, 0.5, 512, 2000));
+    CitationScorer scorer = Mockito.mock(CitationScorer.class);
+    Mockito.when(scorer.isAvailable()).thenReturn(true);
+
+    assertDoesNotThrow(() -> service.setCitationScorer(scorer));
+    assertTrue(citationMatchOps(service).isCitationScorerActive());
   }
 
   // ==================== Edge/error case tests ====================
