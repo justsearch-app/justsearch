@@ -24,8 +24,11 @@ checkpoint; six installed installer pointer/settings crash cuts and the
 standard-model A/B file-mutation path passed there. The `b971982c0` gap
 checkpoint's hosted CI failed the Public claims UI fixture gate and
 three bulk crash scenarios' stale v2 evidence assertion, each retried three
-times. Both failures are reproduced and corrected in the subsequent checkpoint;
-its hosted verification is due. The prior
+times. Both failures are reproduced and corrected in `deffb59be`; its hosted
+system integration, build, Windows-native and unit jobs passed. Public claims
+then failed only on six D1-16 disabled placeholders. Their local replacement
+with explicit pending records passes the suppression ratchet; a new hosted
+whole-CI pass is due. The prior
 `7f469d044` hosted run's manual-pointer race was corrected in this checkpoint.
 [Handoff](handoff.md) names the exact artifacts and red/green local proof.
 
@@ -68,9 +71,11 @@ WP5's design/E/F documentation corrections are present. [Handoff](handoff.md)
 has exact proof and remaining gaps. The release-wrapper compatibility baseline
 is still WP2 work before E; no later acceptance is waived. The next D1-16
 slice has a passing installed baseline plus six named pending feature
-scenarios at `tmp/3497` (three AI-tagged), and its UI gap-decision capture has measured proof
-at `tmp/ui-shot-gap`; [handoff](handoff.md) distinguishes those local results
-from the red preceding hosted run and the next required hosted verification.
+scenario records at `tmp/3503` (three require AI; no disabled tests), and its UI gap-decision capture has measured proof
+at `tmp/ui-shot-gap`. The follow-on UI navigation correction passed the full
+6,602-test suite on final UI source at `tmp/3507`, typecheck and all 27 UI gates;
+[handoff](handoff.md) distinguishes those local results
+from the red `deffb59be` Public claims job and the next required hosted verification.
 
 ## Adopted remaining-work order (2026-09-25)
 

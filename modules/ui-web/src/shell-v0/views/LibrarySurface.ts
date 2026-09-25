@@ -232,6 +232,7 @@ export class LibrarySurface extends JfElement {
   declare gapDecisionError: string | null;
   private observedGapKey: string | null = null;
   private gapRequestSerial = 0;
+  private gapDecisionAttemptSerial = 0;
   private gapLoading = false;
   private lastGapReadAtMs = 0;
 
@@ -601,6 +602,11 @@ export class LibrarySurface extends JfElement {
   protected override settleTransients(): void {
     this.loading = false;
     this.error = null;
+    this.gapDecisionError = null;
+    this.gapRequestSerial++;
+    this.gapDecisionAttemptSerial++;
+    this.gapLoading = false;
+    this.gapDecisionBusy = false;
   }
 
   override disconnectedCallback(): void {
@@ -611,7 +617,6 @@ export class LibrarySurface extends JfElement {
     this.memberTabUnsub = null;
     this.aiUnsub?.();
     this.aiUnsub = null;
-    this.gapRequestSerial++;
     if (this.previewTimer !== null) {
       window.clearTimeout(this.previewTimer);
       this.previewTimer = null;
@@ -864,13 +869,14 @@ export class LibrarySurface extends JfElement {
         this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
       }
     } finally {
-      this.gapLoading = false;
+      if (serial === this.gapRequestSerial) this.gapLoading = false;
     }
   }
 
   private async acceptCurrentGaps(): Promise<void> {
     const decision = this.gapDecision;
     if (!decision || this.gapDecisionBusy) return;
+    const attemptSerial = ++this.gapDecisionAttemptSerial;
     this.gapDecisionBusy = true;
     this.gapDecisionError = null;
     try {
@@ -878,12 +884,21 @@ export class LibrarySurface extends JfElement {
         reindexKey: decision.reindexKey, gapListHash: decision.gapListHash,
       }, { consented: true });
       if (!result.success) throw new Error(result.message ?? 'Migration gap acceptance failed');
-      await this.loadGapDecision(decision.reindexKey);
+      if (attemptSerial === this.gapDecisionAttemptSerial && this.isConnected
+          && decision.reindexKey === this.observedGapKey) {
+        await this.loadGapDecision(decision.reindexKey);
+      }
     } catch (failure) {
+      if (attemptSerial !== this.gapDecisionAttemptSerial || !this.isConnected
+          || decision.reindexKey !== this.observedGapKey) return;
+      const refreshSerial = this.gapRequestSerial + 1;
       await this.loadGapDecision(decision.reindexKey);
-      this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+      if (refreshSerial === this.gapRequestSerial && this.isConnected
+          && attemptSerial === this.gapDecisionAttemptSerial) {
+        this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+      }
     } finally {
-      this.gapDecisionBusy = false;
+      if (attemptSerial === this.gapDecisionAttemptSerial) this.gapDecisionBusy = false;
     }
   }
 

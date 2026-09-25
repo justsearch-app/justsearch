@@ -110,7 +110,10 @@ passed at `tmp/3501-bulk-after.txt` and `tmp/3502-bulk-*.txt`, each with
 `BULK_FAULT_PASS`, STOP 0 and no remaining shared stack. This test-intent
 correction follows the selected D1-9 gap-witness version, rather than
 weakening the settlement proof. The UI and harness corrections require a
-new hosted checkpoint; run 36087239338 is not acceptance.
+new hosted checkpoint; run 36087239338 is not acceptance. The next pushed
+checkpoint `deffb59be` passed its [hosted system integration job](https://github.com/justsearch-app/justsearch/actions/runs/36089686525/job/107929222016),
+build, Windows-native and unit jobs. Public claims failed only on the D1-16
+disabled placeholders described below; that run is not a whole-CI pass.
 
 The D1-9/D1-11 gap decision, WP1 transition barrier and WP2 register gate
 share `KnowledgeServer` and the recoverability register. One integrated
@@ -140,14 +143,30 @@ at `tmp/3467`; the correction is in `b971982c0`. The hosted search-worker
 job passed it, while the separate integration failures above remain open.
 
 **D1-16 skeleton underway:** a dedicated 30-minute
-`lifecycleIntegrationTest` task now drives the installed migration restart
-baseline through the existing `exerciseMigrationRestart` module and leaves
-the later §16 clauses as named, explicitly skipped methods. The task passed
-one active scenario, three skips, three AI-tagged pending methods excluded by
-default, and zero failures at `tmp/3497-d1-16-tagged-harness.txt`; focused
-Spotless and PMD passed in the same run. These pending methods are open D1-16 feature acceptance,
-not green scenario claims. This D1-16 skeleton is a separate checkpoint from
-the preceding gap runtime and does not close its pending clauses.
+`lifecycleIntegrationTest` task drives the installed migration restart
+baseline through the existing `exerciseMigrationRestart` module. Six named
+pending scenario records print `LIFECYCLE_PENDING` with owner and missing
+proof; three require AI. The hosted Public claims suppression ratchet rejected
+the initial six `@Disabled` placeholders. Those placeholders had no behavior
+assertions; the replacement keeps every unmet clause visible without adding
+suppressed tests. The corrected task passed two tests, zero failures/skips at
+`tmp/3503-d1-16-pending-registry.txt`, with Spotless and PMD green; the local
+suppression ratchet now passes with no new disables. The pending records are
+open D1-16 feature acceptance, not green scenario claims.
+
+The next local UI pre-merge pass found one transient retention violation:
+`LibrarySurface.gapDecisionError` survived navigation. The surface now invalidates
+stale gap reads and approvals on detach, releases their busy state, and ignores
+completion from the prior view. The focused navigation regression passed 2/2,
+`run-ui-web-gates` passed 27/27, typecheck passed, and the full UI suite passed
+491 files/6,602 tests on the final UI source at `tmp/3507-ui-unit-final.txt`.
+The earlier full pass is retained at `tmp/3505-ui-unit-current.txt`. The recaptured
+`library-gap-decision` fixture at `tmp/ui-shot-gap/` has zero console errors,
+zero axe violations and no overflow. This correction is local until its next
+hosted run. The owner-requested `git merge worktree-escalation-policy` reported
+Already up to date (`57fd2e1aa` is an ancestor); instruction sync and the
+always-loaded budget checks both pass. `origin/main` was fetched and remains
+an ancestor of this branch (200/0 at this boundary).
 
 The recorded gap decision keeps the bulk row nonterminal in
 `COMPLETE_WITH_GAPS`, exposes the current candidate gap-list hash on the outcome

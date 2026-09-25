@@ -55,4 +55,48 @@ describe('Library recorded migration gap decision', () => {
     expect(el.shadowRoot?.textContent).not.toContain('document-7: PARSER_FAILED');
     el.remove();
   });
+
+  it('does not retain an operation error that completes after navigation', async () => {
+    const rejectDecisions: Array<(reason: Error) => void> = [];
+    const invoke = vi.fn().mockImplementation(() => new Promise<{ success: boolean }>((_resolve, reject) => {
+      rejectDecisions.push(reject);
+    }));
+    const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      state: 'running', historySince: 0, phase: 'awaiting_acceptance',
+      result: { gapListHash: hash, gaps: [gap] },
+    }), { status: 200 }));
+    const host = { platform: { capabilities: new Set<string>() }, data: { fetch, invokeOperation: invoke } } as unknown as PluginHostApi;
+    __feedForTest({ status: { worker: { migration: {
+      migrationState: 'AWAITING_ACCEPTANCE', buildingGenerationId: `g-${key}`,
+    } } } as unknown as StatusSnapshot });
+    const el = document.createElement('jf-library-surface') as LibrarySurface;
+    el.host_ = host;
+    document.body.appendChild(el);
+    await pump(el);
+
+    const accept = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
+      .find((button) => button.getAttribute('label') === 'Accept gaps and activate') as (Element & { onActivate?: () => void }) | undefined;
+    expect(accept).toBeDefined();
+    accept?.onActivate?.();
+    await pump(el);
+    expect(rejectDecisions).toHaveLength(1);
+    el.remove();
+    document.body.appendChild(el);
+    await pump(el);
+    expect(el.gapDecisionBusy).toBe(false);
+    accept?.onActivate?.();
+    await pump(el);
+    expect(rejectDecisions).toHaveLength(2);
+    expect(el.gapDecisionBusy).toBe(true);
+    rejectDecisions[0]!(new Error('obsolete surface error'));
+    await pump(el);
+    expect(el.gapDecisionError).toBeNull();
+    expect(el.gapDecisionBusy).toBe(true);
+    expect(el.shadowRoot?.textContent).not.toContain('obsolete surface error');
+    rejectDecisions[1]!(new Error('current surface error'));
+    await pump(el);
+    expect(el.gapDecisionError).toBe('current surface error');
+    expect(el.gapDecisionBusy).toBe(false);
+    el.remove();
+  });
 });
