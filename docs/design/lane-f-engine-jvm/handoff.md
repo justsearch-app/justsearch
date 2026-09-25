@@ -168,6 +168,27 @@ Already up to date (`57fd2e1aa` is an ancestor); instruction sync and the
 always-loaded budget checks both pass. `origin/main` was fetched and remains
 an ancestor of this branch (200/0 at this boundary).
 
+Checkpoint `5e547f9e0` was pushed after `deffb59be`'s system integration
+completed. Its [hosted run 36091276954](https://github.com/justsearch-app/justsearch/actions/runs/36091276954)
+passed system integration, build, Windows-native, app-ui and the other unit
+jobs. Public claims failed only `dead-code` in the built-input kernel step:
+Knip counted the new generated `OperationOutcomeView` type and schema as unused
+because Library imported its schema from the leaf file. A fresh local Knip
+report reproduced `dead-code/silent-growth` in the generated barrel and leaf
+(`tmp/3518`–`tmp/3519`). Library now imports and explicitly types the strict
+parse through the generated public barrel; the dead-code gate, typecheck, all
+27 UI gates and the 491-file/6,602-test UI suite pass on that source
+(`tmp/3520-ui-unit-generated-import.txt`). No baseline changed. New hosted
+proof is due after this correction is pushed.
+
+**Next D1-9 source seam.** Independent read-only refutation rejected seeding
+non-file projections from Blue: the authoritative project-memory store may hold
+accepted facts absent from Lucene, whose unstored vectors cannot reconstruct
+the full projection. D1-9 now records registered source enumeration before
+candidate replay, including restart re-enumeration and an unreadable-source
+gap. The existing `switch_buffer` remains the only candidate journal. This is
+a design decision and source review, not implementation or executed proof.
+
 The recorded gap decision keeps the bulk row nonterminal in
 `COMPLETE_WITH_GAPS`, exposes the current candidate gap-list hash on the outcome
 wire, requires a separate HIGH/DURABLE webview `core.accept-gaps` preparation,

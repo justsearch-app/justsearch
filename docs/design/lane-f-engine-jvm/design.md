@@ -29,6 +29,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-25: D1-9 seeds non-file projections from registered source owners, starts the existing generation journal before enumeration, and reruns source enumeration after a BUILDING restart. Blue's Lucene index cannot define the authoritative set or reconstruct every projection; an independent source review refuted that shortcut. [Owning D1 correction](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
+
 - 2026-09-25: WP2 2a binds literal durable-store versions to code constants and corrects `ui-settings` to schema 4 with readable predecessors 0–3. Its reconciliation token remains byte-for-byte stable for released updaters; the token names the strategy, while version fields name actual formats. [Release-safety correction](improvements/WP2-release-safety.md), [release sequencing](#171-why-this-shape).
 
 - 2026-09-25: WP5 corrects the complexity ledger's causal labels, bounds rollback to pre-release withdrawal, and adds descriptive paired development measures plus a subsystem map for the final PR. The seven E merge-gate groups do not change. [Owning corrections](#13-what-is-lost-honestly), [E record](stages/E.md#8-the-record-evidencee), [F-8](stages/F.md#f-8--pr-1-to-green-and-ready).

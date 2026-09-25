@@ -75,7 +75,11 @@ scenario records at `tmp/3503` (three require AI; no disabled tests), and its UI
 at `tmp/ui-shot-gap`. The follow-on UI navigation correction passed the full
 6,602-test suite on final UI source at `tmp/3507`, typecheck and all 27 UI gates;
 [handoff](handoff.md) distinguishes those local results
-from the red `deffb59be` Public claims job and the next required hosted verification.
+from the red `deffb59be` Public claims job. The subsequent `5e547f9e0`
+hosted integration passed, while Public claims exposed three new generated
+type/schema exports counted as dead code. The local generated-barrel import
+correction passes the dead-code gate, typecheck, UI gates and 6,602 tests;
+new hosted proof is due.
 
 ## Adopted remaining-work order (2026-09-25)
 
