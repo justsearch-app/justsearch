@@ -305,6 +305,9 @@ and `installer-before-receipt`, passed at `tmp/3580`–`tmp/3585`: each had one
 counted transient restart, the same operation completed, pointer and settings
 named B, real search found both indexed files, and STOP 0 closed owned ports.
 The no-file source and gap rounds, and hosted proof remain.
+This exact source-set checkpoint is `331a860bc` on `codex/lane-f-pr1`.
+The installed runs above used its source before commit; no source changed
+between those runs and the commit. Hosted checks are pending for this push.
 Reusing `tmp/3580`'s retained standard-model A, the fresh installed live
 `model-live-a-b` round passed at `tmp/3586`: A answered a real vector query;
 the named before-SWITCHING hold captured the exact source/building IDs; a
